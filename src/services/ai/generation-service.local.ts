@@ -13,7 +13,11 @@
  * user message. Image output is read from the AI SDK v6 image path
  * (`result.files`, filtered to `image/*` → `uint8Array`).
  */
-import { generateText as aiGenerateText, streamText as aiStreamText } from 'ai'
+import {
+  generateText as aiGenerateText,
+  streamText as aiStreamText,
+  generateImage,
+} from 'ai'
 import type { ModelMessage } from 'ai'
 import { createAnthropic } from '@ai-sdk/anthropic'
 import { createOpenAI } from '@ai-sdk/openai'
@@ -192,6 +196,65 @@ export function createLocalGenerationService(
     async generateImages(
       input: GenerateInput,
     ): Promise<Result<GeneratedAsset[]>> {
+      const cfg = await resolveConfig(input.providerId)
+      if (!cfg) return err('provider not configured')
+      const modelId = resolveModel(cfg.kind, cfg.defaultModel, input.model)
+
+      // OpenAI-shaped image models (gpt-image / dall-e) are served by the IMAGES
+      // endpoint, not /chat/completions — a chat call returns a non-chat body
+      // ("Invalid JSON response"). Use `generateImage` with a single text prompt.
+      // (Screenshot → sheet deconstruction needs a chat-image model, e.g. Gemini,
+      // handled by the files path below; this images API is text-prompt only.)
+      if (cfg.kind === 'openai' || cfg.kind === 'openai-compatible') {
+        if (instructionSourceCount(input) !== 1) {
+          return err('provide exactly one of prompt, system, or promptRef')
+        }
+        const chunks: string[] = []
+        if (input.prompt !== undefined) {
+          chunks.push(input.prompt)
+        } else if (input.promptRef !== undefined) {
+          if (!prompts) return err('prompt service not available')
+          try {
+            const rendered = await prompts.render(input.promptRef)
+            chunks.push(rendered.system)
+            for (const part of rendered.userScaffold ?? []) {
+              if (part.type === 'text') chunks.push(part.text)
+            }
+          } catch (error) {
+            return err(error instanceof Error ? error.message : String(error))
+          }
+        } else if (input.system !== undefined) {
+          chunks.push(input.system)
+        }
+        for (const part of input.input ?? []) {
+          if (part.type === 'text') chunks.push(part.text)
+        }
+        const promptText = chunks.filter((c) => c.trim().length > 0).join('\n\n')
+        if (!promptText) return err('no prompt text for image generation')
+
+        try {
+          const provider = createOpenAI({
+            apiKey: DUMMY_KEY,
+            baseURL: cfg.baseUrl,
+            fetch: tauriFetch(cfg.id, cfg.kind),
+          })
+          const result = await generateImage({
+            model: provider.image(modelId),
+            prompt: promptText,
+            abortSignal: input.signal,
+          })
+          const assets: GeneratedAsset[] = result.images.map((img) => ({
+            mediaType: 'image/png',
+            bytes: img.uint8Array,
+          }))
+          if (assets.length === 0) return err('The model returned no image.')
+          return ok(assets)
+        } catch (error) {
+          return err(error instanceof Error ? error.message : String(error))
+        }
+      }
+
+      // Chat-image models (Gemini etc.): images arrive in `result.files`.
       const prepared = await prepare(input)
       if (isErr(prepared)) return prepared
       try {
@@ -209,7 +272,6 @@ export function createLocalGenerationService(
                 prompt: p.prompt,
                 abortSignal: input.signal,
               })
-        // AI SDK v6 image path: generated images arrive in `result.files`.
         const assets: GeneratedAsset[] = result.files
           .filter((file) => file.mediaType.startsWith('image/'))
           .map((file) => ({ mediaType: file.mediaType, bytes: file.uint8Array }))
