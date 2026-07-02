@@ -96,7 +96,12 @@ export function ModelSlot({ slot, label, hint }: ModelSlotProps) {
           value={providerId || undefined}
           onValueChange={(value) => {
             setProviderId(value)
-            commit(value, model)
+            // Auto-fill the model from the picked endpoint's own default (the slug
+            // set when configuring it) so it isn't re-typed; still editable below.
+            const picked = list.find((p) => p.id === value)
+            const nextModel = picked?.defaultModel ?? model
+            setModel(nextModel)
+            commit(value, nextModel)
           }}
         >
           <SelectTrigger className="w-40 shrink-0">
