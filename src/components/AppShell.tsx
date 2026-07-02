@@ -9,10 +9,12 @@
  * Layout is a column: TopBar · WorkspaceLayout (grows) · StatusBar. The service
  * registry + query/tooltip/toast providers are mounted above this in App.
  */
-import { useCallback, useMemo } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { TopBar } from './topbar/TopBar'
 import { WorkspaceLayout } from './workspace/WorkspaceLayout'
 import { StatusBar } from './status/StatusBar'
+import { SettingsDialog } from '@/components/settings/SettingsDialog'
+import { SettingsUIProvider } from '@/components/settings/settings-ui'
 import { useAnalysisBridge } from '@/hooks/useAnalysisBridge'
 import { useAutoRun } from '@/hooks/useAutoRun'
 import { useHotkeys, type HotkeyHandlers } from '@/hooks/useHotkeys'
@@ -31,6 +33,12 @@ export function AppShell() {
   const { exportAll, exportOne } = useExport()
   const nav = useSliceNavigation()
   const clearSelection = useStore((s) => s.clearSelection)
+
+  // Settings dialog open-state lives here so both the TopBar gear (via the
+  // SettingsUI context) and the ⌘, hotkey can open it.
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const openSettings = useCallback(() => setSettingsOpen(true), [])
+  const settingsUI = useMemo(() => ({ open: openSettings }), [openSettings])
 
   const rerun = useCallback(() => {
     // Re-analyze current params (with slices) using the shell's own bridge.
@@ -59,6 +67,7 @@ export function AppShell() {
       onMove: nav.move,
       onRename: renameSelected,
       onClear: clearSelection,
+      onOpenSettings: openSettings,
     }),
     [
       openPicker,
@@ -70,15 +79,19 @@ export function AppShell() {
       nav.move,
       renameSelected,
       clearSelection,
+      openSettings,
     ],
   )
   useHotkeys(handlers)
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-[#080c11] text-foreground">
-      <TopBar />
-      <WorkspaceLayout />
-      <StatusBar />
-    </div>
+    <SettingsUIProvider value={settingsUI}>
+      <div className="flex h-full min-h-0 flex-col bg-[#080c11] text-foreground">
+        <TopBar />
+        <WorkspaceLayout />
+        <StatusBar />
+      </div>
+      <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
+    </SettingsUIProvider>
   )
 }

@@ -27,6 +27,7 @@ import { DEFAULT_MODEL, SUGGESTED_MODELS } from '@/services/ai/models'
 import {
   useUpsertProvider,
   useSetKey,
+  useTestKey,
   useProviderStatus,
 } from '@/hooks/queries/providers'
 import { Button } from '@/components/ui/button'
@@ -80,6 +81,7 @@ export function ProviderForm({ initial, onDone }: ProviderFormProps) {
 
   const upsert = useUpsertProvider()
   const setKey = useSetKey()
+  const testKey = useTestKey()
   const status = useProviderStatus(initial?.id ?? '')
   const hasKey = isEdit && status.data === true
 
@@ -127,8 +129,9 @@ export function ProviderForm({ initial, onDone }: ProviderFormProps) {
         defaultModel: defaultModel.trim(),
         enabled: initial?.enabled ?? true,
       }
+      const providedKey = secret.trim().length > 0
       const saved = await upsert.mutateAsync(draft)
-      if (secret.trim()) {
+      if (providedKey) {
         await setKey.mutateAsync({ id: saved.id, secret })
         setSecret('') // wipe the secret from JS the moment Rust has it
       }
@@ -141,6 +144,27 @@ export function ProviderForm({ initial, onDone }: ProviderFormProps) {
         },
       )
       onDone()
+      // Auto-test: verify the key without a separate click. Non-blocking — a
+      // failure only toasts; the provider stays saved either way.
+      if (providedKey || hasKey) {
+        void testKey
+          .mutateAsync(saved.id)
+          .then(({ model }) =>
+            toast.success(
+              t({ id: 'settings.status_verified', message: 'Verified' }),
+              { description: `${saved.label} · ${model}` },
+            ),
+          )
+          .catch((error: unknown) =>
+            toast.error(
+              t({ id: 'settings.status_failed', message: 'Verification failed' }),
+              {
+                description:
+                  error instanceof Error ? error.message : String(error),
+              },
+            ),
+          )
+      }
     } catch (error) {
       setSecret('') // never keep a secret around after a failed attempt
       toast.error(t({ id: 'settings.save_failed_toast', message: 'Save failed' }), {

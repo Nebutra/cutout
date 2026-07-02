@@ -24,6 +24,7 @@ export interface HotkeyHandlers {
   onMove?: (dir: 'up' | 'down' | 'left' | 'right') => void
   onRename?: () => void
   onClear?: () => void
+  onOpenSettings?: () => void
 }
 
 /** True when focus sits in a control that should own its own keystrokes. */
@@ -54,6 +55,12 @@ export function useHotkeys(handlers: HotkeyHandlers): void {
       // Esc always works so it can cancel an in-progress rename.
       if (event.key === 'Escape') {
         handlers.onClear?.()
+        return
+      }
+      // ⌘, opens Settings — works even while a text field is focused.
+      if (mod && event.key === ',') {
+        event.preventDefault()
+        handlers.onOpenSettings?.()
         return
       }
       // Everything else is suppressed while typing in a field.

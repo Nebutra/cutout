@@ -1,7 +1,6 @@
 import { Lock, Minus, Plus, Scissors, Sparkles } from 'lucide-react'
 import { ThemeToggle } from './ThemeToggle'
 import { SettingsMenu } from './SettingsMenu'
-import { LanguageSwitcher } from '@/components/common/LanguageSwitcher'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 
@@ -63,7 +62,6 @@ export function TopBar() {
           <Lock className="size-3" />
           Local
         </Badge>
-        <LanguageSwitcher variant="icon" />
         <ThemeToggle />
         <SettingsMenu />
       </div>

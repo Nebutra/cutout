@@ -11,6 +11,16 @@ export const SUPPORTED = ['en', 'zh-CN'] as const
 /** Union of shipped locale tags — the typed currency passed through the i18n API. */
 export type Locale = (typeof SUPPORTED)[number]
 
+/**
+ * Native display name (endonym) for each shipped locale — each language named in
+ * its own script, so it reads the same in every UI language and is intentionally
+ * NOT translated. Shared by the language switcher and Settings › General.
+ */
+export const LOCALE_LABEL: Record<Locale, string> = {
+  en: 'English',
+  'zh-CN': '简体中文',
+}
+
 /** Right-to-left script roots. None ship today; RTL is one map entry away. */
 const RTL_ROOTS = new Set(['ar', 'he', 'fa', 'ur'])
 
