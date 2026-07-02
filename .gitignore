@@ -34,3 +34,6 @@ src-tauri/gen/
 
 # test
 coverage/
+
+# Lingui compiled catalogs (generated from .po by the vite plugin; never imported)
+src/locales/*/messages.js
