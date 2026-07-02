@@ -6,7 +6,18 @@ pub fn run() {
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
-            commands::save_assets::save_assets
+            commands::save_assets::save_assets,
+            // BYOK: keychain key management
+            commands::ai::keys::set_key,
+            commands::ai::keys::key_status,
+            commands::ai::keys::delete_key,
+            commands::ai::keys::list_key_status,
+            // BYOK: non-secret provider-config persistence
+            commands::ai::providers::load_providers,
+            commands::ai::providers::save_providers,
+            // BYOK: secure AI transport proxy
+            commands::ai::ai_proxy::ai_proxy_request,
+            commands::ai::ai_proxy::ai_proxy_stream,
         ])
         .setup(|app| {
             if cfg!(debug_assertions) {

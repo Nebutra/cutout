@@ -7,6 +7,7 @@
  * SAME interfaces, flipped in one place (`createLocalRegistry` → remote).
  */
 import type { Box, CutoutParams } from '@/algorithm/types'
+import type { ProviderService, GenerationService } from './ai/types'
 
 /** Uniform success/failure envelope so callers never throw across the seam. */
 export type Result<T> =
@@ -125,4 +126,8 @@ export interface ServiceRegistry {
   readonly session: SessionService
   readonly cutout: CutoutService
   readonly assets: AssetRepository
+  /** BYOK key + provider management (spec §5). */
+  readonly providers: ProviderService
+  /** BYOK text generation over the Rust proxy (spec §5). */
+  readonly generation: GenerationService
 }

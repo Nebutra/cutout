@@ -28,3 +28,17 @@ tauri-plugin-fs = "2"
 thiserror = "2"
 tokio = { version = "1", features = ["fs", "sync"] }
 base64 = "0.22"
+keyring = "3"
+reqwest = { version = "0.12", default-features = false, features = ["json", "stream", "rustls-tls"] }
+futures-util = "0.3"
+
+# Real OS keychain backends per platform (without a backend feature, keyring 3.x
+# falls back to a process-local mock that does NOT persist across restarts).
+[target.'cfg(target_os = "macos")'.dependencies]
+keyring = { version = "3", features = ["apple-native"] }
+
+[target.'cfg(target_os = "windows")'.dependencies]
+keyring = { version = "3", features = ["windows-native"] }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+keyring = { version = "3", features = ["sync-secret-service", "crypto-rust"] }
