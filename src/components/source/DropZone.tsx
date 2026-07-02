@@ -17,7 +17,7 @@ import { useImageImport } from '@/hooks/useImageImport'
 
 export interface DropZoneProps {
   /** `full` = empty-state hero; `compact` = slim replace bar under a loaded source. */
-  readonly variant?: 'full' | 'compact' | 'node'
+  readonly variant?: 'full' | 'compact'
 }
 
 export function DropZone({ variant = 'full' }: DropZoneProps) {
@@ -46,7 +46,6 @@ export function DropZone({ variant = 'full' }: DropZoneProps) {
   }, [])
 
   const compact = variant === 'compact'
-  const node = variant === 'node'
 
   return (
     <button
@@ -63,11 +62,7 @@ export function DropZone({ variant = 'full' }: DropZoneProps) {
         'group flex w-full flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border text-muted-foreground transition-colors outline-none',
         'hover:border-ring/60 hover:bg-muted/40 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50',
         dragging && 'border-primary/70 bg-primary/5 text-foreground',
-        compact
-          ? 'px-3 py-2'
-          : node
-            ? 'min-h-32 px-5 py-6'
-            : 'min-h-56 flex-1 px-6 py-10',
+        compact ? 'px-3 py-2' : 'min-h-56 flex-1 px-6 py-10',
       )}
     >
       <ImagePlus className={compact ? 'size-4' : 'size-7 opacity-70'} />

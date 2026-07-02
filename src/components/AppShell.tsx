@@ -86,8 +86,8 @@ export function AppShell() {
 
   return (
     <SettingsUIProvider value={settingsUI}>
-      <div className="flex h-full min-h-0 flex-col bg-[#080c11] text-foreground">
-        <TopBar />
+      <div className="flex h-full min-h-0 flex-col bg-background text-foreground">
+        <TopBar onRerun={rerun} />
         <WorkspaceLayout />
         <StatusBar />
       </div>
