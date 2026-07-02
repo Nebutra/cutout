@@ -183,6 +183,19 @@ fn collect_headers(resp: &reqwest::Response) -> HashMap<String, String> {
         .collect()
 }
 
+/// Build an HTTP client with sane timeouts. `overall` (seconds) bounds the whole
+/// request — set for buffered calls (image generation can be slow but must not
+/// hang forever); left `None` for streaming so long token streams aren't cut. A
+/// connect timeout applies either way. Falls back to the default client on error.
+fn build_client(overall: Option<u64>) -> reqwest::Client {
+    let mut builder =
+        reqwest::Client::builder().connect_timeout(std::time::Duration::from_secs(30));
+    if let Some(secs) = overall {
+        builder = builder.timeout(std::time::Duration::from_secs(secs));
+    }
+    builder.build().unwrap_or_else(|_| reqwest::Client::new())
+}
+
 /// Buffered request: read key, inject auth, send, return status/headers/body.
 #[tauri::command]
 pub async fn ai_proxy_request(
@@ -197,7 +210,9 @@ pub async fn ai_proxy_request(
     let secret = read_secret(&provider_id).map_err(ProxyError::from)?;
     let (method, header_map) = build_method_and_headers(&kind, &method, headers, &secret)?;
 
-    let client = reqwest::Client::new();
+    // Bound the whole call: image generation is slow, but a hung relay must not
+    // spin forever — surface a timeout error instead.
+    let client = build_client(Some(120));
     let mut req = client.request(method, &url).headers(header_map);
     if let Some(body) = body {
         req = req.body(body);
@@ -238,7 +253,9 @@ pub async fn ai_proxy_stream(
     let secret = read_secret(&provider_id).map_err(ProxyError::from)?;
     let (method, header_map) = build_method_and_headers(&kind, &method, headers, &secret)?;
 
-    let client = reqwest::Client::new();
+    // Streaming: only a connect timeout (no overall cap — a long token stream is
+    // expected to outlive any fixed request timeout).
+    let client = build_client(None);
     let mut req = client.request(method, &url).headers(header_map);
     if let Some(body) = body {
         req = req.body(body);
