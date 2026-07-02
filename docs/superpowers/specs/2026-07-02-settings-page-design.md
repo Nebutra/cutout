@@ -36,7 +36,7 @@ A controlled shadcn `Dialog` with a left sidebar (master-detail), opened from th
 - **Replaces** the current `SettingsMenu` dropdown. The gear now opens this dialog.
 - **TopBar after this change:** keep the `ThemeToggle` quick icon (common, low-friction); **remove** the standalone `LanguageSwitcher` icon (language now lives in Settings → General); gear opens Settings.
 - **Sidebar** is a simple controlled `activeSection` state (`'general' | 'ai'`), not a route. About is a footer row that opens an inline About view/toast.
-- **Keyboard:** `⌘,` opens (registered in `useHotkeys`); `Esc` closes; arrow/tab focus handled by Radix.
+- **Keyboard:** `⌘,` opens (registered in `useHotkeys`) — this needs a small carve-out so it fires **even while a text field is focused** (the existing `isEditingTarget` gate blocks chords except `Esc`); `Esc` closes; arrow/tab focus handled by Radix.
 
 ---
 
@@ -78,7 +78,7 @@ One form, endpoint declared explicitly (never guessed). This is a small evolutio
 - **Endpoint** (`Select`, = existing `ProviderKind`): `Anthropic` · `OpenAI` · `Google` · `AI Gateway` · `Custom (OpenAI-compatible)`.
 - **Base URL** (`Input`): shown **only** when endpoint is `Custom (OpenAI-compatible)`; **required** there. (Unchanged from today: `needsBaseUrl = kind === 'openai-compatible'`.)
 - **API Key** (`KeyField`, existing): write-only; on save the secret goes straight to `setKey()` → Rust and is wiped from JS. `🔒` affordance + tooltip states the keychain/Rust-proxy guarantee.
-- **Save auto-tests:** after `upsert` + `setKey`, the form fires `useTestKey(id)` automatically and shows the result (`✓ verified` / error) — the user no longer clicks a separate Test.
+- **Save auto-tests:** after `upsert` + `setKey`, the form calls `useTestKey().mutateAsync(saved.id)` automatically and shows the result (`✓ verified` / error) — the user no longer clicks a separate Test.
 
 Reused verbatim: `useUpsertProvider`, `useSetKey`, `useTestKey`, `useProviders`, `useProviderStatus`, `useRemoveProvider`, the local `ProviderService`, and all Rust `commands/ai/*`.
 
@@ -93,7 +93,7 @@ Each slot is a picker over models available from the **configured** endpoints. T
 
 **Model options per slot come from (union, deduped):**
 1. In-repo `SUGGESTED_MODELS[kind]` / `DEFAULT_MODEL[kind]` (existing `services/ai/models.ts`) — for vendor endpoints.
-2. **Auto-fetched `/v1/models`** — for any endpoint that exposes it (relays/中转站 especially, but also OpenAI). Fetched through the existing Rust proxy so the key never enters the webview (§5b).
+2. **Auto-fetched `/v1/models`** — for any endpoint with an **explicit base URL** (`openai-compatible`/relays, or a provider carrying a `baseUrl` override). Fetched through the existing Rust proxy so the key never enters the webview (§5b). Vendor endpoints with **no** base URL (Anthropic / OpenAI / Google / Gateway using the SDK's built-in host) are **not** auto-discovered — they fall back to the suggested list + free-text. (`ProviderConfig.baseUrl` is only populated for `openai-compatible` today; discovery keys off its presence, so there is no per-kind URL map to invent.)
 3. Free-text entry — fallback for anything not listed.
 
 A slot with no configured endpoint is disabled with an inline "add an endpoint first" hint.
@@ -124,11 +124,13 @@ A small function that lists an endpoint's models through the existing buffered p
 ```ts
 // src/services/ai/list-models.ts
 async function listEndpointModels(cfg: ProviderConfig): Promise<string[]>
-// → ai_proxy_request(GET {baseURL}/v1/models) → parse OpenAI-compatible { data: [{ id }] } → string[]
+// runs ONLY when cfg.baseUrl is set (openai-compatible/relays, or a baseUrl override):
+//   → ai_proxy_request(GET {cfg.baseUrl}/v1/models) → parse OpenAI-compatible { data:[{id}] } → string[]
+// no baseUrl → returns [] (caller falls back to SUGGESTED_MODELS + free-text)
 ```
 
-- Reuses the Rust `ai_proxy_request` command as-is (buffered GET). The URL host must pass the existing `enforce_host` guard for the endpoint `kind`; `openai-compatible` already permits the user's `baseURL` host.
-- Exposed to the UI as `useEndpointModels(providerId)` (TanStack Query, `enabled` only when the provider has a key). Failures degrade to the suggested list + free-text; they never block the form.
+- Reuses the Rust `ai_proxy_request` command as-is (buffered GET). **Discovery is gated on `cfg.baseUrl` being present.** The GET host must pass the existing `enforce_host` guard for the endpoint `kind` (`openai-compatible` already permits the user's host; a `baseUrl` override on a vendor kind must still resolve to that vendor's allowed host).
+- Exposed to the UI as `useEndpointModels(providerId)` (TanStack Query, `enabled` only when the provider has a key **and** a `baseUrl`). Empty/failed discovery degrades to the suggested list + free-text; it never blocks the form.
 
 ---
 
@@ -154,7 +156,7 @@ async function listEndpointModels(cfg: ProviderConfig): Promise<string[]>
 Settings → AI → Add endpoint → Endpoint: Custom (OpenAI-compatible)
   → Base URL https://relay/v1 + Key ····
   → Save: upsert(config) → setKey(id, secret) [secret → Rust → keychain, wiped from JS]
-         → auto useTestKey(id) → ✓ verified
+         → auto test (useTestKey().mutateAsync(id)) → ✓ verified
   → useEndpointModels(id): ai_proxy_request GET /v1/models → model list ready for the slots
 ```
 
@@ -237,7 +239,7 @@ P1 is independently shippable; P3 is the piece the AI roadmap depends on.
 | 2 | `ai_proxy_request` accepts a GET with no body and returns the `/v1/models` JSON unchanged | Rust `ai_proxy.rs` (method defaults handled; GET path) |
 | 3 | Relay/中转站 `/v1/models` follows the OpenAI shape `{ data: [{ id }] }` | spot-check a common relay; degrade gracefully if not |
 | 4 | `⌘,` does not collide with an existing hotkey | `useHotkeys` map |
-| 5 | Vendor endpoints that lack `/v1/models` (e.g. Anthropic/Google native) fall back cleanly to suggestions | `useEndpointModels` `enabled`/error path |
+| 5 | Vendor endpoints without a base URL are not auto-discovered and fall back cleanly to `SUGGESTED_MODELS` + free-text | `useEndpointModels` gating on `baseUrl` |
 
 ---
 
@@ -246,7 +248,7 @@ P1 is independently shippable; P3 is the piece the AI roadmap depends on.
 | # | Risk | Sev | Mitigation |
 |---|---|---|---|
 | 1 | `/v1/models` shape varies across relays | MED | tolerant parse (`data[].id` only); on miss → suggestions + free-text; never block save |
-| 2 | Non-OpenAI vendors have no `/v1/models` | LOW | `useEndpointModels` degrades to `SUGGESTED_MODELS` + free-text |
+| 2 | Vendor endpoints (no explicit base URL) aren't auto-discovered | LOW | discovery gates on `baseUrl`; vendors use `SUGGESTED_MODELS` + free-text (some vendors, e.g. Anthropic, do expose `/v1/models`, but only reachable once a base URL is configured) |
 | 3 | Model assignment references a model no longer offered by its endpoint | LOW | validate on read; show a "reselect" hint in the slot; generation surfaces a clear error |
 | 4 | Instant-apply surprises the user (no explicit save) | LOW | per-change toast + reversible controls; destructive ops (remove endpoint) keep the existing AlertDialog confirm |
 | 5 | Scope creep back into a catalog subsystem | LOW | §9 documents the boundary; `/v1/models` + in-repo defaults are the only sources |
