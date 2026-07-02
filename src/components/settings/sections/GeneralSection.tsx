@@ -12,6 +12,11 @@ import { toast } from 'sonner'
 import { Trans, useLingui } from '@lingui/react/macro'
 import { useStore } from '@/store'
 import { Button } from '@/components/ui/button'
+import { Switch } from '@/components/ui/switch'
+import {
+  useExportPrefs,
+  useSetRememberDir,
+} from '@/hooks/queries/export-prefs'
 import { activateLocale } from '@/i18n'
 import { SUPPORTED, LOCALE_LABEL, type Locale } from '@/i18n/config'
 
@@ -49,6 +54,8 @@ export function GeneralSection() {
   const { theme, setTheme } = useTheme()
   const resetParams = useStore((s) => s.resetParams)
   const currentLocale = i18n.locale as Locale
+  const exportPrefs = useExportPrefs()
+  const setRememberDir = useSetRememberDir()
 
   return (
     <div className="flex flex-col divide-y divide-border">
@@ -106,6 +113,28 @@ export function GeneralSection() {
           <RotateCcw />
           <Trans id="settings.reset_params">Reset parameters</Trans>
         </Button>
+      </Row>
+
+      <Row
+        label={
+          <Trans id="settings.remember_dir_label">
+            Remember export folder
+          </Trans>
+        }
+        hint={
+          <Trans id="settings.remember_dir_hint">
+            Reuse the last folder instead of asking on every export.
+          </Trans>
+        }
+      >
+        <Switch
+          checked={exportPrefs.data?.rememberDir ?? false}
+          onCheckedChange={(on) => setRememberDir.mutate(on)}
+          aria-label={t({
+            id: 'settings.remember_dir_label',
+            message: 'Remember export folder',
+          })}
+        />
       </Row>
     </div>
   )

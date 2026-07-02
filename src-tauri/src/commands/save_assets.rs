@@ -158,10 +158,24 @@ async fn pick_folder<R: Runtime>(app: &AppHandle<R>) -> Result<Option<PathBuf>, 
     }
 }
 
+/// Resolve an explicit (remembered) destination directory. Used only when it
+/// still exists as a directory, so a stale/removed remembered path silently
+/// falls back to the picker instead of failing every write.
+fn resolve_dest(dest_dir: &Option<String>) -> Option<PathBuf> {
+    let dir = dest_dir.as_ref()?;
+    let path = PathBuf::from(dir);
+    if path.is_dir() {
+        Some(path)
+    } else {
+        None
+    }
+}
+
 #[tauri::command]
 pub async fn save_assets<R: Runtime>(
     app: AppHandle<R>,
     assets: Vec<AssetInput>,
+    dest_dir: Option<String>,
 ) -> Result<SaveAssetsResult, SaveError> {
     if assets.is_empty() {
         return Ok(SaveAssetsResult {
@@ -172,16 +186,20 @@ pub async fn save_assets<R: Runtime>(
         });
     }
 
-    let dir = match pick_folder(&app).await? {
+    // A valid remembered directory skips the picker; otherwise prompt as before.
+    let dir = match resolve_dest(&dest_dir) {
         Some(dir) => dir,
-        None => {
-            return Ok(SaveAssetsResult {
-                canceled: true,
-                output_dir: None,
-                count: 0,
-                failed: Vec::new(),
-            })
-        }
+        None => match pick_folder(&app).await? {
+            Some(dir) => dir,
+            None => {
+                return Ok(SaveAssetsResult {
+                    canceled: true,
+                    output_dir: None,
+                    count: 0,
+                    failed: Vec::new(),
+                })
+            }
+        },
     };
 
     let mut count = 0usize;
@@ -284,6 +302,24 @@ mod tests {
     fn is_within_rejects_dir_itself() {
         let dir = Path::new("/tmp/export");
         assert!(!is_within(dir, dir));
+    }
+
+    #[test]
+    fn resolve_dest_uses_existing_directory() {
+        let tmp = std::env::temp_dir();
+        assert_eq!(
+            resolve_dest(&Some(tmp.to_string_lossy().into_owned())),
+            Some(tmp)
+        );
+    }
+
+    #[test]
+    fn resolve_dest_falls_back_when_absent_or_missing() {
+        assert_eq!(resolve_dest(&None), None);
+        assert_eq!(
+            resolve_dest(&Some("/no/such/dir/xyzzy-404".to_string())),
+            None
+        );
     }
 
     #[test]

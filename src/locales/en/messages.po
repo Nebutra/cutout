@@ -452,6 +452,11 @@ msgid "settings.provider_updated_toast"
 msgstr "Provider updated"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/GeneralSection.tsx
+msgid "settings.remember_dir_label"
+msgstr "Remember export folder"
+
+#. js-lingui-explicit-id
 #: src/components/settings/ProviderRow.tsx
 msgid "settings.remove_action"
 msgstr "Remove"
@@ -500,6 +505,11 @@ msgstr "Reset parameters to defaults"
 #: src/components/settings/sections/GeneralSection.tsx
 msgid "settings.reset_params_hint"
 msgstr "Restore threshold, min area, gap and padding to defaults."
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/GeneralSection.tsx
+msgid "settings.remember_dir_hint"
+msgstr "Reuse the last folder instead of asking on every export."
 
 #. js-lingui-explicit-id
 #: src/components/settings/ProviderForm.tsx

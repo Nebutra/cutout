@@ -452,6 +452,11 @@ msgid "settings.provider_updated_toast"
 msgstr "已更新提供方"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/GeneralSection.tsx
+msgid "settings.remember_dir_label"
+msgstr "记住导出目录"
+
+#. js-lingui-explicit-id
 #: src/components/settings/ProviderRow.tsx
 msgid "settings.remove_action"
 msgstr "删除"
@@ -500,6 +505,11 @@ msgstr "将参数重置为默认值"
 #: src/components/settings/sections/GeneralSection.tsx
 msgid "settings.reset_params_hint"
 msgstr "将白底阈值、最小面积、合并间距与内边距恢复为默认值。"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/GeneralSection.tsx
+msgid "settings.remember_dir_hint"
+msgstr "复用上次的目录,不必每次导出都询问。"
 
 #. js-lingui-explicit-id
 #: src/components/settings/ProviderForm.tsx

@@ -28,7 +28,15 @@ export interface SaveAssetsResult {
 }
 
 export interface NativeBridge {
-  saveAssets(assets: SaveAssetInput[]): Promise<SaveAssetsResult>
+  /**
+   * Persist assets. When `destDir` is a valid existing directory the native
+   * side writes there directly (no picker); otherwise it opens the folder
+   * picker. `destDir` is the remembered-output-folder path (see export prefs).
+   */
+  saveAssets(
+    assets: SaveAssetInput[],
+    destDir?: string,
+  ): Promise<SaveAssetsResult>
 }
 
 /**
@@ -51,8 +59,9 @@ function toPayload(asset: SaveAssetInput): SaveAssetPayload {
 
 /** Concrete Tauri implementation of {@link NativeBridge}. */
 export const tauriBridge: NativeBridge = {
-  saveAssets: (assets) =>
+  saveAssets: (assets, destDir) =>
     invoke<SaveAssetsResult>('save_assets', {
       assets: assets.map(toPayload),
+      destDir: destDir ?? null,
     }),
 }
