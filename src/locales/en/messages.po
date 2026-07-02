@@ -136,6 +136,11 @@ msgid "settings.dialog_a11y_desc"
 msgstr "Application preferences and AI providers."
 
 #. js-lingui-explicit-id
+#: src/components/source/GeneratePanel.tsx
+msgid "generate.toast_done"
+msgstr "Asset sheet generated — slicing…"
+
+#. js-lingui-explicit-id
 #: src/components/settings/ProviderForm.tsx
 msgid "settings.provider_baseurl_label"
 msgstr "Base URL"
@@ -165,6 +170,11 @@ msgstr "Clipboard image copy is not supported here."
 #: src/components/ui/dialog.tsx
 msgid "common.close"
 msgstr "Close"
+
+#. js-lingui-explicit-id
+#: src/components/source/GeneratePanel.tsx
+msgid "generate.no_model_cta"
+msgstr "Configure an image model in Settings"
 
 #. js-lingui-explicit-id
 #: src/components/settings/ProviderRow.tsx
@@ -220,6 +230,11 @@ msgstr "Default model"
 #: src/components/status/StatusBar.tsx
 msgid "status.state_done"
 msgstr "done"
+
+#. js-lingui-explicit-id
+#: src/components/source/GeneratePanel.tsx
+msgid "generate.proto_title"
+msgstr "Drop a UI screenshot"
 
 #. js-lingui-explicit-id
 #: src/components/source/DropZone.tsx
@@ -312,6 +327,26 @@ msgid "settings.section_general"
 msgstr "General"
 
 #. js-lingui-explicit-id
+#: src/components/source/GeneratePanel.tsx
+msgid "generate.button"
+msgstr "Generate asset sheet"
+
+#. js-lingui-explicit-id
+#: src/components/source/SourcePanel.tsx
+msgid "source.mode_generate"
+msgstr "Generate from screenshot"
+
+#. js-lingui-explicit-id
+#: src/components/source/GeneratePanel.tsx
+msgid "generate.pending"
+msgstr "Generating…"
+
+#. js-lingui-explicit-id
+#: src/components/source/GeneratePanel.tsx
+msgid "generate.toast_failed"
+msgstr "Generation failed"
+
+#. js-lingui-explicit-id
 #: src/components/settings/KeyField.tsx
 msgid "settings.key_hide"
 msgstr "Hide"
@@ -335,6 +370,11 @@ msgstr "Import"
 #: src/components/source/DropZone.tsx
 msgid "source.dropzone_aria"
 msgstr "Import image — drop a file or click to browse"
+
+#. js-lingui-explicit-id
+#: src/components/source/SourcePanel.tsx
+msgid "source.mode_import"
+msgstr "Import sheet"
 
 #. js-lingui-explicit-id
 #: src/components/inspector/SliceDimensions.tsx
@@ -407,6 +447,11 @@ msgid "settings.provider_kind_openai_compatible"
 msgstr "OpenAI Compatible"
 
 #. js-lingui-explicit-id
+#: src/components/source/GeneratePanel.tsx
+msgid "generate.requirement_placeholder"
+msgstr "Optional brief — style, which elements to emphasize…"
+
+#. js-lingui-explicit-id
 #: src/components/source/DropZone.tsx
 msgid "source.dropzone_hint"
 msgstr "or click to browse · PNG, JPEG, WebP"
@@ -450,6 +495,11 @@ msgstr "Provider removed"
 #: src/components/settings/ProviderForm.tsx
 msgid "settings.provider_updated_toast"
 msgstr "Provider updated"
+
+#. js-lingui-explicit-id
+#: src/components/source/GeneratePanel.tsx
+msgid "generate.proto_hint"
+msgstr "Regenerated into a clean, cutout-ready asset sheet."
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/GeneralSection.tsx
@@ -625,6 +675,7 @@ msgid "export.error_unknown"
 msgstr "unknown error"
 
 #. js-lingui-explicit-id
+#: src/components/source/GeneratePanel.tsx
 #: src/hooks/useImageImport.ts
 msgid "import.toast_unsupported"
 msgstr "Unsupported file: {name}"

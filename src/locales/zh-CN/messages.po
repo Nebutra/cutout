@@ -136,6 +136,11 @@ msgid "settings.dialog_a11y_desc"
 msgstr "应用偏好与 AI 服务商。"
 
 #. js-lingui-explicit-id
+#: src/components/source/GeneratePanel.tsx
+msgid "generate.toast_done"
+msgstr "已生成素材图，开始切分…"
+
+#. js-lingui-explicit-id
 #: src/components/settings/ProviderForm.tsx
 msgid "settings.provider_baseurl_label"
 msgstr "Base URL"
@@ -165,6 +170,11 @@ msgstr "此环境不支持复制图像到剪贴板。"
 #: src/components/ui/dialog.tsx
 msgid "common.close"
 msgstr "关闭"
+
+#. js-lingui-explicit-id
+#: src/components/source/GeneratePanel.tsx
+msgid "generate.no_model_cta"
+msgstr "在设置中配置图像模型"
 
 #. js-lingui-explicit-id
 #: src/components/settings/ProviderRow.tsx
@@ -220,6 +230,11 @@ msgstr "默认模型"
 #: src/components/status/StatusBar.tsx
 msgid "status.state_done"
 msgstr "完成"
+
+#. js-lingui-explicit-id
+#: src/components/source/GeneratePanel.tsx
+msgid "generate.proto_title"
+msgstr "拖入 UI 截图"
 
 #. js-lingui-explicit-id
 #: src/components/source/DropZone.tsx
@@ -312,6 +327,26 @@ msgid "settings.section_general"
 msgstr "通用"
 
 #. js-lingui-explicit-id
+#: src/components/source/GeneratePanel.tsx
+msgid "generate.button"
+msgstr "生成素材图"
+
+#. js-lingui-explicit-id
+#: src/components/source/SourcePanel.tsx
+msgid "source.mode_generate"
+msgstr "从截图生成"
+
+#. js-lingui-explicit-id
+#: src/components/source/GeneratePanel.tsx
+msgid "generate.pending"
+msgstr "生成中…"
+
+#. js-lingui-explicit-id
+#: src/components/source/GeneratePanel.tsx
+msgid "generate.toast_failed"
+msgstr "生成失败"
+
+#. js-lingui-explicit-id
 #: src/components/settings/KeyField.tsx
 msgid "settings.key_hide"
 msgstr "隐藏"
@@ -335,6 +370,11 @@ msgstr "导入"
 #: src/components/source/DropZone.tsx
 msgid "source.dropzone_aria"
 msgstr "导入图像 — 拖入文件或点击浏览"
+
+#. js-lingui-explicit-id
+#: src/components/source/SourcePanel.tsx
+msgid "source.mode_import"
+msgstr "导入素材图"
 
 #. js-lingui-explicit-id
 #: src/components/inspector/SliceDimensions.tsx
@@ -407,6 +447,11 @@ msgid "settings.provider_kind_openai_compatible"
 msgstr "OpenAI 兼容"
 
 #. js-lingui-explicit-id
+#: src/components/source/GeneratePanel.tsx
+msgid "generate.requirement_placeholder"
+msgstr "可选说明——风格、要突出哪些元素…"
+
+#. js-lingui-explicit-id
 #: src/components/source/DropZone.tsx
 msgid "source.dropzone_hint"
 msgstr "或点击浏览 · PNG、JPEG、WebP"
@@ -450,6 +495,11 @@ msgstr "已删除提供方"
 #: src/components/settings/ProviderForm.tsx
 msgid "settings.provider_updated_toast"
 msgstr "已更新提供方"
+
+#. js-lingui-explicit-id
+#: src/components/source/GeneratePanel.tsx
+msgid "generate.proto_hint"
+msgstr "将被重绘为干净、易抠图的素材总览图。"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/GeneralSection.tsx
@@ -625,6 +675,7 @@ msgid "export.error_unknown"
 msgstr "未知错误"
 
 #. js-lingui-explicit-id
+#: src/components/source/GeneratePanel.tsx
 #: src/hooks/useImageImport.ts
 msgid "import.toast_unsupported"
 msgstr "不支持的文件：{name}"

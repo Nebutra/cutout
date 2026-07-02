@@ -23,7 +23,7 @@ describe('ui-asset-deconstruction v1.0.0', () => {
       'Senior UI Asset Deconstruction Artist',
     )
     expect(out.system).toContain('UI Asset Sheet / Design Decomposition Board')
-    expect(out.system).toContain('不要生成完整 UI 页面')
+    expect(out.system).toContain('Do NOT generate a complete UI page')
     expect(out.system).toContain('soft matte green/neutral studio background')
     // v1 has no template variables.
     expect(out.userScaffold).toBeUndefined()
@@ -39,7 +39,7 @@ describe('ui-asset-deconstruction v1.0.0', () => {
   it('resolves + renders through the local PromptService', async () => {
     const service = createLocalPromptService()
     const rendered = await service.render({ id: 'ui-asset-deconstruction' })
-    expect(rendered.system).toContain('资深 UI 视觉拆解与资产重建设计师')
+    expect(rendered.system).toContain('Senior UI Asset Deconstruction Artist')
 
     const versions = await service.versions('ui-asset-deconstruction')
     expect(versions).toEqual(['1.0.0'])
