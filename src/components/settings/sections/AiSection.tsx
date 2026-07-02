@@ -17,6 +17,7 @@ import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ProviderRow } from '../ProviderRow'
 import { ProviderForm } from '../ProviderForm'
+import { ModelSlot } from '../ModelSlot'
 
 type View =
   | { readonly mode: 'list' }
@@ -107,6 +108,34 @@ export function AiSection() {
         <Plus />
         <Trans id="settings.add_provider">Add provider</Trans>
       </Button>
+
+      <div className="mt-2 flex flex-col gap-3 border-t border-border pt-4">
+        <h3 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+          <Trans id="settings.models_heading">Models</Trans>
+        </h3>
+        <ModelSlot
+          slot="chat"
+          label={
+            <Trans id="settings.model_chat_label">Chat / Understanding</Trans>
+          }
+          hint={
+            <Trans id="settings.model_chat_hint">
+              Text, reasoning and vision — one multimodal model.
+            </Trans>
+          }
+        />
+        <ModelSlot
+          slot="image"
+          label={
+            <Trans id="settings.model_image_label">Image generation</Trans>
+          }
+          hint={
+            <Trans id="settings.model_image_hint">
+              Produces images (e.g. regenerated asset sheets).
+            </Trans>
+          }
+        />
+      </div>
     </div>
   )
 }
