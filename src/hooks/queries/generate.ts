@@ -17,11 +17,11 @@ import { decodeImage, bytesToBlob } from '@/lib/image'
 import { useModelAssignments } from './ai-settings'
 
 export interface GenerateFromProtoInput {
-  /** Raw bytes of the proto screenshot. */
-  readonly bytes: Uint8Array
+  /** Raw bytes of the proto screenshot (optional — a text brief alone works). */
+  readonly bytes?: Uint8Array
   /** IANA media type of the proto (e.g. `image/png`). */
-  readonly mediaType: string
-  /** Optional brief prepended as a text part (what to emphasize). */
+  readonly mediaType?: string
+  /** Brief prepended as a text part; required when no screenshot is given. */
   readonly requirement?: string
 }
 
@@ -35,16 +35,21 @@ export function useGenerateFromProto() {
   const loadImage = useStore((s) => s.loadImage)
 
   return useMutation<GeneratedAsset, Error, GenerateFromProtoInput>({
-    mutationFn: async ({ bytes, mediaType, requirement }) => {
+    mutationFn: async ({ bytes, requirement }) => {
       const image = assignments.data?.image
       if (!image) {
         throw new Error('No image-generation model is configured.')
       }
 
+      // At least one of {brief, screenshot} drives generation: text-only → a
+      // brief-driven asset sheet; screenshot → deconstruction; both → guided.
       const parts: PromptPart[] = []
       const brief = requirement?.trim()
       if (brief) parts.push({ type: 'text', text: brief })
-      parts.push({ type: 'image', image: bytes })
+      if (bytes) parts.push({ type: 'image', image: bytes })
+      if (parts.length === 0) {
+        throw new Error('Provide a screenshot or a brief to generate.')
+      }
 
       const result = await generation.generateImages({
         providerId: image.providerId,
@@ -59,8 +64,6 @@ export function useGenerateFromProto() {
 
       // The generated sheet becomes the cutout source → auto-analysis follows.
       const bitmap = await decodeImage(bytesToBlob(asset.bytes, asset.mediaType))
-      // `mediaType` is validated by decode; kept for callers that inspect it.
-      void mediaType
       loadImage({ bitmap, name: 'generated-sheet' })
       return asset
     },

@@ -60,10 +60,13 @@ export function GeneratePanel({ onGenerated }: GeneratePanelProps) {
   }
 
   async function onGenerate(): Promise<void> {
-    if (!proto || generate.isPending) return
-    const bytes = new Uint8Array(await proto.file.arrayBuffer())
+    if (generate.isPending) return
+    if (!proto && !requirement.trim()) return
+    const bytes = proto
+      ? new Uint8Array(await proto.file.arrayBuffer())
+      : undefined
     generate.mutate(
-      { bytes, mediaType: proto.file.type || 'image/png', requirement },
+      { bytes, mediaType: proto?.file.type ?? 'image/png', requirement },
       {
         onSuccess: () => {
           toast.success(
@@ -138,7 +141,10 @@ export function GeneratePanel({ onGenerated }: GeneratePanelProps) {
       />
 
       {hasImageModel ? (
-        <Button onClick={onGenerate} disabled={!proto || generate.isPending}>
+        <Button
+          onClick={onGenerate}
+          disabled={(!proto && !requirement.trim()) || generate.isPending}
+        >
           {generate.isPending ? (
             <>
               <Loader2 className="animate-spin" />
