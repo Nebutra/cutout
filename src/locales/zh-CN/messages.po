@@ -192,6 +192,22 @@ msgid "common.close"
 msgstr "关闭"
 
 #. js-lingui-explicit-id
+#: src/components/canvas/nodes/BoardNode.tsx
+msgid "board.composing"
+msgstr "正在合成原型图…"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/BoardNode.tsx
+msgid "board.toast_compose_failed"
+msgstr "合成失败"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/SlicesNode.tsx
+msgid "slices.name_no_model_cta"
+msgstr "配置对话模型以命名切片"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/BoardNode.tsx
 #: src/components/canvas/nodes/BriefNode.tsx
 #: src/components/canvas/nodes/MockupNode.tsx
 #: src/components/source/GeneratePanel.tsx
@@ -532,6 +548,21 @@ msgid "inspector.name_label"
 msgstr "名称"
 
 #. js-lingui-explicit-id
+#: src/components/canvas/nodes/SlicesNode.tsx
+msgid "slices.toast_named"
+msgstr "已命名 {count} 个切片"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/SlicesNode.tsx
+msgid "slices.toast_name_failed"
+msgstr "命名失败"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/SlicesNode.tsx
+msgid "slices.naming"
+msgstr "正在命名切片…"
+
+#. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
 msgid "settings.empty_title"
 msgstr "尚未配置提供方"
@@ -677,6 +708,11 @@ msgid "settings.remember_dir_hint"
 msgstr "复用上次的目录,不必每次导出都询问。"
 
 #. js-lingui-explicit-id
+#: src/components/canvas/nodes/BoardNode.tsx
+msgid "board.compose"
+msgstr "反向合成原型图"
+
+#. js-lingui-explicit-id
 #: src/components/canvas/edges/TransitionEdge.tsx
 msgid "pipeline.status_running"
 msgstr "处理中"
@@ -695,6 +731,11 @@ msgstr "保存失败"
 #: src/components/inspector/InspectorPanel.tsx
 msgid "inspector.empty_has_slices"
 msgstr "选择一个切片以重命名、检视并导出。"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/SlicesNode.tsx
+msgid "slices.name"
+msgstr "语义命名"
 
 #. js-lingui-explicit-id
 #: src/components/settings/SettingsDialog.tsx

@@ -192,6 +192,22 @@ msgid "common.close"
 msgstr "Close"
 
 #. js-lingui-explicit-id
+#: src/components/canvas/nodes/BoardNode.tsx
+msgid "board.composing"
+msgstr "Composing mockup…"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/BoardNode.tsx
+msgid "board.toast_compose_failed"
+msgstr "Composition failed"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/SlicesNode.tsx
+msgid "slices.name_no_model_cta"
+msgstr "Configure a chat model to name slices"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/BoardNode.tsx
 #: src/components/canvas/nodes/BriefNode.tsx
 #: src/components/canvas/nodes/MockupNode.tsx
 #: src/components/source/GeneratePanel.tsx
@@ -532,6 +548,21 @@ msgid "inspector.name_label"
 msgstr "Name"
 
 #. js-lingui-explicit-id
+#: src/components/canvas/nodes/SlicesNode.tsx
+msgid "slices.toast_named"
+msgstr "Named {count} slices"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/SlicesNode.tsx
+msgid "slices.toast_name_failed"
+msgstr "Naming failed"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/SlicesNode.tsx
+msgid "slices.naming"
+msgstr "Naming slices…"
+
+#. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
 msgid "settings.empty_title"
 msgstr "No providers configured yet"
@@ -677,6 +708,11 @@ msgid "settings.remember_dir_hint"
 msgstr "Reuse the last folder instead of asking on every export."
 
 #. js-lingui-explicit-id
+#: src/components/canvas/nodes/BoardNode.tsx
+msgid "board.compose"
+msgstr "Reverse-compose mockup"
+
+#. js-lingui-explicit-id
 #: src/components/canvas/edges/TransitionEdge.tsx
 msgid "pipeline.status_running"
 msgstr "Running"
@@ -695,6 +731,11 @@ msgstr "Save failed"
 #: src/components/inspector/InspectorPanel.tsx
 msgid "inspector.empty_has_slices"
 msgstr "Select a slice to rename, inspect, and export it."
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/SlicesNode.tsx
+msgid "slices.name"
+msgstr "Semantic naming"
 
 #. js-lingui-explicit-id
 #: src/components/settings/SettingsDialog.tsx

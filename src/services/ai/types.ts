@@ -9,6 +9,7 @@
  *    Implemented with the AI SDK over the custom-fetch Rust proxy, so callers
  *    are decoupled from provider specifics and from where the key lives.
  */
+import type { z } from 'zod'
 import type { Result } from '@/services/types'
 import type { ProviderConfig, ProviderDraft } from './provider-types'
 import type { PromptPart, PromptRef } from '@/prompts/types'
@@ -67,4 +68,14 @@ export interface GenerationService {
   streamText(input: GenerateInput): AsyncIterable<string>
   /** Image generation via the AI SDK image path (`result.files`, spec §6). */
   generateImages(input: GenerateInput): Promise<Result<GeneratedAsset[]>>
+  /**
+   * Structured generation (spec §8) — the AI SDK `generateText` +
+   * `Output.object` path. Validates the model's reply against `schema` and
+   * returns the typed object; used by vision slice-naming. Never throws across
+   * the seam — returns a `Result`.
+   */
+  generateObject<T>(
+    input: GenerateInput,
+    schema: z.ZodType<T>,
+  ): Promise<Result<T>>
 }

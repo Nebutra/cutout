@@ -2,19 +2,24 @@
  * Built-in prompt catalog (spec §3/§8) — registers every shipped prompt.
  *
  * P1 shipped `ui-asset-deconstruction`; P2 adds `ui-mockup-generation` (the
- * forward brief→mockup step). Add future built-ins to `BUILTIN_PROMPTS`;
- * `createBuiltinRegistry()` is the ready-to-use catalog the local
- * `PromptService` is backed by.
+ * forward brief→mockup step); P3 adds the reverse `ui-mockup-composition`
+ * (board→mockup) and the vision `ui-slice-naming` step. Add future built-ins to
+ * `BUILTIN_PROMPTS`; `createBuiltinRegistry()` is the ready-to-use catalog the
+ * local `PromptService` is backed by.
  */
 import { createPromptRegistry, type PromptRegistry } from '../registry'
 import type { PromptVersion } from '../types'
 import { uiAssetDeconstruction } from './ui-asset-deconstruction'
 import { uiMockupGeneration } from './ui-mockup-generation'
+import { uiMockupComposition } from './ui-mockup-composition'
+import { uiSliceNaming } from './ui-slice-naming'
 
 /** Every built-in prompt version shipped in the app. */
 export const BUILTIN_PROMPTS: readonly PromptVersion[] = [
   uiAssetDeconstruction,
   uiMockupGeneration,
+  uiMockupComposition,
+  uiSliceNaming,
 ]
 
 /** Register all built-ins into an existing registry. */

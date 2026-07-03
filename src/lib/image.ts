@@ -44,6 +44,21 @@ export async function blobToBytes(blob: Blob): Promise<Uint8Array> {
   return new Uint8Array(await blob.arrayBuffer())
 }
 
+/**
+ * Encode an `ImageBitmap` to PNG bytes on the main thread (via OffscreenCanvas).
+ * Used to hand the `board` source image (stored only as a bitmap) to reverse
+ * compose / vision naming, which need transferable bytes. Throws if the 2D
+ * context is unavailable.
+ */
+export async function bitmapToBytes(bitmap: ImageBitmap): Promise<Uint8Array> {
+  const canvas = new OffscreenCanvas(bitmap.width, bitmap.height)
+  const ctx = canvas.getContext('2d')
+  if (!ctx) throw new Error('OffscreenCanvas 2D context unavailable')
+  ctx.drawImage(bitmap, 0, 0)
+  const blob = await canvas.convertToBlob({ type: 'image/png' })
+  return blobToBytes(blob)
+}
+
 /** Wrap raw bytes back into a typed blob (test/util symmetry with the worker). */
 export function bytesToBlob(bytes: Uint8Array, type = 'image/png'): Blob {
   // Copy into a guaranteed `ArrayBuffer` view: a `Uint8Array` may be backed by a

@@ -131,14 +131,19 @@ export interface MockupArtifact {
 }
 
 /**
- * Which forward generation is currently running (spec §6). Only one AI step
- * runs at a time in the linear V1 chain, so a single phase drives both the
- * `mockup` node's spinner and the two generation edges' running state.
+ * Which generation is currently running (spec §6/§8). Only one AI step runs at a
+ * time in the linear V1 chain, so a single phase drives both the relevant node's
+ * spinner and the generation edges' running state. `composing` is the reverse
+ * step (board → mockup); it lands in the `mockup` node like a forward generate.
  */
-export type GenPhase = 'idle' | 'generating-mockup' | 'deconstructing'
+export type GenPhase =
+  | 'idle'
+  | 'generating-mockup'
+  | 'deconstructing'
+  | 'composing'
 
 /** Which generation op an error is attributable to (drives the node error dot). */
-export type GenOp = 'generate' | 'deconstruct'
+export type GenOp = 'generate' | 'deconstruct' | 'compose'
 
 /** The last generation failure, scoped to its op so the right node shows it. */
 export interface GenError {

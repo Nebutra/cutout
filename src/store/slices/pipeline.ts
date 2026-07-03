@@ -103,10 +103,15 @@ export const createPipelineSlice: StateCreator<Store, [], [], PipelineSlice> = (
 export const selectBriefStatus = (s: Store): NodeStatus =>
   s.brief.trim() ? 'ready' : 'empty'
 
-/** `mockup` reflects its own generation: running / error / has-image. */
+/**
+ * `mockup` reflects the generation that lands in it: forward `generate` (from
+ * the brief) or reverse `compose` (from the board). Running / error / has-image.
+ */
 export const selectMockupStatus = (s: Store): NodeStatus => {
-  if (s.genPhase === 'generating-mockup') return 'running'
-  if (s.genError?.op === 'generate') return 'error'
+  if (s.genPhase === 'generating-mockup' || s.genPhase === 'composing')
+    return 'running'
+  if (s.genError?.op === 'generate' || s.genError?.op === 'compose')
+    return 'error'
   return s.mockup ? 'ready' : 'empty'
 }
 

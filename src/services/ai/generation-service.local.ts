@@ -17,8 +17,10 @@ import {
   generateText as aiGenerateText,
   streamText as aiStreamText,
   generateImage,
+  Output,
 } from 'ai'
 import type { ModelMessage } from 'ai'
+import type { z } from 'zod'
 import { createAnthropic } from '@ai-sdk/anthropic'
 import { createOpenAI } from '@ai-sdk/openai'
 import { createGoogleGenerativeAI } from '@ai-sdk/google'
@@ -190,6 +192,33 @@ export function createLocalGenerationService(
             })
       for await (const delta of result.textStream) {
         yield delta
+      }
+    },
+
+    async generateObject<T>(
+      input: GenerateInput,
+      schema: z.ZodType<T>,
+    ): Promise<Result<T>> {
+      const prepared = await prepare(input)
+      if (isErr(prepared)) return prepared
+      // Structured output rides on `generateText` via `experimental_output`
+      // (`Output.object`); vision naming uses the chat/understanding slot, so a
+      // multimodal (`messages`) call is the only shape that reaches this path.
+      const p = prepared.data
+      if (!('messages' in p)) {
+        return err('structured output requires system/promptRef input')
+      }
+      try {
+        const result = await aiGenerateText({
+          model: p.model,
+          system: p.system,
+          messages: p.messages,
+          abortSignal: input.signal,
+          experimental_output: Output.object({ schema }),
+        })
+        return ok(result.experimental_output)
+      } catch (error) {
+        return err(error instanceof Error ? error.message : String(error))
       }
     },
 
