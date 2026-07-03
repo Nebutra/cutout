@@ -34,6 +34,46 @@ msgstr ""
 #~ msgstr "管理模型提供方与密钥（BYOK）。密钥安全存于系统钥匙串。"
 
 #. js-lingui-explicit-id
+#: src/components/source/GeneratePanel.tsx
+#~ msgid "generate.toast_done"
+#~ msgstr "已生成素材图，开始切分…"
+
+#. js-lingui-explicit-id
+#: src/components/source/GeneratePanel.tsx
+#~ msgid "generate.proto_title"
+#~ msgstr "拖入 UI 截图"
+
+#. js-lingui-explicit-id
+#: src/components/source/GeneratePanel.tsx
+#~ msgid "generate.button"
+#~ msgstr "生成素材图"
+
+#. js-lingui-explicit-id
+#: src/components/source/SourcePanel.tsx
+#~ msgid "source.mode_generate"
+#~ msgstr "从截图生成"
+
+#. js-lingui-explicit-id
+#: src/components/source/GeneratePanel.tsx
+#~ msgid "generate.pending"
+#~ msgstr "生成中…"
+
+#. js-lingui-explicit-id
+#: src/components/source/SourcePanel.tsx
+#~ msgid "source.mode_import"
+#~ msgstr "导入素材图"
+
+#. js-lingui-explicit-id
+#: src/components/source/GeneratePanel.tsx
+#~ msgid "generate.requirement_placeholder"
+#~ msgstr "可选说明——风格、要突出哪些元素…"
+
+#. js-lingui-explicit-id
+#: src/components/source/GeneratePanel.tsx
+#~ msgid "generate.proto_hint"
+#~ msgstr "将被重绘为干净、易抠图的素材总览图。"
+
+#. js-lingui-explicit-id
 #. placeholder {0}: slices.length
 #: src/components/source/SourceMeta.tsx
 msgid "source.meta_region_count"
@@ -146,11 +186,6 @@ msgid "pipeline.node_board_aria"
 msgstr "素材板阶段"
 
 #. js-lingui-explicit-id
-#: src/components/source/GeneratePanel.tsx
-msgid "generate.toast_done"
-msgstr "已生成素材图，开始切分…"
-
-#. js-lingui-explicit-id
 #: src/components/settings/ProviderForm.tsx
 msgid "settings.provider_baseurl_label"
 msgstr "Base URL"
@@ -210,7 +245,6 @@ msgstr "配置对话模型以命名切片"
 #: src/components/canvas/nodes/BoardNode.tsx
 #: src/components/canvas/nodes/BriefNode.tsx
 #: src/components/canvas/nodes/MockupNode.tsx
-#: src/components/source/GeneratePanel.tsx
 msgid "generate.no_model_cta"
 msgstr "在设置中配置图像模型"
 
@@ -304,11 +338,6 @@ msgstr "完成"
 #: src/components/canvas/edges/TransitionEdge.tsx
 msgid "pipeline.status_done"
 msgstr "完成"
-
-#. js-lingui-explicit-id
-#: src/components/source/GeneratePanel.tsx
-msgid "generate.proto_title"
-msgstr "拖入 UI 截图"
 
 #. js-lingui-explicit-id
 #: src/components/source/DropZone.tsx
@@ -406,16 +435,6 @@ msgid "pipeline.transition_generate"
 msgstr "生成"
 
 #. js-lingui-explicit-id
-#: src/components/source/GeneratePanel.tsx
-msgid "generate.button"
-msgstr "生成素材图"
-
-#. js-lingui-explicit-id
-#: src/components/source/SourcePanel.tsx
-msgid "source.mode_generate"
-msgstr "从截图生成"
-
-#. js-lingui-explicit-id
 #: src/components/canvas/nodes/MockupNode.tsx
 msgid "mockup.empty"
 msgstr "从需求生成，或导入截图。"
@@ -431,11 +450,6 @@ msgid "mockup.generating"
 msgstr "正在生成原型图…"
 
 #. js-lingui-explicit-id
-#: src/components/source/GeneratePanel.tsx
-msgid "generate.pending"
-msgstr "生成中…"
-
-#. js-lingui-explicit-id
 #: src/components/canvas/nodes/BriefNode.tsx
 msgid "brief.generating"
 msgstr "生成中…"
@@ -443,7 +457,6 @@ msgstr "生成中…"
 #. js-lingui-explicit-id
 #: src/components/canvas/nodes/BriefNode.tsx
 #: src/components/canvas/nodes/MockupNode.tsx
-#: src/components/source/GeneratePanel.tsx
 msgid "generate.toast_failed"
 msgstr "生成失败"
 
@@ -481,11 +494,6 @@ msgstr "导入图像 — 拖入文件或点击浏览"
 #: src/components/canvas/nodes/BriefNode.tsx
 msgid "brief.import_mockup"
 msgstr "导入原型图"
-
-#. js-lingui-explicit-id
-#: src/components/source/SourcePanel.tsx
-msgid "source.mode_import"
-msgstr "导入素材图"
 
 #. js-lingui-explicit-id
 #: src/components/inspector/SliceDimensions.tsx
@@ -583,11 +591,6 @@ msgid "settings.provider_kind_openai_compatible"
 msgstr "OpenAI 兼容"
 
 #. js-lingui-explicit-id
-#: src/components/source/GeneratePanel.tsx
-msgid "generate.requirement_placeholder"
-msgstr "可选说明——风格、要突出哪些元素…"
-
-#. js-lingui-explicit-id
 #: src/components/source/DropZone.tsx
 msgid "source.dropzone_hint"
 msgstr "或点击浏览 · PNG、JPEG、WebP"
@@ -641,11 +644,6 @@ msgstr "已更新提供方"
 #: src/components/canvas/nodes/MockupNode.tsx
 msgid "mockup.regenerate"
 msgstr "重新生成"
-
-#. js-lingui-explicit-id
-#: src/components/source/GeneratePanel.tsx
-msgid "generate.proto_hint"
-msgstr "将被重绘为干净、易抠图的素材总览图。"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/GeneralSection.tsx
@@ -846,7 +844,6 @@ msgid "export.error_unknown"
 msgstr "未知错误"
 
 #. js-lingui-explicit-id
-#: src/components/source/GeneratePanel.tsx
 #: src/hooks/queries/pipeline.ts
 #: src/hooks/useImageImport.ts
 msgid "import.toast_unsupported"
