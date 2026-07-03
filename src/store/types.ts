@@ -116,12 +116,50 @@ export interface PipelineGraph {
   readonly transitions: readonly PipelineTransition[]
 }
 
+/**
+ * The `mockup` node's artifact (spec §3/§4) — a generated/imported UI prototype
+ * image. Unlike `board`/`slices` (whose artifacts ARE the existing source /
+ * analysis), the P2 `brief`/`mockup` stages have no prior store backing, so
+ * their artifacts live here. `bitmap` is kept for on-canvas display, `blob` is
+ * the deconstruct input; `bitmap.close()` is called on every replacement.
+ */
+export interface MockupArtifact {
+  readonly bitmap: ImageBitmap
+  readonly blob: Blob
+  readonly width: number
+  readonly height: number
+}
+
+/**
+ * Which forward generation is currently running (spec §6). Only one AI step
+ * runs at a time in the linear V1 chain, so a single phase drives both the
+ * `mockup` node's spinner and the two generation edges' running state.
+ */
+export type GenPhase = 'idle' | 'generating-mockup' | 'deconstructing'
+
+/** Which generation op an error is attributable to (drives the node error dot). */
+export type GenOp = 'generate' | 'deconstruct'
+
+/** The last generation failure, scoped to its op so the right node shows it. */
+export interface GenError {
+  readonly op: GenOp
+  readonly message: string
+}
+
 /** Read-only state fields. */
 export interface StoreState {
   readonly source: SourceState
   readonly params: Params
   readonly analysis: AnalysisState
   readonly pipeline: PipelineGraph
+  /** The `brief` node's artifact — the free-text product requirement. */
+  readonly brief: string
+  /** The `mockup` node's artifact (generated or imported), or null when empty. */
+  readonly mockup: MockupArtifact | null
+  /** Which forward generation is in flight (drives mockup/edge running state). */
+  readonly genPhase: GenPhase
+  /** The last generation failure (op-scoped), or null. */
+  readonly genError: GenError | null
 }
 
 /** Actions (spec §5). All state updates are immutable. */
@@ -146,6 +184,16 @@ export interface StoreActions {
   renameSlice(id: string, name: string): void
   /** Clear the current selection. */
   clearSelection(): void
+  /** Set the `brief` node's requirement text (clears any prior generate error). */
+  setBrief(text: string): void
+  /** Fill the `mockup` node (closing a superseded bitmap); marks it ready. */
+  setMockup(artifact: MockupArtifact): void
+  /** Mark a forward generation as started (clears the prior error). */
+  beginGen(phase: Exclude<GenPhase, 'idle'>): void
+  /** Mark the current forward generation as finished (back to idle). */
+  endGen(): void
+  /** Mark the current forward generation as failed, scoped to its op. */
+  failGen(op: GenOp, message: string): void
 }
 
 /** The full store: state + actions. */

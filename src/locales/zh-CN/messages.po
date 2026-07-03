@@ -156,6 +156,16 @@ msgid "settings.provider_baseurl_label"
 msgstr "Base URL"
 
 #. js-lingui-explicit-id
+#: src/components/canvas/nodes/BriefNode.tsx
+msgid "pipeline.stage_brief"
+msgstr "需求"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/BriefNode.tsx
+msgid "pipeline.node_brief_aria"
+msgstr "需求阶段"
+
+#. js-lingui-explicit-id
 #: src/components/inspector/SliceDimensions.tsx
 msgid "inspector.dim_bytes"
 msgstr "字节"
@@ -182,6 +192,8 @@ msgid "common.close"
 msgstr "关闭"
 
 #. js-lingui-explicit-id
+#: src/components/canvas/nodes/BriefNode.tsx
+#: src/components/canvas/nodes/MockupNode.tsx
 #: src/components/source/GeneratePanel.tsx
 msgid "generate.no_model_cta"
 msgstr "在设置中配置图像模型"
@@ -212,6 +224,7 @@ msgid "copy_png.toast_failed"
 msgstr "无法复制图像"
 
 #. js-lingui-explicit-id
+#: src/hooks/queries/pipeline.ts
 #: src/hooks/useImageImport.ts
 msgid "import.toast_load_failed"
 msgstr "无法加载图像"
@@ -237,9 +250,34 @@ msgid "topbar.theme_dark_mode"
 msgstr "深色模式"
 
 #. js-lingui-explicit-id
+#: src/components/canvas/edges/TransitionEdge.tsx
+msgid "pipeline.transition_deconstruct"
+msgstr "拆解"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/MockupNode.tsx
+msgid "mockup.deconstruct"
+msgstr "拆解为素材板"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/MockupNode.tsx
+msgid "mockup.deconstructing"
+msgstr "拆解中…"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/MockupNode.tsx
+msgid "mockup.toast_deconstruct_failed"
+msgstr "拆解失败"
+
+#. js-lingui-explicit-id
 #: src/components/settings/ProviderForm.tsx
 msgid "settings.provider_model_label"
 msgstr "默认模型"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/BriefNode.tsx
+msgid "brief.placeholder"
+msgstr "描述产品及其主界面——面向谁、展示什么……"
 
 #. js-lingui-explicit-id
 #: src/components/status/StatusBar.tsx
@@ -347,6 +385,11 @@ msgid "settings.section_general"
 msgstr "通用"
 
 #. js-lingui-explicit-id
+#: src/components/canvas/edges/TransitionEdge.tsx
+msgid "pipeline.transition_generate"
+msgstr "生成"
+
+#. js-lingui-explicit-id
 #: src/components/source/GeneratePanel.tsx
 msgid "generate.button"
 msgstr "生成素材图"
@@ -357,11 +400,33 @@ msgid "source.mode_generate"
 msgstr "从截图生成"
 
 #. js-lingui-explicit-id
+#: src/components/canvas/nodes/MockupNode.tsx
+msgid "mockup.empty"
+msgstr "从需求生成，或导入截图。"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/BriefNode.tsx
+msgid "brief.generate"
+msgstr "生成原型图"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/MockupNode.tsx
+msgid "mockup.generating"
+msgstr "正在生成原型图…"
+
+#. js-lingui-explicit-id
 #: src/components/source/GeneratePanel.tsx
 msgid "generate.pending"
 msgstr "生成中…"
 
 #. js-lingui-explicit-id
+#: src/components/canvas/nodes/BriefNode.tsx
+msgid "brief.generating"
+msgstr "生成中…"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/BriefNode.tsx
+#: src/components/canvas/nodes/MockupNode.tsx
 #: src/components/source/GeneratePanel.tsx
 msgid "generate.toast_failed"
 msgstr "生成失败"
@@ -387,9 +452,19 @@ msgid "topbar.import"
 msgstr "导入"
 
 #. js-lingui-explicit-id
+#: src/components/canvas/nodes/MockupNode.tsx
+msgid "mockup.import_replace"
+msgstr "导入替换"
+
+#. js-lingui-explicit-id
 #: src/components/source/DropZone.tsx
 msgid "source.dropzone_aria"
 msgstr "导入图像 — 拖入文件或点击浏览"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/BriefNode.tsx
+msgid "brief.import_mockup"
+msgstr "导入原型图"
 
 #. js-lingui-explicit-id
 #: src/components/source/SourcePanel.tsx
@@ -420,6 +495,16 @@ msgstr "语言"
 #: src/components/topbar/ThemeToggle.tsx
 msgid "topbar.theme_light_mode"
 msgstr "浅色模式"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/MockupNode.tsx
+msgid "pipeline.stage_mockup"
+msgstr "原型图"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/MockupNode.tsx
+msgid "pipeline.node_mockup_aria"
+msgstr "原型图阶段"
 
 #. js-lingui-explicit-id
 #: src/components/settings/ModelSlot.tsx
@@ -520,6 +605,11 @@ msgstr "已删除提供方"
 #: src/components/settings/ProviderForm.tsx
 msgid "settings.provider_updated_toast"
 msgstr "已更新提供方"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/MockupNode.tsx
+msgid "mockup.regenerate"
+msgstr "重新生成"
 
 #. js-lingui-explicit-id
 #: src/components/source/GeneratePanel.tsx
@@ -628,15 +718,15 @@ msgid "inspector.empty_no_slices"
 msgstr "切分后的区域及其详情将显示在此处。"
 
 #. js-lingui-explicit-id
-#: src/components/canvas/nodes/SlicesNode.tsx
-msgid "pipeline.stage_slices"
-msgstr "切片"
-
-#. js-lingui-explicit-id
 #: src/components/slices/RightRail.tsx
 #: src/components/slices/RightRailTabs.tsx
 #: src/components/slices/SliceGrid.tsx
 msgid "slices.heading"
+msgstr "切片"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/SlicesNode.tsx
+msgid "pipeline.stage_slices"
 msgstr "切片"
 
 #. js-lingui-explicit-id
@@ -716,6 +806,7 @@ msgstr "未知错误"
 
 #. js-lingui-explicit-id
 #: src/components/source/GeneratePanel.tsx
+#: src/hooks/queries/pipeline.ts
 #: src/hooks/useImageImport.ts
 msgid "import.toast_unsupported"
 msgstr "不支持的文件：{name}"

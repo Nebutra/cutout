@@ -27,22 +27,37 @@ import {
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import { useStore } from '@/store'
-import { selectCutoutStatus } from '@/store/slices/pipeline'
+import {
+  selectCutoutStatus,
+  selectDeconstructStatus,
+  selectGenerateStatus,
+  type TransitionStatus,
+} from '@/store/slices/pipeline'
+import type { Op } from '@/store/types'
 import { positionFor } from './layout'
 import { NODE_DRAG_HANDLE } from './nodes/NodeShell'
+import { BriefNode } from './nodes/BriefNode'
+import { MockupNode } from './nodes/MockupNode'
 import { BoardNode } from './nodes/BoardNode'
 import { SlicesNode } from './nodes/SlicesNode'
 import { TransitionEdge } from './edges/TransitionEdge'
 
 /** Stable maps (spec: node/edge types must not be re-created each render). */
-const nodeTypes: NodeTypes = { board: BoardNode, slices: SlicesNode }
+const nodeTypes: NodeTypes = {
+  brief: BriefNode,
+  mockup: MockupNode,
+  board: BoardNode,
+  slices: SlicesNode,
+}
 const edgeTypes: EdgeTypes = { transition: TransitionEdge }
 
-const FIT_VIEW_OPTIONS = { padding: 0.18 } as const
+const FIT_VIEW_OPTIONS = { padding: 0.16 } as const
 
 export function PipelineCanvas() {
   const { t } = useLingui()
   const topology = useStore((s) => s.pipeline)
+  const generateStatus = useStore(selectGenerateStatus)
+  const deconstructStatus = useStore(selectDeconstructStatus)
   const cutoutStatus = useStore(selectCutoutStatus)
 
   // Positions are layout-driven but the cards stay draggable by their header.
@@ -59,24 +74,33 @@ export function PipelineCanvas() {
   )
   const [nodes, , onNodesChange] = useNodesState(initialNodes)
 
-  // Edges are display-only in P1; status is derived from the analysis run.
-  const edges = useMemo<Edge[]>(
-    () =>
-      topology.transitions.map((transition) => ({
+  // Edges are display-only; each transition's status is derived from the store.
+  const edges = useMemo<Edge[]>(() => {
+    // Live status per op (single source of truth = store); non-P2 ops stay idle.
+    const statusByOp: Readonly<Record<Op, TransitionStatus>> = {
+      generate: generateStatus,
+      deconstruct: deconstructStatus,
+      cutout: cutoutStatus,
+      compose: 'idle',
+      name: 'idle',
+    }
+    return topology.transitions.map((transition) => {
+      const status = statusByOp[transition.op]
+      return {
         id: transition.id,
         source: transition.source,
         target: transition.target,
         type: 'transition',
-        data: { status: cutoutStatus },
+        data: { op: transition.op, status },
         markerEnd: {
           type: MarkerType.ArrowClosed,
           width: 16,
           height: 16,
-          color: cutoutStatus === 'idle' ? 'var(--border)' : 'var(--primary)',
+          color: status === 'idle' ? 'var(--border)' : 'var(--primary)',
         },
-      })),
-    [topology.transitions, cutoutStatus],
-  )
+      }
+    })
+  }, [topology.transitions, generateStatus, deconstructStatus, cutoutStatus])
 
   return (
     <div className="min-h-0 flex-1 bg-background">

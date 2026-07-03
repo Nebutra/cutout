@@ -1,9 +1,10 @@
 /**
  * TransitionEdge (spec §5 / §7) — a directed edge that visualizes a stage
- * transition's state (idle / running / done). In P1 the only edge is
- * `board→slices` (`cutout`), driven by the existing analysis status: it animates
- * while the worker runs and settles to "done" once slices land. The pixel
- * pipeline is unchanged; the edge only reflects it.
+ * transition's state (idle / running / done). The forward chain has three:
+ * `generate` (brief→mockup), `deconstruct` (mockup→board) and `cutout`
+ * (board→slices). Each animates while its step runs and settles to "done" when
+ * the target artifact lands. The pixel pipeline is unchanged; edges only reflect
+ * the store's derived status.
  */
 import { Trans } from '@lingui/react/macro'
 import {
@@ -15,10 +16,12 @@ import {
 } from '@xyflow/react'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
+import type { Op } from '@/store/types'
 import type { TransitionStatus } from '@/store/slices/pipeline'
 
-/** Data carried by a transition edge (op kept for P2 genericity). */
+/** Data carried by a transition edge: its op (for the label) and live status. */
 export interface TransitionEdgeData extends Record<string, unknown> {
+  readonly op: Op
   readonly status: TransitionStatus
 }
 
@@ -28,6 +31,18 @@ const STROKE: Readonly<Record<TransitionStatus, string>> = {
   idle: 'var(--border)',
   running: 'var(--primary)',
   done: 'var(--primary)',
+}
+
+/** The op's label — explicit per-op so Lingui can extract static ids. */
+function OpLabel({ op }: { readonly op: Op }) {
+  switch (op) {
+    case 'generate':
+      return <Trans id="pipeline.transition_generate">Generate</Trans>
+    case 'deconstruct':
+      return <Trans id="pipeline.transition_deconstruct">Deconstruct</Trans>
+    default:
+      return <Trans id="pipeline.transition_cutout">Cutout</Trans>
+  }
 }
 
 export function TransitionEdge({
@@ -40,8 +55,9 @@ export function TransitionEdge({
   markerEnd,
   data,
 }: EdgeProps) {
-  const status: TransitionStatus =
-    (data as TransitionEdgeData | undefined)?.status ?? 'idle'
+  const edge = data as TransitionEdgeData | undefined
+  const status: TransitionStatus = edge?.status ?? 'idle'
+  const op: Op = edge?.op ?? 'cutout'
   const [path, labelX, labelY] = getSmoothStepPath({
     sourceX,
     sourceY,
@@ -72,7 +88,7 @@ export function TransitionEdge({
             variant={status === 'idle' ? 'outline' : 'secondary'}
             className="bg-background"
           >
-            <Trans id="pipeline.transition_cutout">Cutout</Trans>
+            <OpLabel op={op} />
             {status === 'running' ? (
               <span className="text-muted-foreground">
                 {' · '}

@@ -156,6 +156,16 @@ msgid "settings.provider_baseurl_label"
 msgstr "Base URL"
 
 #. js-lingui-explicit-id
+#: src/components/canvas/nodes/BriefNode.tsx
+msgid "pipeline.stage_brief"
+msgstr "Brief"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/BriefNode.tsx
+msgid "pipeline.node_brief_aria"
+msgstr "Brief stage"
+
+#. js-lingui-explicit-id
 #: src/components/inspector/SliceDimensions.tsx
 msgid "inspector.dim_bytes"
 msgstr "Bytes"
@@ -182,6 +192,8 @@ msgid "common.close"
 msgstr "Close"
 
 #. js-lingui-explicit-id
+#: src/components/canvas/nodes/BriefNode.tsx
+#: src/components/canvas/nodes/MockupNode.tsx
 #: src/components/source/GeneratePanel.tsx
 msgid "generate.no_model_cta"
 msgstr "Configure an image model in Settings"
@@ -212,6 +224,7 @@ msgid "copy_png.toast_failed"
 msgstr "Could not copy image"
 
 #. js-lingui-explicit-id
+#: src/hooks/queries/pipeline.ts
 #: src/hooks/useImageImport.ts
 msgid "import.toast_load_failed"
 msgstr "Could not load image"
@@ -237,9 +250,34 @@ msgid "topbar.theme_dark_mode"
 msgstr "Dark mode"
 
 #. js-lingui-explicit-id
+#: src/components/canvas/edges/TransitionEdge.tsx
+msgid "pipeline.transition_deconstruct"
+msgstr "Deconstruct"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/MockupNode.tsx
+msgid "mockup.deconstruct"
+msgstr "Deconstruct to board"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/MockupNode.tsx
+msgid "mockup.deconstructing"
+msgstr "Deconstructing…"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/MockupNode.tsx
+msgid "mockup.toast_deconstruct_failed"
+msgstr "Deconstruction failed"
+
+#. js-lingui-explicit-id
 #: src/components/settings/ProviderForm.tsx
 msgid "settings.provider_model_label"
 msgstr "Default model"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/BriefNode.tsx
+msgid "brief.placeholder"
+msgstr "Describe the product and its main screen — who it is for, what it shows…"
 
 #. js-lingui-explicit-id
 #: src/components/status/StatusBar.tsx
@@ -347,6 +385,11 @@ msgid "settings.section_general"
 msgstr "General"
 
 #. js-lingui-explicit-id
+#: src/components/canvas/edges/TransitionEdge.tsx
+msgid "pipeline.transition_generate"
+msgstr "Generate"
+
+#. js-lingui-explicit-id
 #: src/components/source/GeneratePanel.tsx
 msgid "generate.button"
 msgstr "Generate asset sheet"
@@ -357,11 +400,33 @@ msgid "source.mode_generate"
 msgstr "Generate from screenshot"
 
 #. js-lingui-explicit-id
+#: src/components/canvas/nodes/MockupNode.tsx
+msgid "mockup.empty"
+msgstr "Generate from the brief, or import a screenshot."
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/BriefNode.tsx
+msgid "brief.generate"
+msgstr "Generate mockup"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/MockupNode.tsx
+msgid "mockup.generating"
+msgstr "Generating mockup…"
+
+#. js-lingui-explicit-id
 #: src/components/source/GeneratePanel.tsx
 msgid "generate.pending"
 msgstr "Generating…"
 
 #. js-lingui-explicit-id
+#: src/components/canvas/nodes/BriefNode.tsx
+msgid "brief.generating"
+msgstr "Generating…"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/BriefNode.tsx
+#: src/components/canvas/nodes/MockupNode.tsx
 #: src/components/source/GeneratePanel.tsx
 msgid "generate.toast_failed"
 msgstr "Generation failed"
@@ -387,9 +452,19 @@ msgid "topbar.import"
 msgstr "Import"
 
 #. js-lingui-explicit-id
+#: src/components/canvas/nodes/MockupNode.tsx
+msgid "mockup.import_replace"
+msgstr "Import"
+
+#. js-lingui-explicit-id
 #: src/components/source/DropZone.tsx
 msgid "source.dropzone_aria"
 msgstr "Import image — drop a file or click to browse"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/BriefNode.tsx
+msgid "brief.import_mockup"
+msgstr "Import mockup"
 
 #. js-lingui-explicit-id
 #: src/components/source/SourcePanel.tsx
@@ -420,6 +495,16 @@ msgstr "Language"
 #: src/components/topbar/ThemeToggle.tsx
 msgid "topbar.theme_light_mode"
 msgstr "Light mode"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/MockupNode.tsx
+msgid "pipeline.stage_mockup"
+msgstr "Mockup"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/MockupNode.tsx
+msgid "pipeline.node_mockup_aria"
+msgstr "Mockup stage"
 
 #. js-lingui-explicit-id
 #: src/components/settings/ModelSlot.tsx
@@ -520,6 +605,11 @@ msgstr "Provider removed"
 #: src/components/settings/ProviderForm.tsx
 msgid "settings.provider_updated_toast"
 msgstr "Provider updated"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/MockupNode.tsx
+msgid "mockup.regenerate"
+msgstr "Regenerate"
 
 #. js-lingui-explicit-id
 #: src/components/source/GeneratePanel.tsx
@@ -628,15 +718,15 @@ msgid "inspector.empty_no_slices"
 msgstr "Sliced regions and their details will show up here."
 
 #. js-lingui-explicit-id
-#: src/components/canvas/nodes/SlicesNode.tsx
-msgid "pipeline.stage_slices"
-msgstr "Slices"
-
-#. js-lingui-explicit-id
 #: src/components/slices/RightRail.tsx
 #: src/components/slices/RightRailTabs.tsx
 #: src/components/slices/SliceGrid.tsx
 msgid "slices.heading"
+msgstr "Slices"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/SlicesNode.tsx
+msgid "pipeline.stage_slices"
 msgstr "Slices"
 
 #. js-lingui-explicit-id
@@ -716,6 +806,7 @@ msgstr "unknown error"
 
 #. js-lingui-explicit-id
 #: src/components/source/GeneratePanel.tsx
+#: src/hooks/queries/pipeline.ts
 #: src/hooks/useImageImport.ts
 msgid "import.toast_unsupported"
 msgstr "Unsupported file: {name}"
