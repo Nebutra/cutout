@@ -78,11 +78,50 @@ export interface SliceInput {
   readonly height: number
 }
 
+/**
+ * Pipeline graph (spec §3–§4). The canvas renders this topology as nodes/edges.
+ *
+ * The graph holds only stage *identity* — which nodes exist and how they wire.
+ * Live artifacts and status are NOT duplicated here: the `board` node's artifact
+ * IS the existing {@link SourceState}, and the `slices` node's artifact IS the
+ * existing {@link AnalysisState}. Status is therefore *derived* from those slices
+ * (see `slices/pipeline.ts`), keeping a single source of truth. P2+ adds the
+ * `brief`/`mockup` stages and a transition runner on top of this same shape.
+ */
+export type StageKind = 'brief' | 'mockup' | 'board' | 'slices'
+
+/** Lifecycle status of a pipeline node (derived in P1). */
+export type NodeStatus = 'empty' | 'ready' | 'running' | 'error'
+
+/** A transition operation between two stages. */
+export type Op = 'generate' | 'deconstruct' | 'compose' | 'cutout' | 'name'
+
+/** One stage node in the pipeline graph. */
+export interface PipelineNode {
+  readonly id: string
+  readonly kind: StageKind
+}
+
+/** A directed edge = a typed transition from one stage to the next. */
+export interface PipelineTransition {
+  readonly id: string
+  readonly source: string
+  readonly target: string
+  readonly op: Op
+}
+
+/** The pipeline topology the canvas draws (positions live in the view, not here). */
+export interface PipelineGraph {
+  readonly nodes: readonly PipelineNode[]
+  readonly transitions: readonly PipelineTransition[]
+}
+
 /** Read-only state fields. */
 export interface StoreState {
   readonly source: SourceState
   readonly params: Params
   readonly analysis: AnalysisState
+  readonly pipeline: PipelineGraph
 }
 
 /** Actions (spec §5). All state updates are immutable. */

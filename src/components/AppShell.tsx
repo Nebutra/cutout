@@ -6,12 +6,14 @@
  *   - the manual ⌘R / Rerun trigger,
  *   - the global keyboard map (`useHotkeys`) → import / export / nav / rename.
  *
- * Layout is a column: TopBar · WorkspaceLayout (grows) · StatusBar. The service
- * registry + query/tooltip/toast providers are mounted above this in App.
+ * Layout is a column: TopBar · PipelineCanvas (grows) · StatusBar. The service
+ * registry + query/tooltip/toast providers are mounted above this in App. The
+ * canvas (spec §5) hosts the existing cutout flow as board + slices nodes, so
+ * the whole pipeline — import → params → preview → slices → export — still works.
  */
 import { useCallback, useMemo, useState } from 'react'
 import { TopBar } from './topbar/TopBar'
-import { WorkspaceLayout } from './workspace/WorkspaceLayout'
+import { PipelineCanvas } from './canvas/PipelineCanvas'
 import { StatusBar } from './status/StatusBar'
 import { SettingsDialog } from '@/components/settings/SettingsDialog'
 import { SettingsUIProvider } from '@/components/settings/settings-ui'
@@ -88,7 +90,7 @@ export function AppShell() {
     <SettingsUIProvider value={settingsUI}>
       <div className="flex h-full min-h-0 flex-col bg-background text-foreground">
         <TopBar onRerun={rerun} />
-        <WorkspaceLayout />
+        <PipelineCanvas />
         <StatusBar />
       </div>
       <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />

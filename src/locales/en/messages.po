@@ -136,6 +136,16 @@ msgid "settings.dialog_a11y_desc"
 msgstr "Application preferences and AI providers."
 
 #. js-lingui-explicit-id
+#: src/components/canvas/nodes/BoardNode.tsx
+msgid "pipeline.stage_board"
+msgstr "Asset board"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/BoardNode.tsx
+msgid "pipeline.node_board_aria"
+msgstr "Asset board stage"
+
+#. js-lingui-explicit-id
 #: src/components/source/GeneratePanel.tsx
 msgid "generate.toast_done"
 msgstr "Asset sheet generated — slicing…"
@@ -207,6 +217,11 @@ msgid "import.toast_load_failed"
 msgstr "Could not load image"
 
 #. js-lingui-explicit-id
+#: src/components/canvas/edges/TransitionEdge.tsx
+msgid "pipeline.transition_cutout"
+msgstr "Cutout"
+
+#. js-lingui-explicit-id
 #: src/components/source/ParameterControls.tsx
 msgid "source.params_aria"
 msgstr "Cutout parameters"
@@ -230,6 +245,11 @@ msgstr "Default model"
 #: src/components/status/StatusBar.tsx
 msgid "status.state_done"
 msgstr "done"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/edges/TransitionEdge.tsx
+msgid "pipeline.status_done"
+msgstr "Done"
 
 #. js-lingui-explicit-id
 #: src/components/source/GeneratePanel.tsx
@@ -467,6 +487,11 @@ msgid "settings.reset_done_toast"
 msgstr "Parameters reset"
 
 #. js-lingui-explicit-id
+#: src/components/canvas/PipelineCanvas.tsx
+msgid "pipeline.canvas_aria"
+msgstr "Pipeline canvas"
+
+#. js-lingui-explicit-id
 #: src/components/inspector/SliceDimensions.tsx
 msgid "inspector.dim_position"
 msgstr "Position"
@@ -562,6 +587,11 @@ msgid "settings.remember_dir_hint"
 msgstr "Reuse the last folder instead of asking on every export."
 
 #. js-lingui-explicit-id
+#: src/components/canvas/edges/TransitionEdge.tsx
+msgid "pipeline.status_running"
+msgstr "Running"
+
+#. js-lingui-explicit-id
 #: src/components/settings/ProviderForm.tsx
 msgid "settings.save"
 msgstr "Save"
@@ -598,11 +628,21 @@ msgid "inspector.empty_no_slices"
 msgstr "Sliced regions and their details will show up here."
 
 #. js-lingui-explicit-id
+#: src/components/canvas/nodes/SlicesNode.tsx
+msgid "pipeline.stage_slices"
+msgstr "Slices"
+
+#. js-lingui-explicit-id
 #: src/components/slices/RightRail.tsx
 #: src/components/slices/RightRailTabs.tsx
 #: src/components/slices/SliceGrid.tsx
 msgid "slices.heading"
 msgstr "Slices"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/SlicesNode.tsx
+msgid "pipeline.node_slices_aria"
+msgstr "Slices stage"
 
 #. js-lingui-explicit-id
 #: src/components/topbar/ThemeToggle.tsx
