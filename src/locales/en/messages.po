@@ -86,6 +86,18 @@ msgid "status.slice_count"
 msgstr "{0, plural, one {# slice} other {# slices}}"
 
 #. js-lingui-explicit-id
+#. placeholder {0}: state.output.slices.length
+#: src/components/canvas/nodes/dag-node-common.tsx
+msgid "dag.slices_count"
+msgstr "{0} slices cut"
+
+#. js-lingui-explicit-id
+#. placeholder {0}: state.output.names.length
+#: src/components/canvas/nodes/dag-node-common.tsx
+msgid "dag.names_count"
+msgstr "{0} slices named"
+
+#. js-lingui-explicit-id
 #: src/components/preview/PreviewMeta.tsx
 msgid "preview.region_count"
 msgstr "{count, plural, one {# region} other {# regions}}"
@@ -181,14 +193,29 @@ msgid "pipeline.stage_board"
 msgstr "Asset board"
 
 #. js-lingui-explicit-id
+#: src/components/canvas/nodes/dag-node-common.tsx
+msgid "dag.op_board"
+msgstr "Asset board"
+
+#. js-lingui-explicit-id
 #: src/components/canvas/nodes/BoardNode.tsx
 msgid "pipeline.node_board_aria"
 msgstr "Asset board stage"
 
 #. js-lingui-explicit-id
+#: src/components/canvas/PlannedCanvas.tsx
+msgid "dag.back_to_linear"
+msgstr "Back to the linear chain"
+
+#. js-lingui-explicit-id
 #: src/components/settings/ProviderForm.tsx
 msgid "settings.provider_baseurl_label"
 msgstr "Base URL"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/dag-node-common.tsx
+msgid "dag.blocked"
+msgstr "Blocked — an upstream step failed."
 
 #. js-lingui-explicit-id
 #: src/components/canvas/nodes/BriefNode.tsx
@@ -328,6 +355,16 @@ msgstr "Default model"
 #: src/components/canvas/nodes/BriefNode.tsx
 msgid "brief.placeholder"
 msgstr "Describe the product and its main screen — who it is for, what it shows…"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/dag-node-common.tsx
+msgid "dag.op_design_system"
+msgstr "Design system"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/DesignSystemNode.tsx
+msgid "dag.node_design_system_aria"
+msgstr "Design-system node"
 
 #. js-lingui-explicit-id
 #: src/components/status/StatusBar.tsx
@@ -526,6 +563,11 @@ msgid "pipeline.stage_mockup"
 msgstr "Mockup"
 
 #. js-lingui-explicit-id
+#: src/components/canvas/nodes/dag-node-common.tsx
+msgid "dag.op_mockup"
+msgstr "Mockup"
+
+#. js-lingui-explicit-id
 #: src/components/canvas/nodes/MockupNode.tsx
 msgid "pipeline.node_mockup_aria"
 msgstr "Mockup stage"
@@ -559,6 +601,11 @@ msgstr "Name"
 #: src/components/canvas/nodes/SlicesNode.tsx
 msgid "slices.toast_named"
 msgstr "Named {count} slices"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/dag-node-common.tsx
+msgid "dag.op_name"
+msgstr "Naming"
 
 #. js-lingui-explicit-id
 #: src/components/canvas/nodes/SlicesNode.tsx
@@ -606,9 +653,35 @@ msgid "settings.reset_done_toast"
 msgstr "Parameters reset"
 
 #. js-lingui-explicit-id
-#: src/components/canvas/PipelineCanvas.tsx
+#: src/components/canvas/LinearCanvas.tsx
 msgid "pipeline.canvas_aria"
 msgstr "Pipeline canvas"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/BriefNode.tsx
+msgid "dag.plan_and_generate"
+msgstr "Plan & generate graph"
+
+#. js-lingui-explicit-id
+#. placeholder {0}: node.label
+#: src/components/canvas/nodes/DagNode.tsx
+msgid "dag.node_aria"
+msgstr "Planned node: {0}"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/PlannedCanvas.tsx
+msgid "dag.canvas_aria"
+msgstr "Planned pipeline canvas"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/BriefNode.tsx
+msgid "dag.planning"
+msgstr "Planning & generating…"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/BriefNode.tsx
+msgid "dag.toast_plan_failed"
+msgstr "Planning failed"
 
 #. js-lingui-explicit-id
 #: src/components/inspector/SliceDimensions.tsx
@@ -716,6 +789,11 @@ msgid "pipeline.status_running"
 msgstr "Running"
 
 #. js-lingui-explicit-id
+#: src/components/canvas/nodes/dag-node-common.tsx
+msgid "dag.running"
+msgstr "Running…"
+
+#. js-lingui-explicit-id
 #: src/components/settings/ProviderForm.tsx
 msgid "settings.save"
 msgstr "Save"
@@ -766,6 +844,11 @@ msgstr "Slices"
 #. js-lingui-explicit-id
 #: src/components/canvas/nodes/SlicesNode.tsx
 msgid "pipeline.stage_slices"
+msgstr "Slices"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/dag-node-common.tsx
+msgid "dag.op_cutout"
 msgstr "Slices"
 
 #. js-lingui-explicit-id
@@ -865,3 +948,8 @@ msgstr "Verification failed"
 #: src/components/settings/ProviderRow.tsx
 msgid "settings.status_verified"
 msgstr "Verified"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/dag-node-common.tsx
+msgid "dag.idle"
+msgstr "Waiting to run…"

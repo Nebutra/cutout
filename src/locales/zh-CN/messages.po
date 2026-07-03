@@ -86,6 +86,18 @@ msgid "status.slice_count"
 msgstr "{0, plural, other {# 个切片}}"
 
 #. js-lingui-explicit-id
+#. placeholder {0}: state.output.slices.length
+#: src/components/canvas/nodes/dag-node-common.tsx
+msgid "dag.slices_count"
+msgstr "切出 {0} 张切片"
+
+#. js-lingui-explicit-id
+#. placeholder {0}: state.output.names.length
+#: src/components/canvas/nodes/dag-node-common.tsx
+msgid "dag.names_count"
+msgstr "已命名 {0} 张切片"
+
+#. js-lingui-explicit-id
 #: src/components/preview/PreviewMeta.tsx
 msgid "preview.region_count"
 msgstr "{count, plural, other {# 个区域}}"
@@ -181,14 +193,29 @@ msgid "pipeline.stage_board"
 msgstr "素材板"
 
 #. js-lingui-explicit-id
+#: src/components/canvas/nodes/dag-node-common.tsx
+msgid "dag.op_board"
+msgstr "素材板"
+
+#. js-lingui-explicit-id
 #: src/components/canvas/nodes/BoardNode.tsx
 msgid "pipeline.node_board_aria"
 msgstr "素材板阶段"
 
 #. js-lingui-explicit-id
+#: src/components/canvas/PlannedCanvas.tsx
+msgid "dag.back_to_linear"
+msgstr "返回线性视图"
+
+#. js-lingui-explicit-id
 #: src/components/settings/ProviderForm.tsx
 msgid "settings.provider_baseurl_label"
 msgstr "Base URL"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/dag-node-common.tsx
+msgid "dag.blocked"
+msgstr "已阻塞 — 上游步骤失败。"
 
 #. js-lingui-explicit-id
 #: src/components/canvas/nodes/BriefNode.tsx
@@ -328,6 +355,16 @@ msgstr "默认模型"
 #: src/components/canvas/nodes/BriefNode.tsx
 msgid "brief.placeholder"
 msgstr "描述产品及其主界面——面向谁、展示什么……"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/dag-node-common.tsx
+msgid "dag.op_design_system"
+msgstr "设计系统"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/DesignSystemNode.tsx
+msgid "dag.node_design_system_aria"
+msgstr "设计系统节点"
 
 #. js-lingui-explicit-id
 #: src/components/status/StatusBar.tsx
@@ -526,6 +563,11 @@ msgid "pipeline.stage_mockup"
 msgstr "原型图"
 
 #. js-lingui-explicit-id
+#: src/components/canvas/nodes/dag-node-common.tsx
+msgid "dag.op_mockup"
+msgstr "原型图"
+
+#. js-lingui-explicit-id
 #: src/components/canvas/nodes/MockupNode.tsx
 msgid "pipeline.node_mockup_aria"
 msgstr "原型图阶段"
@@ -559,6 +601,11 @@ msgstr "名称"
 #: src/components/canvas/nodes/SlicesNode.tsx
 msgid "slices.toast_named"
 msgstr "已命名 {count} 个切片"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/dag-node-common.tsx
+msgid "dag.op_name"
+msgstr "命名"
 
 #. js-lingui-explicit-id
 #: src/components/canvas/nodes/SlicesNode.tsx
@@ -606,9 +653,35 @@ msgid "settings.reset_done_toast"
 msgstr "参数已重置"
 
 #. js-lingui-explicit-id
-#: src/components/canvas/PipelineCanvas.tsx
+#: src/components/canvas/LinearCanvas.tsx
 msgid "pipeline.canvas_aria"
 msgstr "流水线画布"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/BriefNode.tsx
+msgid "dag.plan_and_generate"
+msgstr "规划并生成图"
+
+#. js-lingui-explicit-id
+#. placeholder {0}: node.label
+#: src/components/canvas/nodes/DagNode.tsx
+msgid "dag.node_aria"
+msgstr "规划节点：{0}"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/PlannedCanvas.tsx
+msgid "dag.canvas_aria"
+msgstr "规划管线画布"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/BriefNode.tsx
+msgid "dag.planning"
+msgstr "规划并生成中…"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/BriefNode.tsx
+msgid "dag.toast_plan_failed"
+msgstr "规划失败"
 
 #. js-lingui-explicit-id
 #: src/components/inspector/SliceDimensions.tsx
@@ -716,6 +789,11 @@ msgid "pipeline.status_running"
 msgstr "处理中"
 
 #. js-lingui-explicit-id
+#: src/components/canvas/nodes/dag-node-common.tsx
+msgid "dag.running"
+msgstr "运行中…"
+
+#. js-lingui-explicit-id
 #: src/components/settings/ProviderForm.tsx
 msgid "settings.save"
 msgstr "保存"
@@ -766,6 +844,11 @@ msgstr "切片"
 #. js-lingui-explicit-id
 #: src/components/canvas/nodes/SlicesNode.tsx
 msgid "pipeline.stage_slices"
+msgstr "切片"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/dag-node-common.tsx
+msgid "dag.op_cutout"
 msgstr "切片"
 
 #. js-lingui-explicit-id
@@ -865,3 +948,8 @@ msgstr "校验失败"
 #: src/components/settings/ProviderRow.tsx
 msgid "settings.status_verified"
 msgstr "校验通过"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/dag-node-common.tsx
+msgid "dag.idle"
+msgstr "等待运行…"

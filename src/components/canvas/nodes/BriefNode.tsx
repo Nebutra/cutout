@@ -9,16 +9,18 @@
  * rule; the reused controls live under a `nodrag nowheel` body in NodeShell.
  */
 import { useRef } from 'react'
-import { FileUp, Loader2, Settings2, Sparkles } from 'lucide-react'
+import { FileUp, Loader2, Network, Settings2, Sparkles } from 'lucide-react'
 import { toast } from 'sonner'
 import { Trans, useLingui } from '@lingui/react/macro'
 import { useStore } from '@/store'
 import { selectBriefStatus } from '@/store/slices/pipeline'
 import { useModelAssignments } from '@/hooks/queries/ai-settings'
 import { useGenerateMockup, useImportMockup } from '@/hooks/queries/pipeline'
+import { useRunPlan } from '@/hooks/queries/dag'
 import { useSettingsUI } from '@/components/settings/settings-ui'
 import { NodeShell } from './NodeShell'
 import { Button } from '@/components/ui/button'
+import { Separator } from '@/components/ui/separator'
 import { Textarea } from '@/components/ui/textarea'
 
 export function BriefNode() {
@@ -30,17 +32,30 @@ export function BriefNode() {
 
   const assignments = useModelAssignments()
   const hasImageModel = Boolean(assignments.data?.image)
+  const hasChatModel = Boolean(assignments.data?.chat)
   const generate = useGenerateMockup()
+  const runPlan = useRunPlan()
   const importMockup = useImportMockup()
   const inputRef = useRef<HTMLInputElement | null>(null)
 
   const canGenerate = brief.trim().length > 0 && !generate.isPending
+  const canPlan = brief.trim().length > 0 && !runPlan.isPending
 
   function onGenerate(): void {
     if (!canGenerate) return
     generate.mutate(undefined, {
       onError: (error) =>
         toast.error(t({ id: 'generate.toast_failed', message: 'Generation failed' }), {
+          description: error.message,
+        }),
+    })
+  }
+
+  function onPlan(): void {
+    if (!canPlan) return
+    runPlan.mutate(undefined, {
+      onError: (error) =>
+        toast.error(t({ id: 'dag.toast_plan_failed', message: 'Planning failed' }), {
           description: error.message,
         }),
     })
@@ -87,6 +102,25 @@ export function BriefNode() {
             </Trans>
           </Button>
         )}
+
+        {hasImageModel && hasChatModel ? (
+          <>
+            <Separator />
+            <Button variant="secondary" onClick={onPlan} disabled={!canPlan}>
+              {runPlan.isPending ? (
+                <>
+                  <Loader2 className="animate-spin" />
+                  <Trans id="dag.planning">Planning &amp; generating…</Trans>
+                </>
+              ) : (
+                <>
+                  <Network />
+                  <Trans id="dag.plan_and_generate">Plan &amp; generate graph</Trans>
+                </>
+              )}
+            </Button>
+          </>
+        ) : null}
 
         <Button variant="ghost" size="sm" onClick={() => inputRef.current?.click()}>
           <FileUp />

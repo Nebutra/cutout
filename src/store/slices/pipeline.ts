@@ -15,7 +15,9 @@
  * drift. The generation runner itself lives in `hooks/queries/pipeline.ts`.
  */
 import type { StateCreator } from 'zustand'
+import type { GraphSpec } from '@/dag/graph-spec'
 import type {
+  DagNodeState,
   GenError,
   GenOp,
   GenPhase,
@@ -60,11 +62,17 @@ export interface PipelineSlice {
   mockup: MockupArtifact | null
   genPhase: GenPhase
   genError: GenError | null
+  graph: GraphSpec | null
+  dagNodes: Readonly<Record<string, DagNodeState>>
   setBrief(text: string): void
   setMockup(artifact: MockupArtifact): void
   beginGen(phase: Exclude<GenPhase, 'idle'>): void
   endGen(): void
   failGen(op: GenOp, message: string): void
+  setGraph(spec: GraphSpec): void
+  clearGraph(): void
+  setDagNodeState(id: string, state: DagNodeState): void
+  resetDagNodes(ids: ReadonlySet<string>): void
 }
 
 export const createPipelineSlice: StateCreator<Store, [], [], PipelineSlice> = (
@@ -75,6 +83,8 @@ export const createPipelineSlice: StateCreator<Store, [], [], PipelineSlice> = (
   mockup: null,
   genPhase: 'idle',
   genError: null,
+  graph: null,
+  dagNodes: {},
 
   setBrief: (text) =>
     set((s) => ({
@@ -95,6 +105,28 @@ export const createPipelineSlice: StateCreator<Store, [], [], PipelineSlice> = (
   endGen: () => set({ genPhase: 'idle' }),
 
   failGen: (op, message) => set({ genPhase: 'idle', genError: { op, message } }),
+
+  // Seed every planned node `idle`; the Executor drives them from there.
+  setGraph: (spec) =>
+    set({
+      graph: spec,
+      dagNodes: Object.fromEntries(
+        spec.nodes.map((n) => [n.id, { status: 'idle' } as DagNodeState]),
+      ),
+    }),
+
+  clearGraph: () => set({ graph: null, dagNodes: {} }),
+
+  setDagNodeState: (id, state) =>
+    set((s) => ({ dagNodes: { ...s.dagNodes, [id]: state } })),
+
+  // Reset the given nodes to `idle` (immutably) ahead of an adjust-and-re-run.
+  resetDagNodes: (ids) =>
+    set((s) => {
+      const next: Record<string, DagNodeState> = { ...s.dagNodes }
+      for (const id of ids) next[id] = { status: 'idle' }
+      return { dagNodes: next }
+    }),
 })
 
 /* --- Derived status (single source of truth = artifacts above + source/analysis) --- */

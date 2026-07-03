@@ -11,6 +11,10 @@
  * superseded / replaced bitmap to guard against GPU leaks.
  */
 import type { Box, CutoutParams } from '@/algorithm/types'
+import type { GraphSpec } from '@/dag/graph-spec'
+import type { NodeRunState } from '@/dag/executor'
+import type { CutoutSlice } from '@/services/types'
+import type { SliceName } from '@/services/ai/naming'
 
 /** The four tunable parameters (defaults live in `slices/params.ts`). */
 export type Params = CutoutParams
@@ -151,6 +155,30 @@ export interface GenError {
   readonly message: string
 }
 
+/* --- Planned DAG (spec §5/§D + §6/§E) --------------------------------------
+ *
+ * When a requirement is PLANNED, the fixed linear chain is replaced by an
+ * AI-emitted {@link GraphSpec} of arbitrary nodes. Each node's live status +
+ * output live here (`dagNodes`), driven by the Executor via the sync actions
+ * below. This is intentionally SEPARATE from the singleton `source`/`analysis`
+ * that back the linear board→slices leg — the planned graph can fan out to many
+ * mockups/boards, so its outputs cannot be the single cutout source.
+ */
+
+/** One planned node's produced artifact, keyed by kind so downstream reads it. */
+export type DagNodeOutput =
+  | { readonly kind: 'image'; readonly bytes: Uint8Array; readonly mediaType: string }
+  | {
+      readonly kind: 'slices'
+      readonly slices: readonly CutoutSlice[]
+      /** The board bytes the cut ran on (so a downstream `name` node can read it). */
+      readonly boardBytes: Uint8Array
+    }
+  | { readonly kind: 'names'; readonly names: readonly SliceName[] }
+
+/** A planned node's execution state (status + output/error), as the Executor sets it. */
+export type DagNodeState = NodeRunState<DagNodeOutput>
+
 /** Read-only state fields. */
 export interface StoreState {
   readonly source: SourceState
@@ -165,6 +193,10 @@ export interface StoreState {
   readonly genPhase: GenPhase
   /** The last generation failure (op-scoped), or null. */
   readonly genError: GenError | null
+  /** The planned graph (spec §6/§E), or null when the linear chain is shown. */
+  readonly graph: GraphSpec | null
+  /** Per-planned-node execution state, keyed by node id (empty in linear mode). */
+  readonly dagNodes: Readonly<Record<string, DagNodeState>>
 }
 
 /** Actions (spec §5). All state updates are immutable. */
@@ -199,6 +231,14 @@ export interface StoreActions {
   endGen(): void
   /** Mark the current forward generation as failed, scoped to its op. */
   failGen(op: GenOp, message: string): void
+  /** Replace the linear chain with a planned graph; seeds every node `idle`. */
+  setGraph(spec: GraphSpec): void
+  /** Drop the planned graph and return to the linear chain (clears node states). */
+  clearGraph(): void
+  /** Apply one planned node's execution state (the Executor's `onStatus` sink). */
+  setDagNodeState(id: string, state: DagNodeState): void
+  /** Reset a set of planned nodes to `idle` (before an adjust-and-re-run). */
+  resetDagNodes(ids: ReadonlySet<string>): void
 }
 
 /** The full store: state + actions. */
