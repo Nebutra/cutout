@@ -5,6 +5,10 @@ import type {
   ProjectRestoreInput,
   Store,
 } from '@/store/types'
+import {
+  isWorkspaceSnapshotEmpty,
+  type WorkspaceSnapshot,
+} from '@/workspace/workspace-snapshot'
 import { DEFAULT_PARAMS } from '@/store/slices/params'
 import { bitmapToBytes, bytesToBlob, decodeImage } from '@/lib/image'
 import { err, ok, type Result } from '@/services/types'
@@ -51,6 +55,7 @@ export interface LocalProjectRecord extends LocalProjectSummary {
   readonly source?: StoredImage
   readonly mockup?: StoredImage
   readonly designMarkdown: DesignMarkdownAsset | null
+  readonly workspace: WorkspaceSnapshot | null
   readonly slices: readonly StoredSlice[]
 }
 
@@ -171,6 +176,7 @@ export function createEmptyProjectRecord(now = Date.now()): LocalProjectRecord {
     updatedAt: now,
     params: DEFAULT_PARAMS,
     designMarkdown: null,
+    workspace: null,
     slices: [],
   }
 }
@@ -184,6 +190,9 @@ export async function createProjectRecordFromStore(input: {
 }): Promise<LocalProjectRecord> {
   const now = input.now ?? Date.now()
   const state = input.state
+  const workspace = state.workspaceSnapshot && !isWorkspaceSnapshotEmpty(state.workspaceSnapshot)
+    ? state.workspaceSnapshot
+    : null
   const source = state.source.bitmap
     ? input.previous?.source && input.previous.sourceImageId === state.source.imageId
       ? input.previous.source
@@ -212,15 +221,19 @@ export async function createProjectRecordFromStore(input: {
     height: slice.height,
   }))
   const brief = state.brief.trim()
-  const thumbnail = slices[0]?.blob ?? mockup?.blob ?? source?.blob
+  const thumbnail =
+    slices[0]?.blob ??
+    mockup?.blob ??
+    source?.blob ??
+    workspaceThumbnail(workspace)
 
   return {
     id: input.id,
     name: projectNameFromBrief(brief),
     brief,
     assetCount: slices.length,
-    hasDesignMarkdown: Boolean(state.designMarkdown),
-    status: projectStatusFromStore(state),
+    hasDesignMarkdown: Boolean(state.designMarkdown || workspace?.prototypeDesignSystem),
+    status: projectStatusFromStore(state, workspace),
     createdAt: input.createdAt,
     updatedAt: now,
     thumbnail,
@@ -229,6 +242,7 @@ export async function createProjectRecordFromStore(input: {
     source,
     mockup,
     designMarkdown: state.designMarkdown,
+    workspace,
     slices,
   }
 }
@@ -257,6 +271,7 @@ export async function createRestoreInputFromProject(
     source,
     mockup,
     designMarkdown: record.designMarkdown,
+    workspace: record.workspace ?? null,
     slices: record.slices,
   }
 }
@@ -275,20 +290,31 @@ function toSummary(record: LocalProjectRecord): LocalProjectSummary {
   }
 }
 
-function projectStatusFromStore(state: Store): LocalProjectStatus {
+function projectStatusFromStore(
+  state: Store,
+  workspace: WorkspaceSnapshot | null,
+): LocalProjectStatus {
   if (state.genPhase !== 'idle' || state.analysis.status === 'running') {
     return 'Running'
   }
-  if (state.analysis.slices.length > 0) return 'Ready'
+  if (state.analysis.slices.length > 0 || (workspace?.prototypePages.length ?? 0) > 0) {
+    return 'Ready'
+  }
   if (
     state.brief.trim() ||
     state.source.bitmap ||
     state.mockup ||
-    state.designMarkdown
+    state.designMarkdown ||
+    !isWorkspaceSnapshotEmpty(workspace)
   ) {
     return 'Draft'
   }
   return 'Empty'
+}
+
+function workspaceThumbnail(workspace: WorkspaceSnapshot | null): Blob | undefined {
+  const artifact = workspace?.prototypePages[0] ?? workspace?.prototypeDesignSystem
+  return artifact ? bytesToBlob(artifact.bytes, artifact.mediaType) : undefined
 }
 
 function projectNameFromBrief(brief: string): string {

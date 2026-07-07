@@ -17,6 +17,7 @@
 import type { StateCreator } from 'zustand'
 import type { GraphSpec } from '@/dag/graph-spec'
 import type { IntentProfile } from '@/dag/intent-types'
+import type { WorkspaceSnapshot } from '@/workspace/workspace-snapshot'
 import type {
   DagNodeState,
   GenError,
@@ -64,6 +65,7 @@ export interface PipelineSlice {
   intent: IntentProfile | null
   mockup: MockupArtifact | null
   designMarkdown: DesignMarkdownAsset | null
+  workspaceSnapshot: WorkspaceSnapshot | null
   genPhase: GenPhase
   genError: GenError | null
   graph: GraphSpec | null
@@ -91,6 +93,7 @@ export const createPipelineSlice: StateCreator<Store, [], [], PipelineSlice> = (
   intent: null,
   mockup: null,
   designMarkdown: null,
+  workspaceSnapshot: null,
   genPhase: 'idle',
   genError: null,
   graph: null,

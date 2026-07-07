@@ -46,6 +46,7 @@ import {
   type LocalProjectSummary,
 } from '@/services/local/project-repository.local'
 import { isErr } from '@/services/types'
+import { isWorkspaceSnapshotEmpty, workspaceSnapshotFingerprint } from '@/workspace/workspace-snapshot'
 import { cn } from '@/lib/utils'
 
 type AppView = 'home' | 'project'
@@ -359,7 +360,7 @@ export function AppShell() {
         activeRecordRef.current = record
         dispatchProjectShell({ type: 'autosaved', project: record })
       })
-    }, 700)
+    }, 250)
 
     return () => {
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
@@ -464,13 +465,16 @@ function isDisposableEmptyProject(project: LocalProjectSummary): boolean {
   )
 }
 
-function shouldPersistWorkspace(state: ReturnType<typeof getStoreState>): boolean {
+function shouldPersistWorkspace(
+  state: ReturnType<typeof getStoreState>,
+): boolean {
   return Boolean(
     state.brief.trim() ||
       state.source.bitmap ||
       state.mockup ||
       state.designMarkdown ||
-      state.analysis.slices.length > 0,
+      state.analysis.slices.length > 0 ||
+      !isWorkspaceSnapshotEmpty(state.workspaceSnapshot),
   )
 }
 
@@ -496,6 +500,7 @@ function workspaceAutosaveFingerprint(state: ReturnType<typeof getStoreState>): 
     state.source.imageId,
     mockup,
     design,
+    workspaceSnapshotFingerprint(state.workspaceSnapshot),
     state.analysis.status,
     state.genPhase,
     params,

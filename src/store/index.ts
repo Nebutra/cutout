@@ -36,6 +36,7 @@ export const useStore = create<Store>()((set, get, api) => ({
       intent: null,
       mockup: null,
       designMarkdown: null,
+      workspaceSnapshot: null,
       genPhase: 'idle',
       genError: null,
       graph: null,
@@ -82,12 +83,14 @@ export const useStore = create<Store>()((set, get, api) => ({
       intent: input.intent ?? null,
       mockup: input.mockup ?? null,
       designMarkdown: input.designMarkdown ?? null,
+      workspaceSnapshot: input.workspace ?? null,
       genPhase: 'idle',
       genError: null,
       graph: null,
       dagNodes: {},
     })
   },
+  setWorkspaceSnapshot: (snapshot) => set({ workspaceSnapshot: snapshot }),
 }))
 
 /** Non-reactive snapshot accessor (for mutation payloads / worker glue). */

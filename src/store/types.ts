@@ -16,6 +16,7 @@ import type { IntentProfile } from '@/dag/intent-types'
 import type { NodeRunState } from '@/dag/executor'
 import type { CutoutSlice } from '@/services/types'
 import type { SliceName } from '@/services/ai/naming'
+import type { WorkspaceSnapshot } from '@/workspace/workspace-snapshot'
 
 /** The four tunable parameters (defaults live in `slices/params.ts`). */
 export type Params = CutoutParams
@@ -94,6 +95,7 @@ export interface ProjectRestoreInput {
   }
   readonly mockup?: MockupArtifact | null
   readonly designMarkdown?: DesignMarkdownAsset | null
+  readonly workspace?: WorkspaceSnapshot | null
   readonly slices?: ReadonlyArray<{
     readonly id: string
     readonly index: number
@@ -227,6 +229,8 @@ export interface StoreState {
   readonly mockup: MockupArtifact | null
   /** Optional DESIGN.md source-of-truth imported from the ecosystem. */
   readonly designMarkdown: DesignMarkdownAsset | null
+  /** Project-level planning/prototype UI state that must survive refresh/crash. */
+  readonly workspaceSnapshot: WorkspaceSnapshot | null
   /** Which forward generation is in flight (drives mockup/edge running state). */
   readonly genPhase: GenPhase
   /** The last generation failure (op-scoped), or null. */
@@ -271,6 +275,8 @@ export interface StoreActions {
   setDesignMarkdown(asset: DesignMarkdownAsset): void
   /** Clear the imported DESIGN.md context. */
   clearDesignMarkdown(): void
+  /** Replace the project-level planning/prototype snapshot. */
+  setWorkspaceSnapshot(snapshot: WorkspaceSnapshot | null): void
   /** Mark a forward generation as started (clears the prior error). */
   beginGen(phase: Exclude<GenPhase, 'idle'>): void
   /** Mark the current forward generation as finished (back to idle). */

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ComponentType } from 'react'
 import {
+  ArrowUp,
   CheckCircle2,
   Circle,
   ExternalLink,
@@ -15,7 +16,6 @@ import {
   Route,
   Scissors,
   Settings2,
-  Sparkles,
   Tag,
   WandSparkles,
   X,
@@ -54,11 +54,26 @@ import {
   isGenericSliceFilename,
 } from '@/prototype/asset-names'
 import { createPrototypeAssetManifest } from '@/prototype/asset-manifest'
+import type {
+  PersistedPrototypeDesignSystem,
+  PersistedPrototypeImage,
+  PersistedPrototypePage,
+  PersistedReferenceAttachment,
+  WorkspaceNamingStatus,
+  WorkspaceSnapshot,
+  WorkspaceWorkflowPhase,
+} from '@/workspace/workspace-snapshot'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { Textarea } from '@/components/ui/textarea'
 import { SourceCanvas } from '@/components/source/SourceCanvas'
 import { SliceGrid } from '@/components/slices/SliceGrid'
+import { OutputCanvas, type CanvasImageItem } from './OutputCanvas'
+import { AgentConversation } from './AgentConversation'
+import {
+  useAgentConversation,
+  type AgentMessage,
+} from './agent-conversation'
 import { bytesToBlob, blobToBytes, decodeImage, isSupportedImage } from '@/lib/image'
 import { cn } from '@/lib/utils'
 
@@ -73,12 +88,8 @@ type AssetStageId =
   | 'cutout'
   | 'naming'
   | 'done'
-type WorkflowPhase =
-  | 'idle'
-  | 'planning'
-  | 'review'
-  | 'design-system'
-  | 'generating-suite'
+type WorkflowPhase = WorkspaceWorkflowPhase
+type NamingStatus = WorkspaceNamingStatus
 
 interface AssetStage {
   readonly id: Exclude<AssetStageId, 'idle'>
@@ -95,21 +106,22 @@ interface ActivityEvent {
   readonly status: AssetStage['status']
 }
 
-interface PrototypeImageArtifact {
+interface PrototypeImageArtifact extends PersistedPrototypeImage {
   readonly blob: Blob
-  readonly bytes: Uint8Array
-  readonly mediaType: string
-  readonly width: number
-  readonly height: number
 }
 
-interface PrototypeDesignSystemArtifact extends PrototypeImageArtifact {
-  readonly name: string
-  readonly designMarkdown: string
-}
+interface PrototypeDesignSystemArtifact
+  extends PrototypeImageArtifact,
+    Omit<PersistedPrototypeDesignSystem, keyof PersistedPrototypeImage> {}
 
-interface PrototypePageArtifact extends PrototypeImageArtifact {
-  readonly page: PrototypePage
+interface PrototypePageArtifact
+  extends PrototypeImageArtifact,
+    Omit<PersistedPrototypePage, keyof PersistedPrototypeImage> {}
+
+interface ReferenceAttachment extends PersistedReferenceAttachment {
+  readonly blob: Blob
+  /** `URL.createObjectURL(blob)` — revoked on removal / unmount. */
+  readonly url: string
 }
 
 type HumanLoopAnswer = Extract<PrototypeHumanLoop, { mode: 'ask' }>['choices'][number]
@@ -122,20 +134,20 @@ const SERIAL_REFERENCE_PAGE_LIMIT = 4
 type DesignMarkdownAsset = ReturnType<typeof useStore.getState>['designMarkdown']
 type GenerationError = ReturnType<typeof useStore.getState>['genError']
 
-/** A reference image attached to the brief (fed into design-system generation). */
-interface ReferenceAttachment {
-  readonly id: string
-  readonly name: string
-  readonly blob: Blob
-  /** `URL.createObjectURL(blob)` — revoked on removal / unmount. */
-  readonly url: string
-}
-
 export function IntentWorkspace() {
   const services = useServices()
+  const initialWorkspace = useStore((s) => s.workspaceSnapshot)
+  const setWorkspaceSnapshot = useStore((s) => s.setWorkspaceSnapshot)
   const [agentBusy, setAgentBusy] = useState(false)
-  const [attachments, setAttachments] = useState<readonly ReferenceAttachment[]>([])
-  const [webSearchEnabled, setWebSearchEnabled] = useState(false)
+  const [attachments, setAttachments] = useState<readonly ReferenceAttachment[]>(
+    () => restoreReferenceAttachments(initialWorkspace?.attachments ?? []),
+  )
+  const [webSearchEnabled, setWebSearchEnabled] = useState(
+    () => initialWorkspace?.webSearchEnabled ?? false,
+  )
+  // Streaming design-agent conversation (infrastructure; a future agent loop
+  // drives `agent.stream(...)` — see AgentConversation).
+  const agent = useAgentConversation()
   // Track the live attachment list so unmount can revoke every object URL.
   const attachmentsRef = useRef<readonly ReferenceAttachment[]>([])
   attachmentsRef.current = attachments
@@ -161,15 +173,19 @@ export function IntentWorkspace() {
             }),
           )
       } else if (isSupportedImage(file)) {
-        setAttachments((prev) => [
-          ...prev,
-          {
-            id: crypto.randomUUID(),
-            name: file.name,
-            blob: file,
-            url: URL.createObjectURL(file),
-          },
-        ])
+        void blobToBytes(file).then((bytes) => {
+          setAttachments((prev) => [
+            ...prev,
+            {
+              id: crypto.randomUUID(),
+              name: file.name,
+              bytes,
+              mediaType: file.type || 'image/png',
+              blob: file,
+              url: URL.createObjectURL(file),
+            },
+          ])
+        })
       }
     }
   }
@@ -182,21 +198,37 @@ export function IntentWorkspace() {
     })
   }
   const [runStartedAt, setRunStartedAt] = useState<number | null>(null)
-  const [workflowPhase, setWorkflowPhase] = useState<WorkflowPhase>('idle')
-  const [prototypePlan, setPrototypePlan] = useState<PrototypePlan | null>(null)
+  const [workflowPhase, setWorkflowPhase] = useState<WorkflowPhase>(() =>
+    recoverWorkflowPhase(initialWorkspace),
+  )
+  const [prototypePlan, setPrototypePlan] = useState<PrototypePlan | null>(
+    () => initialWorkspace?.prototypePlan ?? null,
+  )
   const [prototypeScope, setPrototypeScope] =
-    useState<PrototypeSuiteScope>('primary-flow')
-  const [humanLoopChoiceId, setHumanLoopChoiceId] = useState<string | null>(null)
-  const [prototypePages, setPrototypePages] = useState<readonly PrototypePageArtifact[]>([])
+    useState<PrototypeSuiteScope>(() => initialWorkspace?.prototypeScope ?? 'primary-flow')
+  const [humanLoopChoiceId, setHumanLoopChoiceId] = useState<string | null>(
+    () => initialWorkspace?.humanLoopChoiceId ?? null,
+  )
+  const [prototypePages, setPrototypePages] = useState<readonly PrototypePageArtifact[]>(
+    () => restorePrototypePages(initialWorkspace?.prototypePages ?? []),
+  )
   const [prototypeDesignSystem, setPrototypeDesignSystem] =
-    useState<PrototypeDesignSystemArtifact | null>(null)
+    useState<PrototypeDesignSystemArtifact | null>(() =>
+      restorePrototypeDesignSystem(initialWorkspace?.prototypeDesignSystem ?? null),
+    )
   const [selectedPrototypePageId, setSelectedPrototypePageId] =
-    useState<string | null>(null)
-  const [humanLoopCustomAnswer, setHumanLoopCustomAnswer] = useState('')
-  const [liveAgentOutput, setLiveAgentOutput] = useState('')
-  const [runError, setRunError] = useState<string | null>(null)
+    useState<string | null>(() => initialWorkspace?.selectedPrototypePageId ?? null)
+  const [humanLoopCustomAnswer, setHumanLoopCustomAnswer] = useState(
+    () => initialWorkspace?.humanLoopCustomAnswer ?? '',
+  )
+  const [liveAgentOutput, setLiveAgentOutput] = useState(
+    () => initialWorkspace?.liveAgentOutput ?? '',
+  )
+  const [runError, setRunError] = useState<string | null>(
+    () => initialWorkspace?.runError ?? null,
+  )
   const [namingStatus, setNamingStatus] =
-    useState<'idle' | 'pending' | 'running' | 'done' | 'skipped' | 'error'>('idle')
+    useState<NamingStatus>(() => initialWorkspace?.namingStatus ?? 'idle')
   const autoNamePendingRef = useRef(false)
   const brief = useStore((s) => s.brief)
   const setBrief = useStore((s) => s.setBrief)
@@ -263,6 +295,42 @@ export function IntentWorkspace() {
     hasDesignSystem: Boolean(prototypeDesignSystem),
     hasPrototypePages: prototypePages.length > 0,
   })
+
+  useEffect(() => {
+    setWorkspaceSnapshot({
+      version: 'workspace.v1',
+      workflowPhase,
+      prototypePlan,
+      prototypeScope,
+      humanLoopChoiceId,
+      humanLoopCustomAnswer,
+      prototypeDesignSystem: prototypeDesignSystem
+        ? persistPrototypeDesignSystem(prototypeDesignSystem)
+        : null,
+      prototypePages: prototypePages.map(persistPrototypePage),
+      selectedPrototypePageId,
+      runError,
+      namingStatus,
+      liveAgentOutput,
+      attachments: attachments.map(persistReferenceAttachment),
+      webSearchEnabled,
+    })
+  }, [
+    attachments,
+    humanLoopChoiceId,
+    humanLoopCustomAnswer,
+    liveAgentOutput,
+    namingStatus,
+    prototypeDesignSystem,
+    prototypePages,
+    prototypePlan,
+    prototypeScope,
+    runError,
+    selectedPrototypePageId,
+    setWorkspaceSnapshot,
+    webSearchEnabled,
+    workflowPhase,
+  ])
 
   useEffect(() => {
     if (!autoNamePendingRef.current) return
@@ -820,6 +888,7 @@ export function IntentWorkspace() {
         onRemoveAttachment={removeAttachment}
         webSearchEnabled={webSearchEnabled}
         onToggleWebSearch={() => setWebSearchEnabled((value) => !value)}
+        agentMessages={agent.messages}
         onOpenSettings={settings.open}
         working={working}
         workflowPhase={workflowPhase}
@@ -827,13 +896,24 @@ export function IntentWorkspace() {
         hasPlan={Boolean(prototypePlan)}
         hasPrototypePages={prototypePages.length > 0}
         humanLoop={prototypePlan?.humanLoop ?? null}
+        humanLoopChoiceId={humanLoopChoiceId}
+        onHumanLoopChoiceChange={setHumanLoopChoiceId}
+        humanLoopCustomAnswer={humanLoopCustomAnswer}
+        onHumanLoopCustomAnswerChange={setHumanLoopCustomAnswer}
         prototypePlan={prototypePlan}
+        prototypePages={prototypePages}
+        prototypeDesignSystem={prototypeDesignSystem}
         prototypeScope={prototypeScope}
         onScopeChange={setPrototypeScope}
         scopeDisabled={working || prototypePages.length > 0}
         onPrimaryAction={() => void createAssets()}
         hasSlices={hasSlices}
         sliceCount={slices.length}
+        activeStage={activeStage}
+        elapsedSeconds={elapsedSeconds}
+        stages={stages}
+        progress={progress}
+        liveAgentOutput={liveAgentOutput}
         genError={genError}
         runError={runError}
       />
@@ -857,22 +937,12 @@ export function IntentWorkspace() {
             onPrototypePageSelect={setSelectedPrototypePageId}
             prototypeScope={prototypeScope}
             onScopeChange={setPrototypeScope}
-            humanLoopChoiceId={humanLoopChoiceId}
-            onHumanLoopChoiceChange={setHumanLoopChoiceId}
-            humanLoopCustomAnswer={humanLoopCustomAnswer}
-            onHumanLoopCustomAnswerChange={setHumanLoopCustomAnswer}
             hasSource={hasSource}
             hasSlices={hasSlices}
-            sliceCount={slices.length}
             working={working}
             analysisStatus={analysisStatus}
-              activeStage={activeStage}
-              elapsedSeconds={elapsedSeconds}
-              stages={stages}
-              progress={progress}
-              liveAgentOutput={liveAgentOutput}
-              runError={runError}
-            />
+            runError={runError}
+          />
         </section>
       </main>
 
@@ -895,6 +965,7 @@ function WorkspaceSidebar({
   onRemoveAttachment,
   webSearchEnabled,
   onToggleWebSearch,
+  agentMessages,
   onOpenSettings,
   working,
   workflowPhase,
@@ -902,13 +973,24 @@ function WorkspaceSidebar({
   hasPlan,
   hasPrototypePages,
   humanLoop,
+  humanLoopChoiceId,
+  onHumanLoopChoiceChange,
+  humanLoopCustomAnswer,
+  onHumanLoopCustomAnswerChange,
   prototypePlan,
+  prototypePages,
+  prototypeDesignSystem,
   prototypeScope,
   onScopeChange,
   scopeDisabled,
   onPrimaryAction,
   hasSlices,
   sliceCount,
+  activeStage,
+  elapsedSeconds,
+  stages,
+  progress,
+  liveAgentOutput,
   genError,
   runError,
 }: {
@@ -921,6 +1003,7 @@ function WorkspaceSidebar({
   readonly onRemoveAttachment: (id: string) => void
   readonly webSearchEnabled: boolean
   readonly onToggleWebSearch: () => void
+  readonly agentMessages: readonly AgentMessage[]
   readonly onOpenSettings: () => void
   readonly working: boolean
   readonly workflowPhase: WorkflowPhase
@@ -928,13 +1011,24 @@ function WorkspaceSidebar({
   readonly hasPlan: boolean
   readonly hasPrototypePages: boolean
   readonly humanLoop: PrototypeHumanLoop | null
+  readonly humanLoopChoiceId: string | null
+  readonly onHumanLoopChoiceChange: (id: string) => void
+  readonly humanLoopCustomAnswer: string
+  readonly onHumanLoopCustomAnswerChange: (value: string) => void
   readonly prototypePlan: PrototypePlan | null
+  readonly prototypePages: readonly PrototypePageArtifact[]
+  readonly prototypeDesignSystem: PrototypeDesignSystemArtifact | null
   readonly prototypeScope: PrototypeSuiteScope
   readonly onScopeChange: (scope: PrototypeSuiteScope) => void
   readonly scopeDisabled: boolean
   readonly onPrimaryAction: () => void
   readonly hasSlices: boolean
   readonly sliceCount: number
+  readonly activeStage: AssetStageId
+  readonly elapsedSeconds: number
+  readonly stages: readonly AssetStage[]
+  readonly progress: number
+  readonly liveAgentOutput: string
   readonly genError: GenerationError
   readonly runError: string | null
 }) {
@@ -945,6 +1039,8 @@ function WorkspaceSidebar({
     : 0
   const fullCount = prototypePlan?.pages.length ?? 0
   const showScope = prototypePlan?.humanLoop.mode === 'continue' && primaryCount < fullCount
+  const selectedHumanLoopChoiceId =
+    humanLoop?.mode === 'ask' ? humanLoopChoiceId ?? humanLoop.defaultChoiceId : null
 
   return (
     <aside className="flex h-full min-h-0 w-[20rem] shrink-0 border-r border-border bg-background">
@@ -966,102 +1062,31 @@ function WorkspaceSidebar({
 
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         <div className="min-h-0 flex-1 overflow-y-auto p-4 pt-5">
-          <section className="space-y-3">
-            <Textarea
-              value={brief}
-              rows={10}
-              onChange={(event) => onBriefChange(event.target.value)}
-              placeholder="Describe the target product, audience, platform, and visual direction."
-              className="min-h-[13.5rem] resize-none rounded-md bg-muted/15 text-sm leading-6"
+          {working ? (
+            <AgentActivityPanel
+              stage={activeStage}
+              elapsedSeconds={elapsedSeconds}
+              stages={stages}
+              progress={progress}
+              prototypePlan={prototypePlan}
+              prototypePages={prototypePages}
+              prototypeDesignSystem={prototypeDesignSystem}
+              sliceCount={sliceCount}
+              liveAgentOutput={liveAgentOutput}
+              compact={false}
             />
-
-            <div className="flex items-center gap-1">
-              <input
-                ref={attachInputRef}
-                type="file"
-                accept="image/*,.md,.markdown,.mdx"
-                multiple
-                className="hidden"
-                onChange={(event) => {
-                  onAttachFiles(event.target.files)
-                  event.target.value = ''
-                }}
-              />
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-sm"
-                aria-label="Attach reference images or a DESIGN.md"
-                onClick={() => attachInputRef.current?.click()}
-              >
-                <Paperclip className="size-4" />
-              </Button>
-              <Button
-                type="button"
-                variant={webSearchEnabled ? 'secondary' : 'ghost'}
-                size="icon-sm"
-                aria-pressed={webSearchEnabled}
-                aria-label="Web search"
-                onClick={onToggleWebSearch}
-              >
-                <Globe className="size-4" />
-              </Button>
-            </div>
-
-            {attachments.length > 0 ? (
-              <div className="flex flex-wrap gap-1.5">
-                {attachments.map((attachment) => (
-                  <span
-                    key={attachment.id}
-                    className="flex min-w-0 items-center gap-1.5 rounded-md border border-border bg-muted/20 py-1 pr-1.5 pl-1"
-                  >
-                    <img
-                      src={attachment.url}
-                      alt=""
-                      className="size-6 shrink-0 rounded object-cover"
-                    />
-                    <span className="max-w-[7.5rem] truncate text-[11px] text-muted-foreground">
-                      {attachment.name}
-                    </span>
-                    <button
-                      type="button"
-                      aria-label={`Remove ${attachment.name}`}
-                      className="shrink-0 rounded text-muted-foreground opacity-70 transition hover:text-foreground hover:opacity-100"
-                      onClick={() => onRemoveAttachment(attachment.id)}
-                    >
-                      <X className="size-3" />
-                    </button>
-                  </span>
-                ))}
-              </div>
-            ) : null}
-
-            <Button
-              size="lg"
-              className="h-10 w-full transition-transform active:scale-[0.99]"
-              disabled={briefEmpty || working}
-              onClick={onPrimaryAction}
-            >
-              {working ? <Loader2 className="animate-spin" /> : <Sparkles />}
-              {primaryButtonLabel({
-                working,
-                workflowPhase,
-                hasPlan,
-                hasPrototypePages,
-                humanLoop,
-              })}
-            </Button>
-
-            {showScope ? (
-              <DockScopePicker
-                scope={prototypeScope}
-                onScopeChange={onScopeChange}
-                disabled={scopeDisabled}
-                primaryCount={primaryCount}
-                fullCount={fullCount}
-              />
-            ) : null}
-          </section>
+          ) : humanLoop?.mode === 'ask' ? (
+            <HumanLoopQuestion
+              loop={humanLoop}
+              selectedChoiceId={selectedHumanLoopChoiceId}
+              onChoiceChange={onHumanLoopChoiceChange}
+              customAnswer={humanLoopCustomAnswer}
+              onCustomAnswerChange={onHumanLoopCustomAnswerChange}
+              compact
+            />
+          ) : (
+            <AgentConversation messages={agentMessages} />
+          )}
 
           {importedDesignMarkdown ? (
             <section className="mt-4 flex min-w-0 items-center gap-2 rounded-md border border-border bg-muted/15 px-3 py-2">
@@ -1120,6 +1145,118 @@ function WorkspaceSidebar({
             <div className="mt-4 min-w-0 whitespace-pre-wrap break-words rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive [overflow-wrap:anywhere]">
               {runError ?? userFacingGenerationError(genError?.message ?? '')}
             </div>
+          ) : null}
+        </div>
+
+        {/* Composer — one unified box, pinned to the bottom of the sidebar. */}
+        <div className="shrink-0 space-y-2 border-t border-border p-3">
+          {attachments.length > 0 ? (
+            <div className="flex flex-wrap gap-1.5">
+              {attachments.map((attachment) => (
+                <span
+                  key={attachment.id}
+                  className="flex min-w-0 items-center gap-1.5 rounded-md border border-border bg-muted/20 py-1 pr-1.5 pl-1"
+                >
+                  <img
+                    src={attachment.url}
+                    alt=""
+                    className="size-6 shrink-0 rounded object-cover"
+                  />
+                  <span className="max-w-[7.5rem] truncate text-[11px] text-muted-foreground">
+                    {attachment.name}
+                  </span>
+                  <button
+                    type="button"
+                    aria-label={`Remove ${attachment.name}`}
+                    className="shrink-0 rounded text-muted-foreground opacity-70 transition hover:text-foreground hover:opacity-100"
+                    onClick={() => onRemoveAttachment(attachment.id)}
+                  >
+                    <X className="size-3" />
+                  </button>
+                </span>
+              ))}
+            </div>
+          ) : null}
+
+          <div className="rounded-2xl border border-border bg-muted/15 shadow-sm transition-colors focus-within:border-ring/50">
+            <input
+              ref={attachInputRef}
+              type="file"
+              accept="image/*,.md,.markdown,.mdx"
+              multiple
+              className="hidden"
+              onChange={(event) => {
+                onAttachFiles(event.target.files)
+                event.target.value = ''
+              }}
+            />
+            <Textarea
+              value={brief}
+              rows={4}
+              onChange={(event) => onBriefChange(event.target.value)}
+              placeholder="Describe the target product, audience, platform, and visual direction."
+              className="min-h-[5.5rem] resize-none border-0 bg-transparent px-3 pt-3 pb-0 text-sm leading-6 shadow-none focus-visible:ring-0"
+            />
+            <div className="flex items-center justify-between gap-2 px-2 pb-2">
+              <div className="flex items-center gap-0.5">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label="Attach reference images or a DESIGN.md"
+                  onClick={() => attachInputRef.current?.click()}
+                >
+                  <Paperclip className="size-4" />
+                </Button>
+                <Button
+                  type="button"
+                  variant={webSearchEnabled ? 'secondary' : 'ghost'}
+                  size="icon-sm"
+                  aria-pressed={webSearchEnabled}
+                  aria-label="Web search"
+                  onClick={onToggleWebSearch}
+                >
+                  <Globe className="size-4" />
+                </Button>
+              </div>
+              <Button
+                type="button"
+                size="icon-sm"
+                className="size-9 shrink-0 rounded-full"
+                disabled={briefEmpty || working}
+                onClick={onPrimaryAction}
+                aria-label={primaryButtonLabel({
+                  working,
+                  workflowPhase,
+                  hasPlan,
+                  hasPrototypePages,
+                  humanLoop,
+                })}
+                title={primaryButtonLabel({
+                  working,
+                  workflowPhase,
+                  hasPlan,
+                  hasPrototypePages,
+                  humanLoop,
+                })}
+              >
+                {working ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <ArrowUp className="size-4" />
+                )}
+              </Button>
+            </div>
+          </div>
+
+          {showScope ? (
+            <DockScopePicker
+              scope={prototypeScope}
+              onScopeChange={onScopeChange}
+              disabled={scopeDisabled}
+              primaryCount={primaryCount}
+              fullCount={fullCount}
+            />
           ) : null}
         </div>
       </div>
@@ -1358,20 +1495,10 @@ function OutputSurface({
   onPrototypePageSelect,
   prototypeScope,
   onScopeChange,
-  humanLoopChoiceId,
-  onHumanLoopChoiceChange,
-  humanLoopCustomAnswer,
-  onHumanLoopCustomAnswerChange,
   hasSource,
   hasSlices,
-  sliceCount,
   working,
   analysisStatus,
-  activeStage,
-  elapsedSeconds,
-  stages,
-  progress,
-  liveAgentOutput,
   runError,
 }: {
   readonly prototypePlan: PrototypePlan | null
@@ -1381,25 +1508,47 @@ function OutputSurface({
   readonly onPrototypePageSelect: (pageId: string) => void
   readonly prototypeScope: PrototypeSuiteScope
   readonly onScopeChange: (scope: PrototypeSuiteScope) => void
-  readonly humanLoopChoiceId: string | null
-  readonly onHumanLoopChoiceChange: (id: string) => void
-  readonly humanLoopCustomAnswer: string
-  readonly onHumanLoopCustomAnswerChange: (value: string) => void
   readonly hasSource: boolean
   readonly hasSlices: boolean
-  readonly sliceCount: number
   readonly working: boolean
   readonly analysisStatus: ReturnType<typeof useStatus>
-  readonly activeStage: AssetStageId
-  readonly elapsedSeconds: number
-  readonly stages: readonly AssetStage[]
-  readonly progress: number
-  readonly liveAgentOutput: string
   readonly runError: string | null
 }) {
   const [previewPageId, setPreviewPageId] = useState<string | null>(null)
   const previewArtifact =
     prototypePages.find((artifact) => artifact.page.id === previewPageId) ?? null
+  const canvasSlices = useSlices()
+
+  // Constrained orchestration board: once a prototype result exists, results +
+  // materials are arranged on one governed canvas (design system · pages · assets).
+  if (prototypeDesignSystem || prototypePages.length > 0) {
+    const canvasDesignSystem: CanvasImageItem | null = prototypeDesignSystem
+      ? {
+          id: 'design-system',
+          label: prototypeDesignSystem.name || 'Design system',
+          blob: prototypeDesignSystem.blob,
+        }
+      : null
+    const canvasPages: CanvasImageItem[] = prototypePages.map((artifact) => ({
+      id: artifact.page.id,
+      label: artifact.page.name,
+      blob: artifact.blob,
+    }))
+    const canvasAssets: CanvasImageItem[] = canvasSlices.map((slice) => ({
+      id: slice.id,
+      label: slice.name,
+      url: slice.objectUrl,
+    }))
+    return (
+      <div className="relative h-full min-h-0">
+        <OutputCanvas
+          designSystem={canvasDesignSystem}
+          pages={canvasPages}
+          assets={canvasAssets}
+        />
+      </div>
+    )
+  }
 
   if (hasSlices) {
     return (
@@ -1429,19 +1578,6 @@ function OutputSurface({
         <div className="min-h-0 flex-1 overflow-y-auto p-3">
           <SliceGrid />
         </div>
-        {working ? (
-          <ProgressOverlay
-            stage={activeStage}
-            elapsedSeconds={elapsedSeconds}
-            stages={stages}
-            progress={progress}
-            prototypePlan={prototypePlan}
-            prototypePages={prototypePages}
-            prototypeDesignSystem={prototypeDesignSystem}
-            sliceCount={sliceCount}
-            liveAgentOutput={liveAgentOutput}
-          />
-        ) : null}
       </div>
     )
   }
@@ -1457,15 +1593,21 @@ function OutputSurface({
   }
 
   if (prototypePlan && prototypePages.length === 0 && !working) {
+    if (prototypePlan.humanLoop.mode === 'ask') {
+      return (
+        <CenteredState
+          icon={MessageCircle}
+          title="Answer in the Agent panel"
+          detail="Choose a direction on the left, or write a custom answer, then continue."
+        />
+      )
+    }
+
     return (
       <PrototypePlanReview
         plan={prototypePlan}
         scope={prototypeScope}
         onScopeChange={onScopeChange}
-        choiceId={humanLoopChoiceId}
-        onChoiceChange={onHumanLoopChoiceChange}
-        customAnswer={humanLoopCustomAnswer}
-        onCustomAnswerChange={onHumanLoopCustomAnswerChange}
       />
     )
   }
@@ -1479,19 +1621,6 @@ function OutputSurface({
           selectedPageId={selectedPrototypePageId}
           onSelectPage={onPrototypePageSelect}
         />
-        {working ? (
-          <ProgressOverlay
-            stage={activeStage}
-            elapsedSeconds={elapsedSeconds}
-            stages={stages}
-            progress={progress}
-            prototypePlan={prototypePlan}
-            prototypePages={prototypePages}
-            prototypeDesignSystem={prototypeDesignSystem}
-            sliceCount={sliceCount}
-            liveAgentOutput={liveAgentOutput}
-          />
-        ) : null}
       </div>
     )
   }
@@ -1510,35 +1639,16 @@ function OutputSurface({
     return (
       <div className="relative flex h-full min-h-0 p-4">
         <SourceCanvas />
-        {working ? (
-          <ProgressOverlay
-            stage={activeStage}
-            elapsedSeconds={elapsedSeconds}
-            stages={stages}
-            progress={progress}
-            prototypePlan={prototypePlan}
-            prototypePages={prototypePages}
-            prototypeDesignSystem={prototypeDesignSystem}
-            sliceCount={sliceCount}
-            liveAgentOutput={liveAgentOutput}
-          />
-        ) : null}
       </div>
     )
   }
 
   if (working) {
     return (
-      <WorkingState
-        stage={activeStage}
-        elapsedSeconds={elapsedSeconds}
-        stages={stages}
-        progress={progress}
-        prototypePlan={prototypePlan}
-        prototypePages={prototypePages}
-        prototypeDesignSystem={prototypeDesignSystem}
-        sliceCount={sliceCount}
-        liveAgentOutput={liveAgentOutput}
+      <CenteredState
+        icon={WandSparkles}
+        title="Generating assets"
+        detail="Agent progress is shown in the left panel."
       />
     )
   }
@@ -1552,45 +1662,6 @@ function OutputSurface({
   )
 }
 
-function WorkingState({
-  stage,
-  elapsedSeconds,
-  stages,
-  progress,
-  prototypePlan,
-  prototypePages,
-  prototypeDesignSystem,
-  sliceCount,
-  liveAgentOutput,
-}: {
-  readonly stage: AssetStageId
-  readonly elapsedSeconds: number
-  readonly stages: readonly AssetStage[]
-  readonly progress: number
-  readonly prototypePlan: PrototypePlan | null
-  readonly prototypePages: readonly PrototypePageArtifact[]
-  readonly prototypeDesignSystem: PrototypeDesignSystemArtifact | null
-  readonly sliceCount: number
-  readonly liveAgentOutput: string
-}) {
-  return (
-    <div className="flex h-full min-h-0 items-center justify-center overflow-auto p-8">
-      <AgentActivityPanel
-        stage={stage}
-        elapsedSeconds={elapsedSeconds}
-        stages={stages}
-        progress={progress}
-        prototypePlan={prototypePlan}
-        prototypePages={prototypePages}
-        prototypeDesignSystem={prototypeDesignSystem}
-        sliceCount={sliceCount}
-        liveAgentOutput={liveAgentOutput}
-        compact={false}
-      />
-    </div>
-  )
-}
-
 function StageStatusIcon({
   status,
 }: {
@@ -1599,45 +1670,6 @@ function StageStatusIcon({
   if (status === 'done') return <CheckCircle2 className="mt-0.5 size-3.5 text-emerald-500" />
   if (status === 'running') return <Loader2 className="mt-0.5 size-3.5 animate-spin text-primary" />
   return <Circle className="mt-0.5 size-3.5 text-muted-foreground/50" />
-}
-
-function ProgressOverlay({
-  stage,
-  elapsedSeconds,
-  stages,
-  progress,
-  prototypePlan,
-  prototypePages,
-  prototypeDesignSystem,
-  sliceCount,
-  liveAgentOutput,
-}: {
-  readonly stage: AssetStageId
-  readonly elapsedSeconds: number
-  readonly stages: readonly AssetStage[]
-  readonly progress: number
-  readonly prototypePlan: PrototypePlan | null
-  readonly prototypePages: readonly PrototypePageArtifact[]
-  readonly prototypeDesignSystem: PrototypeDesignSystemArtifact | null
-  readonly sliceCount: number
-  readonly liveAgentOutput: string
-}) {
-  return (
-    <div className="pointer-events-none absolute right-4 top-4 w-[22rem] max-w-[calc(100%-2rem)] shadow-lg">
-      <AgentActivityPanel
-        stage={stage}
-        elapsedSeconds={elapsedSeconds}
-        stages={stages}
-        progress={progress}
-        prototypePlan={prototypePlan}
-        prototypePages={prototypePages}
-        prototypeDesignSystem={prototypeDesignSystem}
-        sliceCount={sliceCount}
-        liveAgentOutput={liveAgentOutput}
-        compact
-      />
-    </div>
-  )
 }
 
 function AgentActivityPanel({
@@ -1816,43 +1848,15 @@ function PrototypePlanReview({
   plan,
   scope,
   onScopeChange,
-  choiceId,
-  onChoiceChange,
-  customAnswer,
-  onCustomAnswerChange,
 }: {
   readonly plan: PrototypePlan
   readonly scope: PrototypeSuiteScope
   readonly onScopeChange: (scope: PrototypeSuiteScope) => void
-  readonly choiceId: string | null
-  readonly onChoiceChange: (id: string) => void
-  readonly customAnswer: string
-  readonly onCustomAnswerChange: (value: string) => void
 }) {
   const scopedPages = pagesForScope(plan, scope)
   const firstFlow = plan.flows[0]
-  const selectedChoiceId =
-    plan.humanLoop.mode === 'ask'
-      ? choiceId ?? plan.humanLoop.defaultChoiceId
-      : null
   const primaryCount = pagesForScope(plan, 'primary-flow').length
   const fullCount = plan.pages.length
-
-  if (plan.humanLoop.mode === 'ask') {
-    return (
-      <div className="flex h-full min-h-0 items-center justify-center overflow-auto bg-muted/10 p-6">
-        <div className="w-full max-w-xl">
-          <HumanLoopQuestion
-            loop={plan.humanLoop}
-            selectedChoiceId={selectedChoiceId}
-            onChoiceChange={onChoiceChange}
-            customAnswer={customAnswer}
-            onCustomAnswerChange={onCustomAnswerChange}
-          />
-        </div>
-      </div>
-    )
-  }
 
   return (
     <div className="h-full min-h-0 overflow-auto bg-muted/10 p-5">
@@ -1961,12 +1965,14 @@ function HumanLoopQuestion({
   onChoiceChange,
   customAnswer,
   onCustomAnswerChange,
+  compact = false,
 }: {
   readonly loop: Extract<PrototypeHumanLoop, { mode: 'ask' }>
   readonly selectedChoiceId: string | null
   readonly onChoiceChange: (id: string) => void
   readonly customAnswer: string
   readonly onCustomAnswerChange: (value: string) => void
+  readonly compact?: boolean
 }) {
   const customRef = useRef<HTMLTextAreaElement | null>(null)
   const customSelected = selectedChoiceId === CUSTOM_HUMAN_LOOP_ID
@@ -1977,16 +1983,19 @@ function HumanLoopQuestion({
   }
 
   return (
-    <section className="rounded-lg border border-primary/35 bg-background p-4 shadow-sm">
-      <div className="flex items-start justify-between gap-3">
-        <h3 className="min-w-0 text-base font-semibold leading-6">
+    <section className={cn(
+      'rounded-lg border border-primary/35 bg-background shadow-sm',
+      compact ? 'p-3' : 'p-4',
+    )}>
+      <div className={cn('flex items-start gap-3', compact ? 'flex-col' : 'justify-between')}>
+        <h3 className={cn('min-w-0 font-semibold leading-6', compact ? 'text-sm' : 'text-base')}>
           {loop.question}
         </h3>
         <Button
           type="button"
           variant="outline"
           size="sm"
-          className="shrink-0"
+          className={cn('shrink-0', compact ? 'h-8 px-2 text-xs' : null)}
           onClick={focusCustomAnswer}
         >
           <MessageCircle className="size-3.5" />
@@ -1994,7 +2003,7 @@ function HumanLoopQuestion({
         </Button>
       </div>
 
-      <div className="mt-4 grid gap-2 md:grid-cols-2">
+      <div className={cn('grid gap-2', compact ? 'mt-3' : 'mt-4 md:grid-cols-2')}>
         {loop.choices.map((choice) => {
           const selected = choice.id === selectedChoiceId
           return (
@@ -2003,14 +2012,17 @@ function HumanLoopQuestion({
               type="button"
               onClick={() => onChoiceChange(choice.id)}
               className={cn(
-                'min-h-24 rounded-md border p-3 text-left transition-colors',
+                'rounded-md border text-left transition-colors',
+                compact ? 'min-h-0 p-2.5' : 'min-h-24 p-3',
                 selected
                   ? 'border-primary bg-primary/10'
                   : 'border-border bg-muted/10 hover:bg-muted/40',
               )}
             >
               <div className="flex items-center justify-between gap-3">
-                <span className="text-sm font-semibold">{choice.label}</span>
+                <span className={cn('font-semibold', compact ? 'text-xs' : 'text-sm')}>
+                  {choice.label}
+                </span>
                 <span
                   className={cn(
                     'size-2 rounded-full',
@@ -2018,7 +2030,10 @@ function HumanLoopQuestion({
                   )}
                 />
               </div>
-              <p className="mt-2 text-xs leading-5 text-muted-foreground">
+              <p className={cn(
+                'mt-2 text-xs leading-5 text-muted-foreground',
+                compact ? 'line-clamp-3' : null,
+              )}>
                 {choice.description}
               </p>
             </button>
@@ -2028,16 +2043,27 @@ function HumanLoopQuestion({
 
       <div
         role="group"
+        tabIndex={0}
         onClick={focusCustomAnswer}
+        onKeyDown={(event) => {
+          if (event.target !== event.currentTarget) return
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault()
+            focusCustomAnswer()
+          }
+        }}
         className={cn(
-          'mt-2 w-full rounded-md border p-3 text-left transition-colors',
+          'mt-2 w-full rounded-md border text-left transition-colors focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/40',
+          compact ? 'p-2.5' : 'p-3',
           customSelected
             ? 'border-primary bg-primary/10'
             : 'border-border bg-muted/10 hover:bg-muted/40',
         )}
       >
         <div className="flex items-center justify-between gap-3">
-          <span className="text-sm font-semibold">Custom option</span>
+          <span className={cn('font-semibold', compact ? 'text-xs' : 'text-sm')}>
+            Custom option
+          </span>
           <span
             className={cn(
               'size-2 rounded-full',
@@ -2054,9 +2080,9 @@ function HumanLoopQuestion({
             onChoiceChange(CUSTOM_HUMAN_LOOP_ID)
             onCustomAnswerChange(event.target.value)
           }}
-          rows={3}
+          rows={compact ? 2 : 3}
           placeholder="Tell the Agent the direction you want."
-          className="mt-2 resize-none bg-background text-sm"
+          className={cn('mt-2 resize-none bg-background', compact ? 'text-xs leading-5' : 'text-sm')}
         />
       </div>
     </section>
@@ -3017,6 +3043,85 @@ function userFacingGenerationError(message: string): string {
 
   if (message.trim().length === 0) return 'Generation stopped.'
   return message.length > 180 ? 'Generation stopped. Details are available in Agent diagnostics.' : message
+}
+
+function recoverWorkflowPhase(snapshot: WorkspaceSnapshot | null | undefined): WorkflowPhase {
+  if (!snapshot?.prototypePlan) return 'idle'
+  if (snapshot.prototypePages.length > 0 || snapshot.prototypeDesignSystem) return 'idle'
+  return 'review'
+}
+
+function restoreReferenceAttachments(
+  attachments: readonly PersistedReferenceAttachment[],
+): ReferenceAttachment[] {
+  return attachments.map((attachment) => {
+    const blob = bytesToBlob(attachment.bytes, attachment.mediaType)
+    return {
+      ...attachment,
+      blob,
+      url: URL.createObjectURL(blob),
+    }
+  })
+}
+
+function restorePrototypeDesignSystem(
+  artifact: PersistedPrototypeDesignSystem | null,
+): PrototypeDesignSystemArtifact | null {
+  if (!artifact) return null
+  return {
+    ...artifact,
+    blob: bytesToBlob(artifact.bytes, artifact.mediaType),
+  }
+}
+
+function restorePrototypePages(
+  artifacts: readonly PersistedPrototypePage[],
+): PrototypePageArtifact[] {
+  return artifacts.map((artifact) => ({
+    ...artifact,
+    blob: bytesToBlob(artifact.bytes, artifact.mediaType),
+  }))
+}
+
+function persistReferenceAttachment(
+  attachment: ReferenceAttachment,
+): PersistedReferenceAttachment {
+  return {
+    id: attachment.id,
+    name: attachment.name,
+    bytes: attachment.bytes,
+    mediaType: attachment.mediaType,
+  }
+}
+
+function persistPrototypeImage(
+  artifact: PrototypeImageArtifact,
+): PersistedPrototypeImage {
+  return {
+    bytes: artifact.bytes,
+    mediaType: artifact.mediaType,
+    width: artifact.width,
+    height: artifact.height,
+  }
+}
+
+function persistPrototypeDesignSystem(
+  artifact: PrototypeDesignSystemArtifact,
+): PersistedPrototypeDesignSystem {
+  return {
+    ...persistPrototypeImage(artifact),
+    name: artifact.name,
+    designMarkdown: artifact.designMarkdown,
+  }
+}
+
+function persistPrototypePage(
+  artifact: PrototypePageArtifact,
+): PersistedPrototypePage {
+  return {
+    ...persistPrototypeImage(artifact),
+    page: artifact.page,
+  }
 }
 
 async function artifactToMockup(artifact: PrototypePageArtifact) {
