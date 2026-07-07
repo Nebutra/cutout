@@ -141,7 +141,9 @@ export function ProjectHome({
                   {visibleProjects.length} local
                 </p>
               </div>
-              <ViewModeToggle value={viewMode} onChange={setViewMode} />
+              {hasVisibleProjects ? (
+                <ViewModeToggle value={viewMode} onChange={setViewMode} />
+              ) : null}
             </div>
 
             {hasVisibleProjects ? (
@@ -194,23 +196,35 @@ function ViewModeToggle({
     >
       <Button
         type="button"
-        variant={value === 'grid' ? 'secondary' : 'ghost'}
-        size="icon-sm"
+        variant="ghost"
+        size="sm"
         aria-label="Grid view"
         aria-pressed={value === 'grid'}
+        className={cn(
+          'h-7 rounded-[min(var(--radius-md),10px)] px-2',
+          value === 'grid' &&
+            'bg-foreground text-background shadow-sm hover:bg-foreground/90 hover:text-background',
+        )}
         onClick={() => onChange('grid')}
       >
         <LayoutGrid className="size-4" />
+        Grid
       </Button>
       <Button
         type="button"
-        variant={value === 'list' ? 'secondary' : 'ghost'}
-        size="icon-sm"
+        variant="ghost"
+        size="sm"
         aria-label="List view"
         aria-pressed={value === 'list'}
+        className={cn(
+          'h-7 rounded-[min(var(--radius-md),10px)] px-2',
+          value === 'list' &&
+            'bg-foreground text-background shadow-sm hover:bg-foreground/90 hover:text-background',
+        )}
         onClick={() => onChange('list')}
       >
         <List className="size-4" />
+        List
       </Button>
     </div>
   )
