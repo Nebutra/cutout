@@ -74,6 +74,7 @@ type ProjectShellAction =
   | { readonly type: 'open-project'; readonly id: string }
   | { readonly type: 'close-project' }
   | { readonly type: 'create-project'; readonly project: LocalProjectSummary }
+  | { readonly type: 'project-updated'; readonly project: LocalProjectSummary }
   | { readonly type: 'delete-project'; readonly id: string }
   | { readonly type: 'autosaved'; readonly project: LocalProjectSummary }
 
@@ -135,6 +136,14 @@ function projectShellReducer(
         view: 'project',
         projectTabOpen: true,
         projectVersion: state.projectVersion + 1,
+      }
+    case 'project-updated':
+      return {
+        ...state,
+        projects: [
+          action.project,
+          ...state.projects.filter((item) => item.id !== action.project.id),
+        ].sort((a, b) => b.updatedAt - a.updatedAt),
       }
     case 'delete-project': {
       const deletingActive = state.activeProjectId === action.id
@@ -330,6 +339,52 @@ export function AppShell() {
     },
     [activeProjectId, projectRepository, resetProject],
   )
+  const archiveProject = useCallback(
+    async (id: string) => {
+      const archived = await projectRepository.archive(id, Date.now())
+      if (isErr(archived)) {
+        toast.error('Could not archive project', { description: archived.error })
+        return
+      }
+
+      if (saveTimerRef.current) {
+        clearTimeout(saveTimerRef.current)
+        saveTimerRef.current = null
+      }
+      if (activeProjectId === id) {
+        restoringRef.current = true
+        activeRecordRef.current = null
+        resetProject()
+        dispatchProjectShell({ type: 'close-project' })
+        queueMicrotask(() => {
+          restoringRef.current = false
+        })
+      }
+
+      dispatchProjectShell({
+        type: 'project-updated',
+        project: projectSummaryFromRecord(archived.data),
+      })
+      toast.success('Project archived')
+    },
+    [activeProjectId, projectRepository, resetProject],
+  )
+  const restoreArchivedProject = useCallback(
+    async (id: string) => {
+      const restored = await projectRepository.archive(id, null)
+      if (isErr(restored)) {
+        toast.error('Could not restore project', { description: restored.error })
+        return
+      }
+
+      dispatchProjectShell({
+        type: 'project-updated',
+        project: projectSummaryFromRecord(restored.data),
+      })
+      toast.success('Project restored')
+    },
+    [projectRepository],
+  )
 
   useEffect(() => {
     if (!activeProjectId || restoringRef.current) return
@@ -432,6 +487,8 @@ export function AppShell() {
               loadState={projectLoadState}
               loadError={projectLoadError}
               onOpenProject={(id) => void openProjectById(id)}
+              onArchiveProject={(id) => void archiveProject(id)}
+              onRestoreProject={(id) => void restoreArchivedProject(id)}
               onDeleteProject={(id) => void deleteProject(id)}
               onNewProject={requestNewProject}
               onRetryProjects={() => void loadProjects()}
@@ -457,12 +514,28 @@ function projectNameFromBrief(brief: string): string {
 
 function isDisposableEmptyProject(project: LocalProjectSummary): boolean {
   return (
+    !project.archivedAt &&
     project.brief.trim().length === 0 &&
     project.assetCount === 0 &&
     !project.hasDesignMarkdown &&
     project.status === 'Empty' &&
     !project.thumbnail
   )
+}
+
+function projectSummaryFromRecord(record: LocalProjectRecord): LocalProjectSummary {
+  return {
+    id: record.id,
+    name: record.name,
+    brief: record.brief,
+    assetCount: record.assetCount,
+    hasDesignMarkdown: record.hasDesignMarkdown,
+    status: record.status,
+    createdAt: record.createdAt,
+    updatedAt: record.updatedAt,
+    archivedAt: record.archivedAt,
+    thumbnail: record.thumbnail,
+  }
 }
 
 function shouldPersistWorkspace(

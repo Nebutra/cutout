@@ -176,6 +176,33 @@ describe('project-repository.local', () => {
     expect(loaded.data.workspace?.humanLoopChoiceId).toBe('commerce')
   })
 
+  it('archives and restores projects without deleting them', async () => {
+    const repo = makeRepo()
+    const project = {
+      ...createEmptyProjectRecord(350),
+      name: 'Archive me',
+      brief: 'archive test',
+      status: 'Draft' as const,
+    }
+
+    expect((await repo.save(project)).ok).toBe(true)
+
+    const archived = await repo.archive(project.id, 450)
+    expect(archived.ok).toBe(true)
+    if (!archived.ok) return
+    expect(archived.data.archivedAt).toBe(450)
+
+    const listed = await repo.list()
+    expect(listed.ok).toBe(true)
+    if (!listed.ok) return
+    expect(listed.data[0].archivedAt).toBe(450)
+
+    const restored = await repo.archive(project.id, null)
+    expect(restored.ok).toBe(true)
+    if (!restored.ok) return
+    expect(restored.data.archivedAt).toBeUndefined()
+  })
+
   it('creates autosave records from the store workspace snapshot', async () => {
     const state = getStoreState()
     state.resetProject()

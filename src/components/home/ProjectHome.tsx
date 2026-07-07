@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   AlertCircle,
+  Archive,
+  ArchiveRestore,
   ArrowRight,
   Clock3,
   FileText,
@@ -12,6 +14,7 @@ import {
   Scissors,
   Sparkles,
   Trash2,
+  type LucideIcon,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -29,7 +32,7 @@ import {
 import type { LocalProjectSummary } from '@/services/local/project-repository.local'
 import { cn } from '@/lib/utils'
 
-type ProjectFilter = 'all' | 'ready' | 'draft' | 'empty'
+type ProjectFilter = 'all' | 'ready' | 'draft' | 'archived'
 type ProjectViewMode = 'grid' | 'list'
 type ProjectLoadState = 'loading' | 'ready' | 'error'
 
@@ -45,6 +48,8 @@ interface ProjectHomeProps {
   readonly loadState: ProjectLoadState
   readonly loadError: string | null
   readonly onOpenProject: (id: string) => void
+  readonly onArchiveProject: (id: string) => void
+  readonly onRestoreProject: (id: string) => void
   readonly onDeleteProject: (id: string) => void
   readonly onNewProject: () => void
   readonly onRetryProjects: () => void
@@ -56,6 +61,8 @@ export function ProjectHome({
   loadState,
   loadError,
   onOpenProject,
+  onArchiveProject,
+  onRestoreProject,
   onDeleteProject,
   onNewProject,
   onRetryProjects,
@@ -88,7 +95,7 @@ export function ProjectHome({
           </div>
           <div className="min-w-0">
             <p className="truncate text-sm font-semibold">Cutout</p>
-            <p className="text-xs text-muted-foreground">Local projects</p>
+            <p className="text-xs text-muted-foreground">Files</p>
           </div>
         </div>
 
@@ -124,11 +131,11 @@ export function ProjectHome({
             onClick={() => setFilter('draft')}
           />
           <FilterItem
-            icon={Clock3}
-            label="Empty"
-            count={counts.empty}
-            active={filter === 'empty'}
-            onClick={() => setFilter('empty')}
+            icon={Archive}
+            label="Archived"
+            count={counts.archived}
+            active={filter === 'archived'}
+            onClick={() => setFilter('archived')}
           />
         </nav>
       </aside>
@@ -136,7 +143,7 @@ export function ProjectHome({
       <section className="min-w-0 flex-1 overflow-y-auto bg-muted/15">
         <div className="mx-auto w-full max-w-6xl px-6 py-8">
           <header className="border-b border-border pb-6">
-            <p className="text-sm font-medium text-muted-foreground">Home</p>
+            <p className="text-sm font-medium text-muted-foreground">File</p>
             <h1 className="mt-1 text-2xl font-semibold tracking-tight">
               Projects
             </h1>
@@ -174,6 +181,8 @@ export function ProjectHome({
                       project={project}
                       active={project.id === activeProjectId}
                       onOpen={() => onOpenProject(project.id)}
+                      onArchive={() => onArchiveProject(project.id)}
+                      onRestore={() => onRestoreProject(project.id)}
                       onDelete={() => onDeleteProject(project.id)}
                     />
                   ))}
@@ -183,6 +192,8 @@ export function ProjectHome({
                   projects={visibleProjects}
                   activeProjectId={activeProjectId}
                   onOpenProject={onOpenProject}
+                  onArchiveProject={onArchiveProject}
+                  onRestoreProject={onRestoreProject}
                   onDeleteProject={onDeleteProject}
                 />
               )
@@ -425,7 +436,7 @@ function FilterItem({
   active,
   onClick,
 }: {
-  readonly icon: typeof LayoutGrid
+  readonly icon: LucideIcon
   readonly label: string
   readonly count: number
   readonly active: boolean
@@ -452,13 +463,14 @@ function FilterItem({
 }
 
 function projectCounts(projects: readonly LocalProjectSummary[]) {
+  const activeProjects = projects.filter((project) => !project.archivedAt)
   return {
-    all: projects.length,
-    ready: projects.filter((project) => project.status === 'Ready').length,
-    draft: projects.filter(
+    all: activeProjects.length,
+    ready: activeProjects.filter((project) => project.status === 'Ready').length,
+    draft: activeProjects.filter(
       (project) => project.status === 'Draft' || project.status === 'Running',
     ).length,
-    empty: projects.filter((project) => project.status === 'Empty').length,
+    archived: projects.filter((project) => Boolean(project.archivedAt)).length,
   }
 }
 
@@ -466,12 +478,18 @@ function projectMatchesFilter(
   project: LocalProjectSummary,
   filter: ProjectFilter,
 ): boolean {
+  if (filter === 'archived') return Boolean(project.archivedAt)
+  if (project.archivedAt) return false
   if (filter === 'all') return true
   if (filter === 'ready') return project.status === 'Ready'
   if (filter === 'draft') {
-    return project.status === 'Draft' || project.status === 'Running'
+    return (
+      project.status === 'Draft' ||
+      project.status === 'Running' ||
+      project.status === 'Empty'
+    )
   }
-  return project.status === 'Empty'
+  return false
 }
 
 function filterTitle(filter: ProjectFilter): string {
@@ -480,8 +498,8 @@ function filterTitle(filter: ProjectFilter): string {
       return 'Ready'
     case 'draft':
       return 'Drafts'
-    case 'empty':
-      return 'Empty'
+    case 'archived':
+      return 'Archived'
     case 'all':
       return 'Recently viewed'
   }
@@ -491,11 +509,15 @@ function ProjectList({
   projects,
   activeProjectId,
   onOpenProject,
+  onArchiveProject,
+  onRestoreProject,
   onDeleteProject,
 }: {
   readonly projects: readonly LocalProjectSummary[]
   readonly activeProjectId: string | null
   readonly onOpenProject: (id: string) => void
+  readonly onArchiveProject: (id: string) => void
+  readonly onRestoreProject: (id: string) => void
   readonly onDeleteProject: (id: string) => void
 }) {
   return (
@@ -515,6 +537,8 @@ function ProjectList({
             project={project}
             active={project.id === activeProjectId}
             onOpen={() => onOpenProject(project.id)}
+            onArchive={() => onArchiveProject(project.id)}
+            onRestore={() => onRestoreProject(project.id)}
             onDelete={() => onDeleteProject(project.id)}
           />
         ))}
@@ -527,13 +551,18 @@ function ProjectRow({
   project,
   active,
   onOpen,
+  onArchive,
+  onRestore,
   onDelete,
 }: {
   readonly project: LocalProjectSummary
   readonly active: boolean
   readonly onOpen: () => void
+  readonly onArchive: () => void
+  readonly onRestore: () => void
   readonly onDelete: () => void
 }) {
+  const archived = Boolean(project.archivedAt)
   return (
     <div
       className={cn(
@@ -566,10 +595,12 @@ function ProjectRow({
         {project.hasDesignMarkdown ? 'DESIGN.md' : 'No design'}
       </span>
       <span className="hidden text-sm text-muted-foreground lg:block">
-        {project.status}
+        {archived ? 'Archived' : project.status}
       </span>
-      <ProjectDeleteButton
-        projectName={project.name}
+      <ProjectActions
+        project={project}
+        onArchive={onArchive}
+        onRestore={onRestore}
         onDelete={onDelete}
         className="justify-self-start lg:justify-self-end"
       />
@@ -581,13 +612,18 @@ function ProjectCard({
   project,
   active,
   onOpen,
+  onArchive,
+  onRestore,
   onDelete,
 }: {
   readonly project: LocalProjectSummary
   readonly active: boolean
   readonly onOpen: () => void
+  readonly onArchive: () => void
+  readonly onRestore: () => void
   readonly onDelete: () => void
 }) {
+  const archived = Boolean(project.archivedAt)
   return (
     <div
       className={cn(
@@ -619,12 +655,14 @@ function ProjectCard({
               icon={FileText}
               label={project.hasDesignMarkdown ? 'DESIGN.md' : 'No DESIGN.md'}
             />
-            <ProjectChip icon={Clock3} label={project.status} />
+            <ProjectChip icon={Clock3} label={archived ? 'Archived' : project.status} />
           </div>
         </div>
       </button>
-      <ProjectDeleteButton
-        projectName={project.name}
+      <ProjectActions
+        project={project}
+        onArchive={onArchive}
+        onRestore={onRestore}
         onDelete={onDelete}
         className="absolute right-2 top-2 bg-background/90 shadow-sm"
       />
@@ -673,6 +711,89 @@ function ProjectThumbnail({ blob }: { readonly blob: Blob }) {
   )
 }
 
+function ProjectActions({
+  project,
+  onArchive,
+  onRestore,
+  onDelete,
+  className,
+}: {
+  readonly project: LocalProjectSummary
+  readonly onArchive: () => void
+  readonly onRestore: () => void
+  readonly onDelete: () => void
+  readonly className?: string
+}) {
+  if (project.archivedAt) {
+    return (
+      <div className={cn('flex items-center gap-1', className)}>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-sm"
+          aria-label={`Restore ${project.name}`}
+          className="transition-colors hover:text-foreground"
+          onClick={(event) => {
+            event.stopPropagation()
+            onRestore()
+          }}
+        >
+          <ArchiveRestore className="size-3.5" />
+        </Button>
+        <ProjectDeleteButton projectName={project.name} onDelete={onDelete} />
+      </div>
+    )
+  }
+
+  return (
+    <ProjectArchiveButton
+      projectName={project.name}
+      onArchive={onArchive}
+      className={className}
+    />
+  )
+}
+
+function ProjectArchiveButton({
+  projectName,
+  onArchive,
+  className,
+}: {
+  readonly projectName: string
+  readonly onArchive: () => void
+  readonly className?: string
+}) {
+  return (
+    <AlertDialog>
+      <AlertDialogTrigger asChild>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-sm"
+          aria-label={`Archive ${projectName}`}
+          className={cn('transition-colors hover:text-foreground', className)}
+          onClick={(event) => event.stopPropagation()}
+        >
+          <Archive className="size-3.5" />
+        </Button>
+      </AlertDialogTrigger>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Archive project?</AlertDialogTitle>
+          <AlertDialogDescription>
+            “{projectName}” will move out of active projects. You can restore it
+            from Archived.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction onClick={onArchive}>Archive</AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  )
+}
+
 function ProjectDeleteButton({
   projectName,
   onDelete,
@@ -698,9 +819,9 @@ function ProjectDeleteButton({
       </AlertDialogTrigger>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>Delete project?</AlertDialogTitle>
+          <AlertDialogTitle>Delete permanently?</AlertDialogTitle>
           <AlertDialogDescription>
-            This removes “{projectName}” from local projects. This action cannot
+            This removes “{projectName}” from local storage. This action cannot
             be undone.
           </AlertDialogDescription>
         </AlertDialogHeader>

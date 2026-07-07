@@ -1039,17 +1039,43 @@ function WorkspaceSidebar({
     : 0
   const fullCount = prototypePlan?.pages.length ?? 0
   const showScope = prototypePlan?.humanLoop.mode === 'continue' && primaryCount < fullCount
+  const hasDesignSystem = Boolean(importedDesignMarkdown || prototypeDesignSystem)
+  const hasAssetOutput = hasSlices || prototypePages.length > 0
   const selectedHumanLoopChoiceId =
     humanLoop?.mode === 'ask' ? humanLoopChoiceId ?? humanLoop.defaultChoiceId : null
 
   return (
     <aside className="flex h-full min-h-0 w-[20rem] shrink-0 border-r border-border bg-background">
       <nav className="flex w-14 shrink-0 flex-col items-center gap-1 border-r border-border py-3">
-        <SidebarRailItem icon={FileText} label="File" active />
-        <SidebarRailItem icon={WandSparkles} label="Agent" active={Boolean(prototypePlan)} />
-        <SidebarRailItem icon={Layers3} label="Design" active={Boolean(importedDesignMarkdown)} />
-        <SidebarRailItem icon={ImageIcon} label="Assets" active={hasSlices} />
-        <SidebarRailItem icon={Scissors} label="Run" active={working} />
+        <SidebarRailItem
+          icon={FileText}
+          label="File"
+          active={false}
+          disabled
+          title="Project files live in Home."
+        />
+        <SidebarRailItem icon={WandSparkles} label="Agent" active />
+        <SidebarRailItem
+          icon={Layers3}
+          label="Design"
+          active={hasDesignSystem}
+          disabled={!hasDesignSystem}
+          title={hasDesignSystem ? 'Design system is available.' : 'Design system appears after planning.'}
+        />
+        <SidebarRailItem
+          icon={ImageIcon}
+          label="Assets"
+          active={hasAssetOutput}
+          disabled={!hasAssetOutput}
+          title={hasAssetOutput ? 'Assets are available.' : 'Generated assets appear here after the Agent runs.'}
+        />
+        <SidebarRailItem
+          icon={Scissors}
+          label="Run"
+          active={working}
+          disabled={!working}
+          title={working ? 'Run is active.' : 'Run status appears while the Agent is working.'}
+        />
         <div className="mt-auto w-full">
           <SidebarRailItem
             icon={Settings2}
@@ -1268,26 +1294,33 @@ function SidebarRailItem({
   icon: Icon,
   label,
   active,
+  disabled = false,
+  title,
   onClick,
 }: {
   readonly icon: ComponentType<{ className?: string }>
   readonly label: string
   readonly active: boolean
+  readonly disabled?: boolean
+  readonly title?: string
   readonly onClick?: () => void
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
+      disabled={disabled && !onClick}
+      title={title ?? label}
       className={cn(
         'flex w-full flex-col items-center gap-1 px-1.5 py-2 text-[10px] transition-colors',
         active ? 'text-foreground' : 'text-muted-foreground',
+        disabled && !onClick && 'cursor-default opacity-45',
       )}
     >
       <div
         className={cn(
           'flex size-8 items-center justify-center rounded-md',
-          active ? 'bg-muted text-foreground' : 'hover:bg-muted/50',
+          active ? 'bg-muted text-foreground' : !disabled && 'hover:bg-muted/50',
         )}
       >
         <Icon className="size-4" />

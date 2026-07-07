@@ -29,6 +29,7 @@ export interface LocalProjectSummary {
   readonly status: LocalProjectStatus
   readonly createdAt: number
   readonly updatedAt: number
+  readonly archivedAt?: number
   readonly thumbnail?: Blob
 }
 
@@ -63,6 +64,7 @@ export interface LocalProjectRepository {
   list(): Promise<Result<LocalProjectSummary[]>>
   load(id: string): Promise<Result<LocalProjectRecord>>
   save(record: LocalProjectRecord): Promise<Result<void>>
+  archive(id: string, archivedAt: number | null): Promise<Result<LocalProjectRecord>>
   remove(id: string): Promise<Result<void>>
 }
 
@@ -144,6 +146,36 @@ export function createLocalProjectRepository(
     }
   }
 
+  async function archive(
+    id: string,
+    archivedAt: number | null,
+  ): Promise<Result<LocalProjectRecord>> {
+    if (!idb) return err(`Project storage is unavailable.`)
+    try {
+      const db = await openProjectsDb(idb)
+      try {
+        const tx = db.transaction(STORE, 'readwrite')
+        const store = tx.objectStore(STORE)
+        const record = await promisify(
+          store.get(id) as IDBRequest<LocalProjectRecord | undefined>,
+        )
+        if (!record) return err(`Project "${id}" was not found.`)
+        const updated: LocalProjectRecord = {
+          ...record,
+          archivedAt: archivedAt ?? undefined,
+          updatedAt: Date.now(),
+        }
+        store.put(updated)
+        await txDone(tx)
+        return ok(updated)
+      } finally {
+        db.close()
+      }
+    } catch (error) {
+      return err(errorMessage(error))
+    }
+  }
+
   async function remove(id: string): Promise<Result<void>> {
     if (!idb) return err(`Project storage is unavailable.`)
     try {
@@ -161,7 +193,7 @@ export function createLocalProjectRepository(
     }
   }
 
-  return { list, load, save, remove }
+  return { list, load, save, archive, remove }
 }
 
 export function createEmptyProjectRecord(now = Date.now()): LocalProjectRecord {
@@ -174,6 +206,7 @@ export function createEmptyProjectRecord(now = Date.now()): LocalProjectRecord {
     status: 'Empty',
     createdAt: now,
     updatedAt: now,
+    archivedAt: undefined,
     params: DEFAULT_PARAMS,
     designMarkdown: null,
     workspace: null,
@@ -236,6 +269,7 @@ export async function createProjectRecordFromStore(input: {
     status: projectStatusFromStore(state, workspace),
     createdAt: input.createdAt,
     updatedAt: now,
+    archivedAt: input.previous?.archivedAt,
     thumbnail,
     params: state.params,
     sourceImageId: state.source.imageId || undefined,
@@ -286,6 +320,7 @@ function toSummary(record: LocalProjectRecord): LocalProjectSummary {
     status: record.status,
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,
+    archivedAt: record.archivedAt,
     thumbnail: record.thumbnail,
   }
 }
