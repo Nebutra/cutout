@@ -22,6 +22,18 @@ pub fn run() {
             commands::ai::ai_proxy::ai_proxy_stream,
             // BYOK: 垫图 reference-conditioned image edit (multipart /images/edits)
             commands::ai::image_edit::ai_image_edit,
+            // AI Native: file-queue JSON API for local agents / CLI
+            commands::ai_native::ai_native_paths,
+            commands::ai_native::ai_native_poll,
+            commands::ai_native::ai_native_complete,
+            commands::ai_native::ai_native_read_file,
+            commands::ai_native::ai_native_write_artifact,
+            // PNG → SVG vectorization
+            commands::vectorize::set_vectorizer_api_key,
+            commands::vectorize::vectorizer_key_status,
+            commands::vectorize::delete_vectorizer_api_key,
+            commands::vectorize::vectorize_local_vtracer,
+            commands::vectorize::vectorize_vectorizer_ai,
         ])
         .setup(|app| {
             if cfg!(debug_assertions) {

@@ -16,11 +16,13 @@
  */
 import type { StateCreator } from 'zustand'
 import type { GraphSpec } from '@/dag/graph-spec'
+import type { IntentProfile } from '@/dag/intent-types'
 import type {
   DagNodeState,
   GenError,
   GenOp,
   GenPhase,
+  DesignMarkdownAsset,
   MockupArtifact,
   NodeStatus,
   PipelineGraph,
@@ -59,13 +61,19 @@ export const INITIAL_PIPELINE: PipelineGraph = {
 export interface PipelineSlice {
   pipeline: PipelineGraph
   brief: string
+  intent: IntentProfile | null
   mockup: MockupArtifact | null
+  designMarkdown: DesignMarkdownAsset | null
   genPhase: GenPhase
   genError: GenError | null
   graph: GraphSpec | null
   dagNodes: Readonly<Record<string, DagNodeState>>
   setBrief(text: string): void
+  setIntent(intent: IntentProfile): void
+  clearIntent(): void
   setMockup(artifact: MockupArtifact): void
+  setDesignMarkdown(asset: DesignMarkdownAsset): void
+  clearDesignMarkdown(): void
   beginGen(phase: Exclude<GenPhase, 'idle'>): void
   endGen(): void
   failGen(op: GenOp, message: string): void
@@ -80,7 +88,9 @@ export const createPipelineSlice: StateCreator<Store, [], [], PipelineSlice> = (
 ) => ({
   pipeline: INITIAL_PIPELINE,
   brief: '',
+  intent: null,
   mockup: null,
+  designMarkdown: null,
   genPhase: 'idle',
   genError: null,
   graph: null,
@@ -91,7 +101,13 @@ export const createPipelineSlice: StateCreator<Store, [], [], PipelineSlice> = (
       brief: text,
       // Editing the brief clears a stale generate error so the dot can recover.
       genError: s.genError?.op === 'generate' ? null : s.genError,
+      // …and drops the recognized intent — it no longer matches the new brief.
+      intent: null,
     })),
+
+  setIntent: (intent) => set({ intent }),
+
+  clearIntent: () => set({ intent: null }),
 
   setMockup: (artifact) =>
     set((s) => {
@@ -99,6 +115,10 @@ export const createPipelineSlice: StateCreator<Store, [], [], PipelineSlice> = (
       if (s.mockup && s.mockup.bitmap !== artifact.bitmap) s.mockup.bitmap.close()
       return { mockup: artifact, genPhase: 'idle', genError: null }
     }),
+
+  setDesignMarkdown: (asset) => set({ designMarkdown: asset }),
+
+  clearDesignMarkdown: () => set({ designMarkdown: null }),
 
   beginGen: (phase) => set({ genPhase: phase, genError: null }),
 
@@ -134,6 +154,9 @@ export const createPipelineSlice: StateCreator<Store, [], [], PipelineSlice> = (
 /** `brief` is ready once the requirement has non-whitespace text. */
 export const selectBriefStatus = (s: Store): NodeStatus =>
   s.brief.trim() ? 'ready' : 'empty'
+
+/** The recognized, open-world intent for the current brief (spec §7), or null. */
+export const selectIntent = (s: Store): IntentProfile | null => s.intent
 
 /**
  * `mockup` reflects the generation that lands in it: forward `generate` (from

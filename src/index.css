@@ -132,6 +132,25 @@
     }
 }
 
+/*
+ * Smooth the language switch: a locale change re-labels the whole UI, and
+ * Latin↔CJK text differs in width + metrics, so `switchLocale` swaps inside a
+ * View Transition. A short, calm cross-fade (matching the app's Linear/Raycast
+ * feel) reads as "adapting" rather than a hard cut; reduced-motion users get an
+ * instant swap.
+ */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 180ms;
+  animation-timing-function: ease;
+}
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation: none;
+  }
+}
+
 /* Transparent-preview checkerboard backdrop */
 @utility bg-checker {
   background-color: #fff;
@@ -150,4 +169,20 @@
     linear-gradient(-45deg, #2a2a2e 25%, transparent 25%),
     linear-gradient(45deg, transparent 75%, #2a2a2e 75%),
     linear-gradient(-45deg, transparent 75%, #2a2a2e 75%);
+}
+
+.cn-toast {
+  max-width: min(calc(100vw - 2rem), 28rem);
+}
+
+.cn-toast [data-content],
+.cn-toast-title,
+.cn-toast-description {
+  min-width: 0;
+}
+
+.cn-toast-title,
+.cn-toast-description {
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }

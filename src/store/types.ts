@@ -12,6 +12,7 @@
  */
 import type { Box, CutoutParams } from '@/algorithm/types'
 import type { GraphSpec } from '@/dag/graph-spec'
+import type { IntentProfile } from '@/dag/intent-types'
 import type { NodeRunState } from '@/dag/executor'
 import type { CutoutSlice } from '@/services/types'
 import type { SliceName } from '@/services/ai/naming'
@@ -82,6 +83,28 @@ export interface SliceInput {
   readonly height: number
 }
 
+/** A persisted project restore payload decoded back into live browser objects. */
+export interface ProjectRestoreInput {
+  readonly brief: string
+  readonly params?: Params
+  readonly intent?: IntentProfile | null
+  readonly source?: {
+    readonly bitmap: ImageBitmap
+    readonly name: string
+  }
+  readonly mockup?: MockupArtifact | null
+  readonly designMarkdown?: DesignMarkdownAsset | null
+  readonly slices?: ReadonlyArray<{
+    readonly id: string
+    readonly index: number
+    readonly name: string
+    readonly box: Box
+    readonly blob: Blob
+    readonly width: number
+    readonly height: number
+  }>
+}
+
 /**
  * Pipeline graph (spec §3–§4). The canvas renders this topology as nodes/edges.
  *
@@ -132,6 +155,13 @@ export interface MockupArtifact {
   readonly blob: Blob
   readonly width: number
   readonly height: number
+}
+
+/** Imported DESIGN.md context that conditions prototype/design-system generation. */
+export interface DesignMarkdownAsset {
+  readonly name: string
+  readonly content: string
+  readonly importedAt: number
 }
 
 /**
@@ -187,8 +217,16 @@ export interface StoreState {
   readonly pipeline: PipelineGraph
   /** The `brief` node's artifact — the free-text product requirement. */
   readonly brief: string
+  /**
+   * The recognized, open-world understanding of the current brief (spec §6/§7),
+   * or null before recognition. Surfaced on the BriefNode; cleared when the
+   * brief is edited (it becomes stale).
+   */
+  readonly intent: IntentProfile | null
   /** The `mockup` node's artifact (generated or imported), or null when empty. */
   readonly mockup: MockupArtifact | null
+  /** Optional DESIGN.md source-of-truth imported from the ecosystem. */
+  readonly designMarkdown: DesignMarkdownAsset | null
   /** Which forward generation is in flight (drives mockup/edge running state). */
   readonly genPhase: GenPhase
   /** The last generation failure (op-scoped), or null. */
@@ -221,10 +259,18 @@ export interface StoreActions {
   renameSlice(id: string, name: string): void
   /** Clear the current selection. */
   clearSelection(): void
-  /** Set the `brief` node's requirement text (clears any prior generate error). */
+  /** Set the `brief` node's requirement text (clears any prior generate error + stale intent). */
   setBrief(text: string): void
+  /** Record the recognized intent for the current brief (spec §6/§7). */
+  setIntent(intent: IntentProfile): void
+  /** Drop the recognized intent (e.g. after a reset). */
+  clearIntent(): void
   /** Fill the `mockup` node (closing a superseded bitmap); marks it ready. */
   setMockup(artifact: MockupArtifact): void
+  /** Set or replace the imported DESIGN.md context. */
+  setDesignMarkdown(asset: DesignMarkdownAsset): void
+  /** Clear the imported DESIGN.md context. */
+  clearDesignMarkdown(): void
   /** Mark a forward generation as started (clears the prior error). */
   beginGen(phase: Exclude<GenPhase, 'idle'>): void
   /** Mark the current forward generation as finished (back to idle). */
@@ -239,6 +285,10 @@ export interface StoreActions {
   setDagNodeState(id: string, state: DagNodeState): void
   /** Reset a set of planned nodes to `idle` (before an adjust-and-re-run). */
   resetDagNodes(ids: ReadonlySet<string>): void
+  /** Start a clean local project, releasing current image / slice resources. */
+  resetProject(): void
+  /** Restore a persisted local project, rebuilding object URLs and live bitmaps. */
+  restoreProject(input: ProjectRestoreInput): void
 }
 
 /** The full store: state + actions. */

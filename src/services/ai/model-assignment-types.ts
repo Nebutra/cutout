@@ -9,6 +9,7 @@
  * Non-secret; persisted via `@tauri-apps/plugin-store` (see `model-assignment.local`).
  */
 import { z } from 'zod'
+import type { ReasoningEffort } from './reasoning'
 
 /** The two assignable slots, keyed by output modality. */
 export type SlotId = 'chat' | 'image'
@@ -17,6 +18,11 @@ export type SlotId = 'chat' | 'image'
 export interface ModelAssignment {
   readonly providerId: string
   readonly model: string
+  /**
+   * Thinking strength for the chat slot (`undefined` = the model's own default).
+   * Ignored for the image slot. See {@link ReasoningEffort}.
+   */
+  readonly effort?: ReasoningEffort
 }
 
 /** The full assignment table (either slot may be unset). */
@@ -28,6 +34,7 @@ export interface ModelAssignments {
 export const modelAssignmentSchema = z.object({
   providerId: z.string().min(1),
   model: z.string().min(1),
+  effort: z.enum(['low', 'medium', 'high']).optional(),
 })
 
 /** Boundary schema for the persisted blob — a bad/absent value degrades to `{}`. */

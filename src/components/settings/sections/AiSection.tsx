@@ -8,7 +8,7 @@
  *
  * The Models block (assignment by output modality) is added in Phase 3.
  */
-import { useState } from 'react'
+import { memo, useMemo, useState } from 'react'
 import { KeyRound, Plus, ShieldCheck } from 'lucide-react'
 import { Trans } from '@lingui/react/macro'
 import type { ProviderConfig } from '@/services/ai/provider-types'
@@ -18,6 +18,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { ProviderRow } from '../ProviderRow'
 import { ProviderForm } from '../ProviderForm'
 import { ModelSlot } from '../ModelSlot'
+import { VectorizerPanel } from '../VectorizerPanel'
 
 type View =
   | { readonly mode: 'list' }
@@ -109,39 +110,59 @@ export function AiSection() {
         <Trans id="settings.add_provider">Add provider</Trans>
       </Button>
 
-      <div className="mt-2 flex flex-col gap-3 border-t border-border pt-4">
-        <h3 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-          <Trans id="settings.models_heading">Models</Trans>
-        </h3>
-        <p className="-mt-1 text-xs text-muted-foreground">
-          <Trans id="settings.models_hint">
-            One endpoint, a different model per capability — no need to re-add the
-            provider. Pick each from the endpoint's model list or type it.
-          </Trans>
-        </p>
-        <ModelSlot
-          slot="chat"
-          label={
-            <Trans id="settings.model_chat_label">Chat / Understanding</Trans>
-          }
-          hint={
-            <Trans id="settings.model_chat_hint">
-              Text, reasoning and vision — one multimodal model.
-            </Trans>
-          }
-        />
-        <ModelSlot
-          slot="image"
-          label={
-            <Trans id="settings.model_image_label">Image generation</Trans>
-          }
-          hint={
-            <Trans id="settings.model_image_hint">
-              Produces images (e.g. regenerated asset sheets).
-            </Trans>
-          }
-        />
-      </div>
+      <ModelAssignments />
     </div>
   )
 }
+
+const ModelAssignments = memo(function ModelAssignments() {
+  const chatModelLabel = useMemo(
+    () => <Trans id="settings.model_chat_label">Chat / Understanding</Trans>,
+    [],
+  )
+  const chatModelHint = useMemo(
+    () => (
+      <Trans id="settings.model_chat_hint">
+        Text, reasoning and vision — one multimodal model.
+      </Trans>
+    ),
+    [],
+  )
+  const imageModelLabel = useMemo(
+    () => <Trans id="settings.model_image_label">Image generation</Trans>,
+    [],
+  )
+  const imageModelHint = useMemo(
+    () => (
+      <Trans id="settings.model_image_hint">
+        Produces images (e.g. regenerated asset sheets).
+      </Trans>
+    ),
+    [],
+  )
+
+  return (
+    <div className="mt-2 flex flex-col gap-3 border-t border-border pt-4">
+      <h3 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+        <Trans id="settings.models_heading">Models</Trans>
+      </h3>
+      <p className="-mt-1 text-xs text-muted-foreground">
+        <Trans id="settings.models_hint">
+          One endpoint, a different model per capability — no need to re-add the
+          provider. Pick each from the endpoint's model list or type it.
+        </Trans>
+      </p>
+      <ModelSlot
+        slot="chat"
+        label={chatModelLabel}
+        hint={chatModelHint}
+      />
+      <ModelSlot
+        slot="image"
+        label={imageModelLabel}
+        hint={imageModelHint}
+      />
+      <VectorizerPanel />
+    </div>
+  )
+})

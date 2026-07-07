@@ -33,6 +33,8 @@ reqwest = { version = "0.12", default-features = false, features = ["json", "str
 futures-util = "0.3"
 tauri-plugin-os = "2"
 tauri-plugin-store = "2"
+image = "0.23.10"
+vtracer = "0.6.5"
 
 # Real OS keychain backends per platform (without a backend feature, keyring 3.x
 # falls back to a process-local mock that does NOT persist across restarts).

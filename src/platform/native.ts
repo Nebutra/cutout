@@ -6,7 +6,7 @@
  */
 import { invoke } from '@tauri-apps/api/core'
 
-/** One asset to persist. `bytes` (raw PNG) is primary; `dataUrl` is a fallback. */
+/** One asset to persist. `bytes` is primary; `dataUrl` is a fallback. */
 export interface SaveAssetInput {
   name: string
   bytes?: Uint8Array
@@ -27,6 +27,16 @@ export interface SaveAssetsResult {
   failed: FailedWrite[]
 }
 
+export type VectorizerAiMode =
+  | 'production'
+  | 'preview'
+  | 'test'
+  | 'test_preview'
+
+export interface VectorizeSvgResult {
+  svg: string
+}
+
 export interface NativeBridge {
   /**
    * Persist assets. When `destDir` is a valid existing directory the native
@@ -37,6 +47,15 @@ export interface NativeBridge {
     assets: SaveAssetInput[],
     destDir?: string,
   ): Promise<SaveAssetsResult>
+  setVectorizerApiKey(apiId: string, apiSecret: string): Promise<void>
+  vectorizerKeyStatus(apiId: string): Promise<boolean>
+  deleteVectorizerApiKey(apiId: string): Promise<void>
+  vectorizeLocalVTracer(bytes: Uint8Array): Promise<VectorizeSvgResult>
+  vectorizeVectorizerAi(input: {
+    apiId: string
+    bytes: Uint8Array
+    mode?: VectorizerAiMode
+  }): Promise<VectorizeSvgResult>
 }
 
 /**
@@ -63,5 +82,21 @@ export const tauriBridge: NativeBridge = {
     invoke<SaveAssetsResult>('save_assets', {
       assets: assets.map(toPayload),
       destDir: destDir ?? null,
+    }),
+  setVectorizerApiKey: (apiId, apiSecret) =>
+    invoke('set_vectorizer_api_key', { apiId, apiSecret }),
+  vectorizerKeyStatus: (apiId) =>
+    invoke<boolean>('vectorizer_key_status', { apiId }),
+  deleteVectorizerApiKey: (apiId) =>
+    invoke('delete_vectorizer_api_key', { apiId }),
+  vectorizeLocalVTracer: (bytes) =>
+    invoke<VectorizeSvgResult>('vectorize_local_vtracer', {
+      bytes: Array.from(bytes),
+    }),
+  vectorizeVectorizerAi: ({ apiId, bytes, mode }) =>
+    invoke<VectorizeSvgResult>('vectorize_vectorizer_ai', {
+      apiId,
+      bytes: Array.from(bytes),
+      mode: mode ?? null,
     }),
 }

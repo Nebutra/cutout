@@ -6,11 +6,12 @@
  * chosen endpoint's kind unioned with its discovered `/v1/models` (relays). The
  * choice persists instantly (plugin-store) via `useSetModelAssignment`.
  */
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import type { ReactNode } from 'react'
 import { Trans, useLingui } from '@lingui/react/macro'
 import type { SlotId } from '@/services/ai/model-assignment-types'
 import { SUGGESTED_MODELS, POPULAR_MODELS } from '@/services/ai/models'
+import { REASONING_EFFORTS, type ReasoningEffort } from '@/services/ai/reasoning'
 import { useProviders } from '@/hooks/queries/providers'
 import {
   useModelAssignments,
@@ -32,6 +33,50 @@ interface ModelSlotProps {
   readonly hint?: ReactNode
 }
 
+interface ModelSlotDraft {
+  readonly sourceKey: string
+  readonly providerId: string
+  readonly model: string
+  readonly effort: ReasoningEffort | undefined
+}
+
+function draftSourceKey(
+  currentProviderId: string | undefined,
+  currentModel: string | undefined,
+  currentEffort: ReasoningEffort | undefined,
+  soleProviderId: string,
+): string {
+  return [
+    currentProviderId ?? '',
+    currentModel ?? '',
+    currentEffort ?? '',
+    soleProviderId,
+  ].join('\u0000')
+}
+
+function createDraft(
+  sourceKey: string,
+  currentProviderId: string | undefined,
+  currentModel: string | undefined,
+  currentEffort: ReasoningEffort | undefined,
+  soleProviderId: string,
+): ModelSlotDraft {
+  if (currentProviderId !== undefined) {
+    return {
+      sourceKey,
+      providerId: currentProviderId,
+      model: currentModel ?? '',
+      effort: currentEffort,
+    }
+  }
+  return {
+    sourceKey,
+    providerId: soleProviderId,
+    model: '',
+    effort: undefined,
+  }
+}
+
 export function ModelSlot({ slot, label, hint }: ModelSlotProps) {
   const { t } = useLingui()
   const providers = useProviders()
@@ -41,28 +86,35 @@ export function ModelSlot({ slot, label, hint }: ModelSlotProps) {
   const list = providers.data ?? []
   const current = assignments.data?.[slot]
 
-  const [providerId, setProviderId] = useState('')
-  const [model, setModel] = useState('')
-
   // With exactly one endpoint, pre-select it — the same connection (one key)
   // serves every slot; models are chosen per capability, not per provider.
   const soleProviderId = list.length === 1 ? list[0].id : ''
   const currentProviderId = current?.providerId
   const currentModel = current?.model
+  const currentEffort = current?.effort
 
-  // Sync fields when the persisted assignment (re)loads; default an unset slot
-  // to the sole endpoint with the model left blank (picked from /v1/models below).
-  // Depends on the assignment's fields (not the query object identity, which
-  // changes each render) so it doesn't re-run on every fetch.
-  useEffect(() => {
-    if (currentProviderId !== undefined) {
-      setProviderId(currentProviderId)
-      setModel(currentModel ?? '')
-    } else {
-      setProviderId(soleProviderId)
-      setModel('')
-    }
-  }, [currentProviderId, currentModel, soleProviderId])
+  const sourceKey = draftSourceKey(
+    currentProviderId,
+    currentModel,
+    currentEffort,
+    soleProviderId,
+  )
+  const nextDraft = createDraft(
+    sourceKey,
+    currentProviderId,
+    currentModel,
+    currentEffort,
+    soleProviderId,
+  )
+  const [draft, setDraft] = useState<ModelSlotDraft>(nextDraft)
+  const activeDraft = draft.sourceKey === sourceKey ? draft : nextDraft
+  if (draft.sourceKey !== sourceKey) {
+    setDraft(nextDraft)
+  }
+
+  const providerId = activeDraft.providerId
+  const model = activeDraft.model
+  const effort = activeDraft.effort
 
   const selected = list.find((p) => p.id === providerId)
   const endpointModels = useEndpointModels(selected)
@@ -82,11 +134,16 @@ export function ModelSlot({ slot, label, hint }: ModelSlotProps) {
     ]),
   )
 
-  const commit = (pid: string, m: string) => {
+  const commit = (pid: string, m: string, e: ReasoningEffort | undefined) => {
     if (pid && m.trim()) {
       setAssignment.mutate({
         slot,
-        assignment: { providerId: pid, model: m.trim() },
+        assignment: {
+          providerId: pid,
+          model: m.trim(),
+          // Thinking strength is a chat-slot concept only.
+          ...(slot === 'chat' && e ? { effort: e } : {}),
+        },
       })
     }
   }
@@ -118,11 +175,17 @@ export function ModelSlot({ slot, label, hint }: ModelSlotProps) {
           onValueChange={(value) => {
             // Switching endpoint keeps the typed model — a connection isn't tied
             // to one model; the model is chosen per capability from the list below.
-            setProviderId(value)
-            commit(value, model)
+            setDraft({ ...activeDraft, providerId: value })
+            commit(value, model, effort)
           }}
         >
-          <SelectTrigger className="w-40 shrink-0">
+          <SelectTrigger
+            className="w-40 shrink-0"
+            aria-label={t({
+              id: 'settings.model_endpoint_aria',
+              message: 'Model endpoint',
+            })}
+          >
             <SelectValue
               placeholder={t({
                 id: 'settings.model_pick_endpoint',
@@ -143,11 +206,17 @@ export function ModelSlot({ slot, label, hint }: ModelSlotProps) {
           list={listId}
           value={model}
           disabled={!providerId}
-          onChange={(e) => setModel(e.target.value)}
-          onBlur={() => commit(providerId, model)}
+          onChange={(e) =>
+            setDraft({ ...activeDraft, model: e.target.value })
+          }
+          onBlur={() => commit(providerId, model, effort)}
           placeholder={t({
             id: 'settings.model_slug_placeholder',
             message: 'model',
+          })}
+          aria-label={t({
+            id: 'settings.model_name_aria',
+            message: 'Model name',
           })}
           className="font-mono"
           autoCapitalize="off"
@@ -156,10 +225,62 @@ export function ModelSlot({ slot, label, hint }: ModelSlotProps) {
         />
         <datalist id={listId}>
           {suggestions.map((m) => (
-            <option key={m} value={m} />
+            <option key={m} value={m}>
+              {m}
+            </option>
           ))}
         </datalist>
       </div>
+
+      {slot === 'chat' ? (
+        <div className="mt-2 flex items-center justify-between gap-2">
+          <span className="text-xs text-muted-foreground">
+            <Trans id="settings.effort_label">Thinking strength</Trans>
+          </span>
+          <Select
+            value={effort ?? 'default'}
+            onValueChange={(value) => {
+              const next =
+                value === 'default' ? undefined : (value as ReasoningEffort)
+              setDraft({ ...activeDraft, effort: next })
+              commit(providerId, model, next)
+            }}
+          >
+            <SelectTrigger
+              className="w-32 shrink-0"
+              disabled={!providerId}
+              aria-label={t({
+                id: 'settings.effort_aria',
+                message: 'Thinking strength',
+              })}
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="default">
+                <Trans id="settings.effort_default">Default</Trans>
+              </SelectItem>
+              {REASONING_EFFORTS.map((level) => (
+                <SelectItem key={level} value={level}>
+                  <EffortLabel effort={level} />
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      ) : null}
     </div>
   )
+}
+
+/** The localized label for one thinking-strength level. */
+function EffortLabel({ effort }: { readonly effort: ReasoningEffort }) {
+  switch (effort) {
+    case 'low':
+      return <Trans id="settings.effort_low">Low</Trans>
+    case 'medium':
+      return <Trans id="settings.effort_medium">Medium</Trans>
+    case 'high':
+      return <Trans id="settings.effort_high">High</Trans>
+  }
 }

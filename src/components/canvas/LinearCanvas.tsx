@@ -40,6 +40,7 @@ import { MockupNode } from './nodes/MockupNode'
 import { BoardNode } from './nodes/BoardNode'
 import { SlicesNode } from './nodes/SlicesNode'
 import { TransitionEdge } from './edges/TransitionEdge'
+import { useFlowColorMode } from './useFlowColorMode'
 
 /** Stable maps (spec: node/edge types must not be re-created each render). */
 const nodeTypes: NodeTypes = {
@@ -54,6 +55,7 @@ const FIT_VIEW_OPTIONS = { padding: 0.16 } as const
 
 export function LinearCanvas() {
   const { t } = useLingui()
+  const flowColorMode = useFlowColorMode()
   const topology = useStore((s) => s.pipeline)
   const generateStatus = useStore(selectGenerateStatus)
   const deconstructStatus = useStore(selectDeconstructStatus)
@@ -114,12 +116,20 @@ export function LinearCanvas() {
       maxZoom={1.5}
       nodesConnectable={false}
       deleteKeyCode={null}
+      colorMode={flowColorMode}
       aria-label={t({ id: 'pipeline.canvas_aria', message: 'Pipeline canvas' })}
       className="bg-background"
     >
       <Background variant={BackgroundVariant.Dots} gap={20} size={1} color="var(--border)" />
       <Controls showInteractive={false} />
-      <MiniMap pannable zoomable className="!bg-card" />
+      <MiniMap
+        pannable
+        zoomable
+        bgColor="var(--card)"
+        maskColor="var(--background)"
+        nodeColor="var(--muted-foreground)"
+        nodeStrokeColor="var(--border)"
+      />
     </ReactFlow>
   )
 }

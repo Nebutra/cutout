@@ -4,6 +4,8 @@ import { applyAlphaCut } from './applyAlphaCut'
 import { featherEdges } from './featherEdges'
 import { findComponents } from './findComponents'
 import { mergeBoxes } from './mergeBoxes'
+import { splitCompositeBoxes } from './splitCompositeBoxes'
+import { filterUiContainers } from './filterUiContainers'
 import { padBox } from './boxGeometry'
 import { sortBoxes } from './sortBoxes'
 
@@ -14,6 +16,15 @@ export interface PipelineResult {
   /** Final slice boxes in reading order (padded, clamped to image bounds). */
   readonly boxes: Box[]
 }
+
+/**
+ * Pre-merge component cull floor. `findComponents` runs BEFORE the merge, so
+ * culling at the full `minArea` here would discard an asset's thin sub-strokes
+ * (an icon's inner arc, a glyph's dot) before they can rejoin their parent —
+ * truncating multi-stroke line-art. We drop only true antialiasing specks here
+ * and apply the real `minArea` to the ASSEMBLED (merged) boxes instead.
+ */
+const NOISE_FLOOR = 16
 
 /** Thrown by {@link runPipeline} when an abort signal fires between stages. */
 export class PipelineAbortError extends Error {
@@ -30,9 +41,10 @@ export class PipelineAbortError extends Error {
  *   1. floodBackground  → background mask
  *   2. applyAlphaCut    → zero background alpha
  *   3. featherEdges     → 1px anti-halo
- *   4. findComponents   → foreground bounding boxes (>= minArea)
- *   5. mergeBoxes       → merge boxes within mergeGap
- *   6. padBox + sort    → pad each merged box, then order top-to-bottom / left-to-right
+ *   4. findComponents   → foreground bounding boxes (>= NOISE_FLOOR only)
+ *   5. mergeBoxes       → merge boxes within mergeGap, THEN cull those < minArea
+ *   6. splitCompositeBoxes / filterUiContainers → refine, drop UI chrome
+ *   7. padBox + sort    → pad each merged box, then order top-to-bottom / left-to-right
  *
  * `signal` (if provided) is checked between stages; an aborted signal throws
  * {@link PipelineAbortError} so a superseded run stops promptly (spec §6).
@@ -58,13 +70,25 @@ export function runPipeline(
   featherEdges(frame, background)
   checkAbort()
 
-  const components = findComponents(frame, minArea)
+  // Keep sub-`minArea` strokes so they can merge into their parent asset; the
+  // real area cull happens on the merged boxes below (`box.pixels` is the summed
+  // foreground of the union — see `unionBox`).
+  const noiseFloor = Math.min(NOISE_FLOOR, minArea)
+  const components = findComponents(frame, noiseFloor)
   checkAbort()
 
-  const merged = mergeBoxes(components, mergeGap)
+  const merged = mergeBoxes(components, mergeGap).filter(
+    (box) => box.pixels >= minArea,
+  )
   checkAbort()
 
-  const padded = merged.map((box) => padBox(box, padding, width, height))
+  const refined = splitCompositeBoxes(frame, merged, minArea)
+  checkAbort()
+
+  const assetBoxes = filterUiContainers(frame, refined)
+  checkAbort()
+
+  const padded = assetBoxes.map((box) => padBox(box, padding, width, height))
   const boxes = sortBoxes(padded)
 
   return { frame, boxes }

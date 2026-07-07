@@ -6,9 +6,19 @@
  * cloud library is a service swap, not new query code. `useExportAll` already
  * invalidates `assetKeys.all`, so the list refreshes for free once it is real.
  */
-import { queryOptions, useQuery } from '@tanstack/react-query'
+import {
+  queryOptions,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query'
 import { useServices } from '@/services/context'
-import type { AssetListFilter, AssetRef, AssetRepository } from '@/services/types'
+import type {
+  AssetListFilter,
+  AssetRef,
+  AssetRepository,
+  AssetToSave,
+} from '@/services/types'
 import { isErr } from '@/services/types'
 import { assetKeys } from './keys'
 
@@ -34,7 +44,7 @@ export function useAssets(filter?: AssetListFilter) {
   return useQuery(assetsListOptions(assets, filter))
 }
 
-/** Load a single asset blob by id (stubbed; errors in v1). */
+/** Load a single asset blob by id. */
 export function useAsset(id: string) {
   const { assets } = useServices()
   return useQuery(
@@ -49,4 +59,35 @@ export function useAsset(id: string) {
       gcTime: 5 * 60_000,
     }),
   )
+}
+
+/** Add one asset to the managed library, then refresh the list. */
+export function useAddAsset() {
+  const { assets } = useServices()
+  const queryClient = useQueryClient()
+  return useMutation<AssetRef, Error, AssetToSave>({
+    mutationFn: async (asset) => {
+      const result = await assets.add(asset)
+      if (isErr(result)) throw new Error(result.error)
+      return result.data
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: assetKeys.all })
+    },
+  })
+}
+
+/** Remove one asset from the library by id, then refresh the list. */
+export function useRemoveAsset() {
+  const { assets } = useServices()
+  const queryClient = useQueryClient()
+  return useMutation<void, Error, string>({
+    mutationFn: async (id) => {
+      const result = await assets.remove(id)
+      if (isErr(result)) throw new Error(result.error)
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: assetKeys.all })
+    },
+  })
 }

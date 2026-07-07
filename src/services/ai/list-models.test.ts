@@ -66,4 +66,17 @@ describe('listEndpointModels', () => {
       }),
     )
   })
+
+  it('normalizes pathless OpenAI-compatible base URLs to /v1', async () => {
+    invokeMock.mockResolvedValue({
+      status: 200,
+      headers: {},
+      body: JSON.stringify({ data: [] }),
+    })
+    await listEndpointModels(cfg({ baseUrl: 'https://relay' }))
+    expect(invokeMock).toHaveBeenCalledWith(
+      'ai_proxy_request',
+      expect.objectContaining({ url: 'https://relay/v1/models' }),
+    )
+  })
 })

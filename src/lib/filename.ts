@@ -4,7 +4,7 @@
  * These MIRROR the Rust `sanitize_filename` so a name that survives client-side
  * rename produces the same on-disk file: replace every run of characters
  * outside `[A-Za-z0-9._-]` with a single `_` (the JS original used `/[^\w.-]+/g`
- * with the `+` collapsing runs), guard empties, and ensure a `.png` extension.
+ * with the `+` collapsing runs), guard empties, and ensure export extensions.
  */
 
 const UNSAFE_RUN = /[^A-Za-z0-9._-]+/g
@@ -30,4 +30,12 @@ export function ensurePngName(name: string): string {
   const withoutTrailingDot = safe.replace(/\.+$/, '')
   const base = withoutTrailingDot.length > 0 ? withoutTrailingDot : 'asset'
   return `${base}.png`
+}
+
+/** Sanitize, remove the current extension, and guarantee a `.svg` extension. */
+export function ensureSvgName(name: string): string {
+  const safe = sanitizeFilename(name)
+  const withoutExtension = safe.replace(/\.[^.]+$/, '').replace(/\.+$/, '')
+  const base = withoutExtension.length > 0 ? withoutExtension : 'asset'
+  return `${base}.svg`
 }

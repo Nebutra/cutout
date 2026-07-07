@@ -29,6 +29,7 @@ import { Button } from '@/components/ui/button'
 import { DagNode } from './nodes/DagNode'
 import { DesignSystemNode } from './nodes/DesignSystemNode'
 import { materializeGraph } from './materialize'
+import { useFlowColorMode } from './useFlowColorMode'
 
 /** Stable node-type map (must not be re-created each render). */
 const nodeTypes: NodeTypes = {
@@ -40,6 +41,7 @@ const FIT_VIEW_OPTIONS = { padding: 0.18 } as const
 
 export function PlannedCanvas({ graph }: { readonly graph: GraphSpec }) {
   const { t } = useLingui()
+  const flowColorMode = useFlowColorMode()
   const clearGraph = useStore((s) => s.clearGraph)
 
   // The node/edge SET is a pure function of the spec — stable across a run.
@@ -58,6 +60,7 @@ export function PlannedCanvas({ graph }: { readonly graph: GraphSpec }) {
       maxZoom={1.5}
       nodesConnectable={false}
       deleteKeyCode={null}
+      colorMode={flowColorMode}
       aria-label={t({ id: 'dag.canvas_aria', message: 'Planned pipeline canvas' })}
       className="bg-background"
     >
@@ -69,7 +72,14 @@ export function PlannedCanvas({ graph }: { readonly graph: GraphSpec }) {
       </Panel>
       <Background variant={BackgroundVariant.Dots} gap={20} size={1} color="var(--border)" />
       <Controls showInteractive={false} />
-      <MiniMap pannable zoomable className="!bg-card" />
+      <MiniMap
+        pannable
+        zoomable
+        bgColor="var(--card)"
+        maskColor="var(--background)"
+        nodeColor="var(--muted-foreground)"
+        nodeStrokeColor="var(--border)"
+      />
     </ReactFlow>
   )
 }

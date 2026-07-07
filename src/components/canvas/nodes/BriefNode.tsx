@@ -13,12 +13,13 @@ import { FileUp, Loader2, Network, Settings2, Sparkles } from 'lucide-react'
 import { toast } from 'sonner'
 import { Trans, useLingui } from '@lingui/react/macro'
 import { useStore } from '@/store'
-import { selectBriefStatus } from '@/store/slices/pipeline'
+import { selectBriefStatus, selectIntent } from '@/store/slices/pipeline'
 import { useModelAssignments } from '@/hooks/queries/ai-settings'
 import { useGenerateMockup, useImportMockup } from '@/hooks/queries/pipeline'
 import { useRunPlan } from '@/hooks/queries/dag'
 import { useSettingsUI } from '@/components/settings/settings-ui'
 import { NodeShell } from './NodeShell'
+import { IntentPanel } from './IntentPanel'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { Textarea } from '@/components/ui/textarea'
@@ -28,6 +29,7 @@ export function BriefNode() {
   const settings = useSettingsUI()
   const brief = useStore((s) => s.brief)
   const setBrief = useStore((s) => s.setBrief)
+  const intent = useStore(selectIntent)
   const status = useStore(selectBriefStatus)
 
   const assignments = useModelAssignments()
@@ -110,15 +112,16 @@ export function BriefNode() {
               {runPlan.isPending ? (
                 <>
                   <Loader2 className="animate-spin" />
-                  <Trans id="dag.planning">Planning &amp; generating…</Trans>
+                  <Trans id="dag.planning">Recognizing intent…</Trans>
                 </>
               ) : (
                 <>
                   <Network />
-                  <Trans id="dag.plan_and_generate">Plan &amp; generate graph</Trans>
+                  <Trans id="dag.plan_and_generate">Recognize &amp; generate</Trans>
                 </>
               )}
             </Button>
+            {intent ? <IntentPanel intent={intent} /> : null}
           </>
         ) : null}
 

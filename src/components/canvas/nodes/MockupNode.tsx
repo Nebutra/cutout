@@ -10,12 +10,21 @@
  * image object URL is created from the blob and revoked on replacement/unmount.
  */
 import { useEffect, useRef, useState } from 'react'
-import { ChevronRight, ImageOff, Loader2, RefreshCw, Settings2, Upload } from 'lucide-react'
+import {
+  ChevronRight,
+  ImageOff,
+  Library,
+  Loader2,
+  RefreshCw,
+  Settings2,
+  Upload,
+} from 'lucide-react'
 import { toast } from 'sonner'
 import { Trans, useLingui } from '@lingui/react/macro'
 import { useStore } from '@/store'
 import { selectMockupStatus } from '@/store/slices/pipeline'
 import { useModelAssignments } from '@/hooks/queries/ai-settings'
+import { useAddAsset } from '@/hooks/queries/assets'
 import {
   useDeconstructMockup,
   useGenerateMockup,
@@ -23,6 +32,7 @@ import {
 } from '@/hooks/queries/pipeline'
 import { useSettingsUI } from '@/components/settings/settings-ui'
 import { NodeShell } from './NodeShell'
+import { ImageZoom } from './ImageZoom'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 
@@ -38,7 +48,26 @@ export function MockupNode() {
   const generate = useGenerateMockup()
   const deconstruct = useDeconstructMockup()
   const importMockup = useImportMockup()
+  const addAsset = useAddAsset()
   const inputRef = useRef<HTMLInputElement | null>(null)
+
+  function onAddToLibrary(): void {
+    if (!mockup || addAsset.isPending) return
+    addAsset.mutate(
+      { name: 'mockup.png', blob: mockup.blob, kind: 'generated' },
+      {
+        onSuccess: () =>
+          toast.success(
+            t({ id: 'mockup.toast_added_to_library', message: 'Added to library' }),
+          ),
+        onError: (error) =>
+          toast.error(
+            t({ id: 'library.toast_add_failed', message: 'Could not add to library' }),
+            { description: error.message },
+          ),
+      },
+    )
+  }
 
   // Object URL for the mockup blob, recreated + revoked as the artifact changes.
   const [url, setUrl] = useState<string | null>(null)
@@ -86,7 +115,10 @@ export function MockupNode() {
       <div className="flex flex-col gap-3 p-3">
         <div className="flex h-56 items-center justify-center overflow-hidden rounded-lg border border-border/60 bg-muted/30">
           {url ? (
-            <img src={url} alt="" className="max-h-full max-w-full object-contain" />
+            <ImageZoom
+              src={url}
+              label={t({ id: 'mockup.preview_zoom', message: 'Enlarge mockup preview' })}
+            />
           ) : status === 'running' ? (
             <div className="flex flex-col items-center gap-2 text-muted-foreground">
               <Loader2 className="size-6 animate-spin" />
@@ -155,6 +187,16 @@ export function MockupNode() {
             <Trans id="mockup.import_replace">Import</Trans>
           </Button>
         </div>
+
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onAddToLibrary}
+          disabled={!mockup || addAsset.isPending}
+        >
+          {addAsset.isPending ? <Loader2 className="animate-spin" /> : <Library />}
+          <Trans id="mockup.add_to_library">Add to library</Trans>
+        </Button>
         <input
           ref={inputRef}
           type="file"

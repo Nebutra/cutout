@@ -9,6 +9,7 @@
  */
 import { invoke } from '@tauri-apps/api/core'
 import type { ProviderConfig } from './provider-types'
+import { apiBaseUrl } from './base-url'
 
 /** Buffered proxy response, mirroring the Rust `ProxyResponse` (camelCase). */
 interface ProxyResponse {
@@ -36,8 +37,9 @@ function extractModelIds(parsed: unknown): string[] {
  * the endpoint doesn't answer with a usable list.
  */
 export async function listEndpointModels(cfg: ProviderConfig): Promise<string[]> {
-  if (!cfg.baseUrl) return []
-  const url = `${cfg.baseUrl.replace(/\/+$/, '')}/models`
+  const baseUrl = apiBaseUrl(cfg.kind, cfg.baseUrl)
+  if (!baseUrl) return []
+  const url = `${baseUrl}/models`
   try {
     const res = await invoke<ProxyResponse>('ai_proxy_request', {
       providerId: cfg.id,

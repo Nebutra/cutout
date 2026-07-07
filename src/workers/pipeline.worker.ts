@@ -1,5 +1,6 @@
 /// <reference lib="webworker" />
 import { runPipeline, PipelineAbortError } from '@/algorithm/runPipeline'
+import type { Box } from '@/algorithm/types'
 import type { WorkerRequest, WorkerResponse, SliceOut } from './protocol'
 import {
   bitmapToFrame,
@@ -19,6 +20,7 @@ import {
 
 const bitmaps = new Map<string, ImageBitmap>()
 const controllers = new Map<number, AbortController>()
+const SLICE_ENCODE_CONCURRENCY = 4
 
 const ctx = self as unknown as DedicatedWorkerGlobalScope
 
@@ -76,22 +78,10 @@ async function handleAnalyze(
     // Heavy path: re-render (preview transferred the previous bitmap away) and
     // encode a PNG per box.
     const cropSource = renderFrameCanvas(frame)
-    const slices: SliceOut[] = []
-    for (let index = 0; index < boxes.length; index += 1) {
-      if (controller.signal.aborted) {
-        post({ type: 'canceled', runId })
-        return
-      }
-      const box = boxes[index]
-      const png = await cropSlicePng(cropSource, box)
-      slices.push({
-        id: crypto.randomUUID(),
-        index,
-        box,
-        png,
-        width: box.width,
-        height: box.height,
-      })
+    const slices = await encodeSlices(cropSource, boxes, controller.signal)
+    if (!slices) {
+      post({ type: 'canceled', runId })
+      return
     }
     post({ type: 'slices', runId, slices })
   } catch (error) {
@@ -107,4 +97,37 @@ async function handleAnalyze(
   } finally {
     controllers.delete(runId)
   }
+}
+
+async function encodeSlices(
+  cropSource: OffscreenCanvas,
+  boxes: readonly Box[],
+  signal: AbortSignal,
+): Promise<SliceOut[] | null> {
+  const slices = new Array<SliceOut>(boxes.length)
+  let nextIndex = 0
+
+  async function workerLoop(): Promise<void> {
+    while (!signal.aborted) {
+      const index = nextIndex
+      nextIndex += 1
+      if (index >= boxes.length) return
+
+      const box = boxes[index]
+      const png = await cropSlicePng(cropSource, box)
+      if (signal.aborted) return
+      slices[index] = {
+        id: crypto.randomUUID(),
+        index,
+        box,
+        png,
+        width: box.width,
+        height: box.height,
+      }
+    }
+  }
+
+  const workers = Math.min(SLICE_ENCODE_CONCURRENCY, boxes.length)
+  await Promise.all(Array.from({ length: workers }, workerLoop))
+  return signal.aborted ? null : slices
 }

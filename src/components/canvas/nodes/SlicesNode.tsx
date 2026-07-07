@@ -11,13 +11,14 @@
  * an inline CTA opens Settings when unset; naming is optional (fallback = the
  * existing numbered names), so the grid never depends on it.
  */
-import { Loader2, Settings2, Tags } from 'lucide-react'
+import { Library, Loader2, Settings2, Tags } from 'lucide-react'
 import { toast } from 'sonner'
 import { Trans, useLingui } from '@lingui/react/macro'
-import { useStore } from '@/store'
+import { getStoreState, useStore } from '@/store'
 import { selectHasSlices } from '@/store/selectors'
 import { selectSlicesStatus } from '@/store/slices/pipeline'
 import { useModelAssignments } from '@/hooks/queries/ai-settings'
+import { useAddAsset } from '@/hooks/queries/assets'
 import { useNameSlices } from '@/hooks/queries/pipeline'
 import { useSettingsUI } from '@/components/settings/settings-ui'
 import { NodeShell } from './NodeShell'
@@ -33,6 +34,36 @@ export function SlicesNode() {
   const assignments = useModelAssignments()
   const hasChatModel = Boolean(assignments.data?.chat)
   const name = useNameSlices()
+  const addAsset = useAddAsset()
+
+  async function onAddToLibrary(): Promise<void> {
+    if (addAsset.isPending) return
+    const slices = getStoreState().analysis.slices
+    const chosen = slices.some((s) => s.selected)
+      ? slices.filter((s) => s.selected)
+      : slices
+    if (chosen.length === 0) return
+
+    const results = await Promise.allSettled(
+      chosen.map((slice) =>
+        addAsset.mutateAsync({
+          name: slice.name,
+          blob: slice.blob,
+          kind: 'slice',
+        }),
+      ),
+    )
+    const added = results.filter((result) => result.status === 'fulfilled').length
+    if (added > 0) {
+      toast.success(
+        t({ id: 'slices.toast_added_to_library', message: `Added ${added} to library` }),
+      )
+    } else {
+      toast.error(
+        t({ id: 'library.toast_add_failed', message: 'Could not add to library' }),
+      )
+    }
+  }
 
   function onName(): void {
     if (name.isPending) return
@@ -58,7 +89,7 @@ export function SlicesNode() {
       hasTarget
     >
       <div className="flex h-[34rem] flex-col">
-        <div className="shrink-0 border-b border-border/60 p-2">
+        <div className="flex shrink-0 flex-col gap-2 border-b border-border/60 p-2">
           {hasChatModel ? (
             <Button
               variant="ghost"
@@ -92,6 +123,21 @@ export function SlicesNode() {
               </Trans>
             </Button>
           )}
+
+          <Button
+            variant="ghost"
+            size="sm"
+            className="w-full"
+            onClick={onAddToLibrary}
+            disabled={!hasSlices || addAsset.isPending}
+          >
+            {addAsset.isPending ? (
+              <Loader2 className="animate-spin" />
+            ) : (
+              <Library />
+            )}
+            <Trans id="slices.add_to_library">Add to library</Trans>
+          </Button>
         </div>
         <div className="min-h-0 flex-1">
           <RightRail />

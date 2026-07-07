@@ -13,20 +13,40 @@
  */
 import { useEffect, useRef } from 'react'
 import { useStore } from '@/store'
-import { selectParams, selectSource } from '@/store/selectors'
+import { selectParams, selectSlices, selectSource } from '@/store/selectors'
 import { AUTO_RUN_DEBOUNCE_MS } from './useParamAutoRun'
 
 export function useAutoRun(analyze: (wantSlices: boolean) => void): void {
   const params = useStore(selectParams)
   const source = useStore(selectSource)
+  const slices = useStore(selectSlices)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const lastImageIdRef = useRef('')
+  const lastParamsKeyRef = useRef('')
 
   const hasSource = source.bitmap !== null && source.imageId !== ''
+  const paramsKey = `${params.threshold}:${params.minArea}:${params.mergeGap}:${params.padding}`
 
   useEffect(() => {
-    if (!hasSource) return
+    if (!hasSource) {
+      lastImageIdRef.current = ''
+      lastParamsKeyRef.current = ''
+      return
+    }
 
     if (timerRef.current) clearTimeout(timerRef.current)
+
+    if (lastImageIdRef.current !== source.imageId) {
+      lastImageIdRef.current = source.imageId
+      lastParamsKeyRef.current = paramsKey
+      if (slices.length > 0) return
+      analyze(true)
+      return
+    }
+
+    if (lastParamsKeyRef.current === paramsKey) return
+    lastParamsKeyRef.current = paramsKey
+
     timerRef.current = setTimeout(() => {
       analyze(true)
       timerRef.current = null
@@ -42,9 +62,7 @@ export function useAutoRun(analyze: (wantSlices: boolean) => void): void {
     analyze,
     hasSource,
     source.imageId,
-    params.threshold,
-    params.minArea,
-    params.mergeGap,
-    params.padding,
+    paramsKey,
+    slices.length,
   ])
 }

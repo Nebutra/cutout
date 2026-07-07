@@ -9,19 +9,85 @@
  * derived from `source`/`analysis`, not stored (see `slices/pipeline.ts`).
  */
 import { create } from 'zustand'
-import type { Store } from './types'
-import { createSourceSlice } from './slices/source'
-import { createParamsSlice } from './slices/params'
-import { createAnalysisSlice } from './slices/analysis'
+import type { Slice, Store } from './types'
+import { createSourceSlice, INITIAL_SOURCE } from './slices/source'
+import { createParamsSlice, DEFAULT_PARAMS } from './slices/params'
+import { createAnalysisSlice, INITIAL_ANALYSIS, disposeAnalysis } from './slices/analysis'
 import { createSelectionSlice } from './slices/selection'
-import { createPipelineSlice } from './slices/pipeline'
+import { createPipelineSlice, INITIAL_PIPELINE } from './slices/pipeline'
 
-export const useStore = create<Store>()((...a) => ({
-  ...createSourceSlice(...a),
-  ...createParamsSlice(...a),
-  ...createAnalysisSlice(...a),
-  ...createSelectionSlice(...a),
-  ...createPipelineSlice(...a),
+export const useStore = create<Store>()((set, get, api) => ({
+  ...createSourceSlice(set, get, api),
+  ...createParamsSlice(set, get, api),
+  ...createAnalysisSlice(set, get, api),
+  ...createSelectionSlice(set, get, api),
+  ...createPipelineSlice(set, get, api),
+  resetProject: () => {
+    const state = get()
+    state.source.bitmap?.close()
+    state.mockup?.bitmap.close()
+    disposeAnalysis(state.analysis)
+    set({
+      source: INITIAL_SOURCE,
+      params: DEFAULT_PARAMS,
+      analysis: INITIAL_ANALYSIS,
+      pipeline: INITIAL_PIPELINE,
+      brief: '',
+      intent: null,
+      mockup: null,
+      designMarkdown: null,
+      genPhase: 'idle',
+      genError: null,
+      graph: null,
+      dagNodes: {},
+    })
+  },
+  restoreProject: (input) => {
+    const state = get()
+    state.source.bitmap?.close()
+    if (state.mockup && state.mockup !== input.mockup) state.mockup.bitmap.close()
+    disposeAnalysis(state.analysis)
+
+    const slices: Slice[] = (input.slices ?? []).map((slice) => ({
+      id: slice.id,
+      index: slice.index,
+      name: slice.name,
+      box: slice.box,
+      blob: slice.blob,
+      objectUrl: URL.createObjectURL(slice.blob),
+      width: slice.width,
+      height: slice.height,
+      selected: false,
+    }))
+
+    set({
+      source: input.source
+        ? {
+            bitmap: input.source.bitmap,
+            name: input.source.name,
+            width: input.source.bitmap.width,
+            height: input.source.bitmap.height,
+            imageId: crypto.randomUUID(),
+          }
+        : INITIAL_SOURCE,
+      params: input.params ?? DEFAULT_PARAMS,
+      analysis: {
+        ...INITIAL_ANALYSIS,
+        runId: state.analysis.runId + 1,
+        status: slices.length > 0 ? 'done' : 'idle',
+        slices,
+      },
+      pipeline: INITIAL_PIPELINE,
+      brief: input.brief,
+      intent: input.intent ?? null,
+      mockup: input.mockup ?? null,
+      designMarkdown: input.designMarkdown ?? null,
+      genPhase: 'idle',
+      genError: null,
+      graph: null,
+      dagNodes: {},
+    })
+  },
 }))
 
 /** Non-reactive snapshot accessor (for mutation payloads / worker glue). */

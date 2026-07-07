@@ -2,7 +2,7 @@
  * Planned-DAG runner (spec §5/§D + §6/§E) — the mutations behind "规划并生成"
  * (plan-and-generate) and adjust-and-re-run.
  *
- *   - `useRunPlan`      brief → planGraph (chat slot) → setGraph → runGraph
+ *   - `useRunPlan`      brief → recognizeIntent → (questions? stop : planGraph) → runGraph
  *   - `useReRunSubtree` re-run one planned node + its descendants (reRunSubtree)
  *
  * The op→service dispatch lives in {@link createNodeRunner}: each planned node is
@@ -20,7 +20,7 @@ import { useServices } from '@/services/context'
 import { isErr } from '@/services/types'
 import type { ServiceRegistry } from '@/services/types'
 import type { GraphNodeSpec } from '@/dag/graph-spec'
-import { planGraph } from '@/dag/planner'
+import { planFromBrief } from '@/dag/run-plan'
 import { runGraph, reRunSubtree, subtreeIds } from '@/dag/executor'
 import { nameSlices, type SliceBox } from '@/services/ai/naming'
 import type { ModelAssignment } from '@/services/ai/model-assignment-types'
@@ -152,6 +152,7 @@ function createNodeRunner(
           model: chat.model,
           imageBytes: upstream.boardBytes,
           slices: boxes,
+          effort: chat.effort,
         })
         if (isErr(result)) throw new Error(result.error)
         return { kind: 'names', names: result.data }
@@ -174,9 +175,14 @@ async function imageProviderKind(
 }
 
 /**
- * Mutation: plan a graph from the brief (chat slot) then run it (image slot).
- * The component gates on both slots being assigned; the throws here are a safety
- * net. On success the store holds the planned graph and streams node progress.
+ * Mutation: recognize the intent behind the brief (chat slot), then either
+ * surface clarifying questions and STOP, or plan a graph from the enriched
+ * intent and run it (image slot) — spec §6/§7. The recognized `IntentProfile`
+ * is recorded on the store either way so the BriefNode can show the derived
+ * understanding. The component gates on both slots being assigned (intent AND
+ * planning both ride the chat slot; without it we fall back to the raw brief via
+ * `planFromBrief` → `planGraph`, which the recognition step covers); the throws
+ * here are a safety net.
  */
 export function useRunPlan() {
   const services = useServices()
@@ -192,18 +198,27 @@ export function useRunPlan() {
       const brief = getStoreState().brief.trim()
       if (!brief) throw new Error('Write a brief before planning.')
 
-      const plan = await planGraph(services.generation, {
+      // Recognize → (clarify | plan). Pure orchestration lives in the DAG layer.
+      const outcome = await planFromBrief(services.generation, {
         providerId: chat.providerId,
         model: chat.model,
         brief,
+        effort: chat.effort,
       })
-      if (isErr(plan)) throw new Error(plan.error)
+      if (isErr(outcome)) throw new Error(outcome.error)
 
-      getStoreState().setGraph(plan.data)
+      // Surface the derived understanding regardless of which branch we took.
+      getStoreState().setIntent(outcome.data.intent)
+
+      // Low confidence / open questions → stop; the BriefNode shows the prompts.
+      if (outcome.data.kind === 'clarify') return
+
+      const graph = outcome.data.graph
+      getStoreState().setGraph(graph)
 
       const kind = await imageProviderKind(services, image.providerId)
       const runNode = createNodeRunner(services, image, chat, kind)
-      await runGraph<DagNodeOutput>(plan.data, {
+      await runGraph<DagNodeOutput>(graph, {
         runNode,
         onStatus: (id, state) => getStoreState().setDagNodeState(id, state),
       })

@@ -17,11 +17,54 @@ import {
   type ProviderDraft,
 } from './provider-types'
 import { createLocalGenerationService } from './generation-service.local'
+import { apiBaseUrl } from './base-url'
 
 /** Row shape returned by the Rust `list_key_status` command. */
 interface KeyStatusRow {
   readonly id: string
   readonly hasKey: boolean
+}
+
+interface ProxyResponse {
+  readonly status: number
+  readonly body: string
+}
+
+function snippet(body: string): string {
+  return body.replace(/\s+/g, ' ').trim().slice(0, 140)
+}
+
+function isLikelyHtml(body: string): boolean {
+  const trimmed = body.trimStart().slice(0, 128).toLowerCase()
+  return trimmed.startsWith('<!doctype html') || trimmed.startsWith('<html')
+}
+
+function validateModelsResponse(body: string): Result<void> {
+  if (isLikelyHtml(body)) {
+    return err(
+      'HTTP 200 but /models returned a web page, not OpenAI-compatible JSON. Check that Base URL points to the API endpoint, not the web console.',
+    )
+  }
+
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(body)
+  } catch {
+    return err(
+      'HTTP 200 but /models did not return OpenAI-compatible JSON. Check that Base URL points to the API endpoint.',
+    )
+  }
+
+  const data =
+    parsed && typeof parsed === 'object'
+      ? (parsed as { data?: unknown }).data
+      : undefined
+  if (!Array.isArray(data)) {
+    return err(
+      'HTTP 200 but /models did not return an OpenAI-compatible { data: [...] } response.',
+    )
+  }
+  return ok(undefined)
 }
 
 /** Load + validate the persisted provider list (missing file → `[]` in Rust). */
@@ -101,16 +144,23 @@ export function createLocalProviderService(): ProviderService {
       // is obvious.
       if (cfg.baseUrl) {
         try {
-          const url = `${cfg.baseUrl.replace(/\/+$/, '')}/models`
-          const res = await invoke<{ status: number; body: string }>(
-            'ai_proxy_request',
-            { providerId: id, kind: cfg.kind, url, method: 'GET', headers: {}, body: null },
-          )
+          const baseUrl = apiBaseUrl(cfg.kind, cfg.baseUrl) ?? cfg.baseUrl
+          const url = `${baseUrl}/models`
+          const res = await invoke<ProxyResponse>('ai_proxy_request', {
+            providerId: id,
+            kind: cfg.kind,
+            url,
+            method: 'GET',
+            headers: {},
+            body: null,
+          })
           if (res.status >= 200 && res.status < 300) {
+            const valid = validateModelsResponse(res.body)
+            if (!isOk(valid)) return err(valid.error)
             return ok({ model: cfg.defaultModel })
           }
-          const snippet = res.body.replace(/\s+/g, ' ').trim().slice(0, 140)
-          return err(`HTTP ${res.status}${snippet ? ` · ${snippet}` : ''}`)
+          const body = snippet(res.body)
+          return err(`HTTP ${res.status}${body ? ` · ${body}` : ''}`)
         } catch (error) {
           return err(error instanceof Error ? error.message : String(error))
         }

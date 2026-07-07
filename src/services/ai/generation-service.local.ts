@@ -10,13 +10,13 @@
  * The instruction comes from exactly one of `prompt` (raw text, back-compat),
  * `system` (explicit), or `promptRef` (resolved+rendered via the injected
  * `PromptService`). Multimodal `input` parts (the screenshot) attach to a single
- * user message. Image output is read from the AI SDK v6 image path
- * (`result.files`, filtered to `image/*` → `uint8Array`).
+ * user message. OpenAI-shaped image output goes through the Rust proxy directly
+ * so compatible relays can return either `b64_json` or URL-shaped image data;
+ * chat-image models still read image files from the AI SDK text path.
  */
 import {
   generateText as aiGenerateText,
   streamText as aiStreamText,
-  generateImage,
   Output,
 } from 'ai'
 import type { ModelMessage } from 'ai'
@@ -29,6 +29,8 @@ import { invoke } from '@tauri-apps/api/core'
 import { err, isErr, ok } from '@/services/types'
 import type { Result } from '@/services/types'
 import type { PromptPart, PromptService } from '@/prompts/types'
+import { reasoningProviderOptions } from './reasoning'
+import type { ReasoningProviderOptions } from './reasoning'
 import { base64ToBytes } from '@/lib/image'
 import type {
   EditImageInput,
@@ -40,9 +42,19 @@ import type {
 import type { ProviderConfig } from './provider-types'
 import { resolveModel } from './models'
 import { tauriFetch } from './tauri-fetch'
+import { apiBaseUrl } from './base-url'
 
 /** Placeholder key handed to the SDK; the real key is injected in Rust. */
 const DUMMY_KEY = '__managed_by_rust__'
+
+const JSON_ONLY_SUFFIX =
+  'Return only one valid JSON value matching the requested shape. Do not include markdown fences, prose, comments, or trailing commas.'
+
+const JSON_REPAIR_SUFFIX =
+  'Repair the previous JSON so it fully matches the requested schema and product rules. Return one complete corrected JSON value only. Fill every required non-empty array with meaningful entries. Do not return partial JSON, explanations, markdown fences, comments, or trailing commas.'
+
+const API_RESPONSE_HINT =
+  'Check that the provider base URL points to the API endpoint, not the web console.'
 
 /** Only `list` is needed to resolve a `providerId` → config. */
 type ConfigSource = Pick<ProviderService, 'list'>
@@ -50,10 +62,16 @@ type ConfigSource = Pick<ProviderService, 'list'>
 /** Only `render` is needed to turn a `promptRef` → system instruction. */
 type PromptSource = Pick<PromptService, 'render'>
 
+interface ProxyResponse {
+  readonly status: number
+  readonly headers: Record<string, string>
+  readonly body: string
+}
+
 /** Build the AI SDK model for a config, wired to the per-provider proxy fetch. */
 function buildModel(cfg: ProviderConfig, modelId: string) {
   const fetch = tauriFetch(cfg.id, cfg.kind)
-  const baseURL = cfg.baseUrl
+  const baseURL = apiBaseUrl(cfg.kind, cfg.baseUrl)
   switch (cfg.kind) {
     case 'anthropic':
       return createAnthropic({ apiKey: DUMMY_KEY, baseURL, fetch })(modelId)
@@ -84,11 +102,16 @@ function toContentPart(part: PromptPart) {
 
 /** The normalized shape a prepared call resolves to (raw XOR structured). */
 type Prepared =
-  | { readonly model: ReturnType<typeof buildModel>; readonly prompt: string }
+  | {
+      readonly model: ReturnType<typeof buildModel>
+      readonly prompt: string
+      readonly providerOptions: ReasoningProviderOptions
+    }
   | {
       readonly model: ReturnType<typeof buildModel>
       readonly system: string
       readonly messages: ModelMessage[]
+      readonly providerOptions: ReasoningProviderOptions
     }
 
 /** Count how many instruction sources are supplied (must be exactly one). */
@@ -96,6 +119,282 @@ function instructionSourceCount(input: GenerateInput): number {
   return [input.prompt, input.system, input.promptRef].filter(
     (v) => v !== undefined,
   ).length
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
+}
+
+function headerValue(headers: unknown, name: string): string {
+  if (!isRecord(headers)) return ''
+  const target = name.toLowerCase()
+  for (const [key, value] of Object.entries(headers)) {
+    if (key.toLowerCase() === target && typeof value === 'string') {
+      return value
+    }
+  }
+  return ''
+}
+
+function htmlLike(text: string): boolean {
+  const trimmed = text.trimStart().slice(0, 128).toLowerCase()
+  return trimmed.startsWith('<!doctype html') || trimmed.startsWith('<html')
+}
+
+function snippet(text: string): string {
+  return text.replace(/\s+/g, ' ').trim().slice(0, 160)
+}
+
+function errorBodyMessage(body: string): string | null {
+  try {
+    const parsed = JSON.parse(body) as unknown
+    const error = isRecord(parsed) ? parsed.error : undefined
+    const message = isRecord(error) ? error.message : undefined
+    return typeof message === 'string' && message.length > 0 ? message : null
+  } catch {
+    return null
+  }
+}
+
+function apiErrorText(error: unknown): string | null {
+  if (!isRecord(error)) return null
+
+  const lastError = error.lastError
+  if (lastError !== undefined) {
+    const normalized = apiErrorText(lastError)
+    if (normalized) return normalized
+  }
+
+  const errors = error.errors
+  if (Array.isArray(errors) && errors.length > 0) {
+    const normalized = apiErrorText(errors[errors.length - 1])
+    if (normalized) return normalized
+  }
+
+  const body =
+    typeof error.responseBody === 'string' ? error.responseBody : undefined
+  if (body !== undefined) {
+    const providerMessage = errorBodyMessage(body)
+    if (providerMessage) return providerMessage
+  }
+
+  const contentType = headerValue(error.responseHeaders, 'content-type')
+  const status =
+    typeof error.statusCode === 'number' ? error.statusCode : undefined
+  const url =
+    typeof error.url === 'string' && error.url.length > 0
+      ? error.url
+      : 'the provider endpoint'
+
+  if (
+    body !== undefined &&
+    (contentType.toLowerCase().includes('text/html') || htmlLike(body))
+  ) {
+    return `Provider returned an HTML page instead of an API response for ${url}. ${API_RESPONSE_HINT}`
+  }
+
+  if (status !== undefined && body !== undefined && !body.trimStart().startsWith('{')) {
+    return `Provider returned HTTP ${status} instead of an API response for ${url}. ${API_RESPONSE_HINT}${body ? ` Body: ${snippet(body)}` : ''}`
+  }
+
+  return null
+}
+
+function errorText(error: unknown): string {
+  const apiError = apiErrorText(error)
+  if (apiError) return apiError
+  return error instanceof Error ? error.message : String(error)
+}
+
+function dataUrlParts(value: string): { mediaType: string; base64: string } | null {
+  const match = value.match(/^data:([^;,]+);base64,(.*)$/s)
+  if (!match) return null
+  return { mediaType: match[1] || 'image/png', base64: match[2] }
+}
+
+async function imageUrlToAsset(url: string): Promise<GeneratedAsset> {
+  const response = await fetch(url)
+  if (!response.ok) {
+    throw new Error(`Image download failed: HTTP ${response.status}`)
+  }
+  const mediaType = response.headers.get('content-type') || 'image/png'
+  return {
+    mediaType,
+    bytes: new Uint8Array(await response.arrayBuffer()),
+  }
+}
+
+async function imageItemToAsset(item: unknown): Promise<GeneratedAsset | null> {
+  if (!isRecord(item)) return null
+
+  const rawBase64 =
+    typeof item.b64_json === 'string'
+      ? item.b64_json
+      : typeof item.b64 === 'string'
+        ? item.b64
+        : typeof item.base64 === 'string'
+          ? item.base64
+          : undefined
+  if (rawBase64) {
+    const dataUrl = dataUrlParts(rawBase64)
+    return {
+      mediaType: dataUrl?.mediaType ?? 'image/png',
+      bytes: base64ToBytes(dataUrl?.base64 ?? rawBase64),
+    }
+  }
+
+  const url = typeof item.url === 'string' ? item.url : undefined
+  if (url) {
+    const dataUrl = dataUrlParts(url)
+    if (dataUrl) {
+      return {
+        mediaType: dataUrl.mediaType,
+        bytes: base64ToBytes(dataUrl.base64),
+      }
+    }
+    return imageUrlToAsset(url)
+  }
+
+  return null
+}
+
+async function parseImageGenerationBody(body: string): Promise<Result<GeneratedAsset[]>> {
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(body)
+  } catch (error) {
+    return err(`The image endpoint did not return JSON: ${errorText(error)}`)
+  }
+
+  if (!isRecord(parsed)) return err('The image endpoint returned an unexpected response.')
+  const providerMessage = errorBodyMessage(body)
+  if (providerMessage) return err(providerMessage)
+
+  const data = Array.isArray(parsed.data) ? parsed.data : [parsed]
+  const assets: GeneratedAsset[] = []
+  for (const item of data) {
+    const asset = await imageItemToAsset(item)
+    if (asset) assets.push(asset)
+  }
+
+  if (assets.length > 0) return ok(assets)
+  return err(`The image endpoint returned no usable image data. Body: ${snippet(body)}`)
+}
+
+function shouldRetryAsTextJson(message: string): boolean {
+  const lower = message.toLowerCase()
+  if (
+    lower.includes('provider returned') ||
+    lower.includes('provider base url') ||
+    lower.includes('not the web console')
+  ) {
+    return false
+  }
+  return (
+    lower.includes('json') ||
+    lower.includes('schema') ||
+    lower.includes('structured') ||
+    lower.includes('response_format') ||
+    lower.includes('object')
+  )
+}
+
+function extractJson(text: string): string {
+  const trimmed = text.trim()
+  const fenced = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i)
+  const source = (fenced?.[1] ?? trimmed).trim()
+  const objectStart = source.indexOf('{')
+  const arrayStart = source.indexOf('[')
+  const starts = [objectStart, arrayStart].filter((index) => index >= 0)
+  if (starts.length === 0) return source
+
+  const start = Math.min(...starts)
+  const open = source[start]
+  const close = open === '{' ? '}' : ']'
+  let depth = 0
+  let inString = false
+  let escaped = false
+
+  for (let i = start; i < source.length; i += 1) {
+    const char = source[i]
+    if (inString) {
+      if (escaped) escaped = false
+      else if (char === '\\') escaped = true
+      else if (char === '"') inString = false
+      continue
+    }
+    if (char === '"') inString = true
+    else if (char === open) depth += 1
+    else if (char === close) {
+      depth -= 1
+      if (depth === 0) return source.slice(start, i + 1)
+    }
+  }
+
+  return source.slice(start)
+}
+
+interface StructuredParseFailure {
+  readonly error: string
+  readonly jsonText: string
+}
+
+type StructuredParseResult<T> =
+  | { readonly ok: true; readonly data: T }
+  | { readonly ok: false; readonly failure: StructuredParseFailure }
+
+function parseStructuredTextDetailed<T>(
+  text: string,
+  schema: z.ZodType<T>,
+): StructuredParseResult<T> {
+  const jsonText = extractJson(text)
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(jsonText)
+  } catch (error) {
+    return {
+      ok: false,
+      failure: {
+        jsonText,
+        error: `The model did not return parseable JSON: ${errorText(error)}`,
+      },
+    }
+  }
+
+  const validation = schema.safeParse(parsed)
+  if (!validation.success) {
+    return {
+      ok: false,
+      failure: {
+        jsonText,
+        error: `The model returned JSON that did not match the schema: ${validation.error.message}`,
+      },
+    }
+  }
+  return { ok: true, data: validation.data }
+}
+
+function parseStructuredText<T>(text: string, schema: z.ZodType<T>): Result<T> {
+  const parsed = parseStructuredTextDetailed(text, schema)
+  return parsed.ok ? ok(parsed.data) : err(parsed.failure.error)
+}
+
+function repairJsonSystem(
+  system: string,
+  failure: StructuredParseFailure,
+): string {
+  return [
+    system,
+    '',
+    JSON_ONLY_SUFFIX,
+    JSON_REPAIR_SUFFIX,
+    '',
+    'Validation failure to repair:',
+    failure.error,
+    '',
+    'Previous invalid JSON:',
+    failure.jsonText,
+  ].join('\n')
 }
 
 export function createLocalGenerationService(
@@ -118,10 +417,15 @@ export function createLocalGenerationService(
     if (!cfg) return err('provider not configured')
     const modelId = resolveModel(cfg.kind, cfg.defaultModel, input.model)
     const model = buildModel(cfg, modelId)
+    // Thinking strength → per-vendor providerOptions (`{}` when unset/unsafe).
+    const providerOptions = reasoningProviderOptions(
+      cfg.kind,
+      input.reasoningEffort,
+    )
 
     // Back-compat raw text path — a single prompt string, no multimodal parts.
     if (input.prompt !== undefined) {
-      return ok({ model, prompt: input.prompt })
+      return ok({ model, prompt: input.prompt, providerOptions })
     }
 
     // Structured path: resolve the system instruction, then attach user content.
@@ -148,7 +452,7 @@ export function createLocalGenerationService(
     const messages: ModelMessage[] = [
       { role: 'user', content: parts.map(toContentPart) },
     ]
-    return ok({ model, system, messages })
+    return ok({ model, system, messages, providerOptions })
   }
 
   return {
@@ -164,11 +468,13 @@ export function createLocalGenerationService(
                 system: p.system,
                 messages: p.messages,
                 abortSignal: input.signal,
+                providerOptions: p.providerOptions,
               })
             : await aiGenerateText({
                 model: p.model,
                 prompt: p.prompt,
                 abortSignal: input.signal,
+                providerOptions: p.providerOptions,
               })
         return ok(text)
       } catch (error) {
@@ -187,11 +493,13 @@ export function createLocalGenerationService(
               system: p.system,
               messages: p.messages,
               abortSignal: input.signal,
+              providerOptions: p.providerOptions,
             })
           : aiStreamText({
               model: p.model,
               prompt: p.prompt,
               abortSignal: input.signal,
+              providerOptions: p.providerOptions,
             })
       for await (const delta of result.textStream) {
         yield delta
@@ -217,11 +525,42 @@ export function createLocalGenerationService(
           system: p.system,
           messages: p.messages,
           abortSignal: input.signal,
+          providerOptions: p.providerOptions,
           experimental_output: Output.object({ schema }),
         })
         return ok(result.experimental_output)
       } catch (error) {
-        return err(error instanceof Error ? error.message : String(error))
+        const structuredError = errorText(error)
+        if (!shouldRetryAsTextJson(structuredError)) return err(structuredError)
+        try {
+          const { text } = await aiGenerateText({
+            model: p.model,
+            system: `${p.system}\n\n${JSON_ONLY_SUFFIX}`,
+            messages: p.messages,
+            abortSignal: input.signal,
+            providerOptions: p.providerOptions,
+          })
+          const parsed = parseStructuredTextDetailed(text, schema)
+          if (parsed.ok) return ok(parsed.data)
+
+          const repaired = await aiGenerateText({
+            model: p.model,
+            system: repairJsonSystem(p.system, parsed.failure),
+            messages: p.messages,
+            abortSignal: input.signal,
+            providerOptions: p.providerOptions,
+          })
+          const repairedParsed = parseStructuredText(repaired.text, schema)
+          if (repairedParsed.ok) return repairedParsed
+
+          return err(
+            `Structured JSON generation failed (${structuredError}); fallback text JSON failed: ${parsed.failure.error}; repair JSON also failed: ${repairedParsed.error}`,
+          )
+        } catch (fallbackError) {
+          return err(
+            `Structured JSON generation failed (${structuredError}); fallback text JSON also failed: ${errorText(fallbackError)}`,
+          )
+        }
       }
     },
 
@@ -233,10 +572,9 @@ export function createLocalGenerationService(
       const modelId = resolveModel(cfg.kind, cfg.defaultModel, input.model)
 
       // OpenAI-shaped image models (gpt-image / dall-e) are served by the IMAGES
-      // endpoint, not /chat/completions — a chat call returns a non-chat body
-      // ("Invalid JSON response"). Use `generateImage` with a single text prompt.
-      // (Screenshot → sheet deconstruction needs a chat-image model, e.g. Gemini,
-      // handled by the files path below; this images API is text-prompt only.)
+      // endpoint, not /chat/completions. Call the proxied endpoint directly so
+      // OpenAI-compatible relays that return URL-shaped image data don't fail
+      // the AI SDK's stricter `b64_json` response schema.
       if (cfg.kind === 'openai' || cfg.kind === 'openai-compatible') {
         if (instructionSourceCount(input) !== 1) {
           return err('provide exactly one of prompt, system, or promptRef')
@@ -265,22 +603,27 @@ export function createLocalGenerationService(
         if (!promptText) return err('no prompt text for image generation')
 
         try {
-          const provider = createOpenAI({
-            apiKey: DUMMY_KEY,
-            baseURL: cfg.baseUrl,
-            fetch: tauriFetch(cfg.id, cfg.kind),
+          const baseUrl = apiBaseUrl(cfg.kind, cfg.baseUrl)
+          if (!baseUrl) return err('provider has no base URL for image generation')
+          const res = await invoke<ProxyResponse>('ai_proxy_request', {
+            providerId: cfg.id,
+            kind: cfg.kind,
+            url: `${baseUrl}/images/generations`,
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({
+              model: modelId,
+              prompt: promptText,
+              n: 1,
+            }),
           })
-          const result = await generateImage({
-            model: provider.image(modelId),
-            prompt: promptText,
-            abortSignal: input.signal,
-          })
-          const assets: GeneratedAsset[] = result.images.map((img) => ({
-            mediaType: 'image/png',
-            bytes: img.uint8Array,
-          }))
-          if (assets.length === 0) return err('The model returned no image.')
-          return ok(assets)
+          if (res.status < 200 || res.status >= 300) {
+            const providerMessage = errorBodyMessage(res.body)
+            return err(
+              `images/generations failed: HTTP ${res.status}${providerMessage ? ` · ${providerMessage}` : res.body ? ` · ${snippet(res.body)}` : ''}`,
+            )
+          }
+          return parseImageGenerationBody(res.body)
         } catch (error) {
           return err(error instanceof Error ? error.message : String(error))
         }
@@ -320,7 +663,8 @@ export function createLocalGenerationService(
       if (cfg.kind !== 'openai' && cfg.kind !== 'openai-compatible') {
         return err('image edit requires an OpenAI-compatible provider')
       }
-      if (!cfg.baseUrl) return err('provider has no base URL for image edit')
+      const baseUrl = apiBaseUrl(cfg.kind, cfg.baseUrl)
+      if (!baseUrl) return err('provider has no base URL for image edit')
       if (input.images.length === 0) {
         return err('at least one reference image is required')
       }
@@ -332,7 +676,7 @@ export function createLocalGenerationService(
         const res = await invoke<{ images: string[] }>('ai_image_edit', {
           providerId: cfg.id,
           kind: cfg.kind,
-          baseUrl: cfg.baseUrl,
+          baseUrl,
           model: modelId,
           prompt: input.prompt,
           images: input.images.map((bytes) => Array.from(bytes)),

@@ -118,6 +118,11 @@ msgid "slices.empty_halve_min_area"
 msgstr "最小面积 −50%"
 
 #. js-lingui-explicit-id
+#: src/components/canvas/nodes/IntentPanel.tsx
+msgid "intent.questions_title"
+msgstr "先澄清一下"
+
+#. js-lingui-explicit-id
 #: src/components/preview/PreviewToolbar.tsx
 msgid "preview.zoom_actual"
 msgstr "实际大小 (1:1)"
@@ -141,6 +146,26 @@ msgstr "先在上方添加一个端点,再分配模型。"
 #: src/components/settings/sections/AiSection.tsx
 msgid "settings.add_provider"
 msgstr "添加提供方"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/MockupNode.tsx
+msgid "mockup.add_to_library"
+msgstr "加入素材库"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/SlicesNode.tsx
+msgid "slices.add_to_library"
+msgstr "加入素材库"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/SlicesNode.tsx
+msgid "slices.toast_added_to_library"
+msgstr "已加入 {added} 个素材"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/MockupNode.tsx
+msgid "mockup.toast_added_to_library"
+msgstr "已加入素材库"
 
 #. js-lingui-explicit-id
 #: src/components/settings/SettingsSidebar.tsx
@@ -203,6 +228,21 @@ msgid "pipeline.node_board_aria"
 msgstr "素材板阶段"
 
 #. js-lingui-explicit-id
+#: src/components/topbar/LibraryMenu.tsx
+msgid "library.menu_label"
+msgstr "素材库"
+
+#. js-lingui-explicit-id
+#: src/components/library/LibraryDrawer.tsx
+msgid "library.title"
+msgstr "素材库"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/IntentPanel.tsx
+msgid "intent.assumptions"
+msgstr "假设"
+
+#. js-lingui-explicit-id
 #: src/components/canvas/PlannedCanvas.tsx
 msgid "dag.back_to_linear"
 msgstr "返回线性视图"
@@ -250,6 +290,7 @@ msgstr "此环境不支持复制图像到剪贴板。"
 
 #. js-lingui-explicit-id
 #: src/components/ui/dialog.tsx
+#: src/components/ui/sheet.tsx
 msgid "common.close"
 msgstr "关闭"
 
@@ -259,9 +300,19 @@ msgid "board.composing"
 msgstr "正在合成原型图…"
 
 #. js-lingui-explicit-id
+#: src/components/library/LibraryDrawer.tsx
+msgid "library.toast_compose_failed"
+msgstr "合成失败"
+
+#. js-lingui-explicit-id
 #: src/components/canvas/nodes/BoardNode.tsx
 msgid "board.toast_compose_failed"
 msgstr "合成失败"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/IntentPanel.tsx
+msgid "intent.confidence"
+msgstr "置信度"
 
 #. js-lingui-explicit-id
 #: src/components/canvas/nodes/SlicesNode.tsx
@@ -274,6 +325,11 @@ msgstr "配置对话模型以命名切片"
 #: src/components/canvas/nodes/MockupNode.tsx
 msgid "generate.no_model_cta"
 msgstr "在设置中配置图像模型"
+
+#. js-lingui-explicit-id
+#: src/components/library/LibraryDrawer.tsx
+msgid "library.no_model"
+msgstr "在设置中配置图像模型后即可生成。"
 
 #. js-lingui-explicit-id
 #: src/components/settings/ProviderRow.tsx
@@ -296,6 +352,13 @@ msgid "slices.action_copy_png"
 msgstr "复制 PNG"
 
 #. js-lingui-explicit-id
+#: src/components/canvas/nodes/MockupNode.tsx
+#: src/components/canvas/nodes/SlicesNode.tsx
+#: src/components/library/LibraryDrawer.tsx
+msgid "library.toast_add_failed"
+msgstr "无法加入素材库"
+
+#. js-lingui-explicit-id
 #: src/hooks/useCopyPng.ts
 msgid "copy_png.toast_failed"
 msgstr "无法复制图像"
@@ -305,6 +368,11 @@ msgstr "无法复制图像"
 #: src/hooks/useImageImport.ts
 msgid "import.toast_load_failed"
 msgstr "无法加载图像"
+
+#. js-lingui-explicit-id
+#: src/components/library/LibraryDrawer.tsx
+msgid "library.toast_remove_failed"
+msgstr "无法移除素材"
 
 #. js-lingui-explicit-id
 #: src/components/canvas/edges/TransitionEdge.tsx
@@ -347,6 +415,11 @@ msgid "mockup.toast_deconstruct_failed"
 msgstr "拆解失败"
 
 #. js-lingui-explicit-id
+#: src/components/settings/ModelSlot.tsx
+msgid "settings.effort_default"
+msgstr "默认"
+
+#. js-lingui-explicit-id
 #: src/components/settings/ProviderForm.tsx
 msgid "settings.provider_model_label"
 msgstr "默认模型"
@@ -365,6 +438,11 @@ msgstr "设计系统"
 #: src/components/canvas/nodes/DesignSystemNode.tsx
 msgid "dag.node_design_system_aria"
 msgstr "设计系统节点"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/IntentPanel.tsx
+msgid "intent.dimensions"
+msgstr "维度"
 
 #. js-lingui-explicit-id
 #: src/components/status/StatusBar.tsx
@@ -402,9 +480,24 @@ msgid "settings.dialog_edit_title"
 msgstr "编辑提供方"
 
 #. js-lingui-explicit-id
+#: src/components/library/LibraryDrawer.tsx
+msgid "library.empty"
+msgstr "素材库还是空的——把切片或生成的图加入素材库，或导入你自己的图片。"
+
+#. js-lingui-explicit-id
 #: src/components/settings/ModelSlot.tsx
 msgid "settings.model_pick_endpoint"
 msgstr "端点"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/MockupNode.tsx
+msgid "mockup.preview_zoom"
+msgstr "放大预览原型图"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/dag-node-common.tsx
+msgid "dag.preview_zoom"
+msgstr "放大预览"
 
 #. js-lingui-explicit-id
 #: src/components/settings/KeyField.tsx
@@ -482,9 +575,19 @@ msgid "brief.generate"
 msgstr "生成原型图"
 
 #. js-lingui-explicit-id
+#: src/components/library/LibraryDrawer.tsx
+msgid "library.compose"
+msgstr "生成原型图"
+
+#. js-lingui-explicit-id
 #: src/components/canvas/nodes/MockupNode.tsx
 msgid "mockup.generating"
 msgstr "正在生成原型图…"
+
+#. js-lingui-explicit-id
+#: src/components/library/LibraryDrawer.tsx
+msgid "library.composing"
+msgstr "生成中…"
 
 #. js-lingui-explicit-id
 #: src/components/canvas/nodes/BriefNode.tsx
@@ -498,9 +601,19 @@ msgid "generate.toast_failed"
 msgstr "生成失败"
 
 #. js-lingui-explicit-id
+#: src/components/canvas/nodes/IntentPanel.tsx
+msgid "intent.goal"
+msgstr "目标"
+
+#. js-lingui-explicit-id
 #: src/components/settings/KeyField.tsx
 msgid "settings.key_hide"
 msgstr "隐藏"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ModelSlot.tsx
+msgid "settings.effort_high"
+msgstr "高"
 
 #. js-lingui-explicit-id
 #: src/components/status/StatusBar.tsx
@@ -515,6 +628,11 @@ msgstr "图像生成"
 #. js-lingui-explicit-id
 #: src/components/topbar/TopBarActions.tsx
 msgid "topbar.import"
+msgstr "导入"
+
+#. js-lingui-explicit-id
+#: src/components/library/LibraryDrawer.tsx
+msgid "library.import"
 msgstr "导入"
 
 #. js-lingui-explicit-id
@@ -556,6 +674,16 @@ msgstr "语言"
 #: src/components/topbar/ThemeToggle.tsx
 msgid "topbar.theme_light_mode"
 msgstr "浅色模式"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ModelSlot.tsx
+msgid "settings.effort_low"
+msgstr "低"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ModelSlot.tsx
+msgid "settings.effort_medium"
+msgstr "中"
 
 #. js-lingui-explicit-id
 #: src/components/canvas/nodes/MockupNode.tsx
@@ -663,11 +791,6 @@ msgid "pipeline.canvas_aria"
 msgstr "流水线画布"
 
 #. js-lingui-explicit-id
-#: src/components/canvas/nodes/BriefNode.tsx
-msgid "dag.plan_and_generate"
-msgstr "规划并生成图"
-
-#. js-lingui-explicit-id
 #. placeholder {0}: node.label
 #: src/components/canvas/nodes/DagNode.tsx
 msgid "dag.node_aria"
@@ -677,11 +800,6 @@ msgstr "规划节点：{0}"
 #: src/components/canvas/PlannedCanvas.tsx
 msgid "dag.canvas_aria"
 msgstr "规划管线画布"
-
-#. js-lingui-explicit-id
-#: src/components/canvas/nodes/BriefNode.tsx
-msgid "dag.planning"
-msgstr "规划并生成中…"
 
 #. js-lingui-explicit-id
 #: src/components/canvas/nodes/BriefNode.tsx
@@ -704,6 +822,11 @@ msgid "settings.model_image_hint"
 msgstr "生成图像(如重绘的素材总览图)。"
 
 #. js-lingui-explicit-id
+#: src/components/library/LibraryDrawer.tsx
+msgid "library.toast_composed"
+msgstr "已生成原型图到 mockup 节点"
+
+#. js-lingui-explicit-id
 #: src/components/settings/ProviderForm.tsx
 msgid "settings.provider_added_toast"
 msgstr "已添加提供方"
@@ -717,6 +840,21 @@ msgstr "已删除提供方"
 #: src/components/settings/ProviderForm.tsx
 msgid "settings.provider_updated_toast"
 msgstr "已更新提供方"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/BriefNode.tsx
+msgid "dag.plan_and_generate"
+msgstr "规划并生成图"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/BriefNode.tsx
+msgid "dag.planning"
+msgstr "规划并生成中…"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/IntentPanel.tsx
+msgid "intent.questions_hint"
+msgstr "在上方补充需求以回答这些问题，然后重新规划。"
 
 #. js-lingui-explicit-id
 #: src/components/canvas/nodes/MockupNode.tsx
@@ -737,6 +875,11 @@ msgstr "删除"
 #: src/components/settings/ProviderRow.tsx
 msgid "settings.remove_failed_toast"
 msgstr "删除失败"
+
+#. js-lingui-explicit-id
+#: src/components/library/LibraryDrawer.tsx
+msgid "library.delete"
+msgstr "从素材库移除"
 
 #. js-lingui-explicit-id
 #: src/components/settings/ProviderRow.tsx
@@ -862,6 +1005,11 @@ msgid "pipeline.node_slices_aria"
 msgstr "切片阶段"
 
 #. js-lingui-explicit-id
+#: src/components/canvas/nodes/IntentPanel.tsx
+msgid "intent.strategy"
+msgstr "策略"
+
+#. js-lingui-explicit-id
 #: src/components/topbar/ThemeToggle.tsx
 msgid "topbar.theme_to_dark"
 msgstr "切换到深色模式"
@@ -907,6 +1055,11 @@ msgid "settings.theme_label"
 msgstr "主题"
 
 #. js-lingui-explicit-id
+#: src/components/settings/ModelSlot.tsx
+msgid "settings.effort_label"
+msgstr "思考强度"
+
+#. js-lingui-explicit-id
 #: src/components/settings/ProviderRow.tsx
 msgid "settings.remove_confirm_desc"
 msgstr "将删除「{label}」的配置及其保存在系统钥匙串中的密钥，此操作无法撤销。"
@@ -925,6 +1078,11 @@ msgstr "切换棋盘格"
 #: src/components/settings/ProviderForm.tsx
 msgid "settings.provider_kind_label"
 msgstr "类型"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/IntentPanel.tsx
+msgid "intent.title"
+msgstr "识别到的意图"
 
 #. js-lingui-explicit-id
 #: src/hooks/useExport.ts

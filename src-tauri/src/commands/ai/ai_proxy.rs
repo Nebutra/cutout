@@ -25,6 +25,7 @@
 //! the command returns `Ok(())`.
 
 use std::collections::HashMap;
+use std::error::Error as StdError;
 
 use futures_util::StreamExt;
 use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
@@ -35,6 +36,9 @@ use tauri::ipc::{Channel, InvokeResponseBody};
 
 use super::auth_header::{auth_headers, STRIPPED_INBOUND_HEADERS};
 use super::keys::{read_secret, KeyError};
+
+const DEFAULT_BUFFERED_TIMEOUT_SECS: u64 = 120;
+const IMAGE_BUFFERED_TIMEOUT_SECS: u64 = 600;
 
 /// Buffered proxy response returned to JS.
 #[derive(Debug, Serialize)]
@@ -187,12 +191,11 @@ fn collect_headers(resp: &reqwest::Response) -> HashMap<String, String> {
 }
 
 /// Build an HTTP client with sane timeouts. `overall` (seconds) bounds the whole
-/// request — set for buffered calls (image generation can be slow but must not
-/// hang forever); left `None` for streaming so long token streams aren't cut. A
+/// request; left `None` for streaming so long token streams aren't cut. A
 /// connect timeout applies either way. Falls back to the default client on error.
 ///
 /// `pub(crate)` so the sibling multipart `image_edit` command reuses the same
-/// buffered client (a 120s overall cap) for the `/images/edits` call.
+/// client builder for the `/images/edits` call.
 pub(crate) fn build_client(overall: Option<u64>) -> reqwest::Client {
     let mut builder =
         reqwest::Client::builder().connect_timeout(std::time::Duration::from_secs(30));
@@ -200,6 +203,38 @@ pub(crate) fn build_client(overall: Option<u64>) -> reqwest::Client {
         builder = builder.timeout(std::time::Duration::from_secs(secs));
     }
     builder.build().unwrap_or_else(|_| reqwest::Client::new())
+}
+
+/// Image generation/edit endpoints are materially slower than text calls. Keep
+/// chat/model probes bounded at 120s, but let image requests run long enough for
+/// production-grade models before surfacing a timeout.
+pub(crate) fn buffered_timeout_for_url(url: &str) -> u64 {
+    if url.contains("/images/generations") || url.contains("/images/edits") {
+        IMAGE_BUFFERED_TIMEOUT_SECS
+    } else {
+        DEFAULT_BUFFERED_TIMEOUT_SECS
+    }
+}
+
+/// Preserve reqwest's useful source chain (timeout, dns, tcp, tls, body decode)
+/// without ever including headers or secrets. The top-level Display is often
+/// just "error sending request for url (...)", which is not actionable enough.
+pub(crate) fn request_error_message(error: &reqwest::Error) -> String {
+    let mut parts = vec![error.to_string()];
+    if error.is_timeout() && !parts.iter().any(|part| part.contains("timed out")) {
+        parts.push("operation timed out".to_string());
+    }
+
+    let mut source = StdError::source(error);
+    while let Some(cause) = source {
+        let text = cause.to_string();
+        if !text.is_empty() && !parts.iter().any(|part| part == &text) {
+            parts.push(text);
+        }
+        source = cause.source();
+    }
+
+    parts.join(": ")
 }
 
 /// Buffered request: read key, inject auth, send, return status/headers/body.
@@ -216,9 +251,9 @@ pub async fn ai_proxy_request(
     let secret = read_secret(&provider_id).map_err(ProxyError::from)?;
     let (method, header_map) = build_method_and_headers(&kind, &method, headers, &secret)?;
 
-    // Bound the whole call: image generation is slow, but a hung relay must not
-    // spin forever — surface a timeout error instead.
-    let client = build_client(Some(120));
+    // Bound the whole call. Image endpoints use a longer cap; text/model probes
+    // keep the shorter default so a bad relay does not hang the app.
+    let client = build_client(Some(buffered_timeout_for_url(&url)));
     let mut req = client.request(method, &url).headers(header_map);
     if let Some(body) = body {
         req = req.body(body);
@@ -227,13 +262,13 @@ pub async fn ai_proxy_request(
     let resp = req
         .send()
         .await
-        .map_err(|e| ProxyError::Request(e.to_string()))?;
+        .map_err(|e| ProxyError::Request(request_error_message(&e)))?;
     let status = resp.status().as_u16();
     let resp_headers = collect_headers(&resp);
     let body = resp
         .text()
         .await
-        .map_err(|e| ProxyError::Request(e.to_string()))?;
+        .map_err(|e| ProxyError::Request(request_error_message(&e)))?;
 
     Ok(ProxyResponse {
         status,
@@ -269,7 +304,7 @@ pub async fn ai_proxy_stream(
     let resp = req
         .send()
         .await
-        .map_err(|e| ProxyError::Request(e.to_string()))?;
+        .map_err(|e| ProxyError::Request(request_error_message(&e)))?;
 
     // --- Head frame: status + headers, sent before any body bytes. ---
     let status = resp.status().as_u16();
@@ -296,7 +331,7 @@ pub async fn ai_proxy_stream(
                 }
             }
             Err(e) => {
-                let frame = json!({ "type": "error", "message": e.to_string() });
+                let frame = json!({ "type": "error", "message": request_error_message(&e) });
                 let _ = on_chunk.send(InvokeResponseBody::Json(frame.to_string()));
                 return Ok(());
             }
@@ -397,6 +432,22 @@ mod tests {
     fn build_headers_unknown_kind_errors() {
         let err = build_method_and_headers("nope", "POST", HashMap::new(), "k").unwrap_err();
         assert!(matches!(err, ProxyError::UnknownKind));
+    }
+
+    #[test]
+    fn image_endpoints_get_longer_buffered_timeout() {
+        assert_eq!(
+            buffered_timeout_for_url("https://api.example.com/v1/images/generations"),
+            IMAGE_BUFFERED_TIMEOUT_SECS
+        );
+        assert_eq!(
+            buffered_timeout_for_url("https://api.example.com/v1/images/edits"),
+            IMAGE_BUFFERED_TIMEOUT_SECS
+        );
+        assert_eq!(
+            buffered_timeout_for_url("https://api.example.com/v1/chat/completions"),
+            DEFAULT_BUFFERED_TIMEOUT_SECS
+        );
     }
 
     #[test]

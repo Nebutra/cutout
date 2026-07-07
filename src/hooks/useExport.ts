@@ -10,20 +10,35 @@ import { useCallback } from 'react'
 import { toast } from 'sonner'
 import { useLingui } from '@lingui/react/macro'
 import { plural } from '@lingui/core/macro'
-import { useExportAll, useExportOne } from '@/hooks/queries/cutout'
+import {
+  useExportAll,
+  useExportAllSvg,
+  useExportOne,
+} from '@/hooks/queries/cutout'
+import {
+  useVectorizePrefs,
+  vectorizePrefsOrDefault,
+} from '@/hooks/queries/vectorize'
 import type { SaveManyOutcome } from '@/services/types'
 
 export interface ExportControls {
   readonly exportAllPending: boolean
   readonly exportOnePending: boolean
+  readonly exportSvgPending: boolean
   exportAll(): void
+  exportSvgLocal(): void
+  exportSvgApi(): void
+  exportPngAndSvgLocal(): void
+  exportPngAndSvgApi(): void
   exportOne(id: string): void
 }
 
 export function useExport(): ExportControls {
   const { t } = useLingui()
   const exportAllMutation = useExportAll()
+  const exportAllSvgMutation = useExportAllSvg()
   const exportOneMutation = useExportOne()
+  const vectorizePrefs = useVectorizePrefs()
 
   /** Toast the result of a save (shared by all export buttons). */
   const reportOutcome = useCallback(
@@ -70,6 +85,53 @@ export function useExport(): ExportControls {
     })
   }, [exportAllMutation, reportOutcome])
 
+  const exportSvgLocal = useCallback((): void => {
+    exportAllSvgMutation.mutate(
+      { route: 'local' },
+      {
+        onSuccess: reportOutcome,
+        onError: (error) => toast.error(error.message),
+      },
+    )
+  }, [exportAllSvgMutation, reportOutcome])
+
+  const exportSvgApi = useCallback((): void => {
+    const prefs = vectorizePrefsOrDefault(vectorizePrefs.data)
+    exportAllSvgMutation.mutate(
+      { route: 'api', apiId: prefs.apiId, apiMode: prefs.apiMode },
+      {
+        onSuccess: reportOutcome,
+        onError: (error) => toast.error(error.message),
+      },
+    )
+  }, [exportAllSvgMutation, reportOutcome, vectorizePrefs.data])
+
+  const exportPngAndSvgLocal = useCallback((): void => {
+    exportAllSvgMutation.mutate(
+      { route: 'local', includePng: true },
+      {
+        onSuccess: reportOutcome,
+        onError: (error) => toast.error(error.message),
+      },
+    )
+  }, [exportAllSvgMutation, reportOutcome])
+
+  const exportPngAndSvgApi = useCallback((): void => {
+    const prefs = vectorizePrefsOrDefault(vectorizePrefs.data)
+    exportAllSvgMutation.mutate(
+      {
+        route: 'api',
+        apiId: prefs.apiId,
+        apiMode: prefs.apiMode,
+        includePng: true,
+      },
+      {
+        onSuccess: reportOutcome,
+        onError: (error) => toast.error(error.message),
+      },
+    )
+  }, [exportAllSvgMutation, reportOutcome, vectorizePrefs.data])
+
   const exportOne = useCallback(
     (id: string): void => {
       exportOneMutation.mutate(
@@ -86,7 +148,12 @@ export function useExport(): ExportControls {
   return {
     exportAllPending: exportAllMutation.isPending,
     exportOnePending: exportOneMutation.isPending,
+    exportSvgPending: exportAllSvgMutation.isPending,
     exportAll,
+    exportSvgLocal,
+    exportSvgApi,
+    exportPngAndSvgLocal,
+    exportPngAndSvgApi,
     exportOne,
   }
 }

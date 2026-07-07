@@ -12,6 +12,7 @@
 import type { z } from 'zod'
 import type { Result } from '@/services/types'
 import type { ProviderConfig, ProviderDraft } from './provider-types'
+import type { ReasoningEffort } from './reasoning'
 import type { PromptPart, PromptRef } from '@/prompts/types'
 
 /** Key + provider-config management. Secrets are never returned to JS. */
@@ -50,6 +51,11 @@ export interface GenerateInput {
   readonly promptRef?: PromptRef
   /** Multimodal user-message content (image + text framing). */
   readonly input?: readonly PromptPart[]
+  /**
+   * Thinking strength for reasoning-capable chat models. Mapped to each vendor's
+   * `providerOptions` in the generation service; `undefined` sends nothing.
+   */
+  readonly reasoningEffort?: ReasoningEffort
 }
 
 /** A generated binary asset (e.g. an image from `result.files`). */

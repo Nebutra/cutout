@@ -12,13 +12,13 @@ export interface SliceThumbProps {
 
 export function SliceThumb({ slice }: SliceThumbProps) {
   return (
-    <div className="bg-checker flex aspect-square items-center justify-center overflow-hidden rounded-md border border-border/50">
+    <div className="bg-checker flex aspect-square w-full items-center justify-center overflow-hidden rounded-md border border-border/50">
       <img
         src={slice.objectUrl}
         alt={slice.name}
         loading="lazy"
         draggable={false}
-        className="max-h-full max-w-full object-contain"
+        className="block h-full w-full object-contain"
       />
     </div>
   )

@@ -17,7 +17,7 @@ import {
   useExportPrefs,
   useSetRememberDir,
 } from '@/hooks/queries/export-prefs'
-import { activateLocale } from '@/i18n'
+import { switchLocale } from '@/i18n/switch'
 import { SUPPORTED, LOCALE_LABEL, type Locale } from '@/i18n/config'
 
 /** One labelled preference row: title (+ hint) on the left, control on the right. */
@@ -84,7 +84,7 @@ export function GeneralSection() {
               variant={currentLocale === locale ? 'secondary' : 'ghost'}
               size="sm"
               aria-pressed={currentLocale === locale}
-              onClick={() => void activateLocale(locale, true)}
+              onClick={() => void switchLocale(locale)}
             >
               {LOCALE_LABEL[locale]}
             </Button>

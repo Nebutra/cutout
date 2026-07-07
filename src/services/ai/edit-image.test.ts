@@ -76,6 +76,24 @@ describe('GenerationService.editImage', () => {
     )
   })
 
+  it('normalizes a pathless OpenAI-compatible base URL before invoking Rust', async () => {
+    invokeMock.mockResolvedValue({ images: [ABC_B64] })
+    const gen = createLocalGenerationService(
+      providersWith([cfg({ baseUrl: 'https://relay.example' })]),
+    )
+
+    await gen.editImage({
+      providerId: 'p1',
+      prompt: 'p',
+      images: [new Uint8Array([1])],
+    })
+
+    expect(invokeMock).toHaveBeenCalledWith(
+      'ai_image_edit',
+      expect.objectContaining({ baseUrl: 'https://relay.example/v1' }),
+    )
+  })
+
   it('decodes every returned base64 image to PNG bytes', async () => {
     invokeMock.mockResolvedValue({ images: [ABC_B64, ABC_B64] })
     const gen = createLocalGenerationService(providersWith([cfg()]))

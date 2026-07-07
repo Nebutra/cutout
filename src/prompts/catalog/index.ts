@@ -6,6 +6,7 @@
  * (board→mockup) and the vision `ui-slice-naming` step; P6a adds
  * `ui-graph-planner` (the AI Planner that emits a validated GraphSpec); P7a adds
  * `ui-intent-recognition` (the open-world intent miner upstream of the Planner).
+ * P8 adds `ui-prototype-planner` (the multi-page prototype graph planner).
  * Add future built-ins to `BUILTIN_PROMPTS`; `createBuiltinRegistry()` is the
  * ready-to-use catalog the local `PromptService` is backed by.
  */
@@ -17,6 +18,7 @@ import { uiMockupComposition } from './ui-mockup-composition'
 import { uiSliceNaming } from './ui-slice-naming'
 import { uiGraphPlanner } from './ui-graph-planner'
 import { uiIntentRecognition } from './ui-intent-recognition'
+import { uiPrototypePlanner } from './ui-prototype-planner'
 
 /** Every built-in prompt version shipped in the app. */
 export const BUILTIN_PROMPTS: readonly PromptVersion[] = [
@@ -26,6 +28,7 @@ export const BUILTIN_PROMPTS: readonly PromptVersion[] = [
   uiSliceNaming,
   uiGraphPlanner,
   uiIntentRecognition,
+  uiPrototypePlanner,
 ]
 
 /** Register all built-ins into an existing registry. */

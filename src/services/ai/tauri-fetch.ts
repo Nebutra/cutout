@@ -60,6 +60,9 @@ const STRIP_RESPONSE_HEADERS = new Set([
   'connection',
 ])
 
+const API_RESPONSE_HINT =
+  'Check that the provider base URL points to the API endpoint, not the web console.'
+
 /** Copy request headers into a plain record, dropping auth + hop-by-hop. */
 function toHeaderRecord(headers: Headers): Record<string, string> {
   const out: Record<string, string> = {}
@@ -76,6 +79,124 @@ function toResponseHeaders(headers: Record<string, string>): Headers {
     if (!STRIP_RESPONSE_HEADERS.has(key.toLowerCase())) out.append(key, value)
   }
   return out
+}
+
+function responseHeader(
+  headers: Record<string, string>,
+  name: string,
+): string {
+  const target = name.toLowerCase()
+  for (const [key, value] of Object.entries(headers)) {
+    if (key.toLowerCase() === target) return value
+  }
+  return ''
+}
+
+function isJsonContentType(contentType: string): boolean {
+  const lower = contentType.toLowerCase()
+  return (
+    lower.includes('application/json') ||
+    lower.includes('+json') ||
+    lower.includes('application/x-ndjson')
+  )
+}
+
+function isEventStreamContentType(contentType: string): boolean {
+  return contentType.toLowerCase().includes('text/event-stream')
+}
+
+function isJsonLikeBody(body: string): boolean {
+  const trimmed = body.trimStart()
+  return trimmed.startsWith('{') || trimmed.startsWith('[')
+}
+
+function isHtmlLikeResponse(
+  headers: Record<string, string>,
+  body?: string,
+): boolean {
+  const contentType = responseHeader(headers, 'content-type').toLowerCase()
+  if (contentType.includes('text/html')) return true
+  if (body === undefined) return false
+  const trimmed = body.trimStart().slice(0, 128).toLowerCase()
+  return trimmed.startsWith('<!doctype html') || trimmed.startsWith('<html')
+}
+
+function bodySnippet(body: string): string {
+  return body.replace(/\s+/g, ' ').trim().slice(0, 160)
+}
+
+function providerErrorResponse(status: number, message: string): Response {
+  const safeStatus = status >= 400 && status <= 599 ? status : 502
+  return new Response(
+    JSON.stringify({
+      error: {
+        message,
+        type: 'provider_endpoint_misconfigured',
+        code: 'non_api_response',
+      },
+    }),
+    {
+      status: safeStatus,
+      headers: new Headers({ 'content-type': 'application/json' }),
+    },
+  )
+}
+
+function bufferedProxyGuard(
+  res: ProxyResponse,
+  url: string,
+): Response | null {
+  const contentType = responseHeader(res.headers, 'content-type')
+  const html = isHtmlLikeResponse(res.headers, res.body)
+  const apiContent =
+    !html &&
+    (isJsonContentType(contentType) ||
+      isEventStreamContentType(contentType) ||
+      isJsonLikeBody(res.body))
+  if (apiContent) return null
+
+  const bodyKind = html
+    ? 'an HTML page'
+    : contentType
+      ? `a ${contentType} response`
+      : 'a non-API response'
+  const snippet = bodySnippet(res.body)
+
+  if (res.status >= 200 && res.status < 300) {
+    return providerErrorResponse(
+      502,
+      `Provider returned ${bodyKind} instead of an API response for ${url}. ${API_RESPONSE_HINT}`,
+    )
+  }
+
+  return providerErrorResponse(
+    res.status,
+    `Provider returned HTTP ${res.status} with ${bodyKind} for ${url}. ${API_RESPONSE_HINT}${snippet ? ` Body: ${snippet}` : ''}`,
+  )
+}
+
+function streamingProxyGuard(
+  status: number,
+  headers: Record<string, string>,
+  url: string,
+): Response | null {
+  const contentType = responseHeader(headers, 'content-type')
+  if (isJsonContentType(contentType) || isEventStreamContentType(contentType)) {
+    return null
+  }
+
+  if (status >= 200 && status < 300) {
+    const bodyKind = isHtmlLikeResponse(headers)
+      ? 'an HTML page'
+      : contentType
+        ? `a ${contentType} response`
+        : 'a non-API response'
+    return providerErrorResponse(
+      502,
+      `Provider returned ${bodyKind} instead of a streaming API response for ${url}. ${API_RESPONSE_HINT}`,
+    )
+  }
+  return null
 }
 
 /** Heuristic: does this request expect an incrementally-read (SSE) response? */
@@ -105,6 +226,8 @@ async function bufferedResponse(
     headers,
     body,
   })
+  const guarded = bufferedProxyGuard(res, url)
+  if (guarded) return guarded
   return new Response(res.body, {
     status: res.status,
     headers: toResponseHeaders(res.headers),
@@ -197,6 +320,8 @@ async function streamingResponse(
   })
 
   const head = await headReady
+  const guarded = streamingProxyGuard(head.status, head.headers, url)
+  if (guarded) return guarded
   return new Response(stream, {
     status: head.status,
     headers: toResponseHeaders(head.headers),

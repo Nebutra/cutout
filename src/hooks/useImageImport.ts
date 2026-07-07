@@ -10,6 +10,10 @@ import { toast } from 'sonner'
 import { useLingui } from '@lingui/react/macro'
 import { useStore } from '@/store'
 import { decodeImage, isSupportedImage, baseName } from '@/lib/image'
+import {
+  isDesignMarkdownFileName,
+  normalizedDesignMarkdown,
+} from '@/prototype/design-md'
 
 export interface ImageImport {
   /** Decode + load a single file (rejects unsupported types with a toast). */
@@ -26,10 +30,31 @@ export interface ImageImport {
 export function useImageImport(): ImageImport {
   const { t } = useLingui()
   const loadImage = useStore((s) => s.loadImage)
+  const setDesignMarkdown = useStore((s) => s.setDesignMarkdown)
   const inputRef = useRef<HTMLInputElement | null>(null)
 
   const importFile = useCallback(
     async (file: File): Promise<void> => {
+      if (isDesignMarkdownFileName(file.name)) {
+        try {
+          const content = normalizedDesignMarkdown(await file.text())
+          if (!content) throw new Error('DESIGN.md is empty.')
+          setDesignMarkdown({
+            name: file.name,
+            content,
+            importedAt: Date.now(),
+          })
+          toast.success('DESIGN.md imported', {
+            description: 'The design system context will condition prototype generation.',
+          })
+        } catch (error) {
+          toast.error(
+            error instanceof Error ? error.message : 'Could not import DESIGN.md',
+          )
+        }
+        return
+      }
+
       if (!isSupportedImage(file)) {
         const name = file.name
         toast.error(
@@ -48,7 +73,7 @@ export function useImageImport(): ImageImport {
         )
       }
     },
-    [loadImage, t],
+    [loadImage, setDesignMarkdown, t],
   )
 
   const openPicker = useCallback((): void => {

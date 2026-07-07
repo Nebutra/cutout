@@ -22,7 +22,29 @@
 import type { Result } from '@/services/types'
 import { err, isErr, ok } from '@/services/types'
 import type { GenerationService } from '@/services/ai/types'
+import type { ReasoningEffort } from '@/services/ai/reasoning'
 import { intentProfileSchema, type IntentProfile } from './intent-types'
+
+/**
+ * The confidence floor below which the flow surfaces questions instead of
+ * proceeding autonomously (spec §6/§9 risk 2). A profile at or above this is
+ * trusted; below it (or with any explicit `questions`) the user is asked to
+ * refine before any generation runs. The user can always proceed anyway.
+ */
+export const INTENT_CONFIDENCE_THRESHOLD = 0.5
+
+/**
+ * Whether a recognized intent should PAUSE for clarification rather than plan
+ * autonomously: it carries clarifying `questions`, or its self-estimated
+ * `confidence` is below {@link INTENT_CONFIDENCE_THRESHOLD}. Pure + reusable so
+ * the run flow and the UI agree on the same gate.
+ */
+export function intentNeedsClarification(intent: IntentProfile): boolean {
+  return (
+    intent.questions.length > 0 ||
+    intent.confidence < INTENT_CONFIDENCE_THRESHOLD
+  )
+}
 
 /** Inputs the caller resolves (chat model slot + the requirement brief). */
 export interface RecognizeIntentParams {
@@ -31,6 +53,8 @@ export interface RecognizeIntentParams {
   readonly model: string
   /** The vague product brief whose intent is reconstructed + mined. */
   readonly brief: string
+  /** Thinking strength for the chat model (from its Settings assignment). */
+  readonly effort?: ReasoningEffort
   readonly signal?: AbortSignal
 }
 
@@ -52,6 +76,7 @@ export async function recognizeIntent(
       model: params.model,
       promptRef: { id: 'ui-intent-recognition' },
       input: [{ type: 'text', text: brief }],
+      reasoningEffort: params.effort,
       signal: params.signal,
     },
     intentProfileSchema,

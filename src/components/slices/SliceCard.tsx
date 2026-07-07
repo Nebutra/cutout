@@ -36,7 +36,7 @@ export function SliceCard({ slice }: SliceCardProps) {
         }
       }}
       className={cn(
-        'group/card relative cursor-pointer rounded-lg border border-border/60 bg-card p-1.5 transition-all outline-none',
+        'group/card relative cursor-pointer overflow-hidden rounded-lg border border-border/60 bg-card p-1.5 transition-all outline-none',
         'hover:border-ring/50 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/40',
         slice.selected &&
           'border-primary/60 ring-2 ring-primary/40 ring-offset-1 ring-offset-background',

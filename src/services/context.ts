@@ -14,6 +14,7 @@ import { tauriBridge, type NativeBridge } from '@/platform/native'
 import type { ServiceRegistry } from './types'
 import { createLocalCutoutService } from './local/cutout-service.local'
 import { createLocalAssetRepository } from './local/asset-repository.local'
+import { createLocalVectorizeService } from './local/vectorize-service.local'
 import { createLocalSessionService } from './local/session.local'
 import { createLocalProviderService } from './ai/provider-service.local'
 import { createLocalGenerationService } from './ai/generation-service.local'
@@ -33,6 +34,7 @@ export function createLocalRegistry(
   return {
     cutout: createLocalCutoutService(worker),
     assets: createLocalAssetRepository(bridge),
+    vectorize: createLocalVectorizeService(bridge),
     session: createLocalSessionService(),
     providers,
     generation: createLocalGenerationService(providers, prompts),

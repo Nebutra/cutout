@@ -18,6 +18,7 @@ import type { PromptPart } from '@/prompts/types'
 import type { Result } from '@/services/types'
 import { err, isErr, ok } from '@/services/types'
 import type { GenerationService } from './types'
+import type { ReasoningEffort } from './reasoning'
 
 /** One slice's identity for naming: which index, framed by which box. */
 export interface SliceBox {
@@ -51,6 +52,8 @@ export interface NameSlicesParams {
   readonly imageBytes: Uint8Array
   /** Every slice to name, as index + bounding box. */
   readonly slices: readonly SliceBox[]
+  /** Thinking strength for the chat model (from its Settings assignment). */
+  readonly effort?: ReasoningEffort
   readonly signal?: AbortSignal
 }
 
@@ -85,6 +88,7 @@ export async function nameSlices(
       model: params.model,
       promptRef: { id: 'ui-slice-naming' },
       input: parts,
+      reasoningEffort: params.effort,
       signal: params.signal,
     },
     sliceNamesSchema,

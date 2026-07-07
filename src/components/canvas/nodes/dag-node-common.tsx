@@ -6,12 +6,13 @@
  * slice count, or a naming count). Kept dumb + presentational so both the
  * generic {@link DagNode} and the {@link DesignSystemNode} share one look.
  */
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo } from 'react'
 import { ImageOff, Loader2 } from 'lucide-react'
-import { Trans } from '@lingui/react/macro'
+import { Trans, useLingui } from '@lingui/react/macro'
 import type { NodeOp } from '@/dag/graph-spec'
 import type { DagNodeState } from '@/store/types'
 import { bytesToBlob } from '@/lib/image'
+import { ImageZoom } from './ImageZoom'
 
 /** The op badge — explicit per op so Lingui extracts each static id. */
 export function OpBadge({ op }: { readonly op: NodeOp }) {
@@ -35,29 +36,30 @@ function useOutputImageUrl(state: DagNodeState | undefined): string | null {
     state?.status === 'done' && state.output?.kind === 'image'
       ? state.output.bytes
       : null
-  const blob = useMemo(() => (bytes ? bytesToBlob(bytes, 'image/png') : null), [bytes])
-  const [url, setUrl] = useState<string | null>(null)
+  const url = useMemo(() => {
+    if (!bytes) return null
+    return URL.createObjectURL(bytesToBlob(bytes, 'image/png'))
+  }, [bytes])
   useEffect(() => {
-    if (!blob) {
-      setUrl(null)
-      return
-    }
-    const next = URL.createObjectURL(blob)
-    setUrl(next)
-    return () => URL.revokeObjectURL(next)
-  }, [blob])
+    if (!url) return
+    return () => URL.revokeObjectURL(url)
+  }, [url])
   return url
 }
 
 /** The state-driven body: image thumbnail · counts · spinner · error · blocked. */
 export function DagNodePreview({ state }: { readonly state: DagNodeState | undefined }) {
+  const { t } = useLingui()
   const url = useOutputImageUrl(state)
   const status = state?.status ?? 'idle'
 
   return (
     <div className="flex h-40 items-center justify-center overflow-hidden rounded-lg border border-border/60 bg-muted/30 p-2 text-center text-xs text-muted-foreground">
       {url ? (
-        <img src={url} alt="" className="max-h-full max-w-full object-contain" />
+        <ImageZoom
+          src={url}
+          label={t({ id: 'dag.preview_zoom', message: 'Enlarge preview' })}
+        />
       ) : status === 'running' ? (
         <span className="flex flex-col items-center gap-2">
           <Loader2 className="size-5 animate-spin" />

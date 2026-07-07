@@ -22,6 +22,8 @@ import { useServices } from '@/services/context'
 import { isErr } from '@/services/types'
 import type { PromptPart, PromptService } from '@/prompts/types'
 import { nameSlices, type SliceBox } from '@/services/ai/naming'
+import { composeFromLibrary } from '@/services/ai/library-compose'
+import type { ProviderConfig } from '@/services/ai/provider-types'
 import { getStoreState, useStore } from '@/store'
 import type { MockupArtifact } from '@/store/types'
 import {
@@ -31,7 +33,18 @@ import {
   bitmapToBytes,
   isSupportedImage,
 } from '@/lib/image'
+import { logTiming, markTime } from '@/lib/timing'
 import { useModelAssignments } from './ai-settings'
+
+export interface DeconstructPreflight {
+  readonly configs: readonly ProviderConfig[]
+  readonly promptText: string
+}
+
+export interface DeconstructMockupInput {
+  readonly preflight?: Promise<DeconstructPreflight> | DeconstructPreflight
+  readonly referenceImages?: readonly Uint8Array[]
+}
 
 /** Decode a generated/imported image `Blob` into a {@link MockupArtifact}. */
 async function toMockupArtifact(blob: Blob): Promise<MockupArtifact> {
@@ -48,20 +61,56 @@ async function toMockupArtifact(blob: Blob): Promise<MockupArtifact> {
 async function deconstructPromptText(
   prompts: Pick<PromptService, 'render'>,
   brief: string,
+  referenceCount = 1,
 ): Promise<string> {
   const rendered = await prompts.render({ id: 'ui-asset-deconstruction' })
-  return brief ? `${rendered.system}\n\n${brief}` : rendered.system
+  const referenceContext = deconstructReferenceContext(referenceCount)
+  return [rendered.system, referenceContext, brief.trim()]
+    .filter(Boolean)
+    .join('\n\n')
 }
 
 /** Multimodal parts for the chat-image (Gemini) deconstruct path: brief + mockup. */
 function buildDeconstructParts(
   brief: string,
   mockupBytes: Uint8Array,
+  referenceImages: readonly Uint8Array[] = [],
 ): PromptPart[] {
   const parts: PromptPart[] = []
-  if (brief) parts.push({ type: 'text', text: brief })
+  const referenceContext = deconstructReferenceContext(1 + referenceImages.length)
+  const text = [referenceContext, brief.trim()].filter(Boolean).join('\n\n')
+  if (text) parts.push({ type: 'text', text })
   parts.push({ type: 'image', image: mockupBytes })
+  for (const image of referenceImages) {
+    parts.push({ type: 'image', image })
+  }
   return parts
+}
+
+function deconstructReferenceContext(referenceCount: number): string {
+  if (referenceCount <= 1) return ''
+  return [
+    `You receive ${referenceCount} prototype page references for one coherent suite.`,
+    'Extract valuable assets from EVERY attached page, not only the first image.',
+    'Keep the pages stylistically connected, but output a single asset library where each asset is atomic, isolated, complete, and not wrapped in UI chrome.',
+  ].join('\n')
+}
+
+export function usePrepareDeconstructMockup() {
+  const { providers, prompts } = useServices()
+
+  return useCallback(
+    async (brief: string, referenceCount = 1): Promise<DeconstructPreflight> => {
+      const started = markTime()
+      const [configs, promptText] = await Promise.all([
+        providers.list(),
+        deconstructPromptText(prompts, brief.trim(), referenceCount),
+      ])
+      logTiming('deconstruct.preflight.prepare', started)
+      return { configs, promptText }
+    },
+    [prompts, providers],
+  )
 }
 
 /**
@@ -75,6 +124,7 @@ export function useGenerateMockup() {
 
   return useMutation<void, Error, void>({
     mutationFn: async () => {
+      const totalStarted = markTime()
       const image = assignments.data?.image
       if (!image) throw new Error('No image-generation model is configured.')
 
@@ -84,18 +134,23 @@ export function useGenerateMockup() {
       const store = getStoreState()
       store.beginGen('generating-mockup')
       try {
+        const apiStarted = markTime()
         const result = await generation.generateImages({
           providerId: image.providerId,
           model: image.model,
           promptRef: { id: 'ui-mockup-generation' },
           input: [{ type: 'text', text: brief }],
         })
+        logTiming('mockup.generate.api', apiStarted)
         if (isErr(result)) throw new Error(result.error)
         const asset = result.data[0]
         if (!asset) throw new Error('The model returned no image.')
 
+        const decodeStarted = markTime()
         const blob = bytesToBlob(asset.bytes, asset.mediaType)
         store.setMockup(await toMockupArtifact(blob))
+        logTiming('mockup.decode', decodeStarted)
+        logTiming('mockup.generate.total', totalStarted)
       } catch (error) {
         store.failGen('generate', error instanceof Error ? error.message : String(error))
         throw error
@@ -115,51 +170,77 @@ export function useDeconstructMockup() {
   const assignments = useModelAssignments()
   const loadImage = useStore((s) => s.loadImage)
 
-  return useMutation<void, Error, void>({
-    mutationFn: async () => {
+  return useMutation<void, Error, DeconstructMockupInput | void>({
+    mutationFn: async (input) => {
+      const totalStarted = markTime()
       const image = assignments.data?.image
       if (!image) throw new Error('No image-generation model is configured.')
 
       const snapshot = getStoreState()
       const mockup = snapshot.mockup
       if (!mockup) throw new Error('Generate or import a mockup first.')
+      const referenceImages =
+        input && 'referenceImages' in input && input.referenceImages
+          ? input.referenceImages
+          : []
 
       const brief = snapshot.brief.trim()
-      const mockupBytes = await blobToBytes(mockup.blob)
+      snapshot.beginGen('deconstructing')
 
       // 垫图: when the image slot is an OpenAI-shaped provider, the upstream
       // mockup is a reference image the `/images/edits` endpoint conditions on
       // (the OpenAI images path can't carry an input image otherwise). Gemini &
       // other chat-image models keep the multimodal `generateImages` path, which
       // already sends the mockup as an image part.
-      const configs = await providers.list()
-      const kind = configs.find((p) => p.id === image.providerId)?.kind
-      const useEdit = kind === 'openai' || kind === 'openai-compatible'
-
-      snapshot.beginGen('deconstructing')
       try {
+        const preflightStarted = markTime()
+        const preflight =
+          input && 'preflight' in input && input.preflight
+            ? Promise.resolve(input.preflight)
+            : Promise.all([
+                providers.list(),
+                deconstructPromptText(prompts, brief, 1 + referenceImages.length),
+              ]).then(([configs, promptText]) => ({ configs, promptText }))
+        const [mockupBytes, resolvedPreflight] = await Promise.all([
+          blobToBytes(mockup.blob),
+          preflight,
+        ])
+        const { configs, promptText } = resolvedPreflight
+        const kind = configs.find((p) => p.id === image.providerId)?.kind
+        const useEdit = kind === 'openai' || kind === 'openai-compatible'
+        logTiming('deconstruct.preflight', preflightStarted, {
+          route: useEdit ? 'edit-image' : 'generate-image',
+        })
+
+        const apiStarted = markTime()
         const result = useEdit
           ? await generation.editImage({
               providerId: image.providerId,
               model: image.model,
-              prompt: await deconstructPromptText(prompts, brief),
-              images: [mockupBytes],
+              prompt: promptText,
+              images: [mockupBytes, ...referenceImages],
               inputFidelity: 'high',
             })
           : await generation.generateImages({
               providerId: image.providerId,
               model: image.model,
               promptRef: { id: 'ui-asset-deconstruction' },
-              input: buildDeconstructParts(brief, mockupBytes),
+              input: buildDeconstructParts(brief, mockupBytes, referenceImages),
             })
+        logTiming('deconstruct.api', apiStarted, {
+          route: useEdit ? 'edit-image' : 'generate-image',
+        })
         if (isErr(result)) throw new Error(result.error)
         const asset = result.data[0]
         if (!asset) throw new Error('The model returned no image.')
 
         // The board becomes the cutout source → auto-analysis follows (§7).
+        const decodeStarted = markTime()
         const bitmap = await decodeImage(bytesToBlob(asset.bytes, asset.mediaType))
         loadImage({ bitmap, name: 'generated-sheet' })
         getStoreState().endGen()
+        logTiming('deconstruct.decode-load', decodeStarted)
+        logTiming('deconstruct.total', totalStarted)
       } catch (error) {
         getStoreState().failGen(
           'deconstruct',
@@ -223,6 +304,53 @@ export function useComposeMockup() {
 }
 
 /**
+ * Mutation: selected library assets → a composed UI mockup
+ * (`ui-mockup-composition`, spec §6/§7). The library counterpart to
+ * {@link useComposeMockup}: it feeds each chosen asset's bytes as image parts
+ * (the brief rides along as text framing) and lands the result in the `mockup`
+ * node like a forward generate. Gated by the caller on an image model; the throw
+ * is a safety net. The argument is the ordered list of selected asset ids.
+ */
+export function useComposeFromLibrary() {
+  const { generation, assets } = useServices()
+  const assignments = useModelAssignments()
+
+  return useMutation<void, Error, readonly string[]>({
+    mutationFn: async (assetIds) => {
+      const image = assignments.data?.image
+      if (!image) throw new Error('No image-generation model is configured.')
+      if (assetIds.length === 0) {
+        throw new Error('Select at least one asset to compose.')
+      }
+
+      const store = getStoreState()
+      store.beginGen('composing')
+      try {
+        const result = await composeFromLibrary(
+          { generation, load: assets.load },
+          {
+            providerId: image.providerId,
+            model: image.model,
+            assetIds,
+            brief: store.brief,
+          },
+        )
+        if (isErr(result)) throw new Error(result.error)
+
+        const blob = bytesToBlob(result.data.bytes, result.data.mediaType)
+        getStoreState().setMockup(await toMockupArtifact(blob))
+      } catch (error) {
+        getStoreState().failGen(
+          'compose',
+          error instanceof Error ? error.message : String(error),
+        )
+        throw error
+      }
+    },
+  })
+}
+
+/**
  * Mutation: give the current slices semantic filenames (vision, spec §8). Sends
  * the board image + each slice's bounding box to the Settings **chat** vision
  * model and applies the returned names through the existing `store.renameSlice`
@@ -251,6 +379,7 @@ export function useNameSlices() {
         model: chat.model,
         imageBytes: await bitmapToBytes(board),
         slices: boxes,
+        effort: chat.effort,
       })
       if (isErr(result)) throw new Error(result.error)
 

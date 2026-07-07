@@ -14,7 +14,9 @@ use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
 use reqwest::multipart::{Form, Part};
 use serde::Serialize;
 
-use super::ai_proxy::{build_client, enforce_host, ProxyError};
+use super::ai_proxy::{
+    buffered_timeout_for_url, build_client, enforce_host, request_error_message, ProxyError,
+};
 use super::auth_header::auth_headers;
 use super::keys::read_secret;
 
@@ -77,7 +79,9 @@ fn parse_edit_response(body: &str) -> Result<Vec<String>, ProxyError> {
         })
         .unwrap_or_default();
     if images.is_empty() {
-        return Err(ProxyError::Request("no image in edits response".to_string()));
+        return Err(ProxyError::Request(
+            "no image in edits response".to_string(),
+        ));
     }
     Ok(images)
 }
@@ -134,21 +138,22 @@ pub async fn ai_image_edit(
     let fidelity = input_fidelity.as_deref().unwrap_or("high");
     let form = build_edit_form(&model, &prompt, images, size.as_deref(), fidelity);
 
-    // Buffered client with a 120s cap — image edits are slow but must not hang.
-    let client = build_client(Some(120));
+    // Image edits can take several minutes on production models; use the image
+    // endpoint timeout instead of the shorter text/probe cap.
+    let client = build_client(Some(buffered_timeout_for_url(&url)));
     let resp = client
         .post(&url)
         .headers(header_map)
         .multipart(form)
         .send()
         .await
-        .map_err(|e| ProxyError::Request(e.to_string()))?;
+        .map_err(|e| ProxyError::Request(request_error_message(&e)))?;
 
     let status = resp.status();
     let body = resp
         .text()
         .await
-        .map_err(|e| ProxyError::Request(e.to_string()))?;
+        .map_err(|e| ProxyError::Request(request_error_message(&e)))?;
     if !status.is_success() {
         // Surface the status (never the secret) like `ai_proxy_request`.
         return Err(ProxyError::Request(format!(

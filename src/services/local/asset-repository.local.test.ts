@@ -2,9 +2,18 @@ import { describe, it, expect } from 'vitest'
 import { createLocalAssetRepository } from './asset-repository.local'
 import type { NativeBridge, SaveAssetsResult } from '@/platform/native'
 
+const vectorizeBridgeStubs = {
+  setVectorizerApiKey: async () => undefined,
+  vectorizerKeyStatus: async () => false,
+  deleteVectorizerApiKey: async () => undefined,
+  vectorizeLocalVTracer: async () => ({ svg: '<svg />' }),
+  vectorizeVectorizerAi: async () => ({ svg: '<svg />' }),
+} satisfies Omit<NativeBridge, 'saveAssets'>
+
 function fakeBridge(result: SaveAssetsResult) {
   const calls: { count: number; destDir?: string }[] = []
   const bridge: NativeBridge = {
+    ...vectorizeBridgeStubs,
     saveAssets: async (assets, destDir) => {
       calls.push({ count: assets.length, destDir })
       return result

@@ -7,6 +7,7 @@
  * SAME interfaces, flipped in one place (`createLocalRegistry` → remote).
  */
 import type { Box, CutoutParams } from '@/algorithm/types'
+import type { VectorizerAiMode } from '@/platform/native'
 import type { ProviderService, GenerationService } from './ai/types'
 import type { PromptService } from '@/prompts/types'
 
@@ -66,19 +67,33 @@ export interface CutoutService {
   run(input: CutoutRunInput): Promise<Result<CutoutResult>>
 }
 
-/* --- Asset repository (Tauri fs now, HTTP later) --- */
+/* --- Asset repository (Tauri fs export + IndexedDB library now, HTTP later) --- */
 
-/** A reference to a persisted asset. `path` is set for local fs writes. */
+/** Where a library asset originated (drives filtering + provenance display). */
+export type AssetKind = 'slice' | 'import' | 'generated'
+
+/**
+ * A reference to an asset. `path` is set for local fs writes (export); the
+ * library metadata (`kind`/`width`/`height`/`createdAt`/`thumb`) is populated
+ * for IndexedDB-backed library items so the gallery renders from `list()` alone.
+ */
 export interface AssetRef {
   readonly id: string
   readonly name: string
   readonly path?: string
+  readonly kind?: AssetKind
+  readonly width?: number
+  readonly height?: number
+  readonly createdAt?: number
+  /** Small downscaled preview for the gallery grid (library items only). */
+  readonly thumb?: Blob
 }
 
-/** One asset to save: filename + raw PNG bytes (from a blob). */
+/** One asset to save/add: filename + blob, with an optional library `kind`. */
 export interface AssetToSave {
   readonly name: string
   readonly blob: Blob
+  readonly kind?: AssetKind
 }
 
 /** Optional save hints (e.g. a remembered destination). */
@@ -99,13 +114,39 @@ export interface SaveManyOutcome {
 }
 
 export interface AssetRepository {
+  /** List the managed library (IndexedDB), newest first, with thumbnails. */
   list(filter?: AssetListFilter): Promise<Result<AssetRef[]>>
+  /** Load one library asset's full blob by id. */
   load(id: string): Promise<Result<Blob>>
+  /** Persist an asset into the managed library (distinct from disk export). */
+  add(asset: AssetToSave): Promise<Result<AssetRef>>
+  /** Delete one library asset by id. */
+  remove(id: string): Promise<Result<void>>
+  /** Export one asset to disk (Tauri) — NOT the managed library. */
   saveOne(asset: AssetToSave, opts?: SaveOptions): Promise<Result<AssetRef>>
+  /** Export many assets to disk (Tauri) — NOT the managed library. */
   saveMany(
     assets: readonly AssetToSave[],
     opts?: SaveOptions,
   ): Promise<Result<SaveManyOutcome>>
+}
+
+/* --- Vectorization (local VTracer now, API route now, backend later) --- */
+
+export type SvgVectorizerRoute = 'local' | 'api'
+
+export interface VectorizeInput {
+  readonly asset: AssetToSave
+  readonly route: SvgVectorizerRoute
+  readonly apiId?: string
+  readonly apiMode?: VectorizerAiMode
+}
+
+export interface VectorizeService {
+  vectorize(input: VectorizeInput): Promise<Result<AssetToSave>>
+  setApiKey(apiId: string, apiSecret: string): Promise<Result<void>>
+  apiKeyStatus(apiId: string): Promise<Result<boolean>>
+  deleteApiKey(apiId: string): Promise<Result<void>>
 }
 
 /* --- Session (stub now, auth later) --- */
@@ -127,6 +168,7 @@ export interface ServiceRegistry {
   readonly session: SessionService
   readonly cutout: CutoutService
   readonly assets: AssetRepository
+  readonly vectorize: VectorizeService
   /** BYOK key + provider management (spec §5). */
   readonly providers: ProviderService
   /** BYOK text generation over the Rust proxy (spec §5). */

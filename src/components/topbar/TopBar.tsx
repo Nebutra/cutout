@@ -1,35 +1,121 @@
 /**
- * TopBar (spec §4c) — brand · primary actions · theme/settings.
+ * TopBar (spec §4c) — file tabs · primary actions.
  *
  * Thin, dense, and calm (Linear/Raycast). Draggable region for the frameless
  * feel is left to the Tauri window config; here we only lay out controls.
- * Language lives in Settings (⚙); the gear opens the unified Settings dialog.
+ * Settings now lives in the workspace sidebar, matching design-tool shells.
  */
-import { Scissors } from 'lucide-react'
+import { Home, Plus, Scissors, X } from 'lucide-react'
 import { TopBarActions } from './TopBarActions'
 import { ThemeToggle } from './ThemeToggle'
-import { SettingsMenu } from './SettingsMenu'
+import { LibraryMenu } from './LibraryMenu'
+import { Button } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 
 export interface TopBarProps {
+  readonly view: 'home' | 'project'
+  readonly projectName: string
+  readonly projectTabOpen: boolean
+  readonly onOpenHome: () => void
+  readonly onOpenProject: () => void
+  readonly onCloseProject: () => void
+  readonly onNewProject: () => void
   readonly onRerun: () => void
 }
 
-export function TopBar({ onRerun }: TopBarProps) {
+export function TopBar({
+  view,
+  projectName,
+  projectTabOpen,
+  onOpenHome,
+  onOpenProject,
+  onCloseProject,
+  onNewProject,
+  onRerun,
+}: TopBarProps) {
   return (
-    <header className="flex h-12 shrink-0 items-center justify-between gap-3 border-b border-border bg-background/80 px-3 backdrop-blur">
-      <div className="flex items-center gap-2">
-        <div className="flex size-6 items-center justify-center rounded-md bg-primary text-primary-foreground">
-          <Scissors className="size-3.5" />
+    <header className="flex h-12 shrink-0 items-stretch justify-between gap-3 border-b border-border bg-background/80 px-3 backdrop-blur">
+      <div className="flex min-w-0 items-stretch gap-2">
+        <div className="flex min-w-0 items-stretch gap-1">
+          <TopTab
+            active={view === 'home'}
+            label="Home"
+            icon={<Home className="size-3.5" />}
+            onClick={onOpenHome}
+          />
+          {projectTabOpen ? (
+            <TopTab
+              active={view === 'project'}
+              label={projectName}
+              icon={<Scissors className="size-3.5" />}
+              onClick={onOpenProject}
+              onClose={onCloseProject}
+            />
+          ) : null}
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            aria-label="New project"
+            className="my-2 shrink-0 rounded-md"
+            onClick={onNewProject}
+          >
+            <Plus className="size-3.5" />
+          </Button>
         </div>
-        <span className="text-sm font-semibold tracking-tight">Cutout</span>
       </div>
 
       <div className="flex items-center gap-1.5">
-        <TopBarActions onRerun={onRerun} />
-        <div className="mx-1 h-5 w-px bg-border" />
+        {view === 'project' ? <TopBarActions onRerun={onRerun} /> : null}
+        {view === 'project' ? <div className="mx-1 h-5 w-px bg-border" /> : null}
+        <LibraryMenu />
         <ThemeToggle />
-        <SettingsMenu />
       </div>
     </header>
+  )
+}
+
+function TopTab({
+  active,
+  label,
+  icon,
+  onClick,
+  onClose,
+}: {
+  readonly active: boolean
+  readonly label: string
+  readonly icon: React.ReactNode
+  readonly onClick: () => void
+  readonly onClose?: () => void
+}) {
+  return (
+    <div
+      className={cn(
+        'my-1.5 flex max-w-[16rem] min-w-0 items-center rounded-md border text-sm transition-colors',
+        active
+          ? 'border-border bg-muted/70 text-foreground shadow-sm'
+          : 'border-transparent text-muted-foreground hover:bg-muted/45 hover:text-foreground',
+      )}
+    >
+      <button
+        type="button"
+        aria-current={active ? 'page' : undefined}
+        className="flex min-w-0 flex-1 items-center gap-2 rounded-l-md py-1.5 pl-3 pr-2 text-left"
+        onClick={onClick}
+      >
+        <span className="shrink-0">{icon}</span>
+        <span className="truncate font-medium">{label}</span>
+      </button>
+      {onClose ? (
+        <button
+          type="button"
+          aria-label={`Close ${label}`}
+          className="mr-1 flex size-5 shrink-0 items-center justify-center rounded text-muted-foreground opacity-70 transition hover:bg-background/80 hover:text-foreground hover:opacity-100"
+          onClick={onClose}
+        >
+          <X className="size-3" />
+        </button>
+      ) : null}
+    </div>
   )
 }
