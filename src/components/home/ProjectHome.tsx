@@ -200,9 +200,9 @@ function ViewModeToggle({
         aria-label="Grid view"
         aria-pressed={value === 'grid'}
         className={cn(
-          'h-7 rounded-[min(var(--radius-md),10px)] px-2',
+          'h-7 rounded-[min(var(--radius-md),10px)] px-2 text-muted-foreground',
           value === 'grid' &&
-            'bg-foreground text-background shadow-sm hover:bg-foreground/90 hover:text-background',
+            'bg-muted text-foreground shadow-sm hover:bg-muted hover:text-foreground',
         )}
         onClick={() => onChange('grid')}
       >
@@ -216,9 +216,9 @@ function ViewModeToggle({
         aria-label="List view"
         aria-pressed={value === 'list'}
         className={cn(
-          'h-7 rounded-[min(var(--radius-md),10px)] px-2',
+          'h-7 rounded-[min(var(--radius-md),10px)] px-2 text-muted-foreground',
           value === 'list' &&
-            'bg-foreground text-background shadow-sm hover:bg-foreground/90 hover:text-background',
+            'bg-muted text-foreground shadow-sm hover:bg-muted hover:text-foreground',
         )}
         onClick={() => onChange('list')}
       >
@@ -243,28 +243,40 @@ function EmptyProjectState({
   if (viewMode === 'list') {
     return (
       <div className="overflow-hidden rounded-lg border border-border bg-background shadow-sm">
-        <div className="grid grid-cols-[minmax(12rem,1fr)_8.5rem_6rem_7.5rem_7rem] gap-4 border-b border-border px-4 py-3 text-xs font-medium text-muted-foreground">
+        <div className="hidden grid-cols-[minmax(18rem,1fr)_8.5rem_6rem_7.5rem_7rem] gap-4 border-b border-border px-4 py-3 text-xs font-medium text-muted-foreground lg:grid">
           <span>Name</span>
-          <span className="hidden sm:block">Last modified</span>
-          <span className="hidden md:block">Assets</span>
-          <span className="hidden lg:block">Design</span>
-          <span className="hidden lg:block">Status</span>
+          <span>Last modified</span>
+          <span>Assets</span>
+          <span>Design</span>
+          <span>Status</span>
         </div>
         <button
           type="button"
-          className="flex min-h-40 w-full items-center justify-center gap-3 px-4 py-8 text-left transition-colors hover:bg-muted/35"
+          className="grid w-full gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/35 lg:grid-cols-[minmax(18rem,1fr)_8.5rem_6rem_7.5rem_7rem] lg:items-center lg:gap-4"
           onClick={onNewProject}
         >
-          <span className="flex size-11 shrink-0 items-center justify-center rounded-lg border border-border bg-muted/30">
-            <Plus className="size-5 text-muted-foreground" />
-          </span>
-          <span className="min-w-0">
-            <span className="block text-sm font-semibold">New project</span>
-            <span className="mt-1 block max-w-80 text-sm leading-6 text-muted-foreground">
-              {hasProjects
-                ? `No ${filterTitle(filter).toLowerCase()} yet.`
-                : 'Start from one intent and let the Agent plan the prototype suite.'}
+          <span className="flex min-w-0 items-center gap-3">
+            <span className="flex size-11 shrink-0 items-center justify-center rounded-lg border border-dashed border-border bg-muted/25">
+              <Plus className="size-5 text-muted-foreground" />
             </span>
+            <span className="min-w-0">
+              <span className="block text-sm font-semibold">New project</span>
+              <span className="mt-1 block truncate text-xs text-muted-foreground">
+                {hasProjects
+                  ? `No ${filterTitle(filter).toLowerCase()} yet.`
+                  : 'Start from one intent and let the Agent plan the prototype suite.'}
+              </span>
+            </span>
+          </span>
+          <span className="hidden text-sm text-muted-foreground lg:block">—</span>
+          <span className="hidden text-sm tabular-nums text-muted-foreground lg:block">
+            0
+          </span>
+          <span className="hidden text-sm text-muted-foreground lg:block">
+            No design
+          </span>
+          <span className="hidden text-sm text-muted-foreground lg:block">
+            Empty
           </span>
         </button>
       </div>
