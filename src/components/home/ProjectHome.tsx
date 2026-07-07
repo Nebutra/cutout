@@ -141,9 +141,7 @@ export function ProjectHome({
                   {visibleProjects.length} local
                 </p>
               </div>
-              {hasVisibleProjects ? (
-                <ViewModeToggle value={viewMode} onChange={setViewMode} />
-              ) : null}
+              <ViewModeToggle value={viewMode} onChange={setViewMode} />
             </div>
 
             {hasVisibleProjects ? (
@@ -171,6 +169,7 @@ export function ProjectHome({
               <EmptyProjectState
                 hasProjects={hasProjects}
                 filter={filter}
+                viewMode={viewMode}
                 onNewProject={onNewProject}
               />
             )}
@@ -233,12 +232,45 @@ function ViewModeToggle({
 function EmptyProjectState({
   hasProjects,
   filter,
+  viewMode,
   onNewProject,
 }: {
   readonly hasProjects: boolean
   readonly filter: ProjectFilter
+  readonly viewMode: ProjectViewMode
   readonly onNewProject: () => void
 }) {
+  if (viewMode === 'list') {
+    return (
+      <div className="overflow-hidden rounded-lg border border-border bg-background shadow-sm">
+        <div className="grid grid-cols-[minmax(12rem,1fr)_8.5rem_6rem_7.5rem_7rem] gap-4 border-b border-border px-4 py-3 text-xs font-medium text-muted-foreground">
+          <span>Name</span>
+          <span className="hidden sm:block">Last modified</span>
+          <span className="hidden md:block">Assets</span>
+          <span className="hidden lg:block">Design</span>
+          <span className="hidden lg:block">Status</span>
+        </div>
+        <button
+          type="button"
+          className="flex min-h-40 w-full items-center justify-center gap-3 px-4 py-8 text-left transition-colors hover:bg-muted/35"
+          onClick={onNewProject}
+        >
+          <span className="flex size-11 shrink-0 items-center justify-center rounded-lg border border-border bg-muted/30">
+            <Plus className="size-5 text-muted-foreground" />
+          </span>
+          <span className="min-w-0">
+            <span className="block text-sm font-semibold">New project</span>
+            <span className="mt-1 block max-w-80 text-sm leading-6 text-muted-foreground">
+              {hasProjects
+                ? `No ${filterTitle(filter).toLowerCase()} yet.`
+                : 'Start from one intent and let the Agent plan the prototype suite.'}
+            </span>
+          </span>
+        </button>
+      </div>
+    )
+  }
+
   return (
     <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
       <button
