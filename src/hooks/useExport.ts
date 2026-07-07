@@ -14,6 +14,7 @@ import {
   useExportAll,
   useExportAllSvg,
   useExportOne,
+  useExportOneSvg,
 } from '@/hooks/queries/cutout'
 import {
   useVectorizePrefs,
@@ -31,6 +32,8 @@ export interface ExportControls {
   exportPngAndSvgLocal(): void
   exportPngAndSvgApi(): void
   exportOne(id: string): void
+  exportOneSvgLocal(id: string): void
+  exportOneSvgApi(id: string): void
 }
 
 export function useExport(): ExportControls {
@@ -38,6 +41,7 @@ export function useExport(): ExportControls {
   const exportAllMutation = useExportAll()
   const exportAllSvgMutation = useExportAllSvg()
   const exportOneMutation = useExportOne()
+  const exportOneSvgMutation = useExportOneSvg()
   const vectorizePrefs = useVectorizePrefs()
 
   /** Toast the result of a save (shared by all export buttons). */
@@ -145,15 +149,48 @@ export function useExport(): ExportControls {
     [exportOneMutation, reportOutcome],
   )
 
+  const exportOneSvgLocal = useCallback(
+    (id: string): void => {
+      exportOneSvgMutation.mutate(
+        { id, opts: { route: 'local' } },
+        {
+          onSuccess: reportOutcome,
+          onError: (error) => toast.error(error.message),
+        },
+      )
+    },
+    [exportOneSvgMutation, reportOutcome],
+  )
+
+  const exportOneSvgApi = useCallback(
+    (id: string): void => {
+      const prefs = vectorizePrefsOrDefault(vectorizePrefs.data)
+      exportOneSvgMutation.mutate(
+        {
+          id,
+          opts: { route: 'api', apiId: prefs.apiId, apiMode: prefs.apiMode },
+        },
+        {
+          onSuccess: reportOutcome,
+          onError: (error) => toast.error(error.message),
+        },
+      )
+    },
+    [exportOneSvgMutation, reportOutcome, vectorizePrefs.data],
+  )
+
   return {
     exportAllPending: exportAllMutation.isPending,
     exportOnePending: exportOneMutation.isPending,
-    exportSvgPending: exportAllSvgMutation.isPending,
+    exportSvgPending:
+      exportAllSvgMutation.isPending || exportOneSvgMutation.isPending,
     exportAll,
     exportSvgLocal,
     exportSvgApi,
     exportPngAndSvgLocal,
     exportPngAndSvgApi,
     exportOne,
+    exportOneSvgLocal,
+    exportOneSvgApi,
   }
 }

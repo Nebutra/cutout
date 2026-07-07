@@ -133,39 +133,6 @@ export function useExportAllSvg() {
   const { assets, vectorize } = useServices()
   const queryClient = useQueryClient()
 
-  async function vectorizeBatch(
-    payload: readonly AssetToSave[],
-    opts: ExportSvgOptions,
-  ): Promise<VectorizeBatchResult> {
-    if (opts.route === 'api' && !opts.apiId?.trim()) {
-      throw new Error('Configure Vectorizer.AI API Id first')
-    }
-
-    const concurrency =
-      opts.route === 'api'
-        ? API_VECTORIZE_CONCURRENCY
-        : LOCAL_VECTORIZE_CONCURRENCY
-    const rows = await mapWithConcurrency(payload, concurrency, async (asset) => {
-      const result = await vectorize.vectorize({
-        asset,
-        route: opts.route,
-        apiId: opts.apiId,
-        apiMode: opts.apiMode,
-      })
-      return isOk(result)
-        ? { asset: result.data, failed: null }
-        : {
-            asset: null,
-            failed: { name: ensureSvgName(asset.name), error: result.error },
-          }
-    })
-
-    return {
-      assets: rows.flatMap((row) => (row.asset ? [row.asset] : [])),
-      failed: rows.flatMap((row) => (row.failed ? [row.failed] : [])),
-    }
-  }
-
   return useMutation<SaveManyOutcome, Error, ExportSvgOptions>({
     mutationFn: async (opts) => {
       const pngPayload: AssetToSave[] = selectExportPayload(getStoreState())
@@ -173,7 +140,42 @@ export function useExportAllSvg() {
         throw new Error('Nothing to export')
       }
 
-      const svg = await vectorizeBatch(pngPayload, opts)
+      const svg = await vectorizeBatch(vectorize, pngPayload, opts)
+      const payload = opts.includePng
+        ? [...pngPayload, ...svg.assets]
+        : [...svg.assets]
+
+      if (payload.length === 0) return failedOnly(svg.failed)
+      return mergeOutcomes(await runExport(assets, payload, opts), svg.failed)
+    },
+    onSuccess: (outcome) => {
+      if (!outcome.canceled) {
+        void queryClient.invalidateQueries({ queryKey: assetKeys.all })
+      }
+    },
+  })
+}
+
+/** Export one current slice as SVG, optionally with the original PNG. */
+export function useExportOneSvg() {
+  const { assets, vectorize } = useServices()
+  const queryClient = useQueryClient()
+
+  return useMutation<
+    SaveManyOutcome,
+    Error,
+    { id: string; opts: ExportSvgOptions }
+  >({
+    mutationFn: async ({ id, opts }) => {
+      const pngPayload: AssetToSave[] = selectExportPayloadFor(
+        getStoreState(),
+        id,
+      )
+      if (pngPayload.length === 0) {
+        throw new Error('Slice not found')
+      }
+
+      const svg = await vectorizeBatch(vectorize, pngPayload, opts)
       const payload = opts.includePng
         ? [...pngPayload, ...svg.assets]
         : [...svg.assets]
@@ -207,4 +209,36 @@ export function useExportOne() {
       }
     },
   })
+}
+
+async function vectorizeBatch(
+  vectorize: ReturnType<typeof useServices>['vectorize'],
+  payload: readonly AssetToSave[],
+  opts: ExportSvgOptions,
+): Promise<VectorizeBatchResult> {
+  if (opts.route === 'api' && !opts.apiId?.trim()) {
+    throw new Error('Configure Vectorizer.AI API Id first')
+  }
+
+  const concurrency =
+    opts.route === 'api' ? API_VECTORIZE_CONCURRENCY : LOCAL_VECTORIZE_CONCURRENCY
+  const rows = await mapWithConcurrency(payload, concurrency, async (asset) => {
+    const result = await vectorize.vectorize({
+      asset,
+      route: opts.route,
+      apiId: opts.apiId,
+      apiMode: opts.apiMode,
+    })
+    return isOk(result)
+      ? { asset: result.data, failed: null }
+      : {
+          asset: null,
+          failed: { name: ensureSvgName(asset.name), error: result.error },
+        }
+  })
+
+  return {
+    assets: rows.flatMap((row) => (row.asset ? [row.asset] : [])),
+    failed: rows.flatMap((row) => (row.failed ? [row.failed] : [])),
+  }
 }
