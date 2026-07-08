@@ -270,6 +270,31 @@ export function AppShell() {
     async (id: string) => {
       const loaded = await projectRepository.load(id)
       if (isErr(loaded)) {
+        if (activeRecordRef.current?.id === id) {
+          dispatchProjectShell({ type: 'open-project', id })
+          return
+        }
+
+        if (isMissingProjectError(loaded.error)) {
+          if (saveTimerRef.current) {
+            clearTimeout(saveTimerRef.current)
+            saveTimerRef.current = null
+          }
+          if (activeProjectId === id) {
+            restoringRef.current = true
+            activeRecordRef.current = null
+            resetProject()
+            queueMicrotask(() => {
+              restoringRef.current = false
+            })
+          }
+          dispatchProjectShell({ type: 'delete-project', id })
+          toast.warning('Project is no longer available', {
+            description: 'The stale project tab was closed.',
+          })
+          return
+        }
+
         toast.error('Could not open project', { description: loaded.error })
         return
       }
@@ -290,12 +315,17 @@ export function AppShell() {
         })
       }
     },
-    [projectRepository, restoreProject],
+    [activeProjectId, projectRepository, resetProject, restoreProject],
   )
   const openProject = useCallback(() => {
     const id = activeProjectId ?? projects[0]?.id
-    if (id) void openProjectById(id)
-  }, [activeProjectId, openProjectById, projects])
+    if (!id) return
+    if (projectTabOpen && activeRecordRef.current?.id === id) {
+      dispatchProjectShell({ type: 'open-project', id })
+      return
+    }
+    void openProjectById(id)
+  }, [activeProjectId, openProjectById, projectTabOpen, projects])
   const closeProject = useCallback(() => {
     dispatchProjectShell({ type: 'close-project' })
   }, [])
@@ -541,6 +571,10 @@ function projectSummaryFromRecord(record: LocalProjectRecord): LocalProjectSumma
     archivedAt: record.archivedAt,
     thumbnail: record.thumbnail,
   }
+}
+
+function isMissingProjectError(error: string): boolean {
+  return /Project\s+"[^"]+"\s+was not found\./.test(error)
 }
 
 function shouldPersistWorkspace(
