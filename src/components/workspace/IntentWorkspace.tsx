@@ -10,6 +10,7 @@ import {
   Archive,
   ArrowUp,
   CheckCircle2,
+  ChevronRight,
   Circle,
   ExternalLink,
   FileText,
@@ -18,7 +19,6 @@ import {
   Layers3,
   Loader2,
   MessageCircle,
-  Minus,
   MousePointerClick,
   PackageOpen,
   Paperclip,
@@ -93,7 +93,6 @@ import type {
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
-import { Slider } from '@/components/ui/slider'
 import { Textarea } from '@/components/ui/textarea'
 import { SourceCanvas } from '@/components/source/SourceCanvas'
 import { SliceGrid } from '@/components/slices/SliceGrid'
@@ -2057,10 +2056,21 @@ function DesignTableEditor({
   readonly table: EditableDesignTable
   readonly onChange: (content: string) => void
 }) {
+  const [activeCell, setActiveCell] = useState<{
+    readonly rowIndex: number
+    readonly cellIndex: number
+  } | null>(null)
   // A markdown table can have many columns — too many rich editors for the narrow
   // panel. Cells are plain compact inputs in a horizontally-scrollable grid with a
-  // sensible min column width, so headers/values stay legible instead of squishing.
+  // sensible min column width. Rich color/number controls are shown only for the
+  // selected cell below the table, so the grid stays readable.
   const columns = `repeat(${table.headers.length}, minmax(4.25rem, 1fr)) 1.75rem`
+  const activeValue =
+    activeCell ? table.rows[activeCell.rowIndex]?.[activeCell.cellIndex] ?? '' : ''
+  const activeMeta = activeCell ? parseEditableDesignValue(activeValue) : null
+  const activeHeader =
+    activeCell ? table.headers[activeCell.cellIndex] ?? `Column ${activeCell.cellIndex + 1}` : ''
+
   return (
     <div className="space-y-2">
       <div className="overflow-x-auto pb-0.5">
@@ -2071,6 +2081,7 @@ function DesignTableEditor({
                 key={`${table.id}:header:${cellIndex}`}
                 value={header}
                 aria-label={`Table header ${cellIndex + 1}`}
+                onFocus={() => setActiveCell(null)}
                 onChange={(event) =>
                   onChange(updateDesignMarkdownTableCell(
                     content,
@@ -2097,6 +2108,7 @@ function DesignTableEditor({
                   key={`${table.id}:row:${rowIndex}:cell:${cellIndex}`}
                   value={row[cellIndex] ?? ''}
                   aria-label={`Table row ${rowIndex + 1} cell ${cellIndex + 1}`}
+                  onFocus={() => setActiveCell({ rowIndex, cellIndex })}
                   onChange={(event) =>
                     onChange(updateDesignMarkdownTableCell(
                       content,
@@ -2106,7 +2118,12 @@ function DesignTableEditor({
                       event.target.value,
                     ))
                   }
-                  className="h-7 px-2 font-mono text-[11px]"
+                  className={cn(
+                    'h-7 px-2 font-mono text-[11px]',
+                    activeCell?.rowIndex === rowIndex &&
+                      activeCell.cellIndex === cellIndex &&
+                      'border-foreground/60 ring-1 ring-foreground/15',
+                  )}
                 />
               ))}
               <Button
@@ -2114,7 +2131,10 @@ function DesignTableEditor({
                 variant="ghost"
                 size="icon-sm"
                 aria-label={`Delete table row ${rowIndex + 1}`}
-                onClick={() => onChange(removeDesignMarkdownTableRow(content, table, rowIndex))}
+                onClick={() => {
+                  setActiveCell(null)
+                  onChange(removeDesignMarkdownTableRow(content, table, rowIndex))
+                }}
                 className="size-7 self-center"
               >
                 <Trash2 className="size-3.5" />
@@ -2133,6 +2153,31 @@ function DesignTableEditor({
         <Plus className="size-3.5" />
         Add row
       </Button>
+      {activeCell && activeMeta && activeMeta.kind !== 'text' ? (
+        <div className="space-y-2 rounded-lg border border-border bg-background/60 p-2">
+          <div className="flex items-center justify-between gap-2">
+            <p className="min-w-0 truncate text-xs font-medium">
+              {activeHeader}
+            </p>
+            <span className="shrink-0 font-mono text-[10px] text-muted-foreground">
+              Row {activeCell.rowIndex + 1}
+            </span>
+          </div>
+          <DesignValueEditor
+            value={activeValue}
+            label={`${activeHeader} row ${activeCell.rowIndex + 1}`}
+            onChange={(nextValue) =>
+              onChange(updateDesignMarkdownTableCell(
+                content,
+                table,
+                activeCell.rowIndex,
+                activeCell.cellIndex,
+                formatEditedDesignValue(activeValue, nextValue),
+              ))
+            }
+          />
+        </div>
+      ) : null}
     </div>
   )
 }
@@ -2140,23 +2185,41 @@ function DesignTableEditor({
 function DesignControlGroup({
   title,
   count,
+  defaultOpen = true,
   children,
 }: {
   readonly title: string
   readonly count: number
+  readonly defaultOpen?: boolean
   readonly children: ReactNode
 }) {
+  const [open, setOpen] = useState(defaultOpen)
   return (
-    <section className="rounded-lg border border-border bg-card">
-      <div className="flex items-center justify-between border-b border-border px-3 py-2">
-        <p className="text-xs font-semibold">{title}</p>
-        <span className="font-mono text-[10px] text-muted-foreground">{count}</span>
-      </div>
-      <div className="space-y-3 p-3">
-        {count > 0 ? children : (
-          <p className="text-xs text-muted-foreground">No editable fields.</p>
-        )}
-      </div>
+    <section className="overflow-hidden rounded-lg border border-border bg-card">
+      <button
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+        aria-expanded={open}
+        className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left transition-colors hover:bg-muted/30"
+      >
+        <span className="flex min-w-0 items-center gap-1.5">
+          <ChevronRight
+            className={cn(
+              'size-3.5 shrink-0 text-muted-foreground transition-transform',
+              open && 'rotate-90',
+            )}
+          />
+          <span className="truncate text-xs font-semibold">{title}</span>
+        </span>
+        <span className="shrink-0 font-mono text-[10px] text-muted-foreground">{count}</span>
+      </button>
+      {open ? (
+        <div className="space-y-2.5 border-t border-border p-3">
+          {count > 0 ? children : (
+            <p className="text-xs text-muted-foreground">No editable fields.</p>
+          )}
+        </div>
+      ) : null}
     </section>
   )
 }
@@ -2170,30 +2233,42 @@ function DesignControlRow({
   readonly content: string
   readonly onChange: (content: string) => void
 }) {
-  return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between gap-2">
-        <p className="min-w-0 truncate text-xs font-medium text-muted-foreground">
-          {control.label}
-        </p>
-        {control.unit ? (
-          <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
-            {control.unit}
-          </span>
-        ) : null}
-      </div>
+  const editor = (
+    <DesignValueEditor
+      value={control.value}
+      label={control.label}
+      onChange={(nextValue) =>
+        onChange(updateDesignMarkdownControl(
+          content,
+          control,
+          formatEditedDesignValue(control.value, nextValue),
+        ))
+      }
+    />
+  )
 
-      <DesignValueEditor
-        value={control.value}
-        label={control.label}
-        onChange={(nextValue) =>
-          onChange(updateDesignMarkdownControl(
-            content,
-            control,
-            formatEditedDesignValue(control.value, nextValue),
-          ))
-        }
-      />
+  // Short tokens (colour / dimension) read best as a single `label · value` line;
+  // free text (contract fields, rules) keeps a full-width input under its label.
+  if (control.kind === 'color' || control.kind === 'number') {
+    return (
+      <div className="flex items-center gap-3">
+        <span
+          className="min-w-0 flex-1 truncate text-xs text-muted-foreground"
+          title={control.label}
+        >
+          {control.label}
+        </span>
+        <div className="w-[56%] shrink-0">{editor}</div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-1">
+      <p className="truncate text-xs text-muted-foreground" title={control.label}>
+        {control.label}
+      </p>
+      {editor}
     </div>
   )
 }
@@ -2201,12 +2276,10 @@ function DesignControlRow({
 function DesignValueEditor({
   value,
   label,
-  compact = false,
   onChange,
 }: {
   readonly value: string
   readonly label: string
-  readonly compact?: boolean
   readonly onChange: (value: string) => void
 }) {
   const meta = parseEditableDesignValue(value)
@@ -2214,95 +2287,55 @@ function DesignValueEditor({
   const numberValue =
     meta.kind === 'number' ? Number.parseFloat(editableDesignValueLiteral(value)) : Number.NaN
 
+  // Colour: a swatch + the raw value (no clutter).
   if (meta.kind === 'color' && color) {
     return (
-      <div className={cn('grid gap-2', compact ? 'grid-cols-[1.75rem_1fr]' : 'grid-cols-[2rem_1fr]')}>
+      <div className="flex items-center gap-1.5">
         <input
           type="color"
           value={color}
           aria-label={label}
           onChange={(event) => onChange(replaceFirstColor(value, event.target.value))}
-          className={cn(
-            'rounded-md border border-border bg-transparent p-0.5',
-            compact ? 'h-7 w-7' : 'h-8 w-8',
-          )}
+          className="size-7 shrink-0 cursor-pointer rounded-md border border-border bg-transparent p-0.5"
         />
         <Input
           value={value}
           aria-label={`${label} value`}
           onChange={(event) => onChange(event.target.value)}
-          className={cn('font-mono', compact ? 'h-7 px-2 text-[11px]' : 'text-xs')}
+          className="h-7 min-w-0 font-mono text-[11px]"
         />
       </div>
     )
   }
 
+  // Dimension: one compact input + a unit suffix. Native spinners cover stepping;
+  // no slider / ± box — that clutter is what made the narrow panel unreadable.
   if (meta.kind === 'number' && Number.isFinite(numberValue)) {
     const step = numericStepForUnit(meta.unit)
     const updateNumber = (nextValue: number) => {
       const clamped = Math.min(meta.max, Math.max(meta.min, nextValue))
       onChange(formatNumberValue(clamped, meta.unit, step))
     }
-
     return (
-      <div className={cn(
-        'rounded-lg border border-border bg-background/60',
-        compact ? 'space-y-1 p-1' : 'space-y-2 p-2',
-      )}>
-        <div className="flex min-w-0 items-center gap-1">
-          <Input
-            type="number"
-            value={Number(numberValue.toFixed(decimalPlacesForStep(step)))}
-            aria-label={label}
-            min={meta.min}
-            max={meta.max}
-            step={step}
-            onChange={(event) => {
-              const next = Number.parseFloat(event.target.value)
-              if (Number.isFinite(next)) updateNumber(next)
-            }}
-            className={cn(
-              'min-w-0 font-mono tabular-nums',
-              compact ? 'h-6 px-1.5 text-[11px]' : 'h-7 text-xs',
-            )}
-          />
-          {meta.unit ? (
-            <span className="shrink-0 rounded bg-muted px-1.5 py-1 font-mono text-[10px] text-muted-foreground">
-              {meta.unit}
-            </span>
-          ) : null}
-        </div>
-        <div className="grid grid-cols-[1.5rem_1fr_1.5rem] items-center gap-1">
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-xs"
-            aria-label={`Decrease ${label}`}
-            onClick={() => updateNumber(numberValue - step)}
-          >
-            <Minus className="size-3" />
-          </Button>
-          <Slider
-            value={[numberValue]}
-            min={meta.min}
-            max={meta.max}
-            step={step}
-            aria-label={`${label} slider`}
-            onValueChange={(values) => {
-              const next = values[0]
-              if (typeof next === 'number') updateNumber(next)
-            }}
-          />
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-xs"
-            aria-label={`Increase ${label}`}
-            onClick={() => updateNumber(numberValue + step)}
-          >
-            <Plus className="size-3" />
-          </Button>
-        </div>
+      <div className="flex items-center gap-1.5">
+        <Input
+          type="number"
+          value={Number(numberValue.toFixed(decimalPlacesForStep(step)))}
+          aria-label={label}
+          min={meta.min}
+          max={meta.max}
+          step={step}
+          onChange={(event) => {
+            const next = Number.parseFloat(event.target.value)
+            if (Number.isFinite(next)) updateNumber(next)
+          }}
+          className="h-7 min-w-0 font-mono text-[11px] tabular-nums"
+        />
+        {meta.unit ? (
+          <span className="shrink-0 font-mono text-[10px] text-muted-foreground">
+            {meta.unit}
+          </span>
+        ) : null}
       </div>
     )
   }
@@ -2312,7 +2345,7 @@ function DesignValueEditor({
       value={value}
       aria-label={label}
       onChange={(event) => onChange(event.target.value)}
-      className={cn('text-xs', compact && 'h-7 px-2 font-mono text-[11px]')}
+      className="h-7 text-[11px]"
     />
   )
 }
