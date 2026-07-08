@@ -26,6 +26,7 @@ describe('project-repository.local', () => {
         version: 'prototype-plan.v0' as const,
         product: {
           name: 'Brand site',
+          projectName: 'Brand Sprint',
           summary: 'A product website.',
           audience: 'Visitors',
           primaryGoal: 'Choose a direction.',
@@ -218,6 +219,7 @@ describe('project-repository.local', () => {
 
     expect(record.workspace?.prototypePlan?.humanLoop.mode).toBe('ask')
     expect(record.workspace?.humanLoopChoiceId).toBe('commerce')
+    expect(record.name).toBe('Brand Sprint')
     expect(record.status).toBe('Draft')
 
     getStoreState().resetProject()

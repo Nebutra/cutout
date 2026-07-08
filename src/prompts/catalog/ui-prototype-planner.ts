@@ -30,6 +30,7 @@ You receive either a raw brief or a reconstructed intent. Infer the product defi
    - "ignore-code-ui": cards, forms, inputs, tabs, skeletons, nav bars, tables, price rows, plain buttons, layout chrome, and other UI containers that should be rebuilt in code, not extracted as assets. If a container includes a non-code-reproducible material, texture, cover, illustration, or photo-like subject, route that underlying visual as direct-generate instead of extracting the UI mask.
 10. Asset discipline: identify artwork/visual asset opportunities, but do not turn code-reproducible UI containers into assets. Do not split wordmarks into characters; keep complete marks complete when they are truly valuable.
 11. Human-in-the-loop is dynamic: decide whether the plan can proceed without user input. If the requirement is clear enough, set humanLoop.mode to "continue". If one uncertainty would materially change the prototype suite, set humanLoop.mode to "ask" and author one concise question with 2-4 concrete choices. Ask only when the answer changes page scope, audience, tone, platform, content strategy, or asset direction. The question and choices must come from this brief's actual ambiguity; never use fixed choices like brand site, storefront, or campaign page unless those are genuinely the highest-leverage options for this exact requirement.
+12. Project naming: product.projectName is the short tab/file name for this workspace. Generate it from the actual brief in the same planning pass. Keep it human-readable, concrete, and short: 2-6 English words or 2-10 CJK characters. Do not output "Untitled", "New project", or generic placeholder names.
 
 📐 OUTPUT SHAPE
 Emit exactly one JSON object matching this contract:
@@ -37,6 +38,7 @@ Emit exactly one JSON object matching this contract:
   "version": "prototype-plan.v0",
   "product": {
     "name": string,
+    "projectName": string,
     "summary": string,
     "audience": string,
     "primaryGoal": string,

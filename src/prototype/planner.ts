@@ -96,6 +96,7 @@ export function createLocalPrototypePlan(
     version: 'prototype-plan.v0',
     product: {
       name,
+      projectName: fallbackProjectName(name),
       summary,
       audience: firstNonEmpty(
         intentDimension(intent, 'audience'),
@@ -249,6 +250,12 @@ function fallbackProductName(brief: string, intent?: IntentProfile): string {
     firstLine(brief),
     'Untitled product',
   ).slice(0, 80)
+}
+
+function fallbackProjectName(name: string): string {
+  const shortName = firstLine(name).replace(/\s+/g, ' ').trim()
+  if (!shortName) return 'Untitled product'
+  return shortName.length > 32 ? shortName.slice(0, 32).trim() : shortName
 }
 
 function fallbackPlatform(brief: string, intent?: IntentProfile): string {

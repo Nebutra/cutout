@@ -109,6 +109,7 @@ export function workspaceSnapshotFingerprint(
     snapshot.version,
     snapshot.workflowPhase,
     snapshot.prototypePlan?.version ?? '',
+    snapshot.prototypePlan?.product.projectName ?? '',
     snapshot.prototypePlan?.product.name ?? '',
     snapshot.prototypePlan?.humanLoop.mode ?? '',
     snapshot.prototypePlan?.pages.map((page) => page.id).join(',') ?? '',

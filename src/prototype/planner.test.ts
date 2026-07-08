@@ -37,6 +37,7 @@ const samplePlan: PrototypePlan = {
   version: 'prototype-plan.v0',
   product: {
     name: 'Dance Club',
+    projectName: 'VIP Club',
     summary: 'Premium nightlife booking and VIP table discovery.',
     audience: 'Club visitors and promoters',
     primaryGoal: 'Book a VIP table.',
@@ -225,6 +226,7 @@ describe('planPrototype', () => {
     if (!result.ok) throw new Error(result.error)
     expect(result.data.version).toBe('prototype-plan.v0')
     expect(result.data.product.name).toBe('钻石王老五')
+    expect(result.data.product.projectName).toBe('钻石王老五')
     expect(result.data.pages).toHaveLength(1)
     expect(result.data.humanLoop.mode).toBe('continue')
     expect(validatePrototypePlan(result.data).ok).toBe(true)
@@ -241,7 +243,10 @@ describe('planPrototype', () => {
     })
 
     expect(result.ok).toBe(true)
-    if (result.ok) expect(result.data.product.name).toBe('钻石王老五')
+    if (result.ok) {
+      expect(result.data.product.name).toBe('钻石王老五')
+      expect(result.data.product.projectName).toBe('钻石王老五')
+    }
   })
 
   it('does not use the local fallback for provider auth failures', async () => {

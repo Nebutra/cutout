@@ -187,7 +187,13 @@ export function AppShell() {
   const clearSelection = useStore((s) => s.clearSelection)
   const resetProject = useStore((s) => s.resetProject)
   const restoreProject = useStore((s) => s.restoreProject)
-  const brief = useStore((s) => s.brief)
+  const projectName = useStore((s) =>
+    projectNameFromSources(
+      s.workspaceSnapshot?.prototypePlan?.product.projectName,
+      s.workspaceSnapshot?.prototypePlan?.product.name,
+      s.brief,
+    ),
+  )
   const workspaceFingerprint = useStore(workspaceAutosaveFingerprint)
   const projectRepository = useMemo(() => createLocalProjectRepository(), [])
   const [projectShell, dispatchProjectShell] = useReducer(
@@ -211,8 +217,6 @@ export function AppShell() {
   const saveActiveProjectNowRef = useRef<(projectId?: string | null) => Promise<boolean>>(
     async () => false,
   )
-
-  const projectName = useMemo(() => projectNameFromBrief(brief), [brief])
 
   useEffect(() => {
     projectsRef.current = projects
@@ -618,10 +622,12 @@ export function AppShell() {
   )
 }
 
-function projectNameFromBrief(brief: string): string {
-  const firstLine = brief.trim().split(/\n+/)[0]?.trim()
-  if (!firstLine) return 'Untitled project'
-  return firstLine.length > 42 ? `${firstLine.slice(0, 42)}...` : firstLine
+function projectNameFromSources(...sources: Array<string | null | undefined>): string {
+  for (const source of sources) {
+    const firstLine = source?.trim().split(/\n+/)[0]?.trim()
+    if (firstLine) return firstLine.length > 42 ? `${firstLine.slice(0, 42)}...` : firstLine
+  }
+  return 'Untitled project'
 }
 
 function isDisposableEmptyProject(project: LocalProjectSummary): boolean {

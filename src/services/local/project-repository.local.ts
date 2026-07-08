@@ -262,7 +262,11 @@ export async function createProjectRecordFromStore(input: {
 
   return {
     id: input.id,
-    name: projectNameFromBrief(brief),
+    name: projectNameFromSources(
+      workspace?.prototypePlan?.product.projectName,
+      workspace?.prototypePlan?.product.name,
+      brief,
+    ),
     brief,
     assetCount: slices.length,
     hasDesignMarkdown: Boolean(state.designMarkdown || workspace?.prototypeDesignSystem),
@@ -360,10 +364,12 @@ function workspaceThumbnail(workspace: WorkspaceSnapshot | null): Blob | undefin
   return artifact ? bytesToBlob(artifact.bytes, artifact.mediaType) : undefined
 }
 
-function projectNameFromBrief(brief: string): string {
-  const firstLine = brief.split(/\n+/)[0]?.trim()
-  if (!firstLine) return 'Untitled project'
-  return firstLine.length > 42 ? `${firstLine.slice(0, 42)}...` : firstLine
+function projectNameFromSources(...sources: Array<string | null | undefined>): string {
+  for (const source of sources) {
+    const firstLine = source?.trim().split(/\n+/)[0]?.trim()
+    if (firstLine) return firstLine.length > 42 ? `${firstLine.slice(0, 42)}...` : firstLine
+  }
+  return 'Untitled project'
 }
 
 function errorMessage(error: unknown): string {

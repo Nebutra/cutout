@@ -114,6 +114,7 @@ export const prototypePlanSchema = z.object({
   version: z.literal('prototype-plan.v0'),
   product: z.object({
     name: z.string().min(1),
+    projectName: z.string().min(1).max(32).optional(),
     summary: z.string().min(1),
     audience: z.string().min(1),
     primaryGoal: z.string().min(1),

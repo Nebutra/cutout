@@ -31,6 +31,8 @@ describe('ui-prototype-planner v1.1.0', () => {
     expect(out.system).toContain('"ignore-code-ui"')
     expect(out.system).toContain('Human-in-the-loop is dynamic')
     expect(out.system).toContain('humanLoop.mode')
+    expect(out.system).toContain('product.projectName')
+    expect(out.system).toContain('short tab/file name')
     expect(out.system).toContain('PrototypePlan')
     expect(out.userScaffold).toBeUndefined()
   })
