@@ -11,7 +11,7 @@
  * so this component depends on no pipeline types. Nodes are non-draggable; the only
  * freedom is pan/zoom + fit, and the view auto-refits as content streams in.
  */
-import { useEffect, useMemo, useState, type MouseEvent } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   ReactFlow,
   Background,
@@ -90,51 +90,62 @@ function useItemUrl(item: CanvasImageItem): string | null {
 function CardNode({ data }: NodeProps) {
   const { item } = data as CardData
   const url = useItemUrl(item)
-  const [open, setOpen] = useState(false)
+  // Display-only: React Flow's `onNodeClick` (drag-aware) opens the preview, so
+  // clicking enlarges while dragging pans the canvas — no fighting d3-zoom.
+  return (
+    <div
+      title={item.label}
+      className="flex cursor-zoom-in flex-col overflow-hidden rounded-lg border border-border bg-card shadow-sm transition-colors hover:border-ring/60"
+      style={{ width: CARD_W }}
+    >
+      <div className="flex h-32 items-center justify-center overflow-hidden bg-muted/20">
+        {url ? (
+          <img src={url} alt="" className="max-h-full max-w-full object-contain" />
+        ) : (
+          <ImageOff className="size-5 text-muted-foreground opacity-70" />
+        )}
+      </div>
+      <p className="w-full truncate border-t border-border/60 px-2 py-1.5 text-[11px] text-muted-foreground">
+        {item.label}
+      </p>
+    </div>
+  )
+}
 
-  function openPreview(event: MouseEvent<HTMLButtonElement>): void {
-    event.stopPropagation()
-    if (url) setOpen(true)
-  }
+/** Enlarge preview — opened by clicking a card. Owns its own object URL. */
+function CardPreviewDialog({
+  item,
+  onOpenChange,
+}: {
+  readonly item: CanvasImageItem | null
+  readonly onOpenChange: (open: boolean) => void
+}) {
+  const [url, setUrl] = useState<string | null>(null)
+  useEffect(() => {
+    if (!item) {
+      setUrl(null)
+      return
+    }
+    if (item.url) {
+      setUrl(item.url)
+      return
+    }
+    if (!item.blob) {
+      setUrl(null)
+      return
+    }
+    const next = URL.createObjectURL(item.blob)
+    setUrl(next)
+    return () => URL.revokeObjectURL(next)
+  }, [item])
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <button
-        type="button"
-        disabled={!url}
-        aria-label={`Open preview for ${item.label}`}
-        onPointerDownCapture={(event) => event.stopPropagation()}
-        onMouseDownCapture={(event) => event.stopPropagation()}
-        onTouchStartCapture={(event) => event.stopPropagation()}
-        onDoubleClickCapture={(event) => event.stopPropagation()}
-        onClick={openPreview}
-        onDragStart={(event) => event.preventDefault()}
-        className="nodrag nopan nowheel flex cursor-zoom-in flex-col overflow-hidden rounded-lg border border-border bg-card text-left shadow-sm outline-none transition-colors hover:border-ring/50 focus-visible:ring-3 focus-visible:ring-ring/40 disabled:cursor-default"
-        style={{ width: CARD_W }}
-      >
-        <div className="flex h-32 items-center justify-center overflow-hidden bg-muted/20">
-          {url ? (
-            <img
-              src={url}
-              alt=""
-              className="max-h-full max-w-full object-contain"
-            />
-          ) : (
-            <ImageOff className="size-5 text-muted-foreground opacity-70" />
-          )}
-        </div>
-        <p className="w-full truncate border-t border-border/60 px-2 py-1.5 text-[11px] text-muted-foreground">
-          {item.label}
-        </p>
-      </button>
-
+    <Dialog open={item !== null} onOpenChange={onOpenChange}>
       <DialogContent aria-describedby={undefined} className="w-fit max-w-[94vw] gap-0 p-2">
-        <DialogTitle className="sr-only">{item.label}</DialogTitle>
+        <DialogTitle className="sr-only">{item?.label ?? 'Preview'}</DialogTitle>
         {url ? (
           <div className="grid gap-2">
-            <div className="min-w-0 px-1 pt-1">
-              <p className="truncate text-sm font-semibold">{item.label}</p>
-            </div>
+            <p className="truncate px-1 pt-1 text-sm font-semibold">{item?.label}</p>
             <img
               src={url}
               alt=""
@@ -218,8 +229,6 @@ function buildNodes(lanes: readonly Lane[]): { nodes: Node[]; edges: Edge[] } {
         },
         data: { item },
         draggable: false,
-        selectable: false,
-        className: 'nodrag nopan nowheel',
         zIndex: 1,
         sourcePosition: Position.Bottom,
         targetPosition: Position.Top,
@@ -254,6 +263,7 @@ function buildNodes(lanes: readonly Lane[]): { nodes: Node[]; edges: Edge[] } {
 export function OutputCanvas({ designSystem, pages, assets }: OutputCanvasProps) {
   const colorMode = useFlowColorMode()
   const [instance, setInstance] = useState<ReactFlowInstance | null>(null)
+  const [previewItem, setPreviewItem] = useState<CanvasImageItem | null>(null)
 
   const { nodes, edges } = useMemo(() => {
     const lanes: Lane[] = [
@@ -282,34 +292,47 @@ export function OutputCanvas({ designSystem, pages, assets }: OutputCanvasProps)
   }, [instance, nodes.length])
 
   return (
-    <ReactFlow
-      nodes={nodes}
-      edges={edges}
-      nodeTypes={nodeTypes}
-      onInit={setInstance}
-      fitView
-      fitViewOptions={FIT_VIEW_OPTIONS}
-      minZoom={0.2}
-      maxZoom={1.6}
-      nodesDraggable={false}
-      nodesConnectable={false}
-      elementsSelectable={false}
-      onlyRenderVisibleElements
-      deleteKeyCode={null}
-      proOptions={{ hideAttribution: true }}
-      colorMode={colorMode}
-      className="bg-background"
-    >
-      <Background variant={BackgroundVariant.Dots} gap={20} size={1} color="var(--border)" />
-      <Controls showInteractive={false} />
-      <MiniMap
-        pannable
-        zoomable
-        bgColor="var(--card)"
-        maskColor="var(--background)"
-        nodeColor="var(--muted-foreground)"
-        nodeStrokeColor="var(--border)"
+    <>
+      <ReactFlow
+        nodes={nodes}
+        edges={edges}
+        nodeTypes={nodeTypes}
+        onInit={setInstance}
+        onNodeClick={(_, node) => {
+          if (node.type === 'outputCard') {
+            setPreviewItem((node.data as CardData).item)
+          }
+        }}
+        fitView
+        fitViewOptions={FIT_VIEW_OPTIONS}
+        minZoom={0.2}
+        maxZoom={1.6}
+        nodesDraggable={false}
+        nodesConnectable={false}
+        elementsSelectable={false}
+        onlyRenderVisibleElements
+        deleteKeyCode={null}
+        proOptions={{ hideAttribution: true }}
+        colorMode={colorMode}
+        className="bg-background"
+      >
+        <Background variant={BackgroundVariant.Dots} gap={20} size={1} color="var(--border)" />
+        <Controls showInteractive={false} />
+        <MiniMap
+          pannable
+          zoomable
+          bgColor="var(--card)"
+          maskColor="var(--background)"
+          nodeColor="var(--muted-foreground)"
+          nodeStrokeColor="var(--border)"
+        />
+      </ReactFlow>
+      <CardPreviewDialog
+        item={previewItem}
+        onOpenChange={(open) => {
+          if (!open) setPreviewItem(null)
+        }}
       />
-    </ReactFlow>
+    </>
   )
 }
