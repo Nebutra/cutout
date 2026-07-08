@@ -985,6 +985,7 @@ export function IntentWorkspace({
             onPrototypePageSelect={setSelectedPrototypePageId}
             prototypeScope={prototypeScope}
             onScopeChange={setPrototypeScope}
+            onPrimaryAction={() => void createAssets()}
             hasSource={hasSource}
             hasSlices={hasSlices}
             working={working}
@@ -1883,6 +1884,7 @@ function OutputSurface({
   onPrototypePageSelect,
   prototypeScope,
   onScopeChange,
+  onPrimaryAction,
   hasSource,
   hasSlices,
   working,
@@ -1896,6 +1898,7 @@ function OutputSurface({
   readonly onPrototypePageSelect: (pageId: string) => void
   readonly prototypeScope: PrototypeSuiteScope
   readonly onScopeChange: (scope: PrototypeSuiteScope) => void
+  readonly onPrimaryAction: () => void
   readonly hasSource: boolean
   readonly hasSlices: boolean
   readonly working: boolean
@@ -1906,6 +1909,21 @@ function OutputSurface({
   const previewArtifact =
     prototypePages.find((artifact) => artifact.page.id === previewPageId) ?? null
   const canvasSlices = useSlices()
+  const plannedPages = prototypePlan ? pagesForScope(prototypePlan, prototypeScope) : []
+  const generatedPageIds = new Set(prototypePages.map((artifact) => artifact.page.id))
+  const missingPageCount = plannedPages.filter((page) => !generatedPageIds.has(page.id)).length
+  const hasPrototypeArtifacts = Boolean(prototypeDesignSystem) || prototypePages.length > 0
+  const needsContinuation =
+    Boolean(prototypePlan) &&
+    hasPrototypeArtifacts &&
+    !hasSlices &&
+    !working &&
+    prototypePlan?.humanLoop.mode !== 'ask'
+  const continuationDetail = !prototypeDesignSystem
+    ? 'The design system is not finished yet.'
+    : missingPageCount > 0
+      ? `${missingPageCount} prototype page${missingPageCount === 1 ? '' : 's'} still needs to be generated.`
+      : 'Prototype screens are available. Continue to extract assets.'
 
   // Constrained orchestration board: once a prototype result exists, results +
   // materials are arranged on one governed canvas (design system · pages · assets).
@@ -1934,6 +1952,12 @@ function OutputSurface({
           pages={canvasPages}
           assets={canvasAssets}
         />
+        {needsContinuation ? (
+          <ContinueAssetsCallout
+            detail={runError ?? continuationDetail}
+            onContinue={onPrimaryAction}
+          />
+        ) : null}
       </div>
     )
   }
@@ -2902,6 +2926,35 @@ function CenteredState({
         <Icon className="mx-auto mb-4 size-9 text-muted-foreground/60" />
         <h2 className="text-lg font-semibold">{title}</h2>
         <p className="mt-2 max-w-sm text-sm text-muted-foreground">{detail}</p>
+      </div>
+    </div>
+  )
+}
+
+function ContinueAssetsCallout({
+  detail,
+  onContinue,
+}: {
+  readonly detail: string
+  readonly onContinue: () => void
+}) {
+  return (
+    <div className="pointer-events-none absolute inset-x-0 bottom-5 z-10 flex justify-center px-4">
+      <div className="pointer-events-auto flex w-full max-w-xl items-center justify-between gap-4 rounded-lg border border-border bg-background/95 px-4 py-3 shadow-lg backdrop-blur">
+        <div className="min-w-0">
+          <p className="text-sm font-semibold">Continue generation</p>
+          <p className="mt-1 text-xs leading-5 text-muted-foreground">
+            {detail}
+          </p>
+        </div>
+        <Button
+          type="button"
+          onClick={onContinue}
+          className="shrink-0"
+        >
+          <WandSparkles className="size-4" />
+          Continue assets
+        </Button>
       </div>
     </div>
   )

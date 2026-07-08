@@ -11,7 +11,7 @@
  * so this component depends on no pipeline types. Nodes are non-draggable; the only
  * freedom is pan/zoom + fit, and the view auto-refits as content streams in.
  */
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type MouseEvent } from 'react'
 import {
   ReactFlow,
   Background,
@@ -28,8 +28,8 @@ import {
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import { ImageOff } from 'lucide-react'
-import { ImageZoom } from '@/components/canvas/nodes/ImageZoom'
 import { useFlowColorMode } from '@/components/canvas/useFlowColorMode'
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 
 /** One image to place on the board (blob is decoded to a URL lazily). */
 export interface CanvasImageItem {
@@ -90,22 +90,57 @@ function useItemUrl(item: CanvasImageItem): string | null {
 function CardNode({ data }: NodeProps) {
   const { item } = data as CardData
   const url = useItemUrl(item)
+  const [open, setOpen] = useState(false)
+
+  function openPreview(event: MouseEvent<HTMLButtonElement>): void {
+    event.stopPropagation()
+    if (url) setOpen(true)
+  }
+
   return (
-    <div
-      className="nodrag nopan nowheel flex flex-col overflow-hidden rounded-lg border border-border bg-card shadow-sm transition-colors hover:border-ring/50"
-      style={{ width: CARD_W }}
-    >
-      <div className="flex h-32 items-center justify-center overflow-hidden bg-muted/20">
+    <Dialog open={open} onOpenChange={setOpen}>
+      <button
+        type="button"
+        disabled={!url}
+        aria-label={`Open preview for ${item.label}`}
+        onPointerDown={(event) => event.stopPropagation()}
+        onDoubleClick={(event) => event.stopPropagation()}
+        onClick={openPreview}
+        className="nodrag nopan nowheel flex flex-col overflow-hidden rounded-lg border border-border bg-card text-left shadow-sm outline-none transition-colors hover:border-ring/50 focus-visible:ring-3 focus-visible:ring-ring/40 disabled:cursor-default"
+        style={{ width: CARD_W }}
+      >
+        <div className="flex h-32 items-center justify-center overflow-hidden bg-muted/20">
+          {url ? (
+            <img
+              src={url}
+              alt=""
+              className="max-h-full max-w-full object-contain"
+            />
+          ) : (
+            <ImageOff className="size-5 text-muted-foreground opacity-70" />
+          )}
+        </div>
+        <p className="w-full truncate border-t border-border/60 px-2 py-1.5 text-[11px] text-muted-foreground">
+          {item.label}
+        </p>
+      </button>
+
+      <DialogContent aria-describedby={undefined} className="w-fit max-w-[94vw] gap-0 p-2">
+        <DialogTitle className="sr-only">{item.label}</DialogTitle>
         {url ? (
-          <ImageZoom src={url} label={item.label} />
-        ) : (
-          <ImageOff className="size-5 text-muted-foreground opacity-70" />
-        )}
-      </div>
-      <p className="truncate border-t border-border/60 px-2 py-1.5 text-[11px] text-muted-foreground">
-        {item.label}
-      </p>
-    </div>
+          <div className="grid gap-2">
+            <div className="min-w-0 px-1 pt-1">
+              <p className="truncate text-sm font-semibold">{item.label}</p>
+            </div>
+            <img
+              src={url}
+              alt=""
+              className="max-h-[86vh] max-w-[90vw] rounded-md object-contain"
+            />
+          </div>
+        ) : null}
+      </DialogContent>
+    </Dialog>
   )
 }
 
