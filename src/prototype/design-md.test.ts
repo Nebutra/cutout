@@ -5,9 +5,12 @@ import {
   parseEditableDesignMarkdown,
   parseDesignMarkdown,
   appendDesignMarkdownSection,
+  appendDesignMarkdownTableRow,
   removeDesignMarkdownSection,
+  removeDesignMarkdownTableRow,
   updateDesignMarkdownControl,
   updateDesignMarkdownSection,
+  updateDesignMarkdownTableCell,
 } from './design-md'
 
 describe('DESIGN.md helpers', () => {
@@ -39,7 +42,7 @@ describe('DESIGN.md helpers', () => {
       '  primary: "#2463EB"',
       '---',
       '# Overview',
-      'radius: 12px',
+      '- radius: 12px',
       'Use the primary surface.',
     ].join('\n'))
 
@@ -88,5 +91,66 @@ describe('DESIGN.md helpers', () => {
     )
     expect(newSection).toBeTruthy()
     expect(removeDesignMarkdownSection(added, newSection!)).toBe('# Overview\nCopy.')
+  })
+
+  it('parses markdown tables without treating separator rows as controls', () => {
+    const parsed = parseEditableDesignMarkdown([
+      '# Tokens',
+      '| Name | Value |',
+      '| --- | ---: |',
+      '| radius | 12px |',
+      '| primary | #2463EB |',
+    ].join('\n'))
+
+    expect(parsed.tables).toHaveLength(1)
+    expect(parsed.tables[0]?.headers).toEqual(['Name', 'Value'])
+    expect(parsed.controls).toHaveLength(0)
+  })
+
+  it('ignores tables inside fenced code blocks', () => {
+    const parsed = parseEditableDesignMarkdown([
+      '# Example',
+      '```markdown',
+      '| Name | Value |',
+      '| --- | --- |',
+      '| radius | 12px |',
+      '```',
+    ].join('\n'))
+
+    expect(parsed.tables).toHaveLength(0)
+    expect(parsed.controls).toHaveLength(0)
+  })
+
+  it('keeps escaped pipes inside markdown table cells', () => {
+    const parsed = parseEditableDesignMarkdown([
+      '# Tokens',
+      '| Name | Value |',
+      '| --- | --- |',
+      '| copy | A \\| B |',
+    ].join('\n'))
+
+    expect(parsed.tables[0]?.rows[0]).toEqual(['copy', 'A \\| B'])
+  })
+
+  it('updates table cells and rows', () => {
+    const content = [
+      '# Tokens',
+      '| Name | Value |',
+      '| --- | --- |',
+      '| radius | 12px |',
+    ].join('\n')
+    const table = parseEditableDesignMarkdown(content).tables[0]
+
+    expect(table).toBeTruthy()
+    const updatedCell = updateDesignMarkdownTableCell(content, table!, 0, 1, '16px')
+    expect(updatedCell).toContain('| radius | 16px |')
+
+    const appended = appendDesignMarkdownTableRow(content, table!)
+    expect(appended).toContain('| New value | New value |')
+
+    const appendedTable = parseEditableDesignMarkdown(appended).tables[0]
+    expect(appendedTable).toBeTruthy()
+    const removed = removeDesignMarkdownTableRow(appended, appendedTable!, 1)
+    expect(removed).not.toContain('| New value | New value |')
   })
 })

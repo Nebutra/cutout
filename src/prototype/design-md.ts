@@ -30,11 +30,20 @@ export interface EditableDesignSection {
   readonly endLine: number
 }
 
+export interface EditableDesignTable {
+  readonly id: string
+  readonly startLine: number
+  readonly endLine: number
+  readonly headers: readonly string[]
+  readonly rows: readonly (readonly string[])[]
+}
+
 export interface EditableDesignMarkdown {
   readonly frontmatter: Record<string, unknown> | null
   readonly frontmatterError: string | null
   readonly body: string
   readonly sections: readonly EditableDesignSection[]
+  readonly tables: readonly EditableDesignTable[]
   readonly controls: readonly EditableDesignControl[]
 }
 
@@ -72,14 +81,17 @@ export function parseEditableDesignMarkdown(content: string): EditableDesignMark
   const parsed = parseDesignMarkdown(content)
   const frontmatterResult = parseFrontmatter(parsed.frontmatter)
   const sections = parseSections(parsed.body)
+  const tables = parseTables(parsed.body)
+  const ignoredLines = ignoredBodyLineIndexes(parsed.body, tables)
   return {
     frontmatter: frontmatterResult.value,
     frontmatterError: frontmatterResult.error,
     body: parsed.body,
     sections,
+    tables,
     controls: [
       ...frontmatterControls(frontmatterResult.value),
-      ...bodyControls(parsed.body),
+      ...bodyControls(parsed.body, ignoredLines),
     ],
   }
 }
@@ -127,6 +139,48 @@ export function removeDesignMarkdownSection(
   const bodyLines = parsed.body.split('\n')
   bodyLines.splice(section.startLine, Math.max(1, section.endLine - section.startLine))
   return composeDesignMarkdown(parsed.frontmatter, bodyLines.join('\n').replace(/^\n+/, '').trimEnd())
+}
+
+export function updateDesignMarkdownTableCell(
+  content: string,
+  table: EditableDesignTable,
+  row: 'header' | number,
+  cellIndex: number,
+  nextValue: string,
+): string {
+  const parsed = parseDesignMarkdown(content)
+  const bodyLines = parsed.body.split('\n')
+  const targetLine = row === 'header' ? table.startLine : table.startLine + 2 + row
+  if (targetLine < table.startLine || targetLine >= table.endLine) return content
+  const cells = splitTableRow(bodyLines[targetLine] ?? '')
+  if (cellIndex < 0 || cellIndex >= cells.length) return content
+  cells[cellIndex] = nextValue
+  bodyLines[targetLine] = formatTableRow(cells)
+  return composeDesignMarkdown(parsed.frontmatter, bodyLines.join('\n'))
+}
+
+export function appendDesignMarkdownTableRow(
+  content: string,
+  table: EditableDesignTable,
+): string {
+  const parsed = parseDesignMarkdown(content)
+  const bodyLines = parsed.body.split('\n')
+  const row = table.headers.map(() => 'New value')
+  bodyLines.splice(table.endLine, 0, formatTableRow(row))
+  return composeDesignMarkdown(parsed.frontmatter, bodyLines.join('\n'))
+}
+
+export function removeDesignMarkdownTableRow(
+  content: string,
+  table: EditableDesignTable,
+  rowIndex: number,
+): string {
+  const parsed = parseDesignMarkdown(content)
+  const bodyLines = parsed.body.split('\n')
+  const targetLine = table.startLine + 2 + rowIndex
+  if (targetLine < table.startLine + 2 || targetLine >= table.endLine) return content
+  bodyLines.splice(targetLine, 1)
+  return composeDesignMarkdown(parsed.frontmatter, bodyLines.join('\n'))
 }
 
 function parseFrontmatter(
@@ -180,8 +234,10 @@ function frontmatterControls(
 
 function parseSections(body: string): EditableDesignSection[] {
   const lines = body.split('\n')
+  const ignored = ignoredBodyLineIndexes(body, parseTables(body))
   const headings: Array<{ title: string; level: number; line: number }> = []
   lines.forEach((line, index) => {
+    if (ignored.has(index)) return
     const match = /^(#{1,4})\s+(.+?)\s*$/.exec(line)
     if (!match) return
     headings.push({
@@ -206,15 +262,100 @@ function parseSections(body: string): EditableDesignSection[] {
   })
 }
 
-function bodyControls(body: string): EditableDesignControl[] {
+function parseTables(body: string): EditableDesignTable[] {
+  const lines = body.split('\n')
+  const tables: EditableDesignTable[] = []
+  let index = 0
+  let inFence = false
+
+  while (index < lines.length - 1) {
+    if (/^\s*```/.test(lines[index] ?? '')) {
+      inFence = !inFence
+      index += 1
+      continue
+    }
+    if (inFence) {
+      index += 1
+      continue
+    }
+
+    if (!isMarkdownTableRow(lines[index]) || !isMarkdownTableSeparator(lines[index + 1] ?? '')) {
+      index += 1
+      continue
+    }
+
+    const startLine = index
+    const headers = splitTableRow(lines[index])
+    let endLine = index + 2
+    const rows: string[][] = []
+    while (
+      endLine < lines.length &&
+      !/^\s*```/.test(lines[endLine] ?? '') &&
+      isMarkdownTableRow(lines[endLine] ?? '')
+    ) {
+      rows.push(splitTableRow(lines[endLine] ?? ''))
+      endLine += 1
+    }
+
+    tables.push({
+      id: `table:${startLine}:${headers.join('-').slice(0, 48)}`,
+      startLine,
+      endLine,
+      headers,
+      rows,
+    })
+    index = endLine
+  }
+
+  return tables
+}
+
+function ignoredBodyLineIndexes(
+  body: string,
+  tables: readonly EditableDesignTable[],
+): Set<number> {
+  const ignored = new Set<number>()
+  for (const table of tables) {
+    for (let index = table.startLine; index < table.endLine; index += 1) {
+      ignored.add(index)
+    }
+  }
+
+  let inFence = false
+  body.split('\n').forEach((line, index) => {
+    if (/^\s*```/.test(line)) {
+      inFence = !inFence
+      ignored.add(index)
+      return
+    }
+    if (inFence) ignored.add(index)
+  })
+
+  return ignored
+}
+
+function bodyControls(
+  body: string,
+  ignoredLines: ReadonlySet<number>,
+): EditableDesignControl[] {
   return body
     .split('\n')
     .map((line, index): EditableDesignControl | null => {
-      const match = /^(\s*(?:[-*]\s*)?)([^:\n]{2,48}):\s*(.+?)\s*$/.exec(line)
+      if (ignoredLines.has(index)) return null
+      const match = /^(\s*[-*]\s+)([^:\n|]{2,48}):\s*(.+?)\s*$/.exec(line)
       if (!match) return null
       const label = match[2].trim()
       const value = match[3].trim()
-      if (label.startsWith('http') || value.length > 120) return null
+      if (
+        label.startsWith('http') ||
+        label.includes('|') ||
+        value.includes('|') ||
+        value.length > 120 ||
+        !isDesignControlLabel(label) ||
+        !isDesignControlValue(value)
+      ) {
+        return null
+      }
       return {
         id: `body-line:${index}:${slugify(label)}`,
         label,
@@ -224,6 +365,18 @@ function bodyControls(body: string): EditableDesignControl[] {
       }
     })
     .filter((control): control is EditableDesignControl => Boolean(control))
+}
+
+function isDesignControlLabel(label: string): boolean {
+  return /color|colour|radius|rounded|spacing|gap|padding|margin|size|width|height|opacity|shadow|font|type|line|letter|token|primary|secondary|accent|surface|background|foreground|border|颜色|圆角|间距|字号|字体|行高|透明|阴影|宽|高|主色|背景|前景|边框/i.test(label)
+}
+
+function isDesignControlValue(value: string): boolean {
+  return (
+    /#[0-9a-f]{3}(?:[0-9a-f]{3})?(?:[0-9a-f]{2})?/i.test(value) ||
+    /^-?\d+(?:\.\d+)?\s*(px|%|rem|em|vh|vw|s|ms)?$/i.test(value.trim()) ||
+    value.length <= 64
+  )
 }
 
 function controlValueMeta(value: string): Omit<EditableDesignControl, 'id' | 'label' | 'value' | 'source'> {
@@ -272,6 +425,44 @@ function updateBodyLineValue(
   if (!match) return content
   bodyLines[lineIndex] = `${match[1]}${nextValue}`
   return composeDesignMarkdown(parsed.frontmatter, bodyLines.join('\n'))
+}
+
+function isMarkdownTableRow(line: string): boolean {
+  const trimmed = line.trim()
+  if (!trimmed.includes('|')) return false
+  if (/^```/.test(trimmed)) return false
+  return splitTableRow(trimmed).length >= 2
+}
+
+function isMarkdownTableSeparator(line: string): boolean {
+  const cells = splitTableRow(line)
+  if (cells.length < 2) return false
+  return cells.every((cell) => /^:?-{3,}:?$/.test(cell.trim()))
+}
+
+function splitTableRow(line: string): string[] {
+  const trimmed = line.trim()
+  const withoutOuter = trimmed.replace(/^\|/, '').replace(/\|$/, '')
+  const cells: string[] = []
+  let cell = ''
+  let escaped = false
+
+  for (const char of withoutOuter) {
+    if (char === '|' && !escaped) {
+      cells.push(cell.trim())
+      cell = ''
+    } else {
+      cell += char
+    }
+    escaped = !escaped && char === '\\'
+  }
+
+  cells.push(cell.trim())
+  return cells
+}
+
+function formatTableRow(cells: readonly string[]): string {
+  return `| ${cells.map((cell) => cell.trim()).join(' | ')} |`
 }
 
 function composeDesignMarkdown(frontmatter: string | null, body: string): string {

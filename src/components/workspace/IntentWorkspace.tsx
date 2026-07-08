@@ -66,12 +66,16 @@ import {
 import { createPrototypeAssetManifest } from '@/prototype/asset-manifest'
 import {
   appendDesignMarkdownSection,
+  appendDesignMarkdownTableRow,
   parseEditableDesignMarkdown,
   removeDesignMarkdownSection,
+  removeDesignMarkdownTableRow,
   updateDesignMarkdownControl,
   updateDesignMarkdownSection,
+  updateDesignMarkdownTableCell,
   type EditableDesignControl,
   type EditableDesignSection,
+  type EditableDesignTable,
 } from '@/prototype/design-md'
 import type {
   PersistedPrototypeDesignSystem,
@@ -1964,6 +1968,12 @@ function DesignMarkdownControls({
         ))}
       </DesignControlGroup>
 
+      <DesignTablesEditor
+        content={content}
+        tables={model.tables}
+        onChange={onChange}
+      />
+
       <section className="rounded-lg border border-border bg-card">
         <div className="flex items-center justify-between gap-3 border-b border-border px-3 py-2">
           <div className="min-w-0">
@@ -1997,6 +2007,120 @@ function DesignMarkdownControls({
           )}
         </div>
       </section>
+    </div>
+  )
+}
+
+function DesignTablesEditor({
+  content,
+  tables,
+  onChange,
+}: {
+  readonly content: string
+  readonly tables: readonly EditableDesignTable[]
+  readonly onChange: (content: string) => void
+}) {
+  return (
+    <section className="rounded-lg border border-border bg-card">
+      <div className="flex items-center justify-between border-b border-border px-3 py-2">
+        <p className="text-xs font-semibold">Tables</p>
+        <span className="font-mono text-[10px] text-muted-foreground">{tables.length}</span>
+      </div>
+      <div className="space-y-4 p-3">
+        {tables.length > 0 ? (
+          tables.map((table) => (
+            <DesignTableEditor
+              key={table.id}
+              content={content}
+              table={table}
+              onChange={onChange}
+            />
+          ))
+        ) : (
+          <p className="text-xs text-muted-foreground">No markdown tables.</p>
+        )}
+      </div>
+    </section>
+  )
+}
+
+function DesignTableEditor({
+  content,
+  table,
+  onChange,
+}: {
+  readonly content: string
+  readonly table: EditableDesignTable
+  readonly onChange: (content: string) => void
+}) {
+  return (
+    <div className="space-y-2">
+      <div className="grid gap-1" style={{ gridTemplateColumns: `repeat(${table.headers.length}, minmax(0, 1fr))` }}>
+        {table.headers.map((header, cellIndex) => (
+          <Input
+            key={`${table.id}:header:${cellIndex}`}
+            value={header}
+            aria-label={`Table header ${cellIndex + 1}`}
+            onChange={(event) =>
+              onChange(updateDesignMarkdownTableCell(
+                content,
+                table,
+                'header',
+                cellIndex,
+                event.target.value,
+              ))
+            }
+            className="h-7 font-mono text-[11px] font-semibold"
+          />
+        ))}
+      </div>
+      <div className="space-y-1">
+        {table.rows.map((row, rowIndex) => (
+          <div
+            key={`${table.id}:row:${rowIndex}`}
+            className="grid gap-1"
+            style={{ gridTemplateColumns: `repeat(${table.headers.length}, minmax(0, 1fr)) 1.75rem` }}
+          >
+            {table.headers.map((_, cellIndex) => (
+              <Input
+                key={`${table.id}:row:${rowIndex}:cell:${cellIndex}`}
+                value={row[cellIndex] ?? ''}
+                aria-label={`Table row ${rowIndex + 1} cell ${cellIndex + 1}`}
+                onChange={(event) =>
+                  onChange(updateDesignMarkdownTableCell(
+                    content,
+                    table,
+                    rowIndex,
+                    cellIndex,
+                    event.target.value,
+                  ))
+                }
+                className="h-7 font-mono text-[11px]"
+              />
+            ))}
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              aria-label={`Delete table row ${rowIndex + 1}`}
+              onClick={() => onChange(removeDesignMarkdownTableRow(content, table, rowIndex))}
+              className="size-7"
+            >
+              <Trash2 className="size-3.5" />
+            </Button>
+          </div>
+        ))}
+      </div>
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        onClick={() => onChange(appendDesignMarkdownTableRow(content, table))}
+        className="w-full"
+      >
+        <Plus className="size-3.5" />
+        Add row
+      </Button>
     </div>
   )
 }
@@ -2045,9 +2169,9 @@ function DesignControlRow({
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between gap-2">
-        <label className="min-w-0 truncate text-xs font-medium text-muted-foreground">
+        <p className="min-w-0 truncate text-xs font-medium text-muted-foreground">
           {control.label}
-        </label>
+        </p>
         {control.unit ? (
           <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
             {control.unit}
@@ -3295,16 +3419,14 @@ function useElapsedSeconds(startedAt: number | null, active: boolean): number {
   const [now, setNow] = useState(() => Date.now())
 
   useEffect(() => {
-    if (!startedAt || !active) {
-      setNow(Date.now())
-      return
-    }
+    if (!startedAt || !active) return
     const timer = window.setInterval(() => setNow(Date.now()), 500)
     return () => window.clearInterval(timer)
   }, [active, startedAt])
 
   if (!startedAt) return 0
-  return Math.max(0, Math.floor((now - startedAt) / 1000))
+  const displayNow = active ? Math.max(now, Date.now()) : now
+  return Math.max(0, Math.floor((displayNow - startedAt) / 1000))
 }
 
 function resolveAssetStage({
