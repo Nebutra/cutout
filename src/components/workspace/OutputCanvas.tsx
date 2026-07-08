@@ -103,10 +103,13 @@ function CardNode({ data }: NodeProps) {
         type="button"
         disabled={!url}
         aria-label={`Open preview for ${item.label}`}
-        onPointerDown={(event) => event.stopPropagation()}
-        onDoubleClick={(event) => event.stopPropagation()}
+        onPointerDownCapture={(event) => event.stopPropagation()}
+        onMouseDownCapture={(event) => event.stopPropagation()}
+        onTouchStartCapture={(event) => event.stopPropagation()}
+        onDoubleClickCapture={(event) => event.stopPropagation()}
         onClick={openPreview}
-        className="nodrag nopan nowheel flex flex-col overflow-hidden rounded-lg border border-border bg-card text-left shadow-sm outline-none transition-colors hover:border-ring/50 focus-visible:ring-3 focus-visible:ring-ring/40 disabled:cursor-default"
+        onDragStart={(event) => event.preventDefault()}
+        className="nodrag nopan nowheel flex cursor-zoom-in flex-col overflow-hidden rounded-lg border border-border bg-card text-left shadow-sm outline-none transition-colors hover:border-ring/50 focus-visible:ring-3 focus-visible:ring-ring/40 disabled:cursor-default"
         style={{ width: CARD_W }}
       >
         <div className="flex h-32 items-center justify-center overflow-hidden bg-muted/20">
@@ -149,7 +152,7 @@ function ZoneBandNode({ data }: NodeProps) {
   const { title, count, width, height } = data as BandData
   return (
     <div
-      className="rounded-2xl border border-border/60 bg-muted/10"
+      className="pointer-events-none rounded-2xl border border-border/60 bg-muted/10"
       style={{ width, height }}
     >
       <div className="flex items-center gap-2 px-4 pt-3">
@@ -198,6 +201,7 @@ function buildNodes(lanes: readonly Lane[]): { nodes: Node[]; edges: Edge[] } {
       data: { title: lane.title, count: lane.items.length, width: bandW, height: bandH },
       draggable: false,
       selectable: false,
+      className: 'pointer-events-none',
       zIndex: 0,
     })
 
@@ -214,6 +218,8 @@ function buildNodes(lanes: readonly Lane[]): { nodes: Node[]; edges: Edge[] } {
         },
         data: { item },
         draggable: false,
+        selectable: false,
+        className: 'nodrag nopan nowheel',
         zIndex: 1,
         sourcePosition: Position.Bottom,
         targetPosition: Position.Top,
