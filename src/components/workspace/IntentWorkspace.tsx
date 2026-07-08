@@ -2057,63 +2057,71 @@ function DesignTableEditor({
   readonly table: EditableDesignTable
   readonly onChange: (content: string) => void
 }) {
+  // A markdown table can have many columns — too many rich editors for the narrow
+  // panel. Cells are plain compact inputs in a horizontally-scrollable grid with a
+  // sensible min column width, so headers/values stay legible instead of squishing.
+  const columns = `repeat(${table.headers.length}, minmax(4.25rem, 1fr)) 1.75rem`
   return (
     <div className="space-y-2">
-      <div className="grid gap-1" style={{ gridTemplateColumns: `repeat(${table.headers.length}, minmax(0, 1fr))` }}>
-        {table.headers.map((header, cellIndex) => (
-          <Input
-            key={`${table.id}:header:${cellIndex}`}
-            value={header}
-            aria-label={`Table header ${cellIndex + 1}`}
-            onChange={(event) =>
-              onChange(updateDesignMarkdownTableCell(
-                content,
-                table,
-                'header',
-                cellIndex,
-                event.target.value,
-              ))
-            }
-            className="h-7 font-mono text-[11px] font-semibold"
-          />
-        ))}
-      </div>
-      <div className="space-y-1">
-        {table.rows.map((row, rowIndex) => (
-          <div
-            key={`${table.id}:row:${rowIndex}`}
-            className="grid gap-1"
-            style={{ gridTemplateColumns: `repeat(${table.headers.length}, minmax(0, 1fr)) 1.75rem` }}
-          >
-            {table.headers.map((_, cellIndex) => (
-              <DesignValueEditor
-                key={`${table.id}:row:${rowIndex}:cell:${cellIndex}`}
-                value={row[cellIndex] ?? ''}
-                label={`Table row ${rowIndex + 1} cell ${cellIndex + 1}`}
-                compact
-                onChange={(nextValue) =>
+      <div className="overflow-x-auto pb-0.5">
+        <div className="w-max min-w-full space-y-1">
+          <div className="grid gap-1" style={{ gridTemplateColumns: columns }}>
+            {table.headers.map((header, cellIndex) => (
+              <Input
+                key={`${table.id}:header:${cellIndex}`}
+                value={header}
+                aria-label={`Table header ${cellIndex + 1}`}
+                onChange={(event) =>
                   onChange(updateDesignMarkdownTableCell(
                     content,
                     table,
-                    rowIndex,
+                    'header',
                     cellIndex,
-                    formatEditedDesignValue(row[cellIndex] ?? '', nextValue),
+                    event.target.value,
                   ))
                 }
+                className="h-7 px-2 font-mono text-[11px] font-semibold"
               />
             ))}
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-sm"
-              aria-label={`Delete table row ${rowIndex + 1}`}
-              onClick={() => onChange(removeDesignMarkdownTableRow(content, table, rowIndex))}
-              className="size-7"
-            >
-              <Trash2 className="size-3.5" />
-            </Button>
+            <span aria-hidden />
           </div>
-        ))}
+
+          {table.rows.map((row, rowIndex) => (
+            <div
+              key={`${table.id}:row:${rowIndex}`}
+              className="grid gap-1"
+              style={{ gridTemplateColumns: columns }}
+            >
+              {table.headers.map((_, cellIndex) => (
+                <Input
+                  key={`${table.id}:row:${rowIndex}:cell:${cellIndex}`}
+                  value={row[cellIndex] ?? ''}
+                  aria-label={`Table row ${rowIndex + 1} cell ${cellIndex + 1}`}
+                  onChange={(event) =>
+                    onChange(updateDesignMarkdownTableCell(
+                      content,
+                      table,
+                      rowIndex,
+                      cellIndex,
+                      event.target.value,
+                    ))
+                  }
+                  className="h-7 px-2 font-mono text-[11px]"
+                />
+              ))}
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                aria-label={`Delete table row ${rowIndex + 1}`}
+                onClick={() => onChange(removeDesignMarkdownTableRow(content, table, rowIndex))}
+                className="size-7 self-center"
+              >
+                <Trash2 className="size-3.5" />
+              </Button>
+            </div>
+          ))}
+        </div>
       </div>
       <Button
         type="button"
