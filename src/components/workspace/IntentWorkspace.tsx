@@ -1014,6 +1014,7 @@ export function IntentWorkspace({
         <OutputHeader
           hasSlices={hasSlices}
           sliceCount={slices.length}
+          hasPrototypeContext={Boolean(prototypePlan) || Boolean(prototypeDesignSystem) || prototypePages.length > 0}
           working={working}
           activeStage={activeStage}
           elapsedSeconds={elapsedSeconds}
@@ -2023,25 +2024,24 @@ function DesignTablesEditor({
   readonly tables: readonly EditableDesignTable[]
   readonly onChange: (content: string) => void
 }) {
+  const visibleTables = tables.filter(isUsefulDesignTable)
+  if (visibleTables.length === 0) return null
+
   return (
     <section className="rounded-lg border border-border bg-card">
       <div className="flex items-center justify-between border-b border-border px-3 py-2">
         <p className="text-xs font-semibold">Tables</p>
-        <span className="font-mono text-[10px] text-muted-foreground">{tables.length}</span>
+        <span className="font-mono text-[10px] text-muted-foreground">{visibleTables.length}</span>
       </div>
       <div className="space-y-4 p-3">
-        {tables.length > 0 ? (
-          tables.map((table) => (
-            <DesignTableEditor
-              key={table.id}
-              content={content}
-              table={table}
-              onChange={onChange}
-            />
-          ))
-        ) : (
-          <p className="text-xs text-muted-foreground">No markdown tables.</p>
-        )}
+        {visibleTables.map((table) => (
+          <DesignTableEditor
+            key={table.id}
+            content={content}
+            table={table}
+            onChange={onChange}
+          />
+        ))}
       </div>
     </section>
   )
@@ -2070,6 +2070,18 @@ function DesignTableEditor({
   const activeMeta = activeCell ? parseEditableDesignValue(activeValue) : null
   const activeHeader =
     activeCell ? table.headers[activeCell.cellIndex] ?? `Column ${activeCell.cellIndex + 1}` : ''
+  const semanticShape = semanticDesignTableShape(table)
+
+  if (semanticShape) {
+    return (
+      <DesignSemanticTableEditor
+        content={content}
+        table={table}
+        shape={semanticShape}
+        onChange={onChange}
+      />
+    )
+  }
 
   return (
     <div className="space-y-2">
@@ -2182,6 +2194,206 @@ function DesignTableEditor({
   )
 }
 
+function DesignSemanticTableEditor({
+  content,
+  table,
+  shape,
+  onChange,
+}: {
+  readonly content: string
+  readonly table: EditableDesignTable
+  readonly shape: SemanticDesignTableShape
+  readonly onChange: (content: string) => void
+}) {
+  const valueHeader = table.headers[shape.valueIndex] ?? 'Value'
+  const noteHeader = shape.noteIndex !== null ? table.headers[shape.noteIndex] ?? 'Note' : null
+
+  return (
+    <div className="space-y-2">
+      <div className="space-y-2">
+        {table.rows.map((row, rowIndex) => {
+          const name = row[shape.nameIndex] ?? ''
+          const value = row[shape.valueIndex] ?? ''
+          const note = shape.noteIndex !== null ? row[shape.noteIndex] ?? '' : ''
+          if (!isUsefulTableRow(row)) return null
+
+          return (
+            <div
+              key={`${table.id}:semantic:${rowIndex}`}
+              className="space-y-2 rounded-lg border border-border bg-background/60 p-2"
+            >
+              <div className="flex items-center gap-2">
+                <Input
+                  value={name}
+                  aria-label={`Table row ${rowIndex + 1} name`}
+                  onChange={(event) =>
+                    onChange(updateDesignMarkdownTableCell(
+                      content,
+                      table,
+                      rowIndex,
+                      shape.nameIndex,
+                      event.target.value,
+                    ))
+                  }
+                  className="h-7 min-w-0 flex-1 px-2 text-xs font-semibold"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label={`Delete table row ${rowIndex + 1}`}
+                  onClick={() => onChange(removeDesignMarkdownTableRow(content, table, rowIndex))}
+                  className="size-7 shrink-0"
+                >
+                  <Trash2 className="size-3.5" />
+                </Button>
+              </div>
+
+              <div className="space-y-1">
+                <p className="text-[10px] font-medium uppercase text-muted-foreground">
+                  {valueHeader}
+                </p>
+                <DesignValueEditor
+                  value={value}
+                  label={`${name || valueHeader} value`}
+                  onChange={(nextValue) =>
+                    onChange(updateDesignMarkdownTableCell(
+                      content,
+                      table,
+                      rowIndex,
+                      shape.valueIndex,
+                      formatEditedDesignValue(value, nextValue),
+                    ))
+                  }
+                />
+              </div>
+
+              {shape.noteIndex !== null ? (
+                <div className="space-y-1">
+                  <p className="text-[10px] font-medium uppercase text-muted-foreground">
+                    {noteHeader}
+                  </p>
+                  <Input
+                    value={note}
+                    aria-label={`Table row ${rowIndex + 1} note`}
+                    onChange={(event) =>
+                      onChange(updateDesignMarkdownTableCell(
+                        content,
+                        table,
+                        rowIndex,
+                        shape.noteIndex ?? 0,
+                        event.target.value,
+                      ))
+                    }
+                    className="h-7 px-2 text-xs"
+                  />
+                </div>
+              ) : null}
+            </div>
+          )
+        })}
+      </div>
+
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        onClick={() => onChange(appendDesignMarkdownTableRow(content, table))}
+        className="w-full"
+      >
+        <Plus className="size-3.5" />
+        Add row
+      </Button>
+    </div>
+  )
+}
+
+interface SemanticDesignTableShape {
+  readonly nameIndex: number
+  readonly valueIndex: number
+  readonly noteIndex: number | null
+}
+
+function semanticDesignTableShape(table: EditableDesignTable): SemanticDesignTableShape | null {
+  const valueIndex = findTableHeader(table, [
+    'value',
+    '值',
+    'token value',
+    '数值',
+    'color',
+    '颜色',
+    'size',
+    '尺寸',
+    'style',
+    '样式',
+  ])
+  if (valueIndex < 0) return null
+
+  const nameIndex = findTableHeader(table, [
+    'name',
+    'token',
+    'key',
+    'property',
+    '属性',
+    '变量',
+    '名称',
+    '状态',
+  ])
+  if (nameIndex < 0 || nameIndex === valueIndex) return null
+
+  const noteIndex = findTableHeader(table, [
+    'usage',
+    'use',
+    '用途',
+    'description',
+    'desc',
+    '说明',
+    'note',
+    'notes',
+  ])
+
+  return {
+    nameIndex,
+    valueIndex,
+    noteIndex: noteIndex >= 0 && noteIndex !== nameIndex && noteIndex !== valueIndex
+      ? noteIndex
+      : null,
+  }
+}
+
+function findTableHeader(table: EditableDesignTable, candidates: readonly string[]): number {
+  return table.headers.findIndex((header) => {
+    const normalized = normalizeTableText(header)
+    return candidates.some((candidate) => normalized === normalizeTableText(candidate))
+  })
+}
+
+function isUsefulDesignTable(table: EditableDesignTable): boolean {
+  if (table.headers.length < 2 || table.headers.length > 6) return false
+  if (!table.headers.every(isUsefulTableCell)) return false
+  return table.rows.some(isUsefulTableRow)
+}
+
+function isUsefulTableRow(row: readonly string[]): boolean {
+  return row.filter(isUsefulTableCell).length >= 2
+}
+
+function isUsefulTableCell(cell: string): boolean {
+  const text = cell.trim()
+  if (!text) return false
+  if (/^[|\-:—_\s`]+$/.test(text)) return false
+  const signal = text.match(/[a-z0-9\u4e00-\u9fa5#%]/gi)?.length ?? 0
+  return signal > 0
+}
+
+function normalizeTableText(value: string): string {
+  return value
+    .replace(/`+/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase()
+}
+
 function DesignControlGroup({
   title,
   count,
@@ -2194,6 +2406,8 @@ function DesignControlGroup({
   readonly children: ReactNode
 }) {
   const [open, setOpen] = useState(defaultOpen)
+  if (count === 0) return null
+
   return (
     <section className="overflow-hidden rounded-lg border border-border bg-card">
       <button
@@ -2215,9 +2429,7 @@ function DesignControlGroup({
       </button>
       {open ? (
         <div className="space-y-2.5 border-t border-border p-3">
-          {count > 0 ? children : (
-            <p className="text-xs text-muted-foreground">No editable fields.</p>
-          )}
+          {children}
         </div>
       ) : null}
     </section>
@@ -2425,6 +2637,7 @@ function formatNumberValue(value: number, unit: string | null, step: number): st
 function OutputHeader({
   hasSlices,
   sliceCount,
+  hasPrototypeContext,
   working,
   activeStage,
   elapsedSeconds,
@@ -2432,6 +2645,7 @@ function OutputHeader({
 }: {
   readonly hasSlices: boolean
   readonly sliceCount: number
+  readonly hasPrototypeContext: boolean
   readonly working: boolean
   readonly activeStage: AssetStageId
   readonly elapsedSeconds: number
@@ -2443,6 +2657,8 @@ function OutputHeader({
       ? 'Ready; semantic naming is skipped because no vision model is configured.'
       : hasSlices && namingStatus === 'error'
         ? 'Ready; semantic naming failed, filenames are still generic.'
+        : hasSlices && hasPrototypeContext
+          ? 'Prototype context and generated assets are ready.'
         : hasSlices
           ? 'Ready to review and export.'
           : 'Generated assets will appear here.'
@@ -2450,7 +2666,11 @@ function OutputHeader({
     <div className="flex h-14 shrink-0 items-center justify-between border-b border-border px-6">
       <div className="min-w-0">
         <h2 className="truncate text-base font-semibold tracking-tight">
-          {hasSlices ? `${sliceCount} assets` : 'Output'}
+          {hasSlices && hasPrototypeContext
+            ? `Prototype assets · ${sliceCount}`
+            : hasSlices
+              ? `${sliceCount} assets`
+              : 'Output'}
         </h2>
         <p className="text-xs text-muted-foreground">
           {working
@@ -2559,21 +2779,31 @@ function OutputSurface({
   }
 
   if (hasSlices) {
+    const showPrototypeContext =
+      Boolean(prototypePlan) || Boolean(prototypeDesignSystem) || prototypePages.length > 0
     return (
       // Fixed-height column: the parent never scrolls. The strip is pinned and
       // only the slice grid scrolls, so browsing assets never hides the header.
       <div className="relative flex h-full min-h-0 flex-col">
-        {prototypePages.length > 0 ? (
+        {showPrototypeContext ? (
           <div className="shrink-0 p-3 pb-0">
-            <PrototypeSuiteStrip
-              designSystem={prototypeDesignSystem}
-              pages={prototypePages}
-              selectedPageId={selectedPrototypePageId}
-              onSelectPage={(pageId) => {
-                onPrototypePageSelect(pageId)
-                setPreviewPageId(pageId)
-              }}
-            />
+            {prototypePages.length > 0 ? (
+              <PrototypeSuiteStrip
+                designSystem={prototypeDesignSystem}
+                pages={prototypePages}
+                selectedPageId={selectedPrototypePageId}
+                onSelectPage={(pageId) => {
+                  onPrototypePageSelect(pageId)
+                  setPreviewPageId(pageId)
+                }}
+              />
+            ) : (
+              <PrototypeContextStrip
+                plan={prototypePlan}
+                designSystem={prototypeDesignSystem}
+                onContinue={onPrimaryAction}
+              />
+            )}
             <PrototypePreviewDialog
               artifact={previewArtifact}
               open={previewArtifact !== null}
@@ -3215,6 +3445,66 @@ function PrototypeSuiteStrip({
         compact
         opensPreview
       />
+    </section>
+  )
+}
+
+function PrototypeContextStrip({
+  plan,
+  designSystem,
+  onContinue,
+}: {
+  readonly plan: PrototypePlan | null
+  readonly designSystem: PrototypeDesignSystemArtifact | null
+  readonly onContinue: () => void
+}) {
+  const pages = plan?.pages ?? []
+
+  return (
+    <section className="mb-3 rounded-lg border border-border bg-card p-3">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h3 className="text-sm font-semibold">Prototype suite</h3>
+          <p className="mt-1 text-xs leading-5 text-muted-foreground">
+            {pages.length > 0
+              ? 'The plan is available, but prototype screens are not attached to this result yet.'
+              : 'Prototype screens should be generated before assets are treated as the final result.'}
+          </p>
+        </div>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={onContinue}
+          className="shrink-0"
+        >
+          <WandSparkles className="size-3.5" />
+          Continue
+        </Button>
+      </div>
+
+      {designSystem ? (
+        <div className="mt-3">
+          <DesignSystemReference artifact={designSystem} compact />
+        </div>
+      ) : null}
+
+      {pages.length > 0 ? (
+        <div className="mt-3 grid gap-1.5 sm:grid-cols-2">
+          {pages.slice(0, 6).map((page) => (
+            <div
+              key={page.id}
+              className="flex min-w-0 items-center gap-2 rounded-md border border-border bg-background px-2 py-1.5"
+            >
+              <Route className="size-3.5 shrink-0 text-muted-foreground" />
+              <span className="min-w-0 flex-1 truncate text-xs font-medium">{page.name}</span>
+              <span className="shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                planned
+              </span>
+            </div>
+          ))}
+        </div>
+      ) : null}
     </section>
   )
 }
