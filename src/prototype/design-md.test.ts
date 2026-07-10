@@ -39,6 +39,7 @@ describe('DESIGN.md helpers', () => {
     const parsed = parseEditableDesignMarkdown([
       '---',
       'product: Demo',
+      'description: "A long product description should remain markdown context, not a tiny inspector input."',
       'spacing:',
       '  section: 64px',
       'colors:',
@@ -52,7 +53,22 @@ describe('DESIGN.md helpers', () => {
     expect(parsed.frontmatter?.product).toBe('Demo')
     expect(parsed.sections[0]?.title).toBe('Overview')
     expect(parsed.controls.some((control) => control.id === 'frontmatter:colors.primary')).toBe(true)
+    expect(parsed.controls.some((control) => control.id === 'frontmatter:description')).toBe(false)
     expect(parsed.controls.some((control) => control.id.startsWith('body-line:'))).toBe(true)
+  })
+
+  it('keeps concise design text tokens but ignores paragraph-like values', () => {
+    const parsed = parseEditableDesignMarkdown([
+      '# Tokens',
+      '- font family: Inter',
+      '- style: Modern, clear, trustworthy, highly specific commercial interface with dense supporting context.',
+      '- radius: 12px',
+    ].join('\n'))
+
+    expect(parsed.controls.map((control) => control.label)).toEqual([
+      'font family',
+      'radius',
+    ])
   })
 
   it('updates one frontmatter control while preserving the markdown body', () => {

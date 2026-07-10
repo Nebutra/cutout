@@ -242,11 +242,14 @@ function frontmatterControls(
     if (typeof value !== 'string' && typeof value !== 'number') return
 
     const rawValue = String(value)
+    const meta = controlValueMeta(rawValue)
+    if (!isUsefulFrontmatterControl(path, rawValue, meta)) return
+
     controls.push({
       id: `frontmatter:${path.join('.')}`,
       label: path.join('.'),
       value: rawValue,
-      ...controlValueMeta(rawValue),
+      ...meta,
       source: { type: 'frontmatter', path },
     })
   }
@@ -369,13 +372,14 @@ function bodyControls(
       if (!match) return null
       const label = match[2].trim()
       const value = match[3].trim()
+      const meta = controlValueMeta(value)
       if (
         label.startsWith('http') ||
         label.includes('|') ||
         value.includes('|') ||
         value.length > 120 ||
         !isDesignControlLabel(label) ||
-        !isDesignControlValue(value)
+        !isDesignControlValue(label, value, meta)
       ) {
         return null
       }
@@ -383,7 +387,7 @@ function bodyControls(
         id: `body-line:${index}:${slugify(label)}`,
         label,
         value,
-        ...controlValueMeta(value),
+        ...meta,
         source: { type: 'body-line', lineIndex: index },
       }
     })
@@ -394,12 +398,14 @@ function isDesignControlLabel(label: string): boolean {
   return /color|colour|radius|rounded|spacing|gap|padding|margin|size|width|height|opacity|shadow|font|type|line|letter|token|primary|secondary|accent|surface|background|foreground|border|颜色|圆角|间距|字号|字体|行高|透明|阴影|宽|高|主色|背景|前景|边框/i.test(label)
 }
 
-function isDesignControlValue(value: string): boolean {
-  return (
-    /#[0-9a-f]{3}(?:[0-9a-f]{3})?(?:[0-9a-f]{2})?/i.test(value) ||
-    /^-?\d+(?:\.\d+)?\s*(px|%|rem|em|vh|vw|s|ms)?$/i.test(value.trim()) ||
-    value.length <= 64
-  )
+function isDesignControlValue(
+  label: string,
+  value: string,
+  meta: EditableDesignValueMeta,
+): boolean {
+  if (meta.kind !== 'text') return true
+  if (value.length > 64 || looksLikeParagraph(value) || looksLikeMarkdownJunk(value)) return false
+  return /font|type|weight|family|style|mode|tone|language|字体|字重|风格|模式|语言|状态/i.test(label)
 }
 
 function controlValueMeta(value: string): EditableDesignValueMeta {
@@ -423,6 +429,37 @@ function controlValueMeta(value: string): EditableDesignValueMeta {
   }
 
   return { kind: 'text', unit: null, min: 0, max: 100 }
+}
+
+function isUsefulFrontmatterControl(
+  path: readonly string[],
+  value: string,
+  meta: EditableDesignValueMeta,
+): boolean {
+  if (path.length === 0 || path.length > 4) return false
+  if (looksLikeMarkdownJunk(value)) return false
+  if (meta.kind !== 'text') return true
+
+  const root = path[0].toLowerCase()
+  const leaf = path.at(-1)?.toLowerCase() ?? ''
+  if (value.length > 96 || looksLikeParagraph(value)) return false
+
+  if (
+    ['version', 'name', 'product', 'platform', 'orientation', 'style', 'language', 'source']
+      .includes(root)
+  ) {
+    return path.length === 1
+  }
+
+  if (
+    ['colors', 'color', 'typography', 'spacing', 'rounded', 'radius', 'radii', 'components']
+      .includes(root)
+  ) {
+    return /name|family|weight|style|token|size|line|letter|radius|spacing|gap|padding|margin|color|state|variant|名称|字体|字重|字号|行高|圆角|间距|颜色|状态|样式/i
+      .test(leaf)
+  }
+
+  return false
 }
 
 function updateFrontmatterValue(
@@ -535,6 +572,22 @@ function cloneRecord(record: Record<string, unknown>): Record<string, unknown> {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function looksLikeParagraph(value: string): boolean {
+  const text = unwrapInlineCode(value.trim()).inner
+  if (text.length > 72) return true
+  const punctuationCount = (text.match(/[，。,.；;:：]/g) ?? []).length
+  const wordCount = text.split(/\s+/).filter(Boolean).length
+  return punctuationCount >= 2 || wordCount >= 10
+}
+
+function looksLikeMarkdownJunk(value: string): boolean {
+  const text = unwrapInlineCode(value.trim()).inner
+  if (!text) return true
+  if (/^[|\-:—_\s`]+$/.test(text)) return true
+  const signal = text.match(/[a-z0-9\u4e00-\u9fa5#%]/gi)?.length ?? 0
+  return signal === 0
 }
 
 function slugify(value: string): string {
