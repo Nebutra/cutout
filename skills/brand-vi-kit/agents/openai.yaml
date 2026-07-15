@@ -1,0 +1,4 @@
+interface:
+  display_name: "Brand VI Kit"
+  short_description: "Plan and export evidence-backed brand identity artifacts"
+  default_prompt: "Use $brand-vi-kit to plan an evidence-backed brand identity kit."

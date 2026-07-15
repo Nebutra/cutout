@@ -1,0 +1,5 @@
+import { describe,expect,it } from 'vitest'
+import { runConsumerMatrix,type ConsumerMatrixHost } from './consumer-matrix'
+import type { StarterPlan } from './compiler'
+const plan={version:'starter-plan.v1',framework:'nuxt',mergePolicy:'fail',source:{documentId:'d',revisionId:'r',documentFingerprint:'a'.repeat(64),designKitFingerprint:'b'.repeat(64),candidateManifestFingerprint:'c'.repeat(64)},files:[],assets:[]} as StarterPlan
+describe('consumer capability evidence',()=>{it('reports a missing local package tool as capability-required, not a failed build',async()=>{const host:ConsumerMatrixHost={createWorkspace:async()=>({id:'tmp',write:async()=>{},dispose:async()=>{}}),run:async()=>({ok:false,capabilityRequired:true,durationMs:1,output:'capability-required: pnpm is unavailable'})};expect(await runConsumerMatrix(plan,host,()=> '2026-07-12T00:00:00Z')).toMatchObject({status:'capability-required',checks:[{name:'install',status:'capability-required',evidence:['capability-required: pnpm is unavailable']}]})})})

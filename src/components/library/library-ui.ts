@@ -14,6 +14,7 @@ import type { ReactNode } from 'react'
 
 export interface LibraryUI {
   readonly open: () => void
+  readonly openGlobal: () => void
 }
 
 const LibraryUIContext = createContext<LibraryUI | null>(null)

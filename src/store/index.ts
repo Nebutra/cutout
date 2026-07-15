@@ -37,6 +37,7 @@ export const useStore = create<Store>()((set, get, api) => ({
       mockup: null,
       designMarkdown: null,
       workspaceSnapshot: null,
+      pendingAgentRun: null,
       genPhase: 'idle',
       genError: null,
       graph: null,
@@ -59,6 +60,8 @@ export const useStore = create<Store>()((set, get, api) => ({
       width: slice.width,
       height: slice.height,
       selected: false,
+      regionId: slice.regionId ?? null,
+      pageId: slice.pageId ?? null,
     }))
 
     set({
@@ -69,6 +72,7 @@ export const useStore = create<Store>()((set, get, api) => ({
             width: input.source.bitmap.width,
             height: input.source.bitmap.height,
             imageId: crypto.randomUUID(),
+            autoAnalyze: (input.source as { autoAnalyze?: boolean }).autoAnalyze ?? true,
           }
         : INITIAL_SOURCE,
       params: input.params ?? DEFAULT_PARAMS,
@@ -84,6 +88,7 @@ export const useStore = create<Store>()((set, get, api) => ({
       mockup: input.mockup ?? null,
       designMarkdown: input.designMarkdown ?? null,
       workspaceSnapshot: input.workspace ?? null,
+      pendingAgentRun: null,
       genPhase: 'idle',
       genError: null,
       graph: null,

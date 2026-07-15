@@ -1,10 +1,10 @@
 [package]
 name = "app"
 version = "0.1.0"
-description = "A Tauri App"
-authors = ["you"]
-license = ""
-repository = ""
+description = "Local-first AI design production workspace"
+authors = ["Leishi AI Native Team"]
+license = "Apache-2.0"
+repository = "https://github.com/leishi/cutout"
 edition = "2021"
 rust-version = "1.77.2"
 
@@ -26,8 +26,10 @@ tauri-plugin-log = "2"
 tauri-plugin-dialog = "2"
 tauri-plugin-fs = "2"
 thiserror = "2"
-tokio = { version = "1", features = ["fs", "sync"] }
+tokio = { version = "1", features = ["fs", "sync", "time"] }
 base64 = "0.22"
+sha2 = "0.10"
+libc = "0.2"
 keyring = "3"
 reqwest = { version = "0.12", default-features = false, features = ["json", "stream", "rustls-tls", "multipart"] }
 futures-util = "0.3"
@@ -35,6 +37,13 @@ tauri-plugin-os = "2"
 tauri-plugin-store = "2"
 image = "0.23.10"
 vtracer = "0.6.5"
+
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+tauri-plugin-updater = "2.10.1"
+tauri-plugin-process = "2"
+
+[dev-dependencies]
+tempfile = "3"
 
 # Real OS keychain backends per platform (without a backend feature, keyring 3.x
 # falls back to a process-local mock that does NOT persist across restarts).

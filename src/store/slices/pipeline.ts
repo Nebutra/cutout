@@ -26,6 +26,7 @@ import type {
   DesignMarkdownAsset,
   MockupArtifact,
   NodeStatus,
+  PendingAgentRun,
   PipelineGraph,
   Store,
 } from '@/store/types'
@@ -66,6 +67,7 @@ export interface PipelineSlice {
   mockup: MockupArtifact | null
   designMarkdown: DesignMarkdownAsset | null
   workspaceSnapshot: WorkspaceSnapshot | null
+  pendingAgentRun: PendingAgentRun | null
   genPhase: GenPhase
   genError: GenError | null
   graph: GraphSpec | null
@@ -76,6 +78,8 @@ export interface PipelineSlice {
   setMockup(artifact: MockupArtifact): void
   setDesignMarkdown(asset: DesignMarkdownAsset): void
   clearDesignMarkdown(): void
+  requestAgentRun(intent: PendingAgentRun['intent']): PendingAgentRun
+  consumeAgentRun(): PendingAgentRun | null
   beginGen(phase: Exclude<GenPhase, 'idle'>): void
   endGen(): void
   failGen(op: GenOp, message: string): void
@@ -94,6 +98,7 @@ export const createPipelineSlice: StateCreator<Store, [], [], PipelineSlice> = (
   mockup: null,
   designMarkdown: null,
   workspaceSnapshot: null,
+  pendingAgentRun: null,
   genPhase: 'idle',
   genError: null,
   graph: null,
@@ -111,6 +116,21 @@ export const createPipelineSlice: StateCreator<Store, [], [], PipelineSlice> = (
   setIntent: (intent) => set({ intent }),
 
   clearIntent: () => set({ intent: null }),
+
+  requestAgentRun: (intent) => {
+    const request = { id: crypto.randomUUID(), intent }
+    set({ pendingAgentRun: request })
+    return request
+  },
+
+  consumeAgentRun: () => {
+    let request: PendingAgentRun | null = null
+    set((state) => {
+      request = state.pendingAgentRun
+      return request ? { pendingAgentRun: null } : state
+    })
+    return request
+  },
 
   setMockup: (artifact) =>
     set((s) => {

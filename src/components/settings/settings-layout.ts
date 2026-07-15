@@ -1,0 +1,2 @@
+export type SettingsLayout={readonly providerColumns:1|2;readonly verticalScrollOwner:'content';readonly horizontalScrollOwner:'sidebar-and-provider-categories';readonly sidebar:'top'|'left'}
+export function settingsLayoutForViewport(width:number):SettingsLayout{const valid=Number.isFinite(width);return{providerColumns:valid&&width>=640?2:1,verticalScrollOwner:'content',horizontalScrollOwner:'sidebar-and-provider-categories',sidebar:valid&&width>=640?'left':'top'}}

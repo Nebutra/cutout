@@ -1,0 +1,7 @@
+<!doctype html><meta charset="utf-8"><script>
+const parentWindow = parent;
+window.onmessage = (event) => {
+  const message = event.data && event.data.pluginMessage;
+  if (message) parentWindow.postMessage({ pluginMessage: message }, '*');
+};
+</script>

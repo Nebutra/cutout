@@ -95,8 +95,12 @@ describe('planGraph', () => {
     })
     expect(result.ok).toBe(true)
 
-    const [input] = generateObject.mock.calls[0]
-    const text = (input.input?.[0] as { type: 'text'; text: string }).text
+    const call = generateObject.mock.calls[0]
+    expect(call).toBeDefined()
+    const [input] = call!
+    const firstInput = input.input?.[0]
+    expect(firstInput).toMatchObject({ type: 'text' })
+    const text = (firstInput as { type: 'text'; text: string }).text
     // The composed requirement carries the reconstructed goal + self-derived
     // strategy + the mined dimension, plus the original brief for context.
     expect(text).toContain('catalog-first collectibles storefront')
@@ -119,7 +123,7 @@ describe('planGraph', () => {
   it('rejects a structurally invalid (cyclic) graph from the model', async () => {
     const cyclic = {
       nodes: [
-        { id: 'a', op: 'generate-image', label: 'a', inputs: ['b'] },
+        { id: 'a', op: 'edit-image', label: 'a', inputs: ['b'] },
         { id: 'b', op: 'edit-image', label: 'b', inputs: ['a'] },
       ],
       edges: [

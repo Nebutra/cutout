@@ -153,4 +153,39 @@ describe('GenerationService.editImage', () => {
     })
     expect(result).toEqual({ ok: false, error: 'images/edits failed: HTTP 401' })
   })
+
+  it('does not start a paid native edit when already aborted', async () => {
+    const controller = new AbortController()
+    controller.abort()
+    const gen = createLocalGenerationService(providersWith([cfg()]))
+
+    const result = await gen.editImage({
+      providerId: 'p1',
+      prompt: 'p',
+      images: [new Uint8Array([1])],
+      signal: controller.signal,
+    })
+
+    expect(result).toEqual({ ok: false, error: 'Operation aborted' })
+    expect(invokeMock).not.toHaveBeenCalled()
+  })
+
+  it('discards a native response that arrives after cooperative cancellation', async () => {
+    let resolveInvoke!: (value: { images: string[] }) => void
+    invokeMock.mockReturnValue(new Promise((resolve) => { resolveInvoke = resolve }))
+    const controller = new AbortController()
+    const gen = createLocalGenerationService(providersWith([cfg()]))
+
+    const pending = gen.editImage({
+      providerId: 'p1',
+      prompt: 'p',
+      images: [new Uint8Array([1])],
+      signal: controller.signal,
+    })
+    await vi.waitFor(() => expect(invokeMock).toHaveBeenCalledOnce())
+    controller.abort()
+    resolveInvoke({ images: [ABC_B64] })
+
+    await expect(pending).resolves.toEqual({ ok: false, error: 'Operation aborted' })
+  })
 })

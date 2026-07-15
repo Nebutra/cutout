@@ -6,73 +6,83 @@
  * slice count, or a naming count). Kept dumb + presentational so both the
  * generic {@link DagNode} and the {@link DesignSystemNode} share one look.
  */
-import { useEffect, useMemo } from 'react'
-import { ImageOff, Loader2 } from 'lucide-react'
-import { Trans, useLingui } from '@lingui/react/macro'
-import type { NodeOp } from '@/dag/graph-spec'
-import type { DagNodeState } from '@/store/types'
-import { bytesToBlob } from '@/lib/image'
-import { ImageZoom } from './ImageZoom'
+import { useEffect, useMemo } from "react";
+import { ImageOff, Loader2 } from "lucide-react";
+import { Trans, useLingui } from "@lingui/react/macro";
+import type { NodeOp } from "@/dag/graph-spec";
+import type { DagNodeState } from "@/store/types";
+import { bytesToBlob } from "@/lib/image";
+import { ImageZoom } from "./ImageZoom";
 
 /** The op badge — explicit per op so Lingui extracts each static id. */
 export function OpBadge({ op }: { readonly op: NodeOp }) {
   switch (op) {
-    case 'generate-image':
-      return <Trans id="dag.op_design_system">Design system</Trans>
-    case 'edit-image':
-      return <Trans id="dag.op_mockup">Mockup</Trans>
-    case 'deconstruct':
-      return <Trans id="dag.op_board">Asset board</Trans>
-    case 'cutout':
-      return <Trans id="dag.op_cutout">Slices</Trans>
+    case "generate-image":
+      return <Trans id="dag.op_design_system">Design system</Trans>;
+    case "edit-image":
+      return <Trans id="dag.op_mockup">Mockup</Trans>;
+    case "deconstruct":
+      return <Trans id="dag.op_board">Asset board</Trans>;
+    case "cutout":
+      return <Trans id="dag.op_cutout">Slices</Trans>;
     default:
-      return <Trans id="dag.op_name">Naming</Trans>
+      return <Trans id="dag.op_name">Naming</Trans>;
   }
 }
 
 /** An object URL for image-kind output bytes, created + revoked as they change. */
 function useOutputImageUrl(state: DagNodeState | undefined): string | null {
   const bytes =
-    state?.status === 'done' && state.output?.kind === 'image'
+    state?.status === "done" && state.output?.kind === "image"
       ? state.output.bytes
-      : null
+      : null;
   const url = useMemo(() => {
-    if (!bytes) return null
-    return URL.createObjectURL(bytesToBlob(bytes, 'image/png'))
-  }, [bytes])
+    if (!bytes) return null;
+    return URL.createObjectURL(bytesToBlob(bytes, "image/png"));
+  }, [bytes]);
   useEffect(() => {
-    if (!url) return
-    return () => URL.revokeObjectURL(url)
-  }, [url])
-  return url
+    if (!url) return;
+    return () => URL.revokeObjectURL(url);
+  }, [url]);
+  return url;
 }
 
 /** The state-driven body: image thumbnail · counts · spinner · error · blocked. */
-export function DagNodePreview({ state }: { readonly state: DagNodeState | undefined }) {
-  const { t } = useLingui()
-  const url = useOutputImageUrl(state)
-  const status = state?.status ?? 'idle'
+export function DagNodePreview({
+  state,
+}: {
+  readonly state: DagNodeState | undefined;
+}) {
+  const { t } = useLingui();
+  const url = useOutputImageUrl(state);
+  const status = state?.status ?? "idle";
 
   return (
     <div className="flex h-40 items-center justify-center overflow-hidden rounded-lg border border-border/60 bg-muted/30 p-2 text-center text-xs text-muted-foreground">
       {url ? (
         <ImageZoom
           src={url}
-          label={t({ id: 'dag.preview_zoom', message: 'Enlarge preview' })}
+          label={t({ id: "dag.preview_zoom", message: "Enlarge preview" })}
         />
-      ) : status === 'running' ? (
+      ) : status === "running" ? (
         <span className="flex flex-col items-center gap-2">
           <Loader2 className="size-5 animate-spin" />
           <Trans id="dag.running">Running…</Trans>
         </span>
-      ) : status === 'error' ? (
+      ) : status === "error" ? (
         <span className="text-destructive">{state?.error}</span>
-      ) : status === 'blocked' ? (
+      ) : status === "blocked" ? (
         <Trans id="dag.blocked">Blocked — an upstream step failed.</Trans>
-      ) : state?.status === 'done' && state.output?.kind === 'slices' ? (
-        <Trans id="dag.slices_count">{state.output.slices.length} slices cut</Trans>
-      ) : state?.status === 'done' && state.output?.kind === 'names' ? (
-        <Trans id="dag.names_count">{state.output.names.length} slices named</Trans>
+      ) : status === "cancelled" ? (
+        <Trans id="dag.cancelled">Cancelled.</Trans>
+      ) : state?.status === "done" && state.output?.kind === "slices" ? (
+        <Trans id="dag.slices_count">
+          {state.output.slices.length} slices cut
+        </Trans>
+      ) : state?.status === "done" && state.output?.kind === "names" ? (
+        <Trans id="dag.names_count">
+          {state.output.names.length} slices named
+        </Trans>
       ) : (
         <span className="flex flex-col items-center gap-2">
           <ImageOff className="size-5 opacity-70" />
@@ -80,5 +90,5 @@ export function DagNodePreview({ state }: { readonly state: DagNodeState | undef
         </span>
       )}
     </div>
-  )
+  );
 }

@@ -2,8 +2,9 @@
  * Settings UI context — lets any descendant open the Settings dialog.
  *
  * `AppShell` owns the open state (so the `⌘,` hotkey can toggle it) and exposes
- * `open()` here; the TopBar gear (`SettingsMenu`) consumes it without threading a
- * prop through the whole TopBar. Ephemeral UI state — deliberately not in Zustand.
+ * `open()` here; the Home sidebar account menu and the Integrations settings
+ * section consume it without threading a prop through the tree. Ephemeral UI
+ * state — deliberately not in Zustand.
  *
  * Kept as `.ts` (no JSX) — mirrors `services/context.ts`, building its element via
  * `createElement` so the provider + hook can co-live without a fast-refresh warning.
@@ -19,7 +20,7 @@ const SettingsUIContext = createContext<SettingsUI | null>(null)
 
 export interface SettingsUIProviderProps {
   readonly value: SettingsUI
-  readonly children: ReactNode
+  readonly children?: ReactNode
 }
 
 export function SettingsUIProvider(props: SettingsUIProviderProps) {

@@ -1,0 +1,2764 @@
+msgid ""
+msgstr ""
+"POT-Creation-Date: 2026-07-12 03:34+0800\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: @lingui/cli\n"
+"Language: ja\n"
+"Project-Id-Version: cutout\n"
+"Report-Msgid-Bugs-To: \n"
+"PO-Revision-Date: \n"
+"Last-Translator: \n"
+"Language-Team: \n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+
+#. placeholder {0}: slices.length
+#. js-lingui-explicit-id
+#: src/components/status/StatusBar.tsx
+#~ msgid "status.slice_count"
+#~ msgstr "{0, plural, other {# 枚のスライス}}"
+
+#. js-lingui-explicit-id
+#: src/components/status/StatusBar.tsx
+#~ msgid "status.state_running"
+#~ msgstr "解析中…"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/IntegrationsSection.tsx
+#~ msgid "settings.integrations_title"
+#~ msgstr "Cutout をツールと連携する"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/IntegrationsSection.tsx
+#~ msgid "settings.integrations_cta_wip"
+#~ msgstr "アカウント連携は近日公開予定です"
+
+#. js-lingui-explicit-id
+#: src/components/topbar/ThemeToggle.tsx
+#~ msgid "topbar.theme_dark_mode"
+#~ msgstr "ダークモード"
+
+#. js-lingui-explicit-id
+#: src/components/status/StatusBar.tsx
+#~ msgid "status.state_done"
+#~ msgstr "完了"
+
+#. js-lingui-explicit-id
+#: src/components/status/StatusBar.tsx
+#~ msgid "status.state_error"
+#~ msgstr "エラー"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/IntegrationsSection.tsx
+#~ msgid "settings.integrations_description"
+#~ msgstr "Figma、GitHub、Notion、Obsidian などは Connector システムを通じて連携し、Agent がソースを読み取り成果物を届けられるようになります。アカウントとコネクターホストは現在開発中です。"
+
+#. js-lingui-explicit-id
+#: src/components/status/StatusBar.tsx
+#~ msgid "status.state_idle"
+#~ msgstr "アイドル"
+
+#. js-lingui-explicit-id
+#: src/components/topbar/TopBarActions.tsx
+#~ msgid "topbar.import"
+#~ msgstr "インポート"
+
+#. js-lingui-explicit-id
+#: src/components/topbar/ThemeToggle.tsx
+#~ msgid "topbar.theme_light_mode"
+#~ msgstr "ライトモード"
+
+#. js-lingui-explicit-id
+#: src/components/topbar/ThemeToggle.tsx
+#~ msgid "topbar.theme_to_dark"
+#~ msgstr "ダークモードに切り替え"
+
+#. js-lingui-explicit-id
+#: src/components/topbar/ThemeToggle.tsx
+#~ msgid "topbar.theme_to_light"
+#~ msgstr "ライトモードに切り替え"
+
+#. js-lingui-explicit-id
+#: src/components/status/StatusBar.tsx
+#~ msgid "status.param_summary"
+#~ msgstr "しきい値 {threshold} · 面積 {minArea} · ギャップ {mergeGap} · パディング {padding}"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ModelSlot.tsx
+#~ msgid "settings.model_no_provider"
+#~ msgstr "上のエンドポイントを追加してモデルを割り当ててください。"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+#~ msgid "settings.model_chat_label"
+#~ msgstr "チャット / 理解"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ModelSlot.tsx
+#~ msgid "settings.effort_default"
+#~ msgstr "既定"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ModelSlot.tsx
+#~ msgid "settings.model_pick_endpoint"
+#~ msgstr "エンドポイント"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ModelSlot.tsx
+#~ msgid "settings.effort_high"
+#~ msgstr "高"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+#~ msgid "settings.model_image_label"
+#~ msgstr "画像生成"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ModelSlot.tsx
+#~ msgid "settings.effort_low"
+#~ msgstr "低"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ModelSlot.tsx
+#~ msgid "settings.effort_medium"
+#~ msgstr "中"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ModelSlot.tsx
+#~ msgid "settings.model_slug_placeholder"
+#~ msgstr "モデル"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ModelSlot.tsx
+#~ msgid "settings.model_endpoint_aria"
+#~ msgstr "モデルエンドポイント"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ModelSlot.tsx
+#~ msgid "settings.model_name_aria"
+#~ msgstr "モデル名"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+#~ msgid "settings.models_heading"
+#~ msgstr "モデル"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+#~ msgid "settings.models_hint"
+#~ msgstr "1つのエンドポイントで、機能ごとに異なるモデルを — プロバイダーを再追加する必要はありません。エンドポイントのモデル一覧から選択するか、直接入力してください。"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+#~ msgid "settings.model_image_hint"
+#~ msgstr "画像を生成します（例: アセットシートの再生成など）。"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+#~ msgid "settings.model_chat_hint"
+#~ msgstr "テキスト・推論・ビジョン — 1つのマルチモーダルモデル。"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ModelSlot.tsx
+#~ msgid "settings.effort_label"
+#~ msgstr "思考の強さ"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ModelSlot.tsx
+#~ msgid "settings.effort_aria"
+#~ msgstr "思考の強さ"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ModelSlot.tsx
+#~ msgid "settings.model_assignment_save"
+#~ msgstr "割り当てを保存"
+
+#. js-lingui-explicit-id
+#: src/components/library/TeamGovernancePanel.tsx
+#~ msgid "team.role_admin"
+#~ msgstr "管理者"
+
+#. js-lingui-explicit-id
+#: src/components/library/TeamGovernancePanel.tsx
+#~ msgid "team.collaboration_host_required"
+#~ msgstr "コラボレーションホストが必要です"
+
+#. js-lingui-explicit-id
+#: src/components/library/TeamGovernancePanel.tsx
+#~ msgid "team.create_readonly_share"
+#~ msgstr "読み取り専用共有を作成"
+
+#. js-lingui-explicit-id
+#: src/components/library/TeamGovernancePanel.tsx
+#~ msgid "team.role_select_aria"
+#~ msgstr "現在のチームロール"
+
+#. js-lingui-explicit-id
+#: src/components/library/TeamGovernancePanel.tsx
+#~ msgid "team.role_editor"
+#~ msgstr "編集者"
+
+#. js-lingui-explicit-id
+#: src/components/library/TeamGovernancePanel.tsx
+#~ msgid "team.local_review_host"
+#~ msgstr "ローカルレビューホスト"
+
+#. js-lingui-explicit-id
+#: src/components/library/TeamGovernancePanel.tsx
+#~ msgid "team.remote_sync_disabled"
+#~ msgstr "リモート同期は無効です"
+
+#. js-lingui-explicit-id
+#: src/components/library/TeamGovernancePanel.tsx
+#~ msgid "team.role_reviewer"
+#~ msgstr "レビュアー"
+
+#. js-lingui-explicit-id
+#: src/components/library/TeamGovernancePanel.tsx
+#~ msgid "team.label"
+#~ msgstr "チーム"
+
+#. js-lingui-explicit-id
+#: src/components/library/TeamGovernancePanel.tsx
+#~ msgid "team.governance_section_aria"
+#~ msgstr "チームガバナンス"
+
+#. js-lingui-explicit-id
+#: src/components/library/TeamGovernancePanel.tsx
+#~ msgid "team.role_viewer"
+#~ msgstr "閲覧者"
+
+#. js-lingui-explicit-id
+#. placeholder {0}: project.name
+#: src/components/home/ProjectHome.tsx
+msgid "home.archive_project_description"
+msgstr "「{0}」はアクティブなプロジェクトから移動します。アーカイブから復元できます。"
+
+#. js-lingui-explicit-id
+#. placeholder {0}: keys.length
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.toast_assets_updated"
+msgstr "{0, plural, other {# 件のアセットを更新しました}}"
+
+#. js-lingui-explicit-id
+#. placeholder {0}: coverage.missing.length
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.capability_gaps_count"
+msgstr "{0, plural, other {# 件の機能ギャップ}}"
+
+#. js-lingui-explicit-id
+#. placeholder {0}: plan.files.length
+#. placeholder {1}: plan.conflicts.length
+#: src/components/library/RegistryInstallPanel.tsx
+msgid "registry_install.plan_summary"
+msgstr "{0, plural, other {# 件のファイル}} · {1, plural, other {# 件の競合}}"
+
+#. js-lingui-explicit-id
+#. placeholder {0}: consumption.length
+#: src/components/library/KitLibraryInspector.tsx
+msgid "kit_library.project_reference_count"
+msgstr "{0, plural, other {# 件のプロジェクト参照}}"
+
+#. js-lingui-explicit-id
+#. placeholder {0}: slices.length
+#: src/components/source/SourceMeta.tsx
+msgid "source.meta_region_count"
+msgstr "{0, plural, other {# リージョン}}"
+
+#. js-lingui-explicit-id
+#. placeholder {0}: selected.size
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.selected_count"
+msgstr "{0, plural, other {# 件選択中}}"
+
+#. js-lingui-explicit-id
+#. placeholder {0}: receipt.status
+#. placeholder {1}: receipt.fileHashes.length
+#: src/components/library/RegistryInstallPanel.tsx
+msgid "registry_install.receipt_summary"
+msgstr "{0} · {1, plural, other {# 件の検証済みファイル}}"
+
+#. js-lingui-explicit-id
+#. placeholder {0}: item.name
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.toast_added_to_project"
+msgstr "{0} をプロジェクトに追加しました"
+
+#. js-lingui-explicit-id
+#. placeholder {0}: confirmed.size
+#. placeholder {1}: candidates.length - confirmed.size
+#: src/components/library/KitLibraryInspector.tsx
+msgid "kit_library.confirmed_rejected_summary"
+msgstr "承認 {0} 件 · 却下 {1} 件"
+
+#. js-lingui-explicit-id
+#. placeholder {0}: preview.name
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.kit_editor_title"
+msgstr "{0} キットエディター"
+
+#. js-lingui-explicit-id
+#. placeholder {0}: item.name
+#: src/components/library/KitLibraryInspector.tsx
+msgid "kit_library.editor_aria"
+msgstr "{0} キットエディター"
+
+#. js-lingui-explicit-id
+#. placeholder {0}: endpointModels.data.length
+#: src/components/settings/ModelSlot.tsx
+msgid "settings.models_discovered_from_endpoint"
+msgstr "エンドポイントから {0} 件のモデルを検出しました"
+
+#. js-lingui-explicit-id
+#. placeholder {0}: coverage.covered.length
+#. placeholder {1}: coverage.total
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.task_dimensions_covered"
+msgstr "{1} 件中 {0} 件のタスク領域をカバー"
+
+#. js-lingui-explicit-id
+#. placeholder {0}: state.output.slices.length
+#: src/components/canvas/nodes/dag-node-common.tsx
+msgid "dag.slices_count"
+msgstr "{0} 枚のスライスを切り出しました"
+
+#. js-lingui-explicit-id
+#. placeholder {0}: state.output.names.length
+#: src/components/canvas/nodes/dag-node-common.tsx
+msgid "dag.names_count"
+msgstr "{0} 枚のスライスに名前を付けました"
+
+#. js-lingui-explicit-id
+#: src/components/preview/PreviewMeta.tsx
+msgid "preview.region_count"
+msgstr "{count, plural, other {# 件の領域}}"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.exact_duplicates_count"
+msgstr "{duplicateCount, plural, other {完全一致の重複 #件}}"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ModelSlot.tsx
+msgid "settings.evidence_disclaimer"
+msgstr "{evidence}。エンドポイントでの検出は利用可能性を示すものであり、タスク品質やモダリティ対応を保証するものではありません。"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ModelSlot.tsx
+msgid "settings.model_slot_fallback_aria"
+msgstr "{label} のフォールバックモデル"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ModelSlot.tsx
+msgid "settings.model_slot_model_aria"
+msgstr "{label} のモデル"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ModelSlot.tsx
+msgid "settings.model_slot_provider_aria"
+msgstr "{label} のプロバイダー"
+
+#. js-lingui-explicit-id
+#: src/components/library/TeamGovernancePanel.tsx
+msgid "team.share_review_pending_aria"
+msgstr "{label}、{pending} 件保留中"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.passed_count"
+msgstr "{passed, plural, other {合格 #件}}"
+
+#. js-lingui-explicit-id
+#: src/components/library/TeamGovernancePanel.tsx
+msgid "team.pending_reviews_count"
+msgstr "{pending} 件のレビュー待ち"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.lineage_results_count"
+msgstr "{relatedCount, plural, other {系統結果 #件}}"
+
+#. js-lingui-explicit-id
+#: src/hooks/useExport.ts
+msgid "export.toast_success"
+msgstr "{savedCount, plural, other {# 枚のスライスをエクスポートしました}}"
+
+#. js-lingui-explicit-id
+#: src/components/slices/SliceGridEmpty.tsx
+msgid "slices.empty_lower_threshold"
+msgstr "しきい値を −10"
+
+#. js-lingui-explicit-id
+#: src/components/slices/SliceGridEmpty.tsx
+msgid "slices.empty_halve_min_area"
+msgstr "最小面積を −50%"
+
+#. js-lingui-explicit-id
+#: src/components/library/TeamGovernancePanel.tsx
+msgid "team.host_required_description"
+msgstr "レビューまたは読み取り専用共有の作成にはデスクトップコラボレーションホストが必要です。"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/IntentPanel.tsx
+msgid "intent.questions_title"
+msgstr "まず簡単な確認事項です"
+
+#. js-lingui-explicit-id
+#: src/components/preview/PreviewToolbar.tsx
+msgid "preview.zoom_actual"
+msgstr "実寸表示（1:1）"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderDirectory.tsx
+msgid "settings.adapter_available"
+msgstr "アダプター利用可能"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderForm.tsx
+msgid "settings.add"
+msgstr "追加"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.empty_desc"
+msgstr "AI機能を使い始めるには、プロバイダーを追加してAPIキーを入力してください。"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.add_provider"
+msgstr "プロバイダーを追加"
+
+#. js-lingui-explicit-id
+#: src/components/library/ReviewBranchEditor.tsx
+msgid "review_branch.comment_placeholder"
+msgstr "リビジョンに紐づくコメントを追加"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.add_tag_placeholder"
+msgstr "タグを追加"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/MockupNode.tsx
+msgid "mockup.add_to_library"
+msgstr "ライブラリに追加"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/SlicesNode.tsx
+msgid "slices.add_to_library"
+msgstr "ライブラリに追加"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/SlicesNode.tsx
+msgid "slices.toast_added_to_library"
+msgstr "{added} をライブラリに追加しました"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/MockupNode.tsx
+msgid "mockup.toast_added_to_library"
+msgstr "ライブラリに追加しました"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.advanced"
+msgstr "詳細設定"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.advanced_model_bindings_aria"
+msgstr "詳細なモデル割り当て"
+
+#. js-lingui-explicit-id
+#: src/components/settings/SettingsSidebar.tsx
+msgid "settings.section_ai"
+msgstr "AI"
+
+#. js-lingui-explicit-id
+#: src/components/settings/AboutFooter.tsx
+msgid "settings.about_description"
+msgstr "AIネイティブなUI/UX · Tauri 2 · React 19 — ローカル・オフラインファースト。"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderDirectory.tsx
+msgid "settings.provider_category_all"
+msgstr "すべて"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.media_filter_all"
+msgstr "すべて"
+
+#. js-lingui-explicit-id
+#: src/components/inspector/ExportBar.tsx
+msgid "inspector.export_all_button"
+msgstr "すべて（{total}）"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.all_collections"
+msgstr "すべてのコレクション"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.all_dimensions_covered"
+msgstr "設定済みのすべてのタスク領域がアダプターでカバーされています。モデル単位のエビデンスは選択時に確認されます。"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.all_projects"
+msgstr "すべてのプロジェクト"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.all_quality"
+msgstr "すべての品質"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.analyze_video"
+msgstr "動画を解析"
+
+#. js-lingui-explicit-id
+#: src/components/source/SourceMeta.tsx
+msgid "source.meta_analyzing"
+msgstr "解析中…"
+
+#. js-lingui-explicit-id
+#: src/components/preview/ProcessingOverlay.tsx
+msgid "preview.analyzing"
+msgstr "解析中…"
+
+#. js-lingui-explicit-id
+#: src/components/settings/VectorizerPanel.tsx
+msgid "vectorizer.api_id_saved"
+msgstr "API IDを保存しました"
+
+#. js-lingui-explicit-id
+#: src/components/settings/KeyField.tsx
+msgid "settings.key_label"
+msgstr "APIキー"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.keychain_trust"
+msgstr "APIキーはOSのキーチェーンにのみ保存され、ネイティブ層で注入されます — Webページには一切含まれません。"
+
+#. js-lingui-explicit-id
+#: src/components/settings/VectorizerPanel.tsx
+msgid "vectorizer.mode_label"
+msgstr "APIモード"
+
+#. js-lingui-explicit-id
+#: src/components/settings/VectorizerPanel.tsx
+msgid "vectorizer.secret_label"
+msgstr "APIシークレット"
+
+#. js-lingui-explicit-id
+#: src/components/settings/VectorizerPanel.tsx
+msgid "vectorizer.secret_removed"
+msgstr "APIシークレットを削除しました"
+
+#. js-lingui-explicit-id
+#: src/components/settings/VectorizerPanel.tsx
+msgid "vectorizer.secret_saved"
+msgstr "APIシークレットを保存しました"
+
+#. js-lingui-explicit-id
+#: src/components/settings/SettingsDialog.tsx
+msgid "settings.dialog_a11y_desc"
+msgstr "アプリケーション設定とAIプロバイダー。"
+
+#. js-lingui-explicit-id
+#: src/components/library/RegistryInstallPanel.tsx
+msgid "registry_install.approve_and_install"
+msgstr "承認してインストール"
+
+#. js-lingui-explicit-id
+#: src/components/library/ReviewBranchEditor.tsx
+msgid "review_branch.approve_revision"
+msgstr "リビジョンを承認"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.empty_description"
+msgstr "承認済みのプロジェクト成果物とインポートされたパッケージは、不変のバージョンと来歴情報とともにここに表示されます。"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.archive"
+msgstr "アーカイブ"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.archive_project_title"
+msgstr "プロジェクトをアーカイブしますか？"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/ArchivedSection.tsx
+#: src/components/settings/SettingsSidebar.tsx
+msgid "settings.section_archived"
+msgstr "アーカイブ済み"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.archived"
+msgstr "アーカイブ済み"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.archived_projects"
+msgstr "アーカイブ済みプロジェクト"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/ArchivedSection.tsx
+msgid "settings.archived_description"
+msgstr "アーカイブされたプロジェクトは、復元または削除するまでこのデバイスに残ります。"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.archived_empty_description"
+msgstr "アーカイブした作業はここに表示されます。"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.asset_singular"
+msgstr "アセット"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/BoardNode.tsx
+msgid "pipeline.stage_board"
+msgstr "アセットボード"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/dag-node-common.tsx
+msgid "dag.op_board"
+msgstr "アセットボード"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/BoardNode.tsx
+msgid "pipeline.node_board_aria"
+msgstr "アセットボードステージ"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.capabilities_aria"
+msgstr "アセットの機能"
+
+#. js-lingui-explicit-id
+#: src/components/topbar/LibraryMenu.tsx
+msgid "library.menu_label"
+msgstr "アセットライブラリ"
+
+#. js-lingui-explicit-id
+#: src/components/library/LibraryDrawer.tsx
+msgid "library.title"
+msgstr "アセットライブラリ"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.asset_plural"
+msgstr "アセット"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/IntentPanel.tsx
+msgid "intent.assumptions"
+msgstr "前提条件"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.attach_reference"
+msgstr "参考画像を添付"
+
+#. js-lingui-explicit-id
+#: src/components/library/RegistryInstallPanel.tsx
+msgid "registry_install.authorize_workspace"
+msgstr "ワークスペースを認可"
+
+#. js-lingui-explicit-id
+#: src/components/library/RegistryInstallPanel.tsx
+msgid "registry_install.authorized_workspace_fallback"
+msgstr "認可済みワークスペース"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ModelSlot.tsx
+msgid "settings.model_slot_auto"
+msgstr "自動"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.policy_auto_compatible"
+msgstr "自動互換"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.model_routing_description"
+msgstr "自動ルーティングでは、各タスクを必要な機能を備えた利用可能なアダプターにのみ振り分けます。"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ModelSlot.tsx
+msgid "settings.auto_will_choose"
+msgstr "自動選択では接続済みのプロバイダーから選ばれます"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.nav_back"
+msgstr "戻る"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/PlannedCanvas.tsx
+msgid "dag.back_to_linear"
+msgstr "リニアチェーンに戻る"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderForm.tsx
+msgid "settings.provider_baseurl_label"
+msgstr "ベースURL"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/dag-node-common.tsx
+msgid "dag.blocked"
+msgstr "ブロック中 — 前段のステップが失敗しました。"
+
+#. js-lingui-explicit-id
+#: src/components/library/KitLibraryInspector.tsx
+msgid "kit_library.brand_book_confirmation_aria"
+msgstr "ブランドブックの確認"
+
+#. js-lingui-explicit-id
+#: src/components/library/KitLibraryInspector.tsx
+msgid "kit_library.brand_book_confirmation_heading"
+msgstr "ブランドブックの確認"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.preset_brand"
+msgstr "ブランドキット"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.tab_brand_kits"
+msgstr "ブランドキット"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/BriefNode.tsx
+msgid "pipeline.stage_brief"
+msgstr "ブリーフ"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/BriefNode.tsx
+msgid "pipeline.node_brief_aria"
+msgstr "ブリーフステージ"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.bulk_toolbar_aria"
+msgstr "アセットの一括操作"
+
+#. js-lingui-explicit-id
+#: src/components/inspector/SliceDimensions.tsx
+msgid "inspector.dim_bytes"
+msgstr "バイト"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderForm.tsx
+#: src/components/settings/ProviderRow.tsx
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.cancel"
+msgstr "キャンセル"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+#: src/components/settings/sections/ArchivedSection.tsx
+msgid "home.cancel"
+msgstr "キャンセル"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/dag-node-common.tsx
+msgid "dag.cancelled"
+msgstr "キャンセルしました。"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ModelSlot.tsx
+msgid "settings.capability_evidence_unavailable"
+msgstr "機能エビデンスがありません"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderDirectory.tsx
+msgid "settings.catalog_availability_disclaimer"
+msgstr "カタログに掲載されていることは、アダプターがインストール済みであること、認証が有効であること、またはすべてのモデル機能に対応していることを意味しません。"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderDirectory.tsx
+msgid "settings.catalog_only"
+msgstr "カタログのみ"
+
+#. js-lingui-explicit-id
+#: src/components/help/HelpMenu.tsx
+msgid "help.change_language"
+msgstr "言語を変更..."
+
+#. js-lingui-explicit-id
+#: src/components/home/SidebarAccount.tsx
+msgid "home.change_theme"
+msgstr "テーマを変更"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderDirectory.tsx
+msgid "settings.provider_category_china"
+msgstr "中国"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.choose_catalog_definition"
+msgstr "カタログ定義を選択してください。接続後も自動ルーティングが既定のままとなります。"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.rename_project_description"
+msgstr "このローカルプロジェクトにわかりやすい名前を付けてください。"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.clear_selection"
+msgstr "クリア"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.clear_search"
+msgstr "検索をクリア"
+
+#. js-lingui-explicit-id
+#: src/hooks/useCopyPng.ts
+msgid "copy_png.error_unsupported"
+msgstr "ここでは画像のクリップボードコピーはサポートされていません。"
+
+#. js-lingui-explicit-id
+#: src/components/ui/dialog.tsx
+#: src/components/ui/sheet.tsx
+msgid "common.close"
+msgstr "閉じる"
+
+#. js-lingui-explicit-id
+#: src/components/library/KitLibraryInspector.tsx
+msgid "kit_library.close_editor_aria"
+msgstr "キットエディターを閉じる"
+
+#. js-lingui-explicit-id
+#: src/components/library/ReviewBranchEditor.tsx
+msgid "review_branch.comment_action"
+msgstr "コメント"
+
+#. js-lingui-explicit-id
+#: src/components/library/KitLibraryInspector.tsx
+msgid "kit_library.density_compact"
+msgstr "コンパクト"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.tab_components"
+msgstr "コンポーネント"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/BoardNode.tsx
+msgid "board.composing"
+msgstr "モックアップを合成中…"
+
+#. js-lingui-explicit-id
+#: src/components/library/LibraryDrawer.tsx
+msgid "library.toast_compose_failed"
+msgstr "合成に失敗しました"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/BoardNode.tsx
+msgid "board.toast_compose_failed"
+msgstr "合成に失敗しました"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/IntentPanel.tsx
+msgid "intent.confidence"
+msgstr "確信度"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/SlicesNode.tsx
+msgid "slices.name_no_model_cta"
+msgstr "スライスに名前を付けるにはチャットモデルを設定してください"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.discover_references_title"
+msgstr "この操作を有効にするには、認可済みの参照検出プロバイダーホストを設定してください。"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.analyze_video_title"
+msgstr "フレームおよびショット解析を有効にするには、認可済みの動画実行ホストを設定してください。"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/BoardNode.tsx
+#: src/components/canvas/nodes/BriefNode.tsx
+#: src/components/canvas/nodes/MockupNode.tsx
+msgid "generate.no_model_cta"
+msgstr "設定で画像モデルを設定してください"
+
+#. js-lingui-explicit-id
+#: src/components/library/LibraryDrawer.tsx
+msgid "library.no_model"
+msgstr "生成するには設定で画像モデルを設定してください。"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderRow.tsx
+#: src/components/settings/VectorizerPanel.tsx
+msgid "settings.status_configured"
+msgstr "設定済み"
+
+#. js-lingui-explicit-id
+#: src/components/settings/KeyField.tsx
+#: src/components/settings/VectorizerPanel.tsx
+msgid "settings.key_placeholder_replace"
+msgstr "設定済み — 入力すると置き換わります"
+
+#. js-lingui-explicit-id
+#: src/components/library/KitLibraryInspector.tsx
+msgid "kit_library.audit_conflicts"
+msgstr "競合"
+
+#. js-lingui-explicit-id
+#. placeholder {0}: definition.label
+#: src/components/settings/ProviderDirectory.tsx
+msgid "settings.connect_named_provider"
+msgstr "{0} を接続"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.connect_a_provider"
+msgstr "プロバイダーを接続"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.connect_provider_with_capabilities"
+msgstr "これらの機能を備えたプロバイダーを接続"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.connect_ai_capabilities"
+msgstr "AI機能を接続"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.connect_ai_capabilities_description"
+msgstr "まず1つのプロバイダーを接続してください。接続後、Cutoutはテキスト、ビジョン、音声、コーディング、画像の各タスクを自動的にルーティングします。"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.connect_provider"
+msgstr "プロバイダーを接続"
+
+#. js-lingui-explicit-id
+#: src/components/library/KitLibraryInspector.tsx
+msgid "kit_library.consumption_heading"
+msgstr "利用状況"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.meta_content_hash"
+msgstr "コンテンツハッシュ"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.continue_heading"
+msgstr "作業を再開"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.dimension_text_description"
+msgstr "会話、プランニング、ドキュメントの理解。"
+
+#. js-lingui-explicit-id
+#: src/hooks/useCopyPng.ts
+msgid "copy_png.toast_copied"
+msgstr "{label} をコピーしました"
+
+#. js-lingui-explicit-id
+#: src/components/library/KitLibraryInspector.tsx
+msgid "kit_library.copy_manifest"
+msgstr "マニフェストをコピー"
+
+#. js-lingui-explicit-id
+#: src/components/slices/SliceCardActions.tsx
+msgid "slices.action_copy_png"
+msgstr "PNGをコピー"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.toast_add_failed"
+msgstr "ライブラリ項目を追加できませんでした"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/MockupNode.tsx
+#: src/components/canvas/nodes/SlicesNode.tsx
+#: src/components/library/LibraryDrawer.tsx
+msgid "library.toast_add_failed"
+msgstr "ライブラリに追加できませんでした"
+
+#. js-lingui-explicit-id
+#: src/hooks/useCopyPng.ts
+msgid "copy_png.toast_failed"
+msgstr "画像をコピーできませんでした"
+
+#. js-lingui-explicit-id
+#: src/hooks/queries/pipeline.ts
+#: src/hooks/useImageImport.ts
+msgid "import.toast_load_failed"
+msgstr "画像を読み込めませんでした"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.load_failed_title"
+msgstr "プロジェクトを読み込めませんでした"
+
+#. js-lingui-explicit-id
+#: src/components/library/LibraryDrawer.tsx
+msgid "library.toast_remove_failed"
+msgstr "アセットを削除できませんでした"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.toast_update_failed"
+msgstr "アセットを更新できませんでした"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.preset_brand_brief"
+msgstr "ロゴ、カラー、書体、アセットを含む完全なブランドキットを作成："
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.preset_poster_brief"
+msgstr "ポスター／キービジュアルを作成："
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.create_from_brief"
+msgstr "ブリーフから作成"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.dimension_tts_description"
+msgstr "音声を生成します。"
+
+#. js-lingui-explicit-id
+#: src/components/library/TeamGovernancePanel.tsx
+msgid "team.current_project_revision"
+msgstr "現在のプロジェクトリビジョン"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderDirectory.tsx
+msgid "settings.provider_category_custom"
+msgstr "カスタム"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/edges/TransitionEdge.tsx
+msgid "pipeline.transition_cutout"
+msgstr "切り抜き"
+
+#. js-lingui-explicit-id
+#: src/components/source/ParameterControls.tsx
+msgid "source.params_aria"
+msgstr "切り抜きパラメーター"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/GeneralSection.tsx
+msgid "settings.reset_params_label"
+msgstr "切り抜きパラメーター"
+
+#. js-lingui-explicit-id
+#: src/components/home/SidebarAccount.tsx
+msgid "home.theme_dark"
+msgstr "ダーク"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/edges/TransitionEdge.tsx
+msgid "pipeline.transition_deconstruct"
+msgstr "分解"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/MockupNode.tsx
+msgid "mockup.deconstruct"
+msgstr "ボードに分解"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/MockupNode.tsx
+msgid "mockup.deconstructing"
+msgstr "分解中…"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/MockupNode.tsx
+msgid "mockup.toast_deconstruct_failed"
+msgstr "分解に失敗しました"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderForm.tsx
+msgid "settings.provider_model_label"
+msgstr "既定のモデル"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+#: src/components/settings/sections/ArchivedSection.tsx
+msgid "home.delete"
+msgstr "削除"
+
+#. js-lingui-explicit-id
+#. placeholder {0}: project.name
+#: src/components/settings/sections/ArchivedSection.tsx
+msgid "settings.delete_archived_named"
+msgstr "{0} を削除"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.delete_permanently"
+msgstr "完全に削除"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+#: src/components/settings/sections/ArchivedSection.tsx
+msgid "home.delete_permanently_title"
+msgstr "完全に削除しますか？"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/BriefNode.tsx
+msgid "brief.placeholder"
+msgstr "プロダクトとそのメイン画面を説明してください — 誰のためのものか、何を表示するか…"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.brief_placeholder"
+msgstr "デザインしたい内容を説明してください..."
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.preset_desktop_brief"
+msgstr "デスクトップアプリのワークスペースを設計："
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.preset_mobile_brief"
+msgstr "モバイルアプリUIを設計："
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.preset_web_brief"
+msgstr "レスポンシブなWeb体験を設計："
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.preset_miniapp_brief"
+msgstr "WeChatミニプログラムのフローを設計："
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/dag-node-common.tsx
+msgid "dag.op_design_system"
+msgstr "デザインシステム"
+
+#. js-lingui-explicit-id
+#: src/components/library/KitLibraryInspector.tsx
+msgid "kit_library.design_system_files_aria"
+msgstr "デザインシステムキットのファイル"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.tab_design_systems"
+msgstr "デザインシステム"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/DesignSystemNode.tsx
+msgid "dag.node_design_system_aria"
+msgstr "デザインシステムノード"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.preset_desktop"
+msgstr "デスクトップ"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/IntentPanel.tsx
+msgid "intent.dimensions"
+msgstr "寸法"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.discover_references"
+msgstr "参照を検出"
+
+#. js-lingui-explicit-id
+#: src/components/help/HelpMenu.tsx
+msgid "help.documentation"
+msgstr "ドキュメント"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/edges/TransitionEdge.tsx
+msgid "pipeline.status_done"
+msgstr "完了"
+
+#. js-lingui-explicit-id
+#: src/components/library/KitLibraryInspector.tsx
+msgid "kit_library.download"
+msgstr "ダウンロード"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.status_draft"
+msgstr "下書き"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.drafts"
+msgstr "下書き"
+
+#. js-lingui-explicit-id
+#: src/components/source/DropZone.tsx
+msgid "source.dropzone_title"
+msgstr "アセットシートをドロップ"
+
+#. js-lingui-explicit-id
+#: src/components/slices/SliceGridEmpty.tsx
+msgid "slices.empty_no_source"
+msgstr "左側のパネルにアセットシートをドロップして切り抜きを開始してください。"
+
+#. js-lingui-explicit-id
+#: src/components/source/DropZone.tsx
+msgid "source.dropzone_replace"
+msgstr "ドロップまたはクリックして置き換え"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderRow.tsx
+msgid "settings.edit_action"
+msgstr "編集"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.dimension_image_edit_description"
+msgstr "指定した1枚以上の画像を編集します。"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.dialog_edit_title"
+msgstr "プロバイダーを編集"
+
+#. js-lingui-explicit-id
+#. placeholder {0}: formatProjectDate(project.updatedAt, locale)
+#: src/components/home/ProjectHome.tsx
+msgid "home.edited_date"
+msgstr "{0} に編集"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.status_empty"
+msgstr "空"
+
+#. js-lingui-explicit-id
+#: src/components/library/LibraryDrawer.tsx
+msgid "library.empty"
+msgstr "まだ何もありません — スライスや生成した画像をライブラリに追加するか、独自の画像をインポートしてください。"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/MockupNode.tsx
+msgid "mockup.preview_zoom"
+msgstr "モックアッププレビューを拡大"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/dag-node-common.tsx
+msgid "dag.preview_zoom"
+msgstr "プレビューを拡大"
+
+#. js-lingui-explicit-id
+#: src/components/settings/KeyField.tsx
+msgid "settings.key_placeholder_empty"
+msgstr "APIキーを入力"
+
+#. js-lingui-explicit-id
+#: src/components/settings/VectorizerPanel.tsx
+msgid "vectorizer.secret_placeholder"
+msgstr "APIシークレットを入力"
+
+#. js-lingui-explicit-id
+#: src/components/library/KitLibraryInspector.tsx
+msgid "kit_library.error_expected_candidates"
+msgstr "認可済みブランドブックパーサーから候補配列を取得できませんでした。"
+
+#. js-lingui-explicit-id
+#: src/components/topbar/TopBarActions.tsx
+msgid "topbar.export_all_button"
+msgstr "すべてエクスポート"
+
+#. js-lingui-explicit-id
+#: src/components/topbar/TopBarActions.tsx
+msgid "topbar.export_all_label"
+msgstr "すべてのスライスをエクスポート"
+
+#. js-lingui-explicit-id
+#: src/components/inspector/ExportBar.tsx
+msgid "inspector.export_all_tooltip"
+msgstr "すべてのスライスをエクスポート"
+
+#. js-lingui-explicit-id
+#: src/hooks/useExport.ts
+msgid "export.toast_failed"
+msgstr "エクスポートに失敗しました: {reason}"
+
+#. js-lingui-explicit-id
+#: src/components/topbar/TopBarActions.tsx
+msgid "export.menu_label"
+msgstr "エクスポート形式"
+
+#. js-lingui-explicit-id
+#: src/components/slices/SliceCardActions.tsx
+msgid "slices.action_export"
+msgstr "スライスをエクスポート"
+
+#. js-lingui-explicit-id
+#: src/components/inspector/ExportBar.tsx
+msgid "inspector.export_slice"
+msgstr "スライスをエクスポート"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.export_verified_asset"
+msgstr "検証済みアセットをエクスポート"
+
+#. js-lingui-explicit-id
+#: src/hooks/useExport.ts
+msgid "export.toast_partial"
+msgstr "{total} 件中 {savedCount} 件をエクスポートしました"
+
+#. js-lingui-explicit-id
+#: src/components/library/KitLibraryInspector.tsx
+msgid "kit_library.density_extended"
+msgstr "拡張"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.load_failed"
+msgstr "プロバイダーの読み込みに失敗しました"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.favorite_action"
+msgstr "お気に入り"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.collection_filter_aria"
+msgstr "コレクションで絞り込む"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.quality_filter_aria"
+msgstr "品質で絞り込む"
+
+#. js-lingui-explicit-id
+#: src/components/library/KitLibraryInspector.tsx
+msgid "kit_library.first_available_version"
+msgstr "最初の利用可能バージョン"
+
+#. js-lingui-explicit-id
+#: src/components/preview/PreviewToolbar.tsx
+msgid "preview.zoom_fit"
+msgstr "ペインに合わせる"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.policy_follow_updates"
+msgstr "更新に追従"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.reference_following"
+msgstr "フォロー中"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.nav_forward"
+msgstr "進む"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderDirectory.tsx
+msgid "settings.provider_category_gateway"
+msgstr "ゲートウェイ"
+
+#. js-lingui-explicit-id
+#: src/components/settings/SettingsSidebar.tsx
+msgid "settings.section_general"
+msgstr "一般"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/edges/TransitionEdge.tsx
+msgid "pipeline.transition_generate"
+msgstr "生成"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/MockupNode.tsx
+msgid "mockup.empty"
+msgstr "ブリーフから生成するか、スクリーンショットをインポートしてください。"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/BriefNode.tsx
+msgid "brief.generate"
+msgstr "モックアップを生成"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.dimension_image_generation_description"
+msgstr "新しいビジュアル素材を生成します。"
+
+#. js-lingui-explicit-id
+#: src/components/library/LibraryDrawer.tsx
+msgid "library.compose"
+msgstr "プロトタイプを生成"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/MockupNode.tsx
+msgid "mockup.generating"
+msgstr "モックアップを生成中…"
+
+#. js-lingui-explicit-id
+#: src/components/library/LibraryDrawer.tsx
+msgid "library.composing"
+msgstr "生成中…"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/BriefNode.tsx
+msgid "brief.generating"
+msgstr "生成中…"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/BriefNode.tsx
+#: src/components/canvas/nodes/MockupNode.tsx
+msgid "generate.toast_failed"
+msgstr "生成に失敗しました"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderDirectory.tsx
+msgid "settings.provider_category_global"
+msgstr "グローバル"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.section_aria"
+msgstr "グローバルライブラリ"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/IntentPanel.tsx
+msgid "intent.goal"
+msgstr "ゴール"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.layout_grid"
+msgstr "グリッド表示"
+
+#. js-lingui-explicit-id
+#: src/components/help/HelpMenu.tsx
+msgid "help.menu_label"
+msgstr "ヘルプとリソース"
+
+#. js-lingui-explicit-id
+#: src/components/settings/KeyField.tsx
+#: src/components/settings/VectorizerPanel.tsx
+msgid "settings.key_hide"
+msgstr "非表示"
+
+#. js-lingui-explicit-id
+#: src/components/library/TeamGovernancePanel.tsx
+msgid "team.host_required"
+msgstr "ホストが必要です"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderDirectory.tsx
+msgid "settings.provider_category_media"
+msgstr "画像・動画"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.dimension_image_edit_label"
+msgstr "画像編集"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.dimension_image_generation_label"
+msgstr "画像生成"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.dimension_image_to_webdev_label"
+msgstr "画像からWebへ"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.media_filter_images"
+msgstr "画像"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.dimension_image_to_webdev_description"
+msgstr "ビジュアルの情報からWebインターフェースを実装します。"
+
+#. js-lingui-explicit-id
+#: src/components/library/LibraryDrawer.tsx
+msgid "library.import"
+msgstr "インポート"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/MockupNode.tsx
+msgid "mockup.import_replace"
+msgstr "インポート"
+
+#. js-lingui-explicit-id
+#: src/components/library/KitLibraryInspector.tsx
+msgid "kit_library.brand_book_confirmation_hint"
+msgstr "認可済みパーサーの結果をインポートします。確認するまでキットには何も反映されません。"
+
+#. js-lingui-explicit-id
+#: src/components/library/KitLibraryInspector.tsx
+msgid "kit_library.import_candidates_aria"
+msgstr "ブランドブックの候補をインポート"
+
+#. js-lingui-explicit-id
+#: src/components/library/KitLibraryInspector.tsx
+msgid "kit_library.import_candidates"
+msgstr "候補をインポート"
+
+#. js-lingui-explicit-id
+#: src/components/source/DropZone.tsx
+msgid "source.dropzone_aria"
+msgstr "画像をインポート — ファイルをドロップするかクリックして参照"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/BriefNode.tsx
+msgid "brief.import_mockup"
+msgstr "モックアップをインポート"
+
+#. js-lingui-explicit-id
+#: src/components/inspector/SliceDimensions.tsx
+msgid "inspector.dim_index"
+msgstr "インデックス"
+
+#. js-lingui-explicit-id
+#: src/components/slices/RightRailTabs.tsx
+msgid "slices.inspector_tab"
+msgstr "インスペクター"
+
+#. js-lingui-explicit-id
+#: src/components/settings/SettingsSidebar.tsx
+msgid "settings.section_integrations"
+msgstr "連携"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.empty_fallback_label"
+msgstr "項目"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.dialog_form_desc"
+msgstr "キーはシステムキーチェーンにのみ保存され、Webページやディスクに平文で書き込まれることはありません。"
+
+#. js-lingui-explicit-id
+#: src/components/library/KitLibraryInspector.tsx
+msgid "kit_library.audit_aria"
+msgstr "キット監査"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/GeneralSection.tsx
+msgid "topbar.language_label"
+msgstr "言語"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.title"
+msgstr "ライブラリ"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.library_label"
+msgstr "ライブラリ"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.type_tablist_aria"
+msgstr "ライブラリの種類"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.meta_license"
+msgstr "ライセンス"
+
+#. js-lingui-explicit-id
+#: src/components/home/SidebarAccount.tsx
+msgid "home.theme_light"
+msgstr "ライト"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.layout_list"
+msgstr "リスト表示"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.loading_registry_installer"
+msgstr "レジストリインストーラーを読み込み中…"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderDirectory.tsx
+msgid "settings.provider_category_local"
+msgstr "ローカル"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.error_storage_unavailable"
+msgstr "ローカルライブラリのストレージを利用できません。"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.local_projects"
+msgstr "ローカルプロジェクト"
+
+#. js-lingui-explicit-id
+#: src/components/library/TeamGovernancePanel.tsx
+msgid "team.local_review"
+msgstr "ローカルレビュー"
+
+#. js-lingui-explicit-id
+#: src/components/library/TeamGovernancePanel.tsx
+msgid "team.local_review_description"
+msgstr "ローカルレビューでは、コメント、承認、読み取り専用共有がこのデバイスに保持されます。"
+
+#. js-lingui-explicit-id
+#: src/components/settings/VectorizerPanel.tsx
+msgid "vectorizer.hint"
+msgstr "ローカルSVGはオフラインで動作します。API SVGは設定されている場合にVectorizer.AIを使用します。"
+
+#. js-lingui-explicit-id
+#: src/components/home/SidebarAccount.tsx
+msgid "home.local_workspace"
+msgstr "ローカルワークスペース"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.policy_lock_version"
+msgstr "バージョンを固定"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.reference_locked"
+msgstr "ロック中"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.kit_editor_description"
+msgstr "承認済みのコンテンツアドレス指定キット投影を管理します。"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.preset_miniapp"
+msgstr "ミニプログラム"
+
+#. js-lingui-explicit-id
+#: src/components/library/KitLibraryInspector.tsx
+msgid "kit_library.audit_missing"
+msgstr "欠落"
+
+#. js-lingui-explicit-id
+#: src/components/library/KitLibraryInspector.tsx
+msgid "kit_library.missing_from_kit"
+msgstr "承認済みキットに未反映"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.preset_mobile"
+msgstr "モバイルアプリ"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/MockupNode.tsx
+msgid "pipeline.stage_mockup"
+msgstr "モックアップ"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/dag-node-common.tsx
+msgid "dag.op_mockup"
+msgstr "モックアップ"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/MockupNode.tsx
+msgid "pipeline.node_mockup_aria"
+msgstr "モックアップステージ"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ModelSlot.tsx
+msgid "settings.model_or_blank_placeholder"
+msgstr "モデル(空欄で自動)"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.model_routing"
+msgstr "モデルルーティング"
+
+#. js-lingui-explicit-id
+#. placeholder {0}: project.name
+#: src/components/home/ProjectHome.tsx
+msgid "home.more_actions_named"
+msgstr "{0} のその他の操作"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.lineage_results_heading"
+msgstr "類似系統の結果"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.move_to_collection_aria"
+msgstr "選択項目をコレクションに移動"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.move_to_collection_placeholder"
+msgstr "コレクションに移動…"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderForm.tsx
+msgid "settings.provider_name_placeholder"
+msgstr "My Anthropic"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderForm.tsx
+msgid "settings.provider_name_label"
+msgstr "名前"
+
+#. js-lingui-explicit-id
+#: src/components/inspector/SliceNameField.tsx
+msgid "inspector.name_label"
+msgstr "名前"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/SlicesNode.tsx
+msgid "slices.toast_named"
+msgstr "{count} 枚のスライスに名前を付けました"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/dag-node-common.tsx
+msgid "dag.op_name"
+msgstr "命名"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/SlicesNode.tsx
+msgid "slices.toast_name_failed"
+msgstr "命名に失敗しました"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/SlicesNode.tsx
+msgid "slices.naming"
+msgstr "スライスに名前を付けています…"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.quality_needs_attention"
+msgstr "要確認"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.new_project"
+msgstr "新規プロジェクト"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.empty_title"
+msgstr "{label}はまだありません"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderDirectory.tsx
+msgid "settings.no_authorization"
+msgstr "認証なし"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.no_drafts_yet"
+msgstr "下書きはまだありません"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.no_search_matches"
+msgstr "一致するプロジェクトがありません"
+
+#. js-lingui-explicit-id
+#: src/components/topbar/TabsMenu.tsx
+msgid "topbar.tabs_no_match"
+msgstr "一致するタブがありません"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.no_projects_yet"
+msgstr "まだプロジェクトがありません"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.empty_title"
+msgstr "まだプロバイダーが設定されていません"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderDirectory.tsx
+msgid "settings.no_providers_match_search"
+msgstr "この検索条件に一致するプロバイダーはありません。"
+
+#. js-lingui-explicit-id
+#: src/components/slices/SliceGridEmpty.tsx
+msgid "slices.empty_no_regions_title"
+msgstr "領域が見つかりません"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderRow.tsx
+#: src/components/settings/VectorizerPanel.tsx
+msgid "settings.status_unconfigured"
+msgstr "未設定"
+
+#. js-lingui-explicit-id
+#: src/components/library/KitLibraryInspector.tsx
+msgid "kit_library.not_used_by_project"
+msgstr "プロジェクトで未使用"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+#: src/components/settings/sections/ArchivedSection.tsx
+msgid "home.nothing_archived"
+msgstr "アーカイブはありません"
+
+#. js-lingui-explicit-id
+#. placeholder {0}: query.trim()
+#: src/components/home/ProjectHome.tsx
+msgid "home.no_search_matches_description"
+msgstr "「{0}」に一致するものがありません。別の名前やブリーフのキーワードで試してください。"
+
+#. js-lingui-explicit-id
+#: src/components/home/SidebarAccount.tsx
+msgid "home.notifications"
+msgstr "通知"
+
+#. js-lingui-explicit-id
+#: src/components/library/TeamGovernancePanel.tsx
+msgid "team.open_project_to_review"
+msgstr "レビューを開始するにはプロジェクトを開いてください。"
+
+#. js-lingui-explicit-id
+#: src/components/topbar/TabsMenu.tsx
+msgid "topbar.tabs_overview"
+msgstr "開いているタブ"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderForm.tsx
+msgid "settings.provider_kind_openai_compatible"
+msgstr "OpenAI互換"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ModelSlot.tsx
+msgid "settings.optional_fallback_model_placeholder"
+msgstr "フォールバックモデル(任意)"
+
+#. js-lingui-explicit-id
+#: src/components/source/DropZone.tsx
+msgid "source.dropzone_hint"
+msgstr "またはクリックして参照 · PNG、JPEG、WebP"
+
+#. js-lingui-explicit-id
+#: src/components/source/ParameterControls.tsx
+msgid "source.params_heading"
+msgstr "パラメーター"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/GeneralSection.tsx
+msgid "settings.reset_done_toast"
+msgstr "パラメーターをリセットしました"
+
+#. js-lingui-explicit-id
+#: src/components/library/KitLibraryInspector.tsx
+msgid "kit_library.parser_host_not_configured"
+msgstr "このサーフェスではパーサーホストが設定されていません。署名済みのJSON結果をインポートして候補を確認してください。"
+
+#. js-lingui-explicit-id
+#: src/components/settings/SettingsSidebar.tsx
+msgid "settings.section_personalization"
+msgstr "パーソナライズ"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.pin"
+msgstr "ピン留め"
+
+#. js-lingui-explicit-id
+#. placeholder {0}: project.name
+#: src/components/home/ProjectHome.tsx
+msgid "home.pin_named"
+msgstr "{0} をピン留め"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.pin_project"
+msgstr "プロジェクトをピン留め"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/LinearCanvas.tsx
+msgid "pipeline.canvas_aria"
+msgstr "パイプラインキャンバス"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.dimension_webdev_description"
+msgstr "Webインターフェースを計画・実装します。"
+
+#. js-lingui-explicit-id
+#. placeholder {0}: node.label
+#: src/components/canvas/nodes/DagNode.tsx
+msgid "dag.node_aria"
+msgstr "計画されたノード: {0}"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/PlannedCanvas.tsx
+msgid "dag.canvas_aria"
+msgstr "計画されたパイプラインキャンバス"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/BriefNode.tsx
+msgid "dag.toast_plan_failed"
+msgstr "計画に失敗しました"
+
+#. js-lingui-explicit-id
+#: src/components/topbar/TopBarActions.tsx
+msgid "export.menu_png_svg_api"
+msgstr "PNG + SVG · API"
+
+#. js-lingui-explicit-id
+#: src/components/topbar/TopBarActions.tsx
+msgid "export.menu_png_svg_local"
+msgstr "PNG + SVG · ローカル"
+
+#. js-lingui-explicit-id
+#: src/components/inspector/ExportBar.tsx
+#: src/components/topbar/TopBarActions.tsx
+msgid "export.menu_png"
+msgstr "PNGスライス"
+
+#. js-lingui-explicit-id
+#: src/components/inspector/SliceDimensions.tsx
+msgid "inspector.dim_position"
+msgstr "位置"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.preset_poster"
+msgstr "ポスター"
+
+#. js-lingui-explicit-id
+#: src/components/library/KitLibraryInspector.tsx
+msgid "kit_library.audit_present"
+msgstr "存在"
+
+#. js-lingui-explicit-id
+#: src/components/preview/PreviewPanel.tsx
+msgid "preview.heading"
+msgstr "プレビュー"
+
+#. js-lingui-explicit-id
+#: src/components/library/KitLibraryInspector.tsx
+msgid "kit_library.preview_heading"
+msgstr "プレビュー"
+
+#. js-lingui-explicit-id
+#: src/components/library/RegistryInstallPanel.tsx
+msgid "registry_install.preview_install"
+msgstr "インストール内容をプレビュー"
+
+#. js-lingui-explicit-id
+#: src/components/settings/VectorizerPanel.tsx
+msgid "vectorizer.mode_production"
+msgstr "本番運用"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.project_actions"
+msgstr "プロジェクトの操作"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.project_name_aria"
+msgstr "プロジェクト名"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.project_load_error"
+msgstr "プロジェクトストレージを読み込めませんでした。"
+
+#. js-lingui-explicit-id
+#: src/components/home/SidebarAccount.tsx
+msgid "home.local_workspace_hint"
+msgstr "プロジェクトはこの端末に保存されます"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.drafts_empty_description"
+msgstr "まだ成果物のないプロジェクトはここに集まります。"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.published_empty_description"
+msgstr "公開したプロジェクトは公開リンクとともにここに表示されます。この機能にはアカウントとコミュニティサービスが必要ですが、まだ構築されていません。"
+
+#. js-lingui-explicit-id
+#: src/components/library/LibraryDrawer.tsx
+msgid "library.toast_composed"
+msgstr "モックアップノードにプロトタイプを生成しました"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.provenance_and_files"
+msgstr "来歴とファイル"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ModelSlot.tsx
+msgid "settings.provider_placeholder"
+msgstr "プロバイダー"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderForm.tsx
+msgid "settings.provider_added_toast"
+msgstr "プロバイダーを追加しました"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderDirectory.tsx
+msgid "settings.provider_categories_aria"
+msgstr "プロバイダーのカテゴリー"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderDirectory.tsx
+msgid "settings.provider_catalog_only_hint"
+msgstr "このプロバイダーはカタログに掲載されていますが、実行時のアダプターはインストールされていません。"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderRow.tsx
+msgid "settings.provider_removed_toast"
+msgstr "プロバイダーを削除しました"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderForm.tsx
+msgid "settings.provider_updated_toast"
+msgstr "プロバイダーを更新しました"
+
+#. js-lingui-explicit-id
+#: src/components/library/KitLibraryInspector.tsx
+msgid "kit_library.publish_new_version"
+msgstr "新しいバージョンを公開"
+
+#. js-lingui-explicit-id
+#. placeholder {0}: item.name
+#. placeholder {1}: next.version
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.toast_published"
+msgstr "{0} v{1} を公開しました"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.published_projects"
+msgstr "公開済みプロジェクト"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.published_empty_title"
+msgstr "公開機能は準備中です"
+
+#. js-lingui-explicit-id
+#: src/components/library/KitLibraryInspector.tsx
+msgid "kit_library.publishing"
+msgstr "公開中…"
+
+#. js-lingui-explicit-id
+#: src/components/library/ReviewBranchEditor.tsx
+msgid "review_branch.readonly_share"
+msgstr "読み取り専用の共有"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.status_ready"
+msgstr "準備完了"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.recent_heading"
+msgstr "最近"
+
+#. js-lingui-explicit-id
+#: src/components/topbar/TabsMenu.tsx
+msgid "topbar.recently_closed"
+msgstr "最近閉じたタブ"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/BriefNode.tsx
+msgid "dag.plan_and_generate"
+msgstr "グラフを計画して生成"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/BriefNode.tsx
+msgid "dag.planning"
+msgstr "計画・生成中…"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderDirectory.tsx
+msgid "settings.provider_category_recommended"
+msgstr "おすすめ"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.hosts_not_configured"
+msgstr "参照プロバイダーホストが設定されていません。"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.media_filter_references"
+msgstr "参照"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/IntentPanel.tsx
+msgid "intent.questions_hint"
+msgstr "上のブリーフを調整してこれらに答え、もう一度計画してください。"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/MockupNode.tsx
+msgid "mockup.regenerate"
+msgstr "再生成"
+
+#. js-lingui-explicit-id
+#: src/components/library/RegistryInstallPanel.tsx
+msgid "registry_install.requires_desktop_app"
+msgstr "レジストリデスクトップホストにはCutoutデスクトップアプリが必要です。"
+
+#. js-lingui-explicit-id
+#: src/components/library/RegistryInstallPanel.tsx
+msgid "registry_install.section_aria"
+msgstr "レジストリのインストール"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/GeneralSection.tsx
+msgid "settings.remember_dir_label"
+msgstr "エクスポートフォルダを記憶"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderRow.tsx
+#: src/components/settings/VectorizerPanel.tsx
+msgid "settings.remove_action"
+msgstr "削除"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderRow.tsx
+#: src/components/settings/VectorizerPanel.tsx
+msgid "settings.remove_failed_toast"
+msgstr "削除に失敗しました"
+
+#. js-lingui-explicit-id
+#: src/components/library/LibraryDrawer.tsx
+msgid "library.delete"
+msgstr "ライブラリから削除"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderRow.tsx
+msgid "settings.remove_confirm_title"
+msgstr "プロバイダーを削除しますか？"
+
+#. js-lingui-explicit-id
+#: src/components/slices/SliceCardActions.tsx
+msgid "slices.action_rename"
+msgstr "名前を変更"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.rename"
+msgstr "名前を変更"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.rename_project_title"
+msgstr "プロジェクト名を変更"
+
+#. js-lingui-explicit-id
+#: src/components/topbar/TopBarActions.tsx
+msgid "topbar.rerun_button"
+msgstr "再実行"
+
+#. js-lingui-explicit-id
+#: src/components/topbar/TopBarActions.tsx
+msgid "topbar.rerun_label"
+msgstr "解析を再実行"
+
+#. js-lingui-explicit-id
+#: src/components/source/ParameterControls.tsx
+msgid "source.params_reset"
+msgstr "リセット"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/GeneralSection.tsx
+msgid "settings.reset_params"
+msgstr "パラメーターをリセット"
+
+#. js-lingui-explicit-id
+#: src/components/source/ParameterControls.tsx
+msgid "source.params_reset_title"
+msgstr "パラメーターを既定値にリセット"
+
+#. js-lingui-explicit-id
+#. placeholder {0}: conflicts.map(({ kind }) => kind).join(', ')
+#: src/components/library/KitLibraryInspector.tsx
+msgid "kit_library.resolve_conflicts"
+msgstr "公開前に{0}件の競合する候補を解決してください。"
+
+#. js-lingui-explicit-id
+#: src/components/library/ReviewBranchEditor.tsx
+msgid "review_branch.resolved"
+msgstr "解決済み"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+#: src/components/settings/sections/ArchivedSection.tsx
+msgid "home.restore"
+msgstr "復元"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/GeneralSection.tsx
+msgid "settings.reset_params_hint"
+msgstr "しきい値・最小面積・ギャップ・パディングを既定値に戻します。"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.retry"
+msgstr "再試行"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/GeneralSection.tsx
+msgid "settings.remember_dir_hint"
+msgstr "エクスポートのたびに確認せず、前回のフォルダを再利用します。"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/BoardNode.tsx
+msgid "board.compose"
+msgstr "モックアップを逆合成"
+
+#. js-lingui-explicit-id
+#: src/components/library/ReviewBranchEditor.tsx
+msgid "review_branch.section_aria"
+msgstr "レビューブランチ"
+
+#. js-lingui-explicit-id
+#: src/components/library/ReviewBranchEditor.tsx
+msgid "review_branch.label"
+msgstr "レビューブランチ"
+
+#. js-lingui-explicit-id
+#: src/components/library/ReviewBranchEditor.tsx
+msgid "review_branch.comment_aria"
+msgstr "レビューコメント"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.status_running"
+msgstr "実行中"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/edges/TransitionEdge.tsx
+msgid "pipeline.status_running"
+msgstr "実行中"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/dag-node-common.tsx
+msgid "dag.running"
+msgstr "実行中…"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderForm.tsx
+#: src/components/settings/VectorizerPanel.tsx
+msgid "settings.save"
+msgstr "保存"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderForm.tsx
+#: src/components/settings/VectorizerPanel.tsx
+msgid "settings.save_failed_toast"
+msgstr "保存に失敗しました"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.search_aria"
+msgstr "ライブラリを検索"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.search_placeholder"
+msgstr "名前、タグ、来歴で検索"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.search_projects"
+msgstr "プロジェクトを検索..."
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderDirectory.tsx
+msgid "settings.search_providers_placeholder"
+msgstr "プロバイダーを検索"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderDirectory.tsx
+msgid "settings.search_providers_aria"
+msgstr "プロバイダーを検索"
+
+#. js-lingui-explicit-id
+#: src/components/topbar/TabsMenu.tsx
+msgid "topbar.search_tabs"
+msgstr "タブを検索"
+
+#. js-lingui-explicit-id
+#. placeholder {0}: item.name
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.select_item_aria"
+msgstr "{0} を選択"
+
+#. js-lingui-explicit-id
+#: src/components/inspector/InspectorPanel.tsx
+msgid "inspector.empty_has_slices"
+msgstr "スライスを選択すると、名前の変更・確認・エクスポートができます。"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/SlicesNode.tsx
+msgid "slices.name"
+msgstr "セマンティック命名"
+
+#. js-lingui-explicit-id
+#: src/components/home/SidebarAccount.tsx
+#: src/components/settings/SettingsDialog.tsx
+msgid "settings.menu_label"
+msgstr "設定"
+
+#. js-lingui-explicit-id
+#: src/components/library/TeamGovernancePanel.tsx
+msgid "team.share_review"
+msgstr "共有とレビュー"
+
+#. js-lingui-explicit-id
+#: src/components/settings/KeyField.tsx
+#: src/components/settings/VectorizerPanel.tsx
+msgid "settings.key_show"
+msgstr "表示"
+
+#. js-lingui-explicit-id
+#: src/components/inspector/SliceDimensions.tsx
+msgid "inspector.dim_size"
+msgstr "サイズ"
+
+#. js-lingui-explicit-id
+#: src/components/inspector/InspectorPanel.tsx
+msgid "inspector.empty_no_slices"
+msgstr "切り抜かれた領域とその詳細がここに表示されます。"
+
+#. js-lingui-explicit-id
+#: src/components/slices/RightRail.tsx
+#: src/components/slices/RightRailTabs.tsx
+#: src/components/slices/SliceGrid.tsx
+msgid "slices.heading"
+msgstr "スライス"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.media_filter_slices"
+msgstr "スライス"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/SlicesNode.tsx
+msgid "pipeline.stage_slices"
+msgstr "スライス"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/dag-node-common.tsx
+msgid "dag.op_cutout"
+msgstr "スライス"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/SlicesNode.tsx
+msgid "pipeline.node_slices_aria"
+msgstr "スライスステージ"
+
+#. js-lingui-explicit-id
+#: src/components/library/KitLibraryInspector.tsx
+msgid "kit_library.source_heading"
+msgstr "ソース"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderDirectory.tsx
+msgid "settings.provider_category_speech"
+msgstr "音声"
+
+#. js-lingui-explicit-id
+#: src/components/settings/SettingsSidebar.tsx
+msgid "settings.section_speech"
+msgstr "音声"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.dimension_asr_label"
+msgstr "音声認識"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.projects_empty_description"
+msgstr "アイデアから始めるか、ビジュアルボードを取り込んでください。"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/IntentPanel.tsx
+msgid "intent.strategy"
+msgstr "戦略"
+
+#. js-lingui-explicit-id
+#: src/components/help/HelpMenu.tsx
+msgid "help.submit_feedback"
+msgstr "フィードバックを送信"
+
+#. js-lingui-explicit-id
+#: src/components/inspector/ExportBar.tsx
+#: src/components/topbar/TopBarActions.tsx
+msgid "export.menu_svg_api"
+msgstr "SVG · API"
+
+#. js-lingui-explicit-id
+#: src/components/inspector/ExportBar.tsx
+#: src/components/topbar/TopBarActions.tsx
+msgid "export.menu_svg_local"
+msgstr "SVG · ローカル"
+
+#. js-lingui-explicit-id
+#: src/components/settings/VectorizerPanel.tsx
+msgid "vectorizer.heading"
+msgstr "SVGエクスポート"
+
+#. js-lingui-explicit-id
+#: src/components/home/SidebarAccount.tsx
+msgid "home.theme_system"
+msgstr "システム"
+
+#. js-lingui-explicit-id
+#: src/components/topbar/TabsMenu.tsx
+msgid "topbar.tabs_in_window"
+msgstr "このウィンドウのタブ"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.tag_action"
+msgstr "タグ付け"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.tags_to_add_aria"
+msgstr "追加するタグ"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.start_description"
+msgstr "アイデア、既存の画面、またはビジュアルボードを、つながったデザインワークスペースに変えましょう。"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderRow.tsx
+msgid "settings.test_action"
+msgstr "テスト"
+
+#. js-lingui-explicit-id
+#: src/components/settings/VectorizerPanel.tsx
+msgid "vectorizer.mode_test"
+msgstr "テスト"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.dimension_tts_label"
+msgstr "音声合成"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.dimension_text_label"
+msgstr "テキスト理解"
+
+#. js-lingui-explicit-id
+#: src/lib/image.ts
+msgid "image.error_decode_failed"
+msgstr "このファイルは画像としてデコードできませんでした。"
+
+#. js-lingui-explicit-id
+#: src/components/settings/KeyField.tsx
+msgid "settings.key_hint"
+msgstr "キーはシステムキーチェーンにのみ書き込まれ、送り返されたり表示されたりすることはありません。"
+
+#. js-lingui-explicit-id
+#: src/components/slices/SliceGridEmpty.tsx
+msgid "slices.empty_no_regions_hint"
+msgstr "このシートに対してパラメーターが厳しすぎる可能性があります。次を緩めてみてください:"
+
+#. js-lingui-explicit-id
+#: src/components/preview/PreviewCanvas.tsx
+msgid "preview.empty_hint"
+msgstr "シートが解析されると、ここに透過プレビューが表示されます。"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/GeneralSection.tsx
+msgid "settings.theme_label"
+msgstr "テーマ"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ModelSlot.tsx
+msgid "settings.vision_capability_unverified"
+msgstr "画像入力機能がカタログのエビデンスまたはプロバイダーへの照会で確認されるまで、この割り当ては利用できません。"
+
+#. js-lingui-explicit-id
+#. placeholder {0}: pendingDelete.name
+#. placeholder {0}: project.name
+#: src/components/home/ProjectHome.tsx
+#: src/components/settings/sections/ArchivedSection.tsx
+msgid "home.delete_permanently_description"
+msgstr "これにより「{0}」がローカルストレージから削除されます。この操作は元に戻せません。"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderRow.tsx
+msgid "settings.remove_confirm_desc"
+msgstr "これにより「{label}」の設定と、システムキーチェーンに保存されたキーが削除されます。この操作は元に戻せません。"
+
+#. js-lingui-explicit-id
+#: src/components/preview/PreviewToolbar.tsx
+msgid "preview.toggle_checker"
+msgstr "チェッカーボードの表示切替"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.dimension_asr_description"
+msgstr "音声を文字に書き起こします。"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderForm.tsx
+msgid "settings.provider_kind_label"
+msgstr "種類"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.meta_type"
+msgstr "タイプ"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ModelSlot.tsx
+msgid "settings.model_slot_unavailable"
+msgstr "利用不可"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.dimension_vision_description"
+msgstr "スクリーンショット、写真、その他のビジュアル資料を理解します。"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/IntentPanel.tsx
+msgid "intent.title"
+msgstr "把握した意図"
+
+#. js-lingui-explicit-id
+#: src/hooks/useExport.ts
+msgid "export.error_unknown"
+msgstr "不明なエラー"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.unpin"
+msgstr "ピン留めを解除"
+
+#. js-lingui-explicit-id
+#. placeholder {0}: project.name
+#: src/components/home/ProjectHome.tsx
+msgid "home.unpin_named"
+msgstr "{0} のピン留めを解除"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.unpin_project"
+msgstr "プロジェクトのピン留めを解除"
+
+#. js-lingui-explicit-id
+#: src/hooks/queries/pipeline.ts
+#: src/hooks/useImageImport.ts
+msgid "import.toast_unsupported"
+msgstr "サポートされていないファイル: {name}"
+
+#. js-lingui-explicit-id
+#: src/components/source/SourceMeta.tsx
+msgid "source.meta_untitled"
+msgstr "無題"
+
+#. js-lingui-explicit-id
+#. placeholder {0}: item.name
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.use_in_project_aria"
+msgstr "{0} をプロジェクトで使用"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.use_dense_preview"
+msgstr "密なプレビューを使用"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.use_in_project_placeholder"
+msgstr "プロジェクトで使用…"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.use_masonry_preview"
+msgstr "マソンリープレビューを使用"
+
+#. js-lingui-explicit-id
+#. placeholder {0}: previous.version
+#. placeholder {1}: item.version
+#. placeholder {2}: added.length
+#. placeholder {3}: removed.length
+#: src/components/library/KitLibraryInspector.tsx
+msgid "kit_library.version_diff_summary"
+msgstr "v{0} → v{1} · +{2} / −{3}"
+
+#. js-lingui-explicit-id
+#: src/components/settings/VectorizerPanel.tsx
+msgid "vectorizer.api_id_label"
+msgstr "Vectorizer.AI APIID"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderForm.tsx
+#: src/components/settings/ProviderRow.tsx
+msgid "settings.status_failed"
+msgstr "検証に失敗しました"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderForm.tsx
+#: src/components/settings/ProviderRow.tsx
+msgid "settings.status_verified"
+msgstr "検証済み"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.quality_verified"
+msgstr "検証済み"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.bytes_not_available"
+msgstr "検証済みバイト数はローカルで利用できません。"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.asset_preview_description"
+msgstr "検証済みのローカルプレビュー、来歴、機能に応じたアセット操作。"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.verifying_component_blobs"
+msgstr "コンポーネントのソースBlobを検証中…"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.meta_version"
+msgstr "バージョン"
+
+#. js-lingui-explicit-id
+#: src/components/library/KitLibraryInspector.tsx
+msgid "kit_library.version_diff_aria"
+msgstr "バージョン差分"
+
+#. js-lingui-explicit-id
+#: src/components/library/KitLibraryInspector.tsx
+msgid "kit_library.version_diff_heading"
+msgstr "バージョン差分"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.hosts_not_configured_video"
+msgstr "動画実行ホストおよび参照プロバイダーホストが設定されていません。"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.media_filter_videos"
+msgstr "動画"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.dimension_vision_label"
+msgstr "ビジョン"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ModelSlot.tsx
+msgid "settings.vision_required"
+msgstr "ビジョン機能が必要です"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.visual_asset_filters_aria"
+msgstr "ビジュアルアセットのフィルター"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.tab_visual_assets"
+msgstr "ビジュアルアセット"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/dag-node-common.tsx
+msgid "dag.idle"
+msgstr "実行待ち…"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.preset_web"
+msgstr "Web"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.dimension_webdev_label"
+msgstr "Web開発"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.start_title"
+msgstr "何をデザインしますか？"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+#: src/components/settings/SettingsSidebar.tsx
+msgid "home.wip_badge"
+msgstr "WIP"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.workspace"
+msgstr "ワークスペース"
+
+#. js-lingui-explicit-id
+#: src/components/home/SidebarAccount.tsx
+msgid "home.account_menu"
+msgstr "ワークスペースメニュー"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.workspace_navigation"
+msgstr "ワークスペースナビゲーション"
+
+#. js-lingui-explicit-id
+#: src/components/home/SidebarAccount.tsx
+msgid "home.notifications_empty"
+msgstr "すべて確認済みです"
+
+#. js-lingui-explicit-id
+#: src/components/topbar/TabsMenu.tsx
+msgid "topbar.tabs_empty"
+msgstr "開いているタブと最近閉じたタブがここに表示されます"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.your_projects"
+msgstr "あなたのプロジェクト"

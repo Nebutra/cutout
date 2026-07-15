@@ -12,6 +12,7 @@ const noopBridge: NativeBridge = {
     count: 0,
     failed: [],
   }),
+  saveBundle: async () => ({ canceled: true, outputDir: null, bundleDir: null, fileCount: 0, totalBytes: 0, files: [] }),
   setVectorizerApiKey: async () => undefined,
   vectorizerKeyStatus: async () => false,
   deleteVectorizerApiKey: async () => undefined,

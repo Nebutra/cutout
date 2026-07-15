@@ -1,0 +1,8 @@
+import { z } from 'zod'
+const sha=z.string().regex(/^[a-f0-9]{64}$/)
+export const discoveredReferenceSchema=z.object({id:z.string().min(1),title:z.string().min(1),sourceUrl:z.string().url(),thumbnailUrl:z.string().url().optional(),contentSha256:sha,license:z.discriminatedUnion('kind',[z.object({kind:z.literal('spdx'),identifier:z.string().min(1)}).strict(),z.object({kind:z.literal('public-domain'),evidenceUrl:z.string().url()}).strict(),z.object({kind:z.literal('permission'),holder:z.string().min(1),evidenceUrl:z.string().url()}).strict(),z.object({kind:z.literal('unknown'),rationale:z.string().min(1)}).strict()]),provenance:z.object({provider:z.string().min(1),capturedAt:z.string().datetime(),query:z.string().min(1)}).strict()}).strict()
+export type DiscoveredReference=z.infer<typeof discoveredReferenceSchema>
+export interface ReferenceDiscoveryProvider { readonly available:boolean; search(query:string):Promise<readonly unknown[]> }
+export async function discoverReferences(provider:ReferenceDiscoveryProvider,query:string){if(!provider.available)throw new Error('Web reference discovery requires an authorized discovery provider.');const values=(await provider.search(query)).map((value)=>discoveredReferenceSchema.parse(value)),seen=new Set<string>();return values.filter((value)=>{if(seen.has(value.contentSha256))return false;seen.add(value.contentSha256);return true})}
+export interface ReferenceBoard {readonly id:string;readonly name:string;readonly referenceIds:readonly string[]}
+export function addReferenceToBoard(board:ReferenceBoard,reference:DiscoveredReference):ReferenceBoard{return board.referenceIds.includes(reference.id)?board:{...board,referenceIds:[...board.referenceIds,reference.id]}}

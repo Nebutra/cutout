@@ -1,0 +1,2 @@
+import{describe,expect,it}from'vitest';import{CapabilityRequiredSpeechAdapter,SpeechAdapterRegistry}from'./speech-contract'
+describe('speech adapter registry',()=>{it('routes installed providers and does not claim uninstalled remote adapters',()=>{const registry=new SpeechAdapterRegistry(),adapter=new CapabilityRequiredSpeechAdapter('deepgram');registry.register(adapter);expect(registry.adapter('deepgram')).toBe(adapter);expect(registry.adapter('elevenlabs').capabilities).toEqual([]);expect(()=>registry.register(adapter)).toThrow('already registered')})})

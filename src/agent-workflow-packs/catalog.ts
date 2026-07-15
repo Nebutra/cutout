@@ -1,0 +1,11 @@
+import { evaluateWorkflowPack, workflowPackCompatibility, workflowPackSchema, type WorkflowPack } from './contracts'
+export interface InstalledWorkflowPack{readonly id:string;readonly version:string;readonly contentSha256:string;readonly installedAt:string;readonly evalStatus?:'passed'|'failed'}
+export class WorkflowPackCatalog{
+ private readonly available:WorkflowPack[];private installed=new Map<string,InstalledWorkflowPack>();private readonly environment:{cutoutVersion:string;capabilities:readonly string[]};private readonly now:()=>string
+ constructor(packs:readonly unknown[],environment:{cutoutVersion:string;capabilities:readonly string[]},now=()=>new Date().toISOString()){this.available=packs.map(pack=>workflowPackSchema.parse(pack));this.environment=environment;this.now=now}
+ list(){return this.available.map(pack=>({pack,compatibility:workflowPackCompatibility(pack,this.environment),installed:this.installed.get(pack.id)}))}
+ install(id:string,version?:string){const pack=this.select(id,version),compatibility=workflowPackCompatibility(pack,this.environment);if(!compatibility.compatible)throw new Error(compatibility.reason??'Workflow pack is incompatible.');const current=this.installed.get(id);if(current&&current.version===pack.version)return current;const receipt={id:pack.id,version:pack.version,contentSha256:pack.provenance.contentSha256,installedAt:this.now()} satisfies InstalledWorkflowPack;this.installed.set(id,receipt);return receipt}
+ upgrade(id:string){const candidates=this.available.filter(pack=>pack.id===id).sort((a,b)=>b.version.localeCompare(a.version));if(!candidates[0])throw new Error(`Workflow pack not found: ${id}.`);return this.install(id,candidates[0].version)}
+ evaluate(id:string,scores:Readonly<Record<string,{score:number;evidenceIds:readonly string[]}>>){const installed=this.installed.get(id);if(!installed)throw new Error('Workflow pack must be installed before evaluation.');const result=evaluateWorkflowPack(this.select(id,installed.version),scores,this.now());this.installed.set(id,{...installed,evalStatus:result.status});return result}
+ private select(id:string,version?:string){const pack=this.available.find(value=>value.id===id&&(!version||value.version===version));if(!pack)throw new Error(`Workflow pack not found: ${id}${version?`@${version}`:''}.`);return pack}
+}

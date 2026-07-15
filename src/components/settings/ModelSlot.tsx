@@ -1,286 +1,134 @@
-/**
- * ModelSlot (design spec §4b) — assign one model to an output-modality slot.
- *
- * Pick an endpoint + a model. The model field is a free-text input backed by a
- * datalist whose suggestions come from the in-repo `SUGGESTED_MODELS` for the
- * chosen endpoint's kind unioned with its discovered `/v1/models` (relays). The
- * choice persists instantly (plugin-store) via `useSetModelAssignment`.
- */
-import { useState } from 'react'
-import type { ReactNode } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { ChevronDown, CircleAlert, ShieldCheck } from 'lucide-react'
 import { Trans, useLingui } from '@lingui/react/macro'
-import type { SlotId } from '@/services/ai/model-assignment-types'
-import { SUGGESTED_MODELS, POPULAR_MODELS } from '@/services/ai/models'
-import { REASONING_EFFORTS, type ReasoningEffort } from '@/services/ai/reasoning'
+import type { ModelTaskKind } from '@/services/ai/model-capabilities'
 import { useProviders } from '@/hooks/queries/providers'
-import {
-  useModelAssignments,
-  useSetModelAssignment,
-  useEndpointModels,
-} from '@/hooks/queries/ai-settings'
+import { useEndpointModels } from '@/hooks/queries/ai-settings'
 import { Input } from '@/components/ui/input'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import type { ModelDimension } from './model-dimensions'
+import { requiresVerifiedVision } from './model-dimensions'
 
-interface ModelSlotProps {
-  readonly slot: SlotId
-  readonly label: ReactNode
-  readonly hint?: ReactNode
-}
+type ModelSlotProps = ModelDimension & { readonly advanced: boolean }
 
-interface ModelSlotDraft {
-  readonly sourceKey: string
-  readonly providerId: string
-  readonly model: string
-  readonly effort: ReasoningEffort | undefined
-}
+type SavedRoute = { readonly providerId?: string; readonly model?: string; readonly fallback?: string }
+const ROUTE_KEY = 'cutout.model-routing.v1'
 
-function draftSourceKey(
-  currentProviderId: string | undefined,
-  currentModel: string | undefined,
-  currentEffort: ReasoningEffort | undefined,
-  soleProviderId: string,
-): string {
-  return [
-    currentProviderId ?? '',
-    currentModel ?? '',
-    currentEffort ?? '',
-    soleProviderId,
-  ].join('\u0000')
-}
-
-function createDraft(
-  sourceKey: string,
-  currentProviderId: string | undefined,
-  currentModel: string | undefined,
-  currentEffort: ReasoningEffort | undefined,
-  soleProviderId: string,
-): ModelSlotDraft {
-  if (currentProviderId !== undefined) {
-    return {
-      sourceKey,
-      providerId: currentProviderId,
-      model: currentModel ?? '',
-      effort: currentEffort,
-    }
-  }
-  return {
-    sourceKey,
-    providerId: soleProviderId,
-    model: '',
-    effort: undefined,
+function loadRoute(task: ModelTaskKind): SavedRoute {
+  try {
+    const value = JSON.parse(globalThis.localStorage?.getItem(ROUTE_KEY) ?? '{}') as Record<string, SavedRoute>
+    return value[task] ?? {}
+  } catch {
+    return {}
   }
 }
 
-export function ModelSlot({ slot, label, hint }: ModelSlotProps) {
+function saveRoute(task: ModelTaskKind, route: SavedRoute): void {
+  try {
+    const value = JSON.parse(globalThis.localStorage?.getItem(ROUTE_KEY) ?? '{}') as Record<string, SavedRoute>
+    globalThis.localStorage?.setItem(ROUTE_KEY, JSON.stringify({ ...value, [task]: route }))
+  } catch {
+    // Browser storage is an optional non-secret preference cache.
+  }
+}
+
+export function ModelSlot({ task, label, description, advanced }: ModelSlotProps) {
   const { t } = useLingui()
   const providers = useProviders()
-  const assignments = useModelAssignments()
-  const setAssignment = useSetModelAssignment()
-
   const list = providers.data ?? []
-  const current = assignments.data?.[slot]
-
-  // With exactly one endpoint, pre-select it — the same connection (one key)
-  // serves every slot; models are chosen per capability, not per provider.
-  const soleProviderId = list.length === 1 ? list[0].id : ''
-  const currentProviderId = current?.providerId
-  const currentModel = current?.model
-  const currentEffort = current?.effort
-
-  const sourceKey = draftSourceKey(
-    currentProviderId,
-    currentModel,
-    currentEffort,
-    soleProviderId,
-  )
-  const nextDraft = createDraft(
-    sourceKey,
-    currentProviderId,
-    currentModel,
-    currentEffort,
-    soleProviderId,
-  )
-  const [draft, setDraft] = useState<ModelSlotDraft>(nextDraft)
-  const activeDraft = draft.sourceKey === sourceKey ? draft : nextDraft
-  if (draft.sourceKey !== sourceKey) {
-    setDraft(nextDraft)
-  }
-
-  const providerId = activeDraft.providerId
-  const model = activeDraft.model
-  const effort = activeDraft.effort
-
-  const selected = list.find((p) => p.id === providerId)
+  const saved = useMemo(() => loadRoute(task), [task])
+  const [providerId, setProviderId] = useState(saved.providerId ?? (list.length === 1 ? list[0]?.id ?? '' : ''))
+  const [model, setModel] = useState(saved.model ?? '')
+  const [fallback, setFallback] = useState(saved.fallback ?? '')
+  const [expanded, setExpanded] = useState(false)
+  const selected = list.find((provider) => provider.id === providerId)
   const endpointModels = useEndpointModels(selected)
-
-  // Relays / gateways proxy many upstreams → offer the curated mainstream list;
-  // direct vendors offer their own. Union with the endpoint's discovered models.
-  const curated = selected
-    ? selected.kind === 'openai-compatible' || selected.kind === 'gateway'
-      ? POPULAR_MODELS
-      : SUGGESTED_MODELS[selected.kind]
-    : []
-  const suggestions = Array.from(
-    new Set([
-      ...curated,
-      ...(endpointModels.data ?? []),
-      ...(model.trim() ? [model.trim()] : []),
-    ]),
+  const discovered = useMemo(
+    () => Array.from(new Set([...(endpointModels.data ?? []), ...(model ? [model] : [])])).sort(),
+    [endpointModels.data, model],
   )
+  const visionRequired = requiresVerifiedVision(task)
+  const unavailable = list.length === 0
+  const evidence = endpointModels.isSuccess
+    ? t({ id: 'settings.models_discovered_from_endpoint', message: `${endpointModels.data.length} models discovered from endpoint` })
+    : providerId
+      ? t({ id: 'settings.capability_evidence_unavailable', message: 'Capability evidence unavailable' })
+      : t({ id: 'settings.auto_will_choose', message: 'Auto will choose from connected providers' })
 
-  const commit = (pid: string, m: string, e: ReasoningEffort | undefined) => {
-    if (pid && m.trim()) {
-      setAssignment.mutate({
-        slot,
-        assignment: {
-          providerId: pid,
-          model: m.trim(),
-          // Thinking strength is a chat-slot concept only.
-          ...(slot === 'chat' && e ? { effort: e } : {}),
-        },
-      })
-    }
-  }
-
-  if (list.length === 0) {
-    return (
-      <div className="rounded-lg border border-dashed border-border px-3 py-3">
-        <div className="text-sm font-medium">{label}</div>
-        <p className="mt-0.5 text-xs text-muted-foreground">
-          <Trans id="settings.model_no_provider">
-            Add an endpoint above to assign a model.
-          </Trans>
-        </p>
-      </div>
-    )
-  }
-
-  const listId = `models-${slot}`
+  useEffect(() => {
+    saveRoute(task, {
+      ...(providerId ? { providerId } : {}),
+      ...(model.trim() ? { model: model.trim() } : {}),
+      ...(fallback.trim() ? { fallback: fallback.trim() } : {}),
+    })
+  }, [fallback, model, providerId, task])
 
   return (
-    <div className="rounded-lg border border-border bg-card/40 px-3 py-3">
-      <div className="text-sm font-medium">{label}</div>
-      {hint ? (
-        <p className="mt-0.5 text-xs text-muted-foreground">{hint}</p>
-      ) : null}
-      <div className="mt-2 flex gap-2">
-        <Select
-          value={providerId || undefined}
-          onValueChange={(value) => {
-            // Switching endpoint keeps the typed model — a connection isn't tied
-            // to one model; the model is chosen per capability from the list below.
-            setDraft({ ...activeDraft, providerId: value })
-            commit(value, model, effort)
-          }}
-        >
-          <SelectTrigger
-            className="w-40 shrink-0"
-            aria-label={t({
-              id: 'settings.model_endpoint_aria',
-              message: 'Model endpoint',
-            })}
-          >
-            <SelectValue
-              placeholder={t({
-                id: 'settings.model_pick_endpoint',
-                message: 'Endpoint',
-              })}
-            />
-          </SelectTrigger>
-          <SelectContent>
-            {list.map((provider) => (
-              <SelectItem key={provider.id} value={provider.id}>
-                {provider.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
-        <Input
-          list={listId}
-          value={model}
-          disabled={!providerId}
-          onChange={(e) =>
-            setDraft({ ...activeDraft, model: e.target.value })
-          }
-          onBlur={() => commit(providerId, model, effort)}
-          placeholder={t({
-            id: 'settings.model_slug_placeholder',
-            message: 'model',
-          })}
-          aria-label={t({
-            id: 'settings.model_name_aria',
-            message: 'Model name',
-          })}
-          className="font-mono"
-          autoCapitalize="off"
-          autoCorrect="off"
-          spellCheck={false}
-        />
-        <datalist id={listId}>
-          {suggestions.map((m) => (
-            <option key={m} value={m}>
-              {m}
-            </option>
-          ))}
-        </datalist>
-      </div>
-
-      {slot === 'chat' ? (
-        <div className="mt-2 flex items-center justify-between gap-2">
-          <span className="text-xs text-muted-foreground">
-            <Trans id="settings.effort_label">Thinking strength</Trans>
+    <section className="rounded-lg border border-border bg-card/30" aria-label={label}>
+      <button
+        type="button"
+        className="flex w-full items-center gap-3 px-3 py-3 text-left"
+        onClick={() => advanced && setExpanded((value) => !value)}
+        aria-expanded={advanced ? expanded : undefined}
+      >
+        <span className="min-w-0 flex-1">
+          <span className="flex items-center gap-2 text-sm font-medium">
+            {label}
+            {visionRequired ? (
+              <span className="rounded border border-blue-500/30 bg-blue-500/10 px-1.5 py-0.5 text-[10px] font-medium text-blue-600 dark:text-blue-400">
+                <Trans id="settings.vision_required">Vision required</Trans>
+              </span>
+            ) : null}
           </span>
-          <Select
-            value={effort ?? 'default'}
-            onValueChange={(value) => {
-              const next =
-                value === 'default' ? undefined : (value as ReasoningEffort)
-              setDraft({ ...activeDraft, effort: next })
-              commit(providerId, model, next)
-            }}
-          >
-            <SelectTrigger
-              className="w-32 shrink-0"
+          <span className="mt-0.5 block text-xs text-muted-foreground">{description}</span>
+        </span>
+        <span className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
+          {unavailable ? t({ id: 'settings.model_slot_unavailable', message: 'Unavailable' }) : t({ id: 'settings.model_slot_auto', message: 'Auto' })}
+          {advanced ? <ChevronDown className={`size-3.5 transition-transform ${expanded ? 'rotate-180' : ''}`} /> : null}
+        </span>
+      </button>
+
+      {advanced && expanded ? (
+        <div className="border-t border-border px-3 py-3">
+          <div className="grid grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] gap-2">
+            <Select value={providerId || undefined} onValueChange={(value) => { setProviderId(value); setModel('') }}>
+              <SelectTrigger aria-label={t({ id: 'settings.model_slot_provider_aria', message: `${label} provider` })}><SelectValue placeholder={t({ id: 'settings.provider_placeholder', message: 'Provider' })} /></SelectTrigger>
+              <SelectContent>
+                {list.map((provider) => <SelectItem key={provider.id} value={provider.id}>{provider.label}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Input
+              list={`models-${task}`}
+              value={model}
               disabled={!providerId}
-              aria-label={t({
-                id: 'settings.effort_aria',
-                message: 'Thinking strength',
-              })}
-            >
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="default">
-                <Trans id="settings.effort_default">Default</Trans>
-              </SelectItem>
-              {REASONING_EFFORTS.map((level) => (
-                <SelectItem key={level} value={level}>
-                  <EffortLabel effort={level} />
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+              onChange={(event) => setModel(event.target.value)}
+              placeholder={t({ id: 'settings.model_or_blank_placeholder', message: 'Model or leave blank for Auto' })}
+              aria-label={t({ id: 'settings.model_slot_model_aria', message: `${label} model` })}
+              className="font-mono"
+            />
+            <datalist id={`models-${task}`}>
+              {discovered.map((value) => <option key={value} value={value} />)}
+            </datalist>
+          </div>
+          <Input
+            className="mt-2 font-mono"
+            value={fallback}
+            disabled={!providerId}
+            onChange={(event) => setFallback(event.target.value)}
+            placeholder={t({ id: 'settings.optional_fallback_model_placeholder', message: 'Optional fallback model' })}
+            aria-label={t({ id: 'settings.model_slot_fallback_aria', message: `${label} fallback model` })}
+          />
+          <div className="mt-2 flex items-start gap-1.5 text-[11px] text-muted-foreground">
+            {endpointModels.isSuccess ? <ShieldCheck className="mt-0.5 size-3 shrink-0 text-emerald-500" /> : <CircleAlert className="mt-0.5 size-3 shrink-0" />}
+            <span>{t({ id: 'settings.evidence_disclaimer', message: `${evidence}. Endpoint discovery proves availability, not task quality or modality support.` })}</span>
+          </div>
+          {visionRequired && model ? (
+            <p className="mt-2 rounded border border-amber-500/30 bg-amber-500/10 px-2 py-1.5 text-[11px] text-amber-700 dark:text-amber-300">
+              <Trans id="settings.vision_capability_unverified">This assignment remains unavailable until image-input capability is verified by catalog evidence or a provider probe.</Trans>
+            </p>
+          ) : null}
         </div>
       ) : null}
-    </div>
+    </section>
   )
-}
-
-/** The localized label for one thinking-strength level. */
-function EffortLabel({ effort }: { readonly effort: ReasoningEffort }) {
-  switch (effort) {
-    case 'low':
-      return <Trans id="settings.effort_low">Low</Trans>
-    case 'medium':
-      return <Trans id="settings.effort_medium">Medium</Trans>
-    case 'high':
-      return <Trans id="settings.effort_high">High</Trans>
-  }
 }

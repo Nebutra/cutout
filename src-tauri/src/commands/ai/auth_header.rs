@@ -13,7 +13,8 @@
 /// the kind is unknown (the proxy rejects unknown kinds).
 ///
 /// - `anthropic`            → `x-api-key: <secret>` + `anthropic-version: 2023-06-01`
-/// - `openai` / `gateway` / `openai-compatible` → `authorization: Bearer <secret>`
+/// - OpenAI-compatible cloud profiles → `authorization: Bearer <secret>`
+/// - Local profiles (`ollama`, `vllm`, `lm-studio`) → no injected credentials
 /// - `google`              → `x-goog-api-key: <secret>`
 pub fn auth_headers(kind: &str, secret: &str) -> Option<Vec<(String, String)>> {
     match kind {
@@ -21,10 +22,13 @@ pub fn auth_headers(kind: &str, secret: &str) -> Option<Vec<(String, String)>> {
             ("x-api-key".to_string(), secret.to_string()),
             ("anthropic-version".to_string(), "2023-06-01".to_string()),
         ]),
-        "openai" | "gateway" | "openai-compatible" => Some(vec![(
+        "openai" | "gateway" | "openai-compatible" | "dashscope" | "deepseek" | "zhipu"
+        | "moonshot" | "volcengine" | "siliconflow" | "openrouter" | "together" | "groq"
+        | "fireworks" | "xai" | "mistral" => Some(vec![(
             "authorization".to_string(),
             format!("Bearer {secret}"),
         )]),
+        "ollama" | "vllm" | "lm-studio" => Some(Vec::new()),
         "google" => Some(vec![("x-goog-api-key".to_string(), secret.to_string())]),
         _ => None,
     }
@@ -90,8 +94,18 @@ mod tests {
 
     #[test]
     fn unknown_kind_is_none() {
-        assert!(auth_headers("mistral", "x").is_none());
+        assert!(auth_headers("unknown-provider", "x").is_none());
         assert!(auth_headers("", "x").is_none());
+    }
+
+    #[test]
+    fn local_profiles_do_not_inject_dummy_credentials() {
+        for kind in ["ollama", "vllm", "lm-studio"] {
+            assert_eq!(
+                auth_headers(kind, "").unwrap(),
+                Vec::<(String, String)>::new()
+            );
+        }
     }
 
     #[test]

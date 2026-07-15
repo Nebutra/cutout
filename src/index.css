@@ -186,3 +186,38 @@
   overflow-wrap: anywhere;
   word-break: break-word;
 }
+
+/* React Flow zoom/fit Controls — replace the library's stock gray-box look
+   with the app's flat, bordered panel style (matches Button/Panel chrome). */
+.react-flow__controls {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 2px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  background: var(--background);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.05);
+  overflow: hidden;
+}
+.react-flow__controls-button {
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--muted-foreground);
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+.react-flow__controls-button:hover {
+  background: var(--muted);
+  color: var(--foreground);
+}
+.react-flow__controls-button svg {
+  fill: currentColor;
+  max-width: 12px;
+  max-height: 12px;
+}
+.react-flow__controls-button + .react-flow__controls-button {
+  border-top: none;
+}

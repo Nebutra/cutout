@@ -1,0 +1,116 @@
+{
+  "$schema": "./schemas/cutout.agent-capabilities.schema.json",
+  "version": "cutout.agent-capabilities.v1",
+  "product": {
+    "name": "Cutout",
+    "positioning": "Agent-native Design OS with a visual workbench and repo-native control plane",
+    "packageVersion": "0.1.0"
+  },
+  "protocol": {
+    "control": "cutout.control.v1",
+    "designIr": "design-ir.v1",
+    "manifest": "cutout.manifest.v1",
+    "policy": "cutout.policy.v1",
+    "artifactIndex": "cutout.artifacts.v1"
+  },
+  "discovery": {
+    "documentation": "docs/HEADLESS_AGENT_CONTROL.md",
+    "schema": "schemas/cutout.agent-capabilities.schema.json",
+    "validationCommand": "pnpm agent:validate",
+    "skillsCatalog": "skills/index.json",
+    "skillsSchema": "skills/schema.json",
+    "skillsValidationCommand": "node scripts/validate-product-skills.mjs"
+  },
+  "externalControllers": {
+    "protocol": "cutout.external-controller.v1",
+    "role": "External Coding Agents control Cutout through standard MCP, CLI, repository Skills and AGENTS.md. Cutout does not embed or take over their coding runtime.",
+    "clients": ["Codex", "Claude Code", "any MCP-capable coding agent"],
+    "sessionBinding": "The MCP host fixes CUTOUT_PROJECT_ROOT; handshake returns opaque project/session bindings and never accepts a replacement root.",
+    "progressiveDisclosure": ["cutout_controller_handshake", "cutout_capabilities_status", "cutout_skills_list", "cutout_skill_read"],
+    "workflow": ["submit outcome and material/source references", "preview", "explicit approval when required", "apply", "observe or cancel", "read verified deliverables"],
+    "sandboxOwnership": "The external Agent owns its coding sandbox. Cutout owns only its project state, managed exports and policy checks."
+  },
+  "integrations": {
+    "role": "Product, knowledge, design and prototype apps connected through their documented APIs or SDKs; integrations are not external controllers.",
+    "available": ["figma-authorized-snapshot"],
+    "hostRequired": ["figma-foreground-plugin", "obsidian-vault-plugin", "pencil-mcp-cli", "paper-desktop-mcp", "framer-editor-plugin", "canva-apps-sdk"],
+    "authorizationRequired": ["notion-p1-adapter", "github-p1-adapter", "canva-connect-api"],
+    "planned": ["figma-node", "obsidian", "pencil", "paper", "framer", "canva"],
+    "liveSync": false
+  },
+  "operations": [
+    { "type": "project.context", "modes": ["read"], "effect": "none", "approval": "none" },
+    { "type": "material.list", "modes": ["read"], "effect": "none", "approval": "none" },
+    { "type": "validate", "modes": ["read"], "effect": "none", "approval": "none" },
+    { "type": "governance.preview", "modes": ["read"], "effect": "none", "approval": "none", "notes": "Runs the shared deterministic governance harness and returns coverage, measurements and blocking counts for evidence bound to the current Design IR revision." },
+    { "type": "governance.validate", "modes": ["read"], "effect": "none", "approval": "none", "notes": "Returns structured governance findings without verbose evidence payloads; it performs no browser automation or mutation." },
+    { "type": "governance.report", "modes": ["read"], "effect": "none", "approval": "none", "notes": "Returns the complete governance report with measured evidence and repair suggestions; supplied browser facts must already have been collected by an authorized harness." },
+    { "type": "design.patch", "modes": ["dry-run"], "effect": "none", "approval": "none", "notes": "The v1 headless host previews patches but does not mutate Design IR with them." },
+    { "type": "tokens.patch", "modes": ["dry-run"], "effect": "none", "approval": "none", "notes": "The v1 headless host previews token changes but does not apply them." },
+    { "type": "source.ingest", "modes": ["dry-run", "apply"], "effect": "project-state", "approval": "policy-and-explicit-id" },
+    { "type": "run.start", "modes": ["apply"], "effect": "project-state", "approval": "none", "notes": "Records intent and lifecycle events; it does not invoke a model." },
+    { "type": "run.get", "modes": ["read"], "effect": "none", "approval": "none" },
+    { "type": "run.cancel", "modes": ["apply"], "effect": "project-state", "approval": "none" },
+    { "type": "run.events", "modes": ["read"], "effect": "none", "approval": "none" },
+    { "type": "export.design-kit", "modes": ["dry-run", "apply"], "effect": "managed-export", "approval": "policy-and-explicit-id" },
+    { "type": "export.brand-kit", "modes": ["dry-run", "apply"], "effect": "managed-export", "approval": "policy-and-explicit-id" },
+    { "type": "export.starter", "modes": ["dry-run", "apply"], "effect": "managed-export", "approval": "policy-and-explicit-id" },
+    { "type": "coding.execute", "modes": ["dry-run", "apply"], "effect": "provider-required", "approval": "policy-and-explicit-id", "notes": "Requires an injected controlled coding backend and workspace; the bundled headless host returns capability-required." },
+    { "type": "coding.review", "modes": ["dry-run", "apply"], "effect": "provider-required", "approval": "policy-and-explicit-id", "notes": "Review is a versioned CodingTask, never arbitrary shell or an unscoped repository read." },
+    { "type": "coding.repair", "modes": ["dry-run", "apply"], "effect": "provider-required", "approval": "policy-and-explicit-id", "notes": "Repair consumes prior evidence and stays revision-, path-, command-, time-, and byte-budget scoped." },
+    { "type": "tool.invoke", "modes": ["dry-run", "apply"], "effect": "provider-required", "approval": "paid-tool-contract", "notes": "No provider executor exists in the current headless host; apply returns capability-required." }
+  ],
+  "cli": {
+    "command": "pnpm cutout --project <root>",
+    "commands": ["discover", "capabilities", "skills list", "skills read", "context", "materials", "validate", "governance preview", "governance validate", "governance report", "patch", "ingest", "run start", "run get", "run events", "run cancel", "export-kit", "export-brand-kit", "export-starter", "coding execute", "coding review", "coding repair", "registry list", "registry search", "registry get", "registry install", "registry receipt", "workflow list", "workflow get", "workflow compat"]
+  },
+  "mcp": {
+    "transport": "stdio",
+    "command": "pnpm cutout:mcp",
+    "projectRootEnv": "CUTOUT_PROJECT_ROOT",
+    "tools": ["cutout_controller_handshake", "cutout_capabilities_status", "cutout_skills_list", "cutout_skill_read", "cutout_outcome_submit", "cutout_deliverables_read", "cutout_run_start", "cutout_run_get", "cutout_run_events", "cutout_run_cancel", "cutout_project_context", "cutout_list_materials", "cutout_validate", "cutout_governance_preview", "cutout_governance_validate", "cutout_governance_report", "cutout_dry_run_patch", "cutout_plan_source_ingest", "cutout_apply_source_ingest", "cutout_plan_design_kit_export", "cutout_export_design_kit", "cutout_plan_brand_kit_export", "cutout_export_brand_kit", "cutout_plan_starter_export", "cutout_export_starter", "cutout_plan_coding_task", "cutout_apply_coding_task", "cutout_registry_list", "cutout_registry_search", "cutout_registry_get", "cutout_registry_plan_install", "cutout_registry_apply_install", "cutout_registry_install_receipt", "cutout_workflow_pack_list", "cutout_workflow_pack_get", "cutout_workflow_pack_compatibility"]
+  },
+  "policy": {
+    "defaultMode": "dry-run",
+    "applyRequires": ["operation enabled by .cutout policy", "explicit opaque approval id for source ingestion and external exports"],
+    "paidActions": "Budget and approval are declared by cutout.control.v1; the desktop executor can require a short-lived capability lease, while the current headless host has no paid-tool executor.",
+    "secrets": "Control requests, manifests and receipts reject or redact credential-shaped values; provider credentials stay in the host keychain, auth headers are assembled in Rust, and credentials are never part of this manifest.",
+    "filesystemBoundary": "Controlled paths resolve below the canonical selected project root and reject absolute paths, parent traversal and symlink components; generated writes stay below .cutout/exports and use no caller-selected destination.",
+    "permissionBroker": "Host-issued cutout.capability-lease.v1 leases bind subject, request digest, approval id, scopes, paths, commands, hosts, budgets and expiry; revocation, expiry and approval replay fail closed and authorization produces an immutable receipt.",
+    "toolSandbox": "The Node host maps a fixed command enum to argv with shell disabled, copies only allowlisted non-secret environment variables, and enforces wall-clock/output budgets plus POSIX process-group cancellation. It is not an arbitrary shell.",
+    "networkBoundary": "Remote provider traffic is issued by Rust only: provider kind pins scheme/vendor host, redirects are disabled, private/loopback/link-local/ULA addresses are rejected before and after DNS resolution, and credential-shaped response headers are redacted. Explicit local model profiles remain loopback-only."
+  },
+  "paths": {
+    "projectManifest": ".cutout/manifest.json",
+    "designIr": ".cutout/<manifest.files.designIr>",
+    "designMarkdown": ".cutout/<manifest.files.designMarkdown>",
+    "artifactIndex": ".cutout/<manifest.files.artifactIndex>",
+    "contentAddressedObjects": ".cutout/objects/<sha256>",
+    "policy": ".cutout/<manifest.files.policy>",
+    "controlLedger": ".cutout/<manifest.files.controlLedger>",
+    "runEvents": ".cutout/run-events.json",
+    "designKitExports": ".cutout/exports/design-kit/<deterministic-id>",
+    "brandKitExports": ".cutout/exports/brand-kit/<deterministic-id>",
+    "starterExports": ".cutout/exports/starter/<deterministic-id>"
+  },
+  "formats": {
+    "designKit": ["DESIGN.md", "tokens.json", "tokens.css", "tailwind.css", "theme.ts", "manifest.json"],
+    "astryxBinding": ["astryx/cutout.theme.ts", "astryx/component-mapping.json", "astryx/cli-plan.json"],
+    "brandKit": ["BRAND.md", "brand.tokens.json", "brand.css", "brand.manifest.json"],
+    "starterFrameworks": ["next-app-router", "vite-react", "nuxt", "tanstack-start"]
+  },
+  "limitations": [
+    "No live Figma sync or OAuth connector host; Figma support consumes caller-provided authorized snapshots.",
+    "Notion support requires an injected authorized connector host. It handles selected shared content and approved page publication only; no workspace-wide search or generic bidirectional sync is implemented.",
+    "No web crawl or web search; URL ingestion stores a descriptor without fetching it.",
+    "No video processing pipeline.",
+    "No cloud collaboration or remote project service.",
+    "No arbitrary command execution, process spawning, absolute-path scans or arbitrary export destinations.",
+    "No provider executor, bundled coding host or credentials; coding.* requires an injected controlled backend and workspace and otherwise returns capability-required.",
+    "The desktop app has an internal durable local Agent Host under an authorized workspace, but its lifecycle commands are not exposed through cutout.control.v1, CLI, or MCP and it has no provider or arbitrary-shell executor.",
+    "CPU hard limits are capability-required; the Node command host currently enforces wall-clock and output-byte limits, not a kernel CPU quota.",
+    "General Node network isolation is capability-required; provider network traffic is instead constrained by the Rust proxy boundary.",
+    "Reliable Windows process-tree cancellation is capability-required until a Job Object host adapter is implemented; POSIX hosts use detached process-group termination.",
+    "No screenshot-to-JSX inference; starter output requires explicit verified component evidence."
+  ]
+}

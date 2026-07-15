@@ -1,0 +1,5 @@
+import { builtinAdapterRequiredManifests } from '@/integration-sdk/manifests'
+import type { IntegrationManifest } from '@/integration-sdk/contracts'
+const extra: readonly IntegrationManifest[] = [manifest('cutout.figma','Figma','authorization-required','Authorized snapshot selection requires a connector host.'),manifest('cutout.github','GitHub','host-required','GitHub requires an installed host session.'),manifest('cutout.repository','Repository','host-required','Local repository selection requires the desktop host.')]
+export const connectorCatalog=[...new Map([...extra,...builtinAdapterRequiredManifests].map((entry)=>[entry.id,entry])).values()]
+function manifest(id:string,name:string,availability:IntegrationManifest['availability'],unavailableReason:string):IntegrationManifest{return{protocol:'integration-sdk.v1',id,version:'1.0.0',provider:{id:name.toLowerCase(),name},product:{id:name.toLowerCase(),name},surfaces:['desktop'],capabilities:[],auth:{modes:['host-session']},dataDomains:[],syncModes:['none'],eventModel:{cursor:'none',webhooks:'none',delivery:'at-most-once'},limits:{maxBatchItems:1,maxPayloadBytes:1},availability,unavailableReason}}

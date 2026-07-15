@@ -9,19 +9,19 @@
  * time — it is deliberately NOT embedded in the spec.
  *
  * This module owns only the SHAPE (types + schema). Structural validity (unique
- * ids, edges referencing real nodes, `inputs ⊆ edges`, acyclicity) lives in
+ * ids, edges referencing real nodes, exact input/edge equality, acyclicity) lives in
  * `validate.ts` so the schema stays a pure, reusable contract.
  */
 import { z } from 'zod'
 
 /**
  * The reusable node vocabulary (spec §3 table). Each op maps to one service:
- * `plan` (chat + generateObject, bootstrap only) · `generate-image` (image slot)
- * · `edit-image` (垫图 via editImage) · `deconstruct` (image slot) · `cutout`
- * (deterministic worker) · `name` (chat + generateObject).
+ * `generate-image` (image slot) · `edit-image` (垫图 via editImage) ·
+ * `deconstruct` (image slot) · `cutout` (deterministic worker) · `name`
+ * (chat + generateObject). Planning is a bootstrap concern and never appears as
+ * an executable node.
  */
 export const NODE_OPS = [
-  'plan',
   'generate-image',
   'edit-image',
   'deconstruct',
@@ -37,8 +37,8 @@ export const nodeOpSchema = z.enum(NODE_OPS)
 
 /**
  * One node in an AI-emitted graph. `inputs` are the ids of upstream nodes whose
- * OUTPUT feeds this one (data dependencies); every input must also appear as an
- * incoming edge (`inputs ⊆ edges`, enforced in `validate.ts`). The model slot is
+ * OUTPUT feeds this one (data dependencies); inputs and incoming edges must be
+ * an exact one-to-one match (enforced in `validate.ts`). The model slot is
  * resolved from Settings, not embedded — only op-specific hints live here.
  */
 export interface GraphNodeSpec {

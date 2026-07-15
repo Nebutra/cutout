@@ -8,7 +8,7 @@ const vectorizeBridgeStubs = {
   deleteVectorizerApiKey: async () => undefined,
   vectorizeLocalVTracer: async () => ({ svg: '<svg />' }),
   vectorizeVectorizerAi: async () => ({ svg: '<svg />' }),
-} satisfies Omit<NativeBridge, 'saveAssets'>
+} satisfies Omit<NativeBridge, 'saveAssets' | 'saveBundle'>
 
 function fakeBridge(result: SaveAssetsResult) {
   const calls: { count: number; destDir?: string }[] = []
@@ -18,6 +18,7 @@ function fakeBridge(result: SaveAssetsResult) {
       calls.push({ count: assets.length, destDir })
       return result
     },
+    saveBundle: async () => ({ canceled: true, outputDir: null, bundleDir: null, fileCount: 0, totalBytes: 0, files: [] }),
   }
   return { bridge, calls }
 }

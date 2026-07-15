@@ -15,23 +15,30 @@
  * Rust throughout. The planned graph is SEPARATE from the singleton
  * source/analysis that back the linear board→slices leg.
  */
-import { useMutation } from '@tanstack/react-query'
-import { useServices } from '@/services/context'
-import { isErr } from '@/services/types'
-import type { ServiceRegistry } from '@/services/types'
-import type { GraphNodeSpec } from '@/dag/graph-spec'
-import { planFromBrief } from '@/dag/run-plan'
-import { runGraph, reRunSubtree, subtreeIds } from '@/dag/executor'
-import { nameSlices, type SliceBox } from '@/services/ai/naming'
-import type { ModelAssignment } from '@/services/ai/model-assignment-types'
-import { getStoreState } from '@/store'
-import type { DagNodeOutput } from '@/store/types'
-import { decodeImage, bytesToBlob } from '@/lib/image'
-import { useModelAssignments } from './ai-settings'
+import { useMutation } from "@tanstack/react-query";
+import { useEffect, useRef } from "react";
+import { useServices } from "@/services/context";
+import { isErr } from "@/services/types";
+import type { ServiceRegistry } from "@/services/types";
+import type { GraphNodeSpec } from "@/dag/graph-spec";
+import { planFromBrief } from "@/dag/run-plan";
+import {
+  createRunSnapshot,
+  runGraph,
+  reRunSubtree,
+  subtreeIds,
+} from "@/dag/executor";
+import { dagRunCoordinator, type DagRunLease } from "@/dag/run-coordinator";
+import { nameSlices, type SliceBox } from "@/services/ai/naming";
+import type { ModelAssignment } from "@/services/ai/model-assignment-types";
+import { getStoreState } from "@/store";
+import type { DagNodeOutput } from "@/store/types";
+import { decodeImage, bytesToBlob } from "@/lib/image";
+import { useModelAssignments } from "./ai-settings";
 
 /** Whether a provider kind is served by the OpenAI-shaped `/images/edits`. */
 function isOpenAiShaped(kind: string | undefined): boolean {
-  return kind === 'openai' || kind === 'openai-compatible'
+  return kind === "openai" || kind === "openai-compatible";
 }
 
 /** Pull the first image-kind output out of a node's upstream inputs. */
@@ -39,19 +46,32 @@ function firstImageBytes(
   inputs: ReadonlyMap<string, DagNodeOutput>,
 ): Uint8Array | null {
   for (const output of inputs.values()) {
-    if (output.kind === 'image') return output.bytes
+    if (output.kind === "image") return output.bytes;
   }
-  return null
+  return null;
+}
+
+/** Preserve graph input order when collecting edit-image references. */
+function imageBytes(
+  node: GraphNodeSpec,
+  inputs: ReadonlyMap<string, DagNodeOutput>,
+): Uint8Array[] {
+  const references: Uint8Array[] = [];
+  for (const inputId of node.inputs) {
+    const output = inputs.get(inputId);
+    if (output?.kind === "image") references.push(output.bytes);
+  }
+  return references;
 }
 
 /** Pull the first slices-kind output out of a node's upstream inputs. */
 function firstSlices(
   inputs: ReadonlyMap<string, DagNodeOutput>,
-): Extract<DagNodeOutput, { kind: 'slices' }> | null {
+): Extract<DagNodeOutput, { kind: "slices" }> | null {
   for (const output of inputs.values()) {
-    if (output.kind === 'slices') return output
+    if (output.kind === "slices") return output;
   }
-  return null
+  return null;
 }
 
 /**
@@ -65,48 +85,65 @@ function createNodeRunner(
   chat: ModelAssignment,
   imageKind: string | undefined,
 ) {
-  const { generation, prompts, cutout } = services
+  const { generation, prompts, cutout } = services;
 
   return async function runNode(
     node: GraphNodeSpec,
     inputs: ReadonlyMap<string, DagNodeOutput>,
+    signal?: AbortSignal,
   ): Promise<DagNodeOutput> {
     switch (node.op) {
-      case 'generate-image': {
+      case "generate-image": {
         const result = await generation.generateImages({
           providerId: image.providerId,
           model: image.model,
           prompt: node.prompt ?? node.label,
-        })
-        if (isErr(result)) throw new Error(result.error)
-        const asset = result.data[0]
-        if (!asset) throw new Error('The model returned no image.')
-        return { kind: 'image', bytes: asset.bytes, mediaType: asset.mediaType }
+          signal,
+        });
+        if (isErr(result)) throw new Error(result.error);
+        const asset = result.data[0];
+        if (!asset) throw new Error("The model returned no image.");
+        return {
+          kind: "image",
+          bytes: asset.bytes,
+          mediaType: asset.mediaType,
+        };
       }
 
-      case 'edit-image': {
-        const reference = firstImageBytes(inputs)
-        if (!reference) throw new Error('The mockup step has no upstream image.')
+      case "edit-image": {
+        const references = imageBytes(node, inputs);
+        if (references.length !== node.inputs.length) {
+          throw new Error(
+            "The mockup step requires an image from every upstream input.",
+          );
+        }
         const result = await generation.editImage({
           providerId: image.providerId,
           model: image.model,
           prompt: node.prompt ?? node.label,
-          images: [reference],
-          inputFidelity: node.fidelity ?? 'high',
-        })
-        if (isErr(result)) throw new Error(result.error)
-        const asset = result.data[0]
-        if (!asset) throw new Error('The model returned no image.')
-        return { kind: 'image', bytes: asset.bytes, mediaType: asset.mediaType }
+          images: references,
+          inputFidelity: node.fidelity ?? "high",
+          signal,
+        });
+        if (isErr(result)) throw new Error(result.error);
+        const asset = result.data[0];
+        if (!asset) throw new Error("The model returned no image.");
+        return {
+          kind: "image",
+          bytes: asset.bytes,
+          mediaType: asset.mediaType,
+        };
       }
 
-      case 'deconstruct': {
-        const mockup = firstImageBytes(inputs)
-        if (!mockup) throw new Error('The board step has no upstream mockup.')
-        const rendered = await prompts.render({ id: 'ui-asset-deconstruction' })
+      case "deconstruct": {
+        const mockup = firstImageBytes(inputs);
+        if (!mockup) throw new Error("The board step has no upstream mockup.");
+        const rendered = await prompts.render({
+          id: "ui-asset-deconstruction",
+        });
         const promptText = node.prompt
           ? `${rendered.system}\n\n${node.prompt}`
-          : rendered.system
+          : rendered.system;
         // 垫图 for OpenAI-shaped providers; Gemini keeps the multimodal path.
         const result = isOpenAiShaped(imageKind)
           ? await generation.editImage({
@@ -114,55 +151,66 @@ function createNodeRunner(
               model: image.model,
               prompt: promptText,
               images: [mockup],
-              inputFidelity: 'high',
+              inputFidelity: "high",
+              signal,
             })
           : await generation.generateImages({
               providerId: image.providerId,
               model: image.model,
-              promptRef: { id: 'ui-asset-deconstruction' },
+              promptRef: { id: "ui-asset-deconstruction" },
               input: [
-                ...(node.prompt ? [{ type: 'text' as const, text: node.prompt }] : []),
-                { type: 'image', image: mockup },
+                ...(node.prompt
+                  ? [{ type: "text" as const, text: node.prompt }]
+                  : []),
+                { type: "image", image: mockup },
               ],
-            })
-        if (isErr(result)) throw new Error(result.error)
-        const asset = result.data[0]
-        if (!asset) throw new Error('The model returned no image.')
-        return { kind: 'image', bytes: asset.bytes, mediaType: asset.mediaType }
+              signal,
+            });
+        if (isErr(result)) throw new Error(result.error);
+        const asset = result.data[0];
+        if (!asset) throw new Error("The model returned no image.");
+        return {
+          kind: "image",
+          bytes: asset.bytes,
+          mediaType: asset.mediaType,
+        };
       }
 
-      case 'cutout': {
-        const boardBytes = firstImageBytes(inputs)
-        if (!boardBytes) throw new Error('The cutout step has no upstream board.')
-        const bitmap = await decodeImage(bytesToBlob(boardBytes, 'image/png'))
-        const result = await cutout.run({ bitmap, params: getStoreState().params })
-        if (isErr(result)) throw new Error(result.error)
-        return { kind: 'slices', slices: result.data.slices, boardBytes }
+      case "cutout": {
+        const boardBytes = firstImageBytes(inputs);
+        if (!boardBytes)
+          throw new Error("The cutout step has no upstream board.");
+        const bitmap = await decodeImage(bytesToBlob(boardBytes, "image/png"));
+        const result = await cutout.run({
+          bitmap,
+          params: getStoreState().params,
+          signal,
+        });
+        if (isErr(result)) throw new Error(result.error);
+        return { kind: "slices", slices: result.data.slices, boardBytes };
       }
 
-      case 'name': {
-        const upstream = firstSlices(inputs)
-        if (!upstream) throw new Error('The naming step has no upstream slices.')
+      case "name": {
+        const upstream = firstSlices(inputs);
+        if (!upstream)
+          throw new Error("The naming step has no upstream slices.");
         const boxes: SliceBox[] = upstream.slices.map((s) => ({
           index: s.index,
           box: s.box,
-        }))
+        }));
         const result = await nameSlices(generation, {
           providerId: chat.providerId,
           model: chat.model,
           imageBytes: upstream.boardBytes,
           slices: boxes,
           effort: chat.effort,
-        })
-        if (isErr(result)) throw new Error(result.error)
-        return { kind: 'names', names: result.data }
+          signal,
+        });
+        if (isErr(result)) throw new Error(result.error);
+        return { kind: "names", names: result.data };
       }
-
-      default:
-        // `plan` is a bootstrap op, not something the Executor runs.
-        throw new Error(`Unsupported planned op: ${node.op}`)
     }
-  }
+  };
 }
 
 /** Resolve the image provider's kind (for the 垫图 vs. multimodal branch). */
@@ -170,8 +218,8 @@ async function imageProviderKind(
   services: ServiceRegistry,
   providerId: string,
 ): Promise<string | undefined> {
-  const configs = await services.providers.list()
-  return configs.find((c) => c.id === providerId)?.kind
+  const configs = await services.providers.list();
+  return configs.find((c) => c.id === providerId)?.kind;
 }
 
 /**
@@ -185,45 +233,71 @@ async function imageProviderKind(
  * here are a safety net.
  */
 export function useRunPlan() {
-  const services = useServices()
-  const assignments = useModelAssignments()
+  const services = useServices();
+  const assignments = useModelAssignments();
+  const ownedLeaseRef = useRef<DagRunLease | null>(null);
+
+  useEffect(
+    () => () => {
+      if (ownedLeaseRef.current)
+        dagRunCoordinator.cancel(ownedLeaseRef.current);
+    },
+    [],
+  );
 
   return useMutation<void, Error, void>({
     mutationFn: async () => {
-      const chat = assignments.data?.chat
-      if (!chat) throw new Error('No chat/vision model is configured for planning.')
-      const image = assignments.data?.image
-      if (!image) throw new Error('No image-generation model is configured.')
+      const lease = dagRunCoordinator.begin();
+      const { controller } = lease;
+      ownedLeaseRef.current = lease;
+      try {
+        const chat = assignments.data?.chat;
+        if (!chat)
+          throw new Error("No chat/vision model is configured for planning.");
+        const image = assignments.data?.image;
+        if (!image) throw new Error("No image-generation model is configured.");
+        const brief = getStoreState().brief.trim();
+        if (!brief) throw new Error("Write a brief before planning.");
 
-      const brief = getStoreState().brief.trim()
-      if (!brief) throw new Error('Write a brief before planning.')
+        // Recognize → (clarify | plan). Pure orchestration lives in the DAG layer.
+        const outcome = await planFromBrief(services.generation, {
+          providerId: chat.providerId,
+          model: chat.model,
+          brief,
+          effort: chat.effort,
+          signal: controller.signal,
+        });
+        if (!dagRunCoordinator.isActive(lease)) return;
+        if (isErr(outcome)) throw new Error(outcome.error);
 
-      // Recognize → (clarify | plan). Pure orchestration lives in the DAG layer.
-      const outcome = await planFromBrief(services.generation, {
-        providerId: chat.providerId,
-        model: chat.model,
-        brief,
-        effort: chat.effort,
-      })
-      if (isErr(outcome)) throw new Error(outcome.error)
+        // Surface the derived understanding regardless of which branch we took.
+        getStoreState().setIntent(outcome.data.intent);
 
-      // Surface the derived understanding regardless of which branch we took.
-      getStoreState().setIntent(outcome.data.intent)
+        // Low confidence / open questions → stop; the BriefNode shows the prompts.
+        if (outcome.data.kind === "clarify") return;
 
-      // Low confidence / open questions → stop; the BriefNode shows the prompts.
-      if (outcome.data.kind === 'clarify') return
+        const graph = outcome.data.graph;
+        if (!dagRunCoordinator.isActive(lease)) return;
+        getStoreState().setGraph(graph);
 
-      const graph = outcome.data.graph
-      getStoreState().setGraph(graph)
-
-      const kind = await imageProviderKind(services, image.providerId)
-      const runNode = createNodeRunner(services, image, chat, kind)
-      await runGraph<DagNodeOutput>(graph, {
-        runNode,
-        onStatus: (id, state) => getStoreState().setDagNodeState(id, state),
-      })
+        const kind = await imageProviderKind(services, image.providerId);
+        if (!dagRunCoordinator.isActive(lease)) return;
+        const runNode = createNodeRunner(services, image, chat, kind);
+        await runGraph<DagNodeOutput>(graph, {
+          runNode,
+          signal: controller.signal,
+          onStatus: (id, state) => {
+            if (dagRunCoordinator.isActive(lease)) {
+              getStoreState().setDagNodeState(id, state);
+            }
+          },
+        });
+      } finally {
+        dagRunCoordinator.finish(lease);
+        if (ownedLeaseRef.current === lease) ownedLeaseRef.current = null;
+      }
     },
-  })
+  });
 }
 
 /**
@@ -231,30 +305,64 @@ export function useRunPlan() {
  * spec §5/§D). Prior outputs feed the re-run; only the stale subtree re-executes.
  */
 export function useReRunSubtree() {
-  const services = useServices()
-  const assignments = useModelAssignments()
+  const services = useServices();
+  const assignments = useModelAssignments();
+  const ownedLeaseRef = useRef<DagRunLease | null>(null);
+
+  useEffect(
+    () => () => {
+      if (ownedLeaseRef.current)
+        dagRunCoordinator.cancel(ownedLeaseRef.current);
+    },
+    [],
+  );
 
   return useMutation<void, Error, string>({
     mutationFn: async (nodeId) => {
-      const chat = assignments.data?.chat
-      const image = assignments.data?.image
-      if (!chat || !image) throw new Error('Configure a chat and an image model.')
+      const lease = dagRunCoordinator.begin();
+      const { controller } = lease;
+      ownedLeaseRef.current = lease;
+      try {
+        const chat = assignments.data?.chat;
+        const image = assignments.data?.image;
+        if (!chat || !image)
+          throw new Error("Configure a chat and an image model.");
+        const store = getStoreState();
+        const graph = store.graph;
+        if (!graph) throw new Error("There is no planned graph to re-run.");
+        if (!graph.nodes.some((node) => node.id === nodeId)) {
+          throw new Error(`Unknown node: "${nodeId}".`);
+        }
 
-      const store = getStoreState()
-      const graph = store.graph
-      if (!graph) throw new Error('There is no planned graph to re-run.')
-
-      // Mark the stale subtree idle up front so the canvas reflects the re-run.
-      const stale = subtreeIds(graph, nodeId)
-      store.resetDagNodes(stale)
-
-      const prior = new Map(Object.entries(getStoreState().dagNodes))
-      const kind = await imageProviderKind(services, image.providerId)
-      const runNode = createNodeRunner(services, image, chat, kind)
-      await reRunSubtree<DagNodeOutput>(graph, nodeId, {
-        runNode,
-        onStatus: (id, state) => getStoreState().setDagNodeState(id, state),
-      }, prior)
+        const prior = createRunSnapshot(
+          graph,
+          0,
+          new Map(Object.entries(store.dagNodes)),
+        );
+        // Mark the stale subtree idle up front so the canvas reflects the re-run.
+        const stale = subtreeIds(graph, nodeId);
+        store.resetDagNodes(stale);
+        const kind = await imageProviderKind(services, image.providerId);
+        if (!dagRunCoordinator.isActive(lease)) return;
+        const runNode = createNodeRunner(services, image, chat, kind);
+        await reRunSubtree<DagNodeOutput>(
+          graph,
+          nodeId,
+          {
+            runNode,
+            signal: controller.signal,
+            onStatus: (id, state) => {
+              if (dagRunCoordinator.isActive(lease)) {
+                getStoreState().setDagNodeState(id, state);
+              }
+            },
+          },
+          prior,
+        );
+      } finally {
+        dagRunCoordinator.finish(lease);
+        if (ownedLeaseRef.current === lease) ownedLeaseRef.current = null;
+      }
     },
-  })
+  });
 }

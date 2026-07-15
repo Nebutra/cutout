@@ -3,12 +3,14 @@
  *
  * Thin, dense, and calm (Linear/Raycast). Draggable region for the frameless
  * feel is left to the Tauri window config; here we only lay out controls.
- * Settings now lives in the workspace sidebar, matching design-tool shells.
+ * Global destinations stay pinned on the right so they remain reachable from
+ * both Home and project views.
  */
 import { Home, Plus, Scissors, X } from 'lucide-react'
 import { TopBarActions } from './TopBarActions'
-import { ThemeToggle } from './ThemeToggle'
-import { LibraryMenu } from './LibraryMenu'
+import { ProjectMenu } from './ProjectMenu'
+import { shouldShowProjectMenu } from './project-menu-visibility'
+import { TabsMenu, type ClosedTab } from './TabsMenu'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
@@ -21,6 +23,10 @@ export interface TopBarProps {
   readonly onCloseProject: () => void
   readonly onNewProject: () => void
   readonly onRerun: () => void
+  readonly onArchiveProject: () => void
+  readonly onOpenDesignOs: () => void
+  readonly recentlyClosedTabs: readonly ClosedTab[]
+  readonly onReopenTab: (id: string) => void
 }
 
 export function TopBar({
@@ -32,6 +38,9 @@ export function TopBar({
   onCloseProject,
   onNewProject,
   onRerun,
+  onArchiveProject,
+  recentlyClosedTabs,
+  onReopenTab,
 }: TopBarProps) {
   return (
     <header className="flex h-12 shrink-0 items-stretch justify-between gap-3 border-b border-border bg-background/80 px-3 backdrop-blur">
@@ -44,20 +53,23 @@ export function TopBar({
             onClick={onOpenHome}
           />
           {projectTabOpen ? (
-            <TopTab
-              active={view === 'project'}
-              label={projectName}
-              icon={<Scissors className="size-3.5" />}
-              onClick={onOpenProject}
-              onClose={onCloseProject}
-            />
+            <div className="flex items-center">
+              <TopTab
+                active={view === 'project'}
+                label={projectName}
+                icon={<Scissors className="size-3.5" />}
+                onClick={onOpenProject}
+                onClose={onCloseProject}
+              />
+              {shouldShowProjectMenu(view) ? <ProjectMenu projectName={projectName} onArchive={onArchiveProject} /> : null}
+            </div>
           ) : null}
           <Button
             type="button"
             variant="ghost"
             size="icon-sm"
-            aria-label="New project"
-            className="my-2 shrink-0 rounded-md"
+            aria-label="New task"
+            className="my-0.5 size-11 shrink-0 rounded-md"
             onClick={onNewProject}
           >
             <Plus className="size-3.5" />
@@ -67,9 +79,16 @@ export function TopBar({
 
       <div className="flex items-center gap-1.5">
         {view === 'project' ? <TopBarActions onRerun={onRerun} /> : null}
-        {view === 'project' ? <div className="mx-1 h-5 w-px bg-border" /> : null}
-        <LibraryMenu />
-        <ThemeToggle />
+        <TabsMenu
+          view={view}
+          projectName={projectName}
+          projectTabOpen={projectTabOpen}
+          recentlyClosed={recentlyClosedTabs}
+          onOpenHome={onOpenHome}
+          onOpenProject={onOpenProject}
+          onCloseProject={onCloseProject}
+          onReopenTab={onReopenTab}
+        />
       </div>
     </header>
   )

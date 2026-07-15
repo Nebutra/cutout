@@ -142,7 +142,26 @@ export type PrototypeRegion = z.infer<typeof prototypeRegionSchema>
 export type PrototypePage = z.infer<typeof prototypePageSchema>
 export type PrototypeFlow = z.infer<typeof prototypeFlowSchema>
 export type PrototypeHumanLoop = z.infer<typeof prototypeHumanLoopSchema>
+export type PrototypeHumanLoopAsk = Extract<PrototypeHumanLoop, { mode: 'ask' }>
 export type PrototypePlan = z.infer<typeof prototypePlanSchema>
+
+export type HumanLoopChoice = PrototypeHumanLoopAsk['choices'][number]
+export type ResolvedHumanLoopAnswer =
+  | { readonly kind: 'choice', readonly choice: HumanLoopChoice, readonly note: string | null }
+  | { readonly kind: 'custom', readonly text: string }
+
+/**
+ * The minimal shape both `PrototypeHumanLoopAsk` (planPrototype's structured
+ * output, mutable arrays from z.infer) and a live `AgentRunProjection`
+ * ask (readonly arrays, built from run events) satisfy — a plain mutable
+ * array is assignable to a `readonly` one, not the reverse, so this is
+ * intentionally `readonly` throughout to accept both without a cast.
+ */
+export interface HumanLoopAskLike {
+  readonly question: string
+  readonly choices: readonly HumanLoopChoice[]
+  readonly defaultChoiceId: string
+}
 
 export interface PrototypePlanValidation {
   readonly reachablePageIds: readonly string[]

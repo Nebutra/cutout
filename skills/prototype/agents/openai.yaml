@@ -1,0 +1,4 @@
+interface:
+  display_name: "Prototype"
+  short_description: "Plan and validate a reachable product prototype"
+  default_prompt: "Use $prototype to create a validated outcome-oriented prototype plan."

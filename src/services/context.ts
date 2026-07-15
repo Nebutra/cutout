@@ -12,12 +12,15 @@ import { createContext, createElement, useContext } from 'react'
 import type { ReactNode } from 'react'
 import { tauriBridge, type NativeBridge } from '@/platform/native'
 import type { ServiceRegistry } from './types'
+import type { GenerationService, ProviderService } from './ai/types'
+import type { PromptService } from '@/prompts/types'
 import { createLocalCutoutService } from './local/cutout-service.local'
 import { createLocalAssetRepository } from './local/asset-repository.local'
+import { createLocalBundleRepository } from './local/bundle-repository.local'
+import { createLocalRepositorySourceService } from './local/repository-source.local'
 import { createLocalVectorizeService } from './local/vectorize-service.local'
 import { createLocalSessionService } from './local/session.local'
 import { createLocalProviderService } from './ai/provider-service.local'
-import { createLocalGenerationService } from './ai/generation-service.local'
 import { createLocalPromptService } from './ai/prompt-service.local'
 
 /** Assemble the local (v1) registry from a worker + native bridge. */
@@ -34,11 +37,52 @@ export function createLocalRegistry(
   return {
     cutout: createLocalCutoutService(worker),
     assets: createLocalAssetRepository(bridge),
+    bundles: createLocalBundleRepository(bridge),
+    repositorySources: createLocalRepositorySourceService(bridge),
     vectorize: createLocalVectorizeService(bridge),
     session: createLocalSessionService(),
     providers,
-    generation: createLocalGenerationService(providers, prompts),
+    generation: createDeferredGenerationService(providers, prompts),
     prompts,
+  }
+}
+
+/**
+ * Keep the AI SDK and every provider adapter out of the application entry.
+ * Generation methods are already asynchronous, so resolving the implementation
+ * on the first paid/model-backed action preserves the public contract while
+ * avoiding a large startup download for Home and offline editing.
+ */
+function createDeferredGenerationService(
+  providers: Pick<ProviderService, 'list'>,
+  prompts: PromptService,
+): GenerationService {
+  let service: Promise<GenerationService> | undefined
+  const load = () => service ??= import('./ai/generation-service.local')
+    .then(({ createLocalGenerationService }) => createLocalGenerationService(providers, prompts))
+
+  return {
+    async generateText(input) {
+      return (await load()).generateText(input)
+    },
+    async *streamText(input) {
+      yield* (await load()).streamText(input)
+    },
+    async generateImages(input) {
+      return (await load()).generateImages(input)
+    },
+    async editImage(input) {
+      return (await load()).editImage(input)
+    },
+    async research(input) {
+      return (await load()).research(input)
+    },
+    async generateObject(input, schema) {
+      return (await load()).generateObject(input, schema)
+    },
+    async generateWithTools(input) {
+      return (await load()).generateWithTools(input)
+    },
   }
 }
 

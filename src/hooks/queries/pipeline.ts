@@ -20,10 +20,13 @@ import { toast } from 'sonner'
 import { useLingui } from '@lingui/react/macro'
 import { useServices } from '@/services/context'
 import { isErr } from '@/services/types'
+import type { CutoutSlice } from '@/services/types'
 import type { PromptPart, PromptService } from '@/prompts/types'
 import { nameSlices, type SliceBox } from '@/services/ai/naming'
 import { composeFromLibrary } from '@/services/ai/library-compose'
 import type { ProviderConfig } from '@/services/ai/provider-types'
+import type { ModelAssignment } from '@/services/ai/model-assignment-types'
+import type { GenerationService, ProviderService } from '@/services/ai/types'
 import { getStoreState, useStore } from '@/store'
 import type { MockupArtifact } from '@/store/types'
 import {
@@ -44,6 +47,38 @@ export interface DeconstructPreflight {
 export interface DeconstructMockupInput {
   readonly preflight?: Promise<DeconstructPreflight> | DeconstructPreflight
   readonly referenceImages?: readonly Uint8Array[]
+  readonly signal?: AbortSignal
+}
+
+export interface NameSlicesInput {
+  readonly signal?: AbortSignal
+}
+
+/** Explicit-param inputs for {@link runDeconstructMockup} — no store reads. */
+export interface DeconstructMockupParams {
+  readonly mockupBlob: Blob
+  readonly brief: string
+  readonly image: ModelAssignment
+  readonly preflight?: Promise<DeconstructPreflight> | DeconstructPreflight
+  readonly referenceImages?: readonly Uint8Array[]
+  readonly signal?: AbortSignal
+}
+
+export interface DeconstructMockupResult {
+  readonly bitmap: ImageBitmap
+  readonly name: string
+}
+
+/** Explicit-param inputs for {@link runNameSlices} — no store reads. */
+export interface NameSlicesParams {
+  readonly boardBitmap: ImageBitmap
+  readonly slices: readonly Pick<CutoutSlice, 'id' | 'index' | 'box'>[]
+  readonly chat: ModelAssignment
+  readonly signal?: AbortSignal
+}
+
+export interface NameSlicesResult {
+  readonly renamed: readonly { readonly id: string; readonly name: string }[]
 }
 
 /** Decode a generated/imported image `Blob` into a {@link MockupArtifact}. */
@@ -160,20 +195,103 @@ export function useGenerateMockup() {
 }
 
 /**
+ * The mockup → cutout-ready asset board transition (`ui-asset-deconstruction`),
+ * as an explicit-param, store-free function — no Zustand reads/writes, no
+ * `beginGen`/`endGen`/`failGen` phase bracketing. {@link useDeconstructMockup}
+ * wraps this with the store bracket; a future tool wrapper can call it
+ * directly with its own bracket (or none).
+ */
+export async function runDeconstructMockup(
+  deps: {
+    readonly generation: Pick<GenerationService, 'editImage' | 'generateImages'>
+    readonly providers: Pick<ProviderService, 'list'>
+    readonly prompts: Pick<PromptService, 'render'>
+  },
+  params: DeconstructMockupParams,
+): Promise<DeconstructMockupResult> {
+  const totalStarted = markTime()
+  const { mockupBlob, brief, image, preflight: inputPreflight, referenceImages = [], signal } = params
+  signal?.throwIfAborted()
+
+  // 垫图: when the image slot is an OpenAI-shaped provider, the upstream
+  // mockup is a reference image the `/images/edits` endpoint conditions on
+  // (the OpenAI images path can't carry an input image otherwise). Gemini &
+  // other chat-image models keep the multimodal `generateImages` path, which
+  // already sends the mockup as an image part.
+  const preflightStarted = markTime()
+  const preflight = inputPreflight
+    ? Promise.resolve(inputPreflight)
+    : Promise.all([
+        deps.providers.list(),
+        deconstructPromptText(deps.prompts, brief, 1 + referenceImages.length),
+      ]).then(([configs, promptText]) => ({ configs, promptText }))
+  const [mockupBytes, resolvedPreflight] = await Promise.all([
+    blobToBytes(mockupBlob),
+    preflight,
+  ])
+  signal?.throwIfAborted()
+  const { configs, promptText } = resolvedPreflight
+  const kind = configs.find((p) => p.id === image.providerId)?.kind
+  const useEdit = kind === 'openai' || kind === 'openai-compatible'
+  logTiming('deconstruct.preflight', preflightStarted, {
+    route: useEdit ? 'edit-image' : 'generate-image',
+  })
+
+  const apiStarted = markTime()
+  const result = useEdit
+    ? await deps.generation.editImage({
+        providerId: image.providerId,
+        model: image.model,
+        prompt: promptText,
+        images: [mockupBytes, ...referenceImages],
+        inputFidelity: 'high',
+        signal,
+      })
+    : await deps.generation.generateImages({
+        providerId: image.providerId,
+        model: image.model,
+        promptRef: { id: 'ui-asset-deconstruction' },
+        input: buildDeconstructParts(brief, mockupBytes, referenceImages),
+        signal,
+      })
+  logTiming('deconstruct.api', apiStarted, {
+    route: useEdit ? 'edit-image' : 'generate-image',
+  })
+  if (isErr(result)) throw new Error(result.error)
+  signal?.throwIfAborted()
+  const asset = result.data[0]
+  if (!asset) throw new Error('The model returned no image.')
+
+  // The board becomes the cutout source → auto-analysis follows (§7).
+  const decodeStarted = markTime()
+  const bitmap = await decodeImage(bytesToBlob(asset.bytes, asset.mediaType))
+  if (signal?.aborted) {
+    bitmap.close()
+    signal.throwIfAborted()
+  }
+  logTiming('deconstruct.decode-load', decodeStarted)
+  logTiming('deconstruct.total', totalStarted)
+  return { bitmap, name: 'generated-sheet' }
+}
+
+/**
  * Mutation: the current mockup → a cutout-ready asset board
  * (`ui-asset-deconstruction`). The brief (if any) rides along as text framing.
  * The result loads as the cutout **source**, so the existing worker auto-run
  * fills the `board`/`slices` nodes unchanged.
  */
-export function useDeconstructMockup() {
+export function useDeconstructMockup(
+  getRunAssignment?: () => ModelAssignment | undefined,
+) {
   const { generation, providers, prompts } = useServices()
   const assignments = useModelAssignments()
   const loadImage = useStore((s) => s.loadImage)
 
   return useMutation<void, Error, DeconstructMockupInput | void>({
     mutationFn: async (input) => {
-      const totalStarted = markTime()
-      const image = assignments.data?.image
+      // Agent runs inject their route locked at run start. Standalone canvas
+      // actions keep the Settings assignment fallback.
+      const image = getRunAssignment?.() ?? assignments.data?.image
       if (!image) throw new Error('No image-generation model is configured.')
 
       const snapshot = getStoreState()
@@ -183,65 +301,27 @@ export function useDeconstructMockup() {
         input && 'referenceImages' in input && input.referenceImages
           ? input.referenceImages
           : []
+      const signal = input && 'signal' in input ? input.signal : undefined
+      signal?.throwIfAborted()
 
       const brief = snapshot.brief.trim()
       snapshot.beginGen('deconstructing')
-
-      // 垫图: when the image slot is an OpenAI-shaped provider, the upstream
-      // mockup is a reference image the `/images/edits` endpoint conditions on
-      // (the OpenAI images path can't carry an input image otherwise). Gemini &
-      // other chat-image models keep the multimodal `generateImages` path, which
-      // already sends the mockup as an image part.
       try {
-        const preflightStarted = markTime()
-        const preflight =
-          input && 'preflight' in input && input.preflight
-            ? Promise.resolve(input.preflight)
-            : Promise.all([
-                providers.list(),
-                deconstructPromptText(prompts, brief, 1 + referenceImages.length),
-              ]).then(([configs, promptText]) => ({ configs, promptText }))
-        const [mockupBytes, resolvedPreflight] = await Promise.all([
-          blobToBytes(mockup.blob),
-          preflight,
-        ])
-        const { configs, promptText } = resolvedPreflight
-        const kind = configs.find((p) => p.id === image.providerId)?.kind
-        const useEdit = kind === 'openai' || kind === 'openai-compatible'
-        logTiming('deconstruct.preflight', preflightStarted, {
-          route: useEdit ? 'edit-image' : 'generate-image',
-        })
-
-        const apiStarted = markTime()
-        const result = useEdit
-          ? await generation.editImage({
-              providerId: image.providerId,
-              model: image.model,
-              prompt: promptText,
-              images: [mockupBytes, ...referenceImages],
-              inputFidelity: 'high',
-            })
-          : await generation.generateImages({
-              providerId: image.providerId,
-              model: image.model,
-              promptRef: { id: 'ui-asset-deconstruction' },
-              input: buildDeconstructParts(brief, mockupBytes, referenceImages),
-            })
-        logTiming('deconstruct.api', apiStarted, {
-          route: useEdit ? 'edit-image' : 'generate-image',
-        })
-        if (isErr(result)) throw new Error(result.error)
-        const asset = result.data[0]
-        if (!asset) throw new Error('The model returned no image.')
-
-        // The board becomes the cutout source → auto-analysis follows (§7).
-        const decodeStarted = markTime()
-        const bitmap = await decodeImage(bytesToBlob(asset.bytes, asset.mediaType))
-        loadImage({ bitmap, name: 'generated-sheet' })
+        const result = await runDeconstructMockup(
+          { generation, providers, prompts },
+          {
+            mockupBlob: mockup.blob,
+            brief,
+            image,
+            preflight: input && 'preflight' in input ? input.preflight : undefined,
+            referenceImages,
+            signal,
+          },
+        )
+        loadImage({ bitmap: result.bitmap, name: result.name })
         getStoreState().endGen()
-        logTiming('deconstruct.decode-load', decodeStarted)
-        logTiming('deconstruct.total', totalStarted)
       } catch (error) {
+        if (signal?.aborted) throw error
         getStoreState().failGen(
           'deconstruct',
           error instanceof Error ? error.message : String(error),
@@ -357,13 +437,58 @@ export function useComposeFromLibrary() {
  * (which sanitizes + `.png`-suffixes). Optional — the component gates on a chat
  * model being assigned; the throw here is a safety net. Returns the count named.
  */
-export function useNameSlices() {
+/**
+ * The board+slices → slice-name-suggestions transition (vision naming), as an
+ * explicit-param, store-free function — no Zustand reads. Does NOT apply the
+ * renames itself; the caller applies `result.renamed` via `store.renameSlice`
+ * (deliberately fetched fresh by the caller AFTER this resolves, not closed
+ * over beforehand, so a rename never targets a slice list this call started
+ * against but the store has since replaced).
+ */
+export async function runNameSlices(
+  deps: { readonly generation: GenerationService },
+  params: NameSlicesParams,
+): Promise<NameSlicesResult> {
+  const { boardBitmap, slices, chat, signal } = params
+  signal?.throwIfAborted()
+  if (slices.length === 0) throw new Error('There are no slices to name.')
+
+  const boxes: SliceBox[] = slices.map((s) => ({ index: s.index, box: s.box }))
+  const result = await nameSlices(deps.generation, {
+    providerId: chat.providerId,
+    model: chat.model,
+    imageBytes: await bitmapToBytes(boardBitmap),
+    slices: boxes,
+    effort: chat.effort,
+    signal,
+  })
+  if (isErr(result)) throw new Error(result.error)
+  signal?.throwIfAborted()
+
+  // Map each answered index back onto its slice id.
+  const idByIndex = new Map(slices.map((s) => [s.index, s.id]))
+  const renamed: { id: string, name: string }[] = []
+  for (const { index, name } of result.data) {
+    signal?.throwIfAborted()
+    const id = idByIndex.get(index)
+    if (!id) continue
+    renamed.push({ id, name })
+  }
+  if (renamed.length === 0) throw new Error('No slice names could be applied.')
+  return { renamed }
+}
+
+export function useNameSlices(
+  getRunAssignment?: () => ModelAssignment | undefined,
+) {
   const { generation } = useServices()
   const assignments = useModelAssignments()
 
-  return useMutation<number, Error, void>({
-    mutationFn: async () => {
-      const chat = assignments.data?.chat
+  return useMutation<number, Error, NameSlicesInput | void>({
+    mutationFn: async (input) => {
+      const signal = input && 'signal' in input ? input.signal : undefined
+      signal?.throwIfAborted()
+      const chat = getRunAssignment?.() ?? assignments.data?.chat
       if (!chat) throw new Error('No chat/vision model is configured.')
 
       const snapshot = getStoreState()
@@ -373,28 +498,14 @@ export function useNameSlices() {
       const slices = snapshot.analysis.slices
       if (slices.length === 0) throw new Error('There are no slices to name.')
 
-      const boxes: SliceBox[] = slices.map((s) => ({ index: s.index, box: s.box }))
-      const result = await nameSlices(generation, {
-        providerId: chat.providerId,
-        model: chat.model,
-        imageBytes: await bitmapToBytes(board),
-        slices: boxes,
-        effort: chat.effort,
-      })
-      if (isErr(result)) throw new Error(result.error)
+      const result = await runNameSlices({ generation }, { boardBitmap: board, slices, chat, signal })
 
-      // Map each answered index back onto its slice id, then rename in place.
-      const idByIndex = new Map(slices.map((s) => [s.index, s.id]))
+      // Fetched fresh, post-await — never a reference closed over before the
+      // network round trip — so a rename can never target a slice list the
+      // store has since replaced.
       const rename = getStoreState().renameSlice
-      let named = 0
-      for (const { index, name } of result.data) {
-        const id = idByIndex.get(index)
-        if (!id) continue
-        rename(id, name)
-        named += 1
-      }
-      if (named === 0) throw new Error('No slice names could be applied.')
-      return named
+      for (const { id, name } of result.renamed) rename(id, name)
+      return result.renamed.length
     },
   })
 }

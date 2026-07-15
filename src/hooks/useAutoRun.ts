@@ -34,6 +34,14 @@ export function useAutoRun(analyze: (wantSlices: boolean) => void): void {
       return
     }
 
+    // Agent-managed tool loops publish their own cutout result atomically.
+    // Loading their board must not schedule the legacy worker a second time.
+    if (!source.autoAnalyze) {
+      lastImageIdRef.current = source.imageId
+      lastParamsKeyRef.current = paramsKey
+      return
+    }
+
     if (timerRef.current) clearTimeout(timerRef.current)
 
     if (lastImageIdRef.current !== source.imageId) {
@@ -62,6 +70,7 @@ export function useAutoRun(analyze: (wantSlices: boolean) => void): void {
     analyze,
     hasSource,
     source.imageId,
+    source.autoAnalyze,
     paramsKey,
     slices.length,
   ])

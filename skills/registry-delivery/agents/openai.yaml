@@ -1,0 +1,4 @@
+interface:
+  display_name: "Registry Delivery"
+  short_description: "Discover and safely install verified Cutout source items."
+  default_prompt: "Use $registry-delivery to search verified items, preview exact diffs, and apply only an approved conflict-free install."

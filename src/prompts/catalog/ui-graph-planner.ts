@@ -54,7 +54,7 @@ You receive one product requirement as text. Usually it is a RECONSTRUCTED INTEN
 📛 HARD RULES (must all hold or the graph is rejected)
 1. Every "id" is unique and stable (e.g. "ds", "screen-cart", "board-cart", "cut-cart", "name-cart").
 2. "op" MUST be one of: generate-image, edit-image, deconstruct, cutout, name. Never invent an op.
-3. "inputs" lists the ids of upstream nodes whose OUTPUT this node consumes. For every id in a node's "inputs" there MUST be a matching edge { "from": input, "to": thisNode }. Keep "inputs" and "edges" consistent.
+3. "inputs" lists the ids of upstream nodes whose OUTPUT this node consumes. It MUST be an exact one-to-one match with incoming edges: for every input emit one matching edge, and never emit an edge that is absent from the target node's inputs.
 4. The graph MUST be ACYCLIC — no node may (directly or transitively) depend on itself.
 5. Only "generate-image" (the design system) and, if truly standalone, a root node may have empty "inputs". Every mockup/board/cutout/name node has exactly the inputs its chain requires.
 6. "cutout" nodes take no "prompt" (deterministic). "generate-image" and "edit-image" and "deconstruct" nodes SHOULD carry a meaningful "prompt". "edit-image" mockup nodes SHOULD set "fidelity": "high".

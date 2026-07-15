@@ -3,8 +3,9 @@
  * Executor touches it. The Planner is re-promptable, so every failure returns a
  * clear, human-readable reason via the shared `Result` envelope.
  *
- * Checks (all must hold): non-empty; unique node ids; every edge endpoint refers
- * to an existing node; every node's `inputs ⊆ its incoming edges`; and the graph
+ * Checks (all must hold): non-empty; unique node ids, edges, and inputs; every
+ * edge endpoint refers to an existing node; every node's `inputs` exactly match
+ * its incoming edges; and the graph
  * is ACYCLIC. Acyclicity is proven constructively via Kahn's topological sort —
  * on success we hand back the topological ORDER (node ids), which the Executor
  * consumes directly to schedule ready nodes.
@@ -14,12 +15,36 @@
  */
 import type { Result } from '@/services/types'
 import { err, ok } from '@/services/types'
-import type { GraphSpec } from './graph-spec'
+import type { GraphSpec, NodeOp } from './graph-spec'
 
 /** A validated graph plus the topological order the Executor schedules on. */
 export interface ValidatedGraph {
   /** Node ids in a valid execution order (upstream before downstream). */
   readonly order: readonly string[]
+}
+
+interface InputArity {
+  readonly min: number
+  readonly max: number
+}
+
+function inputArity(op: NodeOp): InputArity {
+  switch (op) {
+    case 'generate-image':
+      return { min: 0, max: 0 }
+    case 'edit-image':
+      return { min: 1, max: Number.POSITIVE_INFINITY }
+    case 'deconstruct':
+    case 'cutout':
+    case 'name':
+      return { min: 1, max: 1 }
+  }
+}
+
+function describeArity({ min, max }: InputArity): string {
+  if (min === max) return `exactly ${min}`
+  if (!Number.isFinite(max)) return `at least ${min}`
+  return `between ${min} and ${max}`
 }
 
 /**
@@ -49,17 +74,36 @@ export function validateGraph(spec: GraphSpec): Result<ValidatedGraph> {
   }
 
   // Build the incoming-edge set per node (sources feeding into each target).
+  // Duplicate edges have no useful runtime meaning and make a model-produced
+  // graph ambiguous, so reject them before collapsing to a Set.
   const incoming = new Map<string, Set<string>>(
     nodes.map((n) => [n.id, new Set<string>()]),
   )
   for (const edge of edges) {
-    incoming.get(edge.to)?.add(edge.from)
+    const sources = incoming.get(edge.to) as Set<string>
+    if (sources.has(edge.from)) {
+      return err(`Duplicate edge: "${edge.from}" → "${edge.to}".`)
+    }
+    sources.add(edge.from)
   }
 
-  // inputs ⊆ incoming edges: a data dependency must be backed by an edge.
+  // Edges are the execution/data-dependency contract, not display-only lines.
+  // Require exact equality so the executor cannot silently ignore an incoming
+  // edge and start its target before that source has completed.
   for (const node of nodes) {
     const sources = incoming.get(node.id) ?? new Set<string>()
+    const arity = inputArity(node.op)
+    if (node.inputs.length < arity.min || node.inputs.length > arity.max) {
+      return err(
+        `Node "${node.id}" (${node.op}) must declare ${describeArity(arity)} input${arity.max === 1 ? '' : 's'}, received ${node.inputs.length}.`,
+      )
+    }
+    const inputs = new Set<string>()
     for (const input of node.inputs) {
+      if (inputs.has(input)) {
+        return err(`Node "${node.id}" lists duplicate input: "${input}".`)
+      }
+      inputs.add(input)
       if (!ids.has(input)) {
         return err(
           `Node "${node.id}" lists unknown input: "${input}".`,
@@ -68,6 +112,13 @@ export function validateGraph(spec: GraphSpec): Result<ValidatedGraph> {
       if (!sources.has(input)) {
         return err(
           `Node "${node.id}" input "${input}" has no matching edge.`,
+        )
+      }
+    }
+    for (const source of sources) {
+      if (!inputs.has(source)) {
+        return err(
+          `Node "${node.id}" has incoming edge from "${source}" but does not declare it as an input.`,
         )
       }
     }

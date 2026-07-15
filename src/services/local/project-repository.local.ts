@@ -12,6 +12,16 @@ import {
 import { DEFAULT_PARAMS } from '@/store/slices/params'
 import { bitmapToBytes, bytesToBlob, decodeImage } from '@/lib/image'
 import { err, ok, type Result } from '@/services/types'
+import {
+  designDocumentToWorkspaceSnapshot,
+  fingerprint,
+  migrateWorkspaceV1,
+  projectRecordToDesignDocument,
+  validateDesignDocument,
+  type ContentReference,
+  type ContentResolver,
+  type DesignDocument,
+} from '@/design-ir'
 import { openDb, promisify, txDone } from './idb'
 
 const DB_NAME = 'cutout-projects'
@@ -30,6 +40,9 @@ export interface LocalProjectSummary {
   readonly createdAt: number
   readonly updatedAt: number
   readonly archivedAt?: number
+  readonly pinnedAt?: number
+  readonly metadataUpdatedAt?: number
+  readonly customName?: string
   readonly thumbnail?: Blob
 }
 
@@ -58,6 +71,10 @@ export interface LocalProjectRecord extends LocalProjectSummary {
   readonly designMarkdown: DesignMarkdownAsset | null
   readonly workspace: WorkspaceSnapshot | null
   readonly slices: readonly StoredSlice[]
+  /** Optional canonical IR. Old IndexedDB records omit it safely. */
+  readonly designDocument?: DesignDocument
+  /** Stable IR content hash, excluding projection timestamps. */
+  readonly designDocumentContentHash?: string
 }
 
 export interface LocalProjectRepository {
@@ -65,6 +82,14 @@ export interface LocalProjectRepository {
   load(id: string): Promise<Result<LocalProjectRecord>>
   save(record: LocalProjectRecord): Promise<Result<void>>
   archive(id: string, archivedAt: number | null): Promise<Result<LocalProjectRecord>>
+  updateMetadata(
+    id: string,
+    patch: {
+      readonly expectedMetadataUpdatedAt: number
+      readonly name?: string
+      readonly pinnedAt?: number | null
+    },
+  ): Promise<Result<LocalProjectRecord>>
   remove(id: string): Promise<Result<void>>
 }
 
@@ -120,7 +145,9 @@ export function createLocalProjectRepository(
           >,
         )
         if (!record) return err(`Project "${id}" was not found.`)
-        return ok(record)
+        const normalized = await normalizeProjectRecord(record)
+        if (normalized.didChange) await writeRecord(idb, normalized.record)
+        return ok(normalized.record)
       } finally {
         db.close()
       }
@@ -132,14 +159,8 @@ export function createLocalProjectRepository(
   async function save(record: LocalProjectRecord): Promise<Result<void>> {
     if (!idb) return err(`Project storage is unavailable.`)
     try {
-      const db = await openProjectsDb(idb)
-      try {
-        const tx = db.transaction(STORE, 'readwrite')
-        tx.objectStore(STORE).put(record)
-        await txDone(tx)
-      } finally {
-        db.close()
-      }
+      const normalized = await normalizeProjectRecord(record)
+      await writeRecord(idb, normalized.record)
       return ok(undefined)
     } catch (error) {
       return err(errorMessage(error))
@@ -163,7 +184,7 @@ export function createLocalProjectRepository(
         const updated: LocalProjectRecord = {
           ...record,
           archivedAt: archivedAt ?? undefined,
-          updatedAt: Date.now(),
+          pinnedAt: archivedAt === null ? record.pinnedAt : undefined,
         }
         store.put(updated)
         await txDone(tx)
@@ -193,7 +214,50 @@ export function createLocalProjectRepository(
     }
   }
 
-  return { list, load, save, archive, remove }
+  async function updateMetadata(
+    id: string,
+    patch: {
+      readonly expectedMetadataUpdatedAt: number
+      readonly name?: string
+      readonly pinnedAt?: number | null
+    },
+  ): Promise<Result<LocalProjectRecord>> {
+    if (!idb) return err(`Project storage is unavailable.`)
+    try {
+      const db = await openProjectsDb(idb)
+      try {
+        const tx = db.transaction(STORE, 'readwrite')
+        const store = tx.objectStore(STORE)
+        const record = await promisify(
+          store.get(id) as IDBRequest<LocalProjectRecord | undefined>,
+        )
+        if (!record) return err(`Project "${id}" was not found.`)
+        if ((record.metadataUpdatedAt ?? 0) !== patch.expectedMetadataUpdatedAt) {
+          return err('Project changed since this menu was opened. Reload and try again.')
+        }
+        const name = patch.name === undefined ? record.name : patch.name.trim()
+        if (!name) return err('Project name cannot be empty.')
+        const updated: LocalProjectRecord = {
+          ...record,
+          name,
+          customName: patch.name === undefined ? record.customName : name,
+          pinnedAt: patch.pinnedAt === undefined
+            ? record.pinnedAt
+            : patch.pinnedAt ?? undefined,
+          metadataUpdatedAt: Date.now(),
+        }
+        store.put(updated)
+        await txDone(tx)
+        return ok(updated)
+      } finally {
+        db.close()
+      }
+    } catch (error) {
+      return err(errorMessage(error))
+    }
+  }
+
+  return { list, load, save, archive, updateMetadata, remove }
 }
 
 export function createEmptyProjectRecord(now = Date.now()): LocalProjectRecord {
@@ -260,13 +324,13 @@ export async function createProjectRecordFromStore(input: {
     source?.blob ??
     workspaceThumbnail(workspace)
 
-  return {
+  const record: LocalProjectRecord = {
     id: input.id,
-    name: projectNameFromSources(
-      workspace?.prototypePlan?.product.projectName,
-      workspace?.prototypePlan?.product.name,
-      brief,
-    ),
+    name: input.previous?.customName ?? projectNameFromSources(
+        workspace?.prototypePlan?.product.projectName,
+        workspace?.prototypePlan?.product.name,
+        brief,
+      ),
     brief,
     assetCount: slices.length,
     hasDesignMarkdown: Boolean(state.designMarkdown || workspace?.prototypeDesignSystem),
@@ -274,6 +338,9 @@ export async function createProjectRecordFromStore(input: {
     createdAt: input.createdAt,
     updatedAt: now,
     archivedAt: input.previous?.archivedAt,
+    pinnedAt: input.previous?.pinnedAt,
+    metadataUpdatedAt: input.previous?.metadataUpdatedAt,
+    customName: input.previous?.customName,
     thumbnail,
     params: state.params,
     sourceImageId: state.source.imageId || undefined,
@@ -283,11 +350,23 @@ export async function createProjectRecordFromStore(input: {
     workspace,
     slices,
   }
+  const designDocument = await projectRecordToDesignDocument(record)
+  const workspaceWithDesignDocument = workspace
+    ? { ...workspace, designDocument }
+    : null
+  return {
+    ...record,
+    workspace: workspaceWithDesignDocument,
+    designDocument,
+    designDocumentContentHash: await designDocumentContentFingerprint(designDocument),
+  }
 }
 
 export async function createRestoreInputFromProject(
   record: LocalProjectRecord,
 ): Promise<ProjectRestoreInput> {
+  // Non-repository callers still receive the canonical IR projection first.
+  record = (await normalizeProjectRecord(record)).record
   const source = record.source
     ? {
         name: record.source.name,
@@ -314,6 +393,278 @@ export async function createRestoreInputFromProject(
   }
 }
 
+/**
+ * Stable identity for meaningful Design IR content. Projection/import timestamps
+ * are deliberately excluded, so a hash change always represents a real project
+ * change rather than an autosave tick.
+ */
+export async function designDocumentContentFingerprint(
+  document: DesignDocument,
+): Promise<string> {
+  const content = {
+    ...document,
+    meta: { ...document.meta, createdAt: '', updatedAt: '' },
+    revision: { ...document.revision, createdAt: '' },
+    provenance: document.provenance.map((entry) => ({ ...entry, recordedAt: '' })),
+    materials: document.materials.map((material) => ({
+      ...material,
+      revisions: material.revisions.map((revision) => ({
+        ...revision,
+        createdAt: '',
+      })),
+    })),
+  }
+  // Zod's optional fields can be represented as explicit `undefined` by an
+  // adapter. Canonical JSON correctly rejects that transport-only shape, so
+  // strip it before hashing while preserving every serializable IR field.
+  return fingerprint(JSON.parse(JSON.stringify(content)))
+}
+
+interface NormalizedProjectRecord {
+  readonly record: LocalProjectRecord
+  readonly didChange: boolean
+}
+
+/**
+ * Adds optional IR data to a schemaless IndexedDB record without changing its
+ * object-store version. The migration is idempotent: after a successful write,
+ * the next load returns the same document, content hash, and workspace.
+ */
+async function normalizeProjectRecord(
+  input: LocalProjectRecord,
+): Promise<NormalizedProjectRecord> {
+  const migratedWorkspace = input.workspace
+    ? migrateWorkspaceV1(input.workspace)
+    : null
+  let record: LocalProjectRecord = migratedWorkspace
+    ? { ...input, workspace: migratedWorkspace }
+    : input
+  let didChange = workspaceWasMigrated(input.workspace)
+  const validated = input.designDocument
+    ? validateDesignDocument(input.designDocument)
+    : null
+
+  if (validated?.ok) {
+    const projection = await designDocumentToWorkspaceSnapshot(
+      validated.data.document,
+      await createLegacyContentResolver(record),
+    )
+    if (projection.ok) {
+      const workspace = mergeWorkspaceProjection(record.workspace, projection.data.snapshot)
+      const projectedMarkdown = projection.data.designMarkdown
+      // Design IR deliberately carries portable content, not the UI-only import
+      // timestamp. Preserve it when the material did not change; otherwise use
+      // the persisted record time as a deterministic migration timestamp.
+      const designMarkdown = projectedMarkdown
+        ? {
+            ...projectedMarkdown,
+            importedAt: sameDesignMarkdown(projectedMarkdown, record.designMarkdown)
+              ? record.designMarkdown?.importedAt ?? record.updatedAt
+              : record.updatedAt,
+          }
+        : record.designMarkdown
+      if (
+        !sameRepresentableWorkspace(workspace, record.workspace)
+        || !sameDesignMarkdown(designMarkdown, record.designMarkdown)
+      ) {
+        record = { ...record, workspace, designMarkdown }
+        didChange = true
+      }
+      const contentHash = await designDocumentContentFingerprint(validated.data.document)
+      if (record.designDocumentContentHash !== contentHash) {
+        record = {
+          ...record,
+          designDocument: validated.data.document,
+          designDocumentContentHash: contentHash,
+        }
+        didChange = true
+      }
+      return { record, didChange }
+    }
+
+    // A valid portable IR may intentionally reference content that this local
+    // IndexedDB adapter cannot resolve yet (for example a repo or cloud URI).
+    // Preserve it rather than overwriting it with a lossy legacy projection.
+    // Legacy URIs are different: their bytes are expected to live in this
+    // record, so an unresolved one means the old fields changed and must be
+    // reprojected to refresh their content hashes.
+    if (!designDocumentUsesLegacyContent(validated.data.document, record.id)) {
+      const contentHash = await designDocumentContentFingerprint(validated.data.document)
+      if (record.designDocumentContentHash !== contentHash) {
+        record = {
+          ...record,
+          designDocument: validated.data.document,
+          designDocumentContentHash: contentHash,
+        }
+        didChange = true
+      }
+      return { record, didChange }
+    }
+  }
+
+  // Invalid or unresolvable IR must never strand a legacy project. Its older
+  // workspace/blob record is still recoverable, so re-project and backfill it.
+  const designDocument = await projectRecordToDesignDocument(record)
+  return {
+    record: {
+      ...record,
+      designDocument,
+      designDocumentContentHash: await designDocumentContentFingerprint(designDocument),
+    },
+    didChange: true,
+  }
+}
+
+function workspaceWasMigrated(workspace: WorkspaceSnapshot | null): boolean {
+  if (!workspace) return false
+  return (
+    workspace.workflowPhase === undefined
+    || workspace.prototypePlan === undefined
+    || workspace.prototypeScope === undefined
+    || workspace.humanLoopChoiceId === undefined
+    || workspace.humanLoopCustomAnswer === undefined
+    || workspace.prototypeDesignSystem === undefined
+    || workspace.prototypePages === undefined
+    || workspace.selectedPrototypePageId === undefined
+    || workspace.runError === undefined
+    || workspace.namingStatus === undefined
+    || workspace.liveAgentOutput === undefined
+    || workspace.attachments === undefined
+    || workspace.webSearchEnabled === undefined
+  )
+}
+
+function mergeWorkspaceProjection(
+  legacy: WorkspaceSnapshot | null,
+  projected: WorkspaceSnapshot,
+): WorkspaceSnapshot {
+  const base = legacy ?? projected
+  return {
+    ...base,
+    prototypePlan: projected.prototypePlan,
+    prototypeDesignSystem: projected.prototypeDesignSystem,
+    prototypePages: projected.prototypePages,
+    attachments: projected.attachments,
+  }
+}
+
+/**
+ * Content bytes are verified against IR SHA-256 references before this point;
+ * compare their metadata here together with the complete representable plan so
+ * a route/region/name-only change is still persisted on the first load.
+ */
+function sameRepresentableWorkspace(
+  left: WorkspaceSnapshot,
+  right: WorkspaceSnapshot | null,
+): boolean {
+  const describe = (workspace: WorkspaceSnapshot | null) => workspace
+    ? {
+        plan: workspace.prototypePlan,
+        designSystem: workspace.prototypeDesignSystem
+          ? {
+              name: workspace.prototypeDesignSystem.name,
+              designMarkdown: workspace.prototypeDesignSystem.designMarkdown,
+              mediaType: workspace.prototypeDesignSystem.mediaType,
+              width: workspace.prototypeDesignSystem.width,
+              height: workspace.prototypeDesignSystem.height,
+              bytes: workspace.prototypeDesignSystem.bytes.byteLength,
+            }
+          : null,
+        pages: workspace.prototypePages.map((page) => ({
+          page: page.page,
+          mediaType: page.mediaType,
+          width: page.width,
+          height: page.height,
+          bytes: page.bytes.byteLength,
+        })),
+        attachments: workspace.attachments.map((attachment) => ({
+          id: attachment.id,
+          name: attachment.name,
+          mediaType: attachment.mediaType,
+          bytes: attachment.bytes.byteLength,
+        })),
+      }
+    : null
+  return JSON.stringify(describe(left)) === JSON.stringify(describe(right))
+}
+
+function sameDesignMarkdown(
+  left: Pick<DesignMarkdownAsset, 'name' | 'content'> | null,
+  right: Pick<DesignMarkdownAsset, 'name' | 'content'> | null,
+): boolean {
+  return left?.name === right?.name && left?.content === right?.content
+}
+
+async function createLegacyContentResolver(
+  record: LocalProjectRecord,
+): Promise<ContentResolver> {
+  const content = new Map<string, Uint8Array>()
+  const add = (path: string, bytes: Uint8Array) => {
+    content.set(legacyContentUri(record.id, path), bytes)
+  }
+  add('brief', new TextEncoder().encode(record.brief))
+
+  const system = record.workspace?.prototypeDesignSystem
+  if (system) {
+    add('workspace/design-system/image', system.bytes)
+    add(
+      'workspace/DESIGN.md',
+      new TextEncoder().encode(record.designMarkdown?.content ?? system.designMarkdown),
+    )
+  } else if (record.designMarkdown) {
+    add('workspace/DESIGN.md', new TextEncoder().encode(record.designMarkdown.content))
+  }
+  for (const page of record.workspace?.prototypePages ?? []) {
+    add(`workspace/pages/${page.page.id}`, page.bytes)
+  }
+  for (const attachment of record.workspace?.attachments ?? []) {
+    add(`attachments/${attachment.id}`, attachment.bytes)
+  }
+
+  const blobs = await Promise.all(record.slices.map(async (slice) => ({
+    path: `slices/${slice.id}`,
+    bytes: new Uint8Array(await slice.blob.arrayBuffer()),
+  })))
+  for (const item of blobs) add(item.path, item.bytes)
+
+  return {
+    resolveContent(reference: ContentReference) {
+      return content.get(reference.uri)
+    },
+  }
+}
+
+function legacyContentUri(projectId: string, path: string): string {
+  return `cutout://legacy/${encodeURIComponent(projectId)}/${path
+    .split('/')
+    .map(encodeURIComponent)
+    .join('/')}`
+}
+
+function designDocumentUsesLegacyContent(
+  document: DesignDocument,
+  projectId: string,
+): boolean {
+  const prefix = `cutout://legacy/${encodeURIComponent(projectId)}/`
+  return [
+    ...document.sources.flatMap((source) => source.content),
+    ...document.materials.flatMap((material) =>
+      material.revisions.map((revision) => revision.content),
+    ),
+  ].some((reference) => reference.uri.startsWith(prefix))
+}
+
+async function writeRecord(idb: IDBFactory, record: LocalProjectRecord): Promise<void> {
+  const db = await openProjectsDb(idb)
+  try {
+    const tx = db.transaction(STORE, 'readwrite')
+    tx.objectStore(STORE).put(record)
+    await txDone(tx)
+  } finally {
+    db.close()
+  }
+}
+
 function toSummary(record: LocalProjectRecord): LocalProjectSummary {
   return {
     id: record.id,
@@ -325,6 +676,9 @@ function toSummary(record: LocalProjectRecord): LocalProjectSummary {
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,
     archivedAt: record.archivedAt,
+    pinnedAt: record.pinnedAt,
+    metadataUpdatedAt: record.metadataUpdatedAt,
+    customName: record.customName,
     thumbnail: record.thumbnail,
   }
 }
@@ -344,7 +698,15 @@ function projectStatusFromStore(
   ) {
     return 'Running'
   }
-  if (state.analysis.slices.length > 0 || (workspace?.prototypePages.length ?? 0) > 0) {
+  if (workspace?.outcome?.status === 'ready-to-deliver') {
+    return 'Ready'
+  }
+  // Older snapshots have no outcome contract, so retain their artifact-based
+  // readiness behavior. Once a contract exists, partial artifacts stay Draft.
+  if (
+    !workspace?.outcome &&
+    (state.analysis.slices.length > 0 || (workspace?.prototypePages.length ?? 0) > 0)
+  ) {
     return 'Ready'
   }
   if (

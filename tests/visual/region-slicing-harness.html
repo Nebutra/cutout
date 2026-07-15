@@ -1,0 +1,15 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>region slicing harness</title>
+  </head>
+  <body>
+    <!--
+      A blank Vite-served page so the region-slicing Playwright test can
+      dynamically import the app's slice module in a real browser WITHOUT
+      booting main.tsx (whose client-side navigation destroys the evaluate
+      context). Vite still resolves /src imports against this origin.
+    -->
+  </body>
+</html>

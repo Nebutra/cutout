@@ -13,7 +13,9 @@ use tauri::{AppHandle, Manager, Runtime};
 const CONFIG_FILE: &str = "providers.json";
 
 /// Provider kinds. Serializes as the kebab-cased tag the TS layer uses
-/// (`anthropic`, `openai`, `google`, `gateway`, `openai-compatible`).
+/// Native providers plus the audited OpenAI-compatible profiles exposed by the
+/// TypeScript provider registry. Unknown future kinds fail closed at this
+/// persistence boundary until Rust transport policy is added.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum ProviderKind {
@@ -22,6 +24,21 @@ pub enum ProviderKind {
     Google,
     Gateway,
     OpenaiCompatible,
+    Dashscope,
+    Deepseek,
+    Zhipu,
+    Moonshot,
+    Volcengine,
+    Siliconflow,
+    Openrouter,
+    Together,
+    Groq,
+    Fireworks,
+    Xai,
+    Mistral,
+    Ollama,
+    Vllm,
+    LmStudio,
 }
 
 /// A user-configured provider connection. Contains **no secret** — the key is

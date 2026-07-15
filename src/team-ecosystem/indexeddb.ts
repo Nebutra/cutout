@@ -1,0 +1,8 @@
+import{reviewBranchSchema,shareLinkSchema,type CollaborationHost}from'./contracts'
+const DB='cutout-team-local',VERSION=1,BRANCHES='branches',SHARES='shares'
+export function createIndexedDbCollaborationHost(factory:IDBFactory):CollaborationHost{return{async saveBranch(branch){await put(factory,BRANCHES,reviewBranchSchema.parse(branch),branch.id)},async loadBranch(id){return get(factory,BRANCHES,id)},async createShare(link){await put(factory,SHARES,shareLinkSchema.parse(link),link.id)}}}
+async function open(factory:IDBFactory){return new Promise<IDBDatabase>((resolve,reject)=>{const request=factory.open(DB,VERSION);request.onupgradeneeded=()=>{for(const store of[BRANCHES,SHARES])if(!request.result.objectStoreNames.contains(store))request.result.createObjectStore(store)};request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error)})}
+async function put(factory:IDBFactory,store:string,value:unknown,key:string){const db=await open(factory);try{const tx=db.transaction(store,'readwrite');tx.objectStore(store).put(value,key);await done(tx)}finally{db.close()}}
+async function get(factory:IDBFactory,store:string,key:string){const db=await open(factory);try{return await request(db.transaction(store,'readonly').objectStore(store).get(key))}finally{db.close()}}
+function request<T>(value:IDBRequest<T>){return new Promise<T>((resolve,reject)=>{value.onsuccess=()=>resolve(value.result);value.onerror=()=>reject(value.error)})}
+function done(tx:IDBTransaction){return new Promise<void>((resolve,reject)=>{tx.oncomplete=()=>resolve();tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error)})}

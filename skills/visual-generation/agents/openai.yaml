@@ -1,0 +1,4 @@
+interface:
+  display_name: "Visual Generation"
+  short_description: "Plan governed multimodal visual generation work"
+  default_prompt: "Use $visual-generation to plan visual assets with approval and budget controls."

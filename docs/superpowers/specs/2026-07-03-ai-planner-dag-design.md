@@ -19,7 +19,7 @@ Locked (approved):
 
 ## 2. §A — 垫图 / image edit (`/v1/images/edits`)
 
-**API (verified):** `POST {baseUrl}/images/edits`, **multipart/form-data**: `model`, `prompt` (required), `image[]` (1..N reference images; PNG/WEBP/JPG; gpt-image supports multiple), optional `mask`, `size`, `input_fidelity` (`high` preserves the reference's style/features — use `high` for 垫图), `n`. gpt-image responses are **always base64** (`data[].b64_json`). Sources: OpenAI Create-image-edit reference.
+**API (verified):** `POST {baseUrl}/images/edits`, **multipart/form-data**: `model`, `prompt` (required), repeated `image` fields (1..N reference images; PNG/WEBP/JPG; gpt-image supports multiple), optional `mask`, `size`, `input_fidelity` (`high` preserves the reference's style/features — use `high` for 垫图), `n`. Do not use the non-standard `image[]` spelling: some OpenAI-compatible relays reject it. gpt-image responses are **always base64** (`data[].b64_json`). Sources: OpenAI Create-image-edit reference.
 
 **Rust command** `src-tauri/src/commands/ai/ai_proxy.rs` (or a sibling `image_edit.rs`):
 ```rust
@@ -31,7 +31,7 @@ pub async fn ai_image_edit(
 ) -> Result<ImageEditResult, ProxyError> // { b64: String } or bytes
 ```
 - Enable reqwest `multipart` feature in `Cargo.toml`.
-- Build `multipart::Form`: `model`, `prompt`, `size?`, `input_fidelity` (default `"high"`), and one `part` per image as `image[]` with a filename + PNG mime. Inject the auth header (reuse `build_method_and_headers` / `read_secret`); host must pass `enforce_host`. Buffered client with a timeout (reuse `build_client(Some(120))`).
+- Build `multipart::Form`: `model`, `prompt`, `size?`, `input_fidelity` (default `"high"`), and one repeated `image` part per reference with a filename + PNG mime. Inject the auth header (reuse `build_method_and_headers` / `read_secret`); host must pass `enforce_host`. Buffered client with a timeout (reuse `build_client(Some(120))`).
 - Parse `{ data: [{ b64_json }] }` → return base64 (decode to bytes in JS via existing helpers). Only for `kind` `openai` / `openai-compatible` (edits is an OpenAI-shaped endpoint).
 
 **Service:** extend `GenerationService` (`src/services/ai/types.ts` + `generation-service.local.ts`):
@@ -51,7 +51,7 @@ Implemented by `invoke('ai_image_edit', …)` (NOT the AI SDK — generateImage 
 
 A zod-validated graph the Planner outputs and the Executor runs. `src/dag/graph-spec.ts`:
 ```ts
-type NodeOp = 'plan' | 'generate-image' | 'edit-image' | 'deconstruct' | 'cutout' | 'name'
+type NodeOp = 'generate-image' | 'edit-image' | 'deconstruct' | 'cutout' | 'name'
 interface GraphNodeSpec {
   id: string                       // planner-assigned, unique
   op: NodeOp
@@ -63,12 +63,11 @@ interface GraphNodeSpec {
 }
 interface GraphSpec { nodes: GraphNodeSpec[]; edges: { from: string; to: string }[] }
 ```
-Validation (`src/dag/validate.ts`): non-empty, unique ids, edges reference existing nodes, **acyclic** (topological sort succeeds), inputs ⊆ edges. Invalid → reject with a clear error (the Planner is re-promptable).
+Validation (`src/dag/validate.ts`): non-empty, unique ids/edges/inputs, edges reference existing nodes, incoming edges exactly equal node inputs, op-specific input arity, and **acyclic** (topological sort succeeds). Invalid → reject with a clear error (the Planner is re-promptable).
 
 **Node vocabulary (reusable, typed):**
 | op | reads | produces | via |
 |---|---|---|---|
-| `plan` | 需求 text | a GraphSpec (bootstrap only) | chat slot + generateObject |
 | `generate-image` | prompt | image | image slot + generateImages |
 | `edit-image` (垫图) | prompt + input image(s) | image | image slot + **editImage** |
 | `deconstruct` | mockup image | asset board image | image slot (asset-deconstruction prompt) |

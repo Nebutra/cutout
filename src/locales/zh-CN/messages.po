@@ -13,65 +13,252 @@ msgstr ""
 "Language-Team: \n"
 "Plural-Forms: nplurals=1; plural=0;\n"
 
+#. placeholder {0}: slices.length
 #. js-lingui-explicit-id
-#: src/components/topbar/SettingsMenu.tsx
-#~ msgid "settings.about_item"
-#~ msgstr "关于"
+#: src/components/status/StatusBar.tsx
+#~ msgid "status.slice_count"
+#~ msgstr "{0, plural, other {# 个切片}}"
 
 #. js-lingui-explicit-id
-#: src/components/topbar/SettingsMenu.tsx
-#~ msgid "settings.api_keys"
-#~ msgstr "API Keys / 提供方"
+#: src/components/status/StatusBar.tsx
+#~ msgid "status.state_running"
+#~ msgstr "分析中…"
 
 #. js-lingui-explicit-id
-#: src/components/settings/ProviderSettingsDialog.tsx
-#~ msgid "settings.dialog_title"
-#~ msgstr "API Keys / 提供方"
+#: src/components/settings/sections/IntegrationsSection.tsx
+#~ msgid "settings.integrations_title"
+#~ msgstr "把 Cutout 连接到你的工具"
 
 #. js-lingui-explicit-id
-#: src/components/settings/ProviderSettingsDialog.tsx
-#~ msgid "settings.dialog_list_desc"
-#~ msgstr "管理模型提供方与密钥（BYOK）。密钥安全存于系统钥匙串。"
+#: src/components/settings/sections/IntegrationsSection.tsx
+#~ msgid "settings.integrations_cta_wip"
+#~ msgstr "账号连接即将推出"
 
 #. js-lingui-explicit-id
-#: src/components/source/GeneratePanel.tsx
-#~ msgid "generate.toast_done"
-#~ msgstr "已生成素材图，开始切分…"
+#: src/components/topbar/ThemeToggle.tsx
+#~ msgid "topbar.theme_dark_mode"
+#~ msgstr "深色模式"
 
 #. js-lingui-explicit-id
-#: src/components/source/GeneratePanel.tsx
-#~ msgid "generate.proto_title"
-#~ msgstr "拖入 UI 截图"
+#: src/components/status/StatusBar.tsx
+#~ msgid "status.state_done"
+#~ msgstr "完成"
 
 #. js-lingui-explicit-id
-#: src/components/source/GeneratePanel.tsx
-#~ msgid "generate.button"
-#~ msgstr "生成素材图"
+#: src/components/status/StatusBar.tsx
+#~ msgid "status.state_error"
+#~ msgstr "错误"
 
 #. js-lingui-explicit-id
-#: src/components/source/SourcePanel.tsx
-#~ msgid "source.mode_generate"
-#~ msgstr "从截图生成"
+#: src/components/settings/sections/IntegrationsSection.tsx
+#~ msgid "settings.integrations_description"
+#~ msgstr "Figma、GitHub、Notion、Obsidian 等将通过 Connector 体系接入，让 Agent 读取来源并交付结果。账号与连接器宿主仍在开发中。"
 
 #. js-lingui-explicit-id
-#: src/components/source/GeneratePanel.tsx
-#~ msgid "generate.pending"
-#~ msgstr "生成中…"
+#: src/components/status/StatusBar.tsx
+#~ msgid "status.state_idle"
+#~ msgstr "空闲"
 
 #. js-lingui-explicit-id
-#: src/components/source/SourcePanel.tsx
-#~ msgid "source.mode_import"
-#~ msgstr "导入素材图"
+#: src/components/topbar/TopBarActions.tsx
+#~ msgid "topbar.import"
+#~ msgstr "导入"
 
 #. js-lingui-explicit-id
-#: src/components/source/GeneratePanel.tsx
-#~ msgid "generate.requirement_placeholder"
-#~ msgstr "可选说明——风格、要突出哪些元素…"
+#: src/components/topbar/ThemeToggle.tsx
+#~ msgid "topbar.theme_light_mode"
+#~ msgstr "浅色模式"
 
 #. js-lingui-explicit-id
-#: src/components/source/GeneratePanel.tsx
-#~ msgid "generate.proto_hint"
-#~ msgstr "将被重绘为干净、易抠图的素材总览图。"
+#: src/components/topbar/ThemeToggle.tsx
+#~ msgid "topbar.theme_to_dark"
+#~ msgstr "切换到深色模式"
+
+#. js-lingui-explicit-id
+#: src/components/topbar/ThemeToggle.tsx
+#~ msgid "topbar.theme_to_light"
+#~ msgstr "切换到浅色模式"
+
+#. js-lingui-explicit-id
+#: src/components/status/StatusBar.tsx
+#~ msgid "status.param_summary"
+#~ msgstr "阈值 {threshold} · 面积 {minArea} · 间隙 {mergeGap} · 内边距 {padding}"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ModelSlot.tsx
+#~ msgid "settings.model_no_provider"
+#~ msgstr "先在上方添加一个端点,再分配模型。"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+#~ msgid "settings.model_chat_label"
+#~ msgstr "对话 / 理解"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ModelSlot.tsx
+#~ msgid "settings.effort_default"
+#~ msgstr "默认"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ModelSlot.tsx
+#~ msgid "settings.model_pick_endpoint"
+#~ msgstr "端点"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ModelSlot.tsx
+#~ msgid "settings.effort_high"
+#~ msgstr "高"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+#~ msgid "settings.model_image_label"
+#~ msgstr "图像生成"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ModelSlot.tsx
+#~ msgid "settings.effort_low"
+#~ msgstr "低"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ModelSlot.tsx
+#~ msgid "settings.effort_medium"
+#~ msgstr "中"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ModelSlot.tsx
+#~ msgid "settings.model_slug_placeholder"
+#~ msgstr "模型"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ModelSlot.tsx
+#~ msgid "settings.model_endpoint_aria"
+#~ msgstr "模型端点"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ModelSlot.tsx
+#~ msgid "settings.model_name_aria"
+#~ msgstr "模型名称"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+#~ msgid "settings.models_heading"
+#~ msgstr "模型"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+#~ msgid "settings.models_hint"
+#~ msgstr "同一端点、不同能力用不同模型——无需重加服务商。每个从端点的模型列表里挑，或手填。"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+#~ msgid "settings.model_image_hint"
+#~ msgstr "生成图像(如重绘的素材总览图)。"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+#~ msgid "settings.model_chat_hint"
+#~ msgstr "文本、推理与读图——同一个多模态模型。"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ModelSlot.tsx
+#~ msgid "settings.effort_label"
+#~ msgstr "思考强度"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ModelSlot.tsx
+#~ msgid "settings.effort_aria"
+#~ msgstr "思考强度"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ModelSlot.tsx
+#~ msgid "settings.model_assignment_save"
+#~ msgstr "保存分配"
+
+#. js-lingui-explicit-id
+#: src/components/library/TeamGovernancePanel.tsx
+#~ msgid "team.role_admin"
+#~ msgstr "管理员"
+
+#. js-lingui-explicit-id
+#: src/components/library/TeamGovernancePanel.tsx
+#~ msgid "team.collaboration_host_required"
+#~ msgstr "需要协作主机"
+
+#. js-lingui-explicit-id
+#: src/components/library/TeamGovernancePanel.tsx
+#~ msgid "team.create_readonly_share"
+#~ msgstr "创建只读分享"
+
+#. js-lingui-explicit-id
+#: src/components/library/TeamGovernancePanel.tsx
+#~ msgid "team.role_select_aria"
+#~ msgstr "当前团队角色"
+
+#. js-lingui-explicit-id
+#: src/components/library/TeamGovernancePanel.tsx
+#~ msgid "team.role_editor"
+#~ msgstr "编辑者"
+
+#. js-lingui-explicit-id
+#: src/components/library/TeamGovernancePanel.tsx
+#~ msgid "team.local_review_host"
+#~ msgstr "本地审阅主机"
+
+#. js-lingui-explicit-id
+#: src/components/library/TeamGovernancePanel.tsx
+#~ msgid "team.remote_sync_disabled"
+#~ msgstr "远程同步已禁用"
+
+#. js-lingui-explicit-id
+#: src/components/library/TeamGovernancePanel.tsx
+#~ msgid "team.role_reviewer"
+#~ msgstr "审阅者"
+
+#. js-lingui-explicit-id
+#: src/components/library/TeamGovernancePanel.tsx
+#~ msgid "team.label"
+#~ msgstr "团队"
+
+#. js-lingui-explicit-id
+#: src/components/library/TeamGovernancePanel.tsx
+#~ msgid "team.governance_section_aria"
+#~ msgstr "团队治理"
+
+#. js-lingui-explicit-id
+#: src/components/library/TeamGovernancePanel.tsx
+#~ msgid "team.role_viewer"
+#~ msgstr "查看者"
+
+#. js-lingui-explicit-id
+#. placeholder {0}: project.name
+#: src/components/home/ProjectHome.tsx
+msgid "home.archive_project_description"
+msgstr "“{0}”将从活跃项目中移出，你可以从“已归档”中恢复它。"
+
+#. js-lingui-explicit-id
+#. placeholder {0}: keys.length
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.toast_assets_updated"
+msgstr "{0, plural, other {已更新 # 项素材}}"
+
+#. js-lingui-explicit-id
+#. placeholder {0}: coverage.missing.length
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.capability_gaps_count"
+msgstr "{0, plural, other {# 项能力缺口}}"
+
+#. js-lingui-explicit-id
+#. placeholder {0}: plan.files.length
+#. placeholder {1}: plan.conflicts.length
+#: src/components/library/RegistryInstallPanel.tsx
+msgid "registry_install.plan_summary"
+msgstr "{0, plural, other {# 个文件}} · {1, plural, other {# 个冲突}}"
+
+#. js-lingui-explicit-id
+#. placeholder {0}: consumption.length
+#: src/components/library/KitLibraryInspector.tsx
+msgid "kit_library.project_reference_count"
+msgstr "{0, plural, other {# 个项目引用}}"
 
 #. js-lingui-explicit-id
 #. placeholder {0}: slices.length
@@ -80,10 +267,55 @@ msgid "source.meta_region_count"
 msgstr "{0, plural, other {# 个区域}}"
 
 #. js-lingui-explicit-id
-#. placeholder {0}: slices.length
-#: src/components/status/StatusBar.tsx
-msgid "status.slice_count"
-msgstr "{0, plural, other {# 个切片}}"
+#. placeholder {0}: selected.size
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.selected_count"
+msgstr "{0, plural, other {已选择 #}}"
+
+#. js-lingui-explicit-id
+#. placeholder {0}: receipt.status
+#. placeholder {1}: receipt.fileHashes.length
+#: src/components/library/RegistryInstallPanel.tsx
+msgid "registry_install.receipt_summary"
+msgstr "{0} · {1, plural, other {已验证 # 个文件}}"
+
+#. js-lingui-explicit-id
+#. placeholder {0}: item.name
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.toast_added_to_project"
+msgstr "{0} 已添加到项目"
+
+#. js-lingui-explicit-id
+#. placeholder {0}: confirmed.size
+#. placeholder {1}: candidates.length - confirmed.size
+#: src/components/library/KitLibraryInspector.tsx
+msgid "kit_library.confirmed_rejected_summary"
+msgstr "已确认 {0} · 已拒绝 {1}"
+
+#. js-lingui-explicit-id
+#. placeholder {0}: preview.name
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.kit_editor_title"
+msgstr "{0} 套件编辑器"
+
+#. js-lingui-explicit-id
+#. placeholder {0}: item.name
+#: src/components/library/KitLibraryInspector.tsx
+msgid "kit_library.editor_aria"
+msgstr "{0} 套件编辑器"
+
+#. js-lingui-explicit-id
+#. placeholder {0}: endpointModels.data.length
+#: src/components/settings/ModelSlot.tsx
+msgid "settings.models_discovered_from_endpoint"
+msgstr "从端点发现了 {0} 个模型"
+
+#. js-lingui-explicit-id
+#. placeholder {0}: coverage.covered.length
+#. placeholder {1}: coverage.total
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.task_dimensions_covered"
+msgstr "已覆盖 {0}/{1} 个任务维度"
 
 #. js-lingui-explicit-id
 #. placeholder {0}: state.output.slices.length
@@ -103,6 +335,51 @@ msgid "preview.region_count"
 msgstr "{count, plural, other {# 个区域}}"
 
 #. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.exact_duplicates_count"
+msgstr "{duplicateCount, plural, other {# 个完全重复项}}"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ModelSlot.tsx
+msgid "settings.evidence_disclaimer"
+msgstr "{evidence}。端点发现只能证明可用性，不能证明任务质量或模态支持。"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ModelSlot.tsx
+msgid "settings.model_slot_fallback_aria"
+msgstr "{label} 备用模型"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ModelSlot.tsx
+msgid "settings.model_slot_model_aria"
+msgstr "{label} 模型"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ModelSlot.tsx
+msgid "settings.model_slot_provider_aria"
+msgstr "{label} 提供方"
+
+#. js-lingui-explicit-id
+#: src/components/library/TeamGovernancePanel.tsx
+msgid "team.share_review_pending_aria"
+msgstr "{label}，{pending} 项待处理"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.passed_count"
+msgstr "{passed, plural, other {已通过 #}}"
+
+#. js-lingui-explicit-id
+#: src/components/library/TeamGovernancePanel.tsx
+msgid "team.pending_reviews_count"
+msgstr "{pending} 项待审评论"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.lineage_results_count"
+msgstr "{relatedCount, plural, other {# 个血缘结果}}"
+
+#. js-lingui-explicit-id
 #: src/hooks/useExport.ts
 msgid "export.toast_success"
 msgstr "{savedCount, plural, other {已导出 # 个切片}}"
@@ -118,6 +395,11 @@ msgid "slices.empty_halve_min_area"
 msgstr "最小面积 −50%"
 
 #. js-lingui-explicit-id
+#: src/components/library/TeamGovernancePanel.tsx
+msgid "team.host_required_description"
+msgstr "需要一个桌面协作主机才能进行评审或创建只读分享。"
+
+#. js-lingui-explicit-id
 #: src/components/canvas/nodes/IntentPanel.tsx
 msgid "intent.questions_title"
 msgstr "先澄清一下"
@@ -126,6 +408,11 @@ msgstr "先澄清一下"
 #: src/components/preview/PreviewToolbar.tsx
 msgid "preview.zoom_actual"
 msgstr "实际大小 (1:1)"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderDirectory.tsx
+msgid "settings.adapter_available"
+msgstr "适配器可用"
 
 #. js-lingui-explicit-id
 #: src/components/settings/ProviderForm.tsx
@@ -138,14 +425,19 @@ msgid "settings.empty_desc"
 msgstr "添加一个提供方并填入 API Key 即可开始使用 AI 功能。"
 
 #. js-lingui-explicit-id
-#: src/components/settings/ModelSlot.tsx
-msgid "settings.model_no_provider"
-msgstr "先在上方添加一个端点,再分配模型。"
-
-#. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
 msgid "settings.add_provider"
 msgstr "添加提供方"
+
+#. js-lingui-explicit-id
+#: src/components/library/ReviewBranchEditor.tsx
+msgid "review_branch.comment_placeholder"
+msgstr "添加与版本绑定的评论"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.add_tag_placeholder"
+msgstr "添加标签"
 
 #. js-lingui-explicit-id
 #: src/components/canvas/nodes/MockupNode.tsx
@@ -168,6 +460,16 @@ msgid "mockup.toast_added_to_library"
 msgstr "已加入素材库"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.advanced"
+msgstr "高级"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.advanced_model_bindings_aria"
+msgstr "高级模型绑定"
+
+#. js-lingui-explicit-id
 #: src/components/settings/SettingsSidebar.tsx
 msgid "settings.section_ai"
 msgstr "AI"
@@ -178,14 +480,44 @@ msgid "settings.about_description"
 msgstr "AI 原生 UI/UX · Tauri 2 · React 19 — 本地、离线优先。"
 
 #. js-lingui-explicit-id
+#: src/components/settings/ProviderDirectory.tsx
+msgid "settings.provider_category_all"
+msgstr "全部"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.media_filter_all"
+msgstr "全部"
+
+#. js-lingui-explicit-id
 #: src/components/inspector/ExportBar.tsx
 msgid "inspector.export_all_button"
 msgstr "全部（{total}）"
 
 #. js-lingui-explicit-id
-#: src/components/status/StatusBar.tsx
-msgid "status.state_running"
-msgstr "分析中…"
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.all_collections"
+msgstr "全部合集"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.all_dimensions_covered"
+msgstr "所有已配置的维度都有适配器覆盖。模型级别的证据会在选择时校验。"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.all_projects"
+msgstr "全部项目"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.all_quality"
+msgstr "全部质量"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.analyze_video"
+msgstr "分析视频"
 
 #. js-lingui-explicit-id
 #: src/components/source/SourceMeta.tsx
@@ -198,6 +530,11 @@ msgid "preview.analyzing"
 msgstr "分析中…"
 
 #. js-lingui-explicit-id
+#: src/components/settings/VectorizerPanel.tsx
+msgid "vectorizer.api_id_saved"
+msgstr "API ID 已保存"
+
+#. js-lingui-explicit-id
 #: src/components/settings/KeyField.tsx
 msgid "settings.key_label"
 msgstr "API Key"
@@ -208,9 +545,85 @@ msgid "settings.keychain_trust"
 msgstr "API 密钥仅存于系统钥匙串,并在原生层注入——永不进入网页。"
 
 #. js-lingui-explicit-id
+#: src/components/settings/VectorizerPanel.tsx
+msgid "vectorizer.mode_label"
+msgstr "API 模式"
+
+#. js-lingui-explicit-id
+#: src/components/settings/VectorizerPanel.tsx
+msgid "vectorizer.secret_label"
+msgstr "API 密钥"
+
+#. js-lingui-explicit-id
+#: src/components/settings/VectorizerPanel.tsx
+msgid "vectorizer.secret_removed"
+msgstr "API 密钥已移除"
+
+#. js-lingui-explicit-id
+#: src/components/settings/VectorizerPanel.tsx
+msgid "vectorizer.secret_saved"
+msgstr "API 密钥已保存"
+
+#. js-lingui-explicit-id
 #: src/components/settings/SettingsDialog.tsx
 msgid "settings.dialog_a11y_desc"
 msgstr "应用偏好与 AI 服务商。"
+
+#. js-lingui-explicit-id
+#: src/components/library/RegistryInstallPanel.tsx
+msgid "registry_install.approve_and_install"
+msgstr "批准并安装"
+
+#. js-lingui-explicit-id
+#: src/components/library/ReviewBranchEditor.tsx
+msgid "review_branch.approve_revision"
+msgstr "批准该修订版本"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.empty_description"
+msgstr "已批准的项目成果和导入的软件包会带着不可变版本与来源信息显示在这里。"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.archive"
+msgstr "归档"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.archive_project_title"
+msgstr "归档该项目？"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/ArchivedSection.tsx
+#: src/components/settings/SettingsSidebar.tsx
+msgid "settings.section_archived"
+msgstr "已归档"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.archived"
+msgstr "已归档"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.archived_projects"
+msgstr "已归档项目"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/ArchivedSection.tsx
+msgid "settings.archived_description"
+msgstr "已归档的项目会保留在此设备上，直到你恢复或删除它们。"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.archived_empty_description"
+msgstr "归档的工作会显示在这里。"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.asset_singular"
+msgstr "个素材"
 
 #. js-lingui-explicit-id
 #: src/components/canvas/nodes/BoardNode.tsx
@@ -228,6 +641,11 @@ msgid "pipeline.node_board_aria"
 msgstr "素材板阶段"
 
 #. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.capabilities_aria"
+msgstr "素材能力"
+
+#. js-lingui-explicit-id
 #: src/components/topbar/LibraryMenu.tsx
 msgid "library.menu_label"
 msgstr "素材库"
@@ -238,9 +656,54 @@ msgid "library.title"
 msgstr "素材库"
 
 #. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.asset_plural"
+msgstr "个素材"
+
+#. js-lingui-explicit-id
 #: src/components/canvas/nodes/IntentPanel.tsx
 msgid "intent.assumptions"
 msgstr "假设"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.attach_reference"
+msgstr "添加参考物料"
+
+#. js-lingui-explicit-id
+#: src/components/library/RegistryInstallPanel.tsx
+msgid "registry_install.authorize_workspace"
+msgstr "授权工作区"
+
+#. js-lingui-explicit-id
+#: src/components/library/RegistryInstallPanel.tsx
+msgid "registry_install.authorized_workspace_fallback"
+msgstr "已授权的工作区"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ModelSlot.tsx
+msgid "settings.model_slot_auto"
+msgstr "自动"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.policy_auto_compatible"
+msgstr "自动兼容"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.model_routing_description"
+msgstr "自动路由只会把每个任务分配给具备所需能力的可用适配器。"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ModelSlot.tsx
+msgid "settings.auto_will_choose"
+msgstr "自动从已连接的提供方中选择"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.nav_back"
+msgstr "后退"
 
 #. js-lingui-explicit-id
 #: src/components/canvas/PlannedCanvas.tsx
@@ -258,6 +721,26 @@ msgid "dag.blocked"
 msgstr "已阻塞 — 上游步骤失败。"
 
 #. js-lingui-explicit-id
+#: src/components/library/KitLibraryInspector.tsx
+msgid "kit_library.brand_book_confirmation_aria"
+msgstr "品牌手册确认"
+
+#. js-lingui-explicit-id
+#: src/components/library/KitLibraryInspector.tsx
+msgid "kit_library.brand_book_confirmation_heading"
+msgstr "品牌手册确认"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.preset_brand"
+msgstr "品牌 VI"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.tab_brand_kits"
+msgstr "品牌套件"
+
+#. js-lingui-explicit-id
 #: src/components/canvas/nodes/BriefNode.tsx
 msgid "pipeline.stage_brief"
 msgstr "需求"
@@ -268,6 +751,11 @@ msgid "pipeline.node_brief_aria"
 msgstr "需求阶段"
 
 #. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.bulk_toolbar_aria"
+msgstr "批量素材操作"
+
+#. js-lingui-explicit-id
 #: src/components/inspector/SliceDimensions.tsx
 msgid "inspector.dim_bytes"
 msgstr "字节"
@@ -275,13 +763,70 @@ msgstr "字节"
 #. js-lingui-explicit-id
 #: src/components/settings/ProviderForm.tsx
 #: src/components/settings/ProviderRow.tsx
+#: src/components/settings/sections/AiSection.tsx
 msgid "settings.cancel"
 msgstr "取消"
 
 #. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+#: src/components/settings/sections/ArchivedSection.tsx
+msgid "home.cancel"
+msgstr "取消"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/dag-node-common.tsx
+msgid "dag.cancelled"
+msgstr "已取消。"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ModelSlot.tsx
+msgid "settings.capability_evidence_unavailable"
+msgstr "能力证据不可用"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderDirectory.tsx
+msgid "settings.catalog_availability_disclaimer"
+msgstr "目录中列出并不代表已安装适配器、拥有有效授权，或支持每一种模型能力。"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderDirectory.tsx
+msgid "settings.catalog_only"
+msgstr "仅目录"
+
+#. js-lingui-explicit-id
+#: src/components/help/HelpMenu.tsx
+msgid "help.change_language"
+msgstr "切换语言..."
+
+#. js-lingui-explicit-id
+#: src/components/home/SidebarAccount.tsx
+msgid "home.change_theme"
+msgstr "切换主题"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderDirectory.tsx
+msgid "settings.provider_category_china"
+msgstr "国内"
+
+#. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
-msgid "settings.model_chat_label"
-msgstr "对话 / 理解"
+msgid "settings.choose_catalog_definition"
+msgstr "选择一个目录定义。连接后默认仍会自动路由。"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.rename_project_description"
+msgstr "为这个本地项目起一个清晰的名称。"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.clear_selection"
+msgstr "清除"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.clear_search"
+msgstr "清除搜索"
 
 #. js-lingui-explicit-id
 #: src/hooks/useCopyPng.ts
@@ -293,6 +838,26 @@ msgstr "此环境不支持复制图像到剪贴板。"
 #: src/components/ui/sheet.tsx
 msgid "common.close"
 msgstr "关闭"
+
+#. js-lingui-explicit-id
+#: src/components/library/KitLibraryInspector.tsx
+msgid "kit_library.close_editor_aria"
+msgstr "关闭套件编辑器"
+
+#. js-lingui-explicit-id
+#: src/components/library/ReviewBranchEditor.tsx
+msgid "review_branch.comment_action"
+msgstr "评论"
+
+#. js-lingui-explicit-id
+#: src/components/library/KitLibraryInspector.tsx
+msgid "kit_library.density_compact"
+msgstr "紧凑"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.tab_components"
+msgstr "组件"
 
 #. js-lingui-explicit-id
 #: src/components/canvas/nodes/BoardNode.tsx
@@ -320,6 +885,16 @@ msgid "slices.name_no_model_cta"
 msgstr "配置对话模型以命名切片"
 
 #. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.discover_references_title"
+msgstr "配置一个已授权的参考发现服务主机以启用此操作。"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.analyze_video_title"
+msgstr "配置一个已授权的视频执行主机以启用帧与镜头分析。"
+
+#. js-lingui-explicit-id
 #: src/components/canvas/nodes/BoardNode.tsx
 #: src/components/canvas/nodes/BriefNode.tsx
 #: src/components/canvas/nodes/MockupNode.tsx
@@ -333,13 +908,71 @@ msgstr "在设置中配置图像模型后即可生成。"
 
 #. js-lingui-explicit-id
 #: src/components/settings/ProviderRow.tsx
+#: src/components/settings/VectorizerPanel.tsx
 msgid "settings.status_configured"
 msgstr "已配置"
 
 #. js-lingui-explicit-id
 #: src/components/settings/KeyField.tsx
+#: src/components/settings/VectorizerPanel.tsx
 msgid "settings.key_placeholder_replace"
 msgstr "已配置，输入以替换"
+
+#. js-lingui-explicit-id
+#: src/components/library/KitLibraryInspector.tsx
+msgid "kit_library.audit_conflicts"
+msgstr "冲突"
+
+#. js-lingui-explicit-id
+#. placeholder {0}: definition.label
+#: src/components/settings/ProviderDirectory.tsx
+msgid "settings.connect_named_provider"
+msgstr "连接 {0}"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.connect_a_provider"
+msgstr "连接一个提供方"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.connect_provider_with_capabilities"
+msgstr "连接一个具备这些能力的提供方"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.connect_ai_capabilities"
+msgstr "连接 AI 能力"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.connect_ai_capabilities_description"
+msgstr "先连接一个提供方，Cutout 会自动为文本、视觉、语音、编码和图像任务路由。"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.connect_provider"
+msgstr "连接提供方"
+
+#. js-lingui-explicit-id
+#: src/components/library/KitLibraryInspector.tsx
+msgid "kit_library.consumption_heading"
+msgstr "使用情况"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.meta_content_hash"
+msgstr "内容哈希"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.continue_heading"
+msgstr "继续工作"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.dimension_text_description"
+msgstr "对话、规划与文档理解。"
 
 #. js-lingui-explicit-id
 #: src/hooks/useCopyPng.ts
@@ -347,9 +980,19 @@ msgid "copy_png.toast_copied"
 msgstr "已复制 {label}"
 
 #. js-lingui-explicit-id
+#: src/components/library/KitLibraryInspector.tsx
+msgid "kit_library.copy_manifest"
+msgstr "复制清单"
+
+#. js-lingui-explicit-id
 #: src/components/slices/SliceCardActions.tsx
 msgid "slices.action_copy_png"
 msgstr "复制 PNG"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.toast_add_failed"
+msgstr "无法添加库项目"
 
 #. js-lingui-explicit-id
 #: src/components/canvas/nodes/MockupNode.tsx
@@ -370,9 +1013,49 @@ msgid "import.toast_load_failed"
 msgstr "无法加载图像"
 
 #. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.load_failed_title"
+msgstr "无法加载项目"
+
+#. js-lingui-explicit-id
 #: src/components/library/LibraryDrawer.tsx
 msgid "library.toast_remove_failed"
 msgstr "无法移除素材"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.toast_update_failed"
+msgstr "无法更新素材"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.preset_brand_brief"
+msgstr "为……创建一整套品牌 VI（Logo、色彩、字体、物料）："
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.preset_poster_brief"
+msgstr "为……创建一张海报 / 主视觉："
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.create_from_brief"
+msgstr "根据简报创建"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.dimension_tts_description"
+msgstr "生成语音音频。"
+
+#. js-lingui-explicit-id
+#: src/components/library/TeamGovernancePanel.tsx
+msgid "team.current_project_revision"
+msgstr "当前项目修订版本"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderDirectory.tsx
+msgid "settings.provider_category_custom"
+msgstr "自定义"
 
 #. js-lingui-explicit-id
 #: src/components/canvas/edges/TransitionEdge.tsx
@@ -390,9 +1073,9 @@ msgid "settings.reset_params_label"
 msgstr "切图参数"
 
 #. js-lingui-explicit-id
-#: src/components/topbar/ThemeToggle.tsx
-msgid "topbar.theme_dark_mode"
-msgstr "深色模式"
+#: src/components/home/SidebarAccount.tsx
+msgid "home.theme_dark"
+msgstr "深色"
 
 #. js-lingui-explicit-id
 #: src/components/canvas/edges/TransitionEdge.tsx
@@ -415,14 +1098,32 @@ msgid "mockup.toast_deconstruct_failed"
 msgstr "拆解失败"
 
 #. js-lingui-explicit-id
-#: src/components/settings/ModelSlot.tsx
-msgid "settings.effort_default"
-msgstr "默认"
-
-#. js-lingui-explicit-id
 #: src/components/settings/ProviderForm.tsx
 msgid "settings.provider_model_label"
 msgstr "默认模型"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+#: src/components/settings/sections/ArchivedSection.tsx
+msgid "home.delete"
+msgstr "删除"
+
+#. js-lingui-explicit-id
+#. placeholder {0}: project.name
+#: src/components/settings/sections/ArchivedSection.tsx
+msgid "settings.delete_archived_named"
+msgstr "删除 {0}"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.delete_permanently"
+msgstr "永久删除"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+#: src/components/settings/sections/ArchivedSection.tsx
+msgid "home.delete_permanently_title"
+msgstr "永久删除？"
 
 #. js-lingui-explicit-id
 #: src/components/canvas/nodes/BriefNode.tsx
@@ -430,8 +1131,43 @@ msgid "brief.placeholder"
 msgstr "描述产品及其主界面——面向谁、展示什么……"
 
 #. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.brief_placeholder"
+msgstr "描述你想设计的内容..."
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.preset_desktop_brief"
+msgstr "为……设计一个桌面应用工作区（请补充产品/主题）："
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.preset_mobile_brief"
+msgstr "为……设计一套移动 App 界面（请补充产品/主题）："
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.preset_web_brief"
+msgstr "为……设计一个响应式网页体验（请补充产品/主题）："
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.preset_miniapp_brief"
+msgstr "为……设计一个微信小程序流程（请补充产品/主题）："
+
+#. js-lingui-explicit-id
 #: src/components/canvas/nodes/dag-node-common.tsx
 msgid "dag.op_design_system"
+msgstr "设计系统"
+
+#. js-lingui-explicit-id
+#: src/components/library/KitLibraryInspector.tsx
+msgid "kit_library.design_system_files_aria"
+msgstr "设计系统套件文件"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.tab_design_systems"
 msgstr "设计系统"
 
 #. js-lingui-explicit-id
@@ -440,19 +1176,44 @@ msgid "dag.node_design_system_aria"
 msgstr "设计系统节点"
 
 #. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.preset_desktop"
+msgstr "桌面端"
+
+#. js-lingui-explicit-id
 #: src/components/canvas/nodes/IntentPanel.tsx
 msgid "intent.dimensions"
 msgstr "维度"
 
 #. js-lingui-explicit-id
-#: src/components/status/StatusBar.tsx
-msgid "status.state_done"
-msgstr "完成"
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.discover_references"
+msgstr "发现参考资料"
+
+#. js-lingui-explicit-id
+#: src/components/help/HelpMenu.tsx
+msgid "help.documentation"
+msgstr "文档"
 
 #. js-lingui-explicit-id
 #: src/components/canvas/edges/TransitionEdge.tsx
 msgid "pipeline.status_done"
 msgstr "完成"
+
+#. js-lingui-explicit-id
+#: src/components/library/KitLibraryInspector.tsx
+msgid "kit_library.download"
+msgstr "下载"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.status_draft"
+msgstr "草稿"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.drafts"
+msgstr "草稿"
 
 #. js-lingui-explicit-id
 #: src/components/source/DropZone.tsx
@@ -476,18 +1237,29 @@ msgstr "编辑"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
+msgid "settings.dimension_image_edit_description"
+msgstr "编辑一张或多张给定的图片。"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
 msgid "settings.dialog_edit_title"
 msgstr "编辑提供方"
+
+#. js-lingui-explicit-id
+#. placeholder {0}: formatProjectDate(project.updatedAt, locale)
+#: src/components/home/ProjectHome.tsx
+msgid "home.edited_date"
+msgstr "编辑于 {0}"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.status_empty"
+msgstr "空白"
 
 #. js-lingui-explicit-id
 #: src/components/library/LibraryDrawer.tsx
 msgid "library.empty"
 msgstr "素材库还是空的——把切片或生成的图加入素材库，或导入你自己的图片。"
-
-#. js-lingui-explicit-id
-#: src/components/settings/ModelSlot.tsx
-msgid "settings.model_pick_endpoint"
-msgstr "端点"
 
 #. js-lingui-explicit-id
 #: src/components/canvas/nodes/MockupNode.tsx
@@ -505,9 +1277,14 @@ msgid "settings.key_placeholder_empty"
 msgstr "输入 API Key"
 
 #. js-lingui-explicit-id
-#: src/components/status/StatusBar.tsx
-msgid "status.state_error"
-msgstr "错误"
+#: src/components/settings/VectorizerPanel.tsx
+msgid "vectorizer.secret_placeholder"
+msgstr "输入 API 密钥"
+
+#. js-lingui-explicit-id
+#: src/components/library/KitLibraryInspector.tsx
+msgid "kit_library.error_expected_candidates"
+msgstr "应从授权的品牌手册解析器结果中获取候选项数组。"
 
 #. js-lingui-explicit-id
 #: src/components/topbar/TopBarActions.tsx
@@ -530,6 +1307,11 @@ msgid "export.toast_failed"
 msgstr "导出失败：{reason}"
 
 #. js-lingui-explicit-id
+#: src/components/topbar/TopBarActions.tsx
+msgid "export.menu_label"
+msgstr "导出格式"
+
+#. js-lingui-explicit-id
 #: src/components/slices/SliceCardActions.tsx
 msgid "slices.action_export"
 msgstr "导出切片"
@@ -540,9 +1322,19 @@ msgid "inspector.export_slice"
 msgstr "导出切片"
 
 #. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.export_verified_asset"
+msgstr "导出已验证素材"
+
+#. js-lingui-explicit-id
 #: src/hooks/useExport.ts
 msgid "export.toast_partial"
 msgstr "已导出 {savedCount} / {total}"
+
+#. js-lingui-explicit-id
+#: src/components/library/KitLibraryInspector.tsx
+msgid "kit_library.density_extended"
+msgstr "展开"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
@@ -550,9 +1342,49 @@ msgid "settings.load_failed"
 msgstr "加载提供方失败"
 
 #. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.favorite_action"
+msgstr "收藏"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.collection_filter_aria"
+msgstr "按合集筛选"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.quality_filter_aria"
+msgstr "按质量筛选"
+
+#. js-lingui-explicit-id
+#: src/components/library/KitLibraryInspector.tsx
+msgid "kit_library.first_available_version"
+msgstr "首个可用版本"
+
+#. js-lingui-explicit-id
 #: src/components/preview/PreviewToolbar.tsx
 msgid "preview.zoom_fit"
 msgstr "适应窗口"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.policy_follow_updates"
+msgstr "跟随更新"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.reference_following"
+msgstr "跟随中"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.nav_forward"
+msgstr "前进"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderDirectory.tsx
+msgid "settings.provider_category_gateway"
+msgstr "网关"
 
 #. js-lingui-explicit-id
 #: src/components/settings/SettingsSidebar.tsx
@@ -573,6 +1405,11 @@ msgstr "从需求生成，或导入截图。"
 #: src/components/canvas/nodes/BriefNode.tsx
 msgid "brief.generate"
 msgstr "生成原型图"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.dimension_image_generation_description"
+msgstr "生成全新的视觉素材。"
 
 #. js-lingui-explicit-id
 #: src/components/library/LibraryDrawer.tsx
@@ -601,34 +1438,70 @@ msgid "generate.toast_failed"
 msgstr "生成失败"
 
 #. js-lingui-explicit-id
+#: src/components/settings/ProviderDirectory.tsx
+msgid "settings.provider_category_global"
+msgstr "全球"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.section_aria"
+msgstr "全局库"
+
+#. js-lingui-explicit-id
 #: src/components/canvas/nodes/IntentPanel.tsx
 msgid "intent.goal"
 msgstr "目标"
 
 #. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.layout_grid"
+msgstr "网格视图"
+
+#. js-lingui-explicit-id
+#: src/components/help/HelpMenu.tsx
+msgid "help.menu_label"
+msgstr "帮助与资源"
+
+#. js-lingui-explicit-id
 #: src/components/settings/KeyField.tsx
+#: src/components/settings/VectorizerPanel.tsx
 msgid "settings.key_hide"
 msgstr "隐藏"
 
 #. js-lingui-explicit-id
-#: src/components/settings/ModelSlot.tsx
-msgid "settings.effort_high"
-msgstr "高"
+#: src/components/library/TeamGovernancePanel.tsx
+msgid "team.host_required"
+msgstr "需要主机"
 
 #. js-lingui-explicit-id
-#: src/components/status/StatusBar.tsx
-msgid "status.state_idle"
-msgstr "空闲"
+#: src/components/settings/ProviderDirectory.tsx
+msgid "settings.provider_category_media"
+msgstr "图片与视频"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
-msgid "settings.model_image_label"
+msgid "settings.dimension_image_edit_label"
+msgstr "图像编辑"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.dimension_image_generation_label"
 msgstr "图像生成"
 
 #. js-lingui-explicit-id
-#: src/components/topbar/TopBarActions.tsx
-msgid "topbar.import"
-msgstr "导入"
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.dimension_image_to_webdev_label"
+msgstr "图像转网页"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.media_filter_images"
+msgstr "图片"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.dimension_image_to_webdev_description"
+msgstr "根据视觉素材实现一个网页界面。"
 
 #. js-lingui-explicit-id
 #: src/components/library/LibraryDrawer.tsx
@@ -639,6 +1512,21 @@ msgstr "导入"
 #: src/components/canvas/nodes/MockupNode.tsx
 msgid "mockup.import_replace"
 msgstr "导入替换"
+
+#. js-lingui-explicit-id
+#: src/components/library/KitLibraryInspector.tsx
+msgid "kit_library.brand_book_confirmation_hint"
+msgstr "导入一份已授权的解析器结果。在你确认之前，任何内容都不会进入该套件。"
+
+#. js-lingui-explicit-id
+#: src/components/library/KitLibraryInspector.tsx
+msgid "kit_library.import_candidates_aria"
+msgstr "导入品牌手册候选项"
+
+#. js-lingui-explicit-id
+#: src/components/library/KitLibraryInspector.tsx
+msgid "kit_library.import_candidates"
+msgstr "导入候选项"
 
 #. js-lingui-explicit-id
 #: src/components/source/DropZone.tsx
@@ -661,9 +1549,24 @@ msgid "slices.inspector_tab"
 msgstr "检视"
 
 #. js-lingui-explicit-id
+#: src/components/settings/SettingsSidebar.tsx
+msgid "settings.section_integrations"
+msgstr "集成"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.empty_fallback_label"
+msgstr "项目"
+
+#. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
 msgid "settings.dialog_form_desc"
 msgstr "密钥仅保存在系统钥匙串，永不进入网页或磁盘明文。"
+
+#. js-lingui-explicit-id
+#: src/components/library/KitLibraryInspector.tsx
+msgid "kit_library.audit_aria"
+msgstr "套件审计"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/GeneralSection.tsx
@@ -671,19 +1574,109 @@ msgid "topbar.language_label"
 msgstr "语言"
 
 #. js-lingui-explicit-id
-#: src/components/topbar/ThemeToggle.tsx
-msgid "topbar.theme_light_mode"
-msgstr "浅色模式"
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.title"
+msgstr "库"
 
 #. js-lingui-explicit-id
-#: src/components/settings/ModelSlot.tsx
-msgid "settings.effort_low"
-msgstr "低"
+#: src/components/home/ProjectHome.tsx
+msgid "home.library_label"
+msgstr "库"
 
 #. js-lingui-explicit-id
-#: src/components/settings/ModelSlot.tsx
-msgid "settings.effort_medium"
-msgstr "中"
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.type_tablist_aria"
+msgstr "库类型"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.meta_license"
+msgstr "许可证"
+
+#. js-lingui-explicit-id
+#: src/components/home/SidebarAccount.tsx
+msgid "home.theme_light"
+msgstr "浅色"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.layout_list"
+msgstr "列表视图"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.loading_registry_installer"
+msgstr "正在加载注册表安装程序…"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderDirectory.tsx
+msgid "settings.provider_category_local"
+msgstr "本地"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.error_storage_unavailable"
+msgstr "本地库存储不可用。"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.local_projects"
+msgstr "本地项目"
+
+#. js-lingui-explicit-id
+#: src/components/library/TeamGovernancePanel.tsx
+msgid "team.local_review"
+msgstr "本地评审"
+
+#. js-lingui-explicit-id
+#: src/components/library/TeamGovernancePanel.tsx
+msgid "team.local_review_description"
+msgstr "本地评审会把评论、批准和只读分享都保留在此设备上。"
+
+#. js-lingui-explicit-id
+#: src/components/settings/VectorizerPanel.tsx
+msgid "vectorizer.hint"
+msgstr "本地 SVG 可离线使用。配置后可通过 Vectorizer.AI 生成 API SVG。"
+
+#. js-lingui-explicit-id
+#: src/components/home/SidebarAccount.tsx
+msgid "home.local_workspace"
+msgstr "本地工作区"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.policy_lock_version"
+msgstr "锁定版本"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.reference_locked"
+msgstr "已锁定"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.kit_editor_description"
+msgstr "管理已批准的、内容寻址的套件投影。"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.preset_miniapp"
+msgstr "小程序"
+
+#. js-lingui-explicit-id
+#: src/components/library/KitLibraryInspector.tsx
+msgid "kit_library.audit_missing"
+msgstr "缺失"
+
+#. js-lingui-explicit-id
+#: src/components/library/KitLibraryInspector.tsx
+msgid "kit_library.missing_from_kit"
+msgstr "该已批准套件中缺失"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.preset_mobile"
+msgstr "移动 App"
 
 #. js-lingui-explicit-id
 #: src/components/canvas/nodes/MockupNode.tsx
@@ -702,13 +1695,34 @@ msgstr "原型图阶段"
 
 #. js-lingui-explicit-id
 #: src/components/settings/ModelSlot.tsx
-msgid "settings.model_slug_placeholder"
-msgstr "模型"
+msgid "settings.model_or_blank_placeholder"
+msgstr "填写模型，或留空以自动选择"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
-msgid "settings.models_heading"
-msgstr "模型"
+msgid "settings.model_routing"
+msgstr "模型路由"
+
+#. js-lingui-explicit-id
+#. placeholder {0}: project.name
+#: src/components/home/ProjectHome.tsx
+msgid "home.more_actions_named"
+msgstr "{0} 的更多操作"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.lineage_results_heading"
+msgstr "更多同源血缘结果"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.move_to_collection_aria"
+msgstr "将所选内容移动到合集"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.move_to_collection_placeholder"
+msgstr "移动到合集…"
 
 #. js-lingui-explicit-id
 #: src/components/settings/ProviderForm.tsx
@@ -746,9 +1760,54 @@ msgid "slices.naming"
 msgstr "正在命名切片…"
 
 #. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.quality_needs_attention"
+msgstr "需要关注"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.new_project"
+msgstr "新建项目"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.empty_title"
+msgstr "还没有{label}"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderDirectory.tsx
+msgid "settings.no_authorization"
+msgstr "无需授权"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.no_drafts_yet"
+msgstr "还没有草稿"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.no_search_matches"
+msgstr "没有匹配的项目"
+
+#. js-lingui-explicit-id
+#: src/components/topbar/TabsMenu.tsx
+msgid "topbar.tabs_no_match"
+msgstr "没有匹配的标签页"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.no_projects_yet"
+msgstr "还没有项目"
+
+#. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
 msgid "settings.empty_title"
 msgstr "尚未配置提供方"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderDirectory.tsx
+msgid "settings.no_providers_match_search"
+msgstr "没有匹配此次搜索的提供方。"
 
 #. js-lingui-explicit-id
 #: src/components/slices/SliceGridEmpty.tsx
@@ -757,18 +1816,51 @@ msgstr "未找到区域"
 
 #. js-lingui-explicit-id
 #: src/components/settings/ProviderRow.tsx
+#: src/components/settings/VectorizerPanel.tsx
 msgid "settings.status_unconfigured"
 msgstr "未配置"
 
 #. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.models_hint"
-msgstr "同一端点、不同能力用不同模型——无需重加服务商。每个从端点的模型列表里挑，或手填。"
+#: src/components/library/KitLibraryInspector.tsx
+msgid "kit_library.not_used_by_project"
+msgstr "尚未被任何项目使用"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+#: src/components/settings/sections/ArchivedSection.tsx
+msgid "home.nothing_archived"
+msgstr "暂无归档"
+
+#. js-lingui-explicit-id
+#. placeholder {0}: query.trim()
+#: src/components/home/ProjectHome.tsx
+msgid "home.no_search_matches_description"
+msgstr "没有与“{0}”匹配的项目。试试其他名称或简报关键词。"
+
+#. js-lingui-explicit-id
+#: src/components/home/SidebarAccount.tsx
+msgid "home.notifications"
+msgstr "通知"
+
+#. js-lingui-explicit-id
+#: src/components/library/TeamGovernancePanel.tsx
+msgid "team.open_project_to_review"
+msgstr "打开一个项目以开始评审。"
+
+#. js-lingui-explicit-id
+#: src/components/topbar/TabsMenu.tsx
+msgid "topbar.tabs_overview"
+msgstr "打开的标签页"
 
 #. js-lingui-explicit-id
 #: src/components/settings/ProviderForm.tsx
 msgid "settings.provider_kind_openai_compatible"
 msgstr "OpenAI 兼容"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ModelSlot.tsx
+msgid "settings.optional_fallback_model_placeholder"
+msgstr "可选的备用模型"
 
 #. js-lingui-explicit-id
 #: src/components/source/DropZone.tsx
@@ -786,9 +1878,40 @@ msgid "settings.reset_done_toast"
 msgstr "参数已重置"
 
 #. js-lingui-explicit-id
+#: src/components/library/KitLibraryInspector.tsx
+msgid "kit_library.parser_host_not_configured"
+msgstr "此界面尚未配置解析器主机。请导入其签名的 JSON 结果以查看候选项。"
+
+#. js-lingui-explicit-id
+#: src/components/settings/SettingsSidebar.tsx
+msgid "settings.section_personalization"
+msgstr "个性化"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.pin"
+msgstr "置顶"
+
+#. js-lingui-explicit-id
+#. placeholder {0}: project.name
+#: src/components/home/ProjectHome.tsx
+msgid "home.pin_named"
+msgstr "置顶 {0}"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.pin_project"
+msgstr "置顶项目"
+
+#. js-lingui-explicit-id
 #: src/components/canvas/LinearCanvas.tsx
 msgid "pipeline.canvas_aria"
 msgstr "流水线画布"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.dimension_webdev_description"
+msgstr "规划并实现网页界面。"
 
 #. js-lingui-explicit-id
 #. placeholder {0}: node.label
@@ -807,9 +1930,35 @@ msgid "dag.toast_plan_failed"
 msgstr "规划失败"
 
 #. js-lingui-explicit-id
+#: src/components/topbar/TopBarActions.tsx
+msgid "export.menu_png_svg_api"
+msgstr "PNG + SVG · API"
+
+#. js-lingui-explicit-id
+#: src/components/topbar/TopBarActions.tsx
+msgid "export.menu_png_svg_local"
+msgstr "PNG + SVG · 本地"
+
+#. js-lingui-explicit-id
+#: src/components/inspector/ExportBar.tsx
+#: src/components/topbar/TopBarActions.tsx
+msgid "export.menu_png"
+msgstr "PNG 切片"
+
+#. js-lingui-explicit-id
 #: src/components/inspector/SliceDimensions.tsx
 msgid "inspector.dim_position"
 msgstr "位置"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.preset_poster"
+msgstr "海报"
+
+#. js-lingui-explicit-id
+#: src/components/library/KitLibraryInspector.tsx
+msgid "kit_library.audit_present"
+msgstr "已具备"
 
 #. js-lingui-explicit-id
 #: src/components/preview/PreviewPanel.tsx
@@ -817,9 +1966,49 @@ msgid "preview.heading"
 msgstr "预览"
 
 #. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.model_image_hint"
-msgstr "生成图像(如重绘的素材总览图)。"
+#: src/components/library/KitLibraryInspector.tsx
+msgid "kit_library.preview_heading"
+msgstr "预览"
+
+#. js-lingui-explicit-id
+#: src/components/library/RegistryInstallPanel.tsx
+msgid "registry_install.preview_install"
+msgstr "预览安装"
+
+#. js-lingui-explicit-id
+#: src/components/settings/VectorizerPanel.tsx
+msgid "vectorizer.mode_production"
+msgstr "生产"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.project_actions"
+msgstr "项目操作"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.project_name_aria"
+msgstr "项目名称"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.project_load_error"
+msgstr "无法加载项目存储。"
+
+#. js-lingui-explicit-id
+#: src/components/home/SidebarAccount.tsx
+msgid "home.local_workspace_hint"
+msgstr "项目保存在这台设备上"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.drafts_empty_description"
+msgstr "尚未产出结果的项目会汇总在这里。"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.published_empty_description"
+msgstr "你发布的项目会在这里列出并附带在线链接。这依赖账号与社区服务，目前尚未构建。"
 
 #. js-lingui-explicit-id
 #: src/components/library/LibraryDrawer.tsx
@@ -827,9 +2016,29 @@ msgid "library.toast_composed"
 msgstr "已生成原型图到 mockup 节点"
 
 #. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.provenance_and_files"
+msgstr "来源与文件"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ModelSlot.tsx
+msgid "settings.provider_placeholder"
+msgstr "提供方"
+
+#. js-lingui-explicit-id
 #: src/components/settings/ProviderForm.tsx
 msgid "settings.provider_added_toast"
 msgstr "已添加提供方"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderDirectory.tsx
+msgid "settings.provider_categories_aria"
+msgstr "提供方分类"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderDirectory.tsx
+msgid "settings.provider_catalog_only_hint"
+msgstr "该提供方已列入目录，但尚未安装运行时适配器。"
 
 #. js-lingui-explicit-id
 #: src/components/settings/ProviderRow.tsx
@@ -842,6 +2051,53 @@ msgid "settings.provider_updated_toast"
 msgstr "已更新提供方"
 
 #. js-lingui-explicit-id
+#: src/components/library/KitLibraryInspector.tsx
+msgid "kit_library.publish_new_version"
+msgstr "发布新版本"
+
+#. js-lingui-explicit-id
+#. placeholder {0}: item.name
+#. placeholder {1}: next.version
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.toast_published"
+msgstr "已发布 {0} v{1}"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.published_projects"
+msgstr "已发布项目"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.published_empty_title"
+msgstr "发布功能开发中"
+
+#. js-lingui-explicit-id
+#: src/components/library/KitLibraryInspector.tsx
+msgid "kit_library.publishing"
+msgstr "发布中…"
+
+#. js-lingui-explicit-id
+#: src/components/library/ReviewBranchEditor.tsx
+msgid "review_branch.readonly_share"
+msgstr "只读分享"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.status_ready"
+msgstr "已就绪"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.recent_heading"
+msgstr "最近"
+
+#. js-lingui-explicit-id
+#: src/components/topbar/TabsMenu.tsx
+msgid "topbar.recently_closed"
+msgstr "最近关闭"
+
+#. js-lingui-explicit-id
 #: src/components/canvas/nodes/BriefNode.tsx
 msgid "dag.plan_and_generate"
 msgstr "规划并生成图"
@@ -850,6 +2106,21 @@ msgstr "规划并生成图"
 #: src/components/canvas/nodes/BriefNode.tsx
 msgid "dag.planning"
 msgstr "规划并生成中…"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderDirectory.tsx
+msgid "settings.provider_category_recommended"
+msgstr "推荐"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.hosts_not_configured"
+msgstr "尚未配置参考资料提供方主机。"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.media_filter_references"
+msgstr "参考资料"
 
 #. js-lingui-explicit-id
 #: src/components/canvas/nodes/IntentPanel.tsx
@@ -862,17 +2133,29 @@ msgid "mockup.regenerate"
 msgstr "重新生成"
 
 #. js-lingui-explicit-id
+#: src/components/library/RegistryInstallPanel.tsx
+msgid "registry_install.requires_desktop_app"
+msgstr "注册表桌面主机需要 Cutout 桌面应用。"
+
+#. js-lingui-explicit-id
+#: src/components/library/RegistryInstallPanel.tsx
+msgid "registry_install.section_aria"
+msgstr "注册表安装"
+
+#. js-lingui-explicit-id
 #: src/components/settings/sections/GeneralSection.tsx
 msgid "settings.remember_dir_label"
 msgstr "记住导出目录"
 
 #. js-lingui-explicit-id
 #: src/components/settings/ProviderRow.tsx
+#: src/components/settings/VectorizerPanel.tsx
 msgid "settings.remove_action"
 msgstr "删除"
 
 #. js-lingui-explicit-id
 #: src/components/settings/ProviderRow.tsx
+#: src/components/settings/VectorizerPanel.tsx
 msgid "settings.remove_failed_toast"
 msgstr "删除失败"
 
@@ -890,6 +2173,16 @@ msgstr "删除提供方？"
 #: src/components/slices/SliceCardActions.tsx
 msgid "slices.action_rename"
 msgstr "重命名"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.rename"
+msgstr "重命名"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.rename_project_title"
+msgstr "重命名项目"
 
 #. js-lingui-explicit-id
 #: src/components/topbar/TopBarActions.tsx
@@ -917,9 +2210,31 @@ msgid "source.params_reset_title"
 msgstr "将参数重置为默认值"
 
 #. js-lingui-explicit-id
+#. placeholder {0}: conflicts.map(({ kind }) => kind).join(', ')
+#: src/components/library/KitLibraryInspector.tsx
+msgid "kit_library.resolve_conflicts"
+msgstr "请在发布前解决冲突的 {0} 候选项。"
+
+#. js-lingui-explicit-id
+#: src/components/library/ReviewBranchEditor.tsx
+msgid "review_branch.resolved"
+msgstr "已解决"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+#: src/components/settings/sections/ArchivedSection.tsx
+msgid "home.restore"
+msgstr "恢复"
+
+#. js-lingui-explicit-id
 #: src/components/settings/sections/GeneralSection.tsx
 msgid "settings.reset_params_hint"
 msgstr "将白底阈值、最小面积、合并间距与内边距恢复为默认值。"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.retry"
+msgstr "重试"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/GeneralSection.tsx
@@ -930,6 +2245,26 @@ msgstr "复用上次的目录,不必每次导出都询问。"
 #: src/components/canvas/nodes/BoardNode.tsx
 msgid "board.compose"
 msgstr "反向合成原型图"
+
+#. js-lingui-explicit-id
+#: src/components/library/ReviewBranchEditor.tsx
+msgid "review_branch.section_aria"
+msgstr "评审分支"
+
+#. js-lingui-explicit-id
+#: src/components/library/ReviewBranchEditor.tsx
+msgid "review_branch.label"
+msgstr "评审分支"
+
+#. js-lingui-explicit-id
+#: src/components/library/ReviewBranchEditor.tsx
+msgid "review_branch.comment_aria"
+msgstr "评审评论"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.status_running"
+msgstr "进行中"
 
 #. js-lingui-explicit-id
 #: src/components/canvas/edges/TransitionEdge.tsx
@@ -943,13 +2278,51 @@ msgstr "运行中…"
 
 #. js-lingui-explicit-id
 #: src/components/settings/ProviderForm.tsx
+#: src/components/settings/VectorizerPanel.tsx
 msgid "settings.save"
 msgstr "保存"
 
 #. js-lingui-explicit-id
 #: src/components/settings/ProviderForm.tsx
+#: src/components/settings/VectorizerPanel.tsx
 msgid "settings.save_failed_toast"
 msgstr "保存失败"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.search_aria"
+msgstr "搜索库"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.search_placeholder"
+msgstr "按名称、标签或来源搜索"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.search_projects"
+msgstr "搜索项目..."
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderDirectory.tsx
+msgid "settings.search_providers_placeholder"
+msgstr "搜索提供方"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderDirectory.tsx
+msgid "settings.search_providers_aria"
+msgstr "搜索提供方"
+
+#. js-lingui-explicit-id
+#: src/components/topbar/TabsMenu.tsx
+msgid "topbar.search_tabs"
+msgstr "搜索标签页"
+
+#. js-lingui-explicit-id
+#. placeholder {0}: item.name
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.select_item_aria"
+msgstr "选择 {0}"
 
 #. js-lingui-explicit-id
 #: src/components/inspector/InspectorPanel.tsx
@@ -962,13 +2335,19 @@ msgid "slices.name"
 msgstr "语义命名"
 
 #. js-lingui-explicit-id
+#: src/components/home/SidebarAccount.tsx
 #: src/components/settings/SettingsDialog.tsx
-#: src/components/topbar/SettingsMenu.tsx
 msgid "settings.menu_label"
 msgstr "设置"
 
 #. js-lingui-explicit-id
+#: src/components/library/TeamGovernancePanel.tsx
+msgid "team.share_review"
+msgstr "分享与评审"
+
+#. js-lingui-explicit-id
 #: src/components/settings/KeyField.tsx
+#: src/components/settings/VectorizerPanel.tsx
 msgid "settings.key_show"
 msgstr "显示"
 
@@ -990,6 +2369,11 @@ msgid "slices.heading"
 msgstr "切片"
 
 #. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.media_filter_slices"
+msgstr "切片"
+
+#. js-lingui-explicit-id
 #: src/components/canvas/nodes/SlicesNode.tsx
 msgid "pipeline.stage_slices"
 msgstr "切片"
@@ -1005,19 +2389,81 @@ msgid "pipeline.node_slices_aria"
 msgstr "切片阶段"
 
 #. js-lingui-explicit-id
+#: src/components/library/KitLibraryInspector.tsx
+msgid "kit_library.source_heading"
+msgstr "源文件"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderDirectory.tsx
+msgid "settings.provider_category_speech"
+msgstr "语音"
+
+#. js-lingui-explicit-id
+#: src/components/settings/SettingsSidebar.tsx
+msgid "settings.section_speech"
+msgstr "语音"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.dimension_asr_label"
+msgstr "语音转文本"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.projects_empty_description"
+msgstr "从一个想法开始，或导入视觉板。"
+
+#. js-lingui-explicit-id
 #: src/components/canvas/nodes/IntentPanel.tsx
 msgid "intent.strategy"
 msgstr "策略"
 
 #. js-lingui-explicit-id
-#: src/components/topbar/ThemeToggle.tsx
-msgid "topbar.theme_to_dark"
-msgstr "切换到深色模式"
+#: src/components/help/HelpMenu.tsx
+msgid "help.submit_feedback"
+msgstr "提交反馈"
 
 #. js-lingui-explicit-id
-#: src/components/topbar/ThemeToggle.tsx
-msgid "topbar.theme_to_light"
-msgstr "切换到浅色模式"
+#: src/components/inspector/ExportBar.tsx
+#: src/components/topbar/TopBarActions.tsx
+msgid "export.menu_svg_api"
+msgstr "SVG · API"
+
+#. js-lingui-explicit-id
+#: src/components/inspector/ExportBar.tsx
+#: src/components/topbar/TopBarActions.tsx
+msgid "export.menu_svg_local"
+msgstr "SVG · 本地"
+
+#. js-lingui-explicit-id
+#: src/components/settings/VectorizerPanel.tsx
+msgid "vectorizer.heading"
+msgstr "SVG 导出"
+
+#. js-lingui-explicit-id
+#: src/components/home/SidebarAccount.tsx
+msgid "home.theme_system"
+msgstr "跟随系统"
+
+#. js-lingui-explicit-id
+#: src/components/topbar/TabsMenu.tsx
+msgid "topbar.tabs_in_window"
+msgstr "此窗口中的标签页"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.tag_action"
+msgstr "标签"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.tags_to_add_aria"
+msgstr "要添加的标签"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.start_description"
+msgstr "将想法、已有界面或视觉板转为连贯的设计工作区。"
 
 #. js-lingui-explicit-id
 #: src/components/settings/ProviderRow.tsx
@@ -1025,9 +2471,19 @@ msgid "settings.test_action"
 msgstr "校验"
 
 #. js-lingui-explicit-id
+#: src/components/settings/VectorizerPanel.tsx
+msgid "vectorizer.mode_test"
+msgstr "测试"
+
+#. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
-msgid "settings.model_chat_hint"
-msgstr "文本、推理与读图——同一个多模态模型。"
+msgid "settings.dimension_tts_label"
+msgstr "文本转语音"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.dimension_text_label"
+msgstr "文本理解"
 
 #. js-lingui-explicit-id
 #: src/lib/image.ts
@@ -1056,8 +2512,16 @@ msgstr "主题"
 
 #. js-lingui-explicit-id
 #: src/components/settings/ModelSlot.tsx
-msgid "settings.effort_label"
-msgstr "思考强度"
+msgid "settings.vision_capability_unverified"
+msgstr "在通过目录证据或提供方探测验证图像输入能力之前，此项分配仍不可用。"
+
+#. js-lingui-explicit-id
+#. placeholder {0}: pendingDelete.name
+#. placeholder {0}: project.name
+#: src/components/home/ProjectHome.tsx
+#: src/components/settings/sections/ArchivedSection.tsx
+msgid "home.delete_permanently_description"
+msgstr "这将把“{0}”从本地存储中移除，此操作无法撤销。"
 
 #. js-lingui-explicit-id
 #: src/components/settings/ProviderRow.tsx
@@ -1065,19 +2529,34 @@ msgid "settings.remove_confirm_desc"
 msgstr "将删除「{label}」的配置及其保存在系统钥匙串中的密钥，此操作无法撤销。"
 
 #. js-lingui-explicit-id
-#: src/components/status/StatusBar.tsx
-msgid "status.param_summary"
-msgstr "阈值 {threshold} · 面积 {minArea} · 间隙 {mergeGap} · 内边距 {padding}"
-
-#. js-lingui-explicit-id
 #: src/components/preview/PreviewToolbar.tsx
 msgid "preview.toggle_checker"
 msgstr "切换棋盘格"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.dimension_asr_description"
+msgstr "转录语音音频。"
+
+#. js-lingui-explicit-id
 #: src/components/settings/ProviderForm.tsx
 msgid "settings.provider_kind_label"
 msgstr "类型"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.meta_type"
+msgstr "类型"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ModelSlot.tsx
+msgid "settings.model_slot_unavailable"
+msgstr "不可用"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.dimension_vision_description"
+msgstr "理解截图、照片与视觉参考资料。"
 
 #. js-lingui-explicit-id
 #: src/components/canvas/nodes/IntentPanel.tsx
@@ -1090,6 +2569,22 @@ msgid "export.error_unknown"
 msgstr "未知错误"
 
 #. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.unpin"
+msgstr "取消置顶"
+
+#. js-lingui-explicit-id
+#. placeholder {0}: project.name
+#: src/components/home/ProjectHome.tsx
+msgid "home.unpin_named"
+msgstr "取消置顶 {0}"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.unpin_project"
+msgstr "取消置顶项目"
+
+#. js-lingui-explicit-id
 #: src/hooks/queries/pipeline.ts
 #: src/hooks/useImageImport.ts
 msgid "import.toast_unsupported"
@@ -1099,6 +2594,41 @@ msgstr "不支持的文件：{name}"
 #: src/components/source/SourceMeta.tsx
 msgid "source.meta_untitled"
 msgstr "未命名"
+
+#. js-lingui-explicit-id
+#. placeholder {0}: item.name
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.use_in_project_aria"
+msgstr "在项目中使用 {0}"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.use_dense_preview"
+msgstr "使用密集预览"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.use_in_project_placeholder"
+msgstr "在项目中使用…"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.use_masonry_preview"
+msgstr "使用瀑布流预览"
+
+#. js-lingui-explicit-id
+#. placeholder {0}: previous.version
+#. placeholder {1}: item.version
+#. placeholder {2}: added.length
+#. placeholder {3}: removed.length
+#: src/components/library/KitLibraryInspector.tsx
+msgid "kit_library.version_diff_summary"
+msgstr "v{0} → v{1} · +{2} / −{3}"
+
+#. js-lingui-explicit-id
+#: src/components/settings/VectorizerPanel.tsx
+msgid "vectorizer.api_id_label"
+msgstr "Vectorizer.AI API ID"
 
 #. js-lingui-explicit-id
 #: src/components/settings/ProviderForm.tsx
@@ -1113,6 +2643,122 @@ msgid "settings.status_verified"
 msgstr "校验通过"
 
 #. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.quality_verified"
+msgstr "已验证"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.bytes_not_available"
+msgstr "本地没有可用的已验证字节数据。"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.asset_preview_description"
+msgstr "经过验证的本地预览、来源信息，以及具备能力感知的素材操作。"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.verifying_component_blobs"
+msgstr "正在验证组件源文件…"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.meta_version"
+msgstr "版本"
+
+#. js-lingui-explicit-id
+#: src/components/library/KitLibraryInspector.tsx
+msgid "kit_library.version_diff_aria"
+msgstr "版本差异"
+
+#. js-lingui-explicit-id
+#: src/components/library/KitLibraryInspector.tsx
+msgid "kit_library.version_diff_heading"
+msgstr "版本差异"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.hosts_not_configured_video"
+msgstr "尚未配置视频执行与参考资料提供方主机。"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.media_filter_videos"
+msgstr "视频"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.dimension_vision_label"
+msgstr "视觉"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ModelSlot.tsx
+msgid "settings.vision_required"
+msgstr "需要视觉能力"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.visual_asset_filters_aria"
+msgstr "视觉素材筛选"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.tab_visual_assets"
+msgstr "视觉素材"
+
+#. js-lingui-explicit-id
 #: src/components/canvas/nodes/dag-node-common.tsx
 msgid "dag.idle"
 msgstr "等待运行…"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.preset_web"
+msgstr "网页端"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.dimension_webdev_label"
+msgstr "网页开发"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.start_title"
+msgstr "我们要设计什么？"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+#: src/components/settings/SettingsSidebar.tsx
+msgid "home.wip_badge"
+msgstr "WIP"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.workspace"
+msgstr "工作区"
+
+#. js-lingui-explicit-id
+#: src/components/home/SidebarAccount.tsx
+msgid "home.account_menu"
+msgstr "工作区菜单"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.workspace_navigation"
+msgstr "工作区导航"
+
+#. js-lingui-explicit-id
+#: src/components/home/SidebarAccount.tsx
+msgid "home.notifications_empty"
+msgstr "没有新通知"
+
+#. js-lingui-explicit-id
+#: src/components/topbar/TabsMenu.tsx
+msgid "topbar.tabs_empty"
+msgstr "打开的标签页和最近关闭的标签页会显示在这里"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.your_projects"
+msgstr "你的项目"

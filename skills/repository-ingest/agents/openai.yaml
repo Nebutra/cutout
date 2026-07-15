@@ -1,0 +1,4 @@
+interface:
+  display_name: "Repository Ingest"
+  short_description: "Safely inventory a local repository as evidence"
+  default_prompt: "Use $repository-ingest to preview this repository as Cutout evidence."

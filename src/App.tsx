@@ -6,7 +6,7 @@
  *     I18n           (Lingui I18nProvider — re-renders subscribers on locale switch)
  *       Providers        (QueryClient + Tooltip + Toaster — pre-built)
  *         ServiceProvider(createRegistry())  — the I/O swap seam
- *           AppShell     — TopBar · PipelineCanvas · StatusBar
+ *           AppShell     — TopBar · PipelineCanvas
  *
  * The active locale is detected + activated in `main.tsx` BEFORE first paint, so
  * this tree always renders in the correct language (no flash).

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Starter Delivery"
+  short_description: "Compile an approved Next or Vite starter"
+  default_prompt: "Use $starter-delivery to preview and export a verified starter."

@@ -26,6 +26,7 @@
 
 use std::collections::HashMap;
 use std::error::Error as StdError;
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
 use futures_util::StreamExt;
 use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
@@ -96,9 +97,10 @@ impl From<KeyError> for ProxyError {
 
 /// SSRF guard: enforce that `url`'s host is acceptable for the provider `kind`.
 ///
-/// Known kinds are pinned to their vendor domains over https. `openai-compatible`
-/// permits a user-configured host (any https host) but blocks loopback/unspecified
-/// addresses to avoid trivial local SSRF. Unknown kinds are rejected.
+/// Cloud kinds are pinned to vendor domains over https. `openai-compatible`
+/// permits a user-configured non-loopback https host. Explicit local profiles
+/// permit only loopback HTTP(S), so selecting Ollama/vLLM/LM Studio does not
+/// broaden the proxy into a general LAN request primitive. Unknown kinds fail closed.
 ///
 /// `pub(crate)` so the sibling multipart `image_edit` command reuses the same
 /// host guard for the `/images/edits` endpoint.
@@ -117,7 +119,22 @@ pub(crate) fn enforce_host(kind: &str, url: &str) -> Result<(), ProxyError> {
         "openai" => is_https && suffix_ok("openai.com"),
         "google" => is_https && suffix_ok("googleapis.com"),
         "gateway" => is_https && (suffix_ok("vercel.sh") || suffix_ok("vercel.app")),
-        "openai-compatible" => is_https && !is_loopback_host(&host),
+        "openai-compatible" => is_https && !is_forbidden_remote_host(&host),
+        "dashscope" => is_https && suffix_ok("aliyuncs.com"),
+        "deepseek" => is_https && suffix_ok("deepseek.com"),
+        "zhipu" => is_https && suffix_ok("bigmodel.cn"),
+        "moonshot" => is_https && suffix_ok("moonshot.cn"),
+        "volcengine" => is_https && suffix_ok("volces.com"),
+        "siliconflow" => is_https && suffix_ok("siliconflow.cn"),
+        "openrouter" => is_https && suffix_ok("openrouter.ai"),
+        "together" => is_https && suffix_ok("together.xyz"),
+        "groq" => is_https && suffix_ok("groq.com"),
+        "fireworks" => is_https && suffix_ok("fireworks.ai"),
+        "xai" => is_https && suffix_ok("x.ai"),
+        "mistral" => is_https && suffix_ok("mistral.ai"),
+        "ollama" | "vllm" | "lm-studio" => {
+            matches!(parsed.scheme(), "http" | "https") && is_loopback_host(&host)
+        }
         _ => return Err(ProxyError::UnknownKind),
     };
 
@@ -137,6 +154,86 @@ fn is_loopback_host(host: &str) -> bool {
         return ip.is_loopback() || ip.is_unspecified();
     }
     false
+}
+
+fn is_forbidden_remote_host(host: &str) -> bool {
+    if host == "localhost" || host.ends_with(".localhost") {
+        return true;
+    }
+    host.trim_start_matches('[')
+        .trim_end_matches(']')
+        .parse::<IpAddr>()
+        .map(is_non_public_ip)
+        .unwrap_or(false)
+}
+
+fn is_non_public_ip(ip: IpAddr) -> bool {
+    match ip {
+        IpAddr::V4(ip) => {
+            ip.is_private()
+                || ip.is_loopback()
+                || ip.is_link_local()
+                || ip.is_unspecified()
+                || ip.is_multicast()
+                || ip == Ipv4Addr::BROADCAST
+        }
+        IpAddr::V6(ip) => {
+            ip.is_loopback()
+                || ip.is_unspecified()
+                || ip.is_multicast()
+                || is_ipv6_unique_local(ip)
+                || is_ipv6_link_local(ip)
+        }
+    }
+}
+
+fn is_ipv6_unique_local(ip: Ipv6Addr) -> bool {
+    ip.octets()[0] & 0xfe == 0xfc
+}
+fn is_ipv6_link_local(ip: Ipv6Addr) -> bool {
+    let o = ip.octets();
+    o[0] == 0xfe && o[1] & 0xc0 == 0x80
+}
+
+/// Resolve immediately before connecting and reject any non-public address.
+/// This closes the hostname-to-private-address DNS rebinding gap left by URL
+/// syntax checks. Explicit local providers are intentionally exempt because
+/// their contract is loopback-only.
+pub(crate) async fn enforce_resolved_host(kind: &str, url: &str) -> Result<(), ProxyError> {
+    if matches!(kind, "ollama" | "vllm" | "lm-studio") {
+        return Ok(());
+    }
+    let parsed = reqwest::Url::parse(url).map_err(|_| ProxyError::BadUrl)?;
+    let host = parsed.host_str().ok_or(ProxyError::BadUrl)?;
+    if let Ok(ip) = host
+        .trim_start_matches('[')
+        .trim_end_matches(']')
+        .parse::<IpAddr>()
+    {
+        return if is_non_public_ip(ip) {
+            Err(ProxyError::DisallowedHost)
+        } else {
+            Ok(())
+        };
+    }
+    let port = parsed.port_or_known_default().ok_or(ProxyError::BadUrl)?;
+    let addresses: Vec<_> = tokio::net::lookup_host((host, port))
+        .await
+        .map_err(|_| ProxyError::DisallowedHost)?
+        .collect();
+    if addresses.is_empty()
+        || addresses
+            .iter()
+            .any(|address| is_non_public_ip(address.ip()))
+    {
+        Err(ProxyError::DisallowedHost)
+    } else {
+        Ok(())
+    }
+}
+
+fn requires_secret(kind: &str) -> bool {
+    !matches!(kind, "ollama" | "vllm" | "lm-studio")
 }
 
 /// Parse the method (default POST when empty) and build the outgoing header map:
@@ -182,12 +279,27 @@ fn build_method_and_headers(
 fn collect_headers(resp: &reqwest::Response) -> HashMap<String, String> {
     resp.headers()
         .iter()
+        .filter(|(k, _)| !is_sensitive_response_header(k.as_str()))
         .filter_map(|(k, v)| {
             v.to_str()
                 .ok()
                 .map(|s| (k.as_str().to_string(), s.to_string()))
         })
         .collect()
+}
+
+fn is_sensitive_response_header(name: &str) -> bool {
+    let name = name.to_ascii_lowercase();
+    matches!(
+        name.as_str(),
+        "set-cookie"
+            | "authorization"
+            | "proxy-authorization"
+            | "proxy-authenticate"
+            | "www-authenticate"
+    ) || name.contains("api-key")
+        || name.contains("token")
+        || name.contains("secret")
 }
 
 /// Build an HTTP client with sane timeouts. `overall` (seconds) bounds the whole
@@ -197,8 +309,9 @@ fn collect_headers(resp: &reqwest::Response) -> HashMap<String, String> {
 /// `pub(crate)` so the sibling multipart `image_edit` command reuses the same
 /// client builder for the `/images/edits` call.
 pub(crate) fn build_client(overall: Option<u64>) -> reqwest::Client {
-    let mut builder =
-        reqwest::Client::builder().connect_timeout(std::time::Duration::from_secs(30));
+    let mut builder = reqwest::Client::builder()
+        .connect_timeout(std::time::Duration::from_secs(30))
+        .redirect(reqwest::redirect::Policy::none());
     if let Some(secs) = overall {
         builder = builder.timeout(std::time::Duration::from_secs(secs));
     }
@@ -248,7 +361,12 @@ pub async fn ai_proxy_request(
     body: Option<String>,
 ) -> Result<ProxyResponse, ProxyError> {
     enforce_host(&kind, &url)?;
-    let secret = read_secret(&provider_id).map_err(ProxyError::from)?;
+    enforce_resolved_host(&kind, &url).await?;
+    let secret = if requires_secret(&kind) {
+        read_secret(&provider_id).map_err(ProxyError::from)?
+    } else {
+        String::new()
+    };
     let (method, header_map) = build_method_and_headers(&kind, &method, headers, &secret)?;
 
     // Bound the whole call. Image endpoints use a longer cap; text/model probes
@@ -291,7 +409,12 @@ pub async fn ai_proxy_stream(
 ) -> Result<(), ProxyError> {
     // --- Pre-flight: failures here reject the command (no head frame yet). ---
     enforce_host(&kind, &url)?;
-    let secret = read_secret(&provider_id).map_err(ProxyError::from)?;
+    enforce_resolved_host(&kind, &url).await?;
+    let secret = if requires_secret(&kind) {
+        read_secret(&provider_id).map_err(ProxyError::from)?
+    } else {
+        String::new()
+    };
     let (method, header_map) = build_method_and_headers(&kind, &method, headers, &secret)?;
 
     // Streaming: only a connect timeout (no overall cap — a long token stream is
@@ -386,12 +509,68 @@ mod tests {
             enforce_host("openai-compatible", "https://localhost/v1"),
             Err(ProxyError::DisallowedHost)
         ));
+        for host in [
+            "10.0.0.1",
+            "172.16.0.1",
+            "192.168.1.1",
+            "169.254.1.1",
+            "[::1]",
+            "[fc00::1]",
+            "[fe80::1]",
+        ] {
+            assert!(matches!(
+                enforce_host("openai-compatible", &format!("https://{host}/v1")),
+                Err(ProxyError::DisallowedHost)
+            ));
+        }
+    }
+
+    #[test]
+    fn sensitive_response_headers_are_redacted() {
+        for name in [
+            "set-cookie",
+            "authorization",
+            "x-api-key",
+            "x-refresh-token",
+            "x-client-secret",
+        ] {
+            assert!(is_sensitive_response_header(name));
+        }
+        assert!(!is_sensitive_response_header("content-type"));
+    }
+
+    #[tokio::test]
+    async fn resolved_host_guard_rejects_private_destinations() {
+        assert!(matches!(
+            enforce_resolved_host("openai-compatible", "https://192.168.1.10/v1").await,
+            Err(ProxyError::DisallowedHost)
+        ));
+        assert!(
+            enforce_resolved_host("openai-compatible", "https://8.8.8.8/v1")
+                .await
+                .is_ok()
+        );
+        assert!(enforce_resolved_host("ollama", "http://127.0.0.1:11434/v1")
+            .await
+            .is_ok());
+    }
+
+    #[test]
+    fn local_profiles_allow_only_loopback_http_or_https() {
+        for kind in ["ollama", "vllm", "lm-studio"] {
+            assert!(enforce_host(kind, "http://127.0.0.1:11434/v1/models").is_ok());
+            assert!(enforce_host(kind, "http://localhost:11434/v1/models").is_ok());
+            assert!(matches!(
+                enforce_host(kind, "https://remote.example/v1"),
+                Err(ProxyError::DisallowedHost)
+            ));
+        }
     }
 
     #[test]
     fn unknown_kind_rejected_and_bad_url_rejected() {
         assert!(matches!(
-            enforce_host("mistral", "https://api.mistral.ai/v1"),
+            enforce_host("unknown-provider", "https://example.com/v1"),
             Err(ProxyError::UnknownKind)
         ));
         assert!(matches!(

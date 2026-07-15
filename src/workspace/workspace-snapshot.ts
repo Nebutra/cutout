@@ -1,5 +1,16 @@
 import type { PrototypePlan, PrototypePage } from '@/prototype/prototype-plan'
 import type { PrototypeSuiteScope } from '@/prototype/generate-suite'
+import type { OutcomeRuntimeState } from '@/agent-runtime/outcome-runtime'
+import type { AgentRunEventStore } from '@/agent-runtime/run-events'
+import type {
+  ComposerModelPolicy,
+  ComposerThinkingPolicy,
+} from '@/agent-runtime/execution-policy'
+import type { DesignDocument } from '@/design-ir'
+import type { DesignOsAuthoringState } from '@/design-os-operations/authoring'
+import type { CreativeBoardState } from '@/agent-runtime/creative-board-decisions'
+import type { CompositeDeliveryReceipt, DeliveryPlan, DeliveryRequest } from '@/delivery-center'
+import type { ApprovedDeliverableReceipt } from '@/global-library'
 
 export type WorkspaceWorkflowPhase =
   | 'idle'
@@ -54,6 +65,20 @@ export interface WorkspaceSnapshot {
   readonly liveAgentOutput: string
   readonly attachments: readonly PersistedReferenceAttachment[]
   readonly webSearchEnabled: boolean
+  readonly composerModelPolicy?: ComposerModelPolicy
+  readonly composerThinkingPolicy?: ComposerThinkingPolicy
+  readonly outcome?: OutcomeRuntimeState | null
+  /** Durable observable Agent activity. Older workspace.v1 records omit it. */
+  readonly agentRunEvents?: AgentRunEventStore | null
+  /** Canonical Design IR when a project has been compiled into Design OS. */
+  readonly designDocument?: DesignDocument | null
+  /** Explicit, revision-bound user declarations used by Design OS compilers. */
+  readonly designOsAuthoring?: DesignOsAuthoringState | null
+  readonly creativeBoard?: CreativeBoardState | null
+  readonly deliveryRequest?: DeliveryRequest | null
+  readonly deliveryPlan?: DeliveryPlan | null
+  readonly deliveryReceipt?: CompositeDeliveryReceipt | null
+  readonly approvedDeliverables?: readonly ApprovedDeliverableReceipt[]
 }
 
 export function isWorkspaceSnapshotEmpty(
@@ -70,8 +95,19 @@ export function isWorkspaceSnapshotEmpty(
     snapshot.humanLoopCustomAnswer.trim().length === 0 &&
     snapshot.namingStatus === 'idle' &&
     snapshot.liveAgentOutput.trim().length === 0 &&
-    snapshot.attachments.length === 0 &&
-    !snapshot.webSearchEnabled
+    (snapshot.attachments?.length ?? 0) === 0 &&
+    !snapshot.webSearchEnabled &&
+    !snapshot.composerModelPolicy &&
+    !snapshot.composerThinkingPolicy &&
+    !snapshot.outcome &&
+    !snapshot.agentRunEvents &&
+    !snapshot.designOsAuthoring &&
+    !snapshot.deliveryRequest &&
+    !snapshot.deliveryPlan &&
+    !snapshot.deliveryReceipt &&
+    !(snapshot.approvedDeliverables?.length) &&
+    !snapshot.designDocument &&
+    !hasCreativeBoardContent(snapshot.creativeBoard)
   )
 }
 
@@ -92,27 +128,28 @@ export function workspaceSnapshotFingerprint(
     .map((artifact) =>
       [
         artifact.page.id,
-        artifact.page.name,
+        textFingerprint(JSON.stringify(artifact.page)),
         artifact.width,
         artifact.height,
         artifact.bytes.byteLength,
       ].join(':'),
     )
     .join(',')
-  const attachments = snapshot.attachments
+  const attachments = (snapshot.attachments ?? [])
     .map((attachment) =>
-      [attachment.id, attachment.name, attachment.bytes.byteLength].join(':'),
+      [
+        attachment.id,
+        attachment.name,
+        attachment.mediaType,
+        attachment.bytes.byteLength,
+      ].join(':'),
     )
     .join(',')
 
   return [
     snapshot.version,
     snapshot.workflowPhase,
-    snapshot.prototypePlan?.version ?? '',
-    snapshot.prototypePlan?.product.projectName ?? '',
-    snapshot.prototypePlan?.product.name ?? '',
-    snapshot.prototypePlan?.humanLoop.mode ?? '',
-    snapshot.prototypePlan?.pages.map((page) => page.id).join(',') ?? '',
+    snapshot.prototypePlan ? textFingerprint(JSON.stringify(snapshot.prototypePlan)) : '',
     snapshot.prototypeScope,
     snapshot.humanLoopChoiceId ?? '',
     snapshot.humanLoopCustomAnswer,
@@ -124,7 +161,113 @@ export function workspaceSnapshotFingerprint(
     snapshot.liveAgentOutput.length,
     attachments,
     snapshot.webSearchEnabled ? 'web' : '',
+    composerModelPolicyFingerprint(snapshot.composerModelPolicy),
+    snapshot.composerThinkingPolicy ?? '',
+    outcomeFingerprint(snapshot.outcome),
+    agentRunEventsFingerprint(snapshot.agentRunEvents),
+    snapshot.designOsAuthoring ? textFingerprint(JSON.stringify(snapshot.designOsAuthoring)) : '',
+    snapshot.deliveryRequest ? textFingerprint(JSON.stringify(snapshot.deliveryRequest)) : '',
+    snapshot.deliveryPlan ? textFingerprint(JSON.stringify(snapshot.deliveryPlan)) : '',
+    snapshot.deliveryReceipt ? textFingerprint(JSON.stringify(snapshot.deliveryReceipt)) : '',
+    snapshot.approvedDeliverables?.length ? textFingerprint(JSON.stringify(snapshot.approvedDeliverables)) : '',
+    hasCreativeBoardContent(snapshot.creativeBoard) ? textFingerprint(JSON.stringify(snapshot.creativeBoard)) : '',
+    // DesignDocument is normally derived from the fields above. Including it
+    // here would make an otherwise unchanged snapshot look dirty when the
+    // projector publishes a new object. It is meaningful only for legacy IR-
+    // only records that have no workspace fields to project.
+    hasWorkspaceProjectionInput(snapshot)
+      ? ''
+      : designDocumentFingerprint(snapshot.designDocument),
   ].join('|')
+}
+
+function hasCreativeBoardContent(state: CreativeBoardState | null | undefined): boolean {
+  return Boolean(state && (state.decisions.length > 0 || state.branches.length > 0))
+}
+
+function hasWorkspaceProjectionInput(snapshot: WorkspaceSnapshot): boolean {
+  return Boolean(
+    snapshot.prototypePlan ||
+      snapshot.prototypeDesignSystem ||
+      snapshot.prototypePages.length > 0 ||
+      snapshot.selectedPrototypePageId ||
+      snapshot.runError ||
+      snapshot.humanLoopChoiceId ||
+      snapshot.humanLoopCustomAnswer.trim() ||
+      snapshot.namingStatus !== 'idle' ||
+      snapshot.liveAgentOutput.trim() ||
+      (snapshot.attachments?.length ?? 0) > 0 ||
+      snapshot.webSearchEnabled ||
+      snapshot.composerModelPolicy ||
+      snapshot.composerThinkingPolicy ||
+      snapshot.outcome ||
+      snapshot.agentRunEvents ||
+      snapshot.designOsAuthoring ||
+      snapshot.deliveryRequest ||
+      snapshot.deliveryPlan ||
+      snapshot.deliveryReceipt,
+  )
+}
+
+function composerModelPolicyFingerprint(
+  policy: ComposerModelPolicy | undefined,
+): string {
+  if (!policy || policy.mode === 'auto') return policy?.mode ?? ''
+  return [
+    policy.mode,
+    policy.slot,
+    policy.assignment.providerId,
+    policy.assignment.model,
+  ].join(':')
+}
+
+function outcomeFingerprint(outcome: OutcomeRuntimeState | null | undefined): string {
+  if (!outcome) return ''
+  return [
+    outcome.version,
+    outcome.contract.id,
+    outcome.runId,
+    outcome.status,
+    outcome.materials.map((material) => `${material.kind}:${material.id}`).join(','),
+    outcome.evaluation.missing
+      .map((requirement) => `${requirement.kind}:${requirement.count}`)
+      .join(','),
+  ].join(':')
+}
+
+function agentRunEventsFingerprint(
+  store: AgentRunEventStore | null | undefined,
+): string {
+  if (!store) return ''
+  const last = store.events.at(-1)
+  return [
+    store.version,
+    store.activeRunId ?? '',
+    store.events.length,
+    last?.eventId ?? '',
+    last?.type ?? '',
+    store.activeRun?.status ?? '',
+  ].join(':')
+}
+
+/**
+ * The DesignDocument is a derived projection of this snapshot. Keep enough
+ * identity in autosave for imported/legacy IR-only records, but never hash its
+ * complete graph here: doing so would feed the projection back into its own
+ * write trigger.
+ */
+function designDocumentFingerprint(document: DesignDocument | null | undefined): string {
+  if (!document) return ''
+  return [
+    document.version,
+    document.meta.id,
+    document.revision.id,
+    document.revision.number,
+    document.sources.length,
+    document.materials.length,
+    document.tokens.length,
+    document.components.length,
+  ].join(':')
 }
 
 export function textFingerprint(text: string): string {

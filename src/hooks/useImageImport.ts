@@ -20,6 +20,12 @@ export interface ImageImport {
   importFile(file: File): Promise<void>
   /** Open the OS file picker (also used by ⌘O). */
   openPicker(): void
+  /**
+   * Open the picker and hand the selected file to a one-time callback. The
+   * picker is clicked synchronously, so callers can safely use this from a
+   * button handler and decide what to do only after a file was selected.
+   */
+  pickFile(onFile: (file: File) => void | Promise<void>): void
   /** Ref + change handler to spread onto a hidden `<input type="file">`. */
   inputProps: {
     ref: React.RefObject<HTMLInputElement | null>
@@ -32,6 +38,9 @@ export function useImageImport(): ImageImport {
   const loadImage = useStore((s) => s.loadImage)
   const setDesignMarkdown = useStore((s) => s.setDesignMarkdown)
   const inputRef = useRef<HTMLInputElement | null>(null)
+  const pickedFileHandlerRef = useRef<
+    ((file: File) => void | Promise<void>) | null
+  >(null)
 
   const importFile = useCallback(
     async (file: File): Promise<void> => {
@@ -77,15 +86,29 @@ export function useImageImport(): ImageImport {
   )
 
   const openPicker = useCallback((): void => {
+    pickedFileHandlerRef.current = null
     inputRef.current?.click()
   }, [])
+
+  const pickFile = useCallback(
+    (onFile: (file: File) => void | Promise<void>): void => {
+      pickedFileHandlerRef.current = onFile
+      inputRef.current?.click()
+    },
+    [],
+  )
 
   const onChange = useCallback(
     (event: React.ChangeEvent<HTMLInputElement>): void => {
       const file = event.target.files?.[0]
+      const onFile = pickedFileHandlerRef.current
+      pickedFileHandlerRef.current = null
       // Reset so picking the same file twice still fires `change`.
       event.target.value = ''
-      if (file) void importFile(file)
+      if (file) {
+        if (onFile) void onFile(file)
+        else void importFile(file)
+      }
     },
     [importFile],
   )
@@ -93,6 +116,7 @@ export function useImageImport(): ImageImport {
   return {
     importFile,
     openPicker,
+    pickFile,
     inputProps: { ref: inputRef, onChange },
   }
 }

@@ -30,7 +30,26 @@ function mockProviderTest(response: { status: number; body: string }) {
   })
 }
 
-beforeEach(() => invokeMock.mockReset())
+beforeEach(() => {
+  invokeMock.mockReset()
+  Object.defineProperty(window, '__TAURI_INTERNALS__', { value: { invoke: vi.fn() }, configurable: true })
+})
+
+describe('LocalProviderService host boundary', () => {
+  it('returns an empty catalog in a browser host without invoking Tauri', async () => {
+    Reflect.deleteProperty(window, '__TAURI_INTERNALS__')
+
+    await expect(createLocalProviderService().list()).resolves.toEqual([])
+    expect(invokeMock).not.toHaveBeenCalled()
+  })
+
+  it('rejects browser writes with a controlled host error', async () => {
+    Reflect.deleteProperty(window, '__TAURI_INTERNALS__')
+
+    await expect(createLocalProviderService().upsert(cfg())).rejects.toThrow('requires the desktop host')
+    expect(invokeMock).not.toHaveBeenCalled()
+  })
+})
 
 describe('LocalProviderService.test', () => {
   it('accepts an OpenAI-compatible /models response', async () => {

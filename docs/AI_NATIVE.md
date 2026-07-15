@@ -1,4 +1,11 @@
-# Cutout AI Native
+# Cutout AI Native (Legacy GUI Queue)
+
+> Deprecated: this queue is a compatibility bridge for historical WebView
+> automation. New Codex, Claude Code, CLI, MCP, and GUI integrations must use
+> `cutout.control.v1` and its shared `run.start/get/cancel/events` lifecycle.
+> Queue actions are not equivalent to durable control-protocol runs and must
+> not be advertised as the Agent control plane. See
+> [HEADLESS_AGENT_CONTROL.md](./HEADLESS_AGENT_CONTROL.md).
 
 Cutout exposes a local JSON queue so coding agents can control the running app
 without clicking the UI.

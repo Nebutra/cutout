@@ -1,0 +1,4 @@
+interface:
+  display_name: "Ingest Everything"
+  short_description: "Preview and ingest supported project evidence"
+  default_prompt: "Use $ingest-everything to preview and ingest these project inputs."

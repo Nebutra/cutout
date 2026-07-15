@@ -96,7 +96,9 @@ function uniqueName(value: string, used: Map<string, number>): string {
 export function slugify(value: string): string {
   return value
     .normalize('NFKD')
-    .replace(/[^\x00-\x7F]/g, '')
+    .split('')
+    .filter((character) => character.charCodeAt(0) <= 127)
+    .join('')
     .toLowerCase()
     .replace(/&/g, ' and ')
     .replace(/[^a-z0-9]+/g, '-')

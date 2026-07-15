@@ -30,6 +30,16 @@ interface ProxyResponse {
   readonly body: string
 }
 
+function isTauriHost(): boolean {
+  if (typeof window === 'undefined') return false
+  const internals = (window as Window & { __TAURI_INTERNALS__?: { invoke?: unknown } }).__TAURI_INTERNALS__
+  return typeof internals?.invoke === 'function'
+}
+
+function requireTauriHost(): void {
+  if (!isTauriHost()) throw new Error('Provider configuration requires the desktop host.')
+}
+
 function snippet(body: string): string {
   return body.replace(/\s+/g, ' ').trim().slice(0, 140)
 }
@@ -69,12 +79,14 @@ function validateModelsResponse(body: string): Result<void> {
 
 /** Load + validate the persisted provider list (missing file → `[]` in Rust). */
 async function loadProviders(): Promise<ProviderConfig[]> {
+  if (!isTauriHost()) return []
   const raw = await invoke<unknown>('load_providers')
   return providerConfigsSchema.parse(raw)
 }
 
 /** Persist the full provider list (non-secret JSON). */
 async function saveProviders(providers: readonly ProviderConfig[]): Promise<void> {
+  requireTauriHost()
   await invoke('save_providers', { providers })
 }
 
@@ -107,6 +119,7 @@ export function createLocalProviderService(): ProviderService {
     },
 
     async remove(id: string): Promise<void> {
+      requireTauriHost()
       const list = await loadProviders()
       await saveProviders(list.filter((p) => p.id !== id))
       // Delete the secret too; Rust treats a missing key as success.
@@ -114,17 +127,20 @@ export function createLocalProviderService(): ProviderService {
     },
 
     async setKey(id: string, secret: string): Promise<void> {
+      requireTauriHost()
       // The secret leaves JS here and is never returned or stored in state.
       await invoke('set_key', { providerId: id, secret })
     },
 
     async status(id: string): Promise<{ hasKey: boolean }> {
+      if (!isTauriHost()) return { hasKey: false }
       const hasKey = await invoke<boolean>('key_status', { providerId: id })
       return { hasKey }
     },
 
     async statuses(ids: readonly string[]): Promise<Record<string, boolean>> {
       if (ids.length === 0) return {}
+      if (!isTauriHost()) return Object.fromEntries(ids.map((id) => [id, false]))
       const rows = await invoke<KeyStatusRow[]>('list_key_status', {
         providerIds: [...ids],
       })

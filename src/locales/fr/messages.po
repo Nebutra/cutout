@@ -1,0 +1,2764 @@
+msgid ""
+msgstr ""
+"POT-Creation-Date: 2026-07-12 03:34+0800\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: @lingui/cli\n"
+"Language: fr\n"
+"Project-Id-Version: cutout\n"
+"Report-Msgid-Bugs-To: \n"
+"PO-Revision-Date: \n"
+"Last-Translator: \n"
+"Language-Team: \n"
+"Plural-Forms: nplurals=2; plural=(n > 1);\n"
+
+#. placeholder {0}: slices.length
+#. js-lingui-explicit-id
+#: src/components/status/StatusBar.tsx
+#~ msgid "status.slice_count"
+#~ msgstr "{0, plural, one {# tranche} other {# tranches}}"
+
+#. js-lingui-explicit-id
+#: src/components/status/StatusBar.tsx
+#~ msgid "status.state_running"
+#~ msgstr "analyse en cours…"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/IntegrationsSection.tsx
+#~ msgid "settings.integrations_title"
+#~ msgstr "Connectez Cutout à vos outils"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/IntegrationsSection.tsx
+#~ msgid "settings.integrations_cta_wip"
+#~ msgstr "La connexion de comptes arrive bientôt"
+
+#. js-lingui-explicit-id
+#: src/components/topbar/ThemeToggle.tsx
+#~ msgid "topbar.theme_dark_mode"
+#~ msgstr "Mode sombre"
+
+#. js-lingui-explicit-id
+#: src/components/status/StatusBar.tsx
+#~ msgid "status.state_done"
+#~ msgstr "terminé"
+
+#. js-lingui-explicit-id
+#: src/components/status/StatusBar.tsx
+#~ msgid "status.state_error"
+#~ msgstr "erreur"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/IntegrationsSection.tsx
+#~ msgid "settings.integrations_description"
+#~ msgstr "Figma, GitHub, Notion, Obsidian et d'autres outils se connecteront via le système de connecteurs afin que l'agent puisse lire des sources et livrer des résultats. Les comptes et les hôtes de connecteurs sont encore en cours de développement."
+
+#. js-lingui-explicit-id
+#: src/components/status/StatusBar.tsx
+#~ msgid "status.state_idle"
+#~ msgstr "inactif"
+
+#. js-lingui-explicit-id
+#: src/components/topbar/TopBarActions.tsx
+#~ msgid "topbar.import"
+#~ msgstr "Importer"
+
+#. js-lingui-explicit-id
+#: src/components/topbar/ThemeToggle.tsx
+#~ msgid "topbar.theme_light_mode"
+#~ msgstr "Mode clair"
+
+#. js-lingui-explicit-id
+#: src/components/topbar/ThemeToggle.tsx
+#~ msgid "topbar.theme_to_dark"
+#~ msgstr "Passer en mode sombre"
+
+#. js-lingui-explicit-id
+#: src/components/topbar/ThemeToggle.tsx
+#~ msgid "topbar.theme_to_light"
+#~ msgstr "Passer en mode clair"
+
+#. js-lingui-explicit-id
+#: src/components/status/StatusBar.tsx
+#~ msgid "status.param_summary"
+#~ msgstr "seuil {threshold} · surface {minArea} · écart {mergeGap} · marge {padding}"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ModelSlot.tsx
+#~ msgid "settings.model_no_provider"
+#~ msgstr "Ajoutez un point de terminaison ci-dessus pour assigner un modèle."
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+#~ msgid "settings.model_chat_label"
+#~ msgstr "Discussion / Compréhension"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ModelSlot.tsx
+#~ msgid "settings.effort_default"
+#~ msgstr "Par défaut"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ModelSlot.tsx
+#~ msgid "settings.model_pick_endpoint"
+#~ msgstr "Point de terminaison"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ModelSlot.tsx
+#~ msgid "settings.effort_high"
+#~ msgstr "Élevé"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+#~ msgid "settings.model_image_label"
+#~ msgstr "Génération d'images"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ModelSlot.tsx
+#~ msgid "settings.effort_low"
+#~ msgstr "Faible"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ModelSlot.tsx
+#~ msgid "settings.effort_medium"
+#~ msgstr "Moyen"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ModelSlot.tsx
+#~ msgid "settings.model_slug_placeholder"
+#~ msgstr "modèle"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ModelSlot.tsx
+#~ msgid "settings.model_endpoint_aria"
+#~ msgstr "Point de terminaison du modèle"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ModelSlot.tsx
+#~ msgid "settings.model_name_aria"
+#~ msgstr "Nom du modèle"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+#~ msgid "settings.models_heading"
+#~ msgstr "Modèles"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+#~ msgid "settings.models_hint"
+#~ msgstr "Un point de terminaison, un modèle différent par capacité — inutile de réajouter le fournisseur. Choisissez chaque modèle dans la liste du point de terminaison ou saisissez-le."
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+#~ msgid "settings.model_image_hint"
+#~ msgstr "Produit des images (par ex. des planches d'assets régénérées)."
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+#~ msgid "settings.model_chat_hint"
+#~ msgstr "Texte, raisonnement et vision — un seul modèle multimodal."
+
+#. js-lingui-explicit-id
+#: src/components/settings/ModelSlot.tsx
+#~ msgid "settings.effort_label"
+#~ msgstr "Puissance de réflexion"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ModelSlot.tsx
+#~ msgid "settings.effort_aria"
+#~ msgstr "Puissance de réflexion"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ModelSlot.tsx
+#~ msgid "settings.model_assignment_save"
+#~ msgstr "Enregistrer l'attribution"
+
+#. js-lingui-explicit-id
+#: src/components/library/TeamGovernancePanel.tsx
+#~ msgid "team.role_admin"
+#~ msgstr "Administrateur"
+
+#. js-lingui-explicit-id
+#: src/components/library/TeamGovernancePanel.tsx
+#~ msgid "team.collaboration_host_required"
+#~ msgstr "Hôte de collaboration requis"
+
+#. js-lingui-explicit-id
+#: src/components/library/TeamGovernancePanel.tsx
+#~ msgid "team.create_readonly_share"
+#~ msgstr "Créer un partage en lecture seule"
+
+#. js-lingui-explicit-id
+#: src/components/library/TeamGovernancePanel.tsx
+#~ msgid "team.role_select_aria"
+#~ msgstr "Rôle actuel dans l'équipe"
+
+#. js-lingui-explicit-id
+#: src/components/library/TeamGovernancePanel.tsx
+#~ msgid "team.role_editor"
+#~ msgstr "Éditeur"
+
+#. js-lingui-explicit-id
+#: src/components/library/TeamGovernancePanel.tsx
+#~ msgid "team.local_review_host"
+#~ msgstr "Hôte de revue local"
+
+#. js-lingui-explicit-id
+#: src/components/library/TeamGovernancePanel.tsx
+#~ msgid "team.remote_sync_disabled"
+#~ msgstr "Synchronisation distante désactivée"
+
+#. js-lingui-explicit-id
+#: src/components/library/TeamGovernancePanel.tsx
+#~ msgid "team.role_reviewer"
+#~ msgstr "Relecteur"
+
+#. js-lingui-explicit-id
+#: src/components/library/TeamGovernancePanel.tsx
+#~ msgid "team.label"
+#~ msgstr "Équipe"
+
+#. js-lingui-explicit-id
+#: src/components/library/TeamGovernancePanel.tsx
+#~ msgid "team.governance_section_aria"
+#~ msgstr "Gouvernance de l'équipe"
+
+#. js-lingui-explicit-id
+#: src/components/library/TeamGovernancePanel.tsx
+#~ msgid "team.role_viewer"
+#~ msgstr "Lecteur"
+
+#. js-lingui-explicit-id
+#. placeholder {0}: project.name
+#: src/components/home/ProjectHome.tsx
+msgid "home.archive_project_description"
+msgstr "« {0} » sera retiré des projets actifs. Vous pourrez le restaurer depuis Archivés."
+
+#. js-lingui-explicit-id
+#. placeholder {0}: keys.length
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.toast_assets_updated"
+msgstr "{0, plural, one {# élément mis à jour} other {# éléments mis à jour}}"
+
+#. js-lingui-explicit-id
+#. placeholder {0}: coverage.missing.length
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.capability_gaps_count"
+msgstr "{0, plural, one {# écart de capacité} other {# écarts de capacité}}"
+
+#. js-lingui-explicit-id
+#. placeholder {0}: plan.files.length
+#. placeholder {1}: plan.conflicts.length
+#: src/components/library/RegistryInstallPanel.tsx
+msgid "registry_install.plan_summary"
+msgstr "{0, plural, one {# fichier} other {# fichiers}} · {1, plural, one {# conflit} other {# conflits}}"
+
+#. js-lingui-explicit-id
+#. placeholder {0}: consumption.length
+#: src/components/library/KitLibraryInspector.tsx
+msgid "kit_library.project_reference_count"
+msgstr "{0, plural, one {# référence de projet} other {# références de projet}}"
+
+#. js-lingui-explicit-id
+#. placeholder {0}: slices.length
+#: src/components/source/SourceMeta.tsx
+msgid "source.meta_region_count"
+msgstr "{0, plural, one {# région} other {# régions}}"
+
+#. js-lingui-explicit-id
+#. placeholder {0}: selected.size
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.selected_count"
+msgstr "{0, plural, one {# sélectionné} other {# sélectionnés}}"
+
+#. js-lingui-explicit-id
+#. placeholder {0}: receipt.status
+#. placeholder {1}: receipt.fileHashes.length
+#: src/components/library/RegistryInstallPanel.tsx
+msgid "registry_install.receipt_summary"
+msgstr "{0} · {1, plural, one {# fichier vérifié} other {# fichiers vérifiés}}"
+
+#. js-lingui-explicit-id
+#. placeholder {0}: item.name
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.toast_added_to_project"
+msgstr "{0} ajouté au projet"
+
+#. js-lingui-explicit-id
+#. placeholder {0}: confirmed.size
+#. placeholder {1}: candidates.length - confirmed.size
+#: src/components/library/KitLibraryInspector.tsx
+msgid "kit_library.confirmed_rejected_summary"
+msgstr "{0} confirmé(s) · {1} rejeté(s)"
+
+#. js-lingui-explicit-id
+#. placeholder {0}: preview.name
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.kit_editor_title"
+msgstr "Éditeur de kit {0}"
+
+#. js-lingui-explicit-id
+#. placeholder {0}: item.name
+#: src/components/library/KitLibraryInspector.tsx
+msgid "kit_library.editor_aria"
+msgstr "Éditeur de kit {0}"
+
+#. js-lingui-explicit-id
+#. placeholder {0}: endpointModels.data.length
+#: src/components/settings/ModelSlot.tsx
+msgid "settings.models_discovered_from_endpoint"
+msgstr "{0} modèles découverts depuis le point de terminaison"
+
+#. js-lingui-explicit-id
+#. placeholder {0}: coverage.covered.length
+#. placeholder {1}: coverage.total
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.task_dimensions_covered"
+msgstr "{0} dimension(s) de tâche sur {1} couverte(s)"
+
+#. js-lingui-explicit-id
+#. placeholder {0}: state.output.slices.length
+#: src/components/canvas/nodes/dag-node-common.tsx
+msgid "dag.slices_count"
+msgstr "{0} tranches découpées"
+
+#. js-lingui-explicit-id
+#. placeholder {0}: state.output.names.length
+#: src/components/canvas/nodes/dag-node-common.tsx
+msgid "dag.names_count"
+msgstr "{0} tranches nommées"
+
+#. js-lingui-explicit-id
+#: src/components/preview/PreviewMeta.tsx
+msgid "preview.region_count"
+msgstr "{count, plural, one {# région} other {# régions}}"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.exact_duplicates_count"
+msgstr "{duplicateCount, plural, one {# doublon exact} other {# doublons exacts}}"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ModelSlot.tsx
+msgid "settings.evidence_disclaimer"
+msgstr "{evidence}. La découverte via le point de terminaison prouve la disponibilité, pas la qualité de la tâche ni la prise en charge des modalités."
+
+#. js-lingui-explicit-id
+#: src/components/settings/ModelSlot.tsx
+msgid "settings.model_slot_fallback_aria"
+msgstr "Modèle de secours {label}"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ModelSlot.tsx
+msgid "settings.model_slot_model_aria"
+msgstr "Modèle {label}"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ModelSlot.tsx
+msgid "settings.model_slot_provider_aria"
+msgstr "Fournisseur {label}"
+
+#. js-lingui-explicit-id
+#: src/components/library/TeamGovernancePanel.tsx
+msgid "team.share_review_pending_aria"
+msgstr "{label}, {pending} en attente"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.passed_count"
+msgstr "{passed, plural, one {# réussi} other {# réussis}}"
+
+#. js-lingui-explicit-id
+#: src/components/library/TeamGovernancePanel.tsx
+msgid "team.pending_reviews_count"
+msgstr "{pending} révisions en attente"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.lineage_results_count"
+msgstr "{relatedCount, plural, one {# résultat de filiation} other {# résultats de filiation}}"
+
+#. js-lingui-explicit-id
+#: src/hooks/useExport.ts
+msgid "export.toast_success"
+msgstr "{savedCount, plural, one {# tranche exportée} other {# tranches exportées}}"
+
+#. js-lingui-explicit-id
+#: src/components/slices/SliceGridEmpty.tsx
+msgid "slices.empty_lower_threshold"
+msgstr "Seuil −10"
+
+#. js-lingui-explicit-id
+#: src/components/slices/SliceGridEmpty.tsx
+msgid "slices.empty_halve_min_area"
+msgstr "Aire min. −50 %"
+
+#. js-lingui-explicit-id
+#: src/components/library/TeamGovernancePanel.tsx
+msgid "team.host_required_description"
+msgstr "Un hôte de collaboration de bureau est requis pour relire ou créer un partage en lecture seule."
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/IntentPanel.tsx
+msgid "intent.questions_title"
+msgstr "Une précision rapide avant tout"
+
+#. js-lingui-explicit-id
+#: src/components/preview/PreviewToolbar.tsx
+msgid "preview.zoom_actual"
+msgstr "Taille réelle (1:1)"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderDirectory.tsx
+msgid "settings.adapter_available"
+msgstr "Adaptateur disponible"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderForm.tsx
+msgid "settings.add"
+msgstr "Ajouter"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.empty_desc"
+msgstr "Ajoutez un fournisseur et saisissez une clé API pour commencer à utiliser les fonctionnalités IA."
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.add_provider"
+msgstr "Ajouter un fournisseur"
+
+#. js-lingui-explicit-id
+#: src/components/library/ReviewBranchEditor.tsx
+msgid "review_branch.comment_placeholder"
+msgstr "Ajouter un commentaire lié à la révision"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.add_tag_placeholder"
+msgstr "Ajouter une étiquette"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/MockupNode.tsx
+msgid "mockup.add_to_library"
+msgstr "Ajouter à la bibliothèque"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/SlicesNode.tsx
+msgid "slices.add_to_library"
+msgstr "Ajouter à la bibliothèque"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/SlicesNode.tsx
+msgid "slices.toast_added_to_library"
+msgstr "{added} ajouté(s) à la bibliothèque"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/MockupNode.tsx
+msgid "mockup.toast_added_to_library"
+msgstr "Ajouté à la bibliothèque"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.advanced"
+msgstr "Avancé"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.advanced_model_bindings_aria"
+msgstr "Liaisons de modèles avancées"
+
+#. js-lingui-explicit-id
+#: src/components/settings/SettingsSidebar.tsx
+msgid "settings.section_ai"
+msgstr "IA"
+
+#. js-lingui-explicit-id
+#: src/components/settings/AboutFooter.tsx
+msgid "settings.about_description"
+msgstr "UI/UX AI-native · Tauri 2 · React 19 — local, hors ligne par défaut."
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderDirectory.tsx
+msgid "settings.provider_category_all"
+msgstr "Tous"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.media_filter_all"
+msgstr "Tous"
+
+#. js-lingui-explicit-id
+#: src/components/inspector/ExportBar.tsx
+msgid "inspector.export_all_button"
+msgstr "Tout ({total})"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.all_collections"
+msgstr "Toutes les collections"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.all_dimensions_covered"
+msgstr "Toutes les dimensions configurées disposent d’une couverture par adaptateur. Les preuves au niveau du modèle sont vérifiées au moment de la sélection."
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.all_projects"
+msgstr "Tous les projets"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.all_quality"
+msgstr "Toute qualité"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.analyze_video"
+msgstr "Analyser la vidéo"
+
+#. js-lingui-explicit-id
+#: src/components/source/SourceMeta.tsx
+msgid "source.meta_analyzing"
+msgstr "analyse en cours…"
+
+#. js-lingui-explicit-id
+#: src/components/preview/ProcessingOverlay.tsx
+msgid "preview.analyzing"
+msgstr "Analyse en cours…"
+
+#. js-lingui-explicit-id
+#: src/components/settings/VectorizerPanel.tsx
+msgid "vectorizer.api_id_saved"
+msgstr "Identifiant API enregistré"
+
+#. js-lingui-explicit-id
+#: src/components/settings/KeyField.tsx
+msgid "settings.key_label"
+msgstr "Clé API"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.keychain_trust"
+msgstr "Les clés API sont stockées uniquement dans le trousseau de votre système et injectées au niveau natif — elles n'atteignent jamais la page web."
+
+#. js-lingui-explicit-id
+#: src/components/settings/VectorizerPanel.tsx
+msgid "vectorizer.mode_label"
+msgstr "Mode API"
+
+#. js-lingui-explicit-id
+#: src/components/settings/VectorizerPanel.tsx
+msgid "vectorizer.secret_label"
+msgstr "Secret API"
+
+#. js-lingui-explicit-id
+#: src/components/settings/VectorizerPanel.tsx
+msgid "vectorizer.secret_removed"
+msgstr "Secret API supprimé"
+
+#. js-lingui-explicit-id
+#: src/components/settings/VectorizerPanel.tsx
+msgid "vectorizer.secret_saved"
+msgstr "Secret API enregistré"
+
+#. js-lingui-explicit-id
+#: src/components/settings/SettingsDialog.tsx
+msgid "settings.dialog_a11y_desc"
+msgstr "Préférences de l'application et fournisseurs d'IA."
+
+#. js-lingui-explicit-id
+#: src/components/library/RegistryInstallPanel.tsx
+msgid "registry_install.approve_and_install"
+msgstr "Approuver et installer"
+
+#. js-lingui-explicit-id
+#: src/components/library/ReviewBranchEditor.tsx
+msgid "review_branch.approve_revision"
+msgstr "Approuver la révision"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.empty_description"
+msgstr "Les résultats de projet approuvés et les packages importés apparaissent ici avec une version immuable et leur provenance."
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.archive"
+msgstr "Archiver"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.archive_project_title"
+msgstr "Archiver le projet ?"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/ArchivedSection.tsx
+#: src/components/settings/SettingsSidebar.tsx
+msgid "settings.section_archived"
+msgstr "Archivés"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.archived"
+msgstr "Archivé"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.archived_projects"
+msgstr "Projets archivés"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/ArchivedSection.tsx
+msgid "settings.archived_description"
+msgstr "Les projets archivés restent sur cet appareil jusqu'à ce que vous les restauriez ou les supprimiez."
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.archived_empty_description"
+msgstr "Les travaux archivés apparaîtront ici."
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.asset_singular"
+msgstr "élément"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/BoardNode.tsx
+msgid "pipeline.stage_board"
+msgstr "Tableau d'assets"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/dag-node-common.tsx
+msgid "dag.op_board"
+msgstr "Tableau d'assets"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/BoardNode.tsx
+msgid "pipeline.node_board_aria"
+msgstr "Étape du tableau d'assets"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.capabilities_aria"
+msgstr "Capacités de l'élément"
+
+#. js-lingui-explicit-id
+#: src/components/topbar/LibraryMenu.tsx
+msgid "library.menu_label"
+msgstr "Bibliothèque d'assets"
+
+#. js-lingui-explicit-id
+#: src/components/library/LibraryDrawer.tsx
+msgid "library.title"
+msgstr "Bibliothèque d'assets"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.asset_plural"
+msgstr "éléments"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/IntentPanel.tsx
+msgid "intent.assumptions"
+msgstr "Hypothèses"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.attach_reference"
+msgstr "Joindre une référence"
+
+#. js-lingui-explicit-id
+#: src/components/library/RegistryInstallPanel.tsx
+msgid "registry_install.authorize_workspace"
+msgstr "Autoriser l'espace de travail"
+
+#. js-lingui-explicit-id
+#: src/components/library/RegistryInstallPanel.tsx
+msgid "registry_install.authorized_workspace_fallback"
+msgstr "Espace de travail autorisé"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ModelSlot.tsx
+msgid "settings.model_slot_auto"
+msgstr "Auto"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.policy_auto_compatible"
+msgstr "Auto-compatible"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.model_routing_description"
+msgstr "Le routage automatique dirige chaque tâche uniquement vers un adaptateur disponible possédant la capacité requise."
+
+#. js-lingui-explicit-id
+#: src/components/settings/ModelSlot.tsx
+msgid "settings.auto_will_choose"
+msgstr "Le mode automatique choisira parmi les fournisseurs connectés"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.nav_back"
+msgstr "Retour"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/PlannedCanvas.tsx
+msgid "dag.back_to_linear"
+msgstr "Revenir à la chaîne linéaire"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderForm.tsx
+msgid "settings.provider_baseurl_label"
+msgstr "URL de base"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/dag-node-common.tsx
+msgid "dag.blocked"
+msgstr "Bloqué — une étape en amont a échoué."
+
+#. js-lingui-explicit-id
+#: src/components/library/KitLibraryInspector.tsx
+msgid "kit_library.brand_book_confirmation_aria"
+msgstr "Confirmation du Brand Book"
+
+#. js-lingui-explicit-id
+#: src/components/library/KitLibraryInspector.tsx
+msgid "kit_library.brand_book_confirmation_heading"
+msgstr "Confirmation du Brand Book"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.preset_brand"
+msgstr "Kit de marque"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.tab_brand_kits"
+msgstr "Kits de marque"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/BriefNode.tsx
+msgid "pipeline.stage_brief"
+msgstr "Brief"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/BriefNode.tsx
+msgid "pipeline.node_brief_aria"
+msgstr "Étape du brief"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.bulk_toolbar_aria"
+msgstr "Actions groupées sur les éléments"
+
+#. js-lingui-explicit-id
+#: src/components/inspector/SliceDimensions.tsx
+msgid "inspector.dim_bytes"
+msgstr "Octets"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderForm.tsx
+#: src/components/settings/ProviderRow.tsx
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.cancel"
+msgstr "Annuler"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+#: src/components/settings/sections/ArchivedSection.tsx
+msgid "home.cancel"
+msgstr "Annuler"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/dag-node-common.tsx
+msgid "dag.cancelled"
+msgstr "Annulé."
+
+#. js-lingui-explicit-id
+#: src/components/settings/ModelSlot.tsx
+msgid "settings.capability_evidence_unavailable"
+msgstr "Preuves de capacité indisponibles"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderDirectory.tsx
+msgid "settings.catalog_availability_disclaimer"
+msgstr "La disponibilité dans le catalogue n’implique pas qu’un adaptateur soit installé, qu’une autorisation soit valide, ni la prise en charge de toutes les capacités du modèle."
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderDirectory.tsx
+msgid "settings.catalog_only"
+msgstr "Catalogue uniquement"
+
+#. js-lingui-explicit-id
+#: src/components/help/HelpMenu.tsx
+msgid "help.change_language"
+msgstr "Changer de langue..."
+
+#. js-lingui-explicit-id
+#: src/components/home/SidebarAccount.tsx
+msgid "home.change_theme"
+msgstr "Changer de thème"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderDirectory.tsx
+msgid "settings.provider_category_china"
+msgstr "Chine"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.choose_catalog_definition"
+msgstr "Choisissez une définition de catalogue. Le routage automatique reste le mode par défaut après la connexion."
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.rename_project_description"
+msgstr "Choisissez un nom clair pour ce projet local."
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.clear_selection"
+msgstr "Effacer"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.clear_search"
+msgstr "Effacer la recherche"
+
+#. js-lingui-explicit-id
+#: src/hooks/useCopyPng.ts
+msgid "copy_png.error_unsupported"
+msgstr "La copie d'image dans le presse-papiers n'est pas prise en charge ici."
+
+#. js-lingui-explicit-id
+#: src/components/ui/dialog.tsx
+#: src/components/ui/sheet.tsx
+msgid "common.close"
+msgstr "Fermer"
+
+#. js-lingui-explicit-id
+#: src/components/library/KitLibraryInspector.tsx
+msgid "kit_library.close_editor_aria"
+msgstr "Fermer l'éditeur de kit"
+
+#. js-lingui-explicit-id
+#: src/components/library/ReviewBranchEditor.tsx
+msgid "review_branch.comment_action"
+msgstr "Commenter"
+
+#. js-lingui-explicit-id
+#: src/components/library/KitLibraryInspector.tsx
+msgid "kit_library.density_compact"
+msgstr "Compact"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.tab_components"
+msgstr "Composants"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/BoardNode.tsx
+msgid "board.composing"
+msgstr "Composition du mockup…"
+
+#. js-lingui-explicit-id
+#: src/components/library/LibraryDrawer.tsx
+msgid "library.toast_compose_failed"
+msgstr "Échec de la composition"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/BoardNode.tsx
+msgid "board.toast_compose_failed"
+msgstr "Échec de la composition"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/IntentPanel.tsx
+msgid "intent.confidence"
+msgstr "Confiance"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/SlicesNode.tsx
+msgid "slices.name_no_model_cta"
+msgstr "Configurez un modèle de discussion pour nommer les tranches"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.discover_references_title"
+msgstr "Configurez un hôte fournisseur de découverte de références autorisé pour activer cette action."
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.analyze_video_title"
+msgstr "Configurez un hôte exécuteur vidéo autorisé pour activer l'analyse des images et des plans."
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/BoardNode.tsx
+#: src/components/canvas/nodes/BriefNode.tsx
+#: src/components/canvas/nodes/MockupNode.tsx
+msgid "generate.no_model_cta"
+msgstr "Configurez un modèle d'image dans les paramètres"
+
+#. js-lingui-explicit-id
+#: src/components/library/LibraryDrawer.tsx
+msgid "library.no_model"
+msgstr "Configurez un modèle d'image dans les paramètres pour générer."
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderRow.tsx
+#: src/components/settings/VectorizerPanel.tsx
+msgid "settings.status_configured"
+msgstr "Configuré"
+
+#. js-lingui-explicit-id
+#: src/components/settings/KeyField.tsx
+#: src/components/settings/VectorizerPanel.tsx
+msgid "settings.key_placeholder_replace"
+msgstr "Configuré — saisir pour remplacer"
+
+#. js-lingui-explicit-id
+#: src/components/library/KitLibraryInspector.tsx
+msgid "kit_library.audit_conflicts"
+msgstr "Conflits"
+
+#. js-lingui-explicit-id
+#. placeholder {0}: definition.label
+#: src/components/settings/ProviderDirectory.tsx
+msgid "settings.connect_named_provider"
+msgstr "Connecter {0}"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.connect_a_provider"
+msgstr "Connecter un fournisseur"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.connect_provider_with_capabilities"
+msgstr "Connecter un fournisseur disposant de ces capacités"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.connect_ai_capabilities"
+msgstr "Connecter des capacités IA"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.connect_ai_capabilities_description"
+msgstr "Connectez d’abord un fournisseur. Cutout acheminera ensuite automatiquement les tâches de texte, vision, parole, code et image."
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.connect_provider"
+msgstr "Connecter un fournisseur"
+
+#. js-lingui-explicit-id
+#: src/components/library/KitLibraryInspector.tsx
+msgid "kit_library.consumption_heading"
+msgstr "Consommation"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.meta_content_hash"
+msgstr "Hachage du contenu"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.continue_heading"
+msgstr "Poursuivre le travail"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.dimension_text_description"
+msgstr "Conversation, planification et compréhension de documents."
+
+#. js-lingui-explicit-id
+#: src/hooks/useCopyPng.ts
+msgid "copy_png.toast_copied"
+msgstr "{label} copié"
+
+#. js-lingui-explicit-id
+#: src/components/library/KitLibraryInspector.tsx
+msgid "kit_library.copy_manifest"
+msgstr "Copier le manifeste"
+
+#. js-lingui-explicit-id
+#: src/components/slices/SliceCardActions.tsx
+msgid "slices.action_copy_png"
+msgstr "Copier en PNG"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.toast_add_failed"
+msgstr "Impossible d'ajouter l'élément à la bibliothèque"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/MockupNode.tsx
+#: src/components/canvas/nodes/SlicesNode.tsx
+#: src/components/library/LibraryDrawer.tsx
+msgid "library.toast_add_failed"
+msgstr "Impossible d'ajouter à la bibliothèque"
+
+#. js-lingui-explicit-id
+#: src/hooks/useCopyPng.ts
+msgid "copy_png.toast_failed"
+msgstr "Impossible de copier l'image"
+
+#. js-lingui-explicit-id
+#: src/hooks/queries/pipeline.ts
+#: src/hooks/useImageImport.ts
+msgid "import.toast_load_failed"
+msgstr "Impossible de charger l'image"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.load_failed_title"
+msgstr "Impossible de charger les projets"
+
+#. js-lingui-explicit-id
+#: src/components/library/LibraryDrawer.tsx
+msgid "library.toast_remove_failed"
+msgstr "Impossible de supprimer l'élément"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.toast_update_failed"
+msgstr "Impossible de mettre à jour les éléments"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.preset_brand_brief"
+msgstr "Créer un kit de marque complet (logo, couleurs, typographie, ressources) pour "
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.preset_poster_brief"
+msgstr "Créer une affiche ou un visuel principal pour "
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.create_from_brief"
+msgstr "Créer à partir d'un brief"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.dimension_tts_description"
+msgstr "Créer un contenu audio parlé."
+
+#. js-lingui-explicit-id
+#: src/components/library/TeamGovernancePanel.tsx
+msgid "team.current_project_revision"
+msgstr "Révision actuelle du projet"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderDirectory.tsx
+msgid "settings.provider_category_custom"
+msgstr "Personnalisé"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/edges/TransitionEdge.tsx
+msgid "pipeline.transition_cutout"
+msgstr "Détourage"
+
+#. js-lingui-explicit-id
+#: src/components/source/ParameterControls.tsx
+msgid "source.params_aria"
+msgstr "Paramètres de détourage"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/GeneralSection.tsx
+msgid "settings.reset_params_label"
+msgstr "Paramètres de détourage"
+
+#. js-lingui-explicit-id
+#: src/components/home/SidebarAccount.tsx
+msgid "home.theme_dark"
+msgstr "Sombre"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/edges/TransitionEdge.tsx
+msgid "pipeline.transition_deconstruct"
+msgstr "Déconstruction"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/MockupNode.tsx
+msgid "mockup.deconstruct"
+msgstr "Déconstruire vers le tableau"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/MockupNode.tsx
+msgid "mockup.deconstructing"
+msgstr "Déconstruction en cours…"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/MockupNode.tsx
+msgid "mockup.toast_deconstruct_failed"
+msgstr "Échec de la déconstruction"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderForm.tsx
+msgid "settings.provider_model_label"
+msgstr "Modèle par défaut"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+#: src/components/settings/sections/ArchivedSection.tsx
+msgid "home.delete"
+msgstr "Supprimer"
+
+#. js-lingui-explicit-id
+#. placeholder {0}: project.name
+#: src/components/settings/sections/ArchivedSection.tsx
+msgid "settings.delete_archived_named"
+msgstr "Supprimer {0}"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.delete_permanently"
+msgstr "Supprimer définitivement"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+#: src/components/settings/sections/ArchivedSection.tsx
+msgid "home.delete_permanently_title"
+msgstr "Supprimer définitivement ?"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/BriefNode.tsx
+msgid "brief.placeholder"
+msgstr "Décrivez le produit et son écran principal — à qui il s'adresse, ce qu'il affiche…"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.brief_placeholder"
+msgstr "Décrivez ce que vous voulez concevoir..."
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.preset_desktop_brief"
+msgstr "Concevoir un espace de travail d’application de bureau pour "
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.preset_mobile_brief"
+msgstr "Concevoir l’interface d’une application mobile pour "
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.preset_web_brief"
+msgstr "Concevoir une expérience web responsive pour "
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.preset_miniapp_brief"
+msgstr "Concevoir un parcours de mini-programme WeChat pour "
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/dag-node-common.tsx
+msgid "dag.op_design_system"
+msgstr "Système de design"
+
+#. js-lingui-explicit-id
+#: src/components/library/KitLibraryInspector.tsx
+msgid "kit_library.design_system_files_aria"
+msgstr "Fichiers du kit de système de design"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.tab_design_systems"
+msgstr "Systèmes de design"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/DesignSystemNode.tsx
+msgid "dag.node_design_system_aria"
+msgstr "Nœud système de design"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.preset_desktop"
+msgstr "Bureau"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/IntentPanel.tsx
+msgid "intent.dimensions"
+msgstr "Dimensions"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.discover_references"
+msgstr "Découvrir des références"
+
+#. js-lingui-explicit-id
+#: src/components/help/HelpMenu.tsx
+msgid "help.documentation"
+msgstr "Documentation"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/edges/TransitionEdge.tsx
+msgid "pipeline.status_done"
+msgstr "Terminé"
+
+#. js-lingui-explicit-id
+#: src/components/library/KitLibraryInspector.tsx
+msgid "kit_library.download"
+msgstr "Télécharger"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.status_draft"
+msgstr "Brouillon"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.drafts"
+msgstr "Brouillons"
+
+#. js-lingui-explicit-id
+#: src/components/source/DropZone.tsx
+msgid "source.dropzone_title"
+msgstr "Déposez une planche d'assets"
+
+#. js-lingui-explicit-id
+#: src/components/slices/SliceGridEmpty.tsx
+msgid "slices.empty_no_source"
+msgstr "Déposez une planche d'assets dans le panneau de gauche pour commencer à découper."
+
+#. js-lingui-explicit-id
+#: src/components/source/DropZone.tsx
+msgid "source.dropzone_replace"
+msgstr "Déposez ou cliquez pour remplacer"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderRow.tsx
+msgid "settings.edit_action"
+msgstr "Modifier"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.dimension_image_edit_description"
+msgstr "Modifier une ou plusieurs images fournies."
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.dialog_edit_title"
+msgstr "Modifier le fournisseur"
+
+#. js-lingui-explicit-id
+#. placeholder {0}: formatProjectDate(project.updatedAt, locale)
+#: src/components/home/ProjectHome.tsx
+msgid "home.edited_date"
+msgstr "Modifié {0}"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.status_empty"
+msgstr "Vide"
+
+#. js-lingui-explicit-id
+#: src/components/library/LibraryDrawer.tsx
+msgid "library.empty"
+msgstr "Rien pour l'instant — ajoutez des tranches ou des images générées à la bibliothèque, ou importez les vôtres."
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/MockupNode.tsx
+msgid "mockup.preview_zoom"
+msgstr "Agrandir l'aperçu du mockup"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/dag-node-common.tsx
+msgid "dag.preview_zoom"
+msgstr "Agrandir l'aperçu"
+
+#. js-lingui-explicit-id
+#: src/components/settings/KeyField.tsx
+msgid "settings.key_placeholder_empty"
+msgstr "Saisir la clé API"
+
+#. js-lingui-explicit-id
+#: src/components/settings/VectorizerPanel.tsx
+msgid "vectorizer.secret_placeholder"
+msgstr "Saisir le secret API"
+
+#. js-lingui-explicit-id
+#: src/components/library/KitLibraryInspector.tsx
+msgid "kit_library.error_expected_candidates"
+msgstr "Un tableau de candidats était attendu de la part de l'analyseur Brand Book autorisé."
+
+#. js-lingui-explicit-id
+#: src/components/topbar/TopBarActions.tsx
+msgid "topbar.export_all_button"
+msgstr "Tout exporter"
+
+#. js-lingui-explicit-id
+#: src/components/topbar/TopBarActions.tsx
+msgid "topbar.export_all_label"
+msgstr "Exporter toutes les tranches"
+
+#. js-lingui-explicit-id
+#: src/components/inspector/ExportBar.tsx
+msgid "inspector.export_all_tooltip"
+msgstr "Exporter toutes les tranches"
+
+#. js-lingui-explicit-id
+#: src/hooks/useExport.ts
+msgid "export.toast_failed"
+msgstr "Échec de l'export : {reason}"
+
+#. js-lingui-explicit-id
+#: src/components/topbar/TopBarActions.tsx
+msgid "export.menu_label"
+msgstr "Format d'export"
+
+#. js-lingui-explicit-id
+#: src/components/slices/SliceCardActions.tsx
+msgid "slices.action_export"
+msgstr "Exporter la tranche"
+
+#. js-lingui-explicit-id
+#: src/components/inspector/ExportBar.tsx
+msgid "inspector.export_slice"
+msgstr "Exporter la tranche"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.export_verified_asset"
+msgstr "Exporter l'élément vérifié"
+
+#. js-lingui-explicit-id
+#: src/hooks/useExport.ts
+msgid "export.toast_partial"
+msgstr "{savedCount} sur {total} exportées"
+
+#. js-lingui-explicit-id
+#: src/components/library/KitLibraryInspector.tsx
+msgid "kit_library.density_extended"
+msgstr "Étendu"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.load_failed"
+msgstr "Échec du chargement des fournisseurs"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.favorite_action"
+msgstr "Favori"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.collection_filter_aria"
+msgstr "Filtrer par collection"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.quality_filter_aria"
+msgstr "Filtrer par qualité"
+
+#. js-lingui-explicit-id
+#: src/components/library/KitLibraryInspector.tsx
+msgid "kit_library.first_available_version"
+msgstr "Première version disponible"
+
+#. js-lingui-explicit-id
+#: src/components/preview/PreviewToolbar.tsx
+msgid "preview.zoom_fit"
+msgstr "Ajuster au panneau"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.policy_follow_updates"
+msgstr "Suivre les mises à jour"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.reference_following"
+msgstr "Suivi"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.nav_forward"
+msgstr "Suivant"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderDirectory.tsx
+msgid "settings.provider_category_gateway"
+msgstr "Passerelles"
+
+#. js-lingui-explicit-id
+#: src/components/settings/SettingsSidebar.tsx
+msgid "settings.section_general"
+msgstr "Général"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/edges/TransitionEdge.tsx
+msgid "pipeline.transition_generate"
+msgstr "Générer"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/MockupNode.tsx
+msgid "mockup.empty"
+msgstr "Générez à partir du brief, ou importez une capture d'écran."
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/BriefNode.tsx
+msgid "brief.generate"
+msgstr "Générer le mockup"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.dimension_image_generation_description"
+msgstr "Générer un nouveau contenu visuel."
+
+#. js-lingui-explicit-id
+#: src/components/library/LibraryDrawer.tsx
+msgid "library.compose"
+msgstr "Générer un prototype"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/MockupNode.tsx
+msgid "mockup.generating"
+msgstr "Génération du mockup…"
+
+#. js-lingui-explicit-id
+#: src/components/library/LibraryDrawer.tsx
+msgid "library.composing"
+msgstr "Génération…"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/BriefNode.tsx
+msgid "brief.generating"
+msgstr "Génération…"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/BriefNode.tsx
+#: src/components/canvas/nodes/MockupNode.tsx
+msgid "generate.toast_failed"
+msgstr "Échec de la génération"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderDirectory.tsx
+msgid "settings.provider_category_global"
+msgstr "Global"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.section_aria"
+msgstr "Bibliothèque globale"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/IntentPanel.tsx
+msgid "intent.goal"
+msgstr "Objectif"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.layout_grid"
+msgstr "Vue en grille"
+
+#. js-lingui-explicit-id
+#: src/components/help/HelpMenu.tsx
+msgid "help.menu_label"
+msgstr "Aide et ressources"
+
+#. js-lingui-explicit-id
+#: src/components/settings/KeyField.tsx
+#: src/components/settings/VectorizerPanel.tsx
+msgid "settings.key_hide"
+msgstr "Masquer"
+
+#. js-lingui-explicit-id
+#: src/components/library/TeamGovernancePanel.tsx
+msgid "team.host_required"
+msgstr "Hôte requis"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderDirectory.tsx
+msgid "settings.provider_category_media"
+msgstr "Image et vidéo"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.dimension_image_edit_label"
+msgstr "Édition d’image"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.dimension_image_generation_label"
+msgstr "Génération d’image"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.dimension_image_to_webdev_label"
+msgstr "Image vers Web"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.media_filter_images"
+msgstr "Images"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.dimension_image_to_webdev_description"
+msgstr "Implémenter une interface web à partir de preuves visuelles."
+
+#. js-lingui-explicit-id
+#: src/components/library/LibraryDrawer.tsx
+msgid "library.import"
+msgstr "Importer"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/MockupNode.tsx
+msgid "mockup.import_replace"
+msgstr "Importer"
+
+#. js-lingui-explicit-id
+#: src/components/library/KitLibraryInspector.tsx
+msgid "kit_library.brand_book_confirmation_hint"
+msgstr "Importez le résultat d'un analyseur autorisé. Rien n'entre dans le kit tant que vous ne l'avez pas confirmé."
+
+#. js-lingui-explicit-id
+#: src/components/library/KitLibraryInspector.tsx
+msgid "kit_library.import_candidates_aria"
+msgstr "Importer des candidats Brand Book"
+
+#. js-lingui-explicit-id
+#: src/components/library/KitLibraryInspector.tsx
+msgid "kit_library.import_candidates"
+msgstr "Importer des candidats"
+
+#. js-lingui-explicit-id
+#: src/components/source/DropZone.tsx
+msgid "source.dropzone_aria"
+msgstr "Importer une image — déposez un fichier ou cliquez pour parcourir"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/BriefNode.tsx
+msgid "brief.import_mockup"
+msgstr "Importer une maquette"
+
+#. js-lingui-explicit-id
+#: src/components/inspector/SliceDimensions.tsx
+msgid "inspector.dim_index"
+msgstr "Index"
+
+#. js-lingui-explicit-id
+#: src/components/slices/RightRailTabs.tsx
+msgid "slices.inspector_tab"
+msgstr "Inspecteur"
+
+#. js-lingui-explicit-id
+#: src/components/settings/SettingsSidebar.tsx
+msgid "settings.section_integrations"
+msgstr "Intégrations"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.empty_fallback_label"
+msgstr "éléments"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.dialog_form_desc"
+msgstr "Les clés sont stockées uniquement dans le trousseau système, jamais écrites en clair sur la page web ou sur le disque."
+
+#. js-lingui-explicit-id
+#: src/components/library/KitLibraryInspector.tsx
+msgid "kit_library.audit_aria"
+msgstr "Audit du kit"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/GeneralSection.tsx
+msgid "topbar.language_label"
+msgstr "Langue"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.title"
+msgstr "Bibliothèque"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.library_label"
+msgstr "Bibliothèque"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.type_tablist_aria"
+msgstr "Type de bibliothèque"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.meta_license"
+msgstr "Licence"
+
+#. js-lingui-explicit-id
+#: src/components/home/SidebarAccount.tsx
+msgid "home.theme_light"
+msgstr "Clair"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.layout_list"
+msgstr "Vue en liste"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.loading_registry_installer"
+msgstr "Chargement de l'installateur Registry…"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderDirectory.tsx
+msgid "settings.provider_category_local"
+msgstr "Local"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.error_storage_unavailable"
+msgstr "Le stockage de la bibliothèque locale n'est pas disponible."
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.local_projects"
+msgstr "Projets locaux"
+
+#. js-lingui-explicit-id
+#: src/components/library/TeamGovernancePanel.tsx
+msgid "team.local_review"
+msgstr "Relecture locale"
+
+#. js-lingui-explicit-id
+#: src/components/library/TeamGovernancePanel.tsx
+msgid "team.local_review_description"
+msgstr "La relecture locale conserve les commentaires, approbations et partages en lecture seule sur cet appareil."
+
+#. js-lingui-explicit-id
+#: src/components/settings/VectorizerPanel.tsx
+msgid "vectorizer.hint"
+msgstr "Le SVG local fonctionne hors ligne. Le SVG API utilise Vectorizer.AI lorsqu'il est configuré."
+
+#. js-lingui-explicit-id
+#: src/components/home/SidebarAccount.tsx
+msgid "home.local_workspace"
+msgstr "Espace de travail local"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.policy_lock_version"
+msgstr "Verrouiller la version"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.reference_locked"
+msgstr "Verrouillé"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.kit_editor_description"
+msgstr "Gérez la projection de kit approuvée et adressée par contenu."
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.preset_miniapp"
+msgstr "Mini-programme"
+
+#. js-lingui-explicit-id
+#: src/components/library/KitLibraryInspector.tsx
+msgid "kit_library.audit_missing"
+msgstr "Manquant"
+
+#. js-lingui-explicit-id
+#: src/components/library/KitLibraryInspector.tsx
+msgid "kit_library.missing_from_kit"
+msgstr "Absent du kit approuvé"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.preset_mobile"
+msgstr "Application mobile"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/MockupNode.tsx
+msgid "pipeline.stage_mockup"
+msgstr "Maquette"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/dag-node-common.tsx
+msgid "dag.op_mockup"
+msgstr "Maquette"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/MockupNode.tsx
+msgid "pipeline.node_mockup_aria"
+msgstr "Étape de maquette"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ModelSlot.tsx
+msgid "settings.model_or_blank_placeholder"
+msgstr "Modèle ou laisser vide pour Auto"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.model_routing"
+msgstr "Routage des modèles"
+
+#. js-lingui-explicit-id
+#. placeholder {0}: project.name
+#: src/components/home/ProjectHome.tsx
+msgid "home.more_actions_named"
+msgstr "Plus d'actions pour {0}"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.lineage_results_heading"
+msgstr "Résultats de filiation « plus comme ceci »"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.move_to_collection_aria"
+msgstr "Déplacer la sélection vers une collection"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.move_to_collection_placeholder"
+msgstr "Déplacer vers une collection…"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderForm.tsx
+msgid "settings.provider_name_placeholder"
+msgstr "Mon compte Anthropic"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderForm.tsx
+msgid "settings.provider_name_label"
+msgstr "Nom"
+
+#. js-lingui-explicit-id
+#: src/components/inspector/SliceNameField.tsx
+msgid "inspector.name_label"
+msgstr "Nom"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/SlicesNode.tsx
+msgid "slices.toast_named"
+msgstr "{count} tranches nommées"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/dag-node-common.tsx
+msgid "dag.op_name"
+msgstr "Nommage"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/SlicesNode.tsx
+msgid "slices.toast_name_failed"
+msgstr "Échec du nommage"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/SlicesNode.tsx
+msgid "slices.naming"
+msgstr "Nommage des tranches…"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.quality_needs_attention"
+msgstr "Nécessite une attention"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.new_project"
+msgstr "Nouveau projet"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.empty_title"
+msgstr "Aucun élément « {label} » pour l'instant"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderDirectory.tsx
+msgid "settings.no_authorization"
+msgstr "Aucune autorisation"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.no_drafts_yet"
+msgstr "Aucun brouillon pour l'instant"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.no_search_matches"
+msgstr "Aucun projet correspondant"
+
+#. js-lingui-explicit-id
+#: src/components/topbar/TabsMenu.tsx
+msgid "topbar.tabs_no_match"
+msgstr "Aucun onglet correspondant"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.no_projects_yet"
+msgstr "Aucun projet pour le moment"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.empty_title"
+msgstr "Aucun fournisseur configuré pour le moment"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderDirectory.tsx
+msgid "settings.no_providers_match_search"
+msgstr "Aucun fournisseur ne correspond à cette recherche."
+
+#. js-lingui-explicit-id
+#: src/components/slices/SliceGridEmpty.tsx
+msgid "slices.empty_no_regions_title"
+msgstr "Aucune région trouvée"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderRow.tsx
+#: src/components/settings/VectorizerPanel.tsx
+msgid "settings.status_unconfigured"
+msgstr "Non configuré"
+
+#. js-lingui-explicit-id
+#: src/components/library/KitLibraryInspector.tsx
+msgid "kit_library.not_used_by_project"
+msgstr "Non utilisé par un projet"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+#: src/components/settings/sections/ArchivedSection.tsx
+msgid "home.nothing_archived"
+msgstr "Rien n'est archivé"
+
+#. js-lingui-explicit-id
+#. placeholder {0}: query.trim()
+#: src/components/home/ProjectHome.tsx
+msgid "home.no_search_matches_description"
+msgstr "Aucun résultat pour « {0} ». Essayez un autre nom ou un mot-clé du brief."
+
+#. js-lingui-explicit-id
+#: src/components/home/SidebarAccount.tsx
+msgid "home.notifications"
+msgstr "Notifications"
+
+#. js-lingui-explicit-id
+#: src/components/library/TeamGovernancePanel.tsx
+msgid "team.open_project_to_review"
+msgstr "Ouvrez un projet pour démarrer une relecture."
+
+#. js-lingui-explicit-id
+#: src/components/topbar/TabsMenu.tsx
+msgid "topbar.tabs_overview"
+msgstr "Onglets ouverts"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderForm.tsx
+msgid "settings.provider_kind_openai_compatible"
+msgstr "Compatible OpenAI"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ModelSlot.tsx
+msgid "settings.optional_fallback_model_placeholder"
+msgstr "Modèle de secours (facultatif)"
+
+#. js-lingui-explicit-id
+#: src/components/source/DropZone.tsx
+msgid "source.dropzone_hint"
+msgstr "ou cliquez pour parcourir · PNG, JPEG, WebP"
+
+#. js-lingui-explicit-id
+#: src/components/source/ParameterControls.tsx
+msgid "source.params_heading"
+msgstr "Paramètres"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/GeneralSection.tsx
+msgid "settings.reset_done_toast"
+msgstr "Paramètres réinitialisés"
+
+#. js-lingui-explicit-id
+#: src/components/library/KitLibraryInspector.tsx
+msgid "kit_library.parser_host_not_configured"
+msgstr "Hôte d'analyseur non configuré dans cette surface. Importez son résultat JSON signé pour examiner les candidats."
+
+#. js-lingui-explicit-id
+#: src/components/settings/SettingsSidebar.tsx
+msgid "settings.section_personalization"
+msgstr "Personnalisation"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.pin"
+msgstr "Épingler"
+
+#. js-lingui-explicit-id
+#. placeholder {0}: project.name
+#: src/components/home/ProjectHome.tsx
+msgid "home.pin_named"
+msgstr "Épingler {0}"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.pin_project"
+msgstr "Épingler le projet"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/LinearCanvas.tsx
+msgid "pipeline.canvas_aria"
+msgstr "Canevas du pipeline"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.dimension_webdev_description"
+msgstr "Planifier et implémenter des interfaces web."
+
+#. js-lingui-explicit-id
+#. placeholder {0}: node.label
+#: src/components/canvas/nodes/DagNode.tsx
+msgid "dag.node_aria"
+msgstr "Nœud planifié : {0}"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/PlannedCanvas.tsx
+msgid "dag.canvas_aria"
+msgstr "Canevas du pipeline planifié"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/BriefNode.tsx
+msgid "dag.toast_plan_failed"
+msgstr "Échec de la planification"
+
+#. js-lingui-explicit-id
+#: src/components/topbar/TopBarActions.tsx
+msgid "export.menu_png_svg_api"
+msgstr "PNG + SVG · API"
+
+#. js-lingui-explicit-id
+#: src/components/topbar/TopBarActions.tsx
+msgid "export.menu_png_svg_local"
+msgstr "PNG + SVG · Local"
+
+#. js-lingui-explicit-id
+#: src/components/inspector/ExportBar.tsx
+#: src/components/topbar/TopBarActions.tsx
+msgid "export.menu_png"
+msgstr "Découpes PNG"
+
+#. js-lingui-explicit-id
+#: src/components/inspector/SliceDimensions.tsx
+msgid "inspector.dim_position"
+msgstr "Position"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.preset_poster"
+msgstr "Affiche"
+
+#. js-lingui-explicit-id
+#: src/components/library/KitLibraryInspector.tsx
+msgid "kit_library.audit_present"
+msgstr "Présent"
+
+#. js-lingui-explicit-id
+#: src/components/preview/PreviewPanel.tsx
+msgid "preview.heading"
+msgstr "Aperçu"
+
+#. js-lingui-explicit-id
+#: src/components/library/KitLibraryInspector.tsx
+msgid "kit_library.preview_heading"
+msgstr "Aperçu"
+
+#. js-lingui-explicit-id
+#: src/components/library/RegistryInstallPanel.tsx
+msgid "registry_install.preview_install"
+msgstr "Aperçu de l'installation"
+
+#. js-lingui-explicit-id
+#: src/components/settings/VectorizerPanel.tsx
+msgid "vectorizer.mode_production"
+msgstr "Production"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.project_actions"
+msgstr "Actions du projet"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.project_name_aria"
+msgstr "Nom du projet"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.project_load_error"
+msgstr "Le stockage du projet n'a pas pu être chargé."
+
+#. js-lingui-explicit-id
+#: src/components/home/SidebarAccount.tsx
+msgid "home.local_workspace_hint"
+msgstr "Les projets restent sur cet appareil"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.drafts_empty_description"
+msgstr "Les projets qui n'ont pas encore produit de résultats se retrouveront ici."
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.published_empty_description"
+msgstr "Les projets que vous publiez apparaîtront ici avec leurs liens en ligne. Cette fonctionnalité nécessite des comptes et un service communautaire, qui ne sont pas encore développés."
+
+#. js-lingui-explicit-id
+#: src/components/library/LibraryDrawer.tsx
+msgid "library.toast_composed"
+msgstr "Prototype généré dans le nœud de maquette"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.provenance_and_files"
+msgstr "Provenance et fichiers"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ModelSlot.tsx
+msgid "settings.provider_placeholder"
+msgstr "Fournisseur"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderForm.tsx
+msgid "settings.provider_added_toast"
+msgstr "Fournisseur ajouté"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderDirectory.tsx
+msgid "settings.provider_categories_aria"
+msgstr "Catégories de fournisseurs"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderDirectory.tsx
+msgid "settings.provider_catalog_only_hint"
+msgstr "Le fournisseur est répertorié dans le catalogue, mais aucun adaptateur d’exécution n’est installé."
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderRow.tsx
+msgid "settings.provider_removed_toast"
+msgstr "Fournisseur supprimé"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderForm.tsx
+msgid "settings.provider_updated_toast"
+msgstr "Fournisseur mis à jour"
+
+#. js-lingui-explicit-id
+#: src/components/library/KitLibraryInspector.tsx
+msgid "kit_library.publish_new_version"
+msgstr "Publier une nouvelle version"
+
+#. js-lingui-explicit-id
+#. placeholder {0}: item.name
+#. placeholder {1}: next.version
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.toast_published"
+msgstr "{0} v{1} publié"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.published_projects"
+msgstr "Projets publiés"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.published_empty_title"
+msgstr "La publication arrive bientôt"
+
+#. js-lingui-explicit-id
+#: src/components/library/KitLibraryInspector.tsx
+msgid "kit_library.publishing"
+msgstr "Publication…"
+
+#. js-lingui-explicit-id
+#: src/components/library/ReviewBranchEditor.tsx
+msgid "review_branch.readonly_share"
+msgstr "Partage en lecture seule"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.status_ready"
+msgstr "Prêt"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.recent_heading"
+msgstr "Récents"
+
+#. js-lingui-explicit-id
+#: src/components/topbar/TabsMenu.tsx
+msgid "topbar.recently_closed"
+msgstr "Fermés récemment"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/BriefNode.tsx
+msgid "dag.plan_and_generate"
+msgstr "Planifier et générer le graphe"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/BriefNode.tsx
+msgid "dag.planning"
+msgstr "Planification et génération…"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderDirectory.tsx
+msgid "settings.provider_category_recommended"
+msgstr "Recommandé"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.hosts_not_configured"
+msgstr "L'hôte fournisseur de références n'est pas configuré."
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.media_filter_references"
+msgstr "Références"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/IntentPanel.tsx
+msgid "intent.questions_hint"
+msgstr "Affinez le brief ci-dessus pour y répondre, puis relancez la planification."
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/MockupNode.tsx
+msgid "mockup.regenerate"
+msgstr "Régénérer"
+
+#. js-lingui-explicit-id
+#: src/components/library/RegistryInstallPanel.tsx
+msgid "registry_install.requires_desktop_app"
+msgstr "L'hôte Registry de bureau nécessite l'application de bureau Cutout."
+
+#. js-lingui-explicit-id
+#: src/components/library/RegistryInstallPanel.tsx
+msgid "registry_install.section_aria"
+msgstr "Installation Registry"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/GeneralSection.tsx
+msgid "settings.remember_dir_label"
+msgstr "Mémoriser le dossier d'export"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderRow.tsx
+#: src/components/settings/VectorizerPanel.tsx
+msgid "settings.remove_action"
+msgstr "Supprimer"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderRow.tsx
+#: src/components/settings/VectorizerPanel.tsx
+msgid "settings.remove_failed_toast"
+msgstr "Échec de la suppression"
+
+#. js-lingui-explicit-id
+#: src/components/library/LibraryDrawer.tsx
+msgid "library.delete"
+msgstr "Retirer de la bibliothèque"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderRow.tsx
+msgid "settings.remove_confirm_title"
+msgstr "Supprimer le fournisseur ?"
+
+#. js-lingui-explicit-id
+#: src/components/slices/SliceCardActions.tsx
+msgid "slices.action_rename"
+msgstr "Renommer"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.rename"
+msgstr "Renommer"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.rename_project_title"
+msgstr "Renommer le projet"
+
+#. js-lingui-explicit-id
+#: src/components/topbar/TopBarActions.tsx
+msgid "topbar.rerun_button"
+msgstr "Relancer"
+
+#. js-lingui-explicit-id
+#: src/components/topbar/TopBarActions.tsx
+msgid "topbar.rerun_label"
+msgstr "Relancer l'analyse"
+
+#. js-lingui-explicit-id
+#: src/components/source/ParameterControls.tsx
+msgid "source.params_reset"
+msgstr "Réinitialiser"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/GeneralSection.tsx
+msgid "settings.reset_params"
+msgstr "Réinitialiser les paramètres"
+
+#. js-lingui-explicit-id
+#: src/components/source/ParameterControls.tsx
+msgid "source.params_reset_title"
+msgstr "Réinitialiser les paramètres par défaut"
+
+#. js-lingui-explicit-id
+#. placeholder {0}: conflicts.map(({ kind }) => kind).join(', ')
+#: src/components/library/KitLibraryInspector.tsx
+msgid "kit_library.resolve_conflicts"
+msgstr "Résolvez les candidats {0} en conflit avant la publication."
+
+#. js-lingui-explicit-id
+#: src/components/library/ReviewBranchEditor.tsx
+msgid "review_branch.resolved"
+msgstr "résolu"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+#: src/components/settings/sections/ArchivedSection.tsx
+msgid "home.restore"
+msgstr "Restaurer"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/GeneralSection.tsx
+msgid "settings.reset_params_hint"
+msgstr "Restaurer le seuil, la surface minimale, l'écart et le remplissage par défaut."
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.retry"
+msgstr "Réessayer"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/GeneralSection.tsx
+msgid "settings.remember_dir_hint"
+msgstr "Réutiliser le dernier dossier au lieu de le demander à chaque export."
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/BoardNode.tsx
+msgid "board.compose"
+msgstr "Recomposer le mockup"
+
+#. js-lingui-explicit-id
+#: src/components/library/ReviewBranchEditor.tsx
+msgid "review_branch.section_aria"
+msgstr "Branche de révision"
+
+#. js-lingui-explicit-id
+#: src/components/library/ReviewBranchEditor.tsx
+msgid "review_branch.label"
+msgstr "Branche de révision"
+
+#. js-lingui-explicit-id
+#: src/components/library/ReviewBranchEditor.tsx
+msgid "review_branch.comment_aria"
+msgstr "Commentaire de révision"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.status_running"
+msgstr "En cours"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/edges/TransitionEdge.tsx
+msgid "pipeline.status_running"
+msgstr "En cours"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/dag-node-common.tsx
+msgid "dag.running"
+msgstr "En cours…"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderForm.tsx
+#: src/components/settings/VectorizerPanel.tsx
+msgid "settings.save"
+msgstr "Enregistrer"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderForm.tsx
+#: src/components/settings/VectorizerPanel.tsx
+msgid "settings.save_failed_toast"
+msgstr "Échec de l'enregistrement"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.search_aria"
+msgstr "Rechercher dans la bibliothèque"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.search_placeholder"
+msgstr "Rechercher par nom, tag ou provenance"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.search_projects"
+msgstr "Rechercher des projets..."
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderDirectory.tsx
+msgid "settings.search_providers_placeholder"
+msgstr "Rechercher des fournisseurs"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderDirectory.tsx
+msgid "settings.search_providers_aria"
+msgstr "Rechercher des fournisseurs"
+
+#. js-lingui-explicit-id
+#: src/components/topbar/TabsMenu.tsx
+msgid "topbar.search_tabs"
+msgstr "Rechercher des onglets"
+
+#. js-lingui-explicit-id
+#. placeholder {0}: item.name
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.select_item_aria"
+msgstr "Sélectionner {0}"
+
+#. js-lingui-explicit-id
+#: src/components/inspector/InspectorPanel.tsx
+msgid "inspector.empty_has_slices"
+msgstr "Sélectionnez une tranche pour la renommer, l'inspecter et l'exporter."
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/SlicesNode.tsx
+msgid "slices.name"
+msgstr "Nommage sémantique"
+
+#. js-lingui-explicit-id
+#: src/components/home/SidebarAccount.tsx
+#: src/components/settings/SettingsDialog.tsx
+msgid "settings.menu_label"
+msgstr "Paramètres"
+
+#. js-lingui-explicit-id
+#: src/components/library/TeamGovernancePanel.tsx
+msgid "team.share_review"
+msgstr "Partager et relire"
+
+#. js-lingui-explicit-id
+#: src/components/settings/KeyField.tsx
+#: src/components/settings/VectorizerPanel.tsx
+msgid "settings.key_show"
+msgstr "Afficher"
+
+#. js-lingui-explicit-id
+#: src/components/inspector/SliceDimensions.tsx
+msgid "inspector.dim_size"
+msgstr "Taille"
+
+#. js-lingui-explicit-id
+#: src/components/inspector/InspectorPanel.tsx
+msgid "inspector.empty_no_slices"
+msgstr "Les régions découpées et leurs détails s'affichent ici."
+
+#. js-lingui-explicit-id
+#: src/components/slices/RightRail.tsx
+#: src/components/slices/RightRailTabs.tsx
+#: src/components/slices/SliceGrid.tsx
+msgid "slices.heading"
+msgstr "Tranches"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.media_filter_slices"
+msgstr "Découpes"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/SlicesNode.tsx
+msgid "pipeline.stage_slices"
+msgstr "Tranches"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/dag-node-common.tsx
+msgid "dag.op_cutout"
+msgstr "Tranches"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/SlicesNode.tsx
+msgid "pipeline.node_slices_aria"
+msgstr "Étape Tranches"
+
+#. js-lingui-explicit-id
+#: src/components/library/KitLibraryInspector.tsx
+msgid "kit_library.source_heading"
+msgstr "Source"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderDirectory.tsx
+msgid "settings.provider_category_speech"
+msgstr "Parole"
+
+#. js-lingui-explicit-id
+#: src/components/settings/SettingsSidebar.tsx
+msgid "settings.section_speech"
+msgstr "Voix"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.dimension_asr_label"
+msgstr "Reconnaissance vocale"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.projects_empty_description"
+msgstr "Partez d'une idée ou importez un tableau visuel."
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/IntentPanel.tsx
+msgid "intent.strategy"
+msgstr "Stratégie"
+
+#. js-lingui-explicit-id
+#: src/components/help/HelpMenu.tsx
+msgid "help.submit_feedback"
+msgstr "Envoyer un commentaire"
+
+#. js-lingui-explicit-id
+#: src/components/inspector/ExportBar.tsx
+#: src/components/topbar/TopBarActions.tsx
+msgid "export.menu_svg_api"
+msgstr "SVG · API"
+
+#. js-lingui-explicit-id
+#: src/components/inspector/ExportBar.tsx
+#: src/components/topbar/TopBarActions.tsx
+msgid "export.menu_svg_local"
+msgstr "SVG · Local"
+
+#. js-lingui-explicit-id
+#: src/components/settings/VectorizerPanel.tsx
+msgid "vectorizer.heading"
+msgstr "Export SVG"
+
+#. js-lingui-explicit-id
+#: src/components/home/SidebarAccount.tsx
+msgid "home.theme_system"
+msgstr "Système"
+
+#. js-lingui-explicit-id
+#: src/components/topbar/TabsMenu.tsx
+msgid "topbar.tabs_in_window"
+msgstr "Onglets de cette fenêtre"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.tag_action"
+msgstr "Étiqueter"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.tags_to_add_aria"
+msgstr "Étiquettes à ajouter"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.start_description"
+msgstr "Transformez une idée, un écran existant ou un tableau visuel en espace de conception connecté."
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderRow.tsx
+msgid "settings.test_action"
+msgstr "Tester"
+
+#. js-lingui-explicit-id
+#: src/components/settings/VectorizerPanel.tsx
+msgid "vectorizer.mode_test"
+msgstr "Tester"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.dimension_tts_label"
+msgstr "Synthèse vocale"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.dimension_text_label"
+msgstr "Compréhension du texte"
+
+#. js-lingui-explicit-id
+#: src/lib/image.ts
+msgid "image.error_decode_failed"
+msgstr "Ce fichier n'a pas pu être décodé comme une image."
+
+#. js-lingui-explicit-id
+#: src/components/settings/KeyField.tsx
+msgid "settings.key_hint"
+msgstr "La clé est écrite uniquement dans le trousseau système, jamais renvoyée ni affichée."
+
+#. js-lingui-explicit-id
+#: src/components/slices/SliceGridEmpty.tsx
+msgid "slices.empty_no_regions_hint"
+msgstr "Les paramètres sont peut-être trop stricts pour cette planche. Essayez de les assouplir :"
+
+#. js-lingui-explicit-id
+#: src/components/preview/PreviewCanvas.tsx
+msgid "preview.empty_hint"
+msgstr "L'aperçu transparent apparaît ici une fois qu'une planche est analysée."
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/GeneralSection.tsx
+msgid "settings.theme_label"
+msgstr "Thème"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ModelSlot.tsx
+msgid "settings.vision_capability_unverified"
+msgstr "Cette affectation reste indisponible tant que la capacité d’entrée d’image n’est pas vérifiée par des preuves du catalogue ou un test du fournisseur."
+
+#. js-lingui-explicit-id
+#. placeholder {0}: pendingDelete.name
+#. placeholder {0}: project.name
+#: src/components/home/ProjectHome.tsx
+#: src/components/settings/sections/ArchivedSection.tsx
+msgid "home.delete_permanently_description"
+msgstr "Cela supprimera « {0} » du stockage local. Cette action est irréversible."
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderRow.tsx
+msgid "settings.remove_confirm_desc"
+msgstr "Ceci supprime la configuration de « {label} » ainsi que sa clé stockée dans le trousseau système. Cette action est irréversible."
+
+#. js-lingui-explicit-id
+#: src/components/preview/PreviewToolbar.tsx
+msgid "preview.toggle_checker"
+msgstr "Afficher/masquer le damier"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.dimension_asr_description"
+msgstr "Transcrire de l’audio parlé."
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderForm.tsx
+msgid "settings.provider_kind_label"
+msgstr "Type"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.meta_type"
+msgstr "Type"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ModelSlot.tsx
+msgid "settings.model_slot_unavailable"
+msgstr "Indisponible"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.dimension_vision_description"
+msgstr "Comprendre des captures d’écran, des photos et des références visuelles."
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/IntentPanel.tsx
+msgid "intent.title"
+msgstr "Intention comprise"
+
+#. js-lingui-explicit-id
+#: src/hooks/useExport.ts
+msgid "export.error_unknown"
+msgstr "erreur inconnue"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.unpin"
+msgstr "Détacher"
+
+#. js-lingui-explicit-id
+#. placeholder {0}: project.name
+#: src/components/home/ProjectHome.tsx
+msgid "home.unpin_named"
+msgstr "Détacher {0}"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.unpin_project"
+msgstr "Détacher le projet"
+
+#. js-lingui-explicit-id
+#: src/hooks/queries/pipeline.ts
+#: src/hooks/useImageImport.ts
+msgid "import.toast_unsupported"
+msgstr "Fichier non pris en charge : {name}"
+
+#. js-lingui-explicit-id
+#: src/components/source/SourceMeta.tsx
+msgid "source.meta_untitled"
+msgstr "sans titre"
+
+#. js-lingui-explicit-id
+#. placeholder {0}: item.name
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.use_in_project_aria"
+msgstr "Utiliser {0} dans le projet"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.use_dense_preview"
+msgstr "Utiliser l'aperçu dense"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.use_in_project_placeholder"
+msgstr "Utiliser dans le projet…"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.use_masonry_preview"
+msgstr "Utiliser l'aperçu en mosaïque"
+
+#. js-lingui-explicit-id
+#. placeholder {0}: previous.version
+#. placeholder {1}: item.version
+#. placeholder {2}: added.length
+#. placeholder {3}: removed.length
+#: src/components/library/KitLibraryInspector.tsx
+msgid "kit_library.version_diff_summary"
+msgstr "v{0} → v{1} · +{2} / −{3}"
+
+#. js-lingui-explicit-id
+#: src/components/settings/VectorizerPanel.tsx
+msgid "vectorizer.api_id_label"
+msgstr "Identifiant API Vectorizer.AI"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderForm.tsx
+#: src/components/settings/ProviderRow.tsx
+msgid "settings.status_failed"
+msgstr "Échec de la vérification"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderForm.tsx
+#: src/components/settings/ProviderRow.tsx
+msgid "settings.status_verified"
+msgstr "Vérifié"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.quality_verified"
+msgstr "Vérifié"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.bytes_not_available"
+msgstr "Les octets vérifiés ne sont pas disponibles localement."
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.asset_preview_description"
+msgstr "Aperçu local vérifié, provenance et actions sur l'élément selon ses capacités."
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.verifying_component_blobs"
+msgstr "Vérification des blobs sources des composants…"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.meta_version"
+msgstr "Version"
+
+#. js-lingui-explicit-id
+#: src/components/library/KitLibraryInspector.tsx
+msgid "kit_library.version_diff_aria"
+msgstr "Différences de version"
+
+#. js-lingui-explicit-id
+#: src/components/library/KitLibraryInspector.tsx
+msgid "kit_library.version_diff_heading"
+msgstr "Différences de version"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.hosts_not_configured_video"
+msgstr "Les hôtes exécuteur vidéo et fournisseur de références ne sont pas configurés."
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.media_filter_videos"
+msgstr "Vidéos"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.dimension_vision_label"
+msgstr "Vision"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ModelSlot.tsx
+msgid "settings.vision_required"
+msgstr "Vision requise"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.visual_asset_filters_aria"
+msgstr "Filtres des assets visuels"
+
+#. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.tab_visual_assets"
+msgstr "Assets visuels"
+
+#. js-lingui-explicit-id
+#: src/components/canvas/nodes/dag-node-common.tsx
+msgid "dag.idle"
+msgstr "En attente d'exécution…"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.preset_web"
+msgstr "Web"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.dimension_webdev_label"
+msgstr "Développement web"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.start_title"
+msgstr "Que souhaitez-vous concevoir ?"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+#: src/components/settings/SettingsSidebar.tsx
+msgid "home.wip_badge"
+msgstr "En cours"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.workspace"
+msgstr "Espace de travail"
+
+#. js-lingui-explicit-id
+#: src/components/home/SidebarAccount.tsx
+msgid "home.account_menu"
+msgstr "Menu de l'espace de travail"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.workspace_navigation"
+msgstr "Navigation de l'espace de travail"
+
+#. js-lingui-explicit-id
+#: src/components/home/SidebarAccount.tsx
+msgid "home.notifications_empty"
+msgstr "Vous êtes à jour"
+
+#. js-lingui-explicit-id
+#: src/components/topbar/TabsMenu.tsx
+msgid "topbar.tabs_empty"
+msgstr "Vos onglets ouverts et récemment fermés apparaîtront ici"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.your_projects"
+msgstr "Vos projets"

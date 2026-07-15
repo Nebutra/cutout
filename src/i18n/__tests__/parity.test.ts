@@ -3,10 +3,10 @@
  * Catalog parity (spec §8).
  *
  * Guarantees the shipped locales stay in lock-step:
- *   1. `en` and `zh-CN` expose an identical set of message IDs → no locale can
- *      silently miss a translation a peer locale has.
- *   2. Every `zh-CN` entry has a non-empty translation → no user-visible string
- *      falls back to the English source unintentionally.
+ *   1. Every non-source locale exposes an identical set of message IDs to `en`
+ *      → no locale can silently miss a translation a peer locale has.
+ *   2. Every non-source locale entry has a non-empty translation → no
+ *      user-visible string falls back to the English source unintentionally.
  *
  * The catalogs are read as raw gettext `.po` text (no Lingui compile step), so
  * this test is deterministic and independent of the Vite/Babel macro pipeline.
@@ -14,6 +14,7 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { SUPPORTED } from '../config'
 
 /** One parsed gettext entry. Header (empty msgid) is excluded by the parser. */
 interface Entry {
@@ -78,24 +79,27 @@ const read = (locale: string): readonly Entry[] =>
     ),
   )
 
-const en = read('en')
-const zh = read('zh-CN')
+const SOURCE_LOCALE = 'en'
+const TARGET_LOCALES = SUPPORTED.filter((locale) => locale !== SOURCE_LOCALE)
+
+const en = read(SOURCE_LOCALE)
+const catalogs = new Map(
+  SUPPORTED.map((locale) => [locale, read(locale)] as const),
+)
 
 describe('i18n catalog parity', () => {
-  it('en and zh-CN expose identical message-ID sets', () => {
-    const enIds = en.map((e) => e.id).sort()
-    const zhIds = zh.map((e) => e.id).sort()
-    expect(zhIds).toEqual(enIds)
-  })
+  it.each(TARGET_LOCALES)(
+    '%s exposes an identical message-ID set to en',
+    (locale) => {
+      const enIds = en.map((e) => e.id).sort()
+      const localeIds = catalogs.get(locale)!.map((e) => e.id).sort()
+      expect(localeIds).toEqual(enIds)
+    },
+  )
 
-  it('every message ID is unique within each catalog', () => {
-    for (const [locale, entries] of [
-      ['en', en],
-      ['zh-CN', zh],
-    ] as const) {
-      const ids = entries.map((e) => e.id)
-      expect(new Set(ids).size, `duplicate IDs in ${locale}`).toBe(ids.length)
-    }
+  it.each(SUPPORTED)('every message ID is unique within %s', (locale) => {
+    const ids = catalogs.get(locale)!.map((e) => e.id)
+    expect(new Set(ids).size, `duplicate IDs in ${locale}`).toBe(ids.length)
   })
 
   it('no en source string is empty', () => {
@@ -103,8 +107,8 @@ describe('i18n catalog parity', () => {
       expect(value.length, `empty en source: ${id}`).toBeGreaterThan(0)
   })
 
-  it('no zh-CN translation is empty', () => {
-    for (const { id, value } of zh)
-      expect(value.length, `empty zh-CN translation: ${id}`).toBeGreaterThan(0)
+  it.each(TARGET_LOCALES)('no %s translation is empty', (locale) => {
+    for (const { id, value } of catalogs.get(locale)!)
+      expect(value.length, `empty ${locale} translation: ${id}`).toBeGreaterThan(0)
   })
 })

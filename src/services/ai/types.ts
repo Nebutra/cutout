@@ -14,6 +14,7 @@ import type { Result } from '@/services/types'
 import type { ProviderConfig, ProviderDraft } from './provider-types'
 import type { ReasoningEffort } from './reasoning'
 import type { PromptPart, PromptRef } from '@/prompts/types'
+export interface PersonalizationReceiptFlags{readonly policyVersion:number;readonly personality:string;readonly customInstructions:boolean;readonly memoryEnabled:boolean;readonly memoryIncluded:boolean;readonly toolAssistedMemory:boolean}
 
 /** Key + provider-config management. Secrets are never returned to JS. */
 export interface ProviderService {
@@ -56,6 +57,8 @@ export interface GenerateInput {
    * `providerOptions` in the generation service; `undefined` sends nothing.
    */
   readonly reasoningEffort?: ReasoningEffort
+  /** Runtime-owned structured policy context. Never persisted in receipts. */
+  readonly systemContext?: string
 }
 
 /** A generated binary asset (e.g. an image from `result.files`). */
@@ -64,6 +67,49 @@ export interface GeneratedAsset {
   readonly mediaType: string
   /** Raw bytes of the asset. */
   readonly bytes: Uint8Array
+}
+
+/**
+ * A tool the model may elect to call — plain data (name/description/Zod
+ * input schema/execute), no class hierarchy. `execute` runs inside the
+ * provider call the same way `research()`'s built-in `web_search` tool does;
+ * by the time `generateWithTools` resolves, any called tool has already run.
+ */
+export interface GenerationTool<TInput = unknown, TOutput = unknown> {
+  readonly name: string
+  readonly description: string
+  readonly inputSchema: z.ZodType<TInput>
+  execute(input: TInput): Promise<TOutput>
+}
+
+export interface GenerateWithToolsInput {
+  readonly providerId: string
+  readonly model?: string
+  /** Full instruction text: framing + any grounding context + the user's brief. */
+  readonly prompt: string
+  readonly tools: readonly GenerationTool[]
+  /** Steps the model gets to decide-then-observe-then-decide-again. */
+  readonly maxSteps: number
+  readonly signal?: AbortSignal
+  readonly systemContext?: string
+  readonly personalizationReceipt?:PersonalizationReceiptFlags
+}
+
+export interface GenerateWithToolsCall {
+  readonly toolCallId: string
+  readonly toolName: string
+  readonly input: unknown
+  readonly output: unknown
+  /** Set (and `output` left undefined) when the tool's `execute` threw. */
+  readonly error?: string
+}
+
+export interface GenerateWithToolsOutput {
+  /** The model's final text — its reply when no tool was called, or a summary after one was. */
+  readonly text: string
+  /** Empty when the model chose not to call any registered tool. */
+  readonly toolCalls: readonly GenerateWithToolsCall[]
+  readonly personalizationReceipt?:PersonalizationReceiptFlags
 }
 
 /**
@@ -119,4 +165,13 @@ export interface GenerationService {
     input: GenerateInput,
     schema: z.ZodType<T>,
   ): Promise<Result<T>>
+  /**
+   * Multi-step tool-calling generation — the same AI SDK primitive `research()`
+   * already uses for its built-in web-search tool (`tools` + `stepCountIs`),
+   * generalized to caller-supplied tools. The model decides whether to call a
+   * tool at all; a caller that gets `toolCalls: []` back falls through to
+   * whatever it did before this existed. Only openai / anthropic / google
+   * (same providers `research()` supports); never throws across the seam.
+   */
+  generateWithTools(input: GenerateWithToolsInput): Promise<Result<GenerateWithToolsOutput>>
 }

@@ -14,22 +14,44 @@ import {
   DialogDescription,
   DialogTitle,
 } from '@/components/ui/dialog'
+import type { LocalProjectSummary } from '@/services/local/project-repository.local'
 import { SettingsSidebar, type SettingsSection } from './SettingsSidebar'
 import { AboutFooter } from './AboutFooter'
 import { GeneralSection } from './sections/GeneralSection'
 import { AiSection } from './sections/AiSection'
+import { IntegrationsSection } from './sections/IntegrationsSection'
+import { ArchivedSection } from './sections/ArchivedSection'
+import { PersonalizationSection } from './sections/PersonalizationSection'
+import { SpeechSection } from './sections/SpeechSection'
+import type { DesktopUpdateController } from '@/updater/service'
 
 interface SettingsDialogProps {
   readonly open: boolean
   readonly onOpenChange: (open: boolean) => void
+  readonly initialSection?: SettingsSection
+  readonly projects?: readonly LocalProjectSummary[]
+  readonly onRestoreProject?: (id: string) => void
+  readonly onDeleteProject?: (id: string) => void
+  readonly prepareUpdateRecoverySnapshot?: () => Promise<boolean>
+  readonly updateController?: DesktopUpdateController
 }
 
-export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
-  const [section, setSection] = useState<SettingsSection>('general')
+export function SettingsDialog({
+  open,
+  onOpenChange,
+  initialSection = 'general',
+  projects = [],
+  onRestoreProject = () => {},
+  onDeleteProject = () => {},
+  prepareUpdateRecoverySnapshot = async () => true,
+  updateController,
+}: SettingsDialogProps) {
+  const [section, setSection] = useState<SettingsSection>(initialSection)
+  const archivedCount = projects.filter((project) => project.archivedAt).length
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl gap-0 overflow-hidden p-0">
+      <DialogContent className="h-[min(46rem,calc(100dvh-1rem))] w-[calc(100vw-1rem)] min-w-0 max-w-3xl gap-0 overflow-hidden p-0 sm:h-[min(46rem,calc(100dvh-3rem))]">
         <DialogTitle className="sr-only">
           <Trans id="settings.menu_label">Settings</Trans>
         </DialogTitle>
@@ -39,16 +61,32 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
           </Trans>
         </DialogDescription>
 
-        <div className="flex min-h-[440px]">
-          <aside className="flex w-44 shrink-0 flex-col border-r border-border bg-muted/20 p-2">
-            <SettingsSidebar value={section} onChange={setSection} />
-            <div className="mt-auto pt-2">
+        <div className="flex h-full min-h-0 min-w-0 flex-col sm:flex-row">
+          <aside className="flex w-full shrink-0 flex-col border-b border-border bg-muted/20 p-2 sm:w-44 sm:border-r sm:border-b-0">
+            <SettingsSidebar value={section} onChange={setSection} archivedCount={archivedCount} />
+            <div className="mt-auto hidden pt-2 sm:block">
               <AboutFooter />
             </div>
           </aside>
 
-          <div className="min-w-0 flex-1 overflow-y-auto p-5">
-            {section === 'general' ? <GeneralSection /> : <AiSection />}
+          <div className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain p-3 sm:p-5">
+            {section === 'general' ? (
+              <GeneralSection prepareRecoverySnapshot={prepareUpdateRecoverySnapshot} updateController={updateController} />
+            ) : section === 'speech' ? (
+              <SpeechSection />
+            ) : section === 'personalization' ? (
+              <PersonalizationSection />
+            ) : section === 'integrations' ? (
+              <IntegrationsSection />
+            ) : section === 'archived' ? (
+              <ArchivedSection
+                projects={projects}
+                onRestoreProject={onRestoreProject}
+                onDeleteProject={onDeleteProject}
+              />
+            ) : (
+              <AiSection />
+            )}
           </div>
         </div>
       </DialogContent>

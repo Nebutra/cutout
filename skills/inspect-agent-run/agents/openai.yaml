@@ -1,0 +1,4 @@
+interface:
+  display_name: "Inspect Agent Run"
+  short_description: "Inspect durable Agent run status events and receipts"
+  default_prompt: "Use $inspect-agent-run to inspect the current Cutout Agent run."

@@ -1,0 +1,10 @@
+[[permission]]
+identifier = "updater-runtime"
+description = "Allows the main desktop window to use Cutout's narrow, policy-checked updater runtime."
+commands.allow = [
+  "updater_status",
+  "updater_check",
+  "updater_download",
+  "updater_cancel",
+  "updater_install_and_relaunch",
+]

@@ -11,16 +11,17 @@
 import type { ProviderKind } from './provider-types'
 
 /** The slug pre-filled when a user picks a kind (before they override it). */
-export const DEFAULT_MODEL: Record<ProviderKind, string> = {
+export const DEFAULT_MODEL: Record<string, string> = {
   anthropic: 'claude-sonnet-4.6',
   openai: 'gpt-5.4',
   google: 'gemini-2.5-flash',
   gateway: 'anthropic/claude-sonnet-4.6',
   'openai-compatible': 'gpt-4o-mini',
+  dashscope:'qwen-plus',deepseek:'deepseek-chat',zhipu:'glm-4.5',moonshot:'kimi-k2',volcengine:'doubao-seed-1-6',siliconflow:'Qwen/Qwen3-8B',openrouter:'openai/gpt-4o-mini',together:'meta-llama/Llama-3.3-70B-Instruct-Turbo',groq:'llama-3.3-70b-versatile',fireworks:'accounts/fireworks/models/llama-v3p3-70b-instruct',xai:'grok-4',mistral:'mistral-large-latest',ollama:'qwen3',vllm:'default','lm-studio':'local-model',
 }
 
 /** Optional suggestion lists for a Settings datalist/combobox (non-exhaustive). */
-export const SUGGESTED_MODELS: Record<ProviderKind, readonly string[]> = {
+export const SUGGESTED_MODELS: Record<string, readonly string[]> = {
   anthropic: ['claude-sonnet-4.6', 'claude-opus-4.6', 'claude-haiku-4.6'],
   openai: ['gpt-5.4', 'gpt-5.4-mini'],
   google: ['gemini-2.5-flash', 'gemini-2.5-pro'],

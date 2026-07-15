@@ -14,12 +14,7 @@
 import { z } from 'zod'
 
 /** Every provider kind Rust knows how to inject auth for (spec §4). */
-export type ProviderKind =
-  | 'anthropic'
-  | 'openai'
-  | 'google'
-  | 'gateway'
-  | 'openai-compatible'
+export type ProviderKind = string
 
 /** The ordered, user-selectable kinds (drives the Settings `Select`). */
 export const PROVIDER_KINDS: readonly ProviderKind[] = [
@@ -28,6 +23,9 @@ export const PROVIDER_KINDS: readonly ProviderKind[] = [
   'google',
   'gateway',
   'openai-compatible',
+  'dashscope','deepseek','zhipu','moonshot','volcengine','siliconflow',
+  'openrouter','together','groq','fireworks','xai','mistral',
+  'ollama','vllm','lm-studio',
 ] as const
 
 /** A user-configured provider connection. NO key field — see module doc. */
@@ -52,13 +50,7 @@ export type ProviderDraft = Omit<ProviderConfig, 'id'> & { readonly id?: string 
  * Kept permissive on `baseUrl` (host allowlisting is enforced in Rust, not here)
  * so we never reject a persisted config the UI could otherwise repair.
  */
-export const providerKindSchema = z.enum([
-  'anthropic',
-  'openai',
-  'google',
-  'gateway',
-  'openai-compatible',
-])
+export const providerKindSchema = z.string().min(1).max(120).regex(/^[a-z0-9][a-z0-9._-]*$/)
 
 export const providerConfigSchema = z.object({
   id: z.string().min(1),

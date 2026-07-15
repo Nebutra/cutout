@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "cutout": {
+      "command": "pnpm",
+      "args": ["cutout:mcp"],
+      "env": { "CUTOUT_PROJECT_ROOT": "/absolute/path/to/cutout-project" }
+    }
+  }
+}

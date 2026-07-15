@@ -1,47 +1,131 @@
 # Cutout
 
-> **AI-Native design, from the pixel up.**
-> 一款 AI 原生的 UI/UX 设计工具 —— 让素材被理解、被组织、被再生成。
+Cutout is an Agent-native Design OS for turning mixed product evidence into a
+versioned, reviewable design system and implementation starter. Its durable
+contract is Design IR, not a chat transcript or a screenshot: sources,
+requirements, tokens, materials, prototype structure, component provenance and
+revisions remain inspectable by people and coding agents.
 
-Cutout 从设计协作里最朴素的一步做起:把一张白底素材总览图,智能拆成一张张干净的透明素材。但它的方向,是重新想象"设计工具"本身——当 AI 成为一等公民,界面、原型与物料不应再是彼此割裂的静态文件,而是可理解、可关联、可生成的活体系统。
+The desktop app provides the visual workbench. The repo-native CLI and MCP
+server let Codex, Claude Code and other clients inspect the same project,
+preview changes, ingest controlled sources and export deterministic artifacts
+without automating the GUI.
 
----
+## Current closure
 
-## 现在 · 把总览图变成素材
+The implemented path is:
 
-拖入一张白底素材图,Cutout 会:
+```text
+idea / story / URL descriptor / local file / repository
+  -> source + provenance records
+  -> design-ir.v1
+  -> Design Kit / evidence-backed Brand Kit
+  -> verified component manifest
+  -> Next.js App Router or Vite React starter
+```
 
-- 从边缘识别白色背景并转为透明,按连通区域自动切分独立素材;
-- 保留圆角、图标、卡片等内容本身,不误伤内部亮色;
-- 三个直觉参数(白底阈值 / 最小面积 / 合并间距)**实时预览**,拖动即见效果;
-- 每个切片可勾选、重命名、单独或批量导出透明 PNG。
+Today Cutout supports:
 
-像素运算在独立线程完成,大图不卡顿,切分结果稳定可复现。
+- a Tauri 2 + React 19 visual workbench with an observable multi-turn Agent
+  activity model, outcome checklist, attachments, model routing and thinking
+  controls;
+- deterministic local image cutout and material workflows;
+- versioned `design-ir.v1`, content-addressed artifacts and provenance-aware
+  source ingestion;
+- deterministic Design Kit (`DESIGN.md`, tokens, Tailwind v4 and theme files),
+  Brand/VI Kit and starter compilation;
+- `cutout.control.v1`, a repo-native CLI and a stdio MCP server with request-id
+  idempotency, optimistic revisions, durable run events and cancellation;
+- a desktop-internal durable local Agent Host with atomic checkpoints, leases,
+  heartbeat, pause/resume, bounded retry, cancellation and restart recovery
+  below an explicitly authorized workspace `.cutout` directory;
+- approval- and policy-gated writes restricted to `.cutout/exports/`.
 
-## 方向 · 走向 AI 原生的设计界面
+Cutout does **not** currently provide live Figma sync, OAuth connector hosting,
+web crawling/search, video processing, cloud collaboration or a headless model
+provider. The Figma adapter consumes an authorized snapshot supplied by its
+caller; URL ingestion records a credential-free descriptor and does not fetch
+the page. Paid tool requests have a strict budget/approval contract, but the
+headless host truthfully returns `capability-required` because it has no
+provider executor.
 
-Cutout 的终点不是切图,而是一个 **AI 原生的 UI/UX 设计与物料智能系统**——把上一代设计工具做的事,在 AI 时代重做一遍:
+The durable desktop Host is a local scheduler and checkpoint service, not a
+model provider or shell runner. It starts only after the desktop user grants an
+opaque workspace handle; callers cannot provide a filesystem path. Its run and
+receipt checkpoint is authoritative, while Agent activity events are an
+idempotent UI projection. The CLI and MCP do not expose this desktop-internal
+Host lifecycle.
 
-- **物料智能**:自动识别素材间的关系(组件状态、图标族、卡片变体),沉淀为可检索、可复用的设计库,而非散落的文件;
-- **原型联动**:素材与原型双向绑定,一处修改,处处同步;
-- **生成式补全**:理解既有物料的风格,智能补齐缺失状态、生成新变体、适配多尺寸与多主题;
-- **协作中枢**:云端素材库、账号与共享,把个人工具升级为团队的设计基础设施。
+## Agent entry points
 
-架构已为此预留接缝——服务层(素材仓储 / 抠图服务 / 会话)与数据边界今天指向本地实现,未来接入云端与模型无需重构。
+Start with the machine-readable capability manifest:
 
----
+```text
+cutout.agent-capabilities.json
+```
 
-## 技术底座
+Its schema is `schemas/cutout.agent-capabilities.schema.json`. It lists the
+supported CLI commands, MCP tools, control operations, approval boundaries,
+managed paths and explicit non-capabilities. Validate it against the current
+source surface with:
 
-**Tauri 2 · React 19 · Vite 8 · TypeScript · Tailwind v4 · shadcn/ui** —— 原生桌面壳,安装包约 10MB,启动快、内存低;像素管线跑在 Web Worker,UI 全程流畅。
+```bash
+pnpm agent:validate
+```
 
-## 开发
+Common read-only and dry-run operations:
+
+```bash
+pnpm cutout --project . context --include summary,outcome,run-events
+pnpm cutout --project . materials
+pnpm cutout --project . validate
+pnpm cutout --project . ingest --repo .
+pnpm cutout --project . export-kit
+pnpm cutout --project . export-starter --framework vite-react
+```
+
+Apply operations require both project policy and an explicit approval id. The
+caller cannot choose an arbitrary output directory:
+
+```bash
+pnpm cutout --project . export-kit --apply --approval <opaque-approval-id>
+```
+
+See [Headless Agent Control](docs/HEADLESS_AGENT_CONTROL.md) for the protocol
+and MCP setup, and [Agent Integration](docs/AGENT_INTEGRATION.md) for
+`AGENTS.md`, Claude Code and CI examples. `docs/AI_NATIVE.md` documents only the
+deprecated WebView queue compatibility bridge.
+
+## Project contract
+
+A controlled project stores its manifest, Design IR, policy, artifact index,
+run events and control ledger under `.cutout/`. Binary objects are addressed by
+SHA-256. Generated bundles are immutable, hash-verified directories under:
+
+```text
+.cutout/exports/design-kit/
+.cutout/exports/brand-kit/
+.cutout/exports/starter/
+```
+
+Generated files are projections. Update source evidence or Design IR and
+recompile instead of treating generated token or starter files as the source of
+truth.
+
+## Development
 
 ```bash
 pnpm install
-pnpm tauri dev        # 本地运行(桌面窗口)
-pnpm test             # 运行算法单元测试
-pnpm tauri build      # 打包桌面应用
+pnpm dev                 # browser workbench with hot reload
+pnpm tauri dev           # desktop app with hot reload
+pnpm test                # unit and contract tests
+pnpm test:visual         # Playwright visual checks
+pnpm agent:validate      # capability/schema/source consistency
+pnpm build               # TypeScript, production bundle and bundle gates
+pnpm tauri build         # desktop package
 ```
 
-> 当前尚未接入 Apple Developer 签名,首次打开 macOS 可能提示未验证开发者:右键 App 选择「打开」,或在「系统设置 → 隐私与安全性」中允许。
+Stack: Tauri 2, React 19, Vite 8, TypeScript, Tailwind v4 and shadcn/ui.
+
+The macOS build is not currently notarized. A local package can therefore
+require the standard right-click **Open** flow in macOS Privacy & Security.

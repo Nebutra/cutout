@@ -18,11 +18,12 @@ export const INITIAL_SOURCE: SourceState = {
   width: 0,
   height: 0,
   imageId: '',
+  autoAnalyze: true,
 }
 
 export interface SourceSlice {
   source: SourceState
-  loadImage(input: { bitmap: ImageBitmap; name: string }): void
+  loadImage(input: { bitmap: ImageBitmap; name: string; autoAnalyze?: boolean }): void
 }
 
 export const createSourceSlice: StateCreator<Store, [], [], SourceSlice> = (
@@ -31,7 +32,7 @@ export const createSourceSlice: StateCreator<Store, [], [], SourceSlice> = (
 ) => ({
   source: INITIAL_SOURCE,
 
-  loadImage: ({ bitmap, name }) => {
+  loadImage: ({ bitmap, name, autoAnalyze = true }) => {
     const { source, analysis } = get()
     // Release the outgoing source + all analysis resources before replacing.
     source.bitmap?.close()
@@ -44,6 +45,7 @@ export const createSourceSlice: StateCreator<Store, [], [], SourceSlice> = (
         width: bitmap.width,
         height: bitmap.height,
         imageId: crypto.randomUUID(),
+        autoAnalyze,
       },
       analysis: INITIAL_ANALYSIS,
     })

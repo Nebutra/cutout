@@ -1,0 +1,9 @@
+{
+  "id": "cutout-bridge",
+  "name": "Cutout Bridge",
+  "version": "0.1.0",
+  "minAppVersion": "1.5.0",
+  "description": "Approval-gated Cutout bridge for selected vault-relative Markdown and assets.",
+  "author": "Cutout",
+  "isDesktopOnly": true
+}

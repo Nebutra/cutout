@@ -1,0 +1,4 @@
+import { describe,expect,it } from 'vitest'
+import { addReferenceToBoard,discoverReferences } from './runtime'
+const value={id:'ref.1',title:'Reference',sourceUrl:'https://example.com/a',contentSha256:'a'.repeat(64),license:{kind:'public-domain' as const,evidenceUrl:'https://example.com/license'},provenance:{provider:'fixture',capturedAt:'2026-07-12T00:00:00.000Z',query:'dashboard'}}
+describe('reference discovery runtime',()=>{it('requires a real provider and content-deduplicates licensed results',async()=>{await expect(discoverReferences({available:false,search:async()=>[]},'x')).rejects.toThrow('authorized');await expect(discoverReferences({available:true,search:async()=>[value,{...value,id:'ref.2'}]},'dashboard')).resolves.toHaveLength(1)});it('adds references to boards idempotently',()=>{const board={id:'board',name:'Moodboard',referenceIds:[]};expect(addReferenceToBoard(addReferenceToBoard(board,value),value).referenceIds).toEqual(['ref.1'])})})

@@ -7,7 +7,7 @@
  * SAME interfaces, flipped in one place (`createLocalRegistry` → remote).
  */
 import type { Box, CutoutParams } from '@/algorithm/types'
-import type { VectorizerAiMode } from '@/platform/native'
+import type { NativeRepositoryScanResult, VectorizerAiMode } from '@/platform/native'
 import type { ProviderService, GenerationService } from './ai/types'
 import type { PromptService } from '@/prompts/types'
 
@@ -131,6 +131,50 @@ export interface AssetRepository {
   ): Promise<Result<SaveManyOutcome>>
 }
 
+/* --- Atomic multi-file bundle export (native folder picker) --- */
+
+export type BundleFileContent = string | Uint8Array | Blob
+
+export interface BundleFileToSave {
+  /** POSIX-style path relative to the bundle root, e.g. `tokens/colors.css`. */
+  readonly path: string
+  readonly content: BundleFileContent
+}
+
+export interface BundleToSave {
+  /** Name of the new direct child created inside the user-selected directory. */
+  readonly name: string
+  readonly files: readonly BundleFileToSave[]
+}
+
+export interface BundleFileReceipt {
+  readonly path: string
+  readonly size: number
+  readonly sha256: string
+}
+
+export interface BundleSaveReceipt {
+  readonly canceled: boolean
+  readonly outputDir: string | null
+  readonly bundleDir: string | null
+  readonly fileCount: number
+  readonly totalBytes: number
+  readonly files: readonly BundleFileReceipt[]
+}
+
+export interface BundleRepository {
+  /**
+   * Atomically exports a complete bundle under a user-selected native folder.
+   * An existing target is never overwritten and partial bundles are never exposed.
+   */
+  save(bundle: BundleToSave): Promise<Result<BundleSaveReceipt>>
+}
+
+export interface RepositorySourceService {
+  readonly nativeAvailable: boolean
+  selectAndScan(): Promise<Result<NativeRepositoryScanResult>>
+}
+
 /* --- Vectorization (local VTracer now, API route now, backend later) --- */
 
 export type SvgVectorizerRoute = 'local' | 'api'
@@ -168,6 +212,8 @@ export interface ServiceRegistry {
   readonly session: SessionService
   readonly cutout: CutoutService
   readonly assets: AssetRepository
+  readonly bundles: BundleRepository
+  readonly repositorySources: RepositorySourceService
   readonly vectorize: VectorizeService
   /** BYOK key + provider management (spec §5). */
   readonly providers: ProviderService

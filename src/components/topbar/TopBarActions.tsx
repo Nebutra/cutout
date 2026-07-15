@@ -10,7 +10,6 @@ import {
   ChevronDown,
   DownloadCloud,
   FileType,
-  FolderOpen,
   Layers,
   RefreshCw,
 } from 'lucide-react'
@@ -29,7 +28,6 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
-import { useImageImport } from '@/hooks/useImageImport'
 import { useExport } from '@/hooks/useExport'
 import { useSource, useSlices } from '@/store/selectors'
 import { cn } from '@/lib/utils'
@@ -40,7 +38,6 @@ export interface TopBarActionsProps {
 
 export function TopBarActions({ onRerun }: TopBarActionsProps) {
   const { t } = useLingui()
-  const { openPicker, inputProps } = useImageImport()
   const {
     exportAll,
     exportAllPending,
@@ -56,16 +53,6 @@ export function TopBarActions({ onRerun }: TopBarActionsProps) {
 
   return (
     <div className="flex items-center gap-1.5">
-      <ActionButton
-        label={t({ id: 'topbar.import', message: 'Import' })}
-        shortcut="⌘O"
-        variant="outline"
-        onClick={openPicker}
-      >
-        <FolderOpen />
-        <Trans id="topbar.import">Import</Trans>
-      </ActionButton>
-
       {hasSource ? (
         <ActionButton
           label={t({ id: 'topbar.rerun_label', message: 'Rerun analysis' })}
@@ -139,13 +126,6 @@ export function TopBarActions({ onRerun }: TopBarActionsProps) {
           </DropdownMenuContent>
         </DropdownMenu>
       ) : null}
-
-      <input
-        {...inputProps}
-        type="file"
-        accept="image/*,.md,.markdown"
-        className="hidden"
-      />
     </div>
   )
 }

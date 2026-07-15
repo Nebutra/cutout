@@ -2,13 +2,20 @@ mod commands;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    let builder = tauri::Builder::default()
+        .manage(commands::registry_desktop::RegistryDesktopState::default())
+        .manage(commands::agent_host::AgentHostDesktopState::default());
+    #[cfg(desktop)]
+    let builder = builder.manage(commands::updater::UpdateRuntimeState::default());
+    builder
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_os::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
             commands::save_assets::save_assets,
+            commands::save_bundle::save_bundle,
+            commands::scan_repository::scan_repository,
             // BYOK: keychain key management
             commands::ai::keys::set_key,
             commands::ai::keys::key_status,
@@ -34,8 +41,47 @@ pub fn run() {
             commands::vectorize::delete_vectorizer_api_key,
             commands::vectorize::vectorize_local_vtracer,
             commands::vectorize::vectorize_vectorizer_ai,
+            commands::registry_desktop::registry_authorize_workspace,
+            commands::registry_desktop::registry_preview_install,
+            commands::registry_desktop::registry_apply_install,
+            commands::registry_desktop::registry_validate_install,
+            commands::registry_desktop::registry_install_receipt,
+            commands::agent_host::agent_host_start,
+            commands::agent_host::agent_host_status,
+            commands::agent_host::agent_host_shutdown,
+            commands::agent_host::agent_host_recover,
+            commands::agent_host::agent_host_run_start,
+            commands::agent_host::agent_host_node_claim,
+            commands::agent_host::agent_host_node_complete,
+            commands::agent_host::agent_host_node_heartbeat,
+            commands::agent_host::agent_host_node_fail,
+            commands::agent_host::agent_host_run_pause,
+            commands::agent_host::agent_host_run_resume,
+            commands::agent_host::agent_host_run_cancel,
+            commands::speech::speech_host_capabilities,
+            commands::speech::speech_microphone_devices,
+            commands::speech::speech_request_permission,
+            commands::speech::speech_recording_start,
+            commands::speech::speech_recording_stop,
+            commands::speech::speech_recording_cancel,
+            #[cfg(desktop)]
+            commands::updater::updater_status,
+            #[cfg(desktop)]
+            commands::updater::updater_check,
+            #[cfg(desktop)]
+            commands::updater::updater_download,
+            #[cfg(desktop)]
+            commands::updater::updater_cancel,
+            #[cfg(desktop)]
+            commands::updater::updater_install_and_relaunch,
         ])
         .setup(|app| {
+            #[cfg(desktop)]
+            {
+                app.handle()
+                    .plugin(tauri_plugin_updater::Builder::new().build())?;
+                app.handle().plugin(tauri_plugin_process::init())?;
+            }
             if cfg!(debug_assertions) {
                 app.handle().plugin(
                     tauri_plugin_log::Builder::default()

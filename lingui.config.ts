@@ -15,7 +15,7 @@ import { formatter } from '@lingui/format-po'
  * `lingui extract` / `lingui compile` (the `i18n:*` package scripts) read this file.
  */
 const config: LinguiConfig = {
-  locales: ['en', 'zh-CN'],
+  locales: ['en', 'zh-CN', 'ja', 'fr', 'es'],
   sourceLocale: 'en',
   fallbackLocales: { default: 'en' },
   catalogs: [

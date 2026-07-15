@@ -1,56 +1,85 @@
 import {
+  useCallback,
   useEffect,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
+  type CSSProperties,
   type ComponentType,
   type ReactNode,
-} from 'react'
+} from "react";
 import {
-  Archive,
-  ArrowUp,
-  CheckCircle2,
+  Check,
   ChevronRight,
-  Circle,
   ExternalLink,
-  FileText,
-  Globe,
+  Files as FilesIcon,
+  GitCompareArrows,
   ImageIcon,
   Layers3,
   Loader2,
   MessageCircle,
+  MessageSquare,
   MousePointerClick,
+  PackageCheck,
   PackageOpen,
-  Paperclip,
+  Palette,
+  Grid3x3,
+  Map as MapIcon,
+  PanelLeft,
+  PanelLeftClose,
+  PanelRight,
   Plus,
   Route,
   Scissors,
-  Settings2,
+  ShieldCheck,
+  Sparkles,
+  SwatchBook,
   Tag,
   Trash2,
   WandSparkles,
   X,
-} from 'lucide-react'
-import { toast } from 'sonner'
-import { getStoreState, useStore } from '@/store'
-import { useSource, useSlices, useStatus } from '@/store/selectors'
-import { useServices } from '@/services/context'
-import { isErr } from '@/services/types'
-import type { ModelAssignment } from '@/services/ai/model-assignment-types'
-import { recordAiNativeDiagnostic } from '@/services/ai-native/diagnostics'
-import { useModelAssignments } from '@/hooks/queries/ai-settings'
+} from "lucide-react";
+import { toast } from "sonner";
+import { getStoreState, useStore } from "@/store";
+import { useSource, useSlices, useStatus } from "@/store/selectors";
+import { useImageImportActions } from "@/hooks/image-import-actions";
+import { useExport } from "@/hooks/useExport";
+import { useServices } from "@/services/context";
+import { createCutoutResultSink } from "@/services/cutout-result-sink";
+import { isErr } from "@/services/types";
+import type { ModelAssignment } from "@/services/ai/model-assignment-types";
+import type {
+  ComposerModelPolicy,
+  ComposerThinkingPolicy,
+} from "@/agent-runtime/execution-policy";
+import {
+  composerRouteNotices,
+  composerModelValue,
+  fixedModelValue,
+  lockComposerRoute,
+  parseComposerModelValue,
+  supportsWebSearch,
+  type LockedComposerRoute,
+} from "@/agent-runtime/composer-execution";
+import { recordAiNativeDiagnostic } from "@/services/ai-native/diagnostics";
+import { useModelAssignments } from "@/hooks/queries/ai-settings";
+import { useProviders } from "@/hooks/queries/providers";
 import {
   useDeconstructMockup,
   useNameSlices,
   usePrepareDeconstructMockup,
-} from '@/hooks/queries/pipeline'
-import { useSettingsUI } from '@/components/settings/settings-ui'
-import { planPrototype } from '@/prototype/planner'
+} from "@/hooks/queries/pipeline";
+import { useSettingsUI } from "@/components/settings/settings-ui";
+import { useLibraryUI } from "@/components/library/library-ui";
+import { planPrototype } from "@/prototype/planner";
 import type {
-  PrototypeHumanLoop,
+  HumanLoopAskLike,
+  PrototypeHumanLoopAsk,
   PrototypePage,
   PrototypePlan,
-} from '@/prototype/prototype-plan'
+  ResolvedHumanLoopAnswer,
+} from "@/prototype/prototype-plan";
 import {
   pagesForScope,
   prototypeBoardExtractionBrief,
@@ -59,12 +88,12 @@ import {
   prototypeDesignSystemPrompt,
   prototypePagePrompt,
   type PrototypeSuiteScope,
-} from '@/prototype/generate-suite'
+} from "@/prototype/generate-suite";
 import {
   fallbackPrototypeSliceNames,
   isGenericSliceFilename,
-} from '@/prototype/asset-names'
-import { createPrototypeAssetManifest } from '@/prototype/asset-manifest'
+} from "@/prototype/asset-names";
+import { createPrototypeAssetManifest } from "@/prototype/asset-manifest";
 import {
   appendDesignMarkdownSection,
   appendDesignMarkdownTableRow,
@@ -78,222 +107,571 @@ import {
   updateDesignMarkdownSection,
   updateDesignMarkdownTableCell,
   type EditableDesignControl,
+  type EditableDesignMarkdown,
   type EditableDesignSection,
   type EditableDesignTable,
-} from '@/prototype/design-md'
+} from "@/prototype/design-md";
+import {
+  renderDesignSource,
+  type DesignSourceFormat,
+} from "@/prototype/design-md-export";
+import {
+  ASTRYX_COMMON_VARIABLES,
+  astryxColorChoices,
+  compileAstryxThemeFromDesignMarkdown,
+  suggestAstryxMapping,
+  type AstryxColorChoice,
+} from "@/design-kit/astryx-design-md";
+import { astryxAgentPrompt, type AstryxBinding } from "@/design-kit/astryx";
+import { runToolLoop } from "@/agent-runtime/tool-loop";
+import {
+  askClarifyingQuestionTool,
+  astryxThemeTool,
+  configurePageTargetingTool,
+  configureRegenerationTool,
+  conversationalReplyTool,
+} from "@/agent-runtime/tool-registry";
+import { createClarificationBridge } from "@/agent-runtime/clarification-bridge";
+import type { RegenerationDecision } from "@/prototype/regeneration-tool";
+import type { PageTargetingDecision } from "@/prototype/page-targeting-tool";
+import type { ConversationalReplyInput } from "@/prototype/conversational-reply-tool";
+import type { AskClarifyingQuestionInput } from "@/prototype/ask-clarifying-question-tool";
+import { CanvasBackgroundPicker } from "./CanvasBackgroundPicker";
+import { readCanvasBackground, writeCanvasBackground } from "./canvas-background";
+import {
+  withCanvasAnnotations,
+  type CanvasAnnotation,
+} from "./canvas-annotations";
 import type {
   PersistedPrototypeDesignSystem,
   PersistedPrototypeImage,
   PersistedPrototypePage,
-  PersistedReferenceAttachment,
   WorkspaceNamingStatus,
   WorkspaceSnapshot,
   WorkspaceWorkflowPhase,
-} from '@/workspace/workspace-snapshot'
-import { Button } from '@/components/ui/button'
-import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
-import { Input } from '@/components/ui/input'
-import { Textarea } from '@/components/ui/textarea'
-import { SourceCanvas } from '@/components/source/SourceCanvas'
-import { SliceGrid } from '@/components/slices/SliceGrid'
-import { OutputCanvas, type CanvasImageItem } from './OutputCanvas'
-import { AgentConversation } from './AgentConversation'
+} from "@/workspace/workspace-snapshot";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { SourceCanvas } from "@/components/source/SourceCanvas";
+import { SliceGrid } from "@/components/slices/SliceGrid";
 import {
-  useAgentConversation,
-  type AgentMessage,
-} from './agent-conversation'
-import { bytesToBlob, blobToBytes, decodeImage, isSupportedImage } from '@/lib/image'
-import { cn } from '@/lib/utils'
+  OutputCanvas,
+  type CanvasImageItem,
+  type OutputCanvasProps,
+} from "./OutputCanvas";
+import { projectCanvasOverlayAnchor, projectCanvasSafeArea, projectVisiblePanelInsets, visiblyOccupiesSpace } from "./output-canvas-viewport";
+import type { DesignDocument } from "@/design-ir";
+import {
+  approveCurrentDeliverables,
+  createIndexedDbGlobalLibraryBackend,
+  GlobalLibraryStore,
+  libraryItemFromApproval,
+  type ApprovedDeliverableReceipt,
+  type GlobalLibraryItem,
+} from "@/global-library";
+import { AgentWorkspaceDock } from "@/components/agent-workspace";
+import {
+  FilesPanel,
+  type FilesPanelNode,
+} from "@/components/files-panel/FilesPanel";
+import { bytesToBlob, blobToBytes, decodeImage } from "@/lib/image";
+import {
+  nameRegionSlices,
+  runRegionBreakdown,
+  selectBoardCutoutRegions,
+  sliceRegionBoardBitmap,
+} from "@/prototype/region-deconstruct";
+import { cn } from "@/lib/utils";
+import {
+  persistReferenceAttachment,
+  useReferenceAttachments,
+} from "./useReferenceAttachments";
+import { projectPrototypeOutcome } from "@/agent-runtime/prototype-outcome";
+import {
+  planPrototypeRepair,
+  repairPlanLabel,
+  type PrototypeRepairPlan,
+} from "@/agent-runtime/prototype-repair";
+import { buildAgentViewModel } from "@/components/agent-workspace/agent-view-model";
+import { shouldShowDesignInspector } from "./workspace-inspector-state";
+import {
+  assertImpactPlanCurrent,
+  buildMaterialImpactPlan,
+  reconcileMaterialSelection,
+  type MaterialImpactPlan,
+  type MaterialRef,
+} from "@/agent-runtime/material-impact";
+import {
+  AgentRunCoordinator,
+  isAgentRunCancelled,
+  type AgentRunLease,
+} from "@/agent-runtime/run-coordinator";
+import { useAgentRunEvents } from "@/agent-runtime/use-agent-run-events";
+import { useDesktopToolLoop } from "@/agent-runtime/use-desktop-tool-loop";
+import {
+  decideVariant,
+  decisionFor,
+  emptyCreativeBoard,
+  requestMoreLikeThis,
+  type CreativeBoardState,
+  type CreativeVariantDecision,
+} from "@/agent-runtime/creative-board-decisions";
 
 type AssetStageId =
-  | 'idle'
-  | 'planning'
-  | 'review'
-  | 'design-system'
-  | 'preparing'
-  | 'mockup'
-  | 'deconstruct'
-  | 'cutout'
-  | 'naming'
-  | 'done'
-type WorkflowPhase = WorkspaceWorkflowPhase
-type NamingStatus = WorkspaceNamingStatus
-type WorkspaceSidebarSection = 'file' | 'agent'
+  | "idle"
+  | "planning"
+  | "review"
+  | "design-system"
+  | "preparing"
+  | "mockup"
+  | "deconstruct"
+  | "cutout"
+  | "naming"
+  | "done";
+type WorkflowPhase = WorkspaceWorkflowPhase;
+type NamingStatus = WorkspaceNamingStatus;
 
 interface AssetStage {
-  readonly id: Exclude<AssetStageId, 'idle'>
-  readonly label: string
-  readonly detail: string
-  readonly icon: ComponentType<{ className?: string }>
-  readonly status: 'pending' | 'running' | 'done'
-}
-
-interface ActivityEvent {
-  readonly id: string
-  readonly label: string
-  readonly detail: string
-  readonly status: AssetStage['status']
+  readonly id: Exclude<AssetStageId, "idle">;
+  readonly label: string;
+  readonly detail: string;
+  readonly icon: ComponentType<{ className?: string }>;
+  readonly status: "pending" | "running" | "done";
 }
 
 interface PrototypeImageArtifact extends PersistedPrototypeImage {
-  readonly blob: Blob
+  readonly blob: Blob;
 }
 
 interface PrototypeDesignSystemArtifact
-  extends PrototypeImageArtifact,
+  extends
+    PrototypeImageArtifact,
     Omit<PersistedPrototypeDesignSystem, keyof PersistedPrototypeImage> {}
 
 interface PrototypePageArtifact
-  extends PrototypeImageArtifact,
+  extends
+    PrototypeImageArtifact,
     Omit<PersistedPrototypePage, keyof PersistedPrototypeImage> {}
 
-interface ReferenceAttachment extends PersistedReferenceAttachment {
-  readonly blob: Blob
-  /** `URL.createObjectURL(blob)` — revoked on removal / unmount. */
-  readonly url: string
-}
-
-type HumanLoopAnswer = Extract<PrototypeHumanLoop, { mode: 'ask' }>['choices'][number]
-type ResolvedHumanLoopAnswer =
-  | { readonly kind: 'choice'; readonly choice: HumanLoopAnswer; readonly note: string | null }
-  | { readonly kind: 'custom'; readonly text: string }
-
-const CUSTOM_HUMAN_LOOP_ID = '__custom__'
-const SERIAL_REFERENCE_PAGE_LIMIT = 4
-type DesignMarkdownAsset = ReturnType<typeof useStore.getState>['designMarkdown']
-type GenerationError = ReturnType<typeof useStore.getState>['genError']
+const CUSTOM_HUMAN_LOOP_ID = "__custom__";
+const SERIAL_REFERENCE_PAGE_LIMIT = 4;
+type DesignMarkdownAsset = ReturnType<
+  typeof useStore.getState
+>["designMarkdown"];
 
 export function IntentWorkspace({
-  onArchiveProject,
+  onOpenDesignOs = () => {},
+  advanced = false,
+  onOpenAdvanced,
 }: {
-  readonly onArchiveProject: () => void
+  readonly onOpenDesignOs?: (tab?: "overview" | "delivery" | "specimen") => void;
+  readonly advanced?: boolean;
+  readonly onOpenAdvanced?: () => void;
 }) {
-  const services = useServices()
-  const initialWorkspace = useStore((s) => s.workspaceSnapshot)
-  const setWorkspaceSnapshot = useStore((s) => s.setWorkspaceSnapshot)
-  const [agentBusy, setAgentBusy] = useState(false)
-  const [attachments, setAttachments] = useState<readonly ReferenceAttachment[]>(
-    () => restoreReferenceAttachments(initialWorkspace?.attachments ?? []),
-  )
+  const services = useServices();
+  const dockAttachInputRef = useRef<HTMLInputElement | null>(null);
+  const initialWorkspace = useStore((s) => s.workspaceSnapshot);
+  // This is derived by AppShell from the current workspace. Retain it while
+  // this component persists local UI state; otherwise every interaction would
+  // erase the live Design OS projection before the next autosave.
+  const designDocument = useStore(
+    (s) => s.workspaceSnapshot?.designDocument ?? null,
+  );
+  const setWorkspaceSnapshot = useStore((s) => s.setWorkspaceSnapshot);
+  const [agentBusy, setAgentBusy] = useState(false);
+  const agentRunCoordinatorRef = useRef(new AgentRunCoordinator());
+  const activeRunRef = useRef<AgentRunLease | null>(null);
+  const [runCancelled, setRunCancelled] = useState(false);
+  const {
+    store: agentRunEvents,
+    startRun: startAgentRun,
+    record: emitRunEvent,
+    recordMany: emitRunEvents,
+  } = useAgentRunEvents(initialWorkspace?.agentRunEvents);
+  const { attachments, onAttachFiles, removeAttachment } =
+    useReferenceAttachments({
+      initialAttachments: initialWorkspace?.attachments ?? [],
+      onDesignMarkdownImport: (asset) =>
+        getStoreState().setDesignMarkdown(asset),
+    });
   const [webSearchEnabled, setWebSearchEnabled] = useState(
     () => initialWorkspace?.webSearchEnabled ?? false,
-  )
-  // Streaming design-agent conversation (infrastructure; a future agent loop
-  // drives `agent.stream(...)` — see AgentConversation).
-  const agent = useAgentConversation()
-  // Track the live attachment list so unmount can revoke every object URL.
-  const attachmentsRef = useRef<readonly ReferenceAttachment[]>([])
-  attachmentsRef.current = attachments
-  useEffect(
-    () => () => {
-      for (const item of attachmentsRef.current) URL.revokeObjectURL(item.url)
-    },
+  );
+  const [composerModelPolicy, setComposerModelPolicy] =
+    useState<ComposerModelPolicy>(
+      () => initialWorkspace?.composerModelPolicy ?? { mode: "auto" },
+    );
+  const [composerThinkingPolicy, setComposerThinkingPolicy] =
+    useState<ComposerThinkingPolicy>(
+      () => initialWorkspace?.composerThinkingPolicy ?? "auto",
+    );
+  const [executionNotices, setExecutionNotices] = useState<readonly string[]>(
     [],
-  )
-
-  /** Attach files: markdown → the DESIGN.md contract; images → reference set. */
-  function onAttachFiles(files: FileList | null): void {
-    if (!files) return
-    for (const file of Array.from(files)) {
-      if (/\.(md|markdown|mdx)$/i.test(file.name)) {
-        void file
-          .text()
-          .then((content) =>
-            getStoreState().setDesignMarkdown({
-              name: file.name,
-              content,
-              importedAt: Date.now(),
-            }),
-          )
-      } else if (isSupportedImage(file)) {
-        void blobToBytes(file).then((bytes) => {
-          setAttachments((prev) => [
-            ...prev,
-            {
-              id: crypto.randomUUID(),
-              name: file.name,
-              bytes,
-              mediaType: file.type || 'image/png',
-              blob: file,
-              url: URL.createObjectURL(file),
-            },
-          ])
-        })
-      }
-    }
-  }
-
-  function removeAttachment(id: string): void {
-    setAttachments((prev) => {
-      const found = prev.find((item) => item.id === id)
-      if (found) URL.revokeObjectURL(found.url)
-      return prev.filter((item) => item.id !== id)
-    })
-  }
-  const [runStartedAt, setRunStartedAt] = useState<number | null>(null)
+  );
+  const lockedRouteRef = useRef<LockedComposerRoute | null>(null);
+  const personalizedGenerationRef = useRef(services.generation);
+  const [runStartedAt, setRunStartedAt] = useState<number | null>(null);
   const [workflowPhase, setWorkflowPhase] = useState<WorkflowPhase>(() =>
     recoverWorkflowPhase(initialWorkspace),
-  )
+  );
   const [prototypePlan, setPrototypePlan] = useState<PrototypePlan | null>(
     () => initialWorkspace?.prototypePlan ?? null,
-  )
-  const [prototypeScope, setPrototypeScope] =
-    useState<PrototypeSuiteScope>(() => initialWorkspace?.prototypeScope ?? 'primary-flow')
+  );
+  const [prototypeScope, setPrototypeScope] = useState<PrototypeSuiteScope>(
+    () => initialWorkspace?.prototypeScope ?? "primary-flow",
+  );
   const [humanLoopChoiceId, setHumanLoopChoiceId] = useState<string | null>(
     () => initialWorkspace?.humanLoopChoiceId ?? null,
-  )
-  const [prototypePages, setPrototypePages] = useState<readonly PrototypePageArtifact[]>(
-    () => restorePrototypePages(initialWorkspace?.prototypePages ?? []),
-  )
+  );
+  const [prototypePages, setPrototypePages] = useState<
+    readonly PrototypePageArtifact[]
+  >(() => restorePrototypePages(initialWorkspace?.prototypePages ?? []));
   const [prototypeDesignSystem, setPrototypeDesignSystem] =
     useState<PrototypeDesignSystemArtifact | null>(() =>
-      restorePrototypeDesignSystem(initialWorkspace?.prototypeDesignSystem ?? null),
-    )
-  const [selectedPrototypePageId, setSelectedPrototypePageId] =
-    useState<string | null>(() => initialWorkspace?.selectedPrototypePageId ?? null)
+      restorePrototypeDesignSystem(
+        initialWorkspace?.prototypeDesignSystem ?? null,
+      ),
+    );
+  const [selectedPrototypePageId, setSelectedPrototypePageId] = useState<
+    string | null
+  >(() => initialWorkspace?.selectedPrototypePageId ?? null);
+  const [approvedDeliverables, setApprovedDeliverables] = useState<
+    readonly ApprovedDeliverableReceipt[]
+  >(() => initialWorkspace?.approvedDeliverables ?? []);
+  const [librarySavedMaterialIds, setLibrarySavedMaterialIds] = useState<
+    ReadonlySet<string>
+  >(new Set());
+  const [savedLibraryItems, setSavedLibraryItems] = useState<
+    readonly GlobalLibraryItem[]
+  >([]);
+  const resultsApproved =
+    approvedDeliverables.length > 0 &&
+    approvedDeliverables.every(
+      (receipt) =>
+        receipt.designRevision.revisionId === designDocument?.revision.id,
+    );
+  useEffect(() => {
+    if (typeof indexedDB === "undefined") return;
+    const libraryStore = new GlobalLibraryStore(
+      createIndexedDbGlobalLibraryBackend(indexedDB),
+    );
+    void libraryStore.catalog().then((catalog) => {
+      const saved = approvedDeliverables
+        .map((receipt) =>
+          catalog.items.find(
+            (item) =>
+              item.id === receipt.library.itemId &&
+              item.version === receipt.library.version &&
+              item.contentSha256 === receipt.library.contentSha256,
+          ),
+        )
+        .filter((item): item is GlobalLibraryItem => Boolean(item));
+      setSavedLibraryItems(saved);
+      setLibrarySavedMaterialIds(
+        new Set(
+          approvedDeliverables
+            .filter((receipt) =>
+              saved.some(
+                (item) =>
+                  item.id === receipt.library.itemId &&
+                  item.version === receipt.library.version,
+              ),
+            )
+            .map((receipt) => receipt.material.id),
+        ),
+      );
+    });
+  }, [approvedDeliverables]);
+  const [inspectorOpen, setInspectorOpen] = useState(false);
+  const [agentDockVisible, setAgentDockVisible] = useState(true);
+  const [filesDockVisible, setFilesDockVisible] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [canvasBackground, setCanvasBackground] = useState<string | null>(
+    readCanvasBackground,
+  );
+  const [minimapVisible, setMinimapVisible] = useState(() => {
+    try {
+      return localStorage.getItem("cutout.canvas-minimap") === "1";
+    } catch {
+      return false;
+    }
+  });
+  const [gridVisible, setGridVisible] = useState(() => {
+    try {
+      return localStorage.getItem("cutout.canvas-grid") !== "0";
+    } catch {
+      return true;
+    }
+  });
+  const [canvasAnnotations, setCanvasAnnotations] = useState<
+    readonly CanvasAnnotation[]
+  >([]);
+  const { openPicker } = useImageImportActions();
+  const { exportAll, exportAllPending } = useExport();
+  const focusAgentComposer = useCallback(() => {
+    setSidebarCollapsed(false);
+    setAgentDockVisible(true);
+    setTimeout(() => {
+      document
+        .querySelector<HTMLTextAreaElement>('[aria-label="Message the Agent"]')
+        ?.focus();
+    }, 50);
+  }, []);
+  const library = useLibraryUI();
+  const [inspectorDismissed, setInspectorDismissed] = useState(false);
+  const [focusedArtifactId, setFocusedArtifactId] = useState<string | null>(
+    null,
+  );
+  const [focusRequestId, setFocusRequestId] = useState(0);
+  const [selectedMaterial, setSelectedMaterial] = useState<MaterialRef | null>(
+    null,
+  );
+  const [creativeBoard, setCreativeBoard] = useState(
+    () => initialWorkspace?.creativeBoard ?? emptyCreativeBoard(),
+  );
   const [humanLoopCustomAnswer, setHumanLoopCustomAnswer] = useState(
-    () => initialWorkspace?.humanLoopCustomAnswer ?? '',
-  )
+    () => initialWorkspace?.humanLoopCustomAnswer ?? "",
+  );
   const [liveAgentOutput, setLiveAgentOutput] = useState(
-    () => initialWorkspace?.liveAgentOutput ?? '',
-  )
+    () => initialWorkspace?.liveAgentOutput ?? "",
+  );
   const [runError, setRunError] = useState<string | null>(
     () => initialWorkspace?.runError ?? null,
-  )
-  const [namingStatus, setNamingStatus] =
-    useState<NamingStatus>(() => initialWorkspace?.namingStatus ?? 'idle')
-  const autoNamePendingRef = useRef(false)
-  const brief = useStore((s) => s.brief)
-  const setBrief = useStore((s) => s.setBrief)
-  const setMockup = useStore((s) => s.setMockup)
-  const mockup = useStore((s) => s.mockup)
-  const importedDesignMarkdown = useStore((s) => s.designMarkdown)
-  const setDesignMarkdown = useStore((s) => s.setDesignMarkdown)
-  const clearDesignMarkdown = useStore((s) => s.clearDesignMarkdown)
-  const genPhase = useStore((s) => s.genPhase)
-  const genError = useStore((s) => s.genError)
-  const source = useSource()
-  const slices = useSlices()
-  const analysisStatus = useStatus()
-  const settings = useSettingsUI()
-  const assignments = useModelAssignments()
+  );
+  const [namingStatus, setNamingStatus] = useState<NamingStatus>(
+    () => initialWorkspace?.namingStatus ?? "idle",
+  );
+  const autoNamePendingRef = useRef(false);
+  const brief = useStore((s) => s.brief);
+  const setBrief = useStore((s) => s.setBrief);
+  const setMockup = useStore((s) => s.setMockup);
+  const mockup = useStore((s) => s.mockup);
+  const importedDesignMarkdown = useStore((s) => s.designMarkdown);
+  const setDesignMarkdown = useStore((s) => s.setDesignMarkdown);
+  const genPhase = useStore((s) => s.genPhase);
+  const genError = useStore((s) => s.genError);
+  const source = useSource();
+  const slices = useSlices();
+  const analysisStatus = useStatus();
+  const settings = useSettingsUI();
+  const assignments = useModelAssignments();
+  const providers = useProviders();
+  const desktopTools = useDesktopToolLoop({
+    services,
+    providers: providers.data ?? [],
+    assignments: assignments.data ?? {},
+    revision: designDocument?.revision.number ?? 0,
+    append: emitRunEvents,
+    cutoutResultSink: createCutoutResultSink(getStoreState),
+  });
+  const emitRunEventsRef = useRef(emitRunEvents);
+  emitRunEventsRef.current = emitRunEvents;
+  const clarificationBridge = useMemo(
+    () =>
+      createClarificationBridge({
+        append: (events) => emitRunEventsRef.current(events),
+      }),
+    [],
+  );
+  const hasInspectorContent = Boolean(
+    prototypePlan ||
+    prototypeDesignSystem ||
+    importedDesignMarkdown?.content.trim(),
+  );
+  const showDesignInspector = shouldShowDesignInspector({
+    explicitlyOpen: inspectorOpen,
+    dismissed: inspectorDismissed,
+    hasContent: hasInspectorContent,
+  });
 
   const { mutateAsync: deconstructMockup, isPending: deconstructing } =
-    useDeconstructMockup()
-  const prepareDeconstruct = usePrepareDeconstructMockup()
-  const { mutateAsync: nameSlices, isPending: naming } = useNameSlices()
+    useDeconstructMockup(() => lockedRouteRef.current?.image);
+  const prepareDeconstruct = usePrepareDeconstructMockup();
+  const { mutateAsync: nameSlices, isPending: naming } = useNameSlices(
+    () => lockedRouteRef.current?.chat,
+  );
 
-  const hasSource = Boolean(source.bitmap)
-  const hasSlices = slices.length > 0
-  const hasChatModel = Boolean(assignments.data?.chat)
+  const hasSource = Boolean(source.bitmap);
+  const hasSlices = slices.length > 0;
+  const materialRefs = useMemo<readonly MaterialRef[]>(() => {
+    const sourcePageId = prototypePages[0]?.page.id;
+    return [
+      ...(prototypeDesignSystem
+        ? [
+            {
+              id: "design-system",
+              kind: "design-system" as const,
+              label: prototypeDesignSystem.name || "Design system",
+              version: prototypeImageVersion(prototypeDesignSystem),
+              provenance: { source: "prototype-generation" as const },
+            },
+          ]
+        : []),
+      ...prototypePages.map((artifact) => ({
+        id: artifact.page.id,
+        kind: "prototype-page" as const,
+        label: artifact.page.name,
+        version: prototypeImageVersion(artifact),
+        provenance: { source: "prototype-generation" as const },
+      })),
+      ...slices.map((slice) => ({
+        id: slice.id,
+        kind: "cutout-slice" as const,
+        label: slice.name,
+        version: `${slice.blob.size}:${slice.width}x${slice.height}:${slice.box.x},${slice.box.y}`,
+        provenance: {
+          source: "page-deconstruction" as const,
+          sourcePageId,
+          independentlyEditable: false,
+        },
+      })),
+    ];
+  }, [prototypeDesignSystem, prototypePages, slices]);
+  const impactPlan = useMemo(
+    () =>
+      buildMaterialImpactPlan(selectedMaterial, {
+        designSystemId: prototypeDesignSystem ? "design-system" : null,
+        pageIds: prototypePages.map((artifact) => artifact.page.id),
+        sliceIds: slices.map((slice) => slice.id),
+      }),
+    [prototypeDesignSystem, prototypePages, selectedMaterial, slices],
+  );
+  const filesTree = useMemo<readonly FilesPanelNode[]>(() => {
+    const folders: FilesPanelNode[] = [];
+    if (prototypeDesignSystem) {
+      folders.push({
+        kind: "folder",
+        id: "folder:design-system",
+        name: "Design system",
+        defaultOpen: true,
+        children: [
+          {
+            kind: "file",
+            id: "design-system",
+            name: prototypeDesignSystem.name || "Design system",
+            blob: prototypeDesignSystem.blob,
+            width: prototypeDesignSystem.width,
+            height: prototypeDesignSystem.height,
+          },
+        ],
+      });
+    }
+    if (prototypePages.length > 0) {
+      folders.push({
+        kind: "folder",
+        id: "folder:pages",
+        name: "Pages",
+        defaultOpen: true,
+        children: prototypePages.map((artifact) => ({
+          kind: "file",
+          id: artifact.page.id,
+          name: artifact.page.name,
+          blob: artifact.blob,
+          width: artifact.width,
+          height: artifact.height,
+        })),
+      });
+    }
+    if (slices.length > 0) {
+      folders.push({
+        kind: "folder",
+        id: "folder:slices",
+        name: "Slices",
+        defaultOpen: true,
+        children: slices.map((slice) => ({
+          kind: "file",
+          id: slice.id,
+          name: slice.name,
+          blob: slice.blob,
+          width: slice.width,
+          height: slice.height,
+        })),
+      });
+    }
+    if (approvedDeliverables.length > 0) {
+      folders.push({
+        kind: "folder",
+        id: "folder:approved",
+        name: "Approved",
+        children: approvedDeliverables.map((receipt) => {
+          const saved = savedLibraryItems.find(
+            (item) =>
+              item.id === receipt.library.itemId &&
+              item.version === receipt.library.version,
+          );
+          if (!saved) {
+            return {
+              kind: "receipt",
+              id: `receipt:${receipt.material.id}`,
+              name: receipt.material.name,
+              receiptKind: receipt.material.kind,
+              contentSha256: receipt.material.contentSha256,
+            };
+          }
+          return {
+            kind: "folder",
+            id: `library-item:${saved.id}:${saved.version}`,
+            name: `${receipt.material.name} · v${saved.version}`,
+            children: buildArtifactTree(
+              `library-item:${saved.id}:${saved.version}`,
+              saved.content.artifacts,
+            ),
+          };
+        }),
+      });
+    }
+    return folders;
+  }, [
+    approvedDeliverables,
+    prototypeDesignSystem,
+    prototypePages,
+    savedLibraryItems,
+    slices,
+  ]);
+
+  useEffect(() => {
+    setSelectedMaterial((current) =>
+      reconcileMaterialSelection(current, materialRefs),
+    );
+  }, [materialRefs]);
+  // Once an Agent run starts, naming must use the same locked chat route even
+  // if Settings refresh while paid work is still completing.
+  const hasChatModel = Boolean(
+    lockedRouteRef.current?.chat ?? assignments.data?.chat,
+  );
   const working =
     agentBusy ||
-    workflowPhase === 'planning' ||
-    workflowPhase === 'design-system' ||
-    workflowPhase === 'generating-suite' ||
+    workflowPhase === "planning" ||
+    workflowPhase === "design-system" ||
+    workflowPhase === "generating-suite" ||
     deconstructing ||
     naming ||
-    analysisStatus === 'running'
+    analysisStatus === "running";
+  const composerModelOptions = useMemo(() => {
+    const providerList = providers.data ?? [];
+    const choices = [
+      {
+        value: "auto",
+        label: "Auto",
+        description: "Let the Agent Router choose the chat and image slots.",
+      },
+    ];
+    for (const slot of ["chat", "image"] as const) {
+      const assignment = assignments.data?.[slot];
+      if (!assignment) continue;
+      const provider = providerList.find(
+        (item) => item.id === assignment.providerId,
+      );
+      choices.push({
+        value: fixedModelValue(slot, assignment),
+        label: `${slot === "chat" ? "Chat" : "Image"} · ${assignment.model}`,
+        description: `${provider?.label ?? assignment.providerId} · fixes the ${slot} slot; the other slot remains Auto.`,
+      });
+    }
+    return choices;
+  }, [assignments.data, providers.data]);
   const activeStage = resolveAssetStage({
     genPhase,
     analysisStatus,
@@ -306,8 +684,8 @@ export function IntentWorkspace({
     hasPlan: Boolean(prototypePlan),
     hasDesignSystem: Boolean(prototypeDesignSystem),
     hasPrototypePages: prototypePages.length > 0,
-  })
-  const elapsedSeconds = useElapsedSeconds(runStartedAt, working)
+  });
+  const elapsedSeconds = useElapsedSeconds(runStartedAt, working);
   const stages = buildAssetStages({
     activeStage,
     hasMockup: Boolean(mockup),
@@ -317,22 +695,125 @@ export function IntentWorkspace({
     hasPlan: Boolean(prototypePlan),
     hasDesignSystem: Boolean(prototypeDesignSystem),
     hasPrototypePages: prototypePages.length > 0,
-  })
-  const progress = estimateProgress({
-    activeStage,
-    hasMockup: Boolean(mockup),
-    hasSource,
-    hasSlices,
-    naming,
-    namingStatus,
-    hasPlan: Boolean(prototypePlan),
-    hasDesignSystem: Boolean(prototypeDesignSystem),
-    hasPrototypePages: prototypePages.length > 0,
-  })
+  });
+  const projectedOutcome = useMemo(
+    () =>
+      projectPrototypeOutcome({
+        plan: prototypePlan,
+        scope: prototypeScope,
+        hasDesignSystem: Boolean(prototypeDesignSystem),
+        hasDesignMarkdown: Boolean(
+          prototypeDesignSystem?.designMarkdown.trim(),
+        ),
+        pages: prototypePages,
+        slices,
+        // Only a completed naming pass may turn existing slices into evidence for
+        // this plan. Preserved canvas output from an older run stays visible but
+        // cannot close the current outcome contract.
+        slicesReady: namingStatus === "done" || namingStatus === "skipped",
+      }),
+    [
+      namingStatus,
+      prototypeDesignSystem,
+      prototypePages,
+      prototypePlan,
+      prototypeScope,
+      slices,
+    ],
+  );
+  const outcome = useMemo(
+    () =>
+      projectedOutcome && runCancelled
+        ? { ...projectedOutcome, status: "cancelled" as const }
+        : projectedOutcome,
+    [projectedOutcome, runCancelled],
+  );
+
+  useEffect(() => {
+    const runId = agentRunEvents.activeRunId;
+    if (!runId || !outcome || agentRunEvents.activeRun?.status === "cancelled")
+      return;
+    for (const material of outcome.materials) {
+      emitRunEvent(
+        runId,
+        { type: "material-recorded", material },
+        {
+          eventId: `${runId}:material:${material.id}:${material.evidenceKey ?? ""}`,
+        },
+      );
+    }
+    const missingSignature = outcome.evaluation.missing
+      .map((item) => `${item.kind}:${item.count}`)
+      .join(",");
+    emitRunEvent(
+      runId,
+      {
+        type: "outcome-evaluated",
+        status: outcome.evaluation.status,
+        missing: outcome.evaluation.missing,
+      },
+      {
+        eventId: `${runId}:outcome:${outcome.evaluation.status}:${missingSignature}`,
+      },
+    );
+  }, [
+    agentRunEvents.activeRun?.status,
+    agentRunEvents.activeRunId,
+    emitRunEvent,
+    outcome,
+  ]);
+  const repairPlan = planPrototypeRepair(
+    outcome,
+    Boolean(prototypeDesignSystem),
+  );
+  const agentViewModel = buildAgentViewModel({
+    brief,
+    workflowPhase,
+    stages,
+    outcome,
+    working,
+    elapsedSeconds,
+    runError:
+      runError ??
+      (genError ? userFacingGenerationError(genError.message) : null),
+    notices: executionNotices,
+    runEvents: agentRunEvents,
+  });
+  const humanLoop = prototypePlan?.humanLoop ?? null;
+  // A suspended ask_clarifying_question call (mid model-turn, tool-gate
+  // path) takes priority over the older cross-invocation humanLoop.mode ===
+  // 'ask' (planPrototype's own generateObject-level ask) — the two should
+  // never both be true in practice, but if they were, a live model call
+  // actually waiting on this answer is the more urgent one to surface.
+  const liveAsk = agentRunEvents.activeRun?.humanLoopAsk ?? null;
+  const activeAsk: HumanLoopAskLike | null =
+    liveAsk ?? (humanLoop?.mode === "ask" ? humanLoop : null);
+  const selectedHumanLoopChoiceId = activeAsk
+    ? humanLoopChoiceId === CUSTOM_HUMAN_LOOP_ID
+      ? activeAsk.defaultChoiceId
+      : (humanLoopChoiceId ?? activeAsk.defaultChoiceId)
+    : null;
+  const liveAskId = liveAsk?.askId ?? null;
+  useEffect(() => {
+    // agentBusy is set true synchronously before tryToolGate() is even
+    // called (createAssets), so it's still true for the entire suspension —
+    // without this, `disabled: working` would lock the composer and the
+    // user could never type or submit an answer. Flipping it false here
+    // mirrors how the older cross-invocation ask flow already presents
+    // itself (its finally block resets agentBusy before the question ever
+    // renders); onSubmit sets it back true once the answer is sent.
+    if (liveAskId) setAgentBusy(false);
+  }, [liveAskId]);
+  const scopedPrimaryPageCount = prototypePlan
+    ? pagesForScope(prototypePlan, "primary-flow").length
+    : 0;
+  const showDockScopePicker =
+    humanLoop?.mode === "continue" &&
+    scopedPrimaryPageCount < (prototypePlan?.pages.length ?? 0);
 
   useLayoutEffect(() => {
     setWorkspaceSnapshot({
-      version: 'workspace.v1',
+      version: "workspace.v1",
       workflowPhase,
       prototypePlan,
       prototypeScope,
@@ -348,13 +829,32 @@ export function IntentWorkspace({
       liveAgentOutput,
       attachments: attachments.map(persistReferenceAttachment),
       webSearchEnabled,
-    })
+      composerModelPolicy:
+        composerModelPolicy.mode === "auto" ? undefined : composerModelPolicy,
+      composerThinkingPolicy:
+        composerThinkingPolicy === "auto" ? undefined : composerThinkingPolicy,
+      outcome,
+      agentRunEvents,
+      designDocument,
+      approvedDeliverables,
+      creativeBoard:
+        creativeBoard.decisions.length || creativeBoard.branches.length
+          ? creativeBoard
+          : undefined,
+    });
   }, [
     attachments,
+    agentRunEvents,
+    approvedDeliverables,
+    composerModelPolicy,
+    composerThinkingPolicy,
+    creativeBoard,
+    designDocument,
     humanLoopChoiceId,
     humanLoopCustomAnswer,
     liveAgentOutput,
     namingStatus,
+    outcome,
     prototypeDesignSystem,
     prototypePages,
     prototypePlan,
@@ -362,112 +862,170 @@ export function IntentWorkspace({
     runError,
     selectedPrototypePageId,
     setWorkspaceSnapshot,
+    slices,
     webSearchEnabled,
     workflowPhase,
-  ])
+  ]);
 
   useEffect(() => {
-    if (!autoNamePendingRef.current) return
-    if (analysisStatus !== 'done' || slices.length === 0) return
+    if (!autoNamePendingRef.current) return;
+    if (analysisStatus !== "done" || slices.length === 0) return;
+    const lease = activeRunRef.current;
+    if (!lease || !agentRunCoordinatorRef.current.isActive(lease)) {
+      autoNamePendingRef.current = false;
+      return;
+    }
     if (!hasChatModel || naming) {
       if (!hasChatModel) {
-        autoNamePendingRef.current = false
+        autoNamePendingRef.current = false;
         const fallbackCount = applyLocalSemanticSliceNames(
           prototypePlan,
           prototypeScope,
           true,
-        )
-        setNamingStatus(fallbackCount > 0 ? 'done' : 'skipped')
+        );
+        setNamingStatus(fallbackCount > 0 ? "done" : "skipped");
+        agentRunCoordinatorRef.current.finish(lease);
+        if (activeRunRef.current === lease) activeRunRef.current = null;
       }
-      return
+      return;
     }
 
-    autoNamePendingRef.current = false
-    setNamingStatus('running')
+    autoNamePendingRef.current = false;
+    setNamingStatus("running");
     void (async () => {
       try {
-        const count = await nameSlices()
+        const count = await nameSlices({ signal: lease.controller.signal });
+        agentRunCoordinatorRef.current.checkpoint(lease);
         const fallbackCount = applyLocalSemanticSliceNames(
           prototypePlan,
           prototypeScope,
           true,
-        )
-        setNamingStatus(count + fallbackCount > 0 ? 'done' : 'skipped')
+        );
+        setNamingStatus(count + fallbackCount > 0 ? "done" : "skipped");
       } catch (error) {
+        if (isAgentRunCancelled(error) || lease.controller.signal.aborted)
+          return;
         const fallbackCount = applyLocalSemanticSliceNames(
           prototypePlan,
           prototypeScope,
           true,
-        )
-        setNamingStatus(fallbackCount > 0 ? 'done' : 'error')
+        );
+        setNamingStatus(fallbackCount > 0 ? "done" : "error");
         console.info(
-          '[Cutout] semantic naming skipped:',
+          "[Cutout] semantic naming skipped:",
           error instanceof Error ? error.message : String(error),
-        )
+        );
+      } finally {
+        agentRunCoordinatorRef.current.finish(lease);
+        if (activeRunRef.current === lease) activeRunRef.current = null;
       }
-    })()
-  }, [analysisStatus, hasChatModel, nameSlices, naming, prototypePlan, prototypeScope, slices.length])
+    })();
+  }, [
+    analysisStatus,
+    hasChatModel,
+    nameSlices,
+    naming,
+    prototypePlan,
+    prototypeScope,
+    slices.length,
+  ]);
+
+  function stopActiveRun(): void {
+    const lease = activeRunRef.current;
+    if (!lease || !agentRunCoordinatorRef.current.cancel(lease, "user")) return;
+    const runId = agentRunEvents.activeRunId;
+    if (runId) {
+      emitRunEvent(runId, {
+        type: "run-cancelled",
+        reason: "Stopped by user",
+      });
+    }
+    activeRunRef.current = null;
+    autoNamePendingRef.current = false;
+    setAgentBusy(false);
+    getStoreState().endGen();
+    setRunCancelled(true);
+    setRunError(null);
+    setNamingStatus((status) =>
+      status === "running" || status === "pending" ? "idle" : status,
+    );
+    setWorkflowPhase((phase) =>
+      phase === "planning" ||
+      phase === "design-system" ||
+      phase === "generating-suite"
+        ? "idle"
+        : phase,
+    );
+  }
+
+  useEffect(
+    () => () => {
+      const active = activeRunRef.current;
+      if (active) agentRunCoordinatorRef.current.cancel(active, "unmount");
+    },
+    [],
+  );
 
   useEffect(() => {
-    if (working) return
-    if (!runStartedAt) return
-    const timer = window.setTimeout(() => setRunStartedAt(null), 900)
-    return () => window.clearTimeout(timer)
-  }, [runStartedAt, working])
+    if (working) return;
+    if (!runStartedAt) return;
+    const timer = window.setTimeout(() => setRunStartedAt(null), 900);
+    return () => window.clearTimeout(timer);
+  }, [runStartedAt, working]);
 
   function updateBrief(text: string): void {
-    setBrief(text)
-    setPrototypePlan(null)
-    setPrototypePages([])
-    setPrototypeDesignSystem(null)
-    setSelectedPrototypePageId(null)
-    setHumanLoopChoiceId(null)
-    setHumanLoopCustomAnswer('')
-    setLiveAgentOutput('')
-    setRunError(null)
-    setNamingStatus('idle')
-    setWorkflowPhase('idle')
+    setBrief(text);
+    setPrototypePlan(null);
+    setPrototypePages([]);
+    setPrototypeDesignSystem(null);
+    setSelectedPrototypePageId(null);
+    setHumanLoopChoiceId(null);
+    setHumanLoopCustomAnswer("");
+    setLiveAgentOutput("");
+    setRunError(null);
+    setNamingStatus("idle");
+    setWorkflowPhase("idle");
   }
 
   function updateDesignMarkdownContent(content: string): void {
-    const normalized = content.replace(/\r\n?/g, '\n')
+    const normalized = content.replace(/\r\n?/g, "\n");
     if (prototypeDesignSystem) {
       setPrototypeDesignSystem((current) =>
         current ? { ...current, designMarkdown: normalized } : current,
-      )
-      return
+      );
+      return;
     }
 
     setDesignMarkdown({
-      name: importedDesignMarkdown?.name ?? 'DESIGN.md',
+      name: importedDesignMarkdown?.name ?? "DESIGN.md",
       content: normalized,
       importedAt: importedDesignMarkdown?.importedAt ?? Date.now(),
-    })
+    });
   }
 
   async function providerKeyPreflightMessage(
     providerIds: readonly string[],
   ): Promise<string | null> {
-    const ids = [...new Set(providerIds)]
-    if (ids.length === 0) return null
+    const ids = [...new Set(providerIds)];
+    if (ids.length === 0) return null;
 
     try {
       const [providers, statuses] = await Promise.all([
         services.providers.list(),
         services.providers.statuses(ids),
-      ])
-      const missing = ids.filter((id) => statuses[id] !== true)
-      if (missing.length === 0) return null
+      ]);
+      const missing = ids.filter((id) => statuses[id] !== true);
+      if (missing.length === 0) return null;
 
       const labels = missing.map((id) => {
-        const provider = providers.find((item) => item.id === id)
-        return provider?.label ?? id
-      })
-      return `Add an API key for ${labels.join(', ')} in Settings before generating.`
+        const provider = providers.find((item) => item.id === id);
+        return provider?.label ?? id;
+      });
+      return `Add an API key for ${labels.join(", ")} in Settings before generating.`;
     } catch (error) {
       return `Could not verify provider API key status: ${
         error instanceof Error ? error.message : String(error)
-      }`
+      }`;
     }
   }
 
@@ -476,89 +1034,281 @@ export function IntentWorkspace({
    * web-search tool and append a concise factual summary. Best-effort — any
    * failure (unsupported provider, tool error) returns the brief unchanged.
    */
-  async function researchedBrief(text: string): Promise<string> {
-    if (!webSearchEnabled) return text
-    const chat = assignments.data?.chat
-    if (!chat) return text
-    const result = await services.generation.research({
+  async function researchedBrief(
+    text: string,
+    chat: ModelAssignment,
+    webSearchSupported: boolean,
+    lease: AgentRunLease,
+    runId: string,
+  ): Promise<string> {
+    if (!webSearchEnabled || !webSearchSupported) return text;
+    agentRunCoordinatorRef.current.checkpoint(lease);
+    // `research()` is a provider-native built-in tool call, not something
+    // routed through runToolLoop() (it can't be — see the tool-registry
+    // design note: provider-native web search executes server-side inside
+    // the model call, it has no client-controlled execute()). Narrate it
+    // with the same tool-started/succeeded/failed events runToolLoop's
+    // calls get, so it's visible in the run feed instead of silent until
+    // failure.
+    const toolCallId = crypto.randomUUID();
+    emitRunEvent(runId, {
+      type: "tool-started",
+      toolCallId,
+      tool: "web_search",
+      label: "Web search",
+    });
+    const result = await personalizedGenerationRef.current.research({
       providerId: chat.providerId,
       model: chat.model,
+      reasoningEffort: chat.effort,
       prompt: [
-        'Research this product brief on the web. Return a concise, factual grounding',
-        'summary: key facts, domain conventions, notable brands/competitors, and',
-        'constraints. No preamble, no markdown headings.',
-        '',
+        "Research this product brief on the web. Return a concise, factual grounding",
+        "summary: key facts, domain conventions, notable brands/competitors, and",
+        "constraints. No preamble, no markdown headings.",
+        "",
         text,
-      ].join('\n'),
-    })
-    if (isErr(result) || !result.data.trim()) return text
-    return `${text}\n\n[Web research grounding]\n${result.data.trim()}`
+      ].join("\n"),
+      signal: lease.controller.signal,
+    });
+    agentRunCoordinatorRef.current.checkpoint(lease);
+    if (isErr(result) || !result.data.trim()) {
+      const detail = isErr(result)
+        ? result.error
+        : "No grounding text returned.";
+      emitRunEvent(runId, {
+        type: "tool-failed",
+        toolCallId,
+        tool: "web_search",
+        label: "Web search",
+        detail,
+      });
+      setExecutionNotices((current) => [
+        ...current,
+        `Web search failed and the Agent continued without grounding${isErr(result) ? `: ${result.error}` : "."}`,
+      ]);
+      return text;
+    }
+    emitRunEvent(runId, {
+      type: "tool-succeeded",
+      toolCallId,
+      tool: "web_search",
+      label: "Web search",
+      outputRefs: [],
+    });
+    return `${text}\n\n[Web research grounding]\n${result.data.trim()}`;
   }
 
-  async function createAssets(): Promise<void> {
-    const text = brief.trim()
-    if (!text) return
-    const chatAssignment = assignments.data?.chat
-    const imageAssignment = assignments.data?.image
-    if (!imageAssignment || !chatAssignment) {
-      setRunError('Configure both a chat/vision model and an image model before generating.')
-      settings.open()
-      return
+  async function createAssets(
+    mode: "create" | "repair" = "create",
+    options: { skipToolGate?: boolean; briefOverride?: string } = {},
+  ): Promise<void> {
+    const baseText = (options.briefOverride ?? brief).trim();
+    if (!baseText) return;
+    const text = withCanvasAnnotations(baseText, canvasAnnotations);
+    const plannedImpact = buildMaterialImpactPlan(selectedMaterial, {
+      designSystemId: prototypeDesignSystem ? "design-system" : null,
+      pageIds: prototypePages.map((artifact) => artifact.page.id),
+      sliceIds: slices.map((slice) => slice.id),
+    });
+    try {
+      assertImpactPlanCurrent(plannedImpact, selectedMaterial);
+    } catch (error) {
+      setRunError(errorMessage(error));
+      return;
     }
+    const targetedRepair = selectedMaterial
+      ? repairForMaterialImpact(plannedImpact)
+      : null;
+    const repair =
+      targetedRepair ??
+      (mode === "repair"
+        ? planPrototypeRepair(outcome, Boolean(prototypeDesignSystem))
+        : null);
+    if ((mode === "repair" || selectedMaterial) && (!prototypePlan || !repair))
+      return;
+    const [
+      { createPersonalizationService },
+      { createPersonalizationRuntimeContext, personalizeGenerationService },
+    ] = await Promise.all([
+      import("@/personalization"),
+      import("@/agent-runtime/personalization-runtime"),
+    ]);
+    const personalizationContext = await createPersonalizationRuntimeContext(
+      await createPersonalizationService().load(),
+    );
+    personalizedGenerationRef.current = personalizeGenerationService(
+      services.generation,
+      personalizationContext,
+    );
+    const assignmentTable = assignments.data ?? {};
+    const providerList = providers.data ?? (await services.providers.list());
+    const routePolicy = await import("@/agent-runtime/route-policy");
+    let route: LockedComposerRoute;
+    try {
+      route = lockComposerRoute({
+        model: composerModelPolicy,
+        thinking: composerThinkingPolicy,
+        assignments: assignmentTable,
+        providers: providerList,
+        hasReferenceImages: attachments.length > 0,
+        routePreferences: routePolicy.routePreferencesFromPolicy(
+          routePolicy.loadRoutePolicy(),
+        ),
+      });
+      routePolicy.appendRouteReceipts(
+        [route.chatPolicy.routeReceipt, route.imagePolicy.routeReceipt]
+          .filter((receipt) => receipt !== undefined)
+          .map((receipt) => ({
+            ...receipt,
+            personalization: personalizationContext.receipt,
+          })),
+      );
+    } catch (error) {
+      setRunError(errorMessage(error));
+      return;
+    }
+    lockedRouteRef.current = route;
+    const chatAssignment = route.chat;
+    const imageAssignment = route.image;
     const providerKeyError = await providerKeyPreflightMessage([
       chatAssignment.providerId,
       imageAssignment.providerId,
-    ])
+    ]);
     if (providerKeyError) {
-      setRunError(providerKeyError)
-      settings.open()
-      return
+      setRunError(providerKeyError);
+      return;
     }
 
-    setRunStartedAt(Date.now())
-    setLiveAgentOutput('')
-    setRunError(null)
-    setAgentBusy(true)
+    const lease = agentRunCoordinatorRef.current.begin();
+    activeRunRef.current = lease;
+    // Set synchronously (not after tryToolGate resolves) so the composer's
+    // `working`/disabled state covers the tool-gate phase too — otherwise a
+    // second submission could re-enter createAssets while this one is still
+    // awaiting the tool-gate model call.
+    setAgentBusy(true);
+
+    let regenerationDecision: RegenerationDecision | null = null;
+    let pageTargetingDecision: PageTargetingDecision | null = null;
+    let clarifiedBrief: string | null = null;
+    if (mode === "create" && !selectedMaterial && !options.skipToolGate) {
+      const toolGate = await tryToolGate(text, chatAssignment, lease);
+      // A newer submission may have superseded this lease while tryToolGate
+      // awaited its model call. Stop here instead of falling through into
+      // the pipeline below for a turn that's no longer the active run.
+      if (!agentRunCoordinatorRef.current.isActive(lease)) return;
+      if (toolGate.handled) {
+        agentRunCoordinatorRef.current.finish(lease);
+        if (activeRunRef.current === lease) activeRunRef.current = null;
+        setAgentBusy(false);
+        return;
+      }
+      regenerationDecision = toolGate.regenerationDecision;
+      pageTargetingDecision = toolGate.pageTargetingDecision;
+      clarifiedBrief = toolGate.clarifiedBrief;
+    }
+
+    setRunStartedAt(Date.now());
+    setLiveAgentOutput("");
+    setRunError(null);
+    const webSearchSupported = supportsWebSearch(chatAssignment, providerList);
+    setExecutionNotices([
+      ...composerRouteNotices(route),
+      ...(webSearchEnabled && !webSearchSupported
+        ? [
+            "Web search is unavailable for the selected chat provider. The Agent continued without web grounding.",
+          ]
+        : []),
+    ]);
+    const runId = `workspace:${lease.id}`;
+    startAgentRun(mode, { runId });
+    emitRunEvent(runId, { type: "intent-recorded", intent: text });
+    setRunCancelled(false);
     try {
-      let plan = prototypePlan
-      const plannerBrief = await researchedBrief(text)
-      let generationBrief = plannerBrief
+      let plan = prototypePlan;
+      const plannerBrief = repair
+        ? text
+        : await researchedBrief(
+            clarifiedBrief ?? text,
+            chatAssignment,
+            webSearchSupported,
+            lease,
+            runId,
+          );
+      let generationBrief = plannerBrief;
 
       if (!plan) {
-        plan = await planPrototypeSuite(plannerBrief)
-        if (plan.humanLoop.mode === 'ask') return
+        plan = await planPrototypeSuite(plannerBrief, chatAssignment, lease);
+        if (plan.humanLoop.mode === "ask") return;
       }
 
-      if (plan.humanLoop.mode === 'ask') {
+      if (plan.humanLoop.mode === "ask") {
         const answer = resolveHumanLoopAnswer(
           plan.humanLoop,
           humanLoopChoiceId,
           humanLoopCustomAnswer,
-        )
-        generationBrief = composeHumanLoopRequirement(plannerBrief, plan.humanLoop, answer)
-        plan = await planPrototypeSuite(generationBrief)
-        if (plan.humanLoop.mode === 'ask') return
+        );
+        generationBrief = composeHumanLoopRequirement(
+          plannerBrief,
+          plan.humanLoop,
+          answer,
+        );
+        plan = await planPrototypeSuite(generationBrief, chatAssignment, lease);
+        if (plan.humanLoop.mode === "ask") return;
       }
 
-      autoNamePendingRef.current = true
-      setNamingStatus('pending')
-      await generatePrototypeSuite(generationBrief, plan, {
-        startFresh:
-          hasSlices &&
-          isPrototypeSuiteComplete(
-            plan,
-            prototypeScope,
-            prototypePages,
-            prototypeDesignSystem,
-          ),
-      })
+      autoNamePendingRef.current = repair ? repair.deconstructPages : true;
+      if (!repair || repair.deconstructPages) setNamingStatus("pending");
+      const resolvedTargetPageIds = pageTargetingDecision
+        ? pagesForScope(plan, prototypeScope)
+            .filter((page) =>
+              pageTargetingDecision.targetPageNames.includes(page.name),
+            )
+            .map((page) => page.id)
+        : undefined;
+      await generatePrototypeSuite(
+        generationBrief,
+        plan,
+        route,
+        {
+          startFresh: regenerationDecision
+            ? regenerationDecision.forceRegenerateDesignSystem
+            : !repair &&
+              hasSlices &&
+              isPrototypeSuiteComplete(
+                plan,
+                prototypeScope,
+                prototypePages,
+                prototypeDesignSystem,
+              ),
+          forceParallel:
+            regenerationDecision &&
+            regenerationDecision.parallelPageGeneration !== "auto"
+              ? regenerationDecision.parallelPageGeneration === "parallel"
+              : undefined,
+          repair: repair ?? undefined,
+          targetPageIds:
+            resolvedTargetPageIds && resolvedTargetPageIds.length > 0
+              ? resolvedTargetPageIds
+              : targetedRepair &&
+                  plannedImpact.effectiveTarget?.kind === "prototype-page"
+                ? [plannedImpact.effectiveTarget.id]
+                : undefined,
+        },
+        lease,
+      );
     } catch (error) {
-      autoNamePendingRef.current = false
-      const message = errorMessage(error)
-      const displayMessage = userFacingGenerationError(message)
+      autoNamePendingRef.current = false;
+      if (isAgentRunCancelled(error) || lease.controller.signal.aborted) {
+        agentRunCoordinatorRef.current.publish(lease, () =>
+          setRunCancelled(true),
+        );
+        return;
+      }
+      const message = errorMessage(error);
+      const displayMessage = userFacingGenerationError(message);
       recordAiNativeDiagnostic({
-        level: 'error',
-        scope: 'workspace.create-assets',
+        level: "error",
+        scope: "workspace.create-assets",
         message,
         details: {
           displayMessage,
@@ -570,41 +1320,431 @@ export function IntentWorkspace({
           imageProviderId: imageAssignment.providerId,
           imageModel: imageAssignment.model,
         },
-      })
-      setRunError(displayMessage)
-      toast.error('Generation failed', {
+      });
+      setRunError(displayMessage);
+      toast.error("Generation failed", {
         description: displayMessage,
-      })
+      });
     } finally {
-      setAgentBusy(false)
-      setWorkflowPhase((phase) =>
-        phase === 'planning' ||
-        phase === 'design-system' ||
-        phase === 'generating-suite'
-          ? 'idle'
-          : phase,
-      )
+      if (agentRunCoordinatorRef.current.isActive(lease)) {
+        setAgentBusy(false);
+        setWorkflowPhase((phase) =>
+          phase === "planning" ||
+          phase === "design-system" ||
+          phase === "generating-suite"
+            ? "idle"
+            : phase,
+        );
+        if (!autoNamePendingRef.current) {
+          agentRunCoordinatorRef.current.finish(lease);
+          if (activeRunRef.current === lease) activeRunRef.current = null;
+        }
+      }
     }
   }
 
-  async function planPrototypeSuite(text: string): Promise<PrototypePlan> {
-    const chat = assignments.data?.chat
-    if (!chat) throw new Error('No chat/vision model is configured.')
+  /**
+   * Before falling into the hardcoded plan→design-system→pages sequence, let
+   * the model decide — via real tool-calling, not keyword sniffing, and in
+   * ONE central tool list per call (Claude Code's `assembleToolPool`
+   * pattern, not a chain of single-tool gates) — whether this brief is
+   * asking to compile an Astryx theme, configure how an existing prototype
+   * suite regenerates, regenerate only specific existing pages, needs a
+   * clarifying question before proceeding, or isn't a build request at all
+   * (a greeting, small talk, a question too vague to plan from). All five
+   * tools are free, local, and deterministic (`ask_clarifying_question`
+   * suspends on user input, not on a paid call) — no DAG, no paid-tool
+   * approval chain. None of them execute `generatePrototypeSuite` itself;
+   * they only decide inputs the caller feeds into that same, unmodified
+   * call — the paid generation path and its checkpoint/lease discipline are
+   * never touched.
+   *
+   * `handled: true` means a tool fully answered the turn — the caller
+   * returns immediately without falling into the fixed pipeline. Otherwise
+   * `regenerationDecision`/`pageTargetingDecision`/`clarifiedBrief` carry
+   * whatever the model decided (or null, meaning: keep today's heuristics
+   * and original text) for the caller to fold into what follows.
+   */
+  async function tryToolGate(
+    text: string,
+    chat: ModelAssignment,
+    lease: AgentRunLease,
+  ): Promise<{
+    handled: boolean;
+    regenerationDecision: RegenerationDecision | null;
+    pageTargetingDecision: PageTargetingDecision | null;
+    clarifiedBrief: string | null;
+  }> {
+    const designMarkdownContent =
+      prototypeDesignSystem?.designMarkdown.trim() ||
+      importedDesignMarkdown?.content.trim() ||
+      (prototypePlan
+        ? prototypeDesignMarkdown(
+            prototypePlan,
+            importedDesignMarkdown?.content,
+          )
+        : null);
+    const designModel = designMarkdownContent
+      ? parseEditableDesignMarkdown(designMarkdownContent)
+      : null;
+    const astryxTool =
+      designModel && astryxColorChoices(designModel).length > 0
+        ? astryxThemeTool(designModel)
+        : null;
+    const regenerationTool =
+      prototypeDesignSystem || prototypePages.length > 0
+        ? configureRegenerationTool()
+        : null;
+    const targetablePages = prototypePlan
+      ? pagesForScope(prototypePlan, prototypeScope).map((page) => ({
+          id: page.id,
+          name: page.name,
+        }))
+      : [];
+    const pageTargetingTool =
+      targetablePages.length > 0
+        ? configurePageTargetingTool(targetablePages)
+        : null;
+    // Always offered, unlike the ones above — a brand-new session (no design
+    // system, no colors yet) is exactly where "hello" would otherwise have
+    // nothing to opt out with and fall straight into the fixed pipeline.
+    const replyTool = conversationalReplyTool();
+    const toolRunId = `workspace:tool:${crypto.randomUUID()}`;
+    const askTool = askClarifyingQuestionTool(
+      clarificationBridge,
+      toolRunId,
+      lease.controller.signal,
+    );
+    const tools = [
+      astryxTool,
+      regenerationTool,
+      pageTargetingTool,
+      askTool,
+      replyTool,
+    ].filter((tool) => tool !== null);
+    const actionableToolCount = [
+      astryxTool,
+      regenerationTool,
+      pageTargetingTool,
+    ].filter((tool) => tool !== null).length;
+    // askTool is always offered, and its execute() can call clarificationBridge.ask()
+    // which emits a `human-loop-asked` run event LIVE, synchronously, from inside the
+    // model call below (see clarification-bridge.ts's doc comment). appendRunEvent
+    // silently drops any event whose runId isn't already the active run, so the run
+    // must be started for toolRunId before runToolLoop can invoke the tool — otherwise
+    // the live ask is dropped and the suspended tool call has no visible way to
+    // resolve. The astryx/regeneration branches below call startAgentRun again with
+    // the same runId, which is a no-op once the run is already active.
+    startAgentRun("create", { runId: toolRunId });
 
-    setWorkflowPhase('planning')
-    const result = await planPrototype(services.generation, {
+    const toolLoop = await runToolLoop(personalizedGenerationRef.current, {
+      runId: toolRunId,
+      providerId: chat.providerId,
+      model: chat.model,
+      prompt: [
+        "The user is talking to a design-tool Agent. Call at most one of the non-question tools " +
+          "below, and only if the request explicitly matches it. You may also call " +
+          "`ask_clarifying_question` first if needed — after it returns an answer, decide whether " +
+          "to then call one of the other tools with that answer in hand, or finish.",
+        astryxTool
+          ? "- `compile_astryx_theme`: the user is asking to map DESIGN.md colors to Astryx theme " +
+            "variables and/or generate/compile an Astryx theme."
+          : null,
+        regenerationTool
+          ? "- `configure_prototype_regeneration`: the user is asking to redo/regenerate the design " +
+            "system, or to control whether pages generate in parallel or one at a time, for the " +
+            "prototype suite that already exists."
+          : null,
+        pageTargetingTool
+          ? "- `select_pages_to_regenerate`: the user is naming one or more specific existing pages " +
+            "to redo, leaving the rest of the prototype suite untouched."
+          : null,
+        "- `reply_conversationally`: the message is not a build/design request at all — a greeting, " +
+          "small talk, a question, or too vague to plan a product from.",
+        "- `ask_clarifying_question`: the request IS a real build/design request, but a key decision " +
+          "(platform, primary user, a must-have feature) is genuinely ambiguous enough that guessing " +
+          "would likely produce the wrong direction. Do not ask for politeness or a detail you can " +
+          "reasonably decide yourself.",
+        "For an actual request to design or build something new that is clear enough to proceed, " +
+          "call none of these — it falls through to the design pipeline.",
+        "",
+        `User: ${text}`,
+      ]
+        .filter((line) => line !== null)
+        .join("\n"),
+      tools,
+      // +2 when ask_clarifying_question is on offer: one step to ask, one
+      // more to decide-and-call (or finish) after the answer comes back —
+      // on top of the existing "more than one actionable tool" allowance.
+      maxSteps: (actionableToolCount > 1 ? 3 : 2) + 2,
+      signal: lease.controller.signal,
+    });
+    // A newer submission may have superseded this lease while the model call
+    // above was in flight (createAssets begins the lease synchronously,
+    // before this await, so a second submission aborts this one). Discard
+    // the result instead of firing toasts/clipboard writes/startAgentRun for
+    // a turn that's no longer the active run.
+    if (!agentRunCoordinatorRef.current.isActive(lease)) {
+      return {
+        handled: false,
+        regenerationDecision: null,
+        pageTargetingDecision: null,
+        clarifiedBrief: null,
+      };
+    }
+    if (!toolLoop.ok) {
+      console.info("[Cutout] tool gate failed:", toolLoop.error);
+      return {
+        handled: false,
+        regenerationDecision: null,
+        pageTargetingDecision: null,
+        clarifiedBrief: null,
+      };
+    }
+    if (!toolLoop.data.called) {
+      return {
+        handled: false,
+        regenerationDecision: null,
+        pageTargetingDecision: null,
+        clarifiedBrief: null,
+      };
+    }
+
+    const conversationalCall = toolLoop.data.calls.find(
+      (call) => call.toolName === "reply_conversationally",
+    );
+    const astryxCall = toolLoop.data.calls.find(
+      (call) => call.toolName === "compile_astryx_theme",
+    );
+    const regenerationCall = toolLoop.data.calls.find(
+      (call) => call.toolName === "configure_prototype_regeneration",
+    );
+    const pageTargetingCall = toolLoop.data.calls.find(
+      (call) => call.toolName === "select_pages_to_regenerate",
+    );
+    // A single tryToolGate turn can call ask_clarifying_question more than
+    // once (e.g. the model asks, gets an answer, and still finds a second
+    // ambiguity within the same step budget). Keep every call in order so
+    // the fold below can incorporate all of them instead of only the first.
+    const askCalls = toolLoop.data.calls.filter(
+      (call) => call.toolName === "ask_clarifying_question",
+    );
+
+    const failedAskCall = askCalls.find((call) => call.error);
+    if (failedAskCall) {
+      toast.error("Clarifying question failed", {
+        description: failedAskCall.error,
+      });
+    }
+
+    if (conversationalCall && !conversationalCall.error) {
+      const reply = (conversationalCall.toolOutput as ConversationalReplyInput)
+        .reply;
+      // Fixed id so a newer conversational reply replaces (rather than stacks
+      // on top of) any earlier one still visible — otherwise a user who sends
+      // several vague briefs in a row could leave multiple stale "Build it
+      // anyway" actions on screen, each bound to a different frozen brief.
+      toast.message("Agent", {
+        id: "tool-gate-reply",
+        description: reply,
+        action: {
+          label: "Build it anyway",
+          // Deliberately does NOT call setBrief(text): this closure is bound
+          // to the brief text from the render that created this toast. If
+          // the user has since edited the (shared, global) brief field and
+          // clicks this action, overwriting their live input with the old
+          // rejected text — then generating from it — would silently discard
+          // whatever they just typed. Passing briefOverride lets createAssets
+          // build from exactly this toast's frozen text without touching
+          // component/store state at all.
+          onClick: () => {
+            void createAssets("create", {
+              skipToolGate: true,
+              briefOverride: text,
+            });
+          },
+        },
+      });
+      return {
+        handled: true,
+        regenerationDecision: null,
+        pageTargetingDecision: null,
+        clarifiedBrief: null,
+      };
+    }
+
+    if (conversationalCall?.error) {
+      toast.error("Agent reply failed", {
+        description: conversationalCall.error,
+      });
+      return {
+        handled: true,
+        regenerationDecision: null,
+        pageTargetingDecision: null,
+        clarifiedBrief: null,
+      };
+    }
+
+    if (astryxCall) {
+      startAgentRun("create", { runId: toolRunId });
+      emitRunEvents(toolLoop.data.events);
+      // Scoped to astryxCall itself, not "any tool-failed event in the whole
+      // turn" — since the gate now registers three tools in one call, an
+      // unrelated failure elsewhere in the same turn must not mark a
+      // perfectly good Astryx binding as failed.
+      const failed = Boolean(astryxCall.error);
+      emitRunEvent(
+        toolRunId,
+        failed
+          ? { type: "outcome-evaluated", status: "needs-repair", missing: [] }
+          : { type: "outcome-evaluated", status: "satisfied", missing: [] },
+      );
+
+      if (failed) {
+        toast.error("Astryx theme compilation failed", {
+          description:
+            toolLoop.data.text ||
+            "The Agent could not complete the requested mapping.",
+        });
+        return {
+          handled: true,
+          regenerationDecision: null,
+          pageTargetingDecision: null,
+          clarifiedBrief: null,
+        };
+      }
+
+      const binding = astryxCall.toolOutput as AstryxBinding;
+      const themeFile = binding.files.find(
+        (file) => file.path.startsWith("astryx/") && file.path.endsWith(".ts"),
+      );
+      if (themeFile) {
+        try {
+          await navigator.clipboard.writeText(themeFile.content);
+        } catch {
+          // best-effort convenience copy only
+        }
+      }
+      toast.success(`Astryx theme "${binding.agentBrief.themeName}" compiled`, {
+        description: themeFile
+          ? `${themeFile.path} copied to clipboard. Open the Design panel's Astryx tab for the rest of the bundle.`
+          : "Open the Design panel's Astryx tab to review the bundle.",
+      });
+      return {
+        handled: true,
+        regenerationDecision: null,
+        pageTargetingDecision: null,
+        clarifiedBrief: null,
+      };
+    }
+
+    // regenerationCall and pageTargetingCall are both pure decisions (never
+    // `handled: true`), so both can legitimately fire in the same turn even
+    // though the prompt above asks for "at most one". Handle them together
+    // in a single block — calling emitRunEvents(toolLoop.data.events) once
+    // per branch would double-emit the same event batch if both are present.
+    if (regenerationCall || pageTargetingCall) {
+      startAgentRun("create", { runId: toolRunId });
+      emitRunEvents(toolLoop.data.events);
+      const failed =
+        Boolean(regenerationCall?.error) || Boolean(pageTargetingCall?.error);
+      emitRunEvent(
+        toolRunId,
+        failed
+          ? { type: "outcome-evaluated", status: "needs-repair", missing: [] }
+          : { type: "outcome-evaluated", status: "satisfied", missing: [] },
+      );
+
+      if (regenerationCall?.error) {
+        toast.error("Regeneration strategy request failed", {
+          description: regenerationCall.error,
+        });
+      }
+      if (pageTargetingCall?.error) {
+        toast.error("Page selection failed", {
+          description: pageTargetingCall.error,
+        });
+      }
+    }
+
+    // ask_clarifying_question resolved this turn — fold the Q&A into the
+    // brief the same way the existing cross-invocation humanLoop.mode==='ask'
+    // answer path already does, and let the fixed pipeline plan from the
+    // disambiguated text. This must run regardless of whether the same turn
+    // also called configure_prototype_regeneration, otherwise the user's
+    // answer (already recorded/shown as resolved) would be silently dropped.
+    const successfulAskCalls = askCalls.filter((call) => !call.error);
+    if (successfulAskCalls.length > 0) {
+      // Fold every ask/answer pair from this turn into the brief, in call
+      // order, so a second (or later) clarifying question's answer is not
+      // silently dropped in favor of only the first.
+      const clarifiedBrief = successfulAskCalls.reduce((brief, call) => {
+        const input = call.toolInput as AskClarifyingQuestionInput;
+        const answer = call.toolOutput as ResolvedHumanLoopAnswer;
+        const loop: PrototypeHumanLoopAsk = { mode: "ask", ...input };
+        return composeHumanLoopRequirement(brief, loop, answer);
+      }, text);
+      return {
+        handled: false,
+        regenerationDecision:
+          regenerationCall && !regenerationCall.error
+            ? (regenerationCall.toolOutput as RegenerationDecision)
+            : null,
+        pageTargetingDecision:
+          pageTargetingCall && !pageTargetingCall.error
+            ? (pageTargetingCall.toolOutput as PageTargetingDecision)
+            : null,
+        clarifiedBrief,
+      };
+    }
+
+    return {
+      handled: false,
+      regenerationDecision:
+        regenerationCall && !regenerationCall.error
+          ? (regenerationCall.toolOutput as RegenerationDecision)
+          : null,
+      pageTargetingDecision:
+        pageTargetingCall && !pageTargetingCall.error
+          ? (pageTargetingCall.toolOutput as PageTargetingDecision)
+          : null,
+      clarifiedBrief: null,
+    };
+  }
+
+  useEffect(() => {
+    // Keep the handoff pending until local model assignments have loaded. A
+    // premature consume would open Settings and lose the user's auto-run.
+    if (assignments.isPending) return;
+    const request = getStoreState().consumeAgentRun();
+    if (request?.intent === "create-assets") void createAssets();
+    // The store request is a one-shot mount handoff. Re-running this effect for
+    // changing workspace state would risk duplicate paid generation.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [assignments.isPending]);
+
+  async function planPrototypeSuite(
+    text: string,
+    chat: ModelAssignment,
+    lease: AgentRunLease,
+  ): Promise<PrototypePlan> {
+    agentRunCoordinatorRef.current.checkpoint(lease);
+    setWorkflowPhase("planning");
+    const result = await planPrototype(personalizedGenerationRef.current, {
       providerId: chat.providerId,
       model: chat.model,
       brief: text,
       intent: getStoreState().intent ?? undefined,
       effort: chat.effort,
-    })
+      signal: lease.controller.signal,
+    });
+    agentRunCoordinatorRef.current.checkpoint(lease);
     if (isErr(result)) {
-      console.info('[Cutout] prototype planner failed:', result.error)
-      const displayMessage = userFacingGenerationError(result.error)
+      console.info("[Cutout] prototype planner failed:", result.error);
+      const displayMessage = userFacingGenerationError(result.error);
       recordAiNativeDiagnostic({
-        level: 'error',
-        scope: 'prototype-planner',
+        level: "error",
+        scope: "prototype-planner",
         message: result.error,
         details: {
           displayMessage,
@@ -614,53 +1754,70 @@ export function IntentWorkspace({
           model: chat.model,
           effort: chat.effort,
         },
-      })
-      setPrototypePlan(null)
-      setPrototypePages([])
-      setPrototypeDesignSystem(null)
-      setSelectedPrototypePageId(null)
-      setHumanLoopChoiceId(null)
-      setHumanLoopCustomAnswer('')
-      setLiveAgentOutput('')
-      setRunError(displayMessage)
-      setWorkflowPhase('idle')
-      throw new Error(displayMessage)
+      });
+      setPrototypePlan(null);
+      setPrototypePages([]);
+      setPrototypeDesignSystem(null);
+      setSelectedPrototypePageId(null);
+      setHumanLoopChoiceId(null);
+      setHumanLoopCustomAnswer("");
+      setLiveAgentOutput("");
+      setRunError(displayMessage);
+      setWorkflowPhase("idle");
+      throw new Error(displayMessage);
     }
 
-    setPrototypePlan(result.data)
-    setPrototypePages([])
-    setPrototypeDesignSystem(null)
-    setSelectedPrototypePageId(null)
-    setHumanLoopChoiceId(defaultHumanLoopChoiceId(result.data))
-    setHumanLoopCustomAnswer('')
-    setLiveAgentOutput('')
-    setWorkflowPhase('review')
-    return result.data
+    setPrototypePlan(result.data);
+    setPrototypePages([]);
+    setPrototypeDesignSystem(null);
+    setSelectedPrototypePageId(null);
+    setHumanLoopChoiceId(defaultHumanLoopChoiceId(result.data));
+    setHumanLoopCustomAnswer("");
+    setLiveAgentOutput("");
+    setWorkflowPhase("review");
+    return result.data;
   }
 
   async function generatePrototypeSuite(
     text: string,
     plan: PrototypePlan,
-    options: { readonly startFresh?: boolean } = {},
+    route: LockedComposerRoute,
+    options: {
+      readonly startFresh?: boolean;
+      readonly repair?: PrototypeRepairPlan;
+      readonly targetPageIds?: readonly string[];
+      /** Overrides the page-count heuristic below when the user explicitly asked for one or the other. */
+      readonly forceParallel?: boolean;
+    },
+    lease: AgentRunLease,
   ): Promise<void> {
-    const image = assignments.data?.image
-    if (!image) throw new Error('No image-generation model is configured.')
+    agentRunCoordinatorRef.current.checkpoint(lease);
+    const image = route.image;
 
-    const pages = pagesForScope(plan, prototypeScope)
-    if (pages.length === 0) throw new Error('The prototype plan has no pages.')
-    const pageIds = new Set(pages.map((page) => page.id))
-    const reusablePages = options.startFresh
-      ? []
-      : sortPrototypePages(
-          prototypePages.filter((artifact) => pageIds.has(artifact.page.id)),
-          pages,
-        )
-    const reusableDesignSystem = options.startFresh ? null : prototypeDesignSystem
-    const assetManifest = createPrototypeAssetManifest(plan, pages)
+    const pages = pagesForScope(plan, prototypeScope);
+    if (pages.length === 0) throw new Error("The prototype plan has no pages.");
+    const pageIds = new Set(pages.map((page) => page.id));
+    const targetPageIds = new Set(options.targetPageIds ?? []);
+    const reusablePages =
+      options.startFresh && targetPageIds.size === 0
+        ? []
+        : sortPrototypePages(
+            prototypePages.filter(
+              (artifact) =>
+                pageIds.has(artifact.page.id) &&
+                !targetPageIds.has(artifact.page.id),
+            ),
+            pages,
+          );
+    const reusableDesignSystem =
+      options.startFresh || options.repair?.generateDesignSystem
+        ? null
+        : prototypeDesignSystem;
+    const assetManifest = createPrototypeAssetManifest(plan, pages);
     recordAiNativeDiagnostic({
-      level: 'info',
-      scope: 'prototype-asset-manifest',
-      message: 'Generated prototype asset manifest for this run.',
+      level: "info",
+      scope: "prototype-asset-manifest",
+      message: "Generated prototype asset manifest for this run.",
       details: {
         version: assetManifest.version,
         product: assetManifest.product,
@@ -676,53 +1833,176 @@ export function IntentWorkspace({
           description: asset.description,
         })),
       },
-    })
+    });
 
     if (options.startFresh) {
-      setPrototypePages([])
-      setPrototypeDesignSystem(null)
-      setSelectedPrototypePageId(null)
+      setPrototypePages(reusablePages);
+      setPrototypeDesignSystem(null);
+      setSelectedPrototypePageId(
+        reusablePages.length > 0 ? (reusablePages[0]?.page.id ?? null) : null,
+      );
     } else if (reusablePages.length > 0) {
-      setPrototypePages(reusablePages)
+      setPrototypePages(reusablePages);
       setSelectedPrototypePageId((selected) =>
         selected && pageIds.has(selected)
           ? selected
-          : reusablePages[0]?.page.id ?? null,
-      )
+          : (reusablePages[0]?.page.id ?? null),
+      );
     }
-    setWorkflowPhase('design-system')
+    setWorkflowPhase("design-system");
 
     const deconstructPreflight = prepareDeconstruct(
       prototypeBoardExtractionBrief(plan, pages, text),
       pages.length,
-    )
-    const chat = assignments.data?.chat
-    if (!chat) throw new Error('No chat/vision model is configured.')
+    );
+    const chat = route.chat;
+    const generationContext = selectedMaterial
+      ? [
+          importedDesignMarkdown?.content,
+          `Requested correction for ${selectedMaterial.kind} "${selectedMaterial.label}":\n${text}`,
+        ]
+          .filter(Boolean)
+          .join("\n\n")
+      : importedDesignMarkdown?.content;
 
-    const designSystem =
+    let designSystem =
       reusableDesignSystem ??
-      await generatePrototypeDesignSystem(
+      (await generatePrototypeDesignSystem(
         plan,
         image,
         chat,
-        importedDesignMarkdown?.content,
-      )
-    if (!reusableDesignSystem) setPrototypeDesignSystem(designSystem)
-    setWorkflowPhase('generating-suite')
+        generationContext,
+        lease,
+      ));
+    if (!reusableDesignSystem) setPrototypeDesignSystem(designSystem);
 
+    if (options.repair?.synthesizeDesignMarkdown && reusableDesignSystem) {
+      const designMarkdown =
+        (await synthesizeDesignMarkdownFromReference(
+          plan,
+          chat,
+          reusableDesignSystem.bytes,
+          importedDesignMarkdown?.content,
+          lease,
+        )) ?? prototypeDesignMarkdown(plan, importedDesignMarkdown?.content);
+      designSystem = { ...reusableDesignSystem, designMarkdown };
+      setPrototypeDesignSystem(designSystem);
+    }
+
+    if (
+      options.repair &&
+      !options.repair.generatePages &&
+      !options.repair.deconstructPages
+    ) {
+      setWorkflowPhase("idle");
+      return;
+    }
+    setWorkflowPhase("generating-suite");
+
+    const runSerial =
+      options.forceParallel === undefined
+        ? pages.length <= SERIAL_REFERENCE_PAGE_LIMIT
+        : !options.forceParallel;
     const generated =
-      pages.length <= SERIAL_REFERENCE_PAGE_LIMIT
-        ? await generatePagesSerial(plan, pages, image, designSystem, reusablePages)
-        : await generatePagesParallel(plan, pages, image, designSystem, reusablePages)
-    const first = generated[0]
-    if (!first) throw new Error('The model returned no prototype pages.')
+      options.repair && !options.repair.generatePages
+        ? reusablePages
+        : runSerial
+          ? await generatePagesSerial(
+              plan,
+              pages,
+              image,
+              designSystem,
+              lease,
+              generationContext,
+              reusablePages,
+            )
+          : await generatePagesParallel(
+              plan,
+              pages,
+              image,
+              designSystem,
+              lease,
+              generationContext,
+              reusablePages,
+            );
+    agentRunCoordinatorRef.current.checkpoint(lease);
+    const first = options.targetPageIds?.length
+      ? generated.find((artifact) => targetPageIds.has(artifact.page.id))
+      : generated[0];
+    if (!first) throw new Error("The model returned no prototype pages.");
 
-    setSelectedPrototypePageId(first.page.id)
-    setMockup(await artifactToMockup(first))
-    await deconstructMockup({
-      preflight: deconstructPreflight,
-      referenceImages: generated.slice(1).map((artifact) => artifact.bytes),
-    })
+    setSelectedPrototypePageId(first.page.id);
+    if (options.repair && !options.repair.deconstructPages) {
+      setWorkflowPhase("idle");
+      return;
+    }
+    const nextMockup = await artifactToMockup(first);
+    agentRunCoordinatorRef.current.checkpoint(lease);
+    setMockup(nextMockup);
+
+    const referenceBytes = generated
+      .filter((artifact) => artifact.page.id !== first.page.id)
+      .map((artifact) => artifact.bytes);
+
+    // Per-region breakdown: when the page has board-cutout regions, deconstruct
+    // each region on its own scoped board (fewer dropped assets than one board
+    // for the whole page) and stream the region-tagged slices in as each
+    // finishes. Falls back to the legacy whole-page board when a page has no
+    // board-cutout regions.
+    const boardRegions = selectBoardCutoutRegions(first.page);
+    if (boardRegions.length > 0) {
+      const cutoutParams = getStoreState().params;
+      const regionRunId = getStoreState().beginRegionSlices();
+      await runRegionBreakdown(
+        {
+          generation: personalizedGenerationRef.current,
+          providers: { list: async () => providers.data ?? [] },
+          decode: (bytes) => decodeImage(bytesToBlob(bytes, "image/png")),
+          slice: (bitmap, regionId, pageId, signal) =>
+            sliceRegionBoardBitmap(bitmap, cutoutParams, regionId, pageId, signal),
+          // Name each region's slices in one region-primed vision call, run
+          // concurrently with the next region's board generation.
+          nameRegion: (boardBytes, slices, context, signal) =>
+            nameRegionSlices(
+              personalizedGenerationRef.current,
+              route.chat,
+              boardBytes,
+              slices,
+              context,
+              signal,
+            ),
+        },
+        {
+          page: first.page,
+          pageBytes: first.bytes,
+          referenceImages: referenceBytes,
+          image,
+          signal: lease.controller.signal,
+          onRegionSliced: (_regionId, slices) => {
+            // A newer submission may have superseded this run mid-stream; the
+            // store's runId guard drops the append, but skip the work too.
+            if (!agentRunCoordinatorRef.current.isActive(lease)) return;
+            getStoreState().appendRegionSlices(regionRunId, { slices });
+          },
+          onRegionNamed: (renames) => {
+            if (!agentRunCoordinatorRef.current.isActive(lease)) return;
+            const rename = getStoreState().renameSlice;
+            for (const { id, name } of renames) rename(id, name);
+          },
+          onRegionError: (regionId, message) =>
+            console.info("[Cutout] region deconstruct failed:", regionId, message),
+        },
+      );
+      agentRunCoordinatorRef.current.checkpoint(lease);
+      getStoreState().finishRegionSlices(regionRunId);
+    } else {
+      await deconstructMockup({
+        preflight: deconstructPreflight,
+        referenceImages: referenceBytes,
+        signal: lease.controller.signal,
+      });
+    }
+    agentRunCoordinatorRef.current.checkpoint(lease);
   }
 
   async function generatePrototypeDesignSystem(
@@ -730,45 +2010,61 @@ export function IntentWorkspace({
     image: ModelAssignment,
     chat: ModelAssignment,
     designMarkdown: string | undefined,
+    lease: AgentRunLease,
   ): Promise<PrototypeDesignSystemArtifact> {
-    const prompt = prototypeDesignSystemPrompt(plan, designMarkdown)
+    agentRunCoordinatorRef.current.checkpoint(lease);
+    const prompt = prototypeDesignSystemPrompt(plan, designMarkdown);
     // Attached reference images condition the design system on the user's visual
     // direction (垫图, via editImage). editImage is provider-specific, so on
     // failure — or with no attachments — fall back to a plain prompt generate.
     const references = await Promise.all(
       attachments.map((attachment) => blobToBytes(attachment.blob)),
-    )
+    );
+    agentRunCoordinatorRef.current.checkpoint(lease);
+    const runId = `workspace:${lease.id}`;
     const edited =
       references.length > 0
-        ? await services.generation.editImage({
-            providerId: image.providerId,
-            model: image.model,
+        ? await invokeDesktopImageTool({
+            capability: "edit-image",
+            runId,
+            label: "Generate design system",
             prompt,
-            images: references,
-            inputFidelity: 'high',
-          })
-        : null
+            image,
+            references,
+            toolCallId: `tool:${lease.id}:design-system:edit`,
+            lease,
+          }).catch(() => null)
+        : null;
+    // A provider may resolve an aborted edit as an error result instead of
+    // throwing AbortError. Never enter the paid fallback after cancellation.
+    agentRunCoordinatorRef.current.checkpoint(lease);
     const result =
-      edited && !isErr(edited)
-        ? edited
-        : await services.generation.generateImages({
-            providerId: image.providerId,
-            model: image.model,
-            prompt,
-          })
-    if (isErr(result)) throw new Error(result.error)
-    const asset = result.data[0]
-    if (!asset) throw new Error('The model returned no design-system reference.')
+      edited ??
+      (await invokeDesktopImageTool({
+        capability: "generate-image",
+        runId,
+        label: "Generate design system",
+        prompt,
+        image,
+        references: [],
+        toolCallId: `tool:${lease.id}:design-system:generate`,
+        lease,
+      }));
+    agentRunCoordinatorRef.current.checkpoint(lease);
+    const asset = result[0];
+    if (!asset)
+      throw new Error("The model returned no design-system reference.");
     const groundedDesignMarkdown = await synthesizeDesignMarkdownFromReference(
       plan,
       chat,
       asset.bytes,
       designMarkdown,
-    )
+      lease,
+    );
     return assetToDesignSystemArtifact(
       asset,
       groundedDesignMarkdown ?? prototypeDesignMarkdown(plan, designMarkdown),
-    )
+    );
   }
 
   async function synthesizeDesignMarkdownFromReference(
@@ -776,6 +2072,7 @@ export function IntentWorkspace({
     chat: ModelAssignment,
     imageBytes: Uint8Array,
     importedMarkdown: string | undefined,
+    lease: AgentRunLease,
   ): Promise<string | null> {
     const input = {
       providerId: chat.providerId,
@@ -783,42 +2080,54 @@ export function IntentWorkspace({
       system: prototypeDesignMarkdownSynthesisSystem(plan, importedMarkdown),
       input: [
         {
-          type: 'text' as const,
-          text: 'Read the attached design-system reference image and produce the matching DESIGN.md.',
+          type: "text" as const,
+          text: "Read the attached design-system reference image and produce the matching DESIGN.md.",
         },
-        { type: 'image' as const, image: imageBytes },
+        { type: "image" as const, image: imageBytes },
       ],
       reasoningEffort: chat.effort,
-    }
+      signal: lease.controller.signal,
+    };
 
-    let streamed = ''
+    let streamed = "";
     try {
-      setLiveAgentOutput('')
-      for await (const delta of services.generation.streamText(input)) {
-        streamed += delta
-        setLiveAgentOutput(trimLiveAgentOutput(streamed))
+      setLiveAgentOutput("");
+      for await (const delta of personalizedGenerationRef.current.streamText(
+        input,
+      )) {
+        agentRunCoordinatorRef.current.checkpoint(lease);
+        streamed += delta;
+        setLiveAgentOutput(trimLiveAgentOutput(streamed));
       }
     } catch (error) {
+      if (lease.controller.signal.aborted) throw error;
       console.info(
-        '[Cutout] image-grounded DESIGN.md stream fell back:',
+        "[Cutout] image-grounded DESIGN.md stream fell back:",
         error instanceof Error ? error.message : String(error),
-      )
-      const result = await services.generation.generateText(input)
+      );
+      const result =
+        await personalizedGenerationRef.current.generateText(input);
+      agentRunCoordinatorRef.current.checkpoint(lease);
       if (isErr(result)) {
-        console.info('[Cutout] image-grounded DESIGN.md synthesis fell back:', result.error)
-        setLiveAgentOutput('')
-        return null
+        console.info(
+          "[Cutout] image-grounded DESIGN.md synthesis fell back:",
+          result.error,
+        );
+        setLiveAgentOutput("");
+        return null;
       }
-      streamed = result.data
-      setLiveAgentOutput(trimLiveAgentOutput(streamed))
+      streamed = result.data;
+      setLiveAgentOutput(trimLiveAgentOutput(streamed));
     }
 
-    const markdown = stripMarkdownFence(streamed).trim()
-    if (!markdown.startsWith('---')) {
-      console.info('[Cutout] image-grounded DESIGN.md synthesis returned non-DESIGN.md text.')
-      return null
+    const markdown = stripMarkdownFence(streamed).trim();
+    if (!markdown.startsWith("---")) {
+      console.info(
+        "[Cutout] image-grounded DESIGN.md synthesis returned non-DESIGN.md text.",
+      );
+      return null;
     }
-    return markdown
+    return markdown;
   }
 
   async function generatePagesSerial(
@@ -826,33 +2135,40 @@ export function IntentWorkspace({
     pages: readonly PrototypePage[],
     image: ModelAssignment,
     designSystem: PrototypeDesignSystemArtifact,
+    lease: AgentRunLease,
+    designContext: string | undefined,
     existingPages: readonly PrototypePageArtifact[] = [],
   ): Promise<PrototypePageArtifact[]> {
-    const generated: PrototypePageArtifact[] = [...existingPages]
-    const generatedById = new Map(generated.map((artifact) => [artifact.page.id, artifact]))
-    let previous: PrototypePageArtifact | null = null
+    const generated: PrototypePageArtifact[] = [...existingPages];
+    const generatedById = new Map(
+      generated.map((artifact) => [artifact.page.id, artifact]),
+    );
+    let previous: PrototypePageArtifact | null = null;
     for (const page of pages) {
-      const existing = generatedById.get(page.id)
+      agentRunCoordinatorRef.current.checkpoint(lease);
+      const existing = generatedById.get(page.id);
       if (existing) {
-        previous = existing
-        continue
+        previous = existing;
+        continue;
       }
       const references = previous
         ? [designSystem.bytes, previous.bytes]
-        : [designSystem.bytes]
+        : [designSystem.bytes];
       const artifact = await generatePrototypePage(
         plan,
         page,
         image,
         references,
-        importedDesignMarkdown?.content,
-      )
-      generated.push(artifact)
-      generatedById.set(page.id, artifact)
-      previous = artifact
-      setPrototypePages(sortPrototypePages(generated, pages))
+        designContext,
+        lease,
+      );
+      agentRunCoordinatorRef.current.checkpoint(lease);
+      generated.push(artifact);
+      generatedById.set(page.id, artifact);
+      previous = artifact;
+      setPrototypePages(sortPrototypePages(generated, pages));
     }
-    return sortPrototypePages(generated, pages)
+    return sortPrototypePages(generated, pages);
   }
 
   async function generatePagesParallel(
@@ -860,38 +2176,43 @@ export function IntentWorkspace({
     pages: readonly PrototypePage[],
     image: ModelAssignment,
     designSystem: PrototypeDesignSystemArtifact,
+    lease: AgentRunLease,
+    designContext: string | undefined,
     existingPages: readonly PrototypePageArtifact[] = [],
   ): Promise<PrototypePageArtifact[]> {
     const results = new Map<string, PrototypePageArtifact>(
       existingPages.map((artifact) => [artifact.page.id, artifact]),
-    )
-    const missingPages = pages.filter((page) => !results.has(page.id))
-    let nextIndex = 0
-    const limit = Math.min(2, missingPages.length)
+    );
+    const missingPages = pages.filter((page) => !results.has(page.id));
+    let nextIndex = 0;
+    const limit = Math.min(2, missingPages.length);
 
     async function worker(): Promise<void> {
       while (nextIndex < missingPages.length) {
-        const page = missingPages[nextIndex]
-        nextIndex += 1
-        if (!page) continue
+        agentRunCoordinatorRef.current.checkpoint(lease);
+        const page = missingPages[nextIndex];
+        nextIndex += 1;
+        if (!page) continue;
         const artifact = await generatePrototypePage(
           plan,
           page,
           image,
           [designSystem.bytes],
-          importedDesignMarkdown?.content,
-        )
-        results.set(page.id, artifact)
-        setPrototypePages(sortPrototypePages([...results.values()], pages))
+          designContext,
+          lease,
+        );
+        agentRunCoordinatorRef.current.checkpoint(lease);
+        results.set(page.id, artifact);
+        setPrototypePages(sortPrototypePages([...results.values()], pages));
       }
     }
 
     if (missingPages.length > 0) {
-      await Promise.all(Array.from({ length: limit }, () => worker()))
+      await Promise.all(Array.from({ length: limit }, () => worker()));
     }
     return pages
       .map((page) => results.get(page.id))
-      .filter((item): item is PrototypePageArtifact => Boolean(item))
+      .filter((item): item is PrototypePageArtifact => Boolean(item));
   }
 
   async function generatePrototypePage(
@@ -900,34 +2221,66 @@ export function IntentWorkspace({
     image: ModelAssignment,
     referenceImages: readonly Uint8Array[],
     designMarkdown: string | undefined,
+    lease: AgentRunLease,
   ): Promise<PrototypePageArtifact> {
-    const prompt = prototypePagePrompt(plan, page, designMarkdown)
-    const edited = await services.generation.editImage({
-      providerId: image.providerId,
-      model: image.model,
+    agentRunCoordinatorRef.current.checkpoint(lease);
+    const prompt = prototypePagePrompt(plan, page, designMarkdown);
+    const runId = `workspace:${lease.id}`;
+    const toolBase = `tool:${lease.id}:page:${page.id}`;
+    const edited = await invokeDesktopImageTool({
+      capability: "edit-image",
+      runId,
+      label: `Generate ${page.name}`,
       prompt,
-      images: referenceImages,
-      inputFidelity: 'high',
-    })
-    const result = isErr(edited)
-      ? await services.generation.generateImages({
-          providerId: image.providerId,
-          model: image.model,
-          promptRef: { id: 'ui-mockup-generation' },
-          input: [
-            { type: 'text', text: prompt },
-            ...referenceImages.map((bytes) => ({ type: 'image' as const, image: bytes })),
-          ],
-        })
-      : edited
-    if (isErr(edited) && isErr(result)) {
-      console.info('[Cutout] reference-conditioned prototype fallback failed:', edited.error)
-    }
-    if (isErr(result)) throw new Error(result.error)
-    const asset = result.data[0]
-    if (!asset) throw new Error(`No image returned for ${page.name}.`)
+      image,
+      references: referenceImages,
+      toolCallId: `${toolBase}:edit`,
+      lease,
+    }).catch(() => null);
+    agentRunCoordinatorRef.current.checkpoint(lease);
+    const result =
+      edited ??
+      (await invokeDesktopImageTool({
+        capability: "generate-image",
+        runId,
+        label: `Generate ${page.name}`,
+        prompt,
+        image,
+        references: [],
+        toolCallId: `${toolBase}:generate`,
+        lease,
+      }));
+    agentRunCoordinatorRef.current.checkpoint(lease);
+    const asset = result[0];
+    if (!asset) throw new Error(`No image returned for ${page.name}.`);
 
-    return assetToPageArtifact(page, asset)
+    return assetToPageArtifact(page, asset);
+  }
+
+  async function invokeDesktopImageTool(input: {
+    readonly capability: "generate-image" | "edit-image";
+    readonly runId: string;
+    readonly toolCallId: string;
+    readonly label: string;
+    readonly prompt: string;
+    readonly image: ModelAssignment;
+    readonly references: readonly Uint8Array[];
+    readonly lease: AgentRunLease;
+  }) {
+    agentRunCoordinatorRef.current.checkpoint(input.lease);
+    return desktopTools.invoke({
+      runId: input.runId,
+      toolCallId: input.toolCallId,
+      label: input.label,
+      capability: input.capability,
+      intent: input.prompt,
+      image: input.image,
+      inputs: input.references.map((bytes, index) => ({
+        id: `${input.toolCallId}:input:${index}`,
+        mediaType: "image/png",
+        bytes,
+      })),
+    });
   }
 
   async function assetToDesignSystemArtifact(
@@ -936,24 +2289,24 @@ export function IntentWorkspace({
   ): Promise<PrototypeDesignSystemArtifact> {
     return await decodePrototypeImage(asset, (base) => ({
       ...base,
-      name: 'Design system',
+      name: "Design system",
       designMarkdown,
-    }))
+    }));
   }
 
   async function assetToPageArtifact(
     page: PrototypePage,
     asset: { readonly bytes: Uint8Array; readonly mediaType: string },
   ): Promise<PrototypePageArtifact> {
-    return await decodePrototypeImage(asset, (base) => ({ ...base, page }))
+    return await decodePrototypeImage(asset, (base) => ({ ...base, page }));
   }
 
   async function decodePrototypeImage<T extends PrototypeImageArtifact>(
     asset: { readonly bytes: Uint8Array; readonly mediaType: string },
     build: (base: PrototypeImageArtifact) => T,
   ): Promise<T> {
-    const blob = bytesToBlob(asset.bytes, asset.mediaType)
-    const bitmap = await decodeImage(blob)
+    const blob = bytesToBlob(asset.bytes, asset.mediaType);
+    const bitmap = await decodeImage(blob);
     try {
       return build({
         blob,
@@ -961,68 +2314,492 @@ export function IntentWorkspace({
         mediaType: asset.mediaType,
         width: bitmap.width,
         height: bitmap.height,
-      })
+      });
     } finally {
-      bitmap.close()
+      bitmap.close();
     }
   }
 
+  const canvasToolbar = (
+    <>
+      <CanvasBackgroundPicker
+        value={canvasBackground}
+        onChange={(hex) => {
+          setCanvasBackground(hex);
+          writeCanvasBackground(hex);
+        }}
+      />
+      <button
+        type="button"
+        aria-label="Toggle grid"
+        title="Grid"
+        aria-pressed={gridVisible}
+        className={cn(
+          "flex size-8 items-center justify-center rounded-full border bg-background/95 shadow-[0_2px_10px_rgb(0_0_0/0.10)] backdrop-blur transition-all hover:scale-105",
+          gridVisible
+            ? "border-foreground/30 text-foreground"
+            : "border-border/70 text-muted-foreground hover:border-foreground/25 hover:text-foreground",
+        )}
+        onClick={() => {
+          setGridVisible((visible) => {
+            const next = !visible;
+            try {
+              localStorage.setItem("cutout.canvas-grid", next ? "1" : "0");
+            } catch {
+              // best-effort persistence only
+            }
+            return next;
+          });
+        }}
+      >
+        <Grid3x3 className="size-4" />
+      </button>
+      <button
+        type="button"
+        aria-label="Toggle minimap"
+        title="Minimap"
+        aria-pressed={minimapVisible}
+        className={cn(
+          "flex size-8 items-center justify-center rounded-full border bg-background/95 shadow-[0_2px_10px_rgb(0_0_0/0.10)] backdrop-blur transition-all hover:scale-105",
+          minimapVisible
+            ? "border-foreground/30 text-foreground"
+            : "border-border/70 text-muted-foreground hover:border-foreground/25 hover:text-foreground",
+        )}
+        onClick={() => {
+          setMinimapVisible((visible) => {
+            const next = !visible;
+            try {
+              localStorage.setItem("cutout.canvas-minimap", next ? "1" : "0");
+            } catch {
+              // best-effort persistence only
+            }
+            return next;
+          });
+        }}
+      >
+        <MapIcon className="size-4" />
+      </button>
+    </>
+  );
+
   return (
-    <div className="flex h-full min-h-0 min-w-0 flex-1 overflow-hidden bg-background text-foreground">
-      <WorkspaceSidebar
-        brief={brief}
-        onBriefChange={updateBrief}
-        importedDesignMarkdown={importedDesignMarkdown}
-        onClearDesignMarkdown={clearDesignMarkdown}
-        attachments={attachments}
-        onAttachFiles={onAttachFiles}
-        onRemoveAttachment={removeAttachment}
-        onArchiveProject={onArchiveProject}
-        webSearchEnabled={webSearchEnabled}
-        onToggleWebSearch={() => setWebSearchEnabled((value) => !value)}
-        agentMessages={agent.messages}
-        onOpenSettings={settings.open}
-        working={working}
-        workflowPhase={workflowPhase}
-        briefEmpty={!brief.trim()}
-        hasPlan={Boolean(prototypePlan)}
-        hasPrototypePages={prototypePages.length > 0}
-        humanLoop={prototypePlan?.humanLoop ?? null}
-        humanLoopChoiceId={humanLoopChoiceId}
-        onHumanLoopChoiceChange={setHumanLoopChoiceId}
-        humanLoopCustomAnswer={humanLoopCustomAnswer}
-        onHumanLoopCustomAnswerChange={setHumanLoopCustomAnswer}
-        prototypePlan={prototypePlan}
-        prototypePages={prototypePages}
-        prototypeDesignSystem={prototypeDesignSystem}
-        prototypeScope={prototypeScope}
-        onScopeChange={setPrototypeScope}
-        scopeDisabled={working || prototypePages.length > 0}
-        onPrimaryAction={() => void createAssets()}
-        hasSlices={hasSlices}
-        sliceCount={slices.length}
-        activeStage={activeStage}
-        elapsedSeconds={elapsedSeconds}
-        stages={stages}
-        progress={progress}
-        liveAgentOutput={liveAgentOutput}
-        genError={genError}
-        runError={runError}
+    <div data-workspace-root className="relative flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-background text-foreground lg:flex-row">
+      <input
+        ref={dockAttachInputRef}
+        type="file"
+        accept="image/*,video/*,.md,.markdown,.mdx"
+        multiple
+        className="hidden"
+        onChange={(event) => {
+          onAttachFiles(event.target.files);
+          event.target.value = "";
+        }}
       />
 
-      <main className="flex min-h-0 min-w-0 flex-1 flex-col">
-        <OutputHeader
-          hasSlices={hasSlices}
-          sliceCount={slices.length}
-          hasPrototypeContext={Boolean(prototypePlan) || Boolean(prototypeDesignSystem) || prototypePages.length > 0}
-          working={working}
-          activeStage={activeStage}
-          elapsedSeconds={elapsedSeconds}
-          namingStatus={namingStatus}
+      <div
+        className={cn(
+          "hidden shrink-0 lg:block lg:h-full lg:overflow-hidden lg:transition-[width] lg:duration-300 lg:ease-in-out",
+          sidebarCollapsed ? "lg:w-0" : "lg:w-14",
+        )}
+      >
+        <WorkspaceRail
+          agentActive={agentDockVisible}
+          onToggleAgent={() => {
+            setAgentDockVisible((visible) => !visible);
+            setFilesDockVisible(false);
+          }}
+          filesActive={filesDockVisible}
+          onToggleFiles={() => {
+            setFilesDockVisible((visible) => !visible);
+            setAgentDockVisible(false);
+          }}
+          onOpenAssets={library.open}
+          onOpenDesign={() => {
+            setInspectorOpen(true);
+            setInspectorDismissed(false);
+          }}
+          onOpenTools={() => onOpenDesignOs()}
+          onOpenDeliver={() => onOpenDesignOs("delivery")}
+          advanced={advanced}
+          onOpenAdvanced={onOpenAdvanced}
+          onCollapseSidebar={() => setSidebarCollapsed(true)}
         />
+      </div>
 
-        <section className="relative min-h-0 flex-1 overflow-hidden bg-muted/10">
+      <button
+        type="button"
+        aria-label="Expand sidebar"
+        title="Expand sidebar"
+        className={cn(
+          "group/expand absolute left-3 top-3 z-30 hidden size-8 items-center justify-center rounded-md bg-foreground text-background shadow-md transition-opacity duration-300 lg:flex",
+          sidebarCollapsed ? "opacity-100" : "pointer-events-none opacity-0",
+        )}
+        onClick={() => setSidebarCollapsed(false)}
+      >
+        <Scissors className="size-4 group-hover/expand:hidden" />
+        <PanelLeft className="hidden size-4 group-hover/expand:block" />
+      </button>
+
+      <div
+        data-workspace-panel={filesDockVisible ? "files-drawer" : "agent-drawer"}
+        className={cn(
+          !agentDockVisible && !filesDockVisible && "hidden",
+          "absolute inset-x-0 bottom-0 z-30 h-[min(70dvh,42rem)] min-h-[19rem] w-full overflow-hidden border-t border-border bg-background shadow-2xl lg:inset-y-0 lg:bottom-auto lg:left-14 lg:right-auto lg:h-full lg:w-[24rem] lg:border-r lg:border-t-0",
+        )}
+      >
+        {filesDockVisible ? (
+          <>
+            <button
+              type="button"
+              aria-label="Hide Files"
+              title="Hide Files"
+              className="absolute right-2 top-2 z-10 flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              onClick={() => setFilesDockVisible(false)}
+            >
+              <PanelLeftClose className="size-4" />
+            </button>
+            <FilesPanel
+              nodes={filesTree}
+              selectedId={focusedArtifactId}
+              className="h-full w-full"
+              onSelectFile={(id) => {
+                if (id === "design-system") {
+                  setInspectorOpen(true);
+                  setInspectorDismissed(false);
+                } else if (
+                  prototypePages.some((artifact) => artifact.page.id === id)
+                ) {
+                  setSelectedPrototypePageId(id);
+                }
+                setFocusedArtifactId(id);
+                setFocusRequestId((requestId) => requestId + 1);
+              }}
+            />
+          </>
+        ) : (
+          <>
+            <button
+              type="button"
+              aria-label="Hide Agent"
+              title="Hide Agent"
+              className="absolute right-2 top-2 z-10 flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              onClick={() => setAgentDockVisible(false)}
+            >
+              <PanelLeftClose className="size-4" />
+            </button>
+            <AgentWorkspaceDock
+              viewModel={agentViewModel}
+              mode="sheet"
+              compact
+              className="h-full w-full"
+              composer={{
+                value: activeAsk ? humanLoopCustomAnswer : brief,
+                placeholder: activeAsk
+                  ? "Add a constraint or describe another direction…"
+                  : "Describe a result, correction, or next step…",
+                disabled: working,
+                submitDisabled: Boolean(impactPlan.blockedReason),
+                // A question always has a selected/default choice — the composer
+                // text is optional extra context, per HumanLoopQuestion's own copy
+                // ("Choose one direction... then press the arrow"). Without this,
+                // choosing a direction with no typed text left the send button
+                // permanently disabled (canSubmit requires non-empty value),
+                // silently stranding the user — true for both the live in-call ask
+                // and the older cross-invocation humanLoop.mode==='ask' fallback.
+                allowEmptySubmit: Boolean(activeAsk),
+                busy: working,
+                attachments: attachments.map((attachment) => ({
+                  id: attachment.id,
+                  label: attachment.name,
+                  mediaType: attachment.mediaType,
+                  previewUrl: attachment.url,
+                  status: attachment.mediaType.startsWith("video/")
+                    ? "Adapter required"
+                    : undefined,
+                })),
+                onChange: (value) => {
+                  if (activeAsk) {
+                    setHumanLoopCustomAnswer(value);
+                  } else {
+                    updateBrief(value);
+                  }
+                },
+                onSubmit: () => {
+                  // A live in-call ask (tool-gate path) resolves the suspended
+                  // model call directly via the bridge — it must NOT re-invoke
+                  // createAssets(), which is what the older cross-invocation
+                  // humanLoop.mode==='ask' path below still does.
+                  if (liveAsk) {
+                    const active = activeRunRef.current;
+                    if (
+                      !active ||
+                      !agentRunCoordinatorRef.current.isActive(active)
+                    ) {
+                      toast.error("This request is no longer active.");
+                      setHumanLoopChoiceId(null);
+                      setHumanLoopCustomAnswer("");
+                      return;
+                    }
+                    const answer = resolveHumanLoopAnswer(
+                      liveAsk,
+                      humanLoopChoiceId,
+                      humanLoopCustomAnswer,
+                    );
+                    clarificationBridge.answer(liveAsk.askId, answer);
+                    setHumanLoopChoiceId(null);
+                    setHumanLoopCustomAnswer("");
+                    setAgentBusy(true);
+                    return;
+                  }
+                  void createAssets();
+                },
+                onStop:
+                  working && activeRunRef.current ? stopActiveRun : undefined,
+                onAttach: () => dockAttachInputRef.current?.click(),
+                onRemoveAttachment: removeAttachment,
+                webSearch: {
+                  enabled: webSearchEnabled,
+                  disabled: working,
+                  onChange: setWebSearchEnabled,
+                },
+                modelSelection: {
+                  value: composerModelValue(composerModelPolicy),
+                  options: composerModelOptions,
+                  disabled:
+                    working || assignments.isPending || providers.isPending,
+                  onChange: (value) =>
+                    setComposerModelPolicy(
+                      parseComposerModelValue(value, assignments.data ?? {}),
+                    ),
+                },
+                thinkingSelection: {
+                  value: composerThinkingPolicy,
+                  options: [
+                    {
+                      value: "auto",
+                      label: "Auto",
+                      description: "Let the Agent Router choose for this task.",
+                    },
+                    {
+                      value: "provider-default",
+                      label: "Default",
+                      description: "Use the selected provider model default.",
+                    },
+                    { value: "low", label: "Low" },
+                    { value: "medium", label: "Medium" },
+                    { value: "high", label: "High" },
+                  ],
+                  disabled: working,
+                  onChange: (value) =>
+                    setComposerThinkingPolicy(value as ComposerThinkingPolicy),
+                },
+                materialContext: selectedMaterial
+                  ? {
+                      label: selectedMaterial.label,
+                      detail: materialImpactDetail(impactPlan),
+                      blockedReason: impactPlan.blockedReason,
+                      onClear: () => setSelectedMaterial(null),
+                    }
+                  : undefined,
+              }}
+              intervention={
+                activeAsk ? (
+                  <HumanLoopQuestion
+                    loop={activeAsk}
+                    selectedChoiceId={selectedHumanLoopChoiceId}
+                    onChoiceChange={setHumanLoopChoiceId}
+                    compact
+                  />
+                ) : showDockScopePicker && prototypePlan ? (
+                  <DockScopePicker
+                    scope={prototypeScope}
+                    onScopeChange={setPrototypeScope}
+                    disabled={working || prototypePages.length > 0}
+                    primaryCount={scopedPrimaryPageCount}
+                    fullCount={prototypePlan.pages.length}
+                  />
+                ) : null
+              }
+              showCostNotice={
+                working ||
+                Boolean(repairPlan) ||
+                Boolean(selectedMaterial && impactPlan.paidActionRequired)
+              }
+              labels={
+                repairPlan ? { retry: repairPlanLabel(repairPlan) } : undefined
+              }
+              onCancel={
+                working && activeRunRef.current ? stopActiveRun : undefined
+              }
+              onRetry={
+                !working && repairPlan
+                  ? () => void createAssets("repair")
+                  : undefined
+              }
+              onApproveTool={(toolCallId, requestId) =>
+                void desktopTools.loop.approve(toolCallId, requestId)
+              }
+              onDenyTool={(toolCallId, requestId) =>
+                desktopTools.loop.deny(toolCallId, requestId)
+              }
+              onCancelTool={(toolCallId, requestId) =>
+                desktopTools.loop.cancel(toolCallId, requestId)
+              }
+              onRetryTool={(toolCallId, requestId) =>
+                void desktopTools.loop.retry(toolCallId, requestId)
+              }
+              onOpenBudget={settings.open}
+              onOpenArtifact={(kind) => {
+                if (kind === "design-system" || kind === "design-markdown") {
+                  setInspectorOpen(true);
+                  setInspectorDismissed(false);
+                  setFocusedArtifactId("design-system");
+                  setFocusRequestId((id) => id + 1);
+                  return;
+                }
+                if (kind === "prototype-page") {
+                  const pageId = prototypePages[0]?.page.id;
+                  if (pageId) {
+                    setSelectedPrototypePageId(pageId);
+                    setFocusedArtifactId(pageId);
+                    setFocusRequestId((id) => id + 1);
+                  }
+                  return;
+                }
+                if (kind === "cutout-slice") {
+                  const sliceId = slices[0]?.id;
+                  if (sliceId) {
+                    setFocusedArtifactId(sliceId);
+                    setFocusRequestId((id) => id + 1);
+                  }
+                }
+              }}
+            />
+          </>
+        )}
+      </div>
+
+      <main
+        data-workspace-panel="canvas-main"
+        className="order-1 flex min-h-0 min-w-0 flex-1 flex-col lg:order-none"
+      >
+        {slices.length > 0 ||
+        prototypePages.length > 0 ||
+        prototypeDesignSystem ||
+        hasInspectorContent ? (
+          <OutputHeader
+            sliceCount={slices.length}
+            prototypePageCount={prototypePages.length}
+            hasDesignSystem={Boolean(prototypeDesignSystem)}
+            namingStatus={namingStatus}
+            inspectorOpen={showDesignInspector}
+            onToggleInspector={() => {
+              if (showDesignInspector) {
+                setInspectorOpen(false);
+                setInspectorDismissed(true);
+              } else {
+                setInspectorOpen(true);
+                setInspectorDismissed(false);
+              }
+            }}
+            approved={resultsApproved}
+            onApprove={() => {
+              if (!designDocument || !outcome) return;
+              void approveCurrentDeliverables({
+                document: designDocument,
+                outcome,
+                approvalId: `approval.${crypto.randomUUID()}`,
+                approvedAt: new Date().toISOString(),
+              })
+                .then(setApprovedDeliverables)
+                .catch((error) =>
+                  toast.error("Could not approve deliverables", {
+                    description:
+                      error instanceof Error ? error.message : String(error),
+                  }),
+                );
+            }}
+            onRequestChanges={focusAgentComposer}
+            onCompare={
+              prototypePages.length > 1
+                ? () => {
+                    const currentIndex = prototypePages.findIndex(
+                      (page) => page.page.id === selectedPrototypePageId,
+                    );
+                    const next =
+                      prototypePages[(currentIndex + 1) % prototypePages.length];
+                    if (next) setSelectedPrototypePageId(next.page.id);
+                  }
+                : undefined
+            }
+          />
+        ) : null}
+
+        <section
+          className={cn(
+            "relative min-h-0 flex-1 overflow-hidden",
+            !canvasBackground && "bg-muted/10",
+          )}
+          style={
+            canvasBackground ? { background: canvasBackground } : undefined
+          }
+        >
           <OutputSurface
+            canvasBackground={canvasBackground}
+            showMinimap={minimapVisible}
+            showGrid={gridVisible}
+            canvasToolbar={canvasToolbar}
+            canvasActions={{
+              onImport: openPicker,
+              onAskAgent: focusAgentComposer,
+              onExportAll: exportAll,
+              exportDisabled: exportAllPending || slices.length === 0,
+            }}
+            canvasAnnotations={canvasAnnotations}
+            onCanvasAnnotationsChange={setCanvasAnnotations}
+            designDocument={designDocument}
+            librarySavedMaterialIds={librarySavedMaterialIds}
+            canSaveApproved={resultsApproved}
+            onSaveApprovedToLibrary={async (item) => {
+              if (!item.evidenceMaterialId) return;
+              const receipt = approvedDeliverables.find(
+                (candidate) =>
+                  candidate.material.id === item.evidenceMaterialId,
+              );
+              if (!receipt) {
+                toast.error("Approve the current deliverables before saving.");
+                return;
+              }
+              const libraryItem = await libraryItemFromApproval(receipt);
+              const libraryStore = new GlobalLibraryStore(
+                createIndexedDbGlobalLibraryBackend(indexedDB),
+              );
+              const existing = (await libraryStore.catalog()).items.find(
+                (candidate) =>
+                  candidate.id === libraryItem.id &&
+                  candidate.version === libraryItem.version,
+              );
+              if (existing) {
+                toast.info("This approved version is already in Library.");
+                return;
+              }
+              await libraryStore.saveApproved(libraryItem, {
+                status: "succeeded",
+                approvalId: receipt.approvalId,
+                contentSha256: receipt.library.contentSha256,
+              });
+              toast.success("Saved to Library", {
+                description: `${libraryItem.name} · v${libraryItem.version}`,
+                action: {
+                  label: "Open in Library",
+                  onClick: library.openGlobal,
+                },
+              });
+              setLibrarySavedMaterialIds(
+                (current) => new Set([...current, receipt.material.id]),
+              );
+              setSavedLibraryItems((current) => [...current, libraryItem]);
+            }}
             prototypePlan={prototypePlan}
             prototypePages={prototypePages}
             prototypeDesignSystem={prototypeDesignSystem}
@@ -1036,700 +2813,89 @@ export function IntentWorkspace({
             working={working}
             analysisStatus={analysisStatus}
             runError={runError}
+            focusedArtifactId={focusedArtifactId}
+            focusRequestId={focusRequestId}
+            selectedMaterial={selectedMaterial}
+            onSelectMaterial={setSelectedMaterial}
+            onRequestMaterialChanges={focusAgentComposer}
+            variantDecision={
+              selectedMaterial
+                ? decisionFor(creativeBoard, selectedMaterial.id)
+                : undefined
+            }
+            onVariantDecision={(decision) =>
+              selectedMaterial &&
+              setCreativeBoard((state) =>
+                decideVariant(state, {
+                  materialId: selectedMaterial.id,
+                  version: selectedMaterial.version,
+                  decision,
+                  referenceGroup: selectedMaterial.kind,
+                  referenceLocked:
+                    decisionFor(state, selectedMaterial.id)?.referenceLocked ??
+                    false,
+                }),
+              )
+            }
+            onToggleReferenceLock={() =>
+              selectedMaterial &&
+              setCreativeBoard((state) => {
+                const current = decisionFor(state, selectedMaterial.id);
+                return decideVariant(state, {
+                  materialId: selectedMaterial.id,
+                  version: selectedMaterial.version,
+                  decision: current?.decision ?? "undecided",
+                  referenceGroup: selectedMaterial.kind,
+                  referenceLocked: !(current?.referenceLocked ?? false),
+                });
+              })
+            }
+            onMoreLikeThis={(material) => {
+              setCreativeBoard((state) =>
+                requestMoreLikeThis(state, {
+                  materialId: material.id,
+                  version: material.version,
+                }),
+              );
+              focusAgentComposer();
+            }}
+            branchRequestCount={
+              selectedMaterial
+                ? creativeBoard.branches.filter(
+                    (branch) =>
+                      branch.baseMaterialId === selectedMaterial.id &&
+                      branch.baseVersion === selectedMaterial.version,
+                  ).length
+                : 0
+            }
+            creativeBranches={
+              selectedMaterial
+                ? creativeBoard.branches.filter(
+                    (branch) =>
+                      branch.baseMaterialId === selectedMaterial.id &&
+                      branch.baseVersion === selectedMaterial.version,
+                  )
+                : []
+            }
           />
         </section>
       </main>
 
-      <DesignMarkdownInspector
-        prototypePlan={prototypePlan}
-        prototypeDesignSystem={prototypeDesignSystem}
-        importedDesignMarkdown={importedDesignMarkdown}
-        onChange={updateDesignMarkdownContent}
-      />
+      {showDesignInspector ? (
+        <DesignMarkdownInspector
+          prototypePlan={prototypePlan}
+          prototypeDesignSystem={prototypeDesignSystem}
+          importedDesignMarkdown={importedDesignMarkdown}
+          onChange={updateDesignMarkdownContent}
+          onClose={() => {
+            setInspectorOpen(false);
+            setInspectorDismissed(true);
+          }}
+          onOpenSpecimen={() => onOpenDesignOs("specimen")}
+        />
+      ) : null}
     </div>
-  )
-}
-
-function WorkspaceSidebar({
-  brief,
-  onBriefChange,
-  importedDesignMarkdown,
-  onClearDesignMarkdown,
-  attachments,
-  onAttachFiles,
-  onRemoveAttachment,
-  onArchiveProject,
-  webSearchEnabled,
-  onToggleWebSearch,
-  agentMessages,
-  onOpenSettings,
-  working,
-  workflowPhase,
-  briefEmpty,
-  hasPlan,
-  hasPrototypePages,
-  humanLoop,
-  humanLoopChoiceId,
-  onHumanLoopChoiceChange,
-  humanLoopCustomAnswer,
-  onHumanLoopCustomAnswerChange,
-  prototypePlan,
-  prototypePages,
-  prototypeDesignSystem,
-  prototypeScope,
-  onScopeChange,
-  scopeDisabled,
-  onPrimaryAction,
-  hasSlices,
-  sliceCount,
-  activeStage,
-  elapsedSeconds,
-  stages,
-  progress,
-  liveAgentOutput,
-  genError,
-  runError,
-}: {
-  readonly brief: string
-  readonly onBriefChange: (text: string) => void
-  readonly importedDesignMarkdown: DesignMarkdownAsset
-  readonly onClearDesignMarkdown: () => void
-  readonly attachments: readonly ReferenceAttachment[]
-  readonly onAttachFiles: (files: FileList | null) => void
-  readonly onRemoveAttachment: (id: string) => void
-  readonly onArchiveProject: () => void
-  readonly webSearchEnabled: boolean
-  readonly onToggleWebSearch: () => void
-  readonly agentMessages: readonly AgentMessage[]
-  readonly onOpenSettings: () => void
-  readonly working: boolean
-  readonly workflowPhase: WorkflowPhase
-  readonly briefEmpty: boolean
-  readonly hasPlan: boolean
-  readonly hasPrototypePages: boolean
-  readonly humanLoop: PrototypeHumanLoop | null
-  readonly humanLoopChoiceId: string | null
-  readonly onHumanLoopChoiceChange: (id: string) => void
-  readonly humanLoopCustomAnswer: string
-  readonly onHumanLoopCustomAnswerChange: (value: string) => void
-  readonly prototypePlan: PrototypePlan | null
-  readonly prototypePages: readonly PrototypePageArtifact[]
-  readonly prototypeDesignSystem: PrototypeDesignSystemArtifact | null
-  readonly prototypeScope: PrototypeSuiteScope
-  readonly onScopeChange: (scope: PrototypeSuiteScope) => void
-  readonly scopeDisabled: boolean
-  readonly onPrimaryAction: () => void
-  readonly hasSlices: boolean
-  readonly sliceCount: number
-  readonly activeStage: AssetStageId
-  readonly elapsedSeconds: number
-  readonly stages: readonly AssetStage[]
-  readonly progress: number
-  readonly liveAgentOutput: string
-  readonly genError: GenerationError
-  readonly runError: string | null
-}) {
-  const attachInputRef = useRef<HTMLInputElement | null>(null)
-  const [activeSection, setActiveSection] =
-    useState<WorkspaceSidebarSection>('agent')
-  const plannedPages = prototypePlan?.pages ?? []
-  const primaryCount = prototypePlan
-    ? pagesForScope(prototypePlan, 'primary-flow').length
-    : 0
-  const fullCount = prototypePlan?.pages.length ?? 0
-  const showScope = prototypePlan?.humanLoop.mode === 'continue' && primaryCount < fullCount
-  const hasDesignSystem = Boolean(importedDesignMarkdown || prototypeDesignSystem)
-  const hasAssetOutput = hasSlices || prototypePages.length > 0
-  const humanLoopAsk = activeSection === 'agent' && humanLoop?.mode === 'ask'
-  const selectedHumanLoopChoiceId =
-    humanLoop?.mode === 'ask'
-      ? humanLoopChoiceId === CUSTOM_HUMAN_LOOP_ID
-        ? humanLoop.defaultChoiceId
-        : humanLoopChoiceId ?? humanLoop.defaultChoiceId
-      : null
-  const composerValue = humanLoopAsk ? humanLoopCustomAnswer : brief
-  const composerPlaceholder = humanLoopAsk
-    ? 'Optional: add nuance, constraints, or a different direction.'
-    : 'Describe the target product, audience, platform, and visual direction.'
-  const composerDisabled = working || (!humanLoopAsk && briefEmpty)
-  const prototypeComplete = prototypePlan
-    ? isPrototypeSuiteComplete(
-        prototypePlan,
-        prototypeScope,
-        prototypePages,
-        prototypeDesignSystem,
-      )
-    : false
-
-  return (
-    <aside className="flex h-full min-h-0 w-[20rem] shrink-0 border-r border-border bg-background">
-      <nav className="flex w-14 shrink-0 flex-col items-center gap-1 border-r border-border py-3">
-        <SidebarRailItem
-          icon={FileText}
-          label="File"
-          active={activeSection === 'file'}
-          title="Project file"
-          onClick={() => setActiveSection('file')}
-        />
-        <SidebarRailItem
-          icon={WandSparkles}
-          label="Agent"
-          active={activeSection === 'agent'}
-          onClick={() => setActiveSection('agent')}
-        />
-        <SidebarRailItem
-          icon={Layers3}
-          label="Design"
-          active={hasDesignSystem}
-          disabled={!hasDesignSystem}
-          title={hasDesignSystem ? 'Design system is available.' : 'Design system appears after planning.'}
-        />
-        <SidebarRailItem
-          icon={ImageIcon}
-          label="Assets"
-          active={hasAssetOutput}
-          disabled={!hasAssetOutput}
-          title={hasAssetOutput ? 'Assets are available.' : 'Generated assets appear here after the Agent runs.'}
-        />
-        <SidebarRailItem
-          icon={Scissors}
-          label="Run"
-          active={working}
-          disabled={!working}
-          title={working ? 'Run is active.' : 'Run status appears while the Agent is working.'}
-        />
-        <div className="mt-auto w-full">
-          <SidebarRailItem
-            icon={Settings2}
-            label="Settings"
-            active={false}
-            onClick={onOpenSettings}
-          />
-        </div>
-      </nav>
-
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-        <div className="min-h-0 flex-1 overflow-y-auto p-4 pt-5">
-          {activeSection === 'file' ? (
-            <FileWorkspacePanel
-              brief={brief}
-              importedDesignMarkdown={importedDesignMarkdown}
-              attachments={attachments}
-              prototypePlan={prototypePlan}
-              prototypePages={prototypePages}
-              prototypeDesignSystem={prototypeDesignSystem}
-              hasSlices={hasSlices}
-              sliceCount={sliceCount}
-              working={working}
-              workflowPhase={workflowPhase}
-              onArchiveProject={onArchiveProject}
-            />
-          ) : working ? (
-            <AgentActivityPanel
-              stage={activeStage}
-              elapsedSeconds={elapsedSeconds}
-              stages={stages}
-              progress={progress}
-              prototypePlan={prototypePlan}
-              prototypePages={prototypePages}
-              prototypeDesignSystem={prototypeDesignSystem}
-              sliceCount={sliceCount}
-              liveAgentOutput={liveAgentOutput}
-              compact={false}
-            />
-          ) : humanLoop?.mode === 'ask' ? (
-            <HumanLoopQuestion
-              loop={humanLoop}
-              selectedChoiceId={selectedHumanLoopChoiceId}
-              onChoiceChange={onHumanLoopChoiceChange}
-              compact
-            />
-          ) : (
-            <AgentConversation messages={agentMessages} />
-          )}
-
-          {importedDesignMarkdown ? (
-            <section className="mt-4 flex min-w-0 items-center gap-2 rounded-md border border-border bg-muted/15 px-3 py-2">
-              <FileText className="size-3.5 shrink-0 text-muted-foreground" />
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-xs font-semibold">DESIGN.md imported</p>
-                <p className="truncate text-[11px] text-muted-foreground">
-                  {importedDesignMarkdown.name}
-                </p>
-              </div>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-sm"
-                aria-label="Clear imported DESIGN.md"
-                onClick={onClearDesignMarkdown}
-              >
-                <X className="size-3.5" />
-              </Button>
-            </section>
-          ) : null}
-
-          {prototypePlan ? (
-            <section className="mt-5 border-t border-border pt-4">
-              <div className="mb-2 flex items-center justify-between gap-3">
-                <p className="text-xs font-medium text-muted-foreground">Pages</p>
-                <span className="font-mono text-[10px] text-muted-foreground">
-                  {plannedPages.length}
-                </span>
-              </div>
-              <div className="space-y-1">
-                {plannedPages.map((page) => (
-                  <div
-                    key={page.id}
-                    className="flex min-w-0 items-center gap-2 rounded-md px-2 py-1.5 text-xs hover:bg-muted/30"
-                  >
-                    <Route className="size-3.5 shrink-0 text-muted-foreground" />
-                    <span className="min-w-0 flex-1 truncate">{page.name}</span>
-                    <span className="font-mono text-[10px] text-muted-foreground">
-                      {page.regions.length}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </section>
-          ) : null}
-
-          {hasSlices ? (
-            <section className="mt-4 rounded-md border border-border bg-muted/10 px-3 py-2">
-              <p className="text-xs font-medium text-muted-foreground">Assets</p>
-              <p className="mt-1 text-sm font-semibold">{sliceCount} generated</p>
-            </section>
-          ) : null}
-
-          {runError || genError ? (
-            <div className="mt-4 min-w-0 whitespace-pre-wrap break-words rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive [overflow-wrap:anywhere]">
-              {runError ?? userFacingGenerationError(genError?.message ?? '')}
-            </div>
-          ) : null}
-        </div>
-
-        {activeSection === 'agent' ? (
-        <div className="shrink-0 space-y-2 border-t border-border p-3">
-          {attachments.length > 0 ? (
-            <div className="flex flex-wrap gap-1.5">
-              {attachments.map((attachment) => (
-                <span
-                  key={attachment.id}
-                  className="flex min-w-0 items-center gap-1.5 rounded-md border border-border bg-muted/20 py-1 pr-1.5 pl-1"
-                >
-                  <img
-                    src={attachment.url}
-                    alt=""
-                    className="size-6 shrink-0 rounded object-cover"
-                  />
-                  <span className="max-w-[7.5rem] truncate text-[11px] text-muted-foreground">
-                    {attachment.name}
-                  </span>
-                  <button
-                    type="button"
-                    aria-label={`Remove ${attachment.name}`}
-                    className="shrink-0 rounded text-muted-foreground opacity-70 transition hover:text-foreground hover:opacity-100"
-                    onClick={() => onRemoveAttachment(attachment.id)}
-                  >
-                    <X className="size-3" />
-                  </button>
-                </span>
-              ))}
-            </div>
-          ) : null}
-
-          <div className="rounded-2xl border border-border bg-muted/15 shadow-sm transition-colors focus-within:border-ring/50">
-            <input
-              ref={attachInputRef}
-              type="file"
-              accept="image/*,.md,.markdown,.mdx"
-              multiple
-              className="hidden"
-              onChange={(event) => {
-                onAttachFiles(event.target.files)
-                event.target.value = ''
-              }}
-            />
-            <Textarea
-              value={composerValue}
-              rows={humanLoopAsk ? 3 : 4}
-              onChange={(event) => {
-                if (humanLoopAsk) {
-                  onHumanLoopCustomAnswerChange(event.target.value)
-                } else {
-                  onBriefChange(event.target.value)
-                }
-              }}
-              placeholder={composerPlaceholder}
-              className="min-h-[5.5rem] resize-none border-0 bg-transparent px-3 pt-3 pb-0 text-sm leading-6 shadow-none focus-visible:ring-0"
-            />
-            <div className="flex items-center justify-between gap-2 px-2 pb-2">
-              <div className="flex items-center gap-0.5">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-sm"
-                  aria-label="Attach reference images or a DESIGN.md"
-                  onClick={() => attachInputRef.current?.click()}
-                >
-                  <Paperclip className="size-4" />
-                </Button>
-                <Button
-                  type="button"
-                  variant={webSearchEnabled ? 'secondary' : 'ghost'}
-                  size="icon-sm"
-                  aria-pressed={webSearchEnabled}
-                  aria-label="Web search"
-                  onClick={onToggleWebSearch}
-                >
-                  <Globe className="size-4" />
-                </Button>
-              </div>
-              <Button
-                type="button"
-                size="icon-sm"
-                className="size-9 shrink-0 rounded-full"
-                disabled={composerDisabled}
-                onClick={onPrimaryAction}
-                aria-label={primaryButtonLabel({
-                  working,
-                  workflowPhase,
-                  hasPlan,
-                  hasPrototypePages,
-                  hasPrototypeArtifacts: Boolean(prototypeDesignSystem) || prototypePages.length > 0,
-                  prototypeComplete,
-                  hasSlices,
-                  humanLoop,
-                })}
-                title={primaryButtonLabel({
-                  working,
-                  workflowPhase,
-                  hasPlan,
-                  hasPrototypePages,
-                  hasPrototypeArtifacts: Boolean(prototypeDesignSystem) || prototypePages.length > 0,
-                  prototypeComplete,
-                  hasSlices,
-                  humanLoop,
-                })}
-              >
-                {working ? (
-                  <Loader2 className="size-4 animate-spin" />
-                ) : (
-                  <ArrowUp className="size-4" />
-                )}
-              </Button>
-            </div>
-          </div>
-
-          {showScope ? (
-            <DockScopePicker
-              scope={prototypeScope}
-              onScopeChange={onScopeChange}
-              disabled={scopeDisabled}
-              primaryCount={primaryCount}
-              fullCount={fullCount}
-            />
-          ) : null}
-        </div>
-        ) : null}
-      </div>
-    </aside>
-  )
-}
-
-function SidebarRailItem({
-  icon: Icon,
-  label,
-  active,
-  disabled = false,
-  title,
-  onClick,
-}: {
-  readonly icon: ComponentType<{ className?: string }>
-  readonly label: string
-  readonly active: boolean
-  readonly disabled?: boolean
-  readonly title?: string
-  readonly onClick?: () => void
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled && !onClick}
-      title={title ?? label}
-      className={cn(
-        'flex w-full flex-col items-center gap-1 px-1.5 py-2 text-[10px] transition-colors',
-        active ? 'text-foreground' : 'text-muted-foreground',
-        disabled && !onClick && 'cursor-default opacity-45',
-      )}
-    >
-      <div
-        className={cn(
-          'flex size-8 items-center justify-center rounded-md',
-          active ? 'bg-muted text-foreground' : !disabled && 'hover:bg-muted/50',
-        )}
-      >
-        <Icon className="size-4" />
-      </div>
-      <span className="leading-none">{label}</span>
-    </button>
-  )
-}
-
-function FileWorkspacePanel({
-  brief,
-  importedDesignMarkdown,
-  attachments,
-  prototypePlan,
-  prototypePages,
-  prototypeDesignSystem,
-  hasSlices,
-  sliceCount,
-  working,
-  workflowPhase,
-  onArchiveProject,
-}: {
-  readonly brief: string
-  readonly importedDesignMarkdown: DesignMarkdownAsset
-  readonly attachments: readonly ReferenceAttachment[]
-  readonly prototypePlan: PrototypePlan | null
-  readonly prototypePages: readonly PrototypePageArtifact[]
-  readonly prototypeDesignSystem: PrototypeDesignSystemArtifact | null
-  readonly hasSlices: boolean
-  readonly sliceCount: number
-  readonly working: boolean
-  readonly workflowPhase: WorkflowPhase
-  readonly onArchiveProject: () => void
-}) {
-  const plannedPages = prototypePlan?.pages ?? []
-  const generatedPageIds = new Set(prototypePages.map((artifact) => artifact.page.id))
-  const designState = prototypeDesignSystem
-    ? 'Generated'
-    : importedDesignMarkdown
-      ? 'Imported'
-      : prototypePlan
-        ? 'Draft'
-        : 'Waiting'
-
-  return (
-    <section className="space-y-4">
-      <div>
-        <p className="text-xs font-medium text-muted-foreground">File</p>
-        <h2 className="mt-1 text-lg font-semibold tracking-tight">
-          {prototypePlan?.product.name || brief.trim().split(/\n+/)[0] || 'Untitled project'}
-        </h2>
-        <p className="mt-2 line-clamp-3 text-xs leading-5 text-muted-foreground">
-          {brief.trim() || 'No intent yet.'}
-        </p>
-      </div>
-
-      <section className="rounded-lg border border-border bg-muted/10 p-3">
-        <div className="grid grid-cols-2 gap-2">
-          <FileMetric label="Status" value={working ? 'Running' : workflowPhaseLabel(workflowPhase)} />
-          <FileMetric label="Pages" value={`${prototypePages.length || plannedPages.length}`} />
-          <FileMetric label="Assets" value={`${hasSlices ? sliceCount : 0}`} />
-          <FileMetric label="Design" value={designState} />
-        </div>
-      </section>
-
-      <FileSection
-        icon={Route}
-        title="Pages"
-        count={plannedPages.length || prototypePages.length}
-      >
-        {plannedPages.length > 0 ? (
-          <div className="space-y-1">
-            {plannedPages.map((page) => {
-              const generated = generatedPageIds.has(page.id)
-              return (
-                <div
-                  key={page.id}
-                  className="flex min-w-0 items-center gap-2 rounded-md px-2 py-1.5 text-xs hover:bg-muted/30"
-                >
-                  <Route className="size-3.5 shrink-0 text-muted-foreground" />
-                  <span className="min-w-0 flex-1 truncate">{page.name}</span>
-                  <span className="shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
-                    {generated ? 'ready' : `${page.regions.length} regions`}
-                  </span>
-                </div>
-              )
-            })}
-          </div>
-        ) : prototypePages.length > 0 ? (
-          <div className="space-y-1">
-            {prototypePages.map((artifact) => (
-              <div
-                key={artifact.page.id}
-                className="flex min-w-0 items-center gap-2 rounded-md px-2 py-1.5 text-xs hover:bg-muted/30"
-              >
-                <Route className="size-3.5 shrink-0 text-muted-foreground" />
-                <span className="min-w-0 flex-1 truncate">{artifact.page.name}</span>
-                <span className="font-mono text-[10px] text-muted-foreground">
-                  {artifact.width}x{artifact.height}
-                </span>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <FileEmptyRow label="Pages appear after planning." />
-        )}
-      </FileSection>
-
-      <FileSection icon={Layers3} title="Design" count={designState === 'Waiting' ? 0 : 1}>
-        {prototypeDesignSystem ? (
-          <FileArtifactRow
-            icon={Layers3}
-            label="Design system"
-            detail={`${prototypeDesignSystem.width}x${prototypeDesignSystem.height}`}
-          />
-        ) : importedDesignMarkdown ? (
-          <FileArtifactRow
-            icon={FileText}
-            label={importedDesignMarkdown.name}
-            detail="Imported DESIGN.md"
-          />
-        ) : prototypePlan ? (
-          <FileArtifactRow
-            icon={FileText}
-            label="DESIGN.md draft"
-            detail="Generated from plan"
-          />
-        ) : (
-          <FileEmptyRow label="DESIGN.md appears after planning or import." />
-        )}
-      </FileSection>
-
-      <FileSection icon={ImageIcon} title="Assets" count={sliceCount}>
-        {hasSlices ? (
-          <FileArtifactRow
-            icon={ImageIcon}
-            label={`${sliceCount} cutout assets`}
-            detail="Ready in Output"
-          />
-        ) : (
-          <FileEmptyRow label="Cutout assets appear after generation." />
-        )}
-      </FileSection>
-
-      <FileSection icon={Paperclip} title="References" count={attachments.length}>
-        {attachments.length > 0 ? (
-          <div className="grid grid-cols-3 gap-2">
-            {attachments.slice(0, 6).map((attachment) => (
-              <img
-                key={attachment.id}
-                src={attachment.url}
-                alt=""
-                title={attachment.name}
-                className="aspect-square w-full rounded-md border border-border object-cover"
-              />
-            ))}
-          </div>
-        ) : (
-          <FileEmptyRow label="Attach images or DESIGN.md from Agent." />
-        )}
-      </FileSection>
-
-      <section className="rounded-lg border border-border bg-background p-3">
-        <p className="text-xs font-semibold">Project actions</p>
-        <p className="mt-1 text-xs leading-5 text-muted-foreground">
-          Move this project out of active files. It can be restored from the
-          Archived view on Home.
-        </p>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="mt-3 w-full justify-start"
-          onClick={onArchiveProject}
-        >
-          <Archive className="size-3.5" />
-          Move to archive
-        </Button>
-      </section>
-    </section>
-  )
-}
-
-function FileMetric({
-  label,
-  value,
-}: {
-  readonly label: string
-  readonly value: string
-}) {
-  return (
-    <div className="min-w-0 rounded-md bg-background px-2 py-2">
-      <p className="text-[10px] font-medium text-muted-foreground">{label}</p>
-      <p className="mt-1 truncate text-xs font-semibold">{value}</p>
-    </div>
-  )
-}
-
-function FileSection({
-  icon: Icon,
-  title,
-  count,
-  children,
-}: {
-  readonly icon: ComponentType<{ className?: string }>
-  readonly title: string
-  readonly count: number
-  readonly children: React.ReactNode
-}) {
-  return (
-    <section className="rounded-lg border border-border bg-background p-3">
-      <div className="mb-2 flex items-center gap-2">
-        <Icon className="size-3.5 text-muted-foreground" />
-        <p className="min-w-0 flex-1 text-xs font-semibold">{title}</p>
-        <span className="font-mono text-[10px] text-muted-foreground">{count}</span>
-      </div>
-      {children}
-    </section>
-  )
-}
-
-function FileArtifactRow({
-  icon: Icon,
-  label,
-  detail,
-}: {
-  readonly icon: ComponentType<{ className?: string }>
-  readonly label: string
-  readonly detail: string
-}) {
-  return (
-    <div className="flex min-w-0 items-center gap-2 rounded-md px-2 py-1.5">
-      <Icon className="size-3.5 shrink-0 text-muted-foreground" />
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-xs font-medium">{label}</p>
-        <p className="mt-0.5 truncate text-[11px] text-muted-foreground">{detail}</p>
-      </div>
-    </div>
-  )
-}
-
-function FileEmptyRow({ label }: { readonly label: string }) {
-  return (
-    <div className="rounded-md border border-dashed border-border bg-muted/10 px-2 py-2 text-xs leading-5 text-muted-foreground">
-      {label}
-    </div>
-  )
-}
-
-function workflowPhaseLabel(phase: WorkflowPhase): string {
-  switch (phase) {
-    case 'idle':
-      return 'Draft'
-    case 'planning':
-      return 'Planning'
-    case 'review':
-      return 'Review'
-    case 'design-system':
-      return 'Design'
-    case 'generating-suite':
-      return 'Generating'
-  }
+  );
 }
 
 function DockScopePicker({
@@ -1739,23 +2905,23 @@ function DockScopePicker({
   primaryCount,
   fullCount,
 }: {
-  readonly scope: PrototypeSuiteScope
-  readonly onScopeChange: (scope: PrototypeSuiteScope) => void
-  readonly disabled: boolean
-  readonly primaryCount: number
-  readonly fullCount: number
+  readonly scope: PrototypeSuiteScope;
+  readonly onScopeChange: (scope: PrototypeSuiteScope) => void;
+  readonly disabled: boolean;
+  readonly primaryCount: number;
+  readonly fullCount: number;
 }) {
   return (
     <div className="flex items-center gap-1 rounded-md bg-muted/40 p-1">
       <button
         type="button"
         disabled={disabled}
-        onClick={() => onScopeChange('primary-flow')}
+        onClick={() => onScopeChange("primary-flow")}
         className={cn(
-          'h-8 rounded px-3 text-xs font-medium transition-colors disabled:pointer-events-none disabled:opacity-50',
-          scope === 'primary-flow'
-            ? 'bg-background text-foreground shadow-sm'
-            : 'text-muted-foreground hover:text-foreground',
+          "h-8 rounded px-3 text-xs font-medium transition-colors disabled:pointer-events-none disabled:opacity-50",
+          scope === "primary-flow"
+            ? "bg-background text-foreground shadow-sm"
+            : "text-muted-foreground hover:text-foreground",
         )}
       >
         Primary · {primaryCount}
@@ -1763,18 +2929,31 @@ function DockScopePicker({
       <button
         type="button"
         disabled={disabled}
-        onClick={() => onScopeChange('full-plan')}
+        onClick={() => onScopeChange("full-plan")}
         className={cn(
-          'h-8 rounded px-3 text-xs font-medium transition-colors disabled:pointer-events-none disabled:opacity-50',
-          scope === 'full-plan'
-            ? 'bg-background text-foreground shadow-sm'
-            : 'text-muted-foreground hover:text-foreground',
+          "h-8 rounded px-3 text-xs font-medium transition-colors disabled:pointer-events-none disabled:opacity-50",
+          scope === "full-plan"
+            ? "bg-background text-foreground shadow-sm"
+            : "text-muted-foreground hover:text-foreground",
         )}
       >
         Full · {fullCount}
       </button>
     </div>
-  )
+  );
+}
+
+function emptyInspectorMessage(
+  mode: "controls" | "source",
+  sourceFormat: DesignSourceFormat | "astryx",
+  formatLabels: Record<DesignSourceFormat, string>,
+): string {
+  if (mode !== "source") return "Import DESIGN.md or generate a design system.";
+  if (sourceFormat === "astryx")
+    return "Astryx variable mapping will be available once a design system exists.";
+  if (sourceFormat === "design-md")
+    return "Import DESIGN.md or generate a design system.";
+  return `${formatLabels[sourceFormat]} will be derived from DESIGN.md tokens once a design system exists.`;
 }
 
 function DesignMarkdownInspector({
@@ -1782,40 +2961,67 @@ function DesignMarkdownInspector({
   prototypeDesignSystem,
   importedDesignMarkdown,
   onChange,
+  onClose,
+  onOpenSpecimen,
 }: {
-  readonly prototypePlan: PrototypePlan | null
-  readonly prototypeDesignSystem: PrototypeDesignSystemArtifact | null
-  readonly importedDesignMarkdown: DesignMarkdownAsset
-  readonly onChange: (content: string) => void
+  readonly prototypePlan: PrototypePlan | null;
+  readonly prototypeDesignSystem: PrototypeDesignSystemArtifact | null;
+  readonly importedDesignMarkdown: DesignMarkdownAsset;
+  readonly onChange: (content: string) => void;
+  readonly onClose: () => void;
+  readonly onOpenSpecimen?: () => void;
 }) {
-  const [mode, setMode] = useState<'controls' | 'source'>('controls')
-  const generated = prototypeDesignSystem?.designMarkdown.trim()
-  const imported = importedDesignMarkdown?.content.trim()
+  const [mode, setMode] = useState<"controls" | "source">("controls");
+  const [sourceFormat, setSourceFormat] = useState<
+    DesignSourceFormat | "astryx"
+  >("design-md");
+  const generated = prototypeDesignSystem?.designMarkdown.trim();
+  const imported = importedDesignMarkdown?.content.trim();
   const draft =
     !generated && prototypePlan
       ? prototypeDesignMarkdown(prototypePlan, importedDesignMarkdown?.content)
-      : null
-  const content = generated || imported || draft
-  const source = generated ? 'Generated' : imported ? 'Imported' : draft ? 'Draft' : 'Waiting'
+      : null;
+  const content = generated || imported || draft;
+  const source = generated
+    ? "Generated"
+    : imported
+      ? "Imported"
+      : draft
+        ? "Draft"
+        : "Waiting";
   const name = generated
-    ? 'Generated DESIGN.md'
-    : importedDesignMarkdown?.name ?? 'DESIGN.md'
-  const model = content ? parseEditableDesignMarkdown(content) : null
+    ? "Generated DESIGN.md"
+    : (importedDesignMarkdown?.name ?? "DESIGN.md");
+  const model = content ? parseEditableDesignMarkdown(content) : null;
 
-  async function copyDesignMarkdown(): Promise<void> {
-    if (!content) return
+  const activeFormat: DesignSourceFormat | "astryx" =
+    mode === "source" ? sourceFormat : "design-md";
+  const formatLabels: Record<DesignSourceFormat, string> = {
+    "design-md": "DESIGN.md",
+    tailwind: "Tailwind v4",
+    "css-variables": "CSS Variables",
+    "design-tokens": "Design Tokens",
+  };
+
+  async function copyDesignSource(): Promise<void> {
+    if (!content || !model || activeFormat === "astryx") return;
     try {
-      await navigator.clipboard.writeText(content)
-      toast.success('DESIGN.md copied')
+      await navigator.clipboard.writeText(
+        renderDesignSource(activeFormat, content, model),
+      );
+      toast.success(`${formatLabels[activeFormat]} copied`);
     } catch (error) {
-      toast.error('Copy failed', {
+      toast.error("Copy failed", {
         description: error instanceof Error ? error.message : String(error),
-      })
+      });
     }
   }
 
   return (
-    <aside className="flex h-full min-h-0 w-[18.5rem] shrink-0 flex-col border-l border-border bg-background">
+    <aside
+      aria-label="Inspector"
+      className="absolute inset-y-0 right-0 z-20 flex h-full min-h-0 w-full max-w-[22rem] shrink-0 flex-col border-l border-border bg-background shadow-xl xl:relative xl:z-auto xl:w-[18.5rem] xl:shadow-none"
+    >
       <div className="flex h-12 items-center gap-2 border-b border-border px-3">
         <button
           type="button"
@@ -1830,6 +3036,16 @@ function DesignMarkdownInspector({
         >
           Prototype
         </button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="ml-auto size-7"
+          aria-label="Close design inspector"
+          onClick={onClose}
+        >
+          <X className="size-3.5" />
+        </Button>
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto">
@@ -1837,79 +3053,426 @@ function DesignMarkdownInspector({
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <p className="text-sm font-semibold">DESIGN.md</p>
-              <p className="mt-1 truncate text-xs text-muted-foreground">{name}</p>
+              <p className="mt-1 truncate text-xs text-muted-foreground">
+                {name}
+              </p>
             </div>
             <span className="shrink-0 rounded-full border border-border bg-muted/20 px-2 py-0.5 text-[10px] text-muted-foreground">
               {source}
             </span>
           </div>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="mt-3 w-full"
-            disabled={!content}
-            onClick={() => void copyDesignMarkdown()}
-          >
-            <Tag className="size-3.5" />
-            Copy DESIGN.md
-          </Button>
+          {onOpenSpecimen ? (
+            <button
+              type="button"
+              onClick={onOpenSpecimen}
+              className="mt-2 flex items-center gap-1 text-xs font-medium text-foreground/80 hover:text-foreground hover:underline"
+            >
+              <Palette className="size-3.5" />
+              View specimen
+            </button>
+          ) : null}
+          {activeFormat !== "astryx" ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="mt-3 w-full"
+              disabled={!content}
+              onClick={() => void copyDesignSource()}
+            >
+              <Tag className="size-3.5" />
+              Copy {formatLabels[activeFormat]}
+            </Button>
+          ) : null}
           <div className="mt-3 grid grid-cols-2 gap-1 rounded-lg bg-muted p-1">
             <button
               type="button"
-              onClick={() => setMode('controls')}
+              onClick={() => setMode("controls")}
               className={cn(
-                'h-7 rounded-md text-xs font-medium transition-colors',
-                mode === 'controls'
-                  ? 'bg-background text-foreground shadow-sm'
-                  : 'text-muted-foreground hover:text-foreground',
+                "h-7 rounded-md text-xs font-medium transition-colors",
+                mode === "controls"
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground",
               )}
             >
               Controls
             </button>
             <button
               type="button"
-              onClick={() => setMode('source')}
+              onClick={() => setMode("source")}
               className={cn(
-                'h-7 rounded-md text-xs font-medium transition-colors',
-                mode === 'source'
-                  ? 'bg-background text-foreground shadow-sm'
-                  : 'text-muted-foreground hover:text-foreground',
+                "h-7 rounded-md text-xs font-medium transition-colors",
+                mode === "source"
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground",
               )}
             >
               Source
             </button>
           </div>
+          {mode === "source" ? (
+            <div className="mt-2 flex flex-wrap gap-1">
+              {(Object.keys(formatLabels) as DesignSourceFormat[]).map(
+                (format) => (
+                  <button
+                    key={format}
+                    type="button"
+                    onClick={() => setSourceFormat(format)}
+                    aria-pressed={sourceFormat === format}
+                    className={cn(
+                      "rounded-md border px-2 py-1 text-[11px] font-medium transition-colors",
+                      sourceFormat === format
+                        ? "border-foreground/25 bg-muted text-foreground"
+                        : "border-border text-muted-foreground hover:text-foreground",
+                    )}
+                  >
+                    {formatLabels[format]}
+                  </button>
+                ),
+              )}
+              <button
+                type="button"
+                onClick={() => setSourceFormat("astryx")}
+                aria-pressed={sourceFormat === "astryx"}
+                className={cn(
+                  "rounded-md border px-2 py-1 text-[11px] font-medium transition-colors",
+                  sourceFormat === "astryx"
+                    ? "border-foreground/25 bg-muted text-foreground"
+                    : "border-border text-muted-foreground hover:text-foreground",
+                )}
+              >
+                Astryx
+              </button>
+            </div>
+          ) : null}
         </section>
 
         {content && model ? (
           <section className="p-4">
-            {mode === 'controls' ? (
+            {mode === "controls" ? (
               <DesignMarkdownControls
                 content={content}
                 model={model}
                 onChange={onChange}
               />
-            ) : (
+            ) : sourceFormat === "design-md" ? (
               <Textarea
                 value={content}
                 onChange={(event) => onChange(event.target.value)}
-                className="min-h-[calc(100vh-14rem)] resize-none font-mono text-[11px] leading-5"
+                className="min-h-[calc(100vh-17rem)] resize-none font-mono text-[11px] leading-5"
               />
+            ) : sourceFormat === "astryx" ? (
+              <AstryxMappingPanel model={model} />
+            ) : (
+              <pre className="min-h-[calc(100vh-17rem)] overflow-x-auto rounded-md border border-border bg-muted/20 p-3 font-mono text-[11px] leading-5">
+                {renderDesignSource(sourceFormat, content, model)}
+              </pre>
             )}
           </section>
         ) : (
           <section className="p-4">
             <div className="rounded-md border border-border bg-muted/10 p-3">
               <p className="text-xs font-medium text-muted-foreground">
-                Import DESIGN.md or generate a design system.
+                {emptyInspectorMessage(mode, sourceFormat, formatLabels)}
               </p>
             </div>
           </section>
         )}
       </div>
     </aside>
-  )
+  );
+}
+
+function AstryxMappingPanel({
+  model,
+}: {
+  readonly model: EditableDesignMarkdown;
+}) {
+  const choices = useMemo(() => astryxColorChoices(model), [model]);
+  const choiceKey = choices.map((choice) => choice.controlId).join("|");
+  const seedMapping = () =>
+    Object.fromEntries(
+      [...suggestAstryxMapping(choices)].filter(
+        (entry): entry is [string, string] => entry[1] !== null,
+      ),
+    );
+  const [themeName, setThemeName] = useState("cutout-theme");
+  const [mapping, setMapping] = useState<Record<string, string>>(seedMapping);
+  const [binding, setBinding] = useState<AstryxBinding | null>(null);
+  const [busy, setBusy] = useState(false);
+  const seededKeyRef = useRef(choiceKey);
+
+  useEffect(() => {
+    if (seededKeyRef.current === choiceKey) return;
+    seededKeyRef.current = choiceKey;
+    setMapping(seedMapping());
+    setBinding(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [choiceKey]);
+
+  if (!choices.length) {
+    return (
+      <p className="text-xs text-muted-foreground">
+        No color tokens in DESIGN.md yet — add one under Tokens to map it to
+        Astryx.
+      </p>
+    );
+  }
+
+  const themeNameValid = /^[a-z][a-z0-9-]*$/.test(themeName);
+  const mappedCount = Object.values(mapping).filter(Boolean).length;
+  const themePath = `astryx/${themeName}.ts`;
+  const themeFile = binding?.files.find((file) => file.path === themePath);
+  const otherFiles =
+    binding?.files.filter(
+      (file) =>
+        file.path !== themePath &&
+        file.path !== "astryx/component-mapping.json" &&
+        file.path !== "astryx/cli-plan.json",
+    ) ?? [];
+
+  async function generate(): Promise<void> {
+    if (!themeNameValid || mappedCount === 0) return;
+    setBusy(true);
+    try {
+      const result = await compileAstryxThemeFromDesignMarkdown(
+        model,
+        themeName,
+        Object.entries(mapping)
+          .filter((entry): entry is [string, string] => Boolean(entry[1]))
+          .map(([controlId, astryxVariable]) => ({
+            controlId,
+            astryxVariable,
+          })),
+      );
+      setBinding(result);
+    } catch (error) {
+      toast.error("Could not compile Astryx theme", {
+        description: error instanceof Error ? error.message : String(error),
+      });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function copyFile(path: string, content: string): Promise<void> {
+    try {
+      await navigator.clipboard.writeText(content);
+      toast.success(`${path.split("/").pop()} copied`);
+    } catch (error) {
+      toast.error("Copy failed", {
+        description: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <label
+          htmlFor="astryx-theme-name"
+          className="text-[11px] font-medium text-muted-foreground"
+        >
+          Theme name
+        </label>
+        <Input
+          id="astryx-theme-name"
+          value={themeName}
+          spellCheck={false}
+          aria-invalid={!themeNameValid}
+          onChange={(event) => {
+            setThemeName(event.target.value.trim().toLocaleLowerCase());
+            setBinding(null);
+          }}
+          className="mt-1 h-8 font-mono text-xs"
+        />
+        {!themeNameValid ? (
+          <p className="mt-1 text-[10px] text-destructive">
+            Lowercase letters, numbers and hyphens only, starting with a letter.
+          </p>
+        ) : null}
+      </div>
+
+      <div className="space-y-2">
+        <p className="text-[11px] font-medium text-muted-foreground">
+          Map DESIGN.md colors to Astryx variables
+        </p>
+        {choices.map((choice) => (
+          <AstryxMappingRow
+            key={choice.controlId}
+            choice={choice}
+            value={mapping[choice.controlId] ?? ""}
+            onChange={(next) => {
+              setMapping((prev) => ({ ...prev, [choice.controlId]: next }));
+              setBinding(null);
+            }}
+          />
+        ))}
+      </div>
+
+      <Button
+        type="button"
+        size="sm"
+        className="w-full"
+        disabled={!themeNameValid || mappedCount === 0 || busy}
+        onClick={() => void generate()}
+      >
+        {busy ? (
+          <Loader2 className="size-3.5 animate-spin" />
+        ) : (
+          <WandSparkles className="size-3.5" />
+        )}
+        Generate Astryx bundle
+      </Button>
+
+      {themeFile ? (
+        <div className="space-y-3">
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="flex items-center gap-1 text-[11px] font-medium text-muted-foreground">
+                <Check className="size-3 text-emerald-600" /> {themePath}
+              </span>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-6 px-2 text-[11px]"
+                onClick={() => void copyFile(themePath, themeFile.content)}
+              >
+                <Tag className="size-3" /> Copy
+              </Button>
+            </div>
+            <pre className="max-h-64 overflow-auto rounded-md border border-border bg-muted/20 p-3 font-mono text-[11px] leading-5">
+              {themeFile.content}
+            </pre>
+          </div>
+
+          {otherFiles.length ? (
+            <div className="space-y-1 rounded-md border border-border bg-muted/10 p-2">
+              <p className="px-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                Also generated
+              </p>
+              {otherFiles.map((file) => (
+                <div
+                  key={file.path}
+                  className="flex items-center justify-between gap-2 px-1 py-0.5"
+                >
+                  <span className="truncate font-mono text-[11px] text-foreground">
+                    {file.path.replace(/^astryx\//, "")}
+                  </span>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 shrink-0 px-2 text-[11px]"
+                    onClick={() => void copyFile(file.path, file.content)}
+                  >
+                    <Tag className="size-3" /> Copy
+                  </Button>
+                </div>
+              ))}
+            </div>
+          ) : null}
+
+          {binding ? (
+            <div className="space-y-1.5 rounded-md border border-dashed border-border p-2">
+              <p className="px-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                README.md &amp; AGENTS.md
+              </p>
+              <p className="px-1 text-[10px] leading-4 text-muted-foreground">
+                Cutout's Agent doesn't have a "write this doc" tool yet — this
+                isn't a generated file, it's a grounded brief you can hand to
+                any capable assistant to draft them.
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="w-full text-[11px]"
+                onClick={() =>
+                  void copyFile(
+                    "agent brief",
+                    astryxAgentPrompt(binding.agentBrief),
+                  )
+                }
+              >
+                <Tag className="size-3" /> Copy brief for the Agent
+              </Button>
+            </div>
+          ) : null}
+
+          <p className="text-[10px] leading-4 text-muted-foreground">
+            {binding?.capability.status === "available"
+              ? "Astryx packages detected in this project. Run:"
+              : "Install @astryxdesign/core, @astryxdesign/theme-neutral and @astryxdesign/cli, then run:"}{" "}
+            <code className="rounded bg-muted px-1 py-0.5">
+              npx astryx theme build ./{themePath}
+            </code>
+          </p>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function AstryxMappingRow({
+  choice,
+  value,
+  onChange,
+}: {
+  readonly choice: AstryxColorChoice;
+  readonly value: string;
+  readonly onChange: (value: string) => void;
+}) {
+  const isKnown = value === "" || ASTRYX_COMMON_VARIABLES.includes(value);
+  const [customMode, setCustomMode] = useState(!isKnown);
+
+  return (
+    <div className="flex items-center gap-2">
+      <span
+        aria-hidden="true"
+        className="size-4 shrink-0 rounded-full border border-border"
+        style={{ background: choice.value }}
+      />
+      <span className="w-16 shrink-0 truncate text-xs" title={choice.label}>
+        {choice.label}
+      </span>
+      {customMode ? (
+        <Input
+          value={value}
+          spellCheck={false}
+          placeholder="--color-accent"
+          aria-label={`Astryx variable for ${choice.label}`}
+          aria-invalid={value !== "" && !/^--[a-z][a-z0-9-]*$/.test(value)}
+          onChange={(event) =>
+            onChange(event.target.value.trim().toLocaleLowerCase())
+          }
+          className="h-7 flex-1 font-mono text-[11px]"
+        />
+      ) : (
+        <select
+          value={value}
+          aria-label={`Astryx variable for ${choice.label}`}
+          onChange={(event) => {
+            if (event.target.value === "__custom__") {
+              setCustomMode(true);
+              return;
+            }
+            onChange(event.target.value);
+          }}
+          className="h-7 flex-1 rounded-md border border-border bg-background px-1.5 text-[11px] text-foreground"
+        >
+          <option value="">— unmapped —</option>
+          {ASTRYX_COMMON_VARIABLES.map((variable) => (
+            <option key={variable} value={variable}>
+              {variable}
+            </option>
+          ))}
+          <option value="__custom__">Custom…</option>
+        </select>
+      )}
+    </div>
+  );
 }
 
 function DesignMarkdownControls({
@@ -1917,19 +3480,21 @@ function DesignMarkdownControls({
   model,
   onChange,
 }: {
-  readonly content: string
-  readonly model: ReturnType<typeof parseEditableDesignMarkdown>
-  readonly onChange: (content: string) => void
+  readonly content: string;
+  readonly model: ReturnType<typeof parseEditableDesignMarkdown>;
+  readonly onChange: (content: string) => void;
 }) {
   const frontmatterControls = model.controls.filter(
-    (control) => control.source.type === 'frontmatter' && control.kind === 'text',
-  )
+    (control) =>
+      control.source.type === "frontmatter" && control.kind === "text",
+  );
   const tokenControls = model.controls.filter(
-    (control) => control.kind !== 'text',
-  )
+    (control) => control.kind !== "text",
+  );
   const bodyControls = model.controls.filter(
-    (control) => control.source.type !== 'frontmatter' && control.kind === 'text',
-  )
+    (control) =>
+      control.source.type !== "frontmatter" && control.kind === "text",
+  );
 
   return (
     <div className="space-y-4">
@@ -2007,12 +3572,14 @@ function DesignMarkdownControls({
               />
             ))
           ) : (
-            <p className="p-3 text-xs text-muted-foreground">No markdown sections.</p>
+            <p className="p-3 text-xs text-muted-foreground">
+              No markdown sections.
+            </p>
           )}
         </div>
       </section>
     </div>
-  )
+  );
 }
 
 function DesignTablesEditor({
@@ -2020,9 +3587,9 @@ function DesignTablesEditor({
   tables,
   onChange,
 }: {
-  readonly content: string
-  readonly tables: readonly EditableDesignTable[]
-  readonly onChange: (content: string) => void
+  readonly content: string;
+  readonly tables: readonly EditableDesignTable[];
+  readonly onChange: (content: string) => void;
 }) {
   const visibleTables = tables.filter(isUsefulDesignTable)
   if (visibleTables.length === 0) return null
@@ -2044,7 +3611,7 @@ function DesignTablesEditor({
         ))}
       </div>
     </section>
-  )
+  );
 }
 
 function DesignTableEditor({
@@ -2052,14 +3619,14 @@ function DesignTableEditor({
   table,
   onChange,
 }: {
-  readonly content: string
-  readonly table: EditableDesignTable
-  readonly onChange: (content: string) => void
+  readonly content: string;
+  readonly table: EditableDesignTable;
+  readonly onChange: (content: string) => void;
 }) {
   const [activeCell, setActiveCell] = useState<{
-    readonly rowIndex: number
-    readonly cellIndex: number
-  } | null>(null)
+    readonly rowIndex: number;
+    readonly cellIndex: number;
+  } | null>(null);
   // A markdown table can have many columns — too many rich editors for the narrow
   // panel. Cells are plain compact inputs in a horizontally-scrollable grid with a
   // sensible min column width. Rich color/number controls are shown only for the
@@ -2095,13 +3662,15 @@ function DesignTableEditor({
                 aria-label={`Table header ${cellIndex + 1}`}
                 onFocus={() => setActiveCell(null)}
                 onChange={(event) =>
-                  onChange(updateDesignMarkdownTableCell(
-                    content,
-                    table,
-                    'header',
-                    cellIndex,
-                    event.target.value,
-                  ))
+                  onChange(
+                    updateDesignMarkdownTableCell(
+                      content,
+                      table,
+                      "header",
+                      cellIndex,
+                      event.target.value,
+                    ),
+                  )
                 }
                 className="h-7 px-2 font-mono text-[11px] font-semibold"
               />
@@ -2118,23 +3687,25 @@ function DesignTableEditor({
               {table.headers.map((_, cellIndex) => (
                 <Input
                   key={`${table.id}:row:${rowIndex}:cell:${cellIndex}`}
-                  value={row[cellIndex] ?? ''}
+                  value={row[cellIndex] ?? ""}
                   aria-label={`Table row ${rowIndex + 1} cell ${cellIndex + 1}`}
                   onFocus={() => setActiveCell({ rowIndex, cellIndex })}
                   onChange={(event) =>
-                    onChange(updateDesignMarkdownTableCell(
-                      content,
-                      table,
-                      rowIndex,
-                      cellIndex,
-                      event.target.value,
-                    ))
+                    onChange(
+                      updateDesignMarkdownTableCell(
+                        content,
+                        table,
+                        rowIndex,
+                        cellIndex,
+                        event.target.value,
+                      ),
+                    )
                   }
                   className={cn(
-                    'h-7 px-2 font-mono text-[11px]',
+                    "h-7 px-2 font-mono text-[11px]",
                     activeCell?.rowIndex === rowIndex &&
                       activeCell.cellIndex === cellIndex &&
-                      'border-foreground/60 ring-1 ring-foreground/15',
+                      "border-foreground/60 ring-1 ring-foreground/15",
                   )}
                 />
               ))}
@@ -2144,8 +3715,10 @@ function DesignTableEditor({
                 size="icon-sm"
                 aria-label={`Delete table row ${rowIndex + 1}`}
                 onClick={() => {
-                  setActiveCell(null)
-                  onChange(removeDesignMarkdownTableRow(content, table, rowIndex))
+                  setActiveCell(null);
+                  onChange(
+                    removeDesignMarkdownTableRow(content, table, rowIndex),
+                  );
                 }}
                 className="size-7 self-center"
               >
@@ -2165,7 +3738,7 @@ function DesignTableEditor({
         <Plus className="size-3.5" />
         Add row
       </Button>
-      {activeCell && activeMeta && activeMeta.kind !== 'text' ? (
+      {activeCell && activeMeta && activeMeta.kind !== "text" ? (
         <div className="space-y-2 rounded-lg border border-border bg-background/60 p-2">
           <div className="flex items-center justify-between gap-2">
             <p className="min-w-0 truncate text-xs font-medium">
@@ -2179,19 +3752,21 @@ function DesignTableEditor({
             value={activeValue}
             label={`${activeHeader} row ${activeCell.rowIndex + 1}`}
             onChange={(nextValue) =>
-              onChange(updateDesignMarkdownTableCell(
-                content,
-                table,
-                activeCell.rowIndex,
-                activeCell.cellIndex,
-                formatEditedDesignValue(activeValue, nextValue),
-              ))
+              onChange(
+                updateDesignMarkdownTableCell(
+                  content,
+                  table,
+                  activeCell.rowIndex,
+                  activeCell.cellIndex,
+                  formatEditedDesignValue(activeValue, nextValue),
+                ),
+              )
             }
           />
         </div>
       ) : null}
     </div>
-  )
+  );
 }
 
 function DesignSemanticTableEditor({
@@ -2400,10 +3975,10 @@ function DesignControlGroup({
   defaultOpen = true,
   children,
 }: {
-  readonly title: string
-  readonly count: number
-  readonly defaultOpen?: boolean
-  readonly children: ReactNode
+  readonly title: string;
+  readonly count: number;
+  readonly defaultOpen?: boolean;
+  readonly children: ReactNode;
 }) {
   const [open, setOpen] = useState(defaultOpen)
   if (count === 0) return null
@@ -2419,13 +3994,15 @@ function DesignControlGroup({
         <span className="flex min-w-0 items-center gap-1.5">
           <ChevronRight
             className={cn(
-              'size-3.5 shrink-0 text-muted-foreground transition-transform',
-              open && 'rotate-90',
+              "size-3.5 shrink-0 text-muted-foreground transition-transform",
+              open && "rotate-90",
             )}
           />
           <span className="truncate text-xs font-semibold">{title}</span>
         </span>
-        <span className="shrink-0 font-mono text-[10px] text-muted-foreground">{count}</span>
+        <span className="shrink-0 font-mono text-[10px] text-muted-foreground">
+          {count}
+        </span>
       </button>
       {open ? (
         <div className="space-y-2.5 border-t border-border p-3">
@@ -2433,7 +4010,7 @@ function DesignControlGroup({
         </div>
       ) : null}
     </section>
-  )
+  );
 }
 
 function DesignControlRow({
@@ -2441,27 +4018,29 @@ function DesignControlRow({
   content,
   onChange,
 }: {
-  readonly control: EditableDesignControl
-  readonly content: string
-  readonly onChange: (content: string) => void
+  readonly control: EditableDesignControl;
+  readonly content: string;
+  readonly onChange: (content: string) => void;
 }) {
   const editor = (
     <DesignValueEditor
       value={control.value}
       label={control.label}
       onChange={(nextValue) =>
-        onChange(updateDesignMarkdownControl(
-          content,
-          control,
-          formatEditedDesignValue(control.value, nextValue),
-        ))
+        onChange(
+          updateDesignMarkdownControl(
+            content,
+            control,
+            formatEditedDesignValue(control.value, nextValue),
+          ),
+        )
       }
     />
-  )
+  );
 
   // Short tokens (colour / dimension) read best as a single `label · value` line;
   // free text (contract fields, rules) keeps a full-width input under its label.
-  if (control.kind === 'color' || control.kind === 'number') {
+  if (control.kind === "color" || control.kind === "number") {
     return (
       <div className="flex items-center gap-3">
         <span
@@ -2472,17 +4051,20 @@ function DesignControlRow({
         </span>
         <div className="w-[56%] shrink-0">{editor}</div>
       </div>
-    )
+    );
   }
 
   return (
     <div className="space-y-1">
-      <p className="truncate text-xs text-muted-foreground" title={control.label}>
+      <p
+        className="truncate text-xs text-muted-foreground"
+        title={control.label}
+      >
         {control.label}
       </p>
       {editor}
     </div>
-  )
+  );
 }
 
 function DesignValueEditor({
@@ -2490,24 +4072,28 @@ function DesignValueEditor({
   label,
   onChange,
 }: {
-  readonly value: string
-  readonly label: string
-  readonly onChange: (value: string) => void
+  readonly value: string;
+  readonly label: string;
+  readonly onChange: (value: string) => void;
 }) {
-  const meta = parseEditableDesignValue(value)
-  const color = meta.kind === 'color' ? extractEditableColor(value) : null
+  const meta = parseEditableDesignValue(value);
+  const color = meta.kind === "color" ? extractEditableColor(value) : null;
   const numberValue =
-    meta.kind === 'number' ? Number.parseFloat(editableDesignValueLiteral(value)) : Number.NaN
+    meta.kind === "number"
+      ? Number.parseFloat(editableDesignValueLiteral(value))
+      : Number.NaN;
 
   // Colour: a swatch + the raw value (no clutter).
-  if (meta.kind === 'color' && color) {
+  if (meta.kind === "color" && color) {
     return (
       <div className="flex items-center gap-1.5">
         <input
           type="color"
           value={color}
           aria-label={label}
-          onChange={(event) => onChange(replaceFirstColor(value, event.target.value))}
+          onChange={(event) =>
+            onChange(replaceFirstColor(value, event.target.value))
+          }
           className="size-7 shrink-0 cursor-pointer rounded-md border border-border bg-transparent p-0.5"
         />
         <Input
@@ -2517,17 +4103,17 @@ function DesignValueEditor({
           className="h-7 min-w-0 font-mono text-[11px]"
         />
       </div>
-    )
+    );
   }
 
   // Dimension: one compact input + a unit suffix. Native spinners cover stepping;
   // no slider / ± box — that clutter is what made the narrow panel unreadable.
-  if (meta.kind === 'number' && Number.isFinite(numberValue)) {
-    const step = numericStepForUnit(meta.unit)
+  if (meta.kind === "number" && Number.isFinite(numberValue)) {
+    const step = numericStepForUnit(meta.unit);
     const updateNumber = (nextValue: number) => {
-      const clamped = Math.min(meta.max, Math.max(meta.min, nextValue))
-      onChange(formatNumberValue(clamped, meta.unit, step))
-    }
+      const clamped = Math.min(meta.max, Math.max(meta.min, nextValue));
+      onChange(formatNumberValue(clamped, meta.unit, step));
+    };
     return (
       <div className="flex items-center gap-1.5">
         <Input
@@ -2538,8 +4124,8 @@ function DesignValueEditor({
           max={meta.max}
           step={step}
           onChange={(event) => {
-            const next = Number.parseFloat(event.target.value)
-            if (Number.isFinite(next)) updateNumber(next)
+            const next = Number.parseFloat(event.target.value);
+            if (Number.isFinite(next)) updateNumber(next);
           }}
           className="h-7 min-w-0 font-mono text-[11px] tabular-nums"
         />
@@ -2549,7 +4135,7 @@ function DesignValueEditor({
           </span>
         ) : null}
       </div>
-    )
+    );
   }
 
   return (
@@ -2559,7 +4145,7 @@ function DesignValueEditor({
       onChange={(event) => onChange(event.target.value)}
       className="h-7 text-[11px]"
     />
-  )
+  );
 }
 
 function DesignSectionEditor({
@@ -2567,9 +4153,9 @@ function DesignSectionEditor({
   section,
   onChange,
 }: {
-  readonly content: string
-  readonly section: EditableDesignSection
-  readonly onChange: (content: string) => void
+  readonly content: string;
+  readonly section: EditableDesignSection;
+  readonly onChange: (content: string) => void;
 }) {
   return (
     <div className="p-3">
@@ -2577,7 +4163,7 @@ function DesignSectionEditor({
         <div className="min-w-0">
           <p className="truncate text-xs font-semibold">{section.title}</p>
           <p className="font-mono text-[10px] text-muted-foreground">
-            {'#'.repeat(section.level)}
+            {"#".repeat(section.level)}
           </p>
         </div>
         <Button
@@ -2585,114 +4171,292 @@ function DesignSectionEditor({
           variant="ghost"
           size="icon-sm"
           aria-label={`Delete ${section.title}`}
-          onClick={() => onChange(removeDesignMarkdownSection(content, section))}
+          onClick={() =>
+            onChange(removeDesignMarkdownSection(content, section))
+          }
         >
           <Trash2 className="size-3.5" />
         </Button>
       </div>
       <Textarea
         value={section.body}
-        rows={Math.min(7, Math.max(3, section.body.split('\n').length + 1))}
+        rows={Math.min(7, Math.max(3, section.body.split("\n").length + 1))}
         onChange={(event) =>
-          onChange(updateDesignMarkdownSection(content, section, event.target.value))
+          onChange(
+            updateDesignMarkdownSection(content, section, event.target.value),
+          )
         }
         className="resize-y text-xs leading-5"
       />
     </div>
-  )
+  );
 }
 
 function extractEditableColor(value: string): string | null {
-  const match = /#[0-9a-f]{3}(?:[0-9a-f]{3})?/i.exec(value)
-  if (!match) return null
-  const hex = match[0]
+  const match = /#[0-9a-f]{3}(?:[0-9a-f]{3})?/i.exec(value);
+  if (!match) return null;
+  const hex = match[0];
   if (hex.length === 4) {
-    return `#${hex[1]}${hex[1]}${hex[2]}${hex[2]}${hex[3]}${hex[3]}`.toLowerCase()
+    return `#${hex[1]}${hex[1]}${hex[2]}${hex[2]}${hex[3]}${hex[3]}`.toLowerCase();
   }
-  return hex.slice(0, 7).toLowerCase()
+  return hex.slice(0, 7).toLowerCase();
 }
 
 function replaceFirstColor(value: string, color: string): string {
-  return value.replace(/#[0-9a-f]{3}(?:[0-9a-f]{3})?(?:[0-9a-f]{2})?/i, color)
+  return value.replace(/#[0-9a-f]{3}(?:[0-9a-f]{3})?(?:[0-9a-f]{2})?/i, color);
 }
 
 function numericStepForUnit(unit: string | null): number {
-  if (unit === 'rem' || unit === 'em' || unit === 's' || unit === null) return 0.1
-  if (unit === 'ms') return 10
-  return 1
+  if (unit === "rem" || unit === "em" || unit === "s" || unit === null)
+    return 0.1;
+  if (unit === "ms") return 10;
+  return 1;
 }
 
 function decimalPlacesForStep(step: number): number {
-  const text = String(step)
-  const index = text.indexOf('.')
-  return index < 0 ? 0 : text.length - index - 1
+  const text = String(step);
+  const index = text.indexOf(".");
+  return index < 0 ? 0 : text.length - index - 1;
 }
 
-function formatNumberValue(value: number, unit: string | null, step: number): string {
-  const decimals = decimalPlacesForStep(step)
-  const rounded = Number(value.toFixed(Math.max(0, decimals)))
-  return `${rounded}${unit ?? ''}`
+function formatNumberValue(
+  value: number,
+  unit: string | null,
+  step: number,
+): string {
+  const decimals = decimalPlacesForStep(step);
+  const rounded = Number(value.toFixed(Math.max(0, decimals)));
+  return `${rounded}${unit ?? ""}`;
 }
 
-function OutputHeader({
-  hasSlices,
+function prototypeImageVersion(artifact: PrototypeImageArtifact): string {
+  return `${artifact.bytes.byteLength}:${artifact.width}x${artifact.height}`;
+}
+
+interface LibraryArtifactMeta {
+  readonly path: string;
+  readonly sha256: string;
+  readonly mediaType: string;
+  readonly size: number;
+}
+
+/**
+ * Nest a saved Library item's flat, content-addressed artifact list
+ * (`GlobalLibraryItem.content.artifacts`, real relative paths + hashes) into
+ * a folder tree by path segment. These are genuine catalog entries, not
+ * fabricated — the manifest records paths/hashes only, so leaves carry no
+ * preview bytes.
+ */
+function buildArtifactTree(
+  parentId: string,
+  artifacts: readonly LibraryArtifactMeta[],
+): FilesPanelNode[] {
+  interface Trie {
+    readonly folders: Map<string, Trie>;
+    readonly artifacts: LibraryArtifactMeta[];
+  }
+  const root: Trie = { folders: new Map(), artifacts: [] };
+
+  for (const artifact of artifacts) {
+    const segments = artifact.path.split("/");
+    let node = root;
+    for (let depth = 0; depth < segments.length - 1; depth += 1) {
+      const segment = segments[depth];
+      let child = node.folders.get(segment);
+      if (!child) {
+        child = { folders: new Map(), artifacts: [] };
+        node.folders.set(segment, child);
+      }
+      node = child;
+    }
+    node.artifacts.push(artifact);
+  }
+
+  function toNodes(trie: Trie, pathPrefix: string): FilesPanelNode[] {
+    const folderNodes: FilesPanelNode[] = [...trie.folders.entries()].map(
+      ([name, child]) => ({
+        kind: "folder",
+        id: `${parentId}:${pathPrefix}${name}`,
+        name,
+        children: toNodes(child, `${pathPrefix}${name}/`),
+      }),
+    );
+    const fileNodes: FilesPanelNode[] = trie.artifacts.map((artifact) => ({
+      kind: "artifact",
+      id: `${parentId}:${artifact.path}`,
+      name: artifact.path.split("/").pop() ?? artifact.path,
+      mediaType: artifact.mediaType,
+      size: artifact.size,
+      sha256: artifact.sha256,
+    }));
+    return [...folderNodes, ...fileNodes];
+  }
+
+  return toNodes(root, "");
+}
+
+function repairForMaterialImpact(
+  plan: MaterialImpactPlan,
+): PrototypeRepairPlan | null {
+  if (plan.blockedReason) return null;
+  if (plan.scope === "design") {
+    return {
+      synthesizeDesignMarkdown: false,
+      generateDesignSystem: true,
+      generatePages: false,
+      deconstructPages: false,
+    };
+  }
+  if (plan.scope === "page") {
+    return {
+      synthesizeDesignMarkdown: false,
+      generateDesignSystem: false,
+      generatePages: true,
+      deconstructPages: true,
+    };
+  }
+  return null;
+}
+
+function materialImpactDetail(plan: MaterialImpactPlan): string {
+  if (plan.blockedReason) return plan.blockedReason;
+  const redo = plan.redo.map(impactTokenLabel).join(", ");
+  const preserve = plan.preserve.map(impactTokenLabel).join(", ");
+  const summary = `Redo ${redo || "nothing"}${preserve ? `; preserve ${preserve}` : ""}.`;
+  return plan.degradation ? `${plan.degradation} ${summary}` : summary;
+}
+
+function impactTokenLabel(token: string): string {
+  if (token === "all-slices") return "all derived slices";
+  if (token.startsWith("design:")) return "design system";
+  if (token.startsWith("page:")) return token.slice("page:".length);
+  if (token.startsWith("slice:")) return token.slice("slice:".length);
+  if (token.startsWith("slices-from:"))
+    return `slices from ${token.slice("slices-from:".length)}`;
+  return token;
+}
+
+export function OutputHeader({
   sliceCount,
-  hasPrototypeContext,
-  working,
-  activeStage,
-  elapsedSeconds,
+  prototypePageCount,
+  hasDesignSystem,
   namingStatus,
+  inspectorOpen,
+  onToggleInspector,
+  approved,
+  onApprove,
+  onRequestChanges,
+  onCompare,
 }: {
-  readonly hasSlices: boolean
-  readonly sliceCount: number
-  readonly hasPrototypeContext: boolean
-  readonly working: boolean
-  readonly activeStage: AssetStageId
-  readonly elapsedSeconds: number
-  readonly namingStatus: 'idle' | 'pending' | 'running' | 'done' | 'skipped' | 'error'
+  readonly sliceCount: number;
+  readonly prototypePageCount: number;
+  readonly hasDesignSystem: boolean;
+  readonly namingStatus:
+    "idle" | "pending" | "running" | "done" | "skipped" | "error";
+  readonly inspectorOpen: boolean;
+  readonly onToggleInspector: () => void;
+  readonly approved: boolean;
+  readonly onApprove: () => void;
+  readonly onRequestChanges: () => void;
+  readonly onCompare?: () => void;
 }) {
-  const stageCopy = stageLabel(activeStage)
-  const idleDetail =
-    hasSlices && namingStatus === 'skipped'
-      ? 'Ready; semantic naming is skipped because no vision model is configured.'
-      : hasSlices && namingStatus === 'error'
-        ? 'Ready; semantic naming failed, filenames are still generic.'
-        : hasSlices && hasPrototypeContext
-          ? 'Prototype context and generated assets are ready.'
-        : hasSlices
-          ? 'Ready to review and export.'
-          : 'Generated assets will appear here.'
+  const resultCount = sliceCount + prototypePageCount + Number(hasDesignSystem);
+  const resultParts = [
+    hasDesignSystem ? "Design system" : null,
+    prototypePageCount > 0
+      ? `${prototypePageCount} prototype page${prototypePageCount === 1 ? "" : "s"}`
+      : null,
+    sliceCount > 0
+      ? `${sliceCount} extracted asset${sliceCount === 1 ? "" : "s"}`
+      : null,
+  ].filter((part): part is string => Boolean(part));
+  const detail =
+    sliceCount > 0 && namingStatus === "skipped"
+      ? `${resultParts.join(" · ")} · Semantic naming unavailable`
+      : sliceCount > 0 && namingStatus === "error"
+        ? `${resultParts.join(" · ")} · Using generic filenames`
+        : resultParts.length > 0
+          ? resultParts.join(" · ")
+          : "Generated deliverables will collect here.";
   return (
     <div className="flex h-14 shrink-0 items-center justify-between border-b border-border px-6">
       <div className="min-w-0">
         <h2 className="truncate text-base font-semibold tracking-tight">
-          {hasSlices && hasPrototypeContext
-            ? `Prototype assets · ${sliceCount}`
-            : hasSlices
-              ? `${sliceCount} assets`
-              : 'Output'}
+          {resultCount > 0
+            ? `${resultCount} deliverable${resultCount === 1 ? "" : "s"}`
+            : "Output"}
         </h2>
-        <p className="text-xs text-muted-foreground">
-          {working
-            ? stageCopy.detail
-            : idleDetail}
-        </p>
+        <p className="truncate text-xs text-muted-foreground">{detail}</p>
       </div>
 
-      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-        <span
-          className={cn(
-            'size-2 rounded-full',
-            working ? 'bg-primary' : hasSlices ? 'bg-emerald-500' : 'bg-muted-foreground/40',
-          )}
-        />
-        {working ? `${stageCopy.label} · ${formatElapsed(elapsedSeconds)}` : hasSlices ? 'Ready' : 'Waiting'}
+      <div className="flex items-center gap-1 text-xs text-muted-foreground">
+        {resultCount > 0 ? (
+          <>
+            {onCompare ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={onCompare}
+                aria-label="Compare deliverables"
+              >
+                <GitCompareArrows className="size-4" />{" "}
+                <span className="hidden xl:inline">Compare</span>
+              </Button>
+            ) : null}
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={onRequestChanges}
+              aria-label="Request changes"
+            >
+              <MessageSquare className="size-4" />{" "}
+              <span className="hidden xl:inline">Request changes</span>
+            </Button>
+            <Button
+              type="button"
+              variant={approved ? "secondary" : "default"}
+              size="sm"
+              onClick={onApprove}
+              aria-label="Approve deliverables"
+              aria-pressed={approved}
+            >
+              <Check className="size-4" />{" "}
+              <span className="hidden xl:inline">
+                {approved ? "Approved" : "Approve"}
+              </span>
+            </Button>
+          </>
+        ) : null}
+        <Button
+          type="button"
+          variant={inspectorOpen ? "secondary" : "ghost"}
+          size="icon"
+          className="size-8"
+          aria-label="Details"
+          aria-pressed={inspectorOpen}
+          onClick={onToggleInspector}
+        >
+          <PanelRight className="size-4" />
+        </Button>
       </div>
     </div>
-  )
+  );
 }
 
 function OutputSurface({
+  canvasBackground,
+  showMinimap,
+  showGrid,
+  canvasToolbar,
+  canvasActions,
+  canvasAnnotations,
+  onCanvasAnnotationsChange,
+  designDocument,
+  librarySavedMaterialIds,
+  canSaveApproved,
+  onSaveApprovedToLibrary,
   prototypePlan,
   prototypePages,
   prototypeDesignSystem,
@@ -2706,67 +4470,190 @@ function OutputSurface({
   working,
   analysisStatus,
   runError,
+  focusedArtifactId,
+  focusRequestId,
+  selectedMaterial,
+  onSelectMaterial,
+  onRequestMaterialChanges,
+  variantDecision,
+  onVariantDecision,
+  onToggleReferenceLock,
+  onMoreLikeThis,
+  branchRequestCount,
+  creativeBranches,
 }: {
-  readonly prototypePlan: PrototypePlan | null
-  readonly prototypePages: readonly PrototypePageArtifact[]
-  readonly prototypeDesignSystem: PrototypeDesignSystemArtifact | null
-  readonly selectedPrototypePageId: string | null
-  readonly onPrototypePageSelect: (pageId: string) => void
-  readonly prototypeScope: PrototypeSuiteScope
-  readonly onScopeChange: (scope: PrototypeSuiteScope) => void
-  readonly onPrimaryAction: () => void
-  readonly hasSource: boolean
-  readonly hasSlices: boolean
-  readonly working: boolean
-  readonly analysisStatus: ReturnType<typeof useStatus>
-  readonly runError: string | null
+  readonly canvasBackground: string | null;
+  readonly showMinimap: boolean;
+  readonly showGrid: boolean;
+  readonly canvasToolbar: ReactNode;
+  readonly canvasActions: NonNullable<OutputCanvasProps["actions"]>;
+  readonly canvasAnnotations: readonly CanvasAnnotation[];
+  readonly onCanvasAnnotationsChange: (
+    annotations: readonly CanvasAnnotation[],
+  ) => void;
+  readonly designDocument: DesignDocument | null;
+  readonly librarySavedMaterialIds: ReadonlySet<string>;
+  readonly canSaveApproved: boolean;
+  readonly onSaveApprovedToLibrary: (item: CanvasImageItem) => Promise<void>;
+  readonly prototypePlan: PrototypePlan | null;
+  readonly prototypePages: readonly PrototypePageArtifact[];
+  readonly prototypeDesignSystem: PrototypeDesignSystemArtifact | null;
+  readonly selectedPrototypePageId: string | null;
+  readonly onPrototypePageSelect: (pageId: string) => void;
+  readonly prototypeScope: PrototypeSuiteScope;
+  readonly onScopeChange: (scope: PrototypeSuiteScope) => void;
+  readonly onPrimaryAction: () => void;
+  readonly hasSource: boolean;
+  readonly hasSlices: boolean;
+  readonly working: boolean;
+  readonly analysisStatus: ReturnType<typeof useStatus>;
+  readonly runError: string | null;
+  readonly focusedArtifactId: string | null;
+  readonly focusRequestId: number;
+  readonly selectedMaterial: MaterialRef | null;
+  readonly onSelectMaterial: (material: MaterialRef) => void;
+  readonly onRequestMaterialChanges: (material: MaterialRef) => void;
+  readonly variantDecision?: CreativeVariantDecision;
+  readonly onVariantDecision: (decision: "favorite" | "rejected") => void;
+  readonly onToggleReferenceLock: () => void;
+  readonly onMoreLikeThis: (material: MaterialRef) => void;
+  readonly branchRequestCount: number;
+  readonly creativeBranches: CreativeBoardState["branches"];
 }) {
-  const [previewPageId, setPreviewPageId] = useState<string | null>(null)
+  const [previewPageId, setPreviewPageId] = useState<string | null>(null);
   const previewArtifact =
-    prototypePages.find((artifact) => artifact.page.id === previewPageId) ?? null
-  const canvasSlices = useSlices()
-  const plannedPages = prototypePlan ? pagesForScope(prototypePlan, prototypeScope) : []
-  const generatedPageIds = new Set(prototypePages.map((artifact) => artifact.page.id))
-  const missingPageCount = plannedPages.filter((page) => !generatedPageIds.has(page.id)).length
-  const hasPrototypeArtifacts = Boolean(prototypeDesignSystem) || prototypePages.length > 0
+    prototypePages.find((artifact) => artifact.page.id === previewPageId) ??
+    null;
+  const canvasSlices = useSlices();
+  const plannedPages = prototypePlan
+    ? pagesForScope(prototypePlan, prototypeScope)
+    : [];
+  const generatedPageIds = new Set(
+    prototypePages.map((artifact) => artifact.page.id),
+  );
+  const missingPageCount = plannedPages.filter(
+    (page) => !generatedPageIds.has(page.id),
+  ).length;
+  const hasPrototypeArtifacts =
+    Boolean(prototypeDesignSystem) || prototypePages.length > 0;
   const needsContinuation =
     Boolean(prototypePlan) &&
     hasPrototypeArtifacts &&
     !hasSlices &&
     !working &&
-    prototypePlan?.humanLoop.mode !== 'ask'
+    prototypePlan?.humanLoop.mode !== "ask";
   const continuationDetail = !prototypeDesignSystem
-    ? 'The design system is not finished yet.'
+    ? "The design system is not finished yet."
     : missingPageCount > 0
-      ? `${missingPageCount} prototype page${missingPageCount === 1 ? '' : 's'} still needs to be generated.`
-      : 'Prototype screens are available. Continue to extract assets.'
+      ? `${missingPageCount} prototype page${missingPageCount === 1 ? "" : "s"} still needs to be generated.`
+      : "Prototype screens are available. Continue to extract assets.";
 
   // Constrained orchestration board: once a prototype result exists, results +
   // materials are arranged on one governed canvas (design system · pages · assets).
   if (prototypeDesignSystem || prototypePages.length > 0) {
+    const evidenceFor = (materialId: string) => {
+      const material = designDocument?.materials.find(
+        (candidate) => candidate.id === materialId,
+      );
+      return material
+        ? { materialId: material.id, revisionId: material.currentRevisionId }
+        : null;
+    };
+    const designSystemEvidence = evidenceFor("material:design-system");
     const canvasDesignSystem: CanvasImageItem | null = prototypeDesignSystem
       ? {
-          id: 'design-system',
-          label: prototypeDesignSystem.name || 'Design system',
+          id: "design-system",
+          label: prototypeDesignSystem.name || "Design system",
           blob: prototypeDesignSystem.blob,
+          material: {
+            id: "design-system",
+            kind: "design-system",
+            label: prototypeDesignSystem.name || "Design system",
+            version: prototypeImageVersion(prototypeDesignSystem),
+            provenance: { source: "prototype-generation" },
+          },
+          evidenceMaterialId: designSystemEvidence?.materialId,
+          revisionId: designSystemEvidence?.revisionId,
         }
-      : null
-    const canvasPages: CanvasImageItem[] = prototypePages.map((artifact) => ({
-      id: artifact.page.id,
-      label: artifact.page.name,
-      blob: artifact.blob,
-    }))
-    const canvasAssets: CanvasImageItem[] = canvasSlices.map((slice) => ({
-      id: slice.id,
-      label: slice.name,
-      url: slice.objectUrl,
-    }))
+      : null;
+    const canvasPages: CanvasImageItem[] = prototypePages.map((artifact) => {
+      const evidence = evidenceFor(
+        `material:prototype-page:${artifact.page.id}`,
+      );
+      return {
+        id: artifact.page.id,
+        label: artifact.page.name,
+        blob: artifact.blob,
+        material: {
+          id: artifact.page.id,
+          kind: "prototype-page",
+          label: artifact.page.name,
+          version: prototypeImageVersion(artifact),
+          provenance: { source: "prototype-generation" },
+        },
+        pageId: artifact.page.id,
+        evidenceMaterialId: evidence?.materialId,
+        revisionId: evidence?.revisionId,
+      };
+    });
+    const canvasAssets: CanvasImageItem[] = canvasSlices.map((slice) => {
+      const evidence = evidenceFor(`material:cutout-slice:${slice.id}`);
+      return {
+        id: slice.id,
+        label: slice.name,
+        url: slice.objectUrl,
+        material: {
+          id: slice.id,
+          kind: "cutout-slice",
+          label: slice.name,
+          version: `${slice.blob.size}:${slice.width}x${slice.height}:${slice.box.x},${slice.box.y}`,
+          provenance: {
+            source: "page-deconstruction",
+            sourcePageId: prototypePages[0]?.page.id,
+            independentlyEditable: false,
+          },
+        },
+        pageId: prototypePages[0]?.page.id,
+        evidenceMaterialId: evidence?.materialId,
+        revisionId: evidence?.revisionId,
+      };
+    });
     return (
       <div className="relative h-full min-h-0">
         <OutputCanvas
+          showMinimap={showMinimap}
+          showGrid={showGrid}
+          background={canvasBackground}
+          toolbar={canvasToolbar}
+          actions={canvasActions}
+          annotations={canvasAnnotations}
+          onAnnotationsChange={onCanvasAnnotationsChange}
           designSystem={canvasDesignSystem}
           pages={canvasPages}
           assets={canvasAssets}
+          focusArtifactId={focusedArtifactId}
+          focusRequestId={focusRequestId}
+          selectedMaterialId={selectedMaterial?.id}
+          onSelectMaterial={onSelectMaterial}
+          onRequestMaterialChanges={onRequestMaterialChanges}
+          variantDecision={variantDecision}
+          onVariantDecision={onVariantDecision}
+          onToggleReferenceLock={onToggleReferenceLock}
+          onMoreLikeThis={onMoreLikeThis}
+          branchRequestCount={branchRequestCount}
+          creativeBranches={creativeBranches}
+          onSaveToLibrary={
+            canSaveApproved
+              ? (item) =>
+                  void onSaveApprovedToLibrary(item).catch((error) =>
+                    toast.error("Could not save to Library", {
+                      description:
+                        error instanceof Error ? error.message : String(error),
+                    }),
+                  )
+              : undefined
+          }
+          librarySavedMaterialIds={librarySavedMaterialIds}
         />
         {needsContinuation ? (
           <ContinueAssetsCallout
@@ -2775,7 +4662,7 @@ function OutputSurface({
           />
         ) : null}
       </div>
-    )
+    );
   }
 
   if (hasSlices) {
@@ -2808,7 +4695,7 @@ function OutputSurface({
               artifact={previewArtifact}
               open={previewArtifact !== null}
               onOpenChange={(open) => {
-                if (!open) setPreviewPageId(null)
+                if (!open) setPreviewPageId(null);
               }}
             />
           </div>
@@ -2817,7 +4704,7 @@ function OutputSurface({
           <SliceGrid />
         </div>
       </div>
-    )
+    );
   }
 
   if (runError) {
@@ -2827,18 +4714,18 @@ function OutputSurface({
         title="Generation stopped"
         detail={runError}
       />
-    )
+    );
   }
 
   if (prototypePlan && prototypePages.length === 0 && !working) {
-    if (prototypePlan.humanLoop.mode === 'ask') {
+    if (prototypePlan.humanLoop.mode === "ask") {
       return (
         <CenteredState
           icon={MessageCircle}
           title="Answer in the Agent panel"
           detail="Choose a direction on the left, or write a custom answer, then continue."
         />
-      )
+      );
     }
 
     return (
@@ -2847,7 +4734,7 @@ function OutputSurface({
         scope={prototypeScope}
         onScopeChange={onScopeChange}
       />
-    )
+    );
   }
 
   if (prototypePages.length > 0) {
@@ -2860,17 +4747,17 @@ function OutputSurface({
           onSelectPage={onPrototypePageSelect}
         />
       </div>
-    )
+    );
   }
 
-  if (analysisStatus === 'error') {
+  if (analysisStatus === "error") {
     return (
       <CenteredState
         icon={PackageOpen}
         title="No assets found"
         detail="This run did not produce usable cutouts."
       />
-    )
+    );
   }
 
   if (hasSource) {
@@ -2878,155 +4765,86 @@ function OutputSurface({
       <div className="relative flex h-full min-h-0 p-4">
         <SourceCanvas />
       </div>
-    )
+    );
   }
 
   if (working) {
-    return (
-      <CenteredState
-        icon={WandSparkles}
-        title="Generating assets"
-        detail="Agent progress is shown in the left panel."
-      />
-    )
+    return <PlannedResultSkeleton pages={plannedPages} />;
   }
 
   return (
-    <CenteredState
-      icon={WandSparkles}
-      title="Assets will appear here"
-      detail="Start with a short description on the left."
-    />
-  )
+    <div className="relative h-full min-h-0">
+      <OutputCanvas
+        showMinimap={showMinimap}
+        showGrid={showGrid}
+        background={canvasBackground}
+        toolbar={canvasToolbar}
+        actions={canvasActions}
+        annotations={canvasAnnotations}
+        onAnnotationsChange={onCanvasAnnotationsChange}
+        designSystem={null}
+        pages={[]}
+        assets={[]}
+        emptyHint="Get started by describing your idea to the Agent"
+      />
+    </div>
+  );
 }
 
-function StageStatusIcon({
-  status,
+function PlannedResultSkeleton({
+  pages,
 }: {
-  readonly status: AssetStage['status']
+  readonly pages: readonly PrototypePage[];
 }) {
-  if (status === 'done') return <CheckCircle2 className="mt-0.5 size-3.5 text-emerald-500" />
-  if (status === 'running') return <Loader2 className="mt-0.5 size-3.5 animate-spin text-primary" />
-  return <Circle className="mt-0.5 size-3.5 text-muted-foreground/50" />
-}
-
-function AgentActivityPanel({
-  stage,
-  elapsedSeconds,
-  stages,
-  progress,
-  prototypePlan,
-  prototypePages,
-  prototypeDesignSystem,
-  sliceCount,
-  liveAgentOutput,
-  compact,
-}: {
-  readonly stage: AssetStageId
-  readonly elapsedSeconds: number
-  readonly stages: readonly AssetStage[]
-  readonly progress: number
-  readonly prototypePlan: PrototypePlan | null
-  readonly prototypePages: readonly PrototypePageArtifact[]
-  readonly prototypeDesignSystem: PrototypeDesignSystemArtifact | null
-  readonly sliceCount: number
-  readonly liveAgentOutput: string
-  readonly compact: boolean
-}) {
-  const copy = stageLabel(stage)
-  const events = buildActivityEvents({
-    stages,
-    stage,
-    elapsedSeconds,
-    prototypePlan,
-    prototypePages,
-    prototypeDesignSystem,
-    sliceCount,
-    liveAgentOutput,
-  })
-  const visibleEvents = compact ? events.slice(-4) : events
+  const plannedPages =
+    pages.length > 0
+      ? pages
+      : [
+          { id: "planned-page-1", name: "Primary result" },
+          { id: "planned-page-2", name: "Supporting result" },
+        ];
 
   return (
-    <section
-      aria-live="polite"
-      className={cn(
-        'rounded-lg border border-border bg-background/95 text-left shadow-sm backdrop-blur',
-        compact ? 'p-3' : 'w-full max-w-2xl p-4',
-      )}
+    <div
+      className="h-full overflow-y-auto p-6"
+      aria-label="Planned deliverables"
     >
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <span className="relative flex size-2.5">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-40" />
-              <span className="relative inline-flex size-2.5 rounded-full bg-primary" />
-            </span>
-            <p className="text-xs font-medium text-muted-foreground">Agent activity</p>
+      <div className="mx-auto grid w-full max-w-5xl gap-6">
+        <div>
+          <h3 className="text-sm font-semibold">Building your deliverables</h3>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Results will replace these planned frames as they become available.
+          </p>
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          <div className="overflow-hidden rounded-lg border border-border bg-card">
+            <div className="aspect-[4/3] animate-pulse bg-muted/50" />
+            <div className="border-t border-border/60 px-3 py-2">
+              <p className="text-xs font-medium">Design system</p>
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                Planned foundation
+              </p>
+            </div>
           </div>
-          <h2 className={cn('mt-2 font-semibold', compact ? 'text-sm' : 'text-lg')}>
-            {copy.label}
-          </h2>
-          <p className={cn('mt-1 text-muted-foreground', compact ? 'text-xs' : 'text-sm')}>
-            {copy.detail}
-          </p>
+          {plannedPages.map((page) => (
+            <div
+              key={page.id}
+              className="overflow-hidden rounded-lg border border-border bg-card"
+            >
+              <div className="aspect-[4/3] animate-pulse bg-muted/35" />
+              <div className="border-t border-border/60 px-3 py-2">
+                <p className="truncate text-xs font-medium">{page.name}</p>
+                <p className="mt-1 text-[11px] text-muted-foreground">
+                  Planned prototype page
+                </p>
+              </div>
+            </div>
+          ))}
         </div>
-        <span className="shrink-0 rounded-full border border-border bg-muted/20 px-2 py-1 font-mono text-[11px] text-muted-foreground">
-          {formatElapsed(elapsedSeconds)}
-        </span>
-      </div>
-
-      <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-muted">
-        <div
-          className="h-full rounded-full bg-primary transition-[width] duration-500 ease-out"
-          style={{ width: `${progress}%` }}
-        />
-      </div>
-
-      <div className={cn('mt-4 space-y-2', compact ? 'max-h-40 overflow-hidden' : 'max-h-72 overflow-auto pr-1')}>
-        {visibleEvents.map((event) => (
-          <ActivityRow key={event.id} event={event} compact={compact} />
-        ))}
-      </div>
-
-      {liveAgentOutput.trim() ? (
-        <pre className={cn(
-          'mt-4 max-h-32 overflow-hidden whitespace-pre-wrap break-words rounded-md border border-border bg-muted/20 p-3 font-mono text-[11px] leading-5 text-muted-foreground',
-          compact ? 'hidden' : null,
-        )}>
-          {liveAgentOutput}
-        </pre>
-      ) : null}
-    </section>
-  )
-}
-
-function ActivityRow({
-  event,
-  compact,
-}: {
-  readonly event: ActivityEvent
-  readonly compact: boolean
-}) {
-  return (
-    <div className="flex gap-2">
-      <StageStatusIcon status={event.status} />
-      <div className="min-w-0 flex-1">
-        <div className="flex min-w-0 items-center gap-2">
-          <p className={cn('truncate font-medium', compact ? 'text-xs' : 'text-sm')}>
-            {event.label}
-          </p>
-          {event.status === 'running' ? (
-            <span className="shrink-0 rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
-              live
-            </span>
-          ) : null}
-        </div>
-        <p className={cn('break-words text-muted-foreground', compact ? 'line-clamp-1 text-[11px]' : 'text-xs leading-5')}>
-          {event.detail}
-        </p>
       </div>
     </div>
-  )
+  );
 }
 
 function ScopePicker({
@@ -3036,25 +4854,25 @@ function ScopePicker({
   primaryCount,
   fullCount,
 }: {
-  readonly scope: PrototypeSuiteScope
-  readonly onScopeChange: (scope: PrototypeSuiteScope) => void
-  readonly disabled: boolean
-  readonly primaryCount: number
-  readonly fullCount: number
+  readonly scope: PrototypeSuiteScope;
+  readonly onScopeChange: (scope: PrototypeSuiteScope) => void;
+  readonly disabled: boolean;
+  readonly primaryCount: number;
+  readonly fullCount: number;
 }) {
-  if (primaryCount >= fullCount) return null
+  if (primaryCount >= fullCount) return null;
 
   return (
     <div className="grid grid-cols-2 gap-2">
       <button
         type="button"
         disabled={disabled}
-        onClick={() => onScopeChange('primary-flow')}
+        onClick={() => onScopeChange("primary-flow")}
         className={cn(
-          'rounded-md border px-3 py-2 text-left transition-colors disabled:pointer-events-none disabled:opacity-60',
-          scope === 'primary-flow'
-            ? 'border-primary bg-primary/10'
-            : 'border-border bg-background hover:bg-muted/60',
+          "rounded-md border px-3 py-2 text-left transition-colors disabled:pointer-events-none disabled:opacity-60",
+          scope === "primary-flow"
+            ? "border-primary bg-primary/10"
+            : "border-border bg-background hover:bg-muted/60",
         )}
       >
         <span className="block text-xs font-semibold">Primary flow</span>
@@ -3065,12 +4883,12 @@ function ScopePicker({
       <button
         type="button"
         disabled={disabled}
-        onClick={() => onScopeChange('full-plan')}
+        onClick={() => onScopeChange("full-plan")}
         className={cn(
-          'rounded-md border px-3 py-2 text-left transition-colors disabled:pointer-events-none disabled:opacity-60',
-          scope === 'full-plan'
-            ? 'border-primary bg-primary/10'
-            : 'border-border bg-background hover:bg-muted/60',
+          "rounded-md border px-3 py-2 text-left transition-colors disabled:pointer-events-none disabled:opacity-60",
+          scope === "full-plan"
+            ? "border-primary bg-primary/10"
+            : "border-border bg-background hover:bg-muted/60",
         )}
       >
         <span className="block text-xs font-semibold">Full plan</span>
@@ -3079,7 +4897,7 @@ function ScopePicker({
         </span>
       </button>
     </div>
-  )
+  );
 }
 
 function PrototypePlanReview({
@@ -3087,20 +4905,22 @@ function PrototypePlanReview({
   scope,
   onScopeChange,
 }: {
-  readonly plan: PrototypePlan
-  readonly scope: PrototypeSuiteScope
-  readonly onScopeChange: (scope: PrototypeSuiteScope) => void
+  readonly plan: PrototypePlan;
+  readonly scope: PrototypeSuiteScope;
+  readonly onScopeChange: (scope: PrototypeSuiteScope) => void;
 }) {
-  const scopedPages = pagesForScope(plan, scope)
-  const firstFlow = plan.flows[0]
-  const primaryCount = pagesForScope(plan, 'primary-flow').length
-  const fullCount = plan.pages.length
+  const scopedPages = pagesForScope(plan, scope);
+  const firstFlow = plan.flows[0];
+  const primaryCount = pagesForScope(plan, "primary-flow").length;
+  const fullCount = plan.pages.length;
 
   return (
     <div className="h-full min-h-0 overflow-auto bg-muted/10 p-5">
       <section className="mx-auto grid max-w-6xl gap-4 lg:grid-cols-[18rem_minmax(0,1fr)_18rem]">
         <aside className="rounded-lg border border-border bg-background p-4 shadow-sm">
-          <p className="text-xs font-medium text-muted-foreground">Agent read</p>
+          <p className="text-xs font-medium text-muted-foreground">
+            Agent read
+          </p>
           <h2 className="mt-2 text-xl font-semibold tracking-tight">
             {plan.product.name}
           </h2>
@@ -3119,9 +4939,11 @@ function PrototypePlanReview({
           <section className="rounded-lg border border-border bg-background p-4 shadow-sm">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <p className="text-xs font-medium text-muted-foreground">Flow</p>
+                <p className="text-xs font-medium text-muted-foreground">
+                  Flow
+                </p>
                 <h3 className="mt-1 text-base font-semibold">
-                  {firstFlow?.name ?? 'Generated flow'}
+                  {firstFlow?.name ?? "Generated flow"}
                 </h3>
               </div>
               <span className="rounded-full border border-border bg-muted/20 px-2.5 py-1 text-xs text-muted-foreground">
@@ -3137,7 +4959,9 @@ function PrototypePlanReview({
           <section className="rounded-lg border border-border bg-background p-4 shadow-sm">
             <div className="mb-3 flex items-center justify-between gap-3">
               <div>
-                <p className="text-xs font-medium text-muted-foreground">Pages</p>
+                <p className="text-xs font-medium text-muted-foreground">
+                  Pages
+                </p>
                 <h3 className="mt-1 text-base font-semibold">
                   Prototype structure
                 </h3>
@@ -3168,7 +4992,9 @@ function PrototypePlanReview({
           ) : null}
 
           <section className="rounded-lg border border-border bg-background p-4 shadow-sm">
-            <p className="text-xs font-medium text-muted-foreground">Design system</p>
+            <p className="text-xs font-medium text-muted-foreground">
+              Design system
+            </p>
             <h3 className="mt-1 text-sm font-semibold">Shared visual rules</h3>
             <p className="mt-2 text-xs leading-5 text-muted-foreground">
               {plan.designSystem.styleSummary}
@@ -3186,7 +5012,9 @@ function PrototypePlanReview({
           </section>
 
           <section className="rounded-lg border border-border bg-background p-4 shadow-sm">
-            <p className="text-xs font-medium text-muted-foreground">Asset direction</p>
+            <p className="text-xs font-medium text-muted-foreground">
+              Asset direction
+            </p>
             <p className="mt-2 text-xs leading-5 text-muted-foreground">
               {plan.designSystem.assetDirection}
             </p>
@@ -3194,7 +5022,7 @@ function PrototypePlanReview({
         </aside>
       </section>
     </div>
-  )
+  );
 }
 
 function HumanLoopQuestion({
@@ -3203,105 +5031,142 @@ function HumanLoopQuestion({
   onChoiceChange,
   compact = false,
 }: {
-  readonly loop: Extract<PrototypeHumanLoop, { mode: 'ask' }>
-  readonly selectedChoiceId: string | null
-  readonly onChoiceChange: (id: string) => void
-  readonly compact?: boolean
+  readonly loop: HumanLoopAskLike;
+  readonly selectedChoiceId: string | null;
+  readonly onChoiceChange: (id: string) => void;
+  readonly compact?: boolean;
 }) {
   return (
-    <section className={cn(
-      'rounded-lg border border-primary/35 bg-background shadow-sm',
-      compact ? 'p-3' : 'p-4',
-    )}>
+    <section
+      role="group"
+      aria-label="Choose a direction"
+      className={cn(
+        "rounded-lg border border-primary/35 bg-background shadow-sm",
+        compact ? "p-3" : "p-4",
+      )}
+    >
       <div>
-        <h3 className={cn('min-w-0 font-semibold leading-6', compact ? 'text-sm' : 'text-base')}>
+        <h3
+          className={cn(
+            "min-w-0 font-semibold leading-6",
+            compact ? "text-sm" : "text-base",
+          )}
+        >
           {loop.question}
         </h3>
         <p className="mt-1 text-xs leading-5 text-muted-foreground">
-          Choose one direction. Add optional context below, then press the arrow.
+          Choose one direction. Add optional context below, then press the
+          arrow.
         </p>
       </div>
 
-      <div className={cn('grid gap-2', compact ? 'mt-3' : 'mt-4 md:grid-cols-2')}>
-        {loop.choices.map((choice) => {
-          const selected = choice.id === selectedChoiceId
-          return (
-            <button
-              key={choice.id}
-              type="button"
-              onClick={() => onChoiceChange(choice.id)}
-              className={cn(
-                'rounded-md border text-left transition-colors',
-                compact ? 'min-h-0 p-2.5' : 'min-h-24 p-3',
-                selected
-                  ? 'border-primary bg-primary/10'
-                  : 'border-border bg-muted/10 hover:bg-muted/40',
-              )}
-            >
-              <div className="flex items-center justify-between gap-3">
-                <span className={cn('font-semibold', compact ? 'text-xs' : 'text-sm')}>
-                  {choice.label}
-                </span>
-                <span
+      <div
+        className={cn("grid gap-2", compact ? "mt-3" : "mt-4 md:grid-cols-2")}
+      >
+        <button
+          type="button"
+          aria-label="Use your judgment"
+          onClick={() => onChoiceChange(loop.defaultChoiceId)}
+          className="rounded-md border border-primary/50 bg-primary/10 p-2.5 text-left transition-colors hover:bg-primary/15"
+        >
+          <span className="text-xs font-semibold">Use your judgment</span>
+          <p className="mt-1 text-xs leading-5 text-muted-foreground">
+            Continue with the Agent&apos;s recommended direction.
+          </p>
+        </button>
+        {loop.choices
+          .filter((choice) => choice.id !== loop.defaultChoiceId)
+          .slice(0, 2)
+          .map((choice) => {
+            const selected = choice.id === selectedChoiceId;
+            return (
+              <button
+                key={choice.id}
+                type="button"
+                onClick={() => onChoiceChange(choice.id)}
+                className={cn(
+                  "rounded-md border text-left transition-colors",
+                  compact ? "min-h-0 p-2.5" : "min-h-24 p-3",
+                  selected
+                    ? "border-primary bg-primary/10"
+                    : "border-border bg-muted/10 hover:bg-muted/40",
+                )}
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <span
+                    className={cn(
+                      "font-semibold",
+                      compact ? "text-xs" : "text-sm",
+                    )}
+                  >
+                    {choice.label}
+                  </span>
+                  <span
+                    className={cn(
+                      "size-2 rounded-full",
+                      selected ? "bg-primary" : "bg-muted-foreground/30",
+                    )}
+                  />
+                </div>
+                <p
                   className={cn(
-                    'size-2 rounded-full',
-                    selected ? 'bg-primary' : 'bg-muted-foreground/30',
+                    "mt-2 text-xs leading-5 text-muted-foreground",
+                    compact ? "line-clamp-3" : null,
                   )}
-                />
-              </div>
-              <p className={cn(
-                'mt-2 text-xs leading-5 text-muted-foreground',
-                compact ? 'line-clamp-3' : null,
-              )}>
-                {choice.description}
-              </p>
-            </button>
-          )
-        })}
+                >
+                  {choice.description}
+                </p>
+              </button>
+            );
+          })}
       </div>
     </section>
-  )
+  );
 }
 
 function PlanFact({
   label,
   value,
 }: {
-  readonly label: string
-  readonly value: string
+  readonly label: string;
+  readonly value: string;
 }) {
   return (
     <div>
-      <p className="text-[11px] font-medium text-muted-foreground">
-        {label}
-      </p>
+      <p className="text-[11px] font-medium text-muted-foreground">{label}</p>
       <p className="mt-1 text-sm leading-5">{value}</p>
     </div>
-  )
+  );
 }
 
 function FlowTimeline({
   plan,
   pages,
 }: {
-  readonly plan: PrototypePlan
-  readonly pages: readonly PrototypePage[]
+  readonly plan: PrototypePlan;
+  readonly pages: readonly PrototypePage[];
 }) {
-  const pageById = new Map(plan.pages.map((page) => [page.id, page]))
-  const firstFlow = plan.flows[0]
+  const pageById = new Map(plan.pages.map((page) => [page.id, page]));
+  const firstFlow = plan.flows[0];
   const flowPageIds = firstFlow
-    ? [firstFlow.startPageId, ...firstFlow.steps.map((step) => step.toPageId).filter((id): id is string => Boolean(id))]
-    : pages.map((page) => page.id)
+    ? [
+        firstFlow.startPageId,
+        ...firstFlow.steps
+          .map((step) => step.toPageId)
+          .filter((id): id is string => Boolean(id)),
+      ]
+    : pages.map((page) => page.id);
   const uniqueIds = [...new Set(flowPageIds)].filter((id) =>
     pages.some((page) => page.id === id),
-  )
-  const timelinePages = uniqueIds.length > 0 ? uniqueIds : pages.map((page) => page.id)
+  );
+  const timelinePages =
+    uniqueIds.length > 0 ? uniqueIds : pages.map((page) => page.id);
 
   return (
     <div className="mt-4 flex flex-wrap items-center gap-2">
       {timelinePages.map((id, index) => {
-        const page = pageById.get(id)
-        if (!page) return null
+        const page = pageById.get(id);
+        if (!page) return null;
         return (
           <div key={id} className="flex items-center gap-2">
             <div className="rounded-md border border-border bg-muted/10 px-3 py-2">
@@ -3317,15 +5182,17 @@ function FlowTimeline({
               <ExternalLink className="size-3.5 text-muted-foreground/70" />
             ) : null}
           </div>
-        )
+        );
       })}
     </div>
-  )
+  );
 }
 
 function PlanPageCard({ page }: { readonly page: PrototypePage }) {
-  const primaryInteraction = page.interactions[0]
-  const topAssets = page.regions.flatMap((region) => region.assetOpportunities).slice(0, 3)
+  const primaryInteraction = page.interactions[0];
+  const topAssets = page.regions
+    .flatMap((region) => region.assetOpportunities)
+    .slice(0, 3);
   return (
     <article className="rounded-md border border-border bg-muted/10 p-3">
       <div className="flex items-start justify-between gap-3">
@@ -3336,7 +5203,7 @@ function PlanPageCard({ page }: { readonly page: PrototypePage }) {
           </p>
         </div>
         <span className="shrink-0 rounded-full bg-background px-2 py-1 text-[10px] text-muted-foreground">
-          {page.viewport.scroll === 'long-scroll' ? 'Long' : 'Screen'}
+          {page.viewport.scroll === "long-scroll" ? "Long" : "Screen"}
         </span>
       </div>
       <p className="mt-2 line-clamp-2 text-xs leading-5 text-muted-foreground">
@@ -3367,7 +5234,7 @@ function PlanPageCard({ page }: { readonly page: PrototypePage }) {
         </div>
       ) : null}
     </article>
-  )
+  );
 }
 
 function PrototypeSuitePreview({
@@ -3376,19 +5243,18 @@ function PrototypeSuitePreview({
   selectedPageId,
   onSelectPage,
 }: {
-  readonly designSystem: PrototypeDesignSystemArtifact | null
-  readonly pages: readonly PrototypePageArtifact[]
-  readonly selectedPageId: string | null
-  readonly onSelectPage: (pageId: string) => void
+  readonly designSystem: PrototypeDesignSystemArtifact | null;
+  readonly pages: readonly PrototypePageArtifact[];
+  readonly selectedPageId: string | null;
+  readonly onSelectPage: (pageId: string) => void;
 }) {
   const [previewArtifact, setPreviewArtifact] =
-    useState<PrototypePageArtifact | null>(null)
-  const selected = pages.find((page) => page.page.id === selectedPageId) ?? pages[0]
+    useState<PrototypePageArtifact | null>(null);
+  const selected =
+    pages.find((page) => page.page.id === selectedPageId) ?? pages[0];
   return (
     <div className="flex h-full min-h-0 flex-col overflow-y-auto p-4">
-      {designSystem ? (
-        <DesignSystemReference artifact={designSystem} />
-      ) : null}
+      {designSystem ? <DesignSystemReference artifact={designSystem} /> : null}
       <PrototypePageRail
         pages={pages}
         selectedPageId={selected?.page.id ?? null}
@@ -3404,11 +5270,11 @@ function PrototypeSuitePreview({
         artifact={previewArtifact}
         open={Boolean(previewArtifact)}
         onOpenChange={(open) => {
-          if (!open) setPreviewArtifact(null)
+          if (!open) setPreviewArtifact(null);
         }}
       />
     </div>
-  )
+  );
 }
 
 function PrototypeSuiteStrip({
@@ -3417,10 +5283,10 @@ function PrototypeSuiteStrip({
   selectedPageId,
   onSelectPage,
 }: {
-  readonly designSystem: PrototypeDesignSystemArtifact | null
-  readonly pages: readonly PrototypePageArtifact[]
-  readonly selectedPageId: string | null
-  readonly onSelectPage: (pageId: string) => void
+  readonly designSystem: PrototypeDesignSystemArtifact | null;
+  readonly pages: readonly PrototypePageArtifact[];
+  readonly selectedPageId: string | null;
+  readonly onSelectPage: (pageId: string) => void;
 }) {
   return (
     <section className="mb-3 rounded-lg border border-border bg-card p-3">
@@ -3446,7 +5312,7 @@ function PrototypeSuiteStrip({
         opensPreview
       />
     </section>
-  )
+  );
 }
 
 function PrototypeContextStrip({
@@ -3513,26 +5379,26 @@ function DesignSystemReference({
   artifact,
   compact = false,
 }: {
-  readonly artifact: PrototypeDesignSystemArtifact
-  readonly compact?: boolean
+  readonly artifact: PrototypeDesignSystemArtifact;
+  readonly compact?: boolean;
 }) {
-  const [url, setUrl] = useState<string | null>(null)
-  const [open, setOpen] = useState(false)
+  const [url, setUrl] = useState<string | null>(null);
+  const [open, setOpen] = useState(false);
 
   useEffect(() => {
-    const next = URL.createObjectURL(artifact.blob)
-    setUrl(next)
-    return () => URL.revokeObjectURL(next)
-  }, [artifact.blob])
+    const next = URL.createObjectURL(artifact.blob);
+    setUrl(next);
+    return () => URL.revokeObjectURL(next);
+  }, [artifact.blob]);
 
   async function copyDesignMd(): Promise<void> {
     try {
-      await navigator.clipboard.writeText(artifact.designMarkdown)
-      toast.success('DESIGN.md copied')
+      await navigator.clipboard.writeText(artifact.designMarkdown);
+      toast.success("DESIGN.md copied");
     } catch (error) {
-      toast.error('Copy failed', {
+      toast.error("Copy failed", {
         description: error instanceof Error ? error.message : String(error),
-      })
+      });
     }
   }
 
@@ -3544,16 +5410,12 @@ function DesignSystemReference({
           aria-label="Open design system reference"
           onClick={() => setOpen(true)}
           className={cn(
-            'shrink-0 overflow-hidden rounded-sm border border-border bg-muted/30 outline-none transition-all hover:border-ring/50 focus-visible:ring-3 focus-visible:ring-ring/40',
-            compact ? 'size-16' : 'h-20 w-32',
+            "shrink-0 overflow-hidden rounded-sm border border-border bg-muted/30 outline-none transition-all hover:border-ring/50 focus-visible:ring-3 focus-visible:ring-ring/40",
+            compact ? "size-16" : "h-20 w-32",
           )}
         >
           {url ? (
-            <img
-              src={url}
-              alt=""
-              className="h-full w-full object-cover"
-            />
+            <img src={url} alt="" className="h-full w-full object-cover" />
           ) : (
             <Layers3 className="m-auto size-5 text-muted-foreground" />
           )}
@@ -3585,7 +5447,9 @@ function DesignSystemReference({
             <div className="grid gap-2">
               <div className="flex min-w-0 items-center justify-between gap-4 px-1 pt-1">
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold">Design system</p>
+                  <p className="truncate text-sm font-semibold">
+                    Design system
+                  </p>
                   <p className="truncate text-xs text-muted-foreground">
                     DESIGN.md-compatible style contract
                   </p>
@@ -3610,7 +5474,7 @@ function DesignSystemReference({
         </DialogContent>
       </Dialog>
     </section>
-  )
+  );
 }
 
 function PrototypePageRail({
@@ -3620,11 +5484,11 @@ function PrototypePageRail({
   compact = false,
   opensPreview = false,
 }: {
-  readonly pages: readonly PrototypePageArtifact[]
-  readonly selectedPageId: string | null
-  readonly onSelectPage: (pageId: string) => void
-  readonly compact?: boolean
-  readonly opensPreview?: boolean
+  readonly pages: readonly PrototypePageArtifact[];
+  readonly selectedPageId: string | null;
+  readonly onSelectPage: (pageId: string) => void;
+  readonly compact?: boolean;
+  readonly opensPreview?: boolean;
 }) {
   return (
     <div
@@ -3643,7 +5507,7 @@ function PrototypePageRail({
         />
       ))}
     </div>
-  )
+  );
 }
 
 function PrototypePageThumb({
@@ -3653,48 +5517,56 @@ function PrototypePageThumb({
   compact,
   opensPreview,
 }: {
-  readonly artifact: PrototypePageArtifact
-  readonly selected: boolean
-  readonly onSelect: () => void
-  readonly compact: boolean
-  readonly opensPreview: boolean
+  readonly artifact: PrototypePageArtifact;
+  readonly selected: boolean;
+  readonly onSelect: () => void;
+  readonly compact: boolean;
+  readonly opensPreview: boolean;
 }) {
-  const [url, setUrl] = useState<string | null>(null)
+  const [url, setUrl] = useState<string | null>(null);
 
   useEffect(() => {
-    const next = URL.createObjectURL(artifact.blob)
-    setUrl(next)
-    return () => URL.revokeObjectURL(next)
-  }, [artifact.blob])
+    const next = URL.createObjectURL(artifact.blob);
+    setUrl(next);
+    return () => URL.revokeObjectURL(next);
+  }, [artifact.blob]);
 
   return (
     <button
       type="button"
       role="option"
       aria-selected={selected}
-      aria-label={`${opensPreview ? 'Open preview for' : 'Show'} ${artifact.page.name}`}
+      aria-label={`${opensPreview ? "Open preview for" : "Show"} ${artifact.page.name}`}
       onClick={onSelect}
       className={cn(
-        'w-36 shrink-0 rounded-md border bg-background p-2 text-left outline-none transition-all',
-        opensPreview ? 'cursor-zoom-in' : 'cursor-pointer',
-        'hover:border-ring/50 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/40',
-        selected ? 'border-primary shadow-sm ring-1 ring-primary/30' : 'border-border',
-        compact ? 'w-32' : null,
+        "w-36 shrink-0 rounded-md border bg-background p-2 text-left outline-none transition-all",
+        opensPreview ? "cursor-zoom-in" : "cursor-pointer",
+        "hover:border-ring/50 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/40",
+        selected
+          ? "border-primary shadow-sm ring-1 ring-primary/30"
+          : "border-border",
+        compact ? "w-32" : null,
       )}
     >
       <div className="flex aspect-[4/3] items-center justify-center overflow-hidden rounded-sm bg-muted/30">
         {url ? (
-          <img src={url} alt={artifact.page.name} className="h-full w-full object-cover" />
+          <img
+            src={url}
+            alt={artifact.page.name}
+            className="h-full w-full object-cover"
+          />
         ) : (
           <ImageIcon className="size-5 text-muted-foreground" />
         )}
       </div>
-      <p className="mt-2 truncate text-xs font-semibold">{artifact.page.name}</p>
+      <p className="mt-2 truncate text-xs font-semibold">
+        {artifact.page.name}
+      </p>
       <p className="truncate font-mono text-[10px] text-muted-foreground">
         {artifact.page.route}
       </p>
     </button>
-  )
+  );
 }
 
 function PrototypePreviewDialog({
@@ -3702,21 +5574,21 @@ function PrototypePreviewDialog({
   open,
   onOpenChange,
 }: {
-  readonly artifact: PrototypePageArtifact | null
-  readonly open: boolean
-  readonly onOpenChange: (open: boolean) => void
+  readonly artifact: PrototypePageArtifact | null;
+  readonly open: boolean;
+  readonly onOpenChange: (open: boolean) => void;
 }) {
-  const [url, setUrl] = useState<string | null>(null)
+  const [url, setUrl] = useState<string | null>(null);
 
   useEffect(() => {
     if (!artifact) {
-      setUrl(null)
-      return
+      setUrl(null);
+      return;
     }
-    const next = URL.createObjectURL(artifact.blob)
-    setUrl(next)
-    return () => URL.revokeObjectURL(next)
-  }, [artifact])
+    const next = URL.createObjectURL(artifact.blob);
+    setUrl(next);
+    return () => URL.revokeObjectURL(next);
+  }, [artifact]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -3725,13 +5597,17 @@ function PrototypePreviewDialog({
         className="w-fit max-w-[94vw] gap-0 p-2"
       >
         <DialogTitle className="sr-only">
-          {artifact ? `Prototype preview: ${artifact.page.name}` : 'Prototype preview'}
+          {artifact
+            ? `Prototype preview: ${artifact.page.name}`
+            : "Prototype preview"}
         </DialogTitle>
         {artifact && url ? (
           <div className="grid gap-2">
             <div className="flex min-w-0 items-center justify-between gap-4 px-1 pt-1">
               <div className="min-w-0">
-                <p className="truncate text-sm font-semibold">{artifact.page.name}</p>
+                <p className="truncate text-sm font-semibold">
+                  {artifact.page.name}
+                </p>
                 <p className="truncate text-xs text-muted-foreground">
                   {artifact.page.route} · {artifact.width}×{artifact.height}
                 </p>
@@ -3746,29 +5622,31 @@ function PrototypePreviewDialog({
         ) : null}
       </DialogContent>
     </Dialog>
-  )
+  );
 }
 
 function PrototypePagePreview({
   artifact,
   onOpenPreview,
 }: {
-  readonly artifact: PrototypePageArtifact
-  readonly onOpenPreview: () => void
+  readonly artifact: PrototypePageArtifact;
+  readonly onOpenPreview: () => void;
 }) {
-  const [url, setUrl] = useState<string | null>(null)
+  const [url, setUrl] = useState<string | null>(null);
 
   useEffect(() => {
-    const next = URL.createObjectURL(artifact.blob)
-    setUrl(next)
-    return () => URL.revokeObjectURL(next)
-  }, [artifact.blob])
+    const next = URL.createObjectURL(artifact.blob);
+    setUrl(next);
+    return () => URL.revokeObjectURL(next);
+  }, [artifact.blob]);
 
   return (
     <div className="min-h-0 flex-1 overflow-hidden rounded-lg border border-border bg-background p-3">
       <div className="mb-3 flex items-center justify-between gap-3">
         <div className="min-w-0">
-          <h2 className="truncate text-sm font-semibold">{artifact.page.name}</h2>
+          <h2 className="truncate text-sm font-semibold">
+            {artifact.page.name}
+          </h2>
           <p className="truncate text-xs text-muted-foreground">
             {artifact.page.purpose}
           </p>
@@ -3794,7 +5672,7 @@ function PrototypePagePreview({
         )}
       </button>
     </div>
-  )
+  );
 }
 
 function CenteredState({
@@ -3802,31 +5680,60 @@ function CenteredState({
   title,
   detail,
 }: {
-  readonly icon: ComponentType<{ className?: string }>
-  readonly title: string
-  readonly detail: string
+  readonly icon: ComponentType<{ className?: string }>;
+  readonly title: string;
+  readonly detail: string;
 }) {
+  const { ref, style } = useCenteredSafeArea();
   return (
-    <div className="flex h-full items-center justify-center p-8">
-      <div className="text-center">
+    <div ref={ref} style={style} data-slot="canvas-centered-overlay" className="pointer-events-none absolute z-10 min-w-0 text-center">
+      <div className="min-w-0 text-center">
         <Icon className="mx-auto mb-4 size-9 text-muted-foreground/60" />
-        <h2 className="text-lg font-semibold">{title}</h2>
-        <p className="mt-2 max-w-sm text-sm text-muted-foreground">{detail}</p>
+        <h2 className="break-words text-lg font-semibold">{title}</h2>
+        <p className="mt-2 max-w-sm break-words text-sm text-muted-foreground">{detail}</p>
       </div>
     </div>
-  )
+  );
+}
+
+function useCenteredSafeArea() {
+  const ref = useRef<HTMLDivElement>(null);
+  const [style, setStyle] = useState<CSSProperties>();
+  useLayoutEffect(() => {
+    const element = ref.current;
+    if (!element) return;
+    const workspace = element.closest("[data-workspace-root]");
+    const measure = () => {
+      const bounds = element.parentElement?.getBoundingClientRect();
+      if (!bounds) return;
+      const panels = [...(workspace?.querySelectorAll<HTMLElement>('[data-workspace-panel="agent-drawer"], [data-workspace-panel="files-drawer"], [aria-label="Inspector"]') ?? [])];
+      const { left, right, bottom } = projectVisiblePanelInsets(bounds, panels.map((panel) => ({ bounds: panel.getBoundingClientRect(), visible: visiblyOccupiesSpace(panel) })));
+      const area = projectCanvasSafeArea({ viewport: { width: bounds.width, height: bounds.height }, agentDrawer: { open: left > 0, size: left }, inspector: { open: right > 0, size: right }, bottomOverlay: { open: bottom > 0, size: bottom }, centeredOverlay: { maxWidth: 448, margin: 24 } });
+      const anchor = projectCanvasOverlayAnchor(area, "center");
+      setStyle({ left: anchor.x, top: anchor.y, width: `min(28rem, ${anchor.maxWidth}px)`, transform: "translate(-50%, -50%)" });
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(element.parentElement ?? element);
+    workspace?.querySelectorAll<HTMLElement>("[data-workspace-panel], [aria-label=\"Inspector\"]").forEach((panel) => observer.observe(panel));
+    const mutations = new MutationObserver(measure);
+    if (workspace) mutations.observe(workspace, { subtree: true, childList: true, attributes: true, attributeFilter: ["class", "style", "data-workspace-panel"] });
+    window.addEventListener("resize", measure);
+    return () => { observer.disconnect(); mutations.disconnect(); window.removeEventListener("resize", measure); };
+  }, []);
+  return { ref, style };
 }
 
 function ContinueAssetsCallout({
   detail,
   onContinue,
 }: {
-  readonly detail: string
-  readonly onContinue: () => void
+  readonly detail: string;
+  readonly onContinue: () => void;
 }) {
   return (
-    <div className="pointer-events-none absolute inset-x-0 bottom-5 z-10 flex justify-center px-4">
-      <div className="pointer-events-auto flex w-full max-w-xl items-center justify-between gap-4 rounded-lg border border-border bg-background/95 px-4 py-3 shadow-lg backdrop-blur">
+    <div className="pointer-events-none absolute inset-x-0 bottom-24 z-10 flex justify-center px-4">
+      <div className="pointer-events-none flex w-full max-w-xl items-center justify-between gap-4 rounded-lg border border-border bg-background/95 px-4 py-3 shadow-lg backdrop-blur">
         <div className="min-w-0">
           <p className="text-sm font-semibold">Continue generation</p>
           <p className="mt-1 text-xs leading-5 text-muted-foreground">
@@ -3836,28 +5743,28 @@ function ContinueAssetsCallout({
         <Button
           type="button"
           onClick={onContinue}
-          className="shrink-0"
+          className="pointer-events-auto shrink-0"
         >
           <WandSparkles className="size-4" />
           Continue assets
         </Button>
       </div>
     </div>
-  )
+  );
 }
 
 function useElapsedSeconds(startedAt: number | null, active: boolean): number {
-  const [now, setNow] = useState(() => Date.now())
+  const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
-    if (!startedAt || !active) return
-    const timer = window.setInterval(() => setNow(Date.now()), 500)
-    return () => window.clearInterval(timer)
-  }, [active, startedAt])
+    if (!startedAt || !active) return;
+    const timer = window.setInterval(() => setNow(Date.now()), 500);
+    return () => window.clearInterval(timer);
+  }, [active, startedAt]);
 
-  if (!startedAt) return 0
-  const displayNow = active ? Math.max(now, Date.now()) : now
-  return Math.max(0, Math.floor((displayNow - startedAt) / 1000))
+  if (!startedAt) return 0;
+  const displayNow = active ? Math.max(now, Date.now()) : now;
+  return Math.max(0, Math.floor((displayNow - startedAt) / 1000));
 }
 
 function resolveAssetStage({
@@ -3873,36 +5780,36 @@ function resolveAssetStage({
   hasDesignSystem,
   hasPrototypePages,
 }: {
-  readonly genPhase: ReturnType<typeof useStore.getState>['genPhase']
-  readonly analysisStatus: ReturnType<typeof useStatus>
-  readonly naming: boolean
-  readonly hasMockup: boolean
-  readonly hasSource: boolean
-  readonly hasSlices: boolean
-  readonly agentBusy: boolean
-  readonly workflowPhase: WorkflowPhase
-  readonly hasPlan: boolean
-  readonly hasDesignSystem: boolean
-  readonly hasPrototypePages: boolean
+  readonly genPhase: ReturnType<typeof useStore.getState>["genPhase"];
+  readonly analysisStatus: ReturnType<typeof useStatus>;
+  readonly naming: boolean;
+  readonly hasMockup: boolean;
+  readonly hasSource: boolean;
+  readonly hasSlices: boolean;
+  readonly agentBusy: boolean;
+  readonly workflowPhase: WorkflowPhase;
+  readonly hasPlan: boolean;
+  readonly hasDesignSystem: boolean;
+  readonly hasPrototypePages: boolean;
 }): AssetStageId {
-  if (workflowPhase === 'planning') return 'planning'
-  if (workflowPhase === 'review') return 'review'
-  if (workflowPhase === 'design-system') return 'design-system'
-  if (workflowPhase === 'generating-suite') return 'mockup'
-  if (genPhase === 'generating-mockup') return 'mockup'
-  if (genPhase === 'deconstructing') return 'deconstruct'
-  if (analysisStatus === 'running') return 'cutout'
-  if (naming) return 'naming'
-  if (hasSlices) return 'done'
-  if (hasPrototypePages) return 'mockup'
-  if (hasDesignSystem) return 'design-system'
-  if (hasPlan) return 'review'
+  if (workflowPhase === "planning") return "planning";
+  if (workflowPhase === "review") return "review";
+  if (workflowPhase === "design-system") return "design-system";
+  if (workflowPhase === "generating-suite") return "mockup";
+  if (genPhase === "generating-mockup") return "mockup";
+  if (genPhase === "deconstructing") return "deconstruct";
+  if (analysisStatus === "running") return "cutout";
+  if (naming) return "naming";
+  if (hasSlices) return "done";
+  if (hasPrototypePages) return "mockup";
+  if (hasDesignSystem) return "design-system";
+  if (hasPlan) return "review";
   if (agentBusy) {
-    if (hasSource) return 'cutout'
-    if (hasMockup) return 'deconstruct'
-    return 'preparing'
+    if (hasSource) return "cutout";
+    if (hasMockup) return "deconstruct";
+    return "preparing";
   }
-  return 'idle'
+  return "idle";
 }
 
 function applyLocalSemanticSliceNames(
@@ -3910,22 +5817,26 @@ function applyLocalSemanticSliceNames(
   scope: PrototypeSuiteScope,
   onlyGeneric: boolean,
 ): number {
-  if (!plan) return 0
-  const snapshot = getStoreState()
-  const slices = snapshot.analysis.slices
-  if (slices.length === 0) return 0
+  if (!plan) return 0;
+  const snapshot = getStoreState();
+  const slices = snapshot.analysis.slices;
+  if (slices.length === 0) return 0;
 
-  const names = fallbackPrototypeSliceNames(plan, pagesForScope(plan, scope), slices.length)
-  let renamed = 0
+  const names = fallbackPrototypeSliceNames(
+    plan,
+    pagesForScope(plan, scope),
+    slices.length,
+  );
+  let renamed = 0;
   for (let index = 0; index < slices.length; index += 1) {
-    const slice = slices[index]
-    const name = names[index]
-    if (!slice || !name) continue
-    if (onlyGeneric && !isGenericSliceFilename(slice.name)) continue
-    snapshot.renameSlice(slice.id, name)
-    renamed += 1
+    const slice = slices[index];
+    const name = names[index];
+    if (!slice || !name) continue;
+    if (onlyGeneric && !isGenericSliceFilename(slice.name)) continue;
+    snapshot.renameSlice(slice.id, name);
+    renamed += 1;
   }
-  return renamed
+  return renamed;
 }
 
 function buildAssetStages({
@@ -3938,340 +5849,95 @@ function buildAssetStages({
   hasDesignSystem,
   hasPrototypePages,
 }: {
-  readonly activeStage: AssetStageId
-  readonly hasMockup: boolean
-  readonly hasSource: boolean
-  readonly hasSlices: boolean
-  readonly namingStatus: 'idle' | 'pending' | 'running' | 'done' | 'skipped' | 'error'
-  readonly hasPlan: boolean
-  readonly hasDesignSystem: boolean
-  readonly hasPrototypePages: boolean
+  readonly activeStage: AssetStageId;
+  readonly hasMockup: boolean;
+  readonly hasSource: boolean;
+  readonly hasSlices: boolean;
+  readonly namingStatus:
+    "idle" | "pending" | "running" | "done" | "skipped" | "error";
+  readonly hasPlan: boolean;
+  readonly hasDesignSystem: boolean;
+  readonly hasPrototypePages: boolean;
 }): readonly AssetStage[] {
-  const isDone = (id: AssetStage['id']): boolean => {
-    if (id === 'planning') return hasPlan || hasPrototypePages || hasMockup || hasSource || hasSlices
-    if (id === 'design-system') return hasDesignSystem || hasPrototypePages || hasMockup || hasSource || hasSlices
-    if (id === 'mockup') return hasPrototypePages || hasMockup || hasSource || hasSlices
-    if (id === 'deconstruct') return hasSource || hasSlices
-    if (id === 'cutout') return hasSlices
-    if (id === 'naming') return namingStatus === 'done'
-    return activeStage !== 'idle' && activeStage !== 'preparing' && activeStage !== 'review'
-  }
-  const isRunning = (id: AssetStage['id']): boolean => activeStage === id
+  const isDone = (id: AssetStage["id"]): boolean => {
+    if (id === "planning")
+      return (
+        hasPlan || hasPrototypePages || hasMockup || hasSource || hasSlices
+      );
+    if (id === "design-system")
+      return (
+        hasDesignSystem ||
+        hasPrototypePages ||
+        hasMockup ||
+        hasSource ||
+        hasSlices
+      );
+    if (id === "mockup")
+      return hasPrototypePages || hasMockup || hasSource || hasSlices;
+    if (id === "deconstruct") return hasSource || hasSlices;
+    if (id === "cutout") return hasSlices;
+    if (id === "naming") return namingStatus === "done";
+    return (
+      activeStage !== "idle" &&
+      activeStage !== "preparing" &&
+      activeStage !== "review"
+    );
+  };
+  const isRunning = (id: AssetStage["id"]): boolean => activeStage === id;
 
   const stage = (
-    id: AssetStage['id'],
+    id: AssetStage["id"],
     label: string,
     detail: string,
-    icon: AssetStage['icon'],
+    icon: AssetStage["icon"],
   ): AssetStage => ({
     id,
     label,
     detail,
     icon,
-    status: isDone(id) ? 'done' : isRunning(id) ? 'running' : 'pending',
-  })
+    status: isDone(id) ? "done" : isRunning(id) ? "running" : "pending",
+  });
 
   return [
-    stage('planning', 'Plan', 'Map pages, flows, and scope.', WandSparkles),
-    stage('design-system', 'Design system', 'Create DESIGN.md and visual reference.', Layers3),
-    stage('mockup', 'Prototype suite', 'Generate planned pages.', ImageIcon),
-    stage('deconstruct', 'Asset board', 'Regenerate valuable visual layers.', Layers3),
-    stage('cutout', 'Cutout', 'Detect and split atomic assets.', Scissors),
-    stage('naming', 'Names', 'Apply semantic filenames.', Tag),
-  ]
-}
-
-function estimateProgress({
-  activeStage,
-  hasMockup,
-  hasSource,
-  hasSlices,
-  naming,
-  namingStatus,
-  hasPlan,
-  hasDesignSystem,
-  hasPrototypePages,
-}: {
-  readonly activeStage: AssetStageId
-  readonly hasMockup: boolean
-  readonly hasSource: boolean
-  readonly hasSlices: boolean
-  readonly naming: boolean
-  readonly namingStatus: 'idle' | 'pending' | 'running' | 'done' | 'skipped' | 'error'
-  readonly hasPlan: boolean
-  readonly hasDesignSystem: boolean
-  readonly hasPrototypePages: boolean
-}): number {
-  if (activeStage === 'done') return 100
-  let progress = 4
-  if (hasPlan) progress += 18
-  if (hasDesignSystem) progress += 14
-  if (hasPrototypePages || hasMockup) progress += 30
-  if (hasSource) progress += 28
-  if (hasSlices) progress += 20
-
-  if (activeStage === 'planning') progress = Math.max(progress, 10)
-  if (activeStage === 'review') progress = Math.max(progress, 24)
-  if (activeStage === 'design-system') progress = Math.max(progress, 28)
-  if (activeStage === 'mockup') progress = Math.max(progress, 38)
-  if (activeStage === 'deconstruct') progress = Math.max(progress, 48)
-  if (activeStage === 'cutout') progress = Math.max(progress, 82)
-  if (activeStage === 'naming' || naming || namingStatus === 'running') {
-    progress = Math.max(progress, 94)
-  }
-  if (namingStatus === 'done') return 100
-
-  return Math.min(progress, 98)
-}
-
-function buildActivityEvents({
-  stages,
-  stage,
-  elapsedSeconds,
-  prototypePlan,
-  prototypePages,
-  prototypeDesignSystem,
-  sliceCount,
-  liveAgentOutput,
-}: {
-  readonly stages: readonly AssetStage[]
-  readonly stage: AssetStageId
-  readonly elapsedSeconds: number
-  readonly prototypePlan: PrototypePlan | null
-  readonly prototypePages: readonly PrototypePageArtifact[]
-  readonly prototypeDesignSystem: PrototypeDesignSystemArtifact | null
-  readonly sliceCount: number
-  readonly liveAgentOutput: string
-}): readonly ActivityEvent[] {
-  const events: ActivityEvent[] = stages.map((item) => ({
-    id: `stage-${item.id}`,
-    label: item.label,
-    detail:
-      item.status === 'done'
-        ? `Completed. ${item.detail}`
-        : item.status === 'running'
-          ? `In progress. ${item.detail}`
-          : `Queued. ${item.detail}`,
-    status: item.status,
-  }))
-
-  if (stage === 'planning' && !prototypePlan) {
-    events.push({
-      id: 'planner-stream-wait',
-      label: 'Planner request sent',
-      detail: `Waiting for structured model output. Heartbeat ${formatElapsed(elapsedSeconds)}.`,
-      status: 'running',
-    })
-  }
-
-  if (prototypePlan) {
-    const pageNames = prototypePlan.pages.map((page) => page.name).join(', ')
-    events.push({
-      id: 'plan-pages',
-      label: `Plan received: ${prototypePlan.pages.length} pages`,
-      detail: pageNames || 'The Agent returned a page and flow plan.',
-      status: 'done',
-    })
-  }
-
-  if (stage === 'design-system' && !prototypeDesignSystem) {
-    events.push({
-      id: 'design-system-stream-wait',
-      label: 'Design system generation started',
-      detail: 'Waiting for the image model to return the visual reference and DESIGN.md synthesis.',
-      status: 'running',
-    })
-  }
-
-  if (liveAgentOutput.trim()) {
-    events.push({
-      id: 'text-stream-received',
-      label: 'SSE text stream receiving',
-      detail: 'DESIGN.md synthesis is streaming into the activity panel.',
-      status: 'running',
-    })
-  }
-
-  if (prototypeDesignSystem) {
-    events.push({
-      id: 'design-system-ready',
-      label: 'Design system received',
-      detail: `${prototypeDesignSystem.name} · ${prototypeDesignSystem.width}x${prototypeDesignSystem.height}.`,
-      status: 'done',
-    })
-  }
-
-  if (stage === 'mockup' && prototypePages.length === 0) {
-    events.push({
-      id: 'prototype-page-stream-wait',
-      label: 'Prototype page generation started',
-      detail: 'Waiting for the first page image. Each page appears as soon as it is ready.',
-      status: 'running',
-    })
-  }
-
-  for (const artifact of prototypePages) {
-    events.push({
-      id: `page-${artifact.page.id}`,
-      label: `Page received: ${artifact.page.name}`,
-      detail: `${artifact.width}x${artifact.height} · ${artifact.page.purpose}`,
-      status: 'done',
-    })
-  }
-
-  if (stage === 'deconstruct') {
-    events.push({
-      id: 'asset-board-wait',
-      label: 'Asset extraction request sent',
-      detail: 'Regenerating valuable visual layers before local cutout.',
-      status: 'running',
-    })
-  }
-
-  if (stage === 'cutout') {
-    events.push({
-      id: 'local-cutout-running',
-      label: 'Local cutout running',
-      detail: 'Detecting transparent regions, splitting candidates, and preparing PNG slices.',
-      status: 'running',
-    })
-  }
-
-  if (sliceCount > 0) {
-    events.push({
-      id: 'slice-count',
-      label: `${sliceCount} assets visible`,
-      detail: 'Assets are available while semantic naming continues in the background.',
-      status: 'done',
-    })
-  }
-
-  if (stage === 'naming') {
-    events.push({
-      id: 'naming-running',
-      label: 'Semantic naming started',
-      detail: 'Applying content-aware filenames without blocking asset review.',
-      status: 'running',
-    })
-  }
-
-  return events
-}
-
-function stageLabel(stage: AssetStageId): { label: string; detail: string } {
-  switch (stage) {
-    case 'planning':
-      return {
-        label: 'Planning prototype',
-        detail: 'Agent is mapping pages, flows, regions, and visual system.',
-      }
-    case 'review':
-      return {
-        label: 'Review plan',
-        detail: 'Answer the Agent only when the plan still has a high-impact uncertainty.',
-      }
-    case 'design-system':
-      return {
-        label: 'Creating design system',
-        detail: 'Generating a DESIGN.md-compatible style contract and visual reference.',
-      }
-    case 'preparing':
-      return {
-        label: 'Preparing run',
-        detail: 'Resolving model route and prompt context.',
-      }
-    case 'mockup':
-      return {
-        label: 'Generating prototype',
-        detail: 'Creating the source interface first, then extraction can begin.',
-      }
-    case 'deconstruct':
-      return {
-        label: 'Preparing asset board',
-        detail: 'Separating valuable artwork, products, banners, and material layers.',
-      }
-    case 'cutout':
-      return {
-        label: 'Cutting assets',
-        detail: 'Running local cutout analysis and slice refinement.',
-      }
-    case 'naming':
-      return {
-        label: 'Naming assets',
-        detail: 'Assets are visible now; semantic filenames are being applied.',
-      }
-    case 'done':
-      return {
-        label: 'Ready',
-        detail: 'Assets are ready to review and export.',
-      }
-    case 'idle':
-    default:
-      return {
-        label: 'Waiting',
-        detail: 'Start with a clear intent.',
-      }
-  }
-}
-
-function formatElapsed(seconds: number): string {
-  const mins = Math.floor(seconds / 60)
-  const secs = seconds % 60
-  return `${mins}:${String(secs).padStart(2, '0')}`
+    stage("planning", "Plan", "Map pages, flows, and scope.", WandSparkles),
+    stage(
+      "design-system",
+      "Design system",
+      "Create DESIGN.md and visual reference.",
+      Layers3,
+    ),
+    stage("mockup", "Prototype suite", "Generate planned pages.", ImageIcon),
+    stage(
+      "deconstruct",
+      "Asset board",
+      "Regenerate valuable visual layers.",
+      Layers3,
+    ),
+    stage("cutout", "Cutout", "Detect and split atomic assets.", Scissors),
+    stage("naming", "Names", "Apply semantic filenames.", Tag),
+  ];
 }
 
 function trimLiveAgentOutput(text: string): string {
-  const compact = text.replace(/\n{4,}/g, '\n\n\n').trimStart()
-  if (compact.length <= 1400) return compact
-  return `...${compact.slice(-1400)}`
+  const compact = text.replace(/\n{4,}/g, "\n\n\n").trimStart();
+  if (compact.length <= 1400) return compact;
+  return `...${compact.slice(-1400)}`;
 }
 
 function stripMarkdownFence(text: string): string {
-  const trimmed = text.trim()
-  const fenced = trimmed.match(/^```(?:markdown|md)?\s*([\s\S]*?)\s*```$/i)
-  return (fenced?.[1] ?? trimmed).trim()
-}
-
-function primaryButtonLabel({
-  working,
-  workflowPhase,
-  hasPlan,
-  hasPrototypePages,
-  hasPrototypeArtifacts,
-  prototypeComplete,
-  hasSlices,
-  humanLoop,
-}: {
-  readonly working: boolean
-  readonly workflowPhase: WorkflowPhase
-  readonly hasPlan: boolean
-  readonly hasPrototypePages: boolean
-  readonly hasPrototypeArtifacts: boolean
-  readonly prototypeComplete: boolean
-  readonly hasSlices: boolean
-  readonly humanLoop: PrototypeHumanLoop | null
-}): string {
-  if (working) {
-    if (workflowPhase === 'planning') return 'Planning prototype'
-    if (workflowPhase === 'design-system') return 'Creating design system'
-    if (workflowPhase === 'generating-suite') return 'Generating suite'
-    return 'Creating assets'
-  }
-  if (!hasPlan) return 'Create assets'
-  if (humanLoop?.mode === 'ask') return 'Continue planning'
-  if (hasPrototypeArtifacts && (!prototypeComplete || !hasSlices)) return 'Continue assets'
-  if (!hasPrototypePages) return 'Create assets'
-  return 'Recreate assets'
+  const trimmed = text.trim();
+  const fenced = trimmed.match(/^```(?:markdown|md)?\s*([\s\S]*?)\s*```$/i);
+  return (fenced?.[1] ?? trimmed).trim();
 }
 
 function sortPrototypePages(
   pages: readonly PrototypePageArtifact[],
   order: readonly PrototypePage[],
 ): PrototypePageArtifact[] {
-  const index = new Map(order.map((page, i) => [page.id, i]))
+  const index = new Map(order.map((page, i) => [page.id, i]));
   return pages.toSorted((a, b) => {
-    return (index.get(a.page.id) ?? 999) - (index.get(b.page.id) ?? 999)
-  })
+    return (index.get(a.page.id) ?? 999) - (index.get(b.page.id) ?? 999);
+  });
 }
 
 function isPrototypeSuiteComplete(
@@ -4280,77 +5946,69 @@ function isPrototypeSuiteComplete(
   pages: readonly PrototypePageArtifact[],
   designSystem: PrototypeDesignSystemArtifact | null,
 ): boolean {
-  if (!designSystem) return false
-  const generatedIds = new Set(pages.map((artifact) => artifact.page.id))
-  return pagesForScope(plan, scope).every((page) => generatedIds.has(page.id))
+  if (!designSystem) return false;
+  const generatedIds = new Set(pages.map((artifact) => artifact.page.id));
+  return pagesForScope(plan, scope).every((page) => generatedIds.has(page.id));
 }
 
 function errorMessage(error: unknown): string {
-  if (error instanceof Error) return error.message
-  return String(error)
+  if (error instanceof Error) return error.message;
+  return String(error);
 }
 
 function userFacingGenerationError(message: string): string {
-  const lower = message.toLowerCase()
+  const lower = message.toLowerCase();
 
   if (
-    lower.includes('api_key') ||
-    lower.includes('api key') ||
-    lower.includes('unauthorized') ||
-    lower.includes('invalid key')
+    lower.includes("api_key") ||
+    lower.includes("api key") ||
+    lower.includes("unauthorized") ||
+    lower.includes("invalid key")
   ) {
-    return 'The selected AI provider needs a valid API key. Open Settings and update the provider.'
+    return "The selected AI provider needs a valid API key. Open Settings and update the provider.";
   }
 
   if (
-    lower.includes('timed out') ||
-    lower.includes('timeout') ||
-    lower.includes('request failed') ||
-    lower.includes('network') ||
-    lower.includes('fetch failed')
+    lower.includes("timed out") ||
+    lower.includes("timeout") ||
+    lower.includes("request failed") ||
+    lower.includes("network") ||
+    lower.includes("fetch failed")
   ) {
-    return 'The AI provider timed out. Cutout kept the technical details for Agent diagnostics; try again or switch provider.'
+    return "The AI provider timed out. Cutout kept the technical details for Agent diagnostics; try again or switch provider.";
   }
 
   if (
-    lower.includes('schema') ||
-    lower.includes('json') ||
-    lower.includes('structured')
+    lower.includes("schema") ||
+    lower.includes("json") ||
+    lower.includes("structured")
   ) {
-    return 'The AI planner returned invalid structured data. Cutout kept the raw response for Agent diagnostics.'
+    return "The AI planner returned invalid structured data. Cutout kept the raw response for Agent diagnostics.";
   }
 
-  if (message.trim().length === 0) return 'Generation stopped.'
-  return message.length > 180 ? 'Generation stopped. Details are available in Agent diagnostics.' : message
+  if (message.trim().length === 0) return "Generation stopped.";
+  return message.length > 180
+    ? "Generation stopped. Details are available in Agent diagnostics."
+    : message;
 }
 
-function recoverWorkflowPhase(snapshot: WorkspaceSnapshot | null | undefined): WorkflowPhase {
-  if (!snapshot?.prototypePlan) return 'idle'
-  if (snapshot.prototypePages.length > 0 || snapshot.prototypeDesignSystem) return 'idle'
-  return 'review'
-}
-
-function restoreReferenceAttachments(
-  attachments: readonly PersistedReferenceAttachment[],
-): ReferenceAttachment[] {
-  return attachments.map((attachment) => {
-    const blob = bytesToBlob(attachment.bytes, attachment.mediaType)
-    return {
-      ...attachment,
-      blob,
-      url: URL.createObjectURL(blob),
-    }
-  })
+function recoverWorkflowPhase(
+  snapshot: WorkspaceSnapshot | null | undefined,
+): WorkflowPhase {
+  if (!snapshot?.prototypePlan) return "idle";
+  if (snapshot.prototypePages.length > 0 || snapshot.prototypeDesignSystem)
+    return "idle";
+  return "review";
 }
 
 function restorePrototypeDesignSystem(
   artifact: PersistedPrototypeDesignSystem | null,
 ): PrototypeDesignSystemArtifact | null {
-  if (!artifact) return null
+  if (!artifact) return null;
   return {
     ...artifact,
     blob: bytesToBlob(artifact.bytes, artifact.mediaType),
-  }
+  };
 }
 
 function restorePrototypePages(
@@ -4359,18 +6017,7 @@ function restorePrototypePages(
   return artifacts.map((artifact) => ({
     ...artifact,
     blob: bytesToBlob(artifact.bytes, artifact.mediaType),
-  }))
-}
-
-function persistReferenceAttachment(
-  attachment: ReferenceAttachment,
-): PersistedReferenceAttachment {
-  return {
-    id: attachment.id,
-    name: attachment.name,
-    bytes: attachment.bytes,
-    mediaType: attachment.mediaType,
-  }
+  }));
 }
 
 function persistPrototypeImage(
@@ -4381,7 +6028,7 @@ function persistPrototypeImage(
     mediaType: artifact.mediaType,
     width: artifact.width,
     height: artifact.height,
-  }
+  };
 }
 
 function persistPrototypeDesignSystem(
@@ -4391,7 +6038,7 @@ function persistPrototypeDesignSystem(
     ...persistPrototypeImage(artifact),
     name: artifact.name,
     designMarkdown: artifact.designMarkdown,
-  }
+  };
 }
 
 function persistPrototypePage(
@@ -4400,69 +6047,181 @@ function persistPrototypePage(
   return {
     ...persistPrototypeImage(artifact),
     page: artifact.page,
-  }
+  };
 }
 
 async function artifactToMockup(artifact: PrototypePageArtifact) {
-  const bitmap = await decodeImage(artifact.blob)
+  const bitmap = await decodeImage(artifact.blob);
   return {
     bitmap,
     blob: artifact.blob,
     width: bitmap.width,
     height: bitmap.height,
-  }
+  };
 }
 
 function defaultHumanLoopChoiceId(plan: PrototypePlan): string | null {
-  return plan.humanLoop.mode === 'ask' ? plan.humanLoop.defaultChoiceId : null
+  return plan.humanLoop.mode === "ask" ? plan.humanLoop.defaultChoiceId : null;
 }
 
 function resolveHumanLoopAnswer(
-  loop: Extract<PrototypeHumanLoop, { mode: 'ask' }>,
+  loop: Pick<HumanLoopAskLike, "defaultChoiceId" | "choices">,
   choiceId: string | null,
   customAnswer: string,
 ): ResolvedHumanLoopAnswer {
-  const normalizedCustom = customAnswer.trim()
+  const normalizedCustom = customAnswer.trim();
   if (choiceId === CUSTOM_HUMAN_LOOP_ID && normalizedCustom.length > 0) {
-    return { kind: 'custom', text: normalizedCustom }
+    return { kind: "custom", text: normalizedCustom };
   }
-  const id = choiceId === CUSTOM_HUMAN_LOOP_ID
-    ? loop.defaultChoiceId
-    : choiceId ?? loop.defaultChoiceId
-  const answer = loop.choices.find((choice) => choice.id === id) ?? loop.choices[0]
-  if (!answer) throw new Error('Human-in-the-loop question has no choices.')
+  const id =
+    choiceId === CUSTOM_HUMAN_LOOP_ID
+      ? loop.defaultChoiceId
+      : (choiceId ?? loop.defaultChoiceId);
+  const answer =
+    loop.choices.find((choice) => choice.id === id) ?? loop.choices[0];
+  if (!answer) throw new Error("Human-in-the-loop question has no choices.");
   return {
-    kind: 'choice',
+    kind: "choice",
     choice: answer,
     note: normalizedCustom.length > 0 ? normalizedCustom : null,
-  }
+  };
 }
 
 function composeHumanLoopRequirement(
   brief: string,
-  loop: Extract<PrototypeHumanLoop, { mode: 'ask' }>,
+  loop: PrototypeHumanLoopAsk,
   answer: ResolvedHumanLoopAnswer,
 ): string {
   const answerLines =
-    answer.kind === 'custom'
-      ? [
-          'Selected choice: Custom option',
-          `Custom answer: ${answer.text}`,
-        ]
+    answer.kind === "custom"
+      ? ["Selected choice: Custom option", `Custom answer: ${answer.text}`]
       : [
           `Selected choice: ${answer.choice.label}`,
           `Choice description: ${answer.choice.description}`,
           `Expected planning impact: ${answer.choice.impact}`,
           ...(answer.note ? [`Additional guidance: ${answer.note}`] : []),
-        ]
+        ];
 
   return [
     brief.trim(),
-    '',
-    'Human-in-the-loop answer:',
+    "",
+    "Human-in-the-loop answer:",
     `Question: ${loop.question}`,
     ...answerLines,
-    '',
+    "",
     'Re-plan from the original requirement and this answer. If the answer resolves the material ambiguity, set humanLoop.mode to "continue". Ask another question only if a new, higher-impact ambiguity still blocks a useful prototype suite.',
-  ].join('\n')
+  ].join("\n");
+}
+
+function WorkspaceRail({
+  agentActive,
+  onToggleAgent,
+  filesActive,
+  onToggleFiles,
+  onOpenAssets,
+  onOpenDesign,
+  onOpenTools,
+  onOpenDeliver,
+  advanced,
+  onOpenAdvanced,
+  onCollapseSidebar,
+}: {
+  readonly agentActive: boolean;
+  readonly onToggleAgent: () => void;
+  readonly filesActive: boolean;
+  readonly onToggleFiles: () => void;
+  readonly onOpenAssets: () => void;
+  readonly onOpenDesign: () => void;
+  readonly onOpenTools: () => void;
+  readonly onOpenDeliver: () => void;
+  readonly advanced?: boolean;
+  readonly onOpenAdvanced?: () => void;
+  readonly onCollapseSidebar: () => void;
+}) {
+  return (
+    <nav
+      aria-label="Workspace panels"
+      className="hidden h-full w-14 flex-col items-center gap-1 border-r border-border bg-background py-3 lg:flex"
+    >
+      <button
+        type="button"
+        aria-label="Collapse sidebar"
+        title="Collapse sidebar"
+        className="group/logo mb-2 flex size-8 shrink-0 items-center justify-center rounded-md bg-foreground text-background transition-colors hover:bg-muted hover:text-foreground"
+        onClick={onCollapseSidebar}
+      >
+        <Scissors className="size-4 group-hover/logo:hidden" />
+        <PanelLeftClose className="hidden size-4 group-hover/logo:block" />
+      </button>
+      <RailItem
+        icon={<Sparkles className="size-4" />}
+        label="Agent"
+        active={agentActive}
+        onClick={onToggleAgent}
+      />
+      <RailItem
+        icon={<FilesIcon className="size-4" />}
+        label="Files"
+        active={filesActive}
+        onClick={onToggleFiles}
+      />
+      <RailItem
+        icon={<ImageIcon className="size-4" />}
+        label="Assets"
+        onClick={onOpenAssets}
+      />
+      <RailItem
+        icon={<SwatchBook className="size-4" />}
+        label="Design"
+        onClick={onOpenDesign}
+      />
+      <RailItem
+        icon={<PanelRight className="size-4" />}
+        label="Inspector"
+        onClick={onOpenTools}
+      />
+      <RailItem
+        icon={<PackageCheck className="size-4" />}
+        label="Deliver"
+        onClick={onOpenDeliver}
+      />
+      {advanced && onOpenAdvanced ? (
+        <RailItem
+          icon={<ShieldCheck className="size-4" />}
+          label="Advanced"
+          onClick={onOpenAdvanced}
+        />
+      ) : null}
+    </nav>
+  );
+}
+
+function RailItem({
+  icon,
+  label,
+  active = false,
+  onClick,
+}: {
+  readonly icon: ReactNode;
+  readonly label: string;
+  readonly active?: boolean;
+  readonly onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      aria-pressed={active}
+      className={cn(
+        "flex w-12 flex-col items-center gap-1 rounded-md px-1 py-2 text-[10px] transition-colors",
+        active
+          ? "bg-muted text-foreground"
+          : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
+      )}
+      onClick={onClick}
+    >
+      {icon}
+      <span className="leading-none">{label}</span>
+    </button>
+  );
 }

@@ -1,0 +1,142 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cutout.local/schemas/cutout.agent-capabilities.schema.json",
+  "title": "Cutout Agent Capability Manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "product", "protocol", "discovery", "externalControllers", "integrations", "operations", "cli", "mcp", "policy", "paths", "formats", "limitations"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": { "const": "cutout.agent-capabilities.v1" },
+    "product": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "positioning", "packageVersion"],
+      "properties": {
+        "name": { "const": "Cutout" },
+        "positioning": { "type": "string", "minLength": 1 },
+        "packageVersion": { "type": "string", "minLength": 1 }
+      }
+    },
+    "protocol": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["control", "designIr", "manifest", "policy", "artifactIndex"],
+      "properties": {
+        "control": { "const": "cutout.control.v1" },
+        "designIr": { "const": "design-ir.v1" },
+        "manifest": { "const": "cutout.manifest.v1" },
+        "policy": { "const": "cutout.policy.v1" },
+        "artifactIndex": { "const": "cutout.artifacts.v1" }
+      }
+    },
+    "discovery": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["documentation", "schema", "validationCommand", "skillsCatalog", "skillsSchema", "skillsValidationCommand"],
+      "properties": {
+        "documentation": { "type": "string", "minLength": 1 },
+        "schema": { "type": "string", "minLength": 1 },
+        "validationCommand": { "type": "string", "minLength": 1 },
+        "skillsCatalog": { "const": "skills/index.json" },
+        "skillsSchema": { "const": "skills/schema.json" },
+        "skillsValidationCommand": { "const": "node scripts/validate-product-skills.mjs" }
+      }
+    },
+    "externalControllers": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["protocol", "role", "clients", "sessionBinding", "progressiveDisclosure", "workflow", "sandboxOwnership"],
+      "properties": {
+        "protocol": { "const": "cutout.external-controller.v1" },
+        "role": { "type": "string", "minLength": 1 },
+        "clients": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+        "sessionBinding": { "type": "string", "minLength": 1 },
+        "progressiveDisclosure": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "pattern": "^cutout_[a-z0-9_]+$" } },
+        "workflow": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+        "sandboxOwnership": { "type": "string", "minLength": 1 }
+      }
+    },
+    "integrations": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["role", "available", "planned", "liveSync"],
+      "properties": {
+        "role": { "type": "string", "minLength": 1 },
+        "available": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+        "hostRequired": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+        "authorizationRequired": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+        "planned": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+        "liveSync": { "type": "boolean" }
+      }
+    },
+    "operations": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["type", "modes", "effect", "approval"],
+        "properties": {
+          "type": { "type": "string", "minLength": 1 },
+          "modes": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "enum": ["read", "dry-run", "apply"] } },
+          "effect": { "enum": ["none", "project-state", "managed-export", "provider-required"] },
+          "approval": { "enum": ["none", "policy-and-explicit-id", "paid-tool-contract"] },
+          "notes": { "type": "string" }
+        }
+      }
+    },
+    "cli": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["command", "commands"],
+      "properties": {
+        "command": { "const": "pnpm cutout --project <root>" },
+        "commands": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } }
+      }
+    },
+    "mcp": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["transport", "command", "projectRootEnv", "tools"],
+      "properties": {
+        "transport": { "const": "stdio" },
+        "command": { "const": "pnpm cutout:mcp" },
+        "projectRootEnv": { "const": "CUTOUT_PROJECT_ROOT" },
+        "tools": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "pattern": "^cutout_[a-z0-9_]+$" } }
+      }
+    },
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["defaultMode", "applyRequires", "paidActions", "secrets", "filesystemBoundary", "permissionBroker", "toolSandbox", "networkBoundary"],
+      "properties": {
+        "defaultMode": { "const": "dry-run" },
+        "applyRequires": { "type": "array", "minItems": 2, "uniqueItems": true, "items": { "type": "string" } },
+        "paidActions": { "type": "string", "minLength": 1 },
+        "secrets": { "type": "string", "minLength": 1 },
+        "filesystemBoundary": { "type": "string", "minLength": 1 },
+        "permissionBroker": { "type": "string", "minLength": 1 },
+        "toolSandbox": { "type": "string", "minLength": 1 },
+        "networkBoundary": { "type": "string", "minLength": 1 }
+      }
+    },
+    "paths": {
+      "type": "object",
+      "additionalProperties": { "type": "string", "minLength": 1 }
+    },
+    "formats": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["designKit", "astryxBinding", "brandKit", "starterFrameworks"],
+      "properties": {
+        "designKit": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string" } },
+        "astryxBinding": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string" } },
+        "brandKit": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string" } },
+        "starterFrameworks": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "enum": ["next-app-router", "vite-react", "nuxt", "tanstack-start"] } }
+      }
+    },
+    "limitations": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } }
+  }
+}

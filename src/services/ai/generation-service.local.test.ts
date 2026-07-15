@@ -3,6 +3,7 @@ import { z } from 'zod'
 import type { ProviderConfig } from './provider-types'
 import { createLocalGenerationService } from './generation-service.local'
 import { ok } from '@/services/types'
+import { GenerationAdapterRegistry } from './provider-adapter-registry'
 
 const { generateTextMock, generateImageMock, streamTextMock, invokeMock } =
   vi.hoisted(() => ({
@@ -48,6 +49,8 @@ beforeEach(() => {
   invokeMock.mockReset()
   prompts.render.mockClear()
 })
+
+describe('GenerationService adapter injection',()=>{it('uses the injected registry instead of a provider-kind switch',async()=>{const model={id:'injected'},createModel=vi.fn(async()=>model),registry=new GenerationAdapterRegistry([{kind:'openai-compatible',policy:()=>({auth:'rust-keychain-proxy',headerStrategy:'openai-compatible',baseURL:'https://relay.example/v1'}),createModel}]);generateTextMock.mockResolvedValueOnce({text:'ok'});const generation=createLocalGenerationService(providersWith([cfg()]),prompts,registry);await expect(generation.generateText({providerId:'p1',prompt:'hello'})).resolves.toEqual(ok('ok'));expect(createModel).toHaveBeenCalledWith(expect.objectContaining({id:'p1'}),'chat-model');expect(generateTextMock).toHaveBeenCalledWith(expect.objectContaining({model}))})})
 
 describe('GenerationService.generateObject', () => {
   it('falls back to plain text JSON when structured output is not supported', async () => {
@@ -166,6 +169,21 @@ describe('GenerationService.generateObject', () => {
 })
 
 describe('GenerationService.generateImages', () => {
+  it('does not invoke the paid image endpoint when already aborted', async () => {
+    const controller = new AbortController()
+    controller.abort()
+    const generation = createLocalGenerationService(providersWith([cfg()]), prompts)
+
+    const result = await generation.generateImages({
+      providerId: 'p1',
+      model: 'gpt-image-1',
+      prompt: 'make an icon',
+      signal: controller.signal,
+    })
+
+    expect(result).toEqual({ ok: false, error: 'Operation aborted' })
+    expect(invokeMock).not.toHaveBeenCalled()
+  })
   it('uses the proxied OpenAI-compatible images endpoint and parses b64_json', async () => {
     invokeMock.mockResolvedValueOnce({
       status: 200,

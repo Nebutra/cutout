@@ -1,0 +1,84 @@
+name: Signed updater artifacts
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      channel:
+        description: Update channel
+        required: true
+        type: choice
+        options: [stable, beta]
+      rollout:
+        description: Deterministic rollout percentage
+        required: true
+        default: '10'
+      release_base_url:
+        description: HTTPS CDN or GitHub Release asset base URL
+        required: true
+      previous_version:
+        description: Optional older version authorized for rollback metadata
+        required: false
+      previous_manifest_url:
+        description: Optional HTTPS manifest URL for the previous version
+        required: false
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  macos-updater:
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+    runs-on: macos-14
+    env:
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+      CUTOUT_UPDATER_PUBKEY: ${{ vars.CUTOUT_UPDATER_PUBKEY }}
+      CUTOUT_UPDATER_ALLOWED_HOSTS: ${{ vars.CUTOUT_UPDATER_ALLOWED_HOSTS }}
+      CUTOUT_UPDATER_STABLE_ENDPOINTS: ${{ vars.CUTOUT_UPDATER_STABLE_ENDPOINTS }}
+      CUTOUT_UPDATER_BETA_ENDPOINTS: ${{ vars.CUTOUT_UPDATER_BETA_ENDPOINTS }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 10 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - name: Require CI-only updater signing material
+        run: |
+          test -n "$TAURI_SIGNING_PRIVATE_KEY" || { echo 'TAURI_SIGNING_PRIVATE_KEY is required' >&2; exit 1; }
+          test -n "$CUTOUT_UPDATER_PUBKEY" || { echo 'CUTOUT_UPDATER_PUBKEY is required' >&2; exit 1; }
+          test -n "$CUTOUT_UPDATER_ALLOWED_HOSTS" || { echo 'CUTOUT_UPDATER_ALLOWED_HOSTS is required' >&2; exit 1; }
+          test -n "$CUTOUT_UPDATER_STABLE_ENDPOINTS" || { echo 'CUTOUT_UPDATER_STABLE_ENDPOINTS is required' >&2; exit 1; }
+          test -n "$CUTOUT_UPDATER_BETA_ENDPOINTS" || { echo 'CUTOUT_UPDATER_BETA_ENDPOINTS is required' >&2; exit 1; }
+      - run: pnpm test:update-artifacts
+      - run: pnpm tauri build --bundles app,dmg
+      - name: Generate static channel manifest and evidence
+        shell: bash
+        env:
+          CHANNEL: ${{ inputs.channel || 'stable' }}
+          ROLLOUT: ${{ inputs.rollout || '100' }}
+          RELEASE_BASE_URL: ${{ inputs.release_base_url }}
+          PREVIOUS_VERSION: ${{ inputs.previous_version }}
+          PREVIOUS_MANIFEST_URL: ${{ inputs.previous_manifest_url }}
+        run: |
+          set -euo pipefail
+          artifact="$(find src-tauri/target/release/bundle/macos -name '*.app.tar.gz' -type f -print -quit)"
+          test -n "$artifact" && test -f "$artifact.sig"
+          version="${GITHUB_REF_NAME#v}"
+          base="${RELEASE_BASE_URL:-https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}}"
+          rollback_args=()
+          if test -n "${PREVIOUS_VERSION:-}"; then rollback_args+=(--previous-version "$PREVIOUS_VERSION"); fi
+          if test -n "${PREVIOUS_MANIFEST_URL:-}"; then rollback_args+=(--previous-manifest-url "$PREVIOUS_MANIFEST_URL"); fi
+          pnpm update:generate -- --artifact "$artifact" --version "$version" --channel "$CHANNEL" --rollout "$ROLLOUT" --artifact-url "$base/$(basename "$artifact")" --allowed-hosts "$CUTOUT_UPDATER_ALLOWED_HOSTS" --revision "$GITHUB_SHA" --output dist/update "${rollback_args[@]}"
+          pnpm update:validate -- --manifest "dist/update/$CHANNEL/latest.json" --signature "$artifact.sig" --allowed-hosts "$CUTOUT_UPDATER_ALLOWED_HOSTS"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: signed-updater-${{ github.ref_name }}
+          path: |
+            src-tauri/target/release/bundle/macos/*.app.tar.gz
+            src-tauri/target/release/bundle/macos/*.app.tar.gz.sig
+            dist/update/**
+          if-no-files-found: error

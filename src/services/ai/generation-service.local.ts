@@ -18,14 +18,11 @@ import {
   generateText as aiGenerateText,
   streamText as aiStreamText,
   stepCountIs,
+  tool as aiTool,
   Output,
 } from 'ai'
 import type { ModelMessage } from 'ai'
 import type { z } from 'zod'
-import { createAnthropic } from '@ai-sdk/anthropic'
-import { createOpenAI } from '@ai-sdk/openai'
-import { createGoogleGenerativeAI } from '@ai-sdk/google'
-import { createGatewayProvider } from '@ai-sdk/gateway'
 import { invoke } from '@tauri-apps/api/core'
 import { err, isErr, ok } from '@/services/types'
 import type { Result } from '@/services/types'
@@ -37,6 +34,9 @@ import type {
   EditImageInput,
   GeneratedAsset,
   GenerateInput,
+  GenerateWithToolsCall,
+  GenerateWithToolsInput,
+  GenerateWithToolsOutput,
   GenerationService,
   ProviderService,
 } from './types'
@@ -44,6 +44,7 @@ import type { ProviderConfig } from './provider-types'
 import { resolveModel } from './models'
 import { tauriFetch } from './tauri-fetch'
 import { apiBaseUrl } from './base-url'
+import { createDefaultGenerationAdapterRegistry, type GenerationAdapterRegistry } from './provider-adapter-registry'
 
 /** Placeholder key handed to the SDK; the real key is injected in Rust. */
 const DUMMY_KEY = '__managed_by_rust__'
@@ -70,27 +71,7 @@ interface ProxyResponse {
 }
 
 /** Build the AI SDK model for a config, wired to the per-provider proxy fetch. */
-function buildModel(cfg: ProviderConfig, modelId: string) {
-  const fetch = tauriFetch(cfg.id, cfg.kind)
-  const baseURL = apiBaseUrl(cfg.kind, cfg.baseUrl)
-  switch (cfg.kind) {
-    case 'anthropic':
-      return createAnthropic({ apiKey: DUMMY_KEY, baseURL, fetch })(modelId)
-    case 'openai':
-      return createOpenAI({ apiKey: DUMMY_KEY, baseURL, fetch })(modelId)
-    case 'google':
-      return createGoogleGenerativeAI({ apiKey: DUMMY_KEY, baseURL, fetch })(
-        modelId,
-      )
-    case 'gateway':
-      return createGatewayProvider({ apiKey: DUMMY_KEY, baseURL, fetch })(
-        modelId,
-      )
-    case 'openai-compatible':
-      // `.chat()` targets /chat/completions — the widely-compatible endpoint.
-      return createOpenAI({ apiKey: DUMMY_KEY, baseURL, fetch }).chat(modelId)
-  }
-}
+async function buildModel(cfg: ProviderConfig, modelId: string, adapters:GenerationAdapterRegistry) {return adapters.createModel(cfg,modelId)}
 
 /** Map a domain `PromptPart` to an AI SDK v6 user-message content part. */
 function toContentPart(part: PromptPart) {
@@ -104,12 +85,13 @@ function toContentPart(part: PromptPart) {
 /** The normalized shape a prepared call resolves to (raw XOR structured). */
 type Prepared =
   | {
-      readonly model: ReturnType<typeof buildModel>
+      readonly model: Awaited<ReturnType<typeof buildModel>>
       readonly prompt: string
+      readonly systemContext?: string
       readonly providerOptions: ReasoningProviderOptions
     }
   | {
-      readonly model: ReturnType<typeof buildModel>
+      readonly model: Awaited<ReturnType<typeof buildModel>>
       readonly system: string
       readonly messages: ModelMessage[]
       readonly providerOptions: ReasoningProviderOptions
@@ -401,6 +383,7 @@ function repairJsonSystem(
 export function createLocalGenerationService(
   providers: ConfigSource,
   prompts?: PromptSource,
+  adapters:GenerationAdapterRegistry=createDefaultGenerationAdapterRegistry(),
 ): GenerationService {
   async function resolveConfig(
     id: string,
@@ -417,7 +400,7 @@ export function createLocalGenerationService(
     const cfg = await resolveConfig(input.providerId)
     if (!cfg) return err('provider not configured')
     const modelId = resolveModel(cfg.kind, cfg.defaultModel, input.model)
-    const model = buildModel(cfg, modelId)
+    const model = await buildModel(cfg, modelId,adapters)
     // Thinking strength → per-vendor providerOptions (`{}` when unset/unsafe).
     const providerOptions = reasoningProviderOptions(
       cfg.kind,
@@ -426,7 +409,7 @@ export function createLocalGenerationService(
 
     // Back-compat raw text path — a single prompt string, no multimodal parts.
     if (input.prompt !== undefined) {
-      return ok({ model, prompt: input.prompt, providerOptions })
+      return ok({ model, prompt: input.prompt, ...(input.systemContext?{systemContext:input.systemContext}:{}), providerOptions })
     }
 
     // Structured path: resolve the system instruction, then attach user content.
@@ -436,14 +419,14 @@ export function createLocalGenerationService(
       if (!prompts) return err('prompt service not available')
       try {
         const rendered = await prompts.render(input.promptRef)
-        system = rendered.system
+        system = [input.systemContext,rendered.system].filter(Boolean).join('\n\n')
         scaffold = rendered.userScaffold ?? []
       } catch (error) {
         return err(error instanceof Error ? error.message : String(error))
       }
     } else {
       // Exactly-one-of guarantees `system` is set on this branch.
-      system = input.system as string
+      system = [input.systemContext,input.system as string].filter(Boolean).join('\n\n')
     }
 
     const parts = [...scaffold, ...(input.input ?? [])]
@@ -467,9 +450,11 @@ export function createLocalGenerationService(
       const stopWhen = stepCountIs(4)
       try {
         if (cfg.kind === 'openai') {
+          const { createOpenAI } = await import('@ai-sdk/openai')
           const provider = createOpenAI({ apiKey: DUMMY_KEY, baseURL, fetch })
           const { text } = await aiGenerateText({
             model: provider(modelId),
+            ...(input.systemContext?{system:input.systemContext}:{}),
             prompt,
             tools: { web_search: provider.tools.webSearchPreview({}) },
             stopWhen,
@@ -478,9 +463,11 @@ export function createLocalGenerationService(
           return ok(text)
         }
         if (cfg.kind === 'anthropic') {
+          const { createAnthropic } = await import('@ai-sdk/anthropic')
           const provider = createAnthropic({ apiKey: DUMMY_KEY, baseURL, fetch })
           const { text } = await aiGenerateText({
             model: provider(modelId),
+            ...(input.systemContext?{system:input.systemContext}:{}),
             prompt,
             tools: { web_search: provider.tools.webSearch_20250305({}) },
             stopWhen,
@@ -489,9 +476,11 @@ export function createLocalGenerationService(
           return ok(text)
         }
         if (cfg.kind === 'google') {
+          const { createGoogleGenerativeAI } = await import('@ai-sdk/google')
           const provider = createGoogleGenerativeAI({ apiKey: DUMMY_KEY, baseURL, fetch })
           const { text } = await aiGenerateText({
             model: provider(modelId),
+            ...(input.systemContext?{system:input.systemContext}:{}),
             prompt,
             tools: { google_search: provider.tools.googleSearch({}) },
             stopWhen,
@@ -502,6 +491,63 @@ export function createLocalGenerationService(
         return err('Web search needs an OpenAI, Anthropic, or Google endpoint.')
       } catch (error) {
         return err(error instanceof Error ? error.message : String(error))
+      }
+    },
+
+    async generateWithTools(
+      input: GenerateWithToolsInput,
+    ): Promise<Result<GenerateWithToolsOutput>> {
+      const cfg = await resolveConfig(input.providerId)
+      if (!cfg) return err('provider not configured')
+      const modelId = resolveModel(cfg.kind, cfg.defaultModel, input.model)
+      const model = await buildModel(cfg, modelId,adapters)
+      const tools = Object.fromEntries(
+        input.tools.map((generationTool) => [
+          generationTool.name,
+          aiTool({
+            description: generationTool.description,
+            inputSchema: generationTool.inputSchema,
+            execute: (toolInput: unknown) => generationTool.execute(toolInput),
+          }),
+        ]),
+      )
+      try {
+        const result = await aiGenerateText({
+          model,
+          ...(input.systemContext?{system:input.systemContext}:{}),
+          prompt: input.prompt,
+          tools,
+          stopWhen: stepCountIs(input.maxSteps),
+          abortSignal: input.signal,
+        })
+        // `result.toolResults` silently omits any call whose `execute()` threw —
+        // walking every step's raw content (which carries `tool-error` parts too)
+        // is the only way a thrown validation error reaches the caller instead of
+        // vanishing as if the model had never called the tool at all.
+        const toolCalls: GenerateWithToolsCall[] = []
+        for (const step of result.steps) {
+          for (const part of step.content) {
+            if (part.type === 'tool-result') {
+              toolCalls.push({
+                toolCallId: part.toolCallId,
+                toolName: part.toolName,
+                input: part.input,
+                output: part.output,
+              })
+            } else if (part.type === 'tool-error') {
+              toolCalls.push({
+                toolCallId: part.toolCallId,
+                toolName: part.toolName,
+                input: part.input,
+                output: undefined,
+                error: errorText(part.error),
+              })
+            }
+          }
+        }
+        return ok({ text: result.text, toolCalls, ...(input.personalizationReceipt?{personalizationReceipt:input.personalizationReceipt}:{}) })
+      } catch (error) {
+        return err(errorText(error))
       }
     },
 
@@ -521,6 +567,7 @@ export function createLocalGenerationService(
               })
             : await aiGenerateText({
                 model: p.model,
+                ...(p.systemContext?{system:p.systemContext}:{}),
                 prompt: p.prompt,
                 abortSignal: input.signal,
                 providerOptions: p.providerOptions,
@@ -546,6 +593,7 @@ export function createLocalGenerationService(
             })
           : aiStreamText({
               model: p.model,
+              ...(p.systemContext?{system:p.systemContext}:{}),
               prompt: p.prompt,
               abortSignal: input.signal,
               providerOptions: p.providerOptions,
@@ -616,7 +664,9 @@ export function createLocalGenerationService(
     async generateImages(
       input: GenerateInput,
     ): Promise<Result<GeneratedAsset[]>> {
+      if (input.signal?.aborted) return err('Operation aborted')
       const cfg = await resolveConfig(input.providerId)
+      if (input.signal?.aborted) return err('Operation aborted')
       if (!cfg) return err('provider not configured')
       const modelId = resolveModel(cfg.kind, cfg.defaultModel, input.model)
 
@@ -652,6 +702,7 @@ export function createLocalGenerationService(
         if (!promptText) return err('no prompt text for image generation')
 
         try {
+          if (input.signal?.aborted) return err('Operation aborted')
           const baseUrl = apiBaseUrl(cfg.kind, cfg.baseUrl)
           if (!baseUrl) return err('provider has no base URL for image generation')
           const res = await invoke<ProxyResponse>('ai_proxy_request', {
@@ -666,6 +717,9 @@ export function createLocalGenerationService(
               n: 1,
             }),
           })
+          // Tauri IPC cannot currently abort this command in flight. Treat the
+          // response as cooperative cancellation and never publish late bytes.
+          if (input.signal?.aborted) return err('Operation aborted')
           if (res.status < 200 || res.status >= 300) {
             const providerMessage = errorBodyMessage(res.body)
             return err(
@@ -706,7 +760,9 @@ export function createLocalGenerationService(
     },
 
     async editImage(input: EditImageInput): Promise<Result<GeneratedAsset[]>> {
+      if (input.signal?.aborted) return err('Operation aborted')
       const cfg = await resolveConfig(input.providerId)
+      if (input.signal?.aborted) return err('Operation aborted')
       if (!cfg) return err('provider not configured')
       // The edits endpoint is OpenAI-shaped; other kinds have no `/images/edits`.
       if (cfg.kind !== 'openai' && cfg.kind !== 'openai-compatible') {
@@ -722,6 +778,7 @@ export function createLocalGenerationService(
       // Bytes cross the Tauri IPC as number arrays → Rust `Vec<Vec<u8>>`. The
       // real key is injected in Rust; the base64 reply is decoded to PNG bytes.
       try {
+        if (input.signal?.aborted) return err('Operation aborted')
         const res = await invoke<{ images: string[] }>('ai_image_edit', {
           providerId: cfg.id,
           kind: cfg.kind,
@@ -732,6 +789,9 @@ export function createLocalGenerationService(
           size: input.size ?? null,
           inputFidelity: input.inputFidelity ?? 'high',
         })
+        // `invoke` has no physical AbortSignal channel. Discard a late native
+        // response so a cancelled/superseded run cannot publish paid output.
+        if (input.signal?.aborted) return err('Operation aborted')
         const assets: GeneratedAsset[] = res.images.map((b64) => ({
           mediaType: 'image/png',
           bytes: base64ToBytes(b64),

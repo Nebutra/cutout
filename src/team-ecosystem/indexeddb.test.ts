@@ -1,0 +1,3 @@
+import{IDBFactory}from'fake-indexeddb';import{describe,expect,it}from'vitest';import{createIndexedDbCollaborationHost}from'./indexeddb'
+const at='2026-07-12T00:00:00Z',branch={protocol:'cutout.review-branch.v1' as const,id:'branch.one',projectId:'project.one',baseRevisionId:'r1',headRevisionId:'r2',authorId:'user.one',status:'open' as const,comments:[],approvals:[],createdAt:at,updatedAt:at}
+describe('durable local collaboration host',()=>{it('persists review branches across host restarts',async()=>{const factory=new IDBFactory(),first=createIndexedDbCollaborationHost(factory);await first.saveBranch(branch);const restarted=createIndexedDbCollaborationHost(factory);expect(await restarted.loadBranch(branch.id)).toEqual(branch)})})

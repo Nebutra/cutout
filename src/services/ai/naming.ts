@@ -52,6 +52,12 @@ export interface NameSlicesParams {
   readonly imageBytes: Uint8Array
   /** Every slice to name, as index + bounding box. */
   readonly slices: readonly SliceBox[]
+  /**
+   * Optional semantic grounding (the per-region breakdown supplies the plan
+   * region's name/role/summary/asset types) — primes the vision model so names
+   * are on-domain and consistent instead of cold-guessed.
+   */
+  readonly context?: string
   /** Thinking strength for the chat model (from its Settings assignment). */
   readonly effort?: ReasoningEffort
   readonly signal?: AbortSignal
@@ -79,6 +85,9 @@ export async function nameSlices(
   )
   const parts: PromptPart[] = [
     { type: 'image', image: params.imageBytes },
+    ...(params.context
+      ? [{ type: 'text' as const, text: `Context for these assets:\n${params.context}` }]
+      : []),
     { type: 'text', text: `Slice bounding boxes (JSON):\n${boxesJson}` },
   ]
 

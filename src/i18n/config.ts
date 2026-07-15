@@ -6,7 +6,7 @@
  */
 
 /** Locales the app ships. Order is display order in the language switcher. */
-export const SUPPORTED = ['en', 'zh-CN'] as const
+export const SUPPORTED = ['en', 'zh-CN', 'ja', 'fr', 'es'] as const
 
 /** Union of shipped locale tags — the typed currency passed through the i18n API. */
 export type Locale = (typeof SUPPORTED)[number]
@@ -19,6 +19,9 @@ export type Locale = (typeof SUPPORTED)[number]
 export const LOCALE_LABEL: Record<Locale, string> = {
   en: 'English',
   'zh-CN': '简体中文',
+  ja: '日本語',
+  fr: 'Français',
+  es: 'Español',
 }
 
 /** Right-to-left script roots. None ship today; RTL is one map entry away. */

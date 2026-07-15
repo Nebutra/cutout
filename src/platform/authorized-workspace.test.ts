@@ -1,0 +1,3 @@
+import{afterEach,describe,expect,it,vi}from'vitest';import{getAuthorizedWorkspace,setAuthorizedWorkspace,subscribeAuthorizedWorkspace}from'./authorized-workspace'
+afterEach(()=>setAuthorizedWorkspace(undefined))
+describe('authorized workspace session',()=>{it('shares only an opaque authorized handle and never a caller path',()=>{const listener=vi.fn(),dispose=subscribeAuthorizedWorkspace(listener);setAuthorizedWorkspace({handle:'workspace.opaque-1',label:'Authorized workspace'});expect(getAuthorizedWorkspace()).toEqual({handle:'workspace.opaque-1',label:'Authorized workspace'});expect(listener).toHaveBeenCalledOnce();expect(()=>setAuthorizedWorkspace({handle:'/Users/alice/project'})).toThrow('invalid');dispose()})})

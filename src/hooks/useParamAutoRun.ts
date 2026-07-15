@@ -26,7 +26,7 @@ export function useParamAutoRun(): void {
   const source = useStore(selectSource)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const hasSource = source.bitmap !== null && source.imageId !== ''
+  const hasSource = source.bitmap !== null && source.imageId !== '' && source.autoAnalyze
 
   useEffect(() => {
     if (!hasSource) return

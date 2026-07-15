@@ -5,8 +5,14 @@ function trimTrailingSlashes(value: string): string {
 }
 
 function isOpenAIShaped(kind: ProviderKind): boolean {
-  return kind === 'openai' || kind === 'openai-compatible'
+  return kind === 'openai' || OPENAI_COMPATIBLE_KINDS.has(kind)
 }
+
+const OPENAI_COMPATIBLE_KINDS = new Set([
+  'openai-compatible','dashscope','deepseek','zhipu','moonshot','volcengine',
+  'siliconflow','openrouter','together','groq','fireworks','xai','mistral',
+  'ollama','vllm','lm-studio',
+])
 
 /**
  * OpenAI-compatible SDKs expect `baseURL` to be the API prefix, normally `/v1`.

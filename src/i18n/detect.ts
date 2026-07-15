@@ -29,7 +29,10 @@ function normalize(tag?: string | null): Locale | undefined {
   const lower = tag.toLowerCase()
   if (lower.startsWith('zh')) return 'zh-CN'
   if (lower.startsWith('en')) return 'en'
-  return undefined // extend here for future locales (e.g. "ja")
+  if (lower.startsWith('ja')) return 'ja'
+  if (lower.startsWith('fr')) return 'fr'
+  if (lower.startsWith('es')) return 'es'
+  return undefined
 }
 
 /**

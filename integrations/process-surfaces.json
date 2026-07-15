@@ -1,0 +1,11 @@
+{
+  "protocol": "cutout.process-surfaces.v1",
+  "surfaces": [
+    { "kind": "pencil-mcp", "transport": "mcp", "availability": "host-required", "requires": ["handshake", "preview", "write", "migrate"] },
+    { "kind": "pencil-cli", "transport": "process", "availability": "host-required", "requires": ["handshake", "preview", "write", "migrate"] },
+    { "kind": "paper-desktop-mcp", "transport": "mcp", "availability": "host-required", "requires": ["foreground", "handshake", "preview", "write"] },
+    { "kind": "framer-editor-plugin", "transport": "plugin-message", "availability": "host-required", "requires": ["foreground", "handshake", "stage", "publish"] },
+    { "kind": "canva-apps-sdk", "transport": "app-message", "availability": "host-required", "requires": ["foreground", "handshake", "preview", "write"] },
+    { "kind": "canva-connect-api", "transport": "desktop-host", "availability": "authorization-required", "requires": ["oauth-session", "preview", "user-interaction"] }
+  ]
+}

@@ -6,8 +6,8 @@
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:1420",
-    "beforeDevCommand": "pnpm dev",
-    "beforeBuildCommand": "pnpm build"
+    "beforeDevCommand": "npm run dev --",
+    "beforeBuildCommand": "npm run build"
   },
   "app": {
     "windows": [
@@ -28,7 +28,8 @@
   },
   "bundle": {
     "active": true,
-    "targets": "all",
+    "createUpdaterArtifacts": true,
+    "targets": ["app", "dmg"],
     "copyright": "Copyright © 2026 Leishi AI Native Team",
     "category": "public.app-category.graphics-design",
     "icon": [
@@ -40,7 +41,8 @@
     ],
     "macOS": {
       "minimumSystemVersion": "11.0",
-      "hardenedRuntime": false
+      "hardenedRuntime": true,
+      "entitlements": "Entitlements.plist"
     },
     "android": {
       "debugApplicationIdSuffix": ".debug"

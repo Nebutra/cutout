@@ -27,6 +27,39 @@ export interface SaveAssetsResult {
   failed: FailedWrite[]
 }
 
+export interface SaveBundleFileInput {
+  path: string
+  bytes: Uint8Array
+}
+
+export interface SaveBundleInput {
+  name: string
+  files: SaveBundleFileInput[]
+}
+
+export interface SaveBundleFileReceipt {
+  path: string
+  size: number
+  sha256: string
+}
+
+export interface SaveBundleResult {
+  canceled: boolean
+  outputDir: string | null
+  bundleDir: string | null
+  fileCount: number
+  totalBytes: number
+  files: SaveBundleFileReceipt[]
+}
+
+export interface NativeRepositoryScanResult {
+  canceled: boolean
+  label: string | null
+  entries: { path: string; bytes: number; mediaType: string; sha256: string }[]
+  frameworkHints: { framework: string; evidence: string[]; confidence: 'medium' | 'high' }[]
+  excluded: Record<'symbolicLink' | 'secretPath' | 'secretContent' | 'ignoredDirectory' | 'binary' | 'oversized' | 'unsupported', number>
+}
+
 export type VectorizerAiMode =
   | 'production'
   | 'preview'
@@ -47,6 +80,10 @@ export interface NativeBridge {
     assets: SaveAssetInput[],
     destDir?: string,
   ): Promise<SaveAssetsResult>
+  /** Atomically write a nested multi-file bundle under a native-picked root. */
+  saveBundle(bundle: SaveBundleInput): Promise<SaveBundleResult>
+  /** Opens a native folder picker and returns a metadata-only safe inventory. */
+  scanRepository?(): Promise<NativeRepositoryScanResult>
   setVectorizerApiKey(apiId: string, apiSecret: string): Promise<void>
   vectorizerKeyStatus(apiId: string): Promise<boolean>
   deleteVectorizerApiKey(apiId: string): Promise<void>
@@ -68,6 +105,11 @@ interface SaveAssetPayload {
   dataUrl: string | null
 }
 
+interface SaveBundlePayload {
+  name: string
+  files: { path: string; bytes: number[] }[]
+}
+
 function toPayload(asset: SaveAssetInput): SaveAssetPayload {
   return {
     name: asset.name,
@@ -83,6 +125,17 @@ export const tauriBridge: NativeBridge = {
       assets: assets.map(toPayload),
       destDir: destDir ?? null,
     }),
+  saveBundle: (bundle) => {
+    const payload: SaveBundlePayload = {
+      name: bundle.name,
+      files: bundle.files.map((file) => ({
+        path: file.path,
+        bytes: Array.from(file.bytes),
+      })),
+    }
+    return invoke<SaveBundleResult>('save_bundle', { bundle: payload })
+  },
+  scanRepository: () => invoke<NativeRepositoryScanResult>('scan_repository'),
   setVectorizerApiKey: (apiId, apiSecret) =>
     invoke('set_vectorizer_api_key', { apiId, apiSecret }),
   vectorizerKeyStatus: (apiId) =>

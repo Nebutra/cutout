@@ -45,13 +45,14 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { KeyField } from './KeyField'
+import { createBuiltinProviderRegistry } from '@/services/ai/provider-registry'
 
 /**
  * Brand kind labels. These are product names and stay verbatim across locales;
  * the one translatable kind (`openai-compatible`) is resolved via the `t` macro
  * inside the component so it participates in the catalog.
  */
-const KIND_BRAND: Record<Exclude<ProviderKind, 'openai-compatible'>, string> = {
+const KIND_BRAND: Record<string, string> = {
   anthropic: 'Anthropic',
   openai: 'OpenAI',
   google: 'Google',
@@ -66,18 +67,19 @@ function isKnownDefault(model: string): boolean {
 interface ProviderFormProps {
   /** Existing config → edit mode; absent → add mode. */
   readonly initial?: ProviderConfig
+  readonly initialKind?: ProviderKind
   /** Leave the form (back to the list). */
   readonly onDone: () => void
 }
 
-export function ProviderForm({ initial, onDone }: ProviderFormProps) {
+export function ProviderForm({ initial, initialKind, onDone }: ProviderFormProps) {
   const { t } = useLingui()
   const isEdit = initial !== undefined
-  const [kind, setKind] = useState<ProviderKind>(initial?.kind ?? 'anthropic')
+  const [kind, setKind] = useState<ProviderKind>(initial?.kind ?? initialKind ?? 'anthropic')
   const [label, setLabel] = useState(initial?.label ?? '')
   const [baseUrl, setBaseUrl] = useState(initial?.baseUrl ?? '')
   const [defaultModel, setDefaultModel] = useState(
-    initial?.defaultModel ?? DEFAULT_MODEL.anthropic,
+    initial?.defaultModel ?? DEFAULT_MODEL[initialKind ?? 'anthropic'] ?? '',
   )
   // Ephemeral: the replacement secret the user is typing. Never leaves this state
   // except straight into `setKey`, after which it is cleared.
@@ -97,7 +99,7 @@ export function ProviderForm({ initial, onDone }: ProviderFormProps) {
     // Re-seed the model only when it is empty or a stock default, so a custom
     // slug the user typed survives a kind switch.
     setDefaultModel((cur) =>
-      cur.trim() === '' || isKnownDefault(cur) ? DEFAULT_MODEL[nextKind] : cur,
+      cur.trim() === '' || isKnownDefault(cur) ? DEFAULT_MODEL[nextKind] ?? '' : cur,
     )
   }
 
@@ -107,14 +109,17 @@ export function ProviderForm({ initial, onDone }: ProviderFormProps) {
           id: 'settings.provider_kind_openai_compatible',
           message: 'OpenAI Compatible',
         })
-      : KIND_BRAND[k]
+      : createBuiltinProviderRegistry().definition(k)?.label ?? KIND_BRAND[k] ?? k
   }
 
-  const needsBaseUrl = kind === 'openai-compatible'
+  const definition = createBuiltinProviderRegistry().definition(kind)
+  const needsBaseUrl = definition?.configurableBaseUrl ?? kind === 'openai-compatible'
+  const needsKey = definition?.authMethods.includes('api-key') ?? true
+  const needsOAuth = definition?.authMethods.includes('oauth2') ?? false
   const modelOptions = Array.from(
     new Set(
       [
-        ...SUGGESTED_MODELS[kind],
+        ...(SUGGESTED_MODELS[kind] ?? []),
         // Relays proxy many upstreams → offer the curated mainstream shortlist.
         ...(kind === 'openai-compatible' ? POPULAR_MODELS : []),
         defaultModel,
@@ -157,7 +162,7 @@ export function ProviderForm({ initial, onDone }: ProviderFormProps) {
       onDone()
       // Auto-test: verify the key without a separate click. Non-blocking — a
       // failure only toasts; the provider stays saved either way.
-      if (providedKey || hasKey) {
+      if (!needsKey || providedKey || hasKey) {
         void testKey
           .mutateAsync(saved.id)
           .then(({ model }) =>
@@ -202,6 +207,13 @@ export function ProviderForm({ initial, onDone }: ProviderFormProps) {
           autoFocus
         />
       </div>
+
+      {definition ? (
+        <p className="rounded-md border border-border bg-muted/20 px-2.5 py-2 text-[11px] text-muted-foreground">
+          Catalog available · {definition.adapterIds.length ? 'Adapter available' : 'Adapter unavailable'} ·{' '}
+          {needsOAuth ? 'OAuth authorization required' : needsKey ? `API key required${definition.env.length ? ` (${definition.env.join(', ')})` : ''}` : 'No authorization required'}
+        </p>
+      ) : null}
 
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="provider-kind">
@@ -253,7 +265,7 @@ export function ProviderForm({ initial, onDone }: ProviderFormProps) {
           value={defaultModel}
           disabled={busy}
           onChange={(e) => setDefaultModel(e.target.value)}
-          placeholder={DEFAULT_MODEL[kind]}
+          placeholder={DEFAULT_MODEL[kind] ?? 'Model ID from provider catalog'}
           className="font-mono"
           autoComplete="off"
           autoCapitalize="off"
@@ -269,13 +281,8 @@ export function ProviderForm({ initial, onDone }: ProviderFormProps) {
         )}
       </div>
 
-      <KeyField
-        id="provider-key"
-        value={secret}
-        onChange={setSecret}
-        hasKey={hasKey}
-        disabled={busy}
-      />
+      {needsKey ? <KeyField id="provider-key" value={secret} onChange={setSecret} hasKey={hasKey} disabled={busy} /> : null}
+      {needsOAuth ? <p className="rounded-md border border-amber-500/30 bg-amber-500/10 px-2.5 py-2 text-xs text-amber-700 dark:text-amber-300">Authorization is required. An injected desktop OAuth host must complete the connection before this provider becomes available.</p> : null}
 
       <div className="mt-1 flex justify-end gap-2">
         <Button type="button" variant="outline" onClick={onDone} disabled={busy}>

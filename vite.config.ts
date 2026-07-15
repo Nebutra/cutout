@@ -32,6 +32,22 @@ export default defineConfig({
   worker: {
     format: 'es',
   },
+  build: {
+    rolldownOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes('/node_modules/')) return
+          if (/\/node_modules\/(react|react-dom|scheduler)\//.test(id)) return 'vendor-react'
+          if (/\/node_modules\/(radix-ui|@radix-ui)\//.test(id)) return 'vendor-radix'
+          if (id.includes('/node_modules/lucide-react/')) return 'vendor-icons'
+          if (id.includes('/node_modules/yaml/')) return 'vendor-yaml'
+          if (/\/node_modules\/(@tanstack\/react-query|@tanstack\/query-core|zustand)\//.test(id)) {
+            return 'vendor-state'
+          }
+        },
+      },
+    },
+  },
   // Tauri expects a fixed port and ignores its own source dir while watching.
   clearScreen: false,
   server: {
@@ -46,6 +62,6 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     globals: true,
-    include: ['src/**/*.{test,spec}.ts'],
+    include: ['src/**/*.{test,spec}.{ts,tsx}', 'scripts/**/*.test.ts'],
   },
 })

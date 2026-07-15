@@ -1,0 +1,4 @@
+interface:
+  display_name: "Delivery Center"
+  short_description: "Preview and approve a verified multi-target Cutout delivery."
+  default_prompt: "Use $delivery-center to preview effects, destinations and cost, then execute one approved delivery and inspect its composite receipt."

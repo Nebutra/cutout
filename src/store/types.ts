@@ -33,6 +33,8 @@ export interface SourceState {
   readonly height: number
   /** Stable id sent to the worker with every `loadImage` / `analyze`. */
   readonly imageId: string
+  /** Whether the shell should automatically analyze this source once loaded. */
+  readonly autoAnalyze: boolean
 }
 
 /** Lifecycle status of the current analysis run. */
@@ -51,6 +53,13 @@ export interface Slice {
   readonly width: number
   readonly height: number
   readonly selected: boolean
+  /**
+   * When this slice was cut from a per-region board (the breakdown pipeline),
+   * the plan region + page it belongs to — the reversible page⊃region⊃slice
+   * tree. `null` for slices from the legacy whole-page board or manual imports.
+   */
+  readonly regionId: string | null
+  readonly pageId: string | null
 }
 
 /**
@@ -82,6 +91,9 @@ export interface SliceInput {
   readonly blob: Blob
   readonly width: number
   readonly height: number
+  /** Region/page linkage, set by the per-region breakdown pipeline; else absent. */
+  readonly regionId?: string | null
+  readonly pageId?: string | null
 }
 
 /** A persisted project restore payload decoded back into live browser objects. */
@@ -104,6 +116,8 @@ export interface ProjectRestoreInput {
     readonly blob: Blob
     readonly width: number
     readonly height: number
+    readonly regionId?: string | null
+    readonly pageId?: string | null
   }>
 }
 
@@ -211,6 +225,11 @@ export type DagNodeOutput =
 /** A planned node's execution state (status + output/error), as the Executor sets it. */
 export type DagNodeState = NodeRunState<DagNodeOutput>
 
+export interface PendingAgentRun {
+  readonly id: string
+  readonly intent: 'create-assets'
+}
+
 /** Read-only state fields. */
 export interface StoreState {
   readonly source: SourceState
@@ -231,6 +250,8 @@ export interface StoreState {
   readonly designMarkdown: DesignMarkdownAsset | null
   /** Project-level planning/prototype UI state that must survive refresh/crash. */
   readonly workspaceSnapshot: WorkspaceSnapshot | null
+  /** Ephemeral, single-consumer launch request from a product entry point. */
+  readonly pendingAgentRun: PendingAgentRun | null
   /** Which forward generation is in flight (drives mockup/edge running state). */
   readonly genPhase: GenPhase
   /** The last generation failure (op-scoped), or null. */
@@ -244,7 +265,12 @@ export interface StoreState {
 /** Actions (spec §5). All state updates are immutable. */
 export interface StoreActions {
   /** Load a decoded bitmap as the new source, resetting analysis + selection. */
-  loadImage(input: { bitmap: ImageBitmap; name: string }): void
+  loadImage(input: {
+    bitmap: ImageBitmap
+    name: string
+    /** Defaults to true. Agent-managed cutout flows set false to avoid a duplicate run. */
+    autoAnalyze?: boolean
+  }): void
   /** Update one param immutably (label update is instant; re-run is debounced). */
   setParam(key: ParamKey, value: number): void
   /** Reset all params to their defaults. */
@@ -255,8 +281,16 @@ export interface StoreActions {
   applyPreview(runId: number, previewBitmap: ImageBitmap): void
   /** Commit slice results for `runId`; drops (and closes objectUrls) if stale. */
   applyAnalysisResult(runId: number, result: AnalysisResult): void
+  /** Atomically publish a completed external/tool-loop cutout result. */
+  commitCutoutResult(result: AnalysisResult): void
   /** Mark the current run as failed with a message (drops if stale). */
   failAnalysis(runId: number, message: string): void
+  /** Start a per-region breakdown run: clear prior slices, bump `runId`, mark running. */
+  beginRegionSlices(): number
+  /** Append one region's freshly-cut slices to the running list (streams to UI). */
+  appendRegionSlices(runId: number, result: AnalysisResult): void
+  /** Mark a per-region breakdown run done (drops if superseded). */
+  finishRegionSlices(runId: number): void
   /** Select exactly one slice by id (clears others). */
   selectSlice(id: string): void
   /** Rename a slice (validated + sanitized + `.png`-suffixed). */
@@ -277,6 +311,10 @@ export interface StoreActions {
   clearDesignMarkdown(): void
   /** Replace the project-level planning/prototype snapshot. */
   setWorkspaceSnapshot(snapshot: WorkspaceSnapshot | null): void
+  /** Queue a one-shot agent run after navigation mounts the workspace. */
+  requestAgentRun(intent: PendingAgentRun['intent']): PendingAgentRun
+  /** Atomically take and clear the pending run, preventing duplicate paid work. */
+  consumeAgentRun(): PendingAgentRun | null
   /** Mark a forward generation as started (clears the prior error). */
   beginGen(phase: Exclude<GenPhase, 'idle'>): void
   /** Mark the current forward generation as finished (back to idle). */

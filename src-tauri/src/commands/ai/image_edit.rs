@@ -15,7 +15,8 @@ use reqwest::multipart::{Form, Part};
 use serde::Serialize;
 
 use super::ai_proxy::{
-    buffered_timeout_for_url, build_client, enforce_host, request_error_message, ProxyError,
+    buffered_timeout_for_url, build_client, enforce_host, enforce_resolved_host,
+    request_error_message, ProxyError,
 };
 use super::auth_header::auth_headers;
 use super::keys::read_secret;
@@ -36,7 +37,10 @@ fn is_openai_shaped(kind: &str) -> bool {
 
 /// Build the multipart form for an edits request: `model`, `prompt`, optional
 /// `size`, `input_fidelity` (caller defaults it to `high` for 垫图), and one
-/// `image[]` part per reference image (PNG mime + filename). Pure (no I/O, no
+/// repeated `image` parts per reference image (PNG mime + filename). OpenAI's
+/// multipart contract names the field `image`; repeating that field represents
+/// multiple references. The bracketed `image[]` spelling is rejected by some
+/// otherwise OpenAI-compatible relays. Pure (no I/O, no
 /// secret) so it is unit-testable in isolation.
 fn build_edit_form(
     model: &str,
@@ -58,7 +62,7 @@ fn build_edit_form(
             .file_name(format!("reference-{i}.png"))
             .mime_str("image/png")
             .expect("image/png is a valid mime type");
-        form = form.part("image[]", part);
+        form = form.part("image", part);
     }
     form
 }
@@ -103,7 +107,8 @@ fn build_auth_headers(kind: &str, secret: &str) -> Result<HeaderMap, ProxyError>
 
 /// 垫图: reference-conditioned generation via `POST {base_url}/images/edits`.
 ///
-/// `images` are the raw reference-image bytes (one or more; sent as `image[]`).
+/// `images` are the raw reference-image bytes (one or more; sent as repeated
+/// `image` fields).
 /// `input_fidelity` defaults to `"high"` (preserves the reference's style, which
 /// is what 垫图 wants). The real key is read from the keychain and injected here;
 /// non-2xx responses surface the HTTP status (secret-free), like the other proxy
@@ -132,6 +137,7 @@ pub async fn ai_image_edit(
 
     let url = format!("{}/images/edits", base_url.trim_end_matches('/'));
     enforce_host(&kind, &url)?; // SSRF guard (https + allowed host)
+    enforce_resolved_host(&kind, &url).await?;
     let secret = read_secret(&provider_id).map_err(ProxyError::from)?;
     let header_map = build_auth_headers(&kind, &secret)?;
 
@@ -234,7 +240,7 @@ mod tests {
     #[test]
     fn build_auth_headers_rejects_unknown_kind() {
         assert!(matches!(
-            build_auth_headers("mistral", "k"),
+            build_auth_headers("unknown-provider", "k"),
             Err(ProxyError::UnknownKind)
         ));
     }
