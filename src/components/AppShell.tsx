@@ -33,6 +33,7 @@ import type {
   FigmaWorkbenchPreview,
 } from "@/components/design-os-workbench/DesignOsWorkbench";
 import type { DesignOsWorkbenchModel } from "@/components/design-os-workbench/DesignOsWorkbench";
+import type { TokenValueChange } from "@/design-kit";
 import type { DesignOsCapabilityContext } from "@/components/design-os/model";
 import type { LiveDesignOsArtifacts } from "@/components/design-os-workbench/live-model";
 import { LibraryUIProvider } from "@/components/library/library-ui";
@@ -543,6 +544,13 @@ export function AppShell() {
     revisionId: string;
     files: readonly { path: string; content: string }[];
     composedByAgent: boolean;
+    savedToLibrary: boolean;
+  } | null>(null);
+  const [tokenSyncPreview, setTokenSyncPreview] = useState<{
+    documentId: string;
+    revisionId: string;
+    sourceId: string;
+    changes: readonly TokenValueChange[];
   } | null>(null);
   const [figmaSnapshotPreview, setFigmaSnapshotPreview] =
     useState<FigmaSnapshotPreview>();
@@ -626,8 +634,17 @@ export function AppShell() {
         },
       ),
       workflowPacks: [],
-      ...(specimenKit?.revisionId === designDocument.revision.id
-        ? { specimen: specimenKit }
+      ...(specimenKit
+        ? {
+            specimen: {
+              ...specimenKit,
+              stale: specimenKit.revisionId !== designDocument.revision.id,
+            },
+          }
+        : {}),
+      ...(tokenSyncPreview?.documentId === designDocument.meta.id &&
+      tokenSyncPreview.revisionId === designDocument.revision.id
+        ? { tokenSyncPreview: { changes: tokenSyncPreview.changes } }
         : {}),
     };
   }, [
@@ -640,6 +657,7 @@ export function AppShell() {
     repositoryIngest,
     designKitReceipt,
     specimenKit,
+    tokenSyncPreview,
     figmaSnapshotPreview,
     figmaBindings,
     workspaceSnapshot?.designOsAuthoring,
@@ -935,7 +953,12 @@ export function AppShell() {
       }
     }
 
-    setSpecimenKit({ revisionId: current.revision.id, files, composedByAgent });
+    setSpecimenKit({
+      revisionId: current.revision.id,
+      files,
+      composedByAgent,
+      savedToLibrary: false,
+    });
     toast.success("Specimen generated", {
       description: composedByAgent
         ? "demo.html composed by the Agent for this product."
@@ -946,20 +969,94 @@ export function AppShell() {
   const syncDemoHtml = useCallback(
     (file: File) => {
       void (async () => {
+        const before = getStoreState().workspaceSnapshot?.designDocument;
+        const bytes = new Uint8Array(await file.arrayBuffer());
+        const text = new TextDecoder().decode(bytes);
+        // Source ids are content-addressed (source:{kind}:{sha256}), so the id
+        // is known up front regardless of whether ingest below appends a new
+        // source or finds this content already present.
+        const digestBuffer = await crypto.subtle.digest("SHA-256", bytes);
+        const digest = [...new Uint8Array(digestBuffer)]
+          .map((byte) => byte.toString(16).padStart(2, "0"))
+          .join("");
+        const sourceId = `source:document:${digest}`;
+
         await prepareWorkbenchSource({
           type: "local-file",
           path: file.name,
-          bytes: new Uint8Array(await file.arrayBuffer()),
+          bytes,
           sourceKind: "document",
           mediaType: file.type || "text/html",
           title: `${file.name} (edited demo)`,
           role: "reference",
           license: { kind: "proprietary", holder: "Project owner" },
         });
+
+        if (!before) return;
+        const { diffDemoHtmlTokens } = await import("@/design-kit");
+        const changes = diffDemoHtmlTokens(before, text);
+        if (changes.length === 0) return;
+        const snapshot = getStoreState().workspaceSnapshot;
+        if (!snapshot?.designDocument) return;
+        setTokenSyncPreview({
+          documentId: snapshot.designDocument.meta.id,
+          revisionId: snapshot.designDocument.revision.id,
+          sourceId,
+          changes,
+        });
+        toast.info(
+          `${changes.length} token value change${changes.length === 1 ? "" : "s"} detected in demo.html`,
+          { description: "Review and apply in the Specimen tab." },
+        );
       })();
     },
     [prepareWorkbenchSource],
   );
+
+  const applyDemoHtmlTokenSync = useCallback(async () => {
+    const preview = tokenSyncPreview;
+    const snapshot = getStoreState().workspaceSnapshot;
+    const current = snapshot?.designDocument;
+    if (!preview || !snapshot || !current) {
+      toast.error("Token sync preview is no longer available");
+      return;
+    }
+    if (
+      current.meta.id !== preview.documentId ||
+      current.revision.id !== preview.revisionId
+    ) {
+      toast.error("Design document changed since this sync was prepared", {
+        description: "Re-sync demo.html to review it against the current tokens.",
+      });
+      setTokenSyncPreview(null);
+      return;
+    }
+    const { applyTokenValueChanges } = await import("@/design-kit");
+    const applied = applyTokenValueChanges(current, preview.changes, {
+      id: `revision:demo-sync:${crypto.randomUUID()}`,
+      createdAt: new Date().toISOString(),
+      actor: { kind: "human", id: "human:desktop" },
+      sourceId: preview.sourceId,
+    });
+    if (isErr(applied)) {
+      toast.error("Could not apply token changes", {
+        description: applied.error,
+      });
+      return;
+    }
+    getStoreState().setWorkspaceSnapshot({
+      ...snapshot,
+      designDocument: applied.data,
+    });
+    setTokenSyncPreview(null);
+    toast.success(
+      `${preview.changes.length} token${preview.changes.length === 1 ? "" : "s"} updated from demo.html`,
+    );
+  }, [tokenSyncPreview]);
+
+  const discardDemoHtmlTokenSync = useCallback(() => {
+    setTokenSyncPreview(null);
+  }, []);
 
   const previewUnifiedDelivery = useCallback(
     async (targetIds: readonly string[]) => {
@@ -1345,6 +1442,55 @@ export function AppShell() {
     () => ({ open: openLibrary, openGlobal: openGlobalLibrary }),
     [openGlobalLibrary, openLibrary],
   );
+
+  const saveSpecimenToLibrary = useCallback(async () => {
+    const current = getStoreState().workspaceSnapshot?.designDocument;
+    if (!current || !specimenKit || specimenKit.revisionId !== current.revision.id) {
+      toast.error("Generate a specimen for the current revision first");
+      return;
+    }
+    try {
+      const [{ buildSpecimenLibraryItem, GlobalLibraryStore }, { IndexedDbLibraryBlobStore }, { createIndexedDbGlobalLibraryBackend }] =
+        await Promise.all([
+          import("@/global-library"),
+          import("@/global-library/blob-store"),
+          import("@/global-library/indexeddb"),
+        ]);
+      const blobStore = new IndexedDbLibraryBlobStore(indexedDB);
+      const { item, approval } = await buildSpecimenLibraryItem({
+        document: current,
+        files: specimenKit.files,
+        contentSink: blobStore,
+        approvalId: `approval:specimen:${current.revision.id}`,
+        createdAt: new Date().toISOString(),
+      });
+      const libraryStore = new GlobalLibraryStore(
+        createIndexedDbGlobalLibraryBackend(indexedDB),
+      );
+      const existing = (await libraryStore.catalog()).items.find(
+        (candidate) => candidate.id === item.id && candidate.version === item.version,
+      );
+      if (existing) {
+        toast.info("This specimen is already in Library.");
+        setSpecimenKit((current) =>
+          current ? { ...current, savedToLibrary: true } : current,
+        );
+        return;
+      }
+      await libraryStore.saveApproved(item, approval);
+      setSpecimenKit((current) =>
+        current ? { ...current, savedToLibrary: true } : current,
+      );
+      toast.success("Saved to Library", {
+        description: `${item.name} · v${item.version}`,
+        action: { label: "Open in Library", onClick: openGlobalLibrary },
+      });
+    } catch (error) {
+      toast.error("Could not save specimen to Library", {
+        description: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }, [specimenKit, openGlobalLibrary]);
   const openProjectById = useCallback(
     async (id: string) => {
       if (activeProjectId && activeProjectId !== id) {
@@ -1719,6 +1865,9 @@ export function AppShell() {
     onExportKit: exportWorkbenchKit,
     onGenerateSpecimen: generateSpecimen,
     onSyncDemoHtml: syncDemoHtml,
+    onApplyTokenSync: () => void applyDemoHtmlTokenSync(),
+    onDiscardTokenSync: discardDemoHtmlTokenSync,
+    onSaveSpecimenToLibrary: saveSpecimenToLibrary,
     onExportComponent: exportWorkbenchComponents,
     onExportStarter: exportWorkbenchStarter,
     onPrepareAuthoring: prepareWorkbenchAuthoring,

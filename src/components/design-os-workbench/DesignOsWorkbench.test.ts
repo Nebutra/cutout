@@ -308,6 +308,7 @@ describe("DesignOsWorkbench", () => {
       specimen: {
         revisionId: "revision:12",
         composedByAgent: true,
+        stale: false,
         files: [
           { path: "design-system.html", content: "<html><body>specimen</body></html>" },
           { path: "demo.html", content: "<html><body>demo</body></html>" },
@@ -329,6 +330,7 @@ describe("DesignOsWorkbench", () => {
     expect(view.textContent).toContain("Regenerate");
     expect(view.textContent).toContain("Download demo.html");
     expect(view.textContent).toContain("demo.html: composed for this product");
+    expect(view.textContent).not.toContain("Tokens changed since this specimen was generated");
 
     const input = view.querySelector('[aria-label="Sync from edited demo.html"]') as HTMLInputElement;
     const file = new File(["<html></html>"], "demo.html", { type: "text/html" });
@@ -345,6 +347,7 @@ describe("DesignOsWorkbench", () => {
           specimen: {
             revisionId: "revision:12",
             composedByAgent: false,
+            stale: false,
             files: [
               { path: "design-system.html", content: "<html></html>" },
               { path: "demo.html", content: "<html></html>" },
@@ -356,6 +359,93 @@ describe("DesignOsWorkbench", () => {
     );
     expect(view.textContent).toContain("demo.html: generic template");
     expect(view.textContent).not.toContain("composed for this product");
+  });
+
+  it("shows a staleness banner instead of forgetting the specimen once tokens have moved past it", () => {
+    const view = mount(
+      createElement(DesignOsWorkbench, {
+        model: {
+          ...model,
+          specimen: {
+            revisionId: "revision:11",
+            composedByAgent: true,
+            stale: true,
+            files: [
+              { path: "design-system.html", content: "<html><body>old specimen</body></html>" },
+              { path: "demo.html", content: "<html><body>old demo</body></html>" },
+            ],
+          },
+        },
+        defaultTab: "specimen",
+      }),
+    );
+    expect(view.textContent).toContain("Tokens changed since this specimen was generated");
+    // stale content is still shown, not hidden behind the banner.
+    expect(view.querySelector("iframe")).toBeTruthy();
+    expect(view.textContent).toContain("Regenerate");
+  });
+
+  it("offers to save the specimen to Library, and shows a saved state once it has been", () => {
+    const onSave = vi.fn();
+    const specimenModel: DesignOsWorkbenchModel = {
+      ...model,
+      specimen: {
+        revisionId: "revision:12",
+        composedByAgent: false,
+        stale: false,
+        files: [
+          { path: "design-system.html", content: "<html></html>" },
+          { path: "demo.html", content: "<html></html>" },
+        ],
+      },
+    };
+    const view = mount(
+      createElement(DesignOsWorkbench, {
+        model: specimenModel,
+        defaultTab: "specimen",
+        callbacks: { onSaveSpecimenToLibrary: onSave },
+      }),
+    );
+    const save = Array.from(view.querySelectorAll("button")).find((button) =>
+      button.textContent?.includes("Save to Library"),
+    ) as HTMLButtonElement;
+    expect(save).toBeTruthy();
+    expect(save.disabled).toBe(false);
+    act(() => save.click());
+    expect(onSave).toHaveBeenCalledOnce();
+
+    act(() =>
+      root?.render(
+        createElement(DesignOsWorkbench, {
+          model: { ...specimenModel, specimen: { ...specimenModel.specimen!, savedToLibrary: true } },
+          defaultTab: "specimen",
+          callbacks: { onSaveSpecimenToLibrary: onSave },
+        }),
+      ),
+    );
+    expect(view.textContent).toContain("Saved to Library");
+    const savedButton = Array.from(view.querySelectorAll("button")).find((button) =>
+      button.textContent?.includes("Saved to Library"),
+    ) as HTMLButtonElement;
+    expect(savedButton.disabled).toBe(true);
+  });
+
+  it("does not show the Library action when no callback is provided", () => {
+    const view = mount(
+      createElement(DesignOsWorkbench, {
+        model: {
+          ...model,
+          specimen: {
+            revisionId: "revision:12",
+            composedByAgent: false,
+            stale: false,
+            files: [{ path: "design-system.html", content: "<html></html>" }],
+          },
+        },
+        defaultTab: "specimen",
+      }),
+    );
+    expect(view.textContent).not.toContain("Save to Library");
   });
 
   it("keeps kit evidence progressive and exports only the selected ready target", () => {

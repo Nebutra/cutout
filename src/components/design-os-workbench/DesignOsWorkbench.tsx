@@ -7,6 +7,7 @@ import {
 import {
   Boxes,
   ArrowLeft,
+  Check,
   CheckCircle2,
   CircleAlert,
   Component,
@@ -17,6 +18,7 @@ import {
   FolderInput,
   Layers3,
   Download,
+  LibraryBig,
   PackageCheck,
   Palette,
   RefreshCw,
@@ -25,6 +27,7 @@ import {
   ShieldCheck,
   Sparkles,
   Workflow,
+  X,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -170,6 +173,23 @@ export interface DesignOsWorkbenchModel {
     readonly files: readonly { readonly path: string; readonly content: string }[];
     /** False when demo.html fell back to the deterministic template (no chat model configured, or the Agent call failed). */
     readonly composedByAgent: boolean;
+    /** True once this exact specimen has been saved to the Global Library — lets the UI show "Saved" instead of re-offering the action. */
+    readonly savedToLibrary?: boolean;
+    /** True once the document has moved past the revision this specimen was compiled for — still shown, just flagged. */
+    readonly stale: boolean;
+  };
+  /**
+   * Present when a re-synced demo.html's custom-property values differ from
+   * the current tokens. Requires explicit approval (onApplyTokenSync) —
+   * never applied automatically.
+   */
+  readonly tokenSyncPreview?: {
+    readonly changes: readonly {
+      readonly tokenId: string;
+      readonly name: string;
+      readonly previousValue: string;
+      readonly nextValue: string;
+    }[];
   };
 }
 
@@ -181,12 +201,18 @@ export interface DesignOsWorkbenchCallbacks {
   /** Compiles (or recompiles) the in-memory kit backing the Specimen tab. */
   readonly onGenerateSpecimen?: () => void;
   /**
-   * Re-ingests a hand-edited demo.html as a licensed reference source, so it
-   * becomes durable, provenanced Design IR material instead of a disposable
-   * export — the same ingest-preview/approve gate the Sources tab already
-   * uses, not a bespoke token-mutation path.
+   * Re-ingests a hand-edited demo.html as a licensed reference source (so it
+   * becomes durable, provenanced Design IR material) and diffs its custom
+   * property values against the current tokens. A resulting change set shows
+   * up as `tokenSyncPreview` for explicit review — never applied silently.
    */
   readonly onSyncDemoHtml?: (file: File) => void;
+  /** Applies the currently previewed token value changes from tokenSyncPreview. */
+  readonly onApplyTokenSync?: () => void;
+  /** Discards the currently previewed token value changes without applying them. */
+  readonly onDiscardTokenSync?: () => void;
+  /** Saves the currently compiled design-system.html + demo.html into the Global Library as a design-system-kit item. */
+  readonly onSaveSpecimenToLibrary?: () => void;
   readonly onExportComponent?: (itemId: string) => void;
   readonly onExportStarter?: (itemId: string) => void;
   readonly onPrepareFigmaSnapshot?: (snapshot: unknown) => void;
@@ -1232,6 +1258,13 @@ function Specimen({
         }
       />
 
+      {model.specimen?.stale ? (
+        <p role="status" className="flex items-center gap-1.5 rounded-md border border-amber-500/25 bg-amber-500/10 px-2.5 py-2 text-xs text-amber-700 dark:text-amber-300">
+          <CircleAlert className="size-3.5 shrink-0" />
+          Tokens changed since this specimen was generated — Regenerate to see the current design.
+        </p>
+      ) : null}
+
       {specimenHtml ? (
         <>
           <div className="flex flex-wrap items-center gap-2">
@@ -1270,10 +1303,61 @@ function Specimen({
               </>
             ) : null}
           </div>
+          {callbacks?.onSaveSpecimenToLibrary ? (
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                size="sm"
+                variant={model.specimen?.savedToLibrary ? "secondary" : "outline"}
+                disabled={model.specimen?.savedToLibrary}
+                onClick={callbacks.onSaveSpecimenToLibrary}
+              >
+                <LibraryBig /> {model.specimen?.savedToLibrary ? "Saved to Library" : "Save to Library"}
+              </Button>
+              <p className="text-xs text-muted-foreground">
+                Keeps this specimen past this session — reopen it from Library even after the tokens change again.
+              </p>
+            </div>
+          ) : null}
           <p className="text-xs text-muted-foreground">
             Hand-edit the downloaded demo.html, or ask the Agent to adjust it, then sync it back —
             changes go through the same review you already use for Sources, nothing is applied silently.
           </p>
+
+          {model.tokenSyncPreview && model.tokenSyncPreview.changes.length > 0 ? (
+            <div className="rounded-lg border border-border bg-muted/20 p-3" data-slot="token-sync-preview">
+              <div className="flex items-center gap-1.5 text-sm font-medium">
+                <CircleAlert className="size-3.5 text-amber-600 dark:text-amber-400" />
+                {model.tokenSyncPreview.changes.length} token value change
+                {model.tokenSyncPreview.changes.length === 1 ? "" : "s"} detected in the synced demo.html
+              </div>
+              <ul aria-label="Token value changes" className="mt-2 divide-y divide-border">
+                {model.tokenSyncPreview.changes.map((change) => (
+                  <li
+                    key={change.tokenId}
+                    className="flex min-w-0 items-center gap-2 py-1.5 text-xs"
+                  >
+                    <span className="min-w-0 flex-1 truncate font-medium">{change.name}</span>
+                    <SwatchOrValue value={change.previousValue} />
+                    <span className="text-muted-foreground" aria-hidden="true">→</span>
+                    <SwatchOrValue value={change.nextValue} />
+                  </li>
+                ))}
+              </ul>
+              <div className="mt-2 flex gap-2">
+                {callbacks?.onApplyTokenSync ? (
+                  <Button size="sm" onClick={callbacks.onApplyTokenSync}>
+                    <Check /> Apply changes
+                  </Button>
+                ) : null}
+                {callbacks?.onDiscardTokenSync ? (
+                  <Button size="sm" variant="ghost" onClick={callbacks.onDiscardTokenSync}>
+                    <X /> Discard
+                  </Button>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
+
           <iframe
             title="Design system specimen"
             srcDoc={specimenHtml}
@@ -1629,6 +1713,24 @@ function SectionHeading({
       </div>
       {action}
     </div>
+  );
+}
+
+const CSS_COLOR_VALUE = /^(#[0-9a-f]{3,8}|rgb|hsl|oklch|oklab|lab|lch)/i;
+
+/** A compact value chip, prefixed with a live color swatch when the value looks like a CSS color. */
+function SwatchOrValue({ value }: { readonly value: string }) {
+  return (
+    <span className="inline-flex max-w-28 shrink-0 items-center gap-1 rounded border border-border bg-background px-1.5 py-0.5 font-mono text-[11px]">
+      {CSS_COLOR_VALUE.test(value.trim()) ? (
+        <span
+          aria-hidden="true"
+          className="size-2.5 shrink-0 rounded-full border border-border/60"
+          style={{ background: value }}
+        />
+      ) : null}
+      <span className="truncate" title={value}>{value}</span>
+    </span>
   );
 }
 

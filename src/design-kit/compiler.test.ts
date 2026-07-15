@@ -149,6 +149,69 @@ describe('Design Kit v1 compiler', () => {
     expect(specimen).toContain('&lt;script&gt;alert(1)&lt;/script&gt;')
     expect(specimen).toMatch(/style="background:&quot;&gt;&lt;script&gt;alert\(1\)&lt;\/script&gt;"/)
   })
+
+  it('keeps the flat swatch grid when no color token declares a tier', async () => {
+    const compiled = await compileDesignKit(input())
+    const specimen = content(compiled, 'design-system.html')
+    // the stylesheet always defines .tier-label (cheap, unconditional CSS);
+    // what must NOT appear is any element actually using it.
+    expect(specimen).not.toContain('class="tier-label"')
+    expect((specimen.match(/class="swatch-grid"/g) ?? []).length).toBe(1)
+  })
+
+  it('groups the swatch grid into Primitive/Semantic/Alias sections once any color token declares a tier', async () => {
+    const tieredDocument: DesignDocument = {
+      ...document(),
+      tokens: [
+        { id: 'token:color:brand', name: 'Brand', kind: 'color', value: '#0ea5e9', provenanceId: 'provenance:brand', tier: 'primitive' },
+        { id: 'token:color:primary', name: 'Primary', kind: 'color', value: '#0284c7', provenanceId: 'provenance:brand', tier: 'semantic', aliasOf: 'token:color:brand' },
+        { id: 'token:color:accent', name: 'Accent', kind: 'color', value: '#f59e0b', tier: 'alias', aliasOf: 'token:color:primary' },
+        { id: 'token:color:loose', name: 'Loose', kind: 'color', value: '#111827' },
+      ],
+    }
+    const compiled = await compileDesignKit({
+      document: tieredDocument,
+      tokens: [
+        { tokenId: 'token:color:brand', status: 'verified', category: 'color', cssName: 'brand' },
+        { tokenId: 'token:color:primary', status: 'verified', category: 'color', cssName: 'primary' },
+        { tokenId: 'token:color:accent', status: 'verified', category: 'color', cssName: 'accent' },
+        { tokenId: 'token:color:loose', status: 'verified', category: 'color', cssName: 'loose' },
+      ],
+    })
+    const specimen = content(compiled, 'design-system.html')
+
+    expect(specimen).toContain('<h3 class="tier-label">Primitive</h3>')
+    expect(specimen).toContain('<h3 class="tier-label">Semantic</h3>')
+    expect(specimen).toContain('<h3 class="tier-label">Alias</h3>')
+    expect(specimen).toContain('<h3 class="tier-label">Ungrouped</h3>')
+    expect((specimen.match(/class="swatch-grid"/g) ?? []).length).toBe(4)
+
+    // the tokenId, not the IR-alias tokenId, is what a reader can act on —
+    // resolved swatch alias references are shown by cssName.
+    expect(specimen).toContain('alias of brand')
+    expect(specimen).toContain('alias of primary')
+    // "loose" carries no tier and no alias — falls into Ungrouped, no alias line.
+    expect(specimen).toContain('color.loose')
+  })
+
+  it('does not crash when a tiered token aliases a target that exists in the document but was not selected into this kit', async () => {
+    const tieredDocument: DesignDocument = {
+      ...document(),
+      tokens: [
+        { id: 'token:color:brand', name: 'Brand', kind: 'color', value: '#0ea5e9', tier: 'semantic', aliasOf: 'token:color:not-included' },
+        { id: 'token:color:not-included', name: 'Not included', kind: 'color', value: '#111827' },
+      ],
+    }
+    const compiled = await compileDesignKit({
+      document: tieredDocument,
+      // Only "brand" is adapted into this kit — its alias target is a real
+      // document token, just not one this kit chose to compile.
+      tokens: [{ tokenId: 'token:color:brand', status: 'verified', category: 'color', cssName: 'brand' }],
+    })
+    const specimen = content(compiled, 'design-system.html')
+    expect(specimen).toContain('<h3 class="tier-label">Semantic</h3>')
+    expect(specimen).toContain('alias of token:color:not-included')
+  })
 })
 
 function content(compiled: Awaited<ReturnType<typeof compileDesignKit>>, path: string): string {
