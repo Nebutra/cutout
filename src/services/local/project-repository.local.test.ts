@@ -1,9 +1,10 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { IDBFactory } from 'fake-indexeddb'
 import {
   createEmptyProjectRecord,
   createLocalProjectRepository,
   createProjectRecordFromStore,
+  createRestoreInputFromProject,
   type LocalProjectRecord,
 } from './project-repository.local'
 import { getStoreState } from '@/store'
@@ -498,6 +499,71 @@ describe('project-repository.local', () => {
     )
 
     getStoreState().resetProject()
+  })
+
+  it('round-trips per-region slice tree linkage (regionId/pageId) through save + restore', async () => {
+    const createSpy = vi
+      .spyOn(URL, 'createObjectURL')
+      .mockReturnValue('blob:test')
+    const revokeSpy = vi
+      .spyOn(URL, 'revokeObjectURL')
+      .mockImplementation(() => {})
+    try {
+      const state = getStoreState()
+      state.resetProject()
+      const runId = state.beginRegionSlices()
+      state.appendRegionSlices(runId, {
+        slices: [
+          {
+            id: 'slice-hero',
+            index: 0,
+            box: { x: 0, y: 0, width: 8, height: 8 },
+            blob: pngBlob(),
+            width: 8,
+            height: 8,
+            regionId: 'region-hero',
+            pageId: 'page-1',
+          },
+          {
+            id: 'slice-grid',
+            index: 0,
+            box: { x: 0, y: 0, width: 8, height: 8 },
+            blob: pngBlob(2),
+            width: 8,
+            height: 8,
+            regionId: 'region-grid',
+            pageId: 'page-1',
+          },
+        ],
+      })
+      state.finishRegionSlices(runId)
+
+      const record = await createProjectRecordFromStore({
+        id: crypto.randomUUID(),
+        createdAt: 800,
+        state: getStoreState(),
+        now: 900,
+      })
+
+      // Saved record carries the linkage.
+      expect(record.slices?.map((s) => [s.regionId, s.pageId])).toEqual([
+        ['region-hero', 'page-1'],
+        ['region-grid', 'page-1'],
+      ])
+
+      // Restore round-trip preserves it in the live store.
+      const restoreInput = await createRestoreInputFromProject(record)
+      getStoreState().restoreProject(restoreInput)
+      const restored = getStoreState().analysis.slices
+      expect(restored.map((s) => [s.id, s.regionId, s.pageId])).toEqual([
+        ['slice-hero', 'region-hero', 'page-1'],
+        ['slice-grid', 'region-grid', 'page-1'],
+      ])
+    } finally {
+      getStoreState().resetProject()
+      createSpy.mockRestore()
+      revokeSpy.mockRestore()
+    }
   })
 
   it('marks persisted workspace work as running while a resumable step is active', async () => {
