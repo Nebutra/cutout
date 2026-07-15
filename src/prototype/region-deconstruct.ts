@@ -251,7 +251,14 @@ export async function runRegionBreakdown(
       const asset = board.data[0]
       if (!asset) throw new Error('The model returned no board image for this region.')
       const bitmap = await deps.decode(asset.bytes)
-      const slices = await deps.slice(bitmap, region.id, params.page.id, params.signal)
+      let slices: SliceInput[]
+      try {
+        slices = await deps.slice(bitmap, region.id, params.page.id, params.signal)
+      } finally {
+        // Release the decoded board surface promptly (the worker path closes
+        // its bitmaps too); naming uses asset.bytes, not the bitmap.
+        bitmap.close()
+      }
       sliceCount += slices.length
       params.onRegionSliced(region.id, slices)
 
@@ -269,8 +276,11 @@ export async function runRegionBreakdown(
               if (namespaced.length > 0) params.onRegionNamed?.(namespaced)
             })
             .catch((error) => {
-              if (params.signal?.aborted) throw error
-              // Naming is best-effort — the slice keeps its placeholder name.
+              // Naming is best-effort. On abort the whole run is being torn
+              // down — swallow it so this job never rejects (a re-throw here
+              // would orphan the promise if the main loop's abort skips the
+              // Promise.all below, surfacing as an unhandled rejection).
+              if (params.signal?.aborted) return
               params.onRegionError?.(
                 region.id,
                 `naming: ${error instanceof Error ? error.message : String(error)}`,

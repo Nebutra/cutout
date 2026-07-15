@@ -1953,48 +1953,62 @@ export function IntentWorkspace({
     if (boardRegions.length > 0) {
       const cutoutParams = getStoreState().params;
       const regionRunId = getStoreState().beginRegionSlices();
-      await runRegionBreakdown(
-        {
-          generation: personalizedGenerationRef.current,
-          providers: { list: async () => providers.data ?? [] },
-          decode: (bytes) => decodeImage(bytesToBlob(bytes, "image/png")),
-          slice: (bitmap, regionId, pageId, signal) =>
-            sliceRegionBoardBitmap(bitmap, cutoutParams, regionId, pageId, signal),
-          // Name each region's slices in one region-primed vision call, run
-          // concurrently with the next region's board generation.
-          nameRegion: (boardBytes, slices, context, signal) =>
-            nameRegionSlices(
-              personalizedGenerationRef.current,
-              route.chat,
-              boardBytes,
-              slices,
-              context,
-              signal,
-            ),
-        },
-        {
-          page: first.page,
-          pageBytes: first.bytes,
-          referenceImages: referenceBytes,
-          image,
-          signal: lease.controller.signal,
-          onRegionSliced: (_regionId, slices) => {
-            // A newer submission may have superseded this run mid-stream; the
-            // store's runId guard drops the append, but skip the work too.
-            if (!agentRunCoordinatorRef.current.isActive(lease)) return;
-            getStoreState().appendRegionSlices(regionRunId, { slices });
+      // The per-region path names each region's slices itself (below), so the
+      // whole-board auto-naming effect must NOT also fire — it reads
+      // source.bitmap (never set here) and would throw, flipping namingStatus
+      // to 'error' on an otherwise-successful, already-named run.
+      autoNamePendingRef.current = false;
+      try {
+        await runRegionBreakdown(
+          {
+            generation: personalizedGenerationRef.current,
+            providers: { list: async () => providers.data ?? [] },
+            decode: (bytes) => decodeImage(bytesToBlob(bytes, "image/png")),
+            slice: (bitmap, regionId, pageId, signal) =>
+              sliceRegionBoardBitmap(bitmap, cutoutParams, regionId, pageId, signal),
+            // Name each region's slices in one region-primed vision call, run
+            // concurrently with the next region's board generation.
+            nameRegion: (boardBytes, slices, context, signal) =>
+              nameRegionSlices(
+                personalizedGenerationRef.current,
+                route.chat,
+                boardBytes,
+                slices,
+                context,
+                signal,
+              ),
           },
-          onRegionNamed: (renames) => {
-            if (!agentRunCoordinatorRef.current.isActive(lease)) return;
-            const rename = getStoreState().renameSlice;
-            for (const { id, name } of renames) rename(id, name);
+          {
+            page: first.page,
+            pageBytes: first.bytes,
+            referenceImages: referenceBytes,
+            image,
+            signal: lease.controller.signal,
+            onRegionSliced: (_regionId, slices) => {
+              // A newer submission may have superseded this run mid-stream; the
+              // store's runId guard drops the append, but skip the work too.
+              if (!agentRunCoordinatorRef.current.isActive(lease)) return;
+              getStoreState().appendRegionSlices(regionRunId, { slices });
+            },
+            onRegionNamed: (renames) => {
+              if (!agentRunCoordinatorRef.current.isActive(lease)) return;
+              const rename = getStoreState().renameSlice;
+              for (const { id, name } of renames) rename(id, name);
+            },
+            onRegionError: (regionId, message) =>
+              console.info("[Cutout] region deconstruct failed:", regionId, message),
           },
-          onRegionError: (regionId, message) =>
-            console.info("[Cutout] region deconstruct failed:", regionId, message),
-        },
-      );
-      agentRunCoordinatorRef.current.checkpoint(lease);
-      getStoreState().finishRegionSlices(regionRunId);
+        );
+        agentRunCoordinatorRef.current.checkpoint(lease);
+      } finally {
+        // Always clear the streaming run's 'running' status — even when
+        // runRegionBreakdown throws on cancel — so the cutout edge doesn't
+        // spin forever. runId-guarded: a no-op once a newer run took over.
+        getStoreState().finishRegionSlices(regionRunId);
+        if (agentRunCoordinatorRef.current.isActive(lease)) {
+          setNamingStatus("done");
+        }
+      }
     } else {
       await deconstructMockup({
         preflight: deconstructPreflight,
