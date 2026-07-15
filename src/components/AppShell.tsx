@@ -542,6 +542,7 @@ export function AppShell() {
   const [specimenKit, setSpecimenKit] = useState<{
     revisionId: string;
     files: readonly { path: string; content: string }[];
+    composedByAgent: boolean;
   } | null>(null);
   const [figmaSnapshotPreview, setFigmaSnapshotPreview] =
     useState<FigmaSnapshotPreview>();
@@ -905,15 +906,42 @@ export function AppShell() {
       });
       return;
     }
-    setSpecimenKit({
-      revisionId: current.revision.id,
-      files: compiled.data.files.map((file) => ({
-        path: file.path,
-        content: file.content,
-      })),
+    let files = compiled.data.files.map((file) => ({
+      path: file.path,
+      content: file.content,
+    }));
+
+    // The deterministic demo.html above is always valid, but it's a generic
+    // template — it has no idea what this product actually is. When a chat
+    // model is configured, ask it to compose a demo that reflects the real
+    // needs/components instead, and swap it in only if that succeeds.
+    const chat = modelAssignments.data?.chat;
+    let composedByAgent = false;
+    if (chat) {
+      const { composeDemoHtmlWithAgent } = await import("@/design-kit");
+      const tokensCss =
+        files.find((file) => file.path === "tokens.css")?.content ?? "";
+      const composed = await composeDemoHtmlWithAgent({
+        document: current,
+        tokensCss,
+        chat,
+        generation: services.generation,
+      });
+      if (composed) {
+        composedByAgent = true;
+        files = files.map((file) =>
+          file.path === "demo.html" ? { ...file, content: composed } : file,
+        );
+      }
+    }
+
+    setSpecimenKit({ revisionId: current.revision.id, files, composedByAgent });
+    toast.success("Specimen generated", {
+      description: composedByAgent
+        ? "demo.html composed by the Agent for this product."
+        : "demo.html used the deterministic template — connect a chat model for a product-aware demo.",
     });
-    toast.success("Specimen generated");
-  }, []);
+  }, [modelAssignments.data?.chat, services.generation]);
 
   const syncDemoHtml = useCallback(
     (file: File) => {

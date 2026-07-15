@@ -168,6 +168,8 @@ export interface DesignOsWorkbenchModel {
   readonly specimen?: {
     readonly revisionId: string;
     readonly files: readonly { readonly path: string; readonly content: string }[];
+    /** False when demo.html fell back to the deterministic template (no chat model configured, or the Agent call failed). */
+    readonly composedByAgent: boolean;
   };
 }
 
@@ -1240,6 +1242,13 @@ function Specimen({
               <Button size="sm" variant="outline" onClick={() => download("demo.html", demoHtml)}>
                 <Download /> Download demo.html
               </Button>
+            ) : null}
+            {demoHtml ? (
+              <Badge variant={model.specimen?.composedByAgent ? "secondary" : "outline"}>
+                {model.specimen?.composedByAgent
+                  ? "demo.html: composed for this product"
+                  : "demo.html: generic template"}
+              </Badge>
             ) : null}
             {callbacks?.onSyncDemoHtml ? (
               <>

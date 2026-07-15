@@ -307,6 +307,7 @@ describe("DesignOsWorkbench", () => {
       ...model,
       specimen: {
         revisionId: "revision:12",
+        composedByAgent: true,
         files: [
           { path: "design-system.html", content: "<html><body>specimen</body></html>" },
           { path: "demo.html", content: "<html><body>demo</body></html>" },
@@ -327,12 +328,34 @@ describe("DesignOsWorkbench", () => {
     expect(iframe.getAttribute("srcdoc")).toContain("specimen");
     expect(view.textContent).toContain("Regenerate");
     expect(view.textContent).toContain("Download demo.html");
+    expect(view.textContent).toContain("demo.html: composed for this product");
 
     const input = view.querySelector('[aria-label="Sync from edited demo.html"]') as HTMLInputElement;
     const file = new File(["<html></html>"], "demo.html", { type: "text/html" });
     Object.defineProperty(input, "files", { value: [file] });
     act(() => input.dispatchEvent(new Event("change", { bubbles: true })));
     expect(onSync).toHaveBeenCalledWith(file);
+  });
+
+  it("marks the demo as a generic template when composition fell back to the deterministic renderer", () => {
+    const view = mount(
+      createElement(DesignOsWorkbench, {
+        model: {
+          ...model,
+          specimen: {
+            revisionId: "revision:12",
+            composedByAgent: false,
+            files: [
+              { path: "design-system.html", content: "<html></html>" },
+              { path: "demo.html", content: "<html></html>" },
+            ],
+          },
+        },
+        defaultTab: "specimen",
+      }),
+    );
+    expect(view.textContent).toContain("demo.html: generic template");
+    expect(view.textContent).not.toContain("composed for this product");
   });
 
   it("keeps kit evidence progressive and exports only the selected ready target", () => {
