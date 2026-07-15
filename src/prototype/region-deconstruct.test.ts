@@ -205,6 +205,47 @@ describe('runRegionBreakdown', () => {
     expect(named).toEqual([{ id: 'slice-a', name: 'hero-banner-cta-button' }])
   })
 
+  it('closes each region board bitmap after slicing (no leak)', async () => {
+    const close = vi.fn()
+    const deps: RegionBreakdownDeps = {
+      ...makeDeps(),
+      decode: async () => ({ width: 1024, height: 1024, close }) as unknown as ImageBitmap,
+    }
+    await runRegionBreakdown(deps, {
+      page: page([region({ id: 'a', name: 'Hero' }), region({ id: 'c', name: 'Gallery' })]),
+      pageBytes: new Uint8Array([1]),
+      image: IMAGE,
+      onRegionSliced: () => {},
+    })
+    expect(close).toHaveBeenCalledTimes(2)
+  })
+
+  it('swallows a naming rejection on abort — not reported as a region error, no throw', async () => {
+    const controller = new AbortController()
+    const errors: string[] = []
+    const streamed: string[] = []
+    const deps: RegionBreakdownDeps = {
+      ...makeDeps(),
+      nameRegion: async () => {
+        controller.abort()
+        throw new Error('aborted mid-naming')
+      },
+    }
+    await expect(
+      runRegionBreakdown(deps, {
+        page: page([region({ id: 'a', name: 'Hero' })]),
+        pageBytes: new Uint8Array([1]),
+        image: IMAGE,
+        signal: controller.signal,
+        onRegionSliced: (regionId) => streamed.push(regionId),
+        onRegionNamed: () => {},
+        onRegionError: (_regionId, message) => errors.push(message),
+      }),
+    ).resolves.toBeDefined()
+    expect(streamed).toEqual(['a']) // slice still streamed
+    expect(errors.filter((m) => m.startsWith('naming'))).toEqual([]) // abort swallowed
+  })
+
   it('keeps naming best-effort — a naming failure does not drop the slices', async () => {
     const named: Array<{ id: string; name: string }> = []
     const errors: string[] = []
