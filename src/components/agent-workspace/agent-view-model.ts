@@ -39,7 +39,7 @@ export type AgentFeedItem =
       readonly type: 'message'
       /** Chat bubble role — user right, agent left. */
       readonly role: 'user' | 'agent'
-      readonly status: 'complete'
+      readonly status: 'complete' | 'pending'
       readonly title: 'You' | 'Agent'
       readonly detail: string
       readonly provenance: 'runtime'
@@ -165,6 +165,17 @@ function buildFeed(input: AgentViewModelInput): readonly AgentFeedItem[] {
     if (event.type !== 'intent-recorded' && event.type !== 'agent-message') return []
     return feedItemFromRunEvent(event)
   })
+  const preparationItem: AgentFeedItem[] = input.preparing
+    ? [{
+        id: 'runtime:preparing',
+        type: 'message',
+        role: 'agent',
+        status: 'pending',
+        title: 'Agent',
+        detail: 'Checking your request…',
+        provenance: 'runtime',
+      }]
+    : []
 
   // Ops rows (tools/stages/materials/errors) stay scoped to the active run.
   const activeOpsItems = activeRunId
@@ -220,7 +231,7 @@ function buildFeed(input: AgentViewModelInput): readonly AgentFeedItem[] {
   }))
 
   const fallbackItems = [...noticeItems, ...stageItems, ...materialItems, ...errorItems]
-  const eventItems = [...conversationItems, ...activeOpsItems]
+  const eventItems = [...conversationItems, ...preparationItem, ...activeOpsItems]
   if (eventItems.length === 0) return fallbackItems
 
   // Durable events are authoritative for facts they contain, but the current
@@ -576,9 +587,9 @@ function buildRunSummary(input: AgentViewModelInput): AgentRunSummary {
   if (input.working) {
     if (input.preparing) {
       return {
-        status: 'running',
-        title: 'Reviewing the request',
-        detail: 'Checking intent and routing before generation.',
+        status: 'draft',
+        title: 'Describe the result you need',
+        detail: 'The Agent will plan and execute against a visible outcome checklist.',
         intent,
         elapsedLabel,
       }

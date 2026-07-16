@@ -93,7 +93,7 @@ describe('buildAgentViewModel', () => {
     expect(JSON.stringify(model)).not.toMatch(/thinking|reasoning|heartbeat|request sent/i)
   })
 
-  it('describes request routing before a workflow phase begins', () => {
+  it('projects request routing as a temporary Agent conversation turn', () => {
     const model = buildAgentViewModel({
       brief: 'Hello',
       workflowPhase: 'idle',
@@ -105,11 +105,14 @@ describe('buildAgentViewModel', () => {
       runError: null,
     })
 
-    expect(model.summary).toMatchObject({
-      status: 'running',
-      title: 'Reviewing the request',
-      detail: 'Checking intent and routing before generation.',
-    })
+    expect(model.summary.status).toBe('draft')
+    expect(model.feed).toContainEqual(expect.objectContaining({
+      id: 'runtime:preparing',
+      type: 'message',
+      role: 'agent',
+      status: 'pending',
+      detail: 'Checking your request…',
+    }))
   })
 
   it('prefers replayed durable events over inferred stage activity', () => {

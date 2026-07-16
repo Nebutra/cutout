@@ -428,6 +428,7 @@ function FeedRow({ item, detailsLabel, onApproveTool, onDenyTool, onCancelTool, 
   // Conversation turns: left/right chat bubbles (user right, agent left).
   if (item.type === 'message') {
     const isUser = item.role === 'user'
+    const pending = item.status === 'pending'
     return (
       <div
         data-slot={isUser ? 'user-message' : 'agent-message'}
@@ -441,7 +442,14 @@ function FeedRow({ item, detailsLabel, onApproveTool, onDenyTool, onCancelTool, 
               : 'rounded-bl-md bg-muted text-foreground',
           )}
         >
-          <p className="whitespace-pre-wrap break-words">{item.detail}</p>
+          {pending ? (
+            <p role="status" className="flex items-center gap-2 text-muted-foreground">
+              <LoaderCircle className="size-3.5 animate-spin" />
+              <span>{item.detail}</span>
+            </p>
+          ) : (
+            <p className="whitespace-pre-wrap break-words">{item.detail}</p>
+          )}
           {item.action && onAgentAction ? (
             <div className="mt-2">
               <Button

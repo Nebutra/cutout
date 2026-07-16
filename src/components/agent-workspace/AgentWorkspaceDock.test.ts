@@ -183,6 +183,28 @@ describe('AgentWorkspaceDock', () => {
     expect(html).not.toContain('>Cancel</button>')
   })
 
+  it('renders a pending Agent status as a conversation bubble', () => {
+    const html = renderToStaticMarkup(createElement(AgentWorkspaceDock, {
+      viewModel: {
+        ...draftModel,
+        feed: [{
+          id: 'runtime:preparing',
+          type: 'message',
+          role: 'agent',
+          status: 'pending',
+          title: 'Agent',
+          detail: 'Checking your request…',
+          provenance: 'runtime',
+        }],
+      },
+      composer: { value: 'Hi', busy: true, disabled: true, onChange: vi.fn(), onSubmit: vi.fn(), onStop: vi.fn() },
+    }))
+
+    expect(html).toContain('data-slot="agent-message"')
+    expect(html).toContain('Checking your request…')
+    expect(html).not.toContain('data-slot="agent-run-overview"')
+  })
+
   it('keeps draft capability notices visible without expanding the run overview', () => {
     const html = renderToStaticMarkup(createElement(AgentWorkspaceDock, {
       viewModel: {
