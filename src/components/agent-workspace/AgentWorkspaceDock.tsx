@@ -1,4 +1,4 @@
-import { useEffect, useRef, type KeyboardEvent, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 import {
   AlertTriangle,
   Check,
@@ -22,6 +22,9 @@ import {
   BadgeDollarSign,
   Ban,
   ReceiptText,
+  Copy,
+  Pencil,
+  CheckCheck,
 } from 'lucide-react'
 import type {
   AgentFeedItem,
@@ -129,6 +132,7 @@ export interface AgentWorkspaceDockProps {
   readonly onCancelTool?: (toolCallId: string, requestId?: string) => void
   readonly onRetryTool?: (toolCallId: string, requestId?: string) => void
   readonly onAgentAction?: (eventId: string, action: 'proceed-anyway', brief: string) => void
+  readonly onEditMessage?: (message: string) => void
   readonly onOpenBudget?: () => void
   /** Cost disclosure is transactional, not permanent workspace chrome. */
   readonly showCostNotice?: boolean
@@ -174,6 +178,7 @@ export function AgentWorkspaceDock({
   onCancelTool,
   onRetryTool,
   onAgentAction,
+  onEditMessage,
   onOpenBudget,
   showCostNotice = false,
 }: AgentWorkspaceDockProps) {
@@ -239,6 +244,7 @@ export function AgentWorkspaceDock({
             heading="Conversation"
             compact
             onAgentAction={onAgentAction}
+            onEditMessage={onEditMessage}
           />
         </div>
       ) : null}
@@ -364,6 +370,7 @@ export function AgentRunFeed({
   onCancelTool,
   onRetryTool,
   onAgentAction,
+  onEditMessage,
 }: {
   readonly items: readonly AgentFeedItem[]
   readonly heading: string
@@ -375,6 +382,7 @@ export function AgentRunFeed({
   readonly onCancelTool?: AgentWorkspaceDockProps['onCancelTool']
   readonly onRetryTool?: AgentWorkspaceDockProps['onRetryTool']
   readonly onAgentAction?: AgentWorkspaceDockProps['onAgentAction']
+  readonly onEditMessage?: AgentWorkspaceDockProps['onEditMessage']
 }) {
   const endRef = useRef<HTMLDivElement | null>(null)
   const previousCountRef = useRef(items.length)
@@ -405,7 +413,7 @@ export function AgentRunFeed({
         {items.length === 0 ? (
           <p className="max-w-[30ch] break-words py-2 text-xs leading-4 text-muted-foreground">{emptyLabel}</p>
         ) : items.map((item) => (
-          <FeedRow key={item.id} item={item} detailsLabel={detailsLabel} onApproveTool={onApproveTool} onDenyTool={onDenyTool} onCancelTool={onCancelTool} onRetryTool={onRetryTool} onAgentAction={onAgentAction} />
+          <FeedRow key={item.id} item={item} detailsLabel={detailsLabel} onApproveTool={onApproveTool} onDenyTool={onDenyTool} onCancelTool={onCancelTool} onRetryTool={onRetryTool} onAgentAction={onAgentAction} onEditMessage={onEditMessage} />
         ))}
         <div ref={endRef} />
       </div>
@@ -413,7 +421,7 @@ export function AgentRunFeed({
   )
 }
 
-function FeedRow({ item, detailsLabel, onApproveTool, onDenyTool, onCancelTool, onRetryTool, onAgentAction }: {
+function FeedRow({ item, detailsLabel, onApproveTool, onDenyTool, onCancelTool, onRetryTool, onAgentAction, onEditMessage }: {
   readonly item: AgentFeedItem
   readonly detailsLabel: string
   readonly onApproveTool?: AgentWorkspaceDockProps['onApproveTool']
@@ -421,6 +429,7 @@ function FeedRow({ item, detailsLabel, onApproveTool, onDenyTool, onCancelTool, 
   readonly onCancelTool?: AgentWorkspaceDockProps['onCancelTool']
   readonly onRetryTool?: AgentWorkspaceDockProps['onRetryTool']
   readonly onAgentAction?: AgentWorkspaceDockProps['onAgentAction']
+  readonly onEditMessage?: AgentWorkspaceDockProps['onEditMessage']
 }) {
   const isError = item.type === 'error'
   const tool = item.type === 'tool' ? item : null
@@ -432,38 +441,46 @@ function FeedRow({ item, detailsLabel, onApproveTool, onDenyTool, onCancelTool, 
     return (
       <div
         data-slot={isUser ? 'user-message' : 'agent-message'}
-        className={cn('flex w-full', isUser ? 'justify-end' : 'justify-start')}
+        className={cn('group/message flex w-full', isUser ? 'justify-end' : 'justify-start')}
       >
-        <article
-          className={cn(
-            'max-w-[92%] rounded-2xl px-3 py-2 text-sm leading-5',
-            isUser
-              ? 'rounded-br-md bg-primary text-primary-foreground'
-              : 'rounded-bl-md bg-muted text-foreground',
-          )}
-        >
-          {pending ? (
-            <p role="status" className="flex items-center gap-2 text-muted-foreground">
-              <LoaderCircle className="size-3.5 animate-spin" />
-              <span>{item.detail}</span>
-            </p>
-          ) : (
-            <p className="whitespace-pre-wrap break-words">{item.detail}</p>
-          )}
-          {item.action && onAgentAction ? (
-            <div className="mt-2">
-              <Button
-                type="button"
-                size="sm"
-                variant={isUser ? 'secondary' : 'outline'}
-                className={cn(isUser && 'border-primary-foreground/20')}
-                onClick={() => onAgentAction(item.id, item.action!.type, item.action!.brief)}
-              >
-                {item.action.label}
-              </Button>
-            </div>
+        <div className="max-w-[92%]">
+          <article
+            className={cn(
+              'rounded-2xl px-3 py-2 text-sm leading-5',
+              isUser
+                ? 'rounded-br-md bg-primary text-primary-foreground'
+                : 'rounded-bl-md bg-muted text-foreground',
+            )}
+          >
+            {pending ? (
+              <p role="status" className="flex items-center gap-2 text-muted-foreground">
+                <LoaderCircle className="size-3.5 animate-spin" />
+                <span>{item.detail}</span>
+              </p>
+            ) : (
+              <p className="whitespace-pre-wrap break-words">{item.detail}</p>
+            )}
+          </article>
+          {!pending ? (
+            <MessageActions
+              align={isUser ? 'end' : 'start'}
+              message={item.detail}
+              allowEdit={isUser && Boolean(onEditMessage)}
+              onEdit={onEditMessage}
+            />
           ) : null}
-        </article>
+          {item.action && onAgentAction ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="mt-2 max-w-full"
+              onClick={() => onAgentAction(item.id, item.action!.type, item.action!.brief)}
+            >
+              {item.action.label}
+            </Button>
+          ) : null}
+        </div>
       </div>
     )
   }
@@ -518,6 +535,57 @@ function FeedRow({ item, detailsLabel, onApproveTool, onDenyTool, onCancelTool, 
         </div>
       </div>
     </article>
+  )
+}
+
+function MessageActions({
+  align,
+  message,
+  allowEdit,
+  onEdit,
+}: {
+  readonly align: 'start' | 'end'
+  readonly message: string
+  readonly allowEdit: boolean
+  readonly onEdit?: (message: string) => void
+}) {
+  const [copied, setCopied] = useState(false)
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(message)
+      setCopied(true)
+      window.setTimeout(() => setCopied(false), 1_500)
+    } catch {
+      setCopied(false)
+    }
+  }
+
+  return (
+    <TooltipProvider delayDuration={300}>
+      <div className={cn(
+        'mt-1 flex items-center gap-0.5 text-muted-foreground transition-opacity sm:opacity-0 sm:group-hover/message:opacity-100 sm:focus-within:opacity-100',
+        align === 'end' ? 'justify-end' : 'justify-start',
+      )}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button type="button" variant="ghost" size="icon-sm" aria-label="Copy message" onClick={() => void copy()}>
+              {copied ? <CheckCheck /> : <Copy />}
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>{copied ? 'Copied' : 'Copy'}</TooltipContent>
+        </Tooltip>
+        {allowEdit && onEdit ? (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button type="button" variant="ghost" size="icon-sm" aria-label="Edit message" onClick={() => onEdit(message)}>
+                <Pencil />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Edit</TooltipContent>
+          </Tooltip>
+        ) : null}
+      </div>
+    </TooltipProvider>
   )
 }
 

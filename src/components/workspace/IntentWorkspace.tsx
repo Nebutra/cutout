@@ -2740,6 +2740,10 @@ export function IntentWorkspace({
                   briefOverride: actionBrief,
                 });
               }}
+              onEditMessage={(message) => {
+                setBrief(message);
+                focusAgentComposer();
+              }}
               onOpenBudget={() => settings.open({section:'ai',anchor:'paid-actions'})}
               onOpenArtifact={(kind) => {
                 if (kind === "design-system" || kind === "design-markdown") {

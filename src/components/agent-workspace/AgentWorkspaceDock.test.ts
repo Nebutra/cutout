@@ -84,11 +84,30 @@ describe('AgentWorkspaceDock', () => {
     expect(html).toContain('>hi</p>')
     expect(html).toContain("Hi! Tell me what you&#x27;d like to design or build.")
     expect(html).toContain('Build it anyway')
+    expect(html).toContain('aria-label="Copy message"')
     expect(html).toContain('data-slot="agent-composer"')
     expect(html).not.toContain('data-slot="agent-details"')
     expect(html).not.toContain('Agent activity')
     expect(html).not.toContain('RUNTIME')
     expect(html).not.toContain('data-sonner-toast')
+  })
+  it('offers edit only for user messages and keeps Agent suggestions below the bubble', () => {
+    const html = renderToStaticMarkup(createElement(AgentWorkspaceDock, {
+      viewModel: {
+        ...draftModel,
+        feed: [
+          { id: 'user', type: 'message', role: 'user', status: 'complete', title: 'You', detail: 'Make it green', provenance: 'runtime' },
+          { id: 'agent', type: 'message', role: 'agent', status: 'complete', title: 'Agent', detail: 'I can help with that.', provenance: 'runtime', action: { type: 'proceed-anyway', label: 'Build it anyway', brief: 'Make it green' } },
+        ],
+      },
+      composer: { value: '', onChange: vi.fn(), onSubmit: vi.fn() },
+      onEditMessage: vi.fn(),
+      onAgentAction: vi.fn(),
+    }))
+
+    expect(html.match(/aria-label="Edit message"/g)).toHaveLength(1)
+    expect(html).toContain('data-slot="agent-message"')
+    expect(html).toContain('mt-2 max-w-full')
   })
   it('renders approval actions, route/cost facts, receipt evidence, and a compact budget entry', () => {
     const onApproveTool = vi.fn()
