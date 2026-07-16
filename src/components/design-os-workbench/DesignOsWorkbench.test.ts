@@ -128,13 +128,13 @@ function mount(element: ReturnType<typeof createElement>) {
 }
 
 describe("DesignOsWorkbench", () => {
-  it("SSR renders the Canvas inspector shell with a dedicated Figma surface", () => {
+  it("SSR renders the System inspector with project tools and progressive evidence", () => {
     const html = renderToStaticMarkup(
       createElement(DesignOsWorkbench, { model }),
     );
 
-    expect(html).toContain('aria-label="Canvas inspector"');
-    expect(html).toContain('aria-label="Canvas inspector sections"');
+    expect(html).toContain('aria-label="System inspector"');
+    expect(html).toContain('aria-label="System inspector sections"');
     expect(html).not.toContain(">Design OS<");
     expect(html).toContain("Overview");
     expect(html).toContain("Sources");
@@ -142,9 +142,11 @@ describe("DesignOsWorkbench", () => {
     expect(html).not.toContain(">Kits</button>");
     expect(html).not.toContain(">Components</button>");
     expect(html).not.toContain(">Starter</button>");
-    expect(html).toContain("project:acme");
-    expect(html).toContain("Delivery readiness");
-    expect(html).toContain("missing something required first");
+    expect(html).toContain("Project system");
+    expect(html).toContain("Advanced system evidence");
+    expect(html.indexOf("Revision 12")).toBeGreaterThan(
+      html.indexOf("Advanced system evidence"),
+    );
     expect(html).not.toContain("Only verified outputs");
   });
 
@@ -163,7 +165,7 @@ describe("DesignOsWorkbench", () => {
     expect(html).not.toContain(">Overview</button>");
     expect(html).not.toContain(">Sources</button>");
     expect(html).not.toContain(">Figma</button>");
-    expect(html).not.toContain("Canvas inspector");
+    expect(html).not.toContain("System inspector");
     expect(html).not.toContain("Axe host required");
     expect(html.match(/>Delivery center<\/button>/g)).toHaveLength(1);
     expect(html).toContain('aria-label="Deliver"');

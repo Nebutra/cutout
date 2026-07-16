@@ -12,7 +12,7 @@
 import { generateText as aiGenerateText, stepCountIs, tool as aiTool } from 'ai'
 import { describe, expect, it } from 'vitest'
 import { runToolLoop } from './tool-loop'
-import { astryxThemeTool, askClarifyingQuestionTool, configurePageTargetingTool, configureRegenerationTool, conversationalReplyTool } from './tool-registry'
+import { astryxThemeTool, askClarifyingQuestionTool, configurePageTargetingTool, configureRegenerationTool, conversationalReplyTool, proceedWithGenerationTool } from './tool-registry'
 import { createClarificationBridge } from './clarification-bridge'
 import type { AgentRunEvent } from './run-events'
 import { parseEditableDesignMarkdown } from '@/prototype/design-md'
@@ -85,7 +85,7 @@ function gatewayGeneration(key: string, base: string): Pick<GenerationService, '
 /** Mirrors `tryToolGate`'s prompt-building exactly (IntentWorkspace.tsx, `async function tryToolGate`). */
 function toolGatePrompt(
   text: string,
-  offered: { astryx: boolean, regeneration: boolean, pageTargeting: boolean, ask: boolean },
+  offered: { astryx: boolean, regeneration: boolean, pageTargeting: boolean, proceed?: boolean, ask: boolean },
 ): string {
   return [
     'The user is talking to a design-tool Agent. Call at most one of the non-question tools '
@@ -113,8 +113,12 @@ function toolGatePrompt(
         + 'that guessing would likely produce the wrong direction. Do not ask for politeness or a '
         + 'detail you can reasonably decide yourself.'
       : null,
-    'For an actual request to design or build something new that is clear enough to proceed, '
-    + 'call none of these — it falls through to the design pipeline.',
+    offered.proceed
+      ? '- `proceed_with_generation`: the message is a real design/build request that is clear '
+        + 'enough to proceed. Prefer calling this (with a distilled, self-contained brief) over '
+        + 'doing nothing — especially when the message is rambling or buried in asides.'
+      : null,
+    'If none of these fit, call nothing — it falls through to the design pipeline.',
     '',
     `User: ${text}`,
   ].filter((line) => line !== null).join('\n')
@@ -207,6 +211,28 @@ describe.skipIf(!RUN)('tryToolGate classification vs. a real model', () => {
     const call = result.data.calls.find((c) => c.toolName === 'select_pages_to_regenerate')
     expect(call).toBeDefined()
     expect((call!.toolOutput as { targetPageIds: string[] }).targetPageIds).toEqual(['page-login'])
+  })
+
+  it('a rambling but clear build request calls proceed_with_generation with a distilled brief', { timeout: 30_000 }, async () => {
+    const result = await runToolLoop(generation!, {
+      runId: 'benchmark:proceed',
+      providerId: 'mox',
+      model: MODEL,
+      prompt: toolGatePrompt(
+        '嗯…我昨天跟朋友聊天想到的，其实也不一定要做，但你要是能做的话——就是那种给自由职业者记账的小工具吧，' +
+          '能记收入支出、看看这个月赚了多少、导出个报表报税用，手机上用。啰嗦了这么多不好意思哈。',
+        { astryx: false, regeneration: false, pageTargeting: false, proceed: true, ask: false },
+      ),
+      tools: [proceedWithGenerationTool(), conversationalReplyTool()],
+    })
+    expect(result.ok).toBe(true)
+    if (!result.ok) throw new Error('expected ok')
+    const call = result.data.calls.find((c) => c.toolName === 'proceed_with_generation')
+    expect(call).toBeDefined()
+    const refined = (call!.toolOutput as { refinedBrief: string }).refinedBrief
+    // A distilled, non-empty brief that dropped the rambling and kept the intent.
+    expect(refined.length).toBeGreaterThan(0)
+    expect(refined).not.toContain('不好意思')
   })
 
   it(

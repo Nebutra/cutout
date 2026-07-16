@@ -38,6 +38,7 @@ export function createUpdateOrchestrator(input: {
     preferences: input.preferences.read(),
     downloaded: 0,
   };
+  let downloadAttempt = 0;
   const listeners = new Set<Listener>();
   const publish = (patch: Partial<UpdateState>) => {
     state = { ...state, ...patch };
@@ -95,11 +96,23 @@ export function createUpdateOrchestrator(input: {
     const release = state.release;
     if (!release || state.phase !== "available") return;
     publish({ phase: "downloading", downloaded: 0, error: undefined });
+    const attempt = ++downloadAttempt;
     try {
       await input.backend.download(release, (downloaded, total) =>
         publish({ downloaded, total }),
       );
-      publish({ phase: "ready" });
+      if (attempt === downloadAttempt) publish({ phase: "ready" });
+    } catch (error) {
+      if (attempt === downloadAttempt) publish({ phase: "error", error: message(error) });
+    }
+  };
+
+  const cancel = async () => {
+    if (state.phase !== "downloading") return;
+    try {
+      await input.backend.cancel();
+      downloadAttempt += 1;
+      publish({ phase: state.release ? "available" : "idle", downloaded: 0, total: undefined, error: undefined });
     } catch (error) {
       publish({ phase: "error", error: message(error) });
     }
@@ -130,6 +143,7 @@ export function createUpdateOrchestrator(input: {
     check,
     autoCheck,
     download,
+    cancel,
     install,
     retry() {
       return state.release && state.downloaded > 0 ? download() : check();

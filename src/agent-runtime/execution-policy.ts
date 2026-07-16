@@ -3,10 +3,7 @@ import type {
   ModelAssignments,
   SlotId,
 } from '@/services/ai/model-assignment-types'
-import type {
-  ProviderConfig,
-  ProviderKind,
-} from '@/services/ai/provider-types'
+import type { ProviderConfig } from '@/services/ai/provider-types'
 import type { ReasoningEffort } from '@/services/ai/reasoning'
 import { routeByCapabilities, type ModelCapability, type ModelDescriptor, type ModelRouteReceipt, type RoutePreferences } from './capability-router'
 
@@ -26,6 +23,14 @@ export interface AgentTaskContext {
   readonly multimodal: boolean
   readonly paidAction: PaidAction
   readonly workload?: 'general'|'webdev'|'image-to-webdev'
+  readonly effortSignals?: {
+    readonly complexity?: number
+    readonly ambiguity?: number
+    readonly dagDepth?: number
+    readonly risk?: 'low' | 'medium' | 'high'
+    readonly retryCount?: number
+    readonly budgetPressure?: number
+  }
 }
 
 export type ComposerModelPolicy =
@@ -78,13 +83,8 @@ export interface ExecutionPolicyResult {
   readonly degradations: readonly ExecutionPolicyDegradation[]
   readonly rationaleCodes: readonly ExecutionPolicyRationale[]
   readonly routeReceipt?: ModelRouteReceipt
+  readonly effortReceipt?: NonNullable<ModelRouteReceipt['effort']>
 }
-
-const THINKING_PROVIDER_KINDS: ReadonlySet<ProviderKind> = new Set([
-  'openai',
-  'anthropic',
-  'google',
-])
 
 /**
  * Resolve a Composer choice into capabilities the current backend actually has.
@@ -115,7 +115,18 @@ export function routeExecutionPolicy(
     )
   }
 
-  if(input.modelCatalog){const capabilities=capabilitiesFor(input.task),enabledProviders=new Set(input.providers.filter(provider=>provider.enabled).map(provider=>provider.id)),routed=routeByCapabilities({slot,descriptors:input.modelCatalog.map(descriptor=>({...descriptor,available:descriptor.available!==false&&enabledProviders.has(descriptor.providerId)})),requiredCapabilities:capabilities.required,preferredCapabilities:capabilities.preferred,preferences:input.routePreferences,preferredAssignment:assignment});assignment=routed.assignment;routeReceipt=routed.receipt}
+  const exactFixedSelection =
+    input.model.mode === 'fixed' && input.model.slot === requiredSlot
+  if(input.modelCatalog && !exactFixedSelection){const configured=assignment,capabilities=capabilitiesFor(input.task),enabledProviders=new Set(input.providers.filter(provider=>provider.enabled).map(provider=>provider.id)),routed=routeByCapabilities({slot,descriptors:input.modelCatalog.map(descriptor=>({...descriptor,available:descriptor.available!==false&&enabledProviders.has(descriptor.providerId)})),requiredCapabilities:capabilities.required,preferredCapabilities:capabilities.preferred,preferences:input.routePreferences,preferredAssignment:assignment});assignment=routed.assignment;routeReceipt=routed.receipt
+    if(!assignment&&configured){
+      // A slot IS configured but every catalog candidate was rejected
+      // (unverified provider, capability/region mismatch). Reporting
+      // assignment-missing here would tell the user to configure a model
+      // they already configured.
+      degradations.push('provider-unavailable')
+      rationaleCodes.push('provider-unavailable')
+      return blocked(input, slot, degradations, rationaleCodes, configured, routeReceipt)
+    }}
 
   if (!assignment) {
     degradations.push('assignment-missing')
@@ -133,6 +144,7 @@ export function routeExecutionPolicy(
   }
 
   let reasoningEffort: ReasoningEffort | undefined
+  let effortReceipt: NonNullable<ModelRouteReceipt['effort']> | undefined
   let thinkingSupport: ExecutionPolicyResult['thinkingSupport'] = 'supported'
   if (slot === 'image') {
     thinkingSupport = 'not-applicable'
@@ -142,13 +154,13 @@ export function routeExecutionPolicy(
     }
   } else if (input.thinking === 'provider-default') {
     rationaleCodes.push('provider-default-thinking')
+    effortReceipt = effortDecision(input.task, input.thinking)
   } else {
-    const requested =
-      input.thinking === 'auto'
-        ? automaticThinkingFor(input.task)
-        : input.thinking
-    if (THINKING_PROVIDER_KINDS.has(provider.kind)) {
+    const decision = effortDecision(input.task, input.thinking)
+    const requested = decision.selected!
+    if (supportsReasoningControl(provider, assignment, input.modelCatalog)) {
       reasoningEffort = requested
+      effortReceipt = decision
       if (input.thinking === 'auto') {
         rationaleCodes.push(`auto-thinking-${requested}`)
       }
@@ -156,8 +168,11 @@ export function routeExecutionPolicy(
       degradations.push('thinking-provider-unsupported')
       rationaleCodes.push('thinking-provider-unsupported')
       thinkingSupport = 'unsupported'
+      effortReceipt = { ...decision, selected: undefined }
     }
   }
+
+  const receiptedRoute = routeReceipt && effortReceipt ? { ...routeReceipt, effort: effortReceipt } : routeReceipt
 
   return {
     status: degradations.length > 0 ? 'degraded' : 'ready',
@@ -168,9 +183,10 @@ export function routeExecutionPolicy(
     requestedThinking: input.thinking,
     thinkingSupport,
     reasoningEffort,
+    effortReceipt,
     degradations,
     rationaleCodes,
-    ...(routeReceipt?{routeReceipt}:{}),
+    ...(receiptedRoute?{routeReceipt:receiptedRoute}:{}),
   }
 }
 
@@ -186,20 +202,19 @@ function requiredSlotFor(task: AgentTaskContext): SlotId {
   return 'chat'
 }
 
-function automaticThinkingFor(task: AgentTaskContext): ReasoningEffort {
-  switch (task.stage) {
-    case 'research':
-    case 'plan':
-    case 'review':
-      return 'high'
-    case 'understand':
-      return task.multimodal ? 'medium' : 'low'
-    case 'execute':
-    case 'name':
-      return 'medium'
-    case 'deliver':
-      return 'low'
-  }
+function effortDecision(task: AgentTaskContext, requested: ComposerThinkingPolicy): NonNullable<ModelRouteReceipt['effort']> {
+  const signals = task.effortSignals ?? {}, stageBase: Record<AgentTaskStage, number> = { understand: task.multimodal ? .25 : .1, research: .25, plan: .3, execute: .2, name: .08, review: .3, deliver: .05 }
+  const bounded = (value = 0) => Math.max(0, Math.min(1, value)), risk = signals.risk === 'high' ? 1 : signals.risk === 'medium' ? .5 : 0
+  const score = Number(Math.max(0, Math.min(1, stageBase[task.stage] + bounded(signals.complexity) * .25 + bounded(signals.ambiguity) * .15 + Math.min(1, Math.max(0, signals.dagDepth ?? 0) / 8) * .15 + risk * .2 + Math.min(1, Math.max(0, signals.retryCount ?? 0) / 2) * .15 - bounded(signals.budgetPressure) * .15)).toFixed(3))
+  const automatic: ReasoningEffort = score >= .68 ? 'high' : score >= .25 ? 'medium' : 'low'
+  const selected = requested === 'auto' ? automatic : requested === 'provider-default' ? undefined : requested
+  return { protocol: 'cutout.effort-decision.v1', requested, selected, score, manualOverride: requested !== 'auto' && requested !== 'provider-default', signals: { stage: task.stage, multimodal: String(task.multimodal), complexity: bounded(signals.complexity), ambiguity: bounded(signals.ambiguity), dagDepth: Math.max(0, signals.dagDepth ?? 0), risk: signals.risk ?? 'low', retryCount: Math.max(0, signals.retryCount ?? 0), budgetPressure: bounded(signals.budgetPressure) } }
+}
+
+function supportsReasoningControl(provider: ProviderConfig, assignment: ModelAssignment, catalog?: readonly ModelDescriptor[]): boolean {
+  if (provider.kind === 'openai' || provider.kind === 'anthropic' || provider.kind === 'google') return true
+  if (!assignment.reasoningProtocol || !catalog) return false
+  return catalog.some((descriptor) => descriptor.providerId === assignment.providerId && descriptor.model === assignment.model && descriptor.available !== false && descriptor.capabilities.includes('reasoning') && descriptor.reasoningProtocol === assignment.reasoningProtocol)
 }
 
 function blocked(

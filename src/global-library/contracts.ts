@@ -22,7 +22,7 @@ function unique<T>(values: readonly T[], key: (value: T) => string): boolean {
   return new Set(values.map(key)).size === values.length
 }
 
-export const libraryItemKindSchema = z.enum(['brand-kit', 'design-system-kit', 'component-library-item', 'visual-asset'])
+export const libraryItemKindSchema = z.enum(['brand-kit', 'design-system-kit', 'component-library-item', 'starter-kit', 'visual-asset'])
 
 export const libraryOriginSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('generated'), producer: safeIdSchema, projectId: safeIdSchema, runId: safeIdSchema, sourceRevision: safeIdSchema }).strict(),

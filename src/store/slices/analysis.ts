@@ -47,8 +47,12 @@ function toSlice(input: SliceInput, base: string, index: number): Slice {
     width: input.width,
     height: input.height,
     selected: false,
+    included: input.included ?? true,
+    confidence: input.confidence ?? null,
+    reviewIssues: input.reviewIssues ?? [],
     regionId: input.regionId ?? null,
     pageId: input.pageId ?? null,
+    assetManifestItemId: input.assetManifestItemId ?? null,
   }
 }
 
@@ -63,7 +67,7 @@ export interface AnalysisSlice {
    * Start a per-region breakdown run: clear prior slices, bump `runId`, mark
    * running. Returns the run id so appends for a superseded run can be dropped.
    */
-  beginRegionSlices(): number
+  beginRegionSlices(targetRegionIds?: readonly string[]): number
   /**
    * Append one region's freshly-cut slices to the running list (does NOT
    * replace) so the UI streams them in as each region finishes. Global
@@ -144,16 +148,23 @@ export const createAnalysisSlice: StateCreator<Store, [], [], AnalysisSlice> = (
     }))
   },
 
-  beginRegionSlices: () => {
+  beginRegionSlices: (targetRegionIds) => {
     const { analysis } = get()
-    for (const previous of analysis.slices) URL.revokeObjectURL(previous.objectUrl)
-    analysis.previewBitmap?.close()
+    const targets = targetRegionIds?.length ? new Set(targetRegionIds) : null
+    const preserved = targets
+      ? analysis.slices.filter((slice) => !slice.regionId || !targets.has(slice.regionId))
+      : []
+    for (const previous of analysis.slices) {
+      if (!preserved.includes(previous)) URL.revokeObjectURL(previous.objectUrl)
+    }
+    if (!targets) analysis.previewBitmap?.close()
     const runId = analysis.runId + 1
     set({
       analysis: {
         ...INITIAL_ANALYSIS,
         runId,
         status: 'running',
+        slices: preserved,
       },
     })
     return runId

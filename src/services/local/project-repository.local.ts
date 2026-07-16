@@ -61,9 +61,13 @@ interface StoredSlice {
   readonly blob: Blob
   readonly width: number
   readonly height: number
+  readonly included?: boolean
+  readonly confidence?: number | null
+  readonly reviewIssues?: readonly string[]
   /** page⊃region⊃slice linkage from the per-region breakdown; null for legacy/flat slices. */
   readonly regionId?: string | null
   readonly pageId?: string | null
+  readonly assetManifestItemId?: string | null
 }
 
 export interface LocalProjectRecord extends LocalProjectSummary {
@@ -319,8 +323,12 @@ export async function createProjectRecordFromStore(input: {
     blob: slice.blob,
     width: slice.width,
     height: slice.height,
+    included: slice.included,
+    confidence: slice.confidence,
+    reviewIssues: slice.reviewIssues,
     regionId: slice.regionId,
     pageId: slice.pageId,
+    assetManifestItemId: slice.assetManifestItemId,
   }))
   const brief = state.brief.trim()
   const thumbnail =

@@ -60,8 +60,12 @@ export const useStore = create<Store>()((set, get, api) => ({
       width: slice.width,
       height: slice.height,
       selected: false,
+      included: slice.included ?? true,
+      confidence: slice.confidence ?? null,
+      reviewIssues: slice.reviewIssues ?? [],
       regionId: slice.regionId ?? null,
       pageId: slice.pageId ?? null,
+      assetManifestItemId: slice.assetManifestItemId ?? null,
     }))
 
     set({

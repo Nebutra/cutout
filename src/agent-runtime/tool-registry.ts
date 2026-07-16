@@ -14,6 +14,7 @@ import { configureRegenerationTool } from '@/prototype/regeneration-tool'
 import { conversationalReplyTool } from '@/prototype/conversational-reply-tool'
 import { askClarifyingQuestionTool } from '@/prototype/ask-clarifying-question-tool'
 import { configurePageTargetingTool } from '@/prototype/page-targeting-tool'
+import { proceedWithGenerationTool } from '@/prototype/generation-tool'
 
 export {
   astryxThemeTool,
@@ -21,10 +22,15 @@ export {
   conversationalReplyTool,
   askClarifyingQuestionTool,
   configurePageTargetingTool,
+  proceedWithGenerationTool,
 }
 
 /**
  * No-arg factories only — the others need a DESIGN.md model, a page list,
  * or a clarification bridge + runId and are exported above instead.
  */
-export const NO_ARG_TOOL_FACTORIES = [configureRegenerationTool, conversationalReplyTool] as const
+export const NO_ARG_TOOL_FACTORIES = [
+  configureRegenerationTool,
+  conversationalReplyTool,
+  proceedWithGenerationTool,
+] as const

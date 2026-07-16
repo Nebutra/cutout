@@ -13,6 +13,8 @@ export interface ModelDescriptor {
   readonly speed:number
   readonly region:ModelRegion
   readonly available?:boolean
+  /** Positive catalog/probe evidence for the reasoning option wire shape. */
+  readonly reasoningProtocol?:'openai'|'anthropic'|'google'
 }
 export interface RoutePreferences {
   readonly priority?:'balanced'|'quality'|'cost'|'speed'
@@ -26,6 +28,7 @@ export interface ModelRouteReceipt {
   readonly fallback:boolean
   readonly candidates:readonly {readonly providerId:string;readonly model:string;readonly eligible:boolean;readonly reason?:string;readonly score?:number}[]
   readonly personalization?:PersonalizationReceiptFlags
+  readonly effort?:{readonly protocol:'cutout.effort-decision.v1';readonly requested:'auto'|'provider-default'|'low'|'medium'|'high';readonly selected?:'low'|'medium'|'high';readonly score:number;readonly manualOverride:boolean;readonly signals:Readonly<Record<string,string|number>>}
 }
 
 export function routeByCapabilities(input:{readonly slot:SlotId;readonly descriptors:readonly ModelDescriptor[];readonly requiredCapabilities:readonly ModelCapability[];readonly preferredCapabilities?:readonly ModelCapability[];readonly preferences?:RoutePreferences;readonly preferredAssignment?:ModelAssignment}):{readonly assignment?:ModelAssignment;readonly receipt?:ModelRouteReceipt}{
@@ -41,7 +44,7 @@ export function routeByCapabilities(input:{readonly slot:SlotId;readonly descrip
   }
   eligible.sort((a,b)=>b.score-a.score||a.descriptor.providerId.localeCompare(b.descriptor.providerId)||a.descriptor.model.localeCompare(b.descriptor.model))
   const chosen=eligible[0]?.descriptor;if(!chosen)return{receipt:{protocol:'cutout.model-route-receipt.v1',requiredCapabilities:[...input.requiredCapabilities],preferredCapabilities:[...preferred],fallback:false,candidates:records}}
-  const assignment={providerId:chosen.providerId,model:chosen.model},fallback=Boolean(input.preferredAssignment&&(input.preferredAssignment.providerId!==assignment.providerId||input.preferredAssignment.model!==assignment.model))
+  const assignment={providerId:chosen.providerId,model:chosen.model,...(chosen.reasoningProtocol?{reasoningProtocol:chosen.reasoningProtocol}:{})},fallback=Boolean(input.preferredAssignment&&(input.preferredAssignment.providerId!==assignment.providerId||input.preferredAssignment.model!==assignment.model))
   return{assignment,receipt:{protocol:'cutout.model-route-receipt.v1',requiredCapabilities:[...input.requiredCapabilities],preferredCapabilities:[...preferred],selected:assignment,fallback,candidates:records}}
 }
 function routeScore(model:ModelDescriptor,preferred:readonly ModelCapability[],preferences:RoutePreferences){const priority=preferences.priority??'balanced',weights=priority==='quality'?[.7,.15,.15]:priority==='cost'?[.2,.65,.15]:priority==='speed'?[.2,.15,.65]:[.45,.3,.25],capabilityBonus=preferred.filter(capability=>model.capabilities.includes(capability)).length*.05;return Number((model.quality*weights[0]+(1-model.cost)*weights[1]+model.speed*weights[2]+capabilityBonus).toFixed(6))}

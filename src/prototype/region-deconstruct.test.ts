@@ -149,6 +149,22 @@ describe('runRegionBreakdown', () => {
     expect(result.sliceCount).toBe(2)
   })
 
+  it('retries only explicitly targeted regions', async () => {
+    const streamed: string[] = []
+    const result = await runRegionBreakdown(makeDeps(), {
+      page: page([
+        region({ id: 'hero', name: 'Hero' }),
+        region({ id: 'gallery', name: 'Gallery' }),
+      ]),
+      pageBytes: new Uint8Array([1]),
+      image: IMAGE,
+      targetRegionIds: ['gallery'],
+      onRegionSliced: (regionId) => streamed.push(regionId),
+    })
+    expect(streamed).toEqual(['gallery'])
+    expect(result.regionCount).toBe(1)
+  })
+
   it('uses the openai edit path (page attached as reference image)', async () => {
     const editImage = vi.fn(async (_input: EditImageInput) =>
       ok([{ mediaType: 'image/png', bytes: new Uint8Array([137]) } as GeneratedAsset]),

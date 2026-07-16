@@ -11,6 +11,8 @@ import type { DesignOsAuthoringState } from '@/design-os-operations/authoring'
 import type { CreativeBoardState } from '@/agent-runtime/creative-board-decisions'
 import type { CompositeDeliveryReceipt, DeliveryPlan, DeliveryRequest } from '@/delivery-center'
 import type { ApprovedDeliverableReceipt } from '@/global-library'
+import type { BrandViRun } from '@/brand-kit'
+import type { CanvasAnnotation } from '@/components/workspace/canvas-annotations'
 
 export type WorkspaceWorkflowPhase =
   | 'idle'
@@ -62,6 +64,8 @@ export interface WorkspaceSnapshot {
   readonly selectedPrototypePageId: string | null
   readonly runError: string | null
   readonly namingStatus: WorkspaceNamingStatus
+  /** Regions whose extraction failed; drives durable targeted retry. */
+  readonly failedRegionIds?: readonly string[]
   readonly liveAgentOutput: string
   readonly attachments: readonly PersistedReferenceAttachment[]
   readonly webSearchEnabled: boolean
@@ -79,6 +83,44 @@ export interface WorkspaceSnapshot {
   readonly deliveryPlan?: DeliveryPlan | null
   readonly deliveryReceipt?: CompositeDeliveryReceipt | null
   readonly approvedDeliverables?: readonly ApprovedDeliverableReceipt[]
+  readonly brandViRun?: BrandViRun | null
+  /** User-authored canvas guidance. It is Agent context, never raster output. */
+  readonly canvasAnnotations?: readonly CanvasAnnotation[]
+  /** Durable evidence for inputs that require a runtime capability not currently available. */
+  readonly capabilityReceipts?: readonly WorkspaceCapabilityReceipt[]
+}
+
+export interface WorkspaceCapabilityReceipt {
+  readonly protocol: 'cutout.workspace-capability-receipt.v1'
+  readonly id: string
+  readonly capability: 'video-understanding'
+  readonly status: 'required' | 'available' | 'completed'
+  readonly sourceName: string
+  readonly mediaType: string
+  readonly createdAt: string
+  readonly message: string
+}
+
+export function createEmptyWorkspaceSnapshot(
+  patch: Partial<WorkspaceSnapshot> = {},
+): WorkspaceSnapshot {
+  return {
+    version: 'workspace.v1',
+    workflowPhase: 'idle',
+    prototypePlan: null,
+    prototypeScope: 'primary-flow',
+    humanLoopChoiceId: null,
+    humanLoopCustomAnswer: '',
+    prototypeDesignSystem: null,
+    prototypePages: [],
+    selectedPrototypePageId: null,
+    runError: null,
+    namingStatus: 'idle',
+    liveAgentOutput: '',
+    attachments: [],
+    webSearchEnabled: false,
+    ...patch,
+  }
 }
 
 export function isWorkspaceSnapshotEmpty(
@@ -94,6 +136,7 @@ export function isWorkspaceSnapshotEmpty(
     !snapshot.humanLoopChoiceId &&
     snapshot.humanLoopCustomAnswer.trim().length === 0 &&
     snapshot.namingStatus === 'idle' &&
+    !(snapshot.failedRegionIds?.length) &&
     snapshot.liveAgentOutput.trim().length === 0 &&
     (snapshot.attachments?.length ?? 0) === 0 &&
     !snapshot.webSearchEnabled &&
@@ -106,6 +149,9 @@ export function isWorkspaceSnapshotEmpty(
     !snapshot.deliveryPlan &&
     !snapshot.deliveryReceipt &&
     !(snapshot.approvedDeliverables?.length) &&
+    !snapshot.brandViRun &&
+    !(snapshot.canvasAnnotations?.length) &&
+    !(snapshot.capabilityReceipts?.length) &&
     !snapshot.designDocument &&
     !hasCreativeBoardContent(snapshot.creativeBoard)
   )
@@ -158,6 +204,7 @@ export function workspaceSnapshotFingerprint(
     snapshot.selectedPrototypePageId ?? '',
     snapshot.runError ?? '',
     snapshot.namingStatus,
+    snapshot.failedRegionIds?.join(',') ?? '',
     snapshot.liveAgentOutput.length,
     attachments,
     snapshot.webSearchEnabled ? 'web' : '',
@@ -170,6 +217,13 @@ export function workspaceSnapshotFingerprint(
     snapshot.deliveryPlan ? textFingerprint(JSON.stringify(snapshot.deliveryPlan)) : '',
     snapshot.deliveryReceipt ? textFingerprint(JSON.stringify(snapshot.deliveryReceipt)) : '',
     snapshot.approvedDeliverables?.length ? textFingerprint(JSON.stringify(snapshot.approvedDeliverables)) : '',
+    snapshot.brandViRun ? textFingerprint(JSON.stringify(snapshot.brandViRun)) : '',
+    snapshot.canvasAnnotations?.length
+      ? textFingerprint(JSON.stringify(snapshot.canvasAnnotations))
+      : '',
+    snapshot.capabilityReceipts?.length
+      ? textFingerprint(JSON.stringify(snapshot.capabilityReceipts))
+      : '',
     hasCreativeBoardContent(snapshot.creativeBoard) ? textFingerprint(JSON.stringify(snapshot.creativeBoard)) : '',
     // DesignDocument is normally derived from the fields above. Including it
     // here would make an otherwise unchanged snapshot look dirty when the
@@ -195,6 +249,7 @@ function hasWorkspaceProjectionInput(snapshot: WorkspaceSnapshot): boolean {
       snapshot.humanLoopChoiceId ||
       snapshot.humanLoopCustomAnswer.trim() ||
       snapshot.namingStatus !== 'idle' ||
+      (snapshot.failedRegionIds?.length ?? 0) > 0 ||
       snapshot.liveAgentOutput.trim() ||
       (snapshot.attachments?.length ?? 0) > 0 ||
       snapshot.webSearchEnabled ||
@@ -205,7 +260,10 @@ function hasWorkspaceProjectionInput(snapshot: WorkspaceSnapshot): boolean {
       snapshot.designOsAuthoring ||
       snapshot.deliveryRequest ||
       snapshot.deliveryPlan ||
-      snapshot.deliveryReceipt,
+      snapshot.deliveryReceipt ||
+      snapshot.brandViRun ||
+      (snapshot.canvasAnnotations?.length ?? 0) > 0 ||
+      (snapshot.capabilityReceipts?.length ?? 0) > 0
   )
 }
 

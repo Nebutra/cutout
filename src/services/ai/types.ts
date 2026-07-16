@@ -57,6 +57,8 @@ export interface GenerateInput {
    * `providerOptions` in the generation service; `undefined` sends nothing.
    */
   readonly reasoningEffort?: ReasoningEffort
+  /** Runtime-verified reasoning option protocol for compatible providers. */
+  readonly reasoningProtocol?: 'openai' | 'anthropic' | 'google'
   /** Runtime-owned structured policy context. Never persisted in receipts. */
   readonly systemContext?: string
 }

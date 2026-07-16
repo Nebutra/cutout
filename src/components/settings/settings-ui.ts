@@ -13,7 +13,23 @@ import { createContext, createElement, useContext } from 'react'
 import type { ReactNode } from 'react'
 
 export interface SettingsUI {
-  readonly open: () => void
+  readonly open: (target?: SettingsTarget) => void
+}
+export type SettingsTargetSection='general'|'ai'|'speech'|'personalization'|'integrations'|'archived'
+export interface SettingsTarget{readonly section:SettingsTargetSection;readonly anchor?:'model-routing'|'connections'|'paid-actions'|'updates'}
+
+export function focusSettingsTarget(
+  target: SettingsTarget | undefined,
+  root: Pick<Document, 'querySelector'> = document,
+): HTMLElement | null {
+  if (!target?.anchor) return null
+  const selector = target.anchor === 'connections'
+    ? '#settings-integrations-heading'
+    : `[data-settings-anchor="${target.anchor}"]`
+  const element = root.querySelector<HTMLElement>(selector)
+  element?.scrollIntoView({ block: 'center' })
+  element?.focus({ preventScroll: true })
+  return element
 }
 
 const SettingsUIContext = createContext<SettingsUI | null>(null)

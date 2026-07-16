@@ -11,3 +11,5 @@ pub mod speech;
 #[cfg(desktop)]
 pub mod updater;
 pub mod vectorize;
+#[cfg(desktop)]
+pub mod workspace_bridge;

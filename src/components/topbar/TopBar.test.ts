@@ -43,13 +43,13 @@ describe('TopBar global settings entry', () => {
 })
 
 describe('TopBar project-local actions', () => {
-  it('exposes one New task action and dispatches one intent per click', () => {
+  it('exposes one New project action and dispatches one intent per click', () => {
     const host=document.createElement('div'),onNewProject=vi.fn();document.body.append(host);const root=createRoot(host)
     act(()=>root.render(createElement(TopBar,{view:'home',projectName:'Untitled project',projectTabOpen:false,...callbacks,onNewProject})))
-    const button=host.querySelector<HTMLButtonElement>('button[aria-label="New task"]')!
+    const button=host.querySelector<HTMLButtonElement>('button[aria-label="New project"]')!
     act(()=>button.click())
     expect(onNewProject).toHaveBeenCalledOnce()
-    expect(host.querySelector('button[aria-label="New project"]')).toBeNull()
+    expect(host.querySelector('button[aria-label="New task"]')).toBeNull()
     act(()=>root.unmount());host.remove()
   })
   it('keeps the design inspector out of global chrome and attaches project actions to the project tab', () => {

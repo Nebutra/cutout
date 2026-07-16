@@ -24,6 +24,8 @@ export interface DesktopToolLoopRequest {
   readonly stepId?: string;
   readonly expectedRevision: number;
   readonly request: PaidToolRequest;
+  readonly capabilityLeaseId?: string;
+  readonly requestDigest?: string;
 }
 
 export interface DesktopToolLoopDependencies {
@@ -37,6 +39,13 @@ export interface DesktopToolLoopDependencies {
   readonly timeoutMs?: number;
   /** Optional durable request/attempt ledger and event outbox for desktop hosts. */
   readonly durability?: ToolDurabilityStore;
+  /** Issues a short-lived capability lease only after this attempt has an
+   * actual approval event. Retries therefore receive a fresh, request-bound
+   * lease instead of replaying the previous attempt's authority. */
+  readonly authorize?: (
+    input: DesktopToolLoopRequest,
+    approvalId: string,
+  ) => Promise<{ readonly capabilityLeaseId: string; readonly requestDigest: string }>;
 }
 
 export interface DesktopToolLoop {
@@ -111,9 +120,16 @@ export function createDesktopToolLoop(
     call.controller = new AbortController();
     let result: DesktopToolExecutionResult;
     try {
+      const authorization = dependencies.authorize
+        ? await dependencies.authorize(
+            call.input,
+            `event:${call.input.requestId}:tool-approved`,
+          )
+        : {};
       result = await withDeadline(
         dependencies.executors.execute({
           ...call.input,
+          ...authorization,
           approvalGranted,
           policy: dependencies.policy(),
           signal: call.controller.signal,

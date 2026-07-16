@@ -34,8 +34,8 @@ export function ExportBar({ slice }: ExportBarProps) {
     exportOneSvgApi,
     exportSvgPending,
   } = useExport()
-  const total = useSlices().length
-  const exportSliceDisabled = exportOnePending || exportSvgPending
+  const total = useSlices().filter((item) => item.included).length
+  const exportSliceDisabled = exportOnePending || exportSvgPending || !slice.included
 
   return (
     <div className="flex items-center gap-2">

@@ -53,6 +53,12 @@ export interface Slice {
   readonly width: number
   readonly height: number
   readonly selected: boolean
+  /** User-controlled delivery eligibility. Excluded results remain recoverable. */
+  readonly included: boolean
+  /** Optional model confidence. Missing confidence is not treated as a failure. */
+  readonly confidence: number | null
+  /** Normalized QA findings shown in the review queue, never raw model traces. */
+  readonly reviewIssues: readonly string[]
   /**
    * When this slice was cut from a per-region board (the breakdown pipeline),
    * the plan region + page it belongs to — the reversible page⊃region⊃slice
@@ -60,6 +66,8 @@ export interface Slice {
    */
   readonly regionId: string | null
   readonly pageId: string | null
+  /** Exact originating manifest item; null for legacy/manual slices. */
+  readonly assetManifestItemId: string | null
 }
 
 /**
@@ -91,9 +99,13 @@ export interface SliceInput {
   readonly blob: Blob
   readonly width: number
   readonly height: number
+  readonly included?: boolean
+  readonly confidence?: number | null
+  readonly reviewIssues?: readonly string[]
   /** Region/page linkage, set by the per-region breakdown pipeline; else absent. */
   readonly regionId?: string | null
   readonly pageId?: string | null
+  readonly assetManifestItemId?: string | null
 }
 
 /** A persisted project restore payload decoded back into live browser objects. */
@@ -116,8 +128,12 @@ export interface ProjectRestoreInput {
     readonly blob: Blob
     readonly width: number
     readonly height: number
+    readonly included?: boolean
+    readonly confidence?: number | null
+    readonly reviewIssues?: readonly string[]
     readonly regionId?: string | null
     readonly pageId?: string | null
+    readonly assetManifestItemId?: string | null
   }>
 }
 
@@ -286,7 +302,7 @@ export interface StoreActions {
   /** Mark the current run as failed with a message (drops if stale). */
   failAnalysis(runId: number, message: string): void
   /** Start a per-region breakdown run: clear prior slices, bump `runId`, mark running. */
-  beginRegionSlices(): number
+  beginRegionSlices(targetRegionIds?: readonly string[]): number
   /** Append one region's freshly-cut slices to the running list (streams to UI). */
   appendRegionSlices(runId: number, result: AnalysisResult): void
   /** Mark a per-region breakdown run done (drops if superseded). */
@@ -295,6 +311,10 @@ export interface StoreActions {
   selectSlice(id: string): void
   /** Rename a slice (validated + sanitized + `.png`-suffixed). */
   renameSlice(id: string, name: string): void
+  /** Correct a result boundary without exposing the internal extraction graph. */
+  updateSliceBounds(id: string, box: Box): void
+  /** Include or exclude a result from bulk delivery. */
+  setSliceIncluded(id: string, included: boolean): void
   /** Clear the current selection. */
   clearSelection(): void
   /** Set the `brief` node's requirement text (clears any prior generate error + stale intent). */

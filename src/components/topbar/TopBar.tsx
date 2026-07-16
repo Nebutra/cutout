@@ -24,7 +24,6 @@ export interface TopBarProps {
   readonly onNewProject: () => void
   readonly onRerun: () => void
   readonly onArchiveProject: () => void
-  readonly onOpenDesignOs: () => void
   readonly recentlyClosedTabs: readonly ClosedTab[]
   readonly onReopenTab: (id: string) => void
 }
@@ -68,7 +67,7 @@ export function TopBar({
             type="button"
             variant="ghost"
             size="icon-sm"
-            aria-label="New task"
+            aria-label="New project"
             className="my-0.5 size-11 shrink-0 rounded-md"
             onClick={onNewProject}
           >

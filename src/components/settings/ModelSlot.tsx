@@ -1,9 +1,8 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { ChevronDown, CircleAlert, ShieldCheck } from 'lucide-react'
 import { Trans, useLingui } from '@lingui/react/macro'
-import type { ModelTaskKind } from '@/services/ai/model-capabilities'
 import { useProviders } from '@/hooks/queries/providers'
-import { useEndpointModels } from '@/hooks/queries/ai-settings'
+import { useCapabilityBindings, useEndpointModels, useSetCapabilityBinding } from '@/hooks/queries/ai-settings'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import type { ModelDimension } from './model-dimensions'
@@ -11,35 +10,17 @@ import { requiresVerifiedVision } from './model-dimensions'
 
 type ModelSlotProps = ModelDimension & { readonly advanced: boolean }
 
-type SavedRoute = { readonly providerId?: string; readonly model?: string; readonly fallback?: string }
-const ROUTE_KEY = 'cutout.model-routing.v1'
-
-function loadRoute(task: ModelTaskKind): SavedRoute {
-  try {
-    const value = JSON.parse(globalThis.localStorage?.getItem(ROUTE_KEY) ?? '{}') as Record<string, SavedRoute>
-    return value[task] ?? {}
-  } catch {
-    return {}
-  }
-}
-
-function saveRoute(task: ModelTaskKind, route: SavedRoute): void {
-  try {
-    const value = JSON.parse(globalThis.localStorage?.getItem(ROUTE_KEY) ?? '{}') as Record<string, SavedRoute>
-    globalThis.localStorage?.setItem(ROUTE_KEY, JSON.stringify({ ...value, [task]: route }))
-  } catch {
-    // Browser storage is an optional non-secret preference cache.
-  }
-}
-
 export function ModelSlot({ task, label, description, advanced }: ModelSlotProps) {
   const { t } = useLingui()
   const providers = useProviders()
-  const list = providers.data ?? []
-  const saved = useMemo(() => loadRoute(task), [task])
-  const [providerId, setProviderId] = useState(saved.providerId ?? (list.length === 1 ? list[0]?.id ?? '' : ''))
-  const [model, setModel] = useState(saved.model ?? '')
-  const [fallback, setFallback] = useState(saved.fallback ?? '')
+  const list = useMemo(() => providers.data ?? [], [providers.data])
+  const bindings = useCapabilityBindings()
+  const { mutateAsync: setCapabilityBinding } = useSetCapabilityBinding()
+  const saved = bindings.data?.bindings[task]
+  const [providerId, setProviderId] = useState('')
+  const [model, setModel] = useState('')
+  const [fallback, setFallback] = useState('')
+  const hydrated=useRef<string|undefined>(undefined)
   const [expanded, setExpanded] = useState(false)
   const selected = list.find((provider) => provider.id === providerId)
   const endpointModels = useEndpointModels(selected)
@@ -55,13 +36,8 @@ export function ModelSlot({ task, label, description, advanced }: ModelSlotProps
       ? t({ id: 'settings.capability_evidence_unavailable', message: 'Capability evidence unavailable' })
       : t({ id: 'settings.auto_will_choose', message: 'Auto will choose from connected providers' })
 
-  useEffect(() => {
-    saveRoute(task, {
-      ...(providerId ? { providerId } : {}),
-      ...(model.trim() ? { model: model.trim() } : {}),
-      ...(fallback.trim() ? { fallback: fallback.trim() } : {}),
-    })
-  }, [fallback, model, providerId, task])
+  useEffect(()=>{if(bindings.isPending||hydrated.current===task)return;hydrated.current=task;setProviderId(saved?.providerId??(list.length===1?list[0]?.id??'':''));setModel(saved?.model??'');setFallback(saved?.fallbackModel??'')},[bindings.isPending,list,saved,task])
+  useEffect(()=>{if(hydrated.current!==task)return;const timer=setTimeout(()=>{const assignment=providerId&&model.trim()?{providerId,model:model.trim(),...(fallback.trim()?{fallbackModel:fallback.trim()}:{} )}:undefined;void setCapabilityBinding({task,assignment})},300);return()=>clearTimeout(timer)},[fallback,model,providerId,setCapabilityBinding,task])
 
   return (
     <section className="rounded-lg border border-border bg-card/30" aria-label={label}>
@@ -83,7 +59,7 @@ export function ModelSlot({ task, label, description, advanced }: ModelSlotProps
           <span className="mt-0.5 block text-xs text-muted-foreground">{description}</span>
         </span>
         <span className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
-          {unavailable ? t({ id: 'settings.model_slot_unavailable', message: 'Unavailable' }) : t({ id: 'settings.model_slot_auto', message: 'Auto' })}
+          {unavailable ? t({ id: 'settings.model_slot_unavailable', message: 'Unavailable' }) : model.trim() || t({ id: 'settings.model_slot_auto', message: 'Auto' })}
           {advanced ? <ChevronDown className={`size-3.5 transition-transform ${expanded ? 'rotate-180' : ''}`} /> : null}
         </span>
       </button>

@@ -13,10 +13,12 @@ import { useSource } from '@/store/selectors'
 import { SliceCard } from './SliceCard'
 import { SliceGridEmpty } from './SliceGridEmpty'
 import { SliceGridSkeleton } from './SliceGridSkeleton'
+import type { Slice } from '@/store/types'
 
-export function SliceGrid() {
+export function SliceGrid({ items }: { readonly items?: readonly Slice[] } = {}) {
   const { t } = useLingui()
-  const slices = useSlices()
+  const allSlices = useSlices()
+  const slices = items ?? allSlices
   const status = useStatus()
   const hasSource = useSource().bitmap !== null
 
@@ -25,9 +27,11 @@ export function SliceGrid() {
     return <SliceGridSkeleton />
   }
 
-  if (slices.length === 0) {
+  if (slices.length === 0 && items === undefined) {
     return <SliceGridEmpty />
   }
+
+  if (slices.length === 0) return null
 
   return (
     <div

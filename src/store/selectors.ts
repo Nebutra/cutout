@@ -37,13 +37,13 @@ export const selectHasSlices = (s: Store): boolean =>
 
 /** Snapshot of every slice as an export payload (default/renamed names applied). */
 export function selectExportPayload(s: Store): ExportItem[] {
-  return s.analysis.slices.map((slice) => ({ name: slice.name, blob: slice.blob }))
+  return s.analysis.slices.filter((slice) => slice.included).map((slice) => ({ name: slice.name, blob: slice.blob }))
 }
 
 /** Export payload for a single slice id (empty if not found). */
 export function selectExportPayloadFor(s: Store, id: string): ExportItem[] {
   const slice = s.analysis.slices.find((item) => item.id === id)
-  return slice ? [{ name: slice.name, blob: slice.blob }] : []
+  return slice?.included ? [{ name: slice.name, blob: slice.blob }] : []
 }
 
 /* --- Ready-made hooks (thin wrappers so components skip importing `useStore`) --- */

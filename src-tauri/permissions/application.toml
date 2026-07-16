@@ -1,0 +1,19 @@
+[[permission]]
+identifier = "project-files"
+description = "Allows bounded project asset, bundle, repository scan and AI-native queue commands."
+commands.allow = ["save_assets", "save_bundle", "scan_repository", "ai_native_paths", "ai_native_poll", "ai_native_complete", "ai_native_read_file", "ai_native_write_artifact"]
+
+[[permission]]
+identifier = "provider-secrets-network"
+description = "Allows host-owned provider keychain and policy-checked AI transport commands."
+commands.allow = ["set_key", "key_status", "delete_key", "list_key_status", "load_providers", "save_providers", "ai_proxy_request", "ai_proxy_stream", "ai_image_edit", "set_vectorizer_api_key", "vectorizer_key_status", "delete_vectorizer_api_key", "vectorize_local_vtracer", "vectorize_vectorizer_ai"]
+
+[[permission]]
+identifier = "registry-and-agent-host"
+description = "Allows authorized workspace registry and durable Agent Host lifecycle commands."
+commands.allow = ["registry_authorize_workspace", "registry_preview_install", "registry_apply_install", "registry_validate_install", "registry_install_receipt", "agent_host_start", "agent_host_status", "agent_host_shutdown", "agent_host_recover", "agent_host_run_start", "agent_host_node_claim", "agent_host_node_complete", "agent_host_node_heartbeat", "agent_host_node_fail", "agent_host_run_pause", "agent_host_run_resume", "agent_host_run_cancel"]
+
+[[permission]]
+identifier = "speech-host"
+description = "Allows truthful desktop speech capability and bounded recording session commands."
+commands.allow = ["speech_host_capabilities", "speech_microphone_devices", "speech_request_permission", "speech_recording_start", "speech_recording_stop", "speech_recording_cancel"]

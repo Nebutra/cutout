@@ -43,7 +43,6 @@ export function SettingsSidebar({ value, onChange, archivedCount = 0 }: Settings
       id: 'integrations',
       icon: Layers,
       label: <Trans id="settings.section_integrations">Integrations</Trans>,
-      badge: <Trans id="home.wip_badge">WIP</Trans>,
     },
     {
       id: 'archived',

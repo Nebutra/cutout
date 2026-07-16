@@ -77,7 +77,7 @@ import { SidebarAccount } from "./SidebarAccount";
 import { GlobalLibraryView } from "@/components/library/GlobalLibraryView";
 
 type HomeSection =
-  "start" | "library" | "drafts" | "projects" | "published" | "archived";
+  "start" | "library" | "drafts" | "projects" | "archived";
 
 function isDraftProject(project: LocalProjectSummary) {
   return project.status === "Draft" || project.status === "Empty";
@@ -283,8 +283,6 @@ export function ProjectHome({
             <div className="min-h-full">
               <GlobalLibraryView projectId={activeProjectId} />
             </div>
-          ) : section === "published" ? (
-            <PublishedProjectsPlaceholder />
           ) : section === "start" ? (
             <StartWorkspace
               key={resetToStartSignal ?? 0}
@@ -352,10 +350,6 @@ function WorkspaceHeader({
     library: t({ id: "home.library_label", message: "Library" }),
     drafts: t({ id: "home.drafts", message: "Drafts" }),
     projects: t({ id: "home.all_projects", message: "All projects" }),
-    published: t({
-      id: "home.published_projects",
-      message: "Published Projects",
-    }),
     archived: t({ id: "home.archived", message: "Archived" }),
   };
   const presets = [
@@ -560,7 +554,7 @@ function ProjectNavigation({
 
   return (
     <nav
-      className={cn(compact ? "grid grid-cols-5 gap-1" : "mt-5 space-y-1")}
+      className={cn(compact ? "grid grid-cols-4 gap-1" : "mt-5 space-y-1")}
       aria-label={t({
         id: "home.workspace_navigation",
         message: "Workspace navigation",
@@ -588,17 +582,6 @@ function ProjectNavigation({
         count={counts.active}
         active={section === "projects"}
         onClick={() => onSelectSection("projects")}
-      />
-      <NavItem
-        compact={compact}
-        icon={Globe}
-        label={t({
-          id: "home.published_projects",
-          message: "Published Projects",
-        })}
-        badge={t({ id: "home.wip_badge", message: "WIP" })}
-        active={section === "published"}
-        onClick={() => onSelectSection("published")}
       />
     </nav>
   );
@@ -902,7 +885,7 @@ function ProjectDirectory({
   onStartNew,
 }: {
   readonly activeProjectId: string | null;
-  readonly section: Exclude<HomeSection, "start" | "published">;
+  readonly section: Exclude<HomeSection, "start">;
   readonly projects: readonly LocalProjectSummary[];
   readonly loadState: ProjectLoadState;
   readonly loadError: string | null;
@@ -1665,51 +1648,10 @@ function DirectoryError({
   );
 }
 
-function PublishedProjectsPlaceholder() {
-  const { t } = useLingui();
-
-  return (
-    <div className="mx-auto w-full max-w-5xl px-6 py-10 lg:px-10">
-      <header className="border-b border-border pb-5">
-        <p className="text-sm text-muted-foreground">
-          {t({ id: "home.workspace", message: "Workspace" })}
-        </p>
-        <div className="mt-1 flex items-center gap-2.5">
-          <h1 className="text-2xl font-semibold tracking-tight">
-            {t({
-              id: "home.published_projects",
-              message: "Published Projects",
-            })}
-          </h1>
-          <span className="rounded border border-border bg-muted/60 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-            {t({ id: "home.wip_badge", message: "WIP" })}
-          </span>
-        </div>
-      </header>
-      <div className="mt-6 flex min-h-64 flex-col items-center justify-center rounded-lg border border-dashed border-border bg-background/70 p-8 text-center">
-        <Globe className="size-6 text-muted-foreground" />
-        <h2 className="mt-3 text-sm font-semibold">
-          {t({
-            id: "home.published_empty_title",
-            message: "Publishing is on the way",
-          })}
-        </h2>
-        <p className="mt-1 max-w-md text-sm text-muted-foreground">
-          {t({
-            id: "home.published_empty_description",
-            message:
-              "Projects you publish will be listed here with their live links. This needs accounts and a community service, which are not built yet.",
-          })}
-        </p>
-      </div>
-    </div>
-  );
-}
-
 function EmptyDirectory({
   section,
 }: {
-  readonly section: Exclude<HomeSection, "start" | "published">;
+  readonly section: Exclude<HomeSection, "start">;
 }) {
   const { t } = useLingui();
   const Icon =

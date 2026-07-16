@@ -50,7 +50,7 @@ export function HelpMenu() {
             {t({ id: 'help.submit_feedback', message: 'Submit feedback' })}
           </DropdownMenuItem>
           <DropdownMenuSeparator />
-          <DropdownMenuItem onSelect={openSettings}>
+          <DropdownMenuItem onSelect={() => openSettings()}>
             <Languages className="size-4" />
             {t({ id: 'help.change_language', message: 'Change language...' })}
           </DropdownMenuItem>

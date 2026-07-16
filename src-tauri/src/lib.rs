@@ -7,6 +7,8 @@ pub fn run() {
         .manage(commands::agent_host::AgentHostDesktopState::default());
     #[cfg(desktop)]
     let builder = builder.manage(commands::updater::UpdateRuntimeState::default());
+    #[cfg(desktop)]
+    let builder = builder.manage(commands::workspace_bridge::WorkspaceBridgeState::default());
     builder
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_os::init())
@@ -74,6 +76,12 @@ pub fn run() {
             commands::updater::updater_cancel,
             #[cfg(desktop)]
             commands::updater::updater_install_and_relaunch,
+            #[cfg(desktop)]
+            commands::workspace_bridge::workspace_revision_read,
+            #[cfg(desktop)]
+            commands::workspace_bridge::workspace_revision_preview_export,
+            #[cfg(desktop)]
+            commands::workspace_bridge::workspace_revision_apply_export,
         ])
         .setup(|app| {
             #[cfg(desktop)]

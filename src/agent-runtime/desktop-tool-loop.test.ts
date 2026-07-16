@@ -42,7 +42,11 @@ function input(
 
 function harness(
   result?: Awaited<ReturnType<ToolExecutor["execute"]>>,
-  options: { timeoutMs?: number; durability?: ToolDurabilityStore } = {},
+  options: {
+    timeoutMs?: number;
+    durability?: ToolDurabilityStore;
+    authorize?: Parameters<typeof createDesktopToolLoop>[0]["authorize"];
+  } = {},
 ) {
   const batches: AgentRunEvent[][] = [];
   const execute = vi.fn(
@@ -83,6 +87,7 @@ function harness(
     id: () => `retry-${++nextId}`,
     timeoutMs: options.timeoutMs,
     durability: options.durability,
+    authorize: options.authorize,
   });
   return {
     loop,
@@ -95,6 +100,30 @@ function harness(
 }
 
 describe("desktop tool loop", () => {
+  it("issues request-bound authority only after a real approval event", async () => {
+    const authorize = vi.fn(async (request, approvalId) => ({
+      capabilityLeaseId: `lease:${request.requestId}`,
+      requestDigest: `digest:${request.requestId}:${approvalId}`,
+    }));
+    const h = harness(undefined, { authorize });
+    await h.loop.request(
+      input({ request: { ...input().request, approvalPolicy: "explicit" } }),
+    );
+    expect(authorize).not.toHaveBeenCalled();
+
+    await h.loop.approve("tool", "request");
+    expect(authorize).toHaveBeenCalledWith(
+      expect.objectContaining({ requestId: "request" }),
+      "event:request:tool-approved",
+    );
+    expect(h.execute).toHaveBeenCalledWith(
+      expect.objectContaining({
+        capabilityLeaseId: "lease:request",
+        requestDigest: "digest:request:event:request:tool-approved",
+      }),
+    );
+  });
+
   it("waits for explicit approval and executes once", async () => {
     const h = harness();
     await h.loop.request(

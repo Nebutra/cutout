@@ -72,9 +72,9 @@ test("Canvas centered states follow the responsive safe content rectangle", asyn
     await assertCentered();
     await page.getByRole("button", { name: "Files", exact: true }).click();
     await page.getByRole("button", { name: "Inspector", exact: true }).click();
-    const dialog = page.getByRole("dialog");
-    await expect(dialog).toBeVisible();
-    await dialog.getByRole("button", { name: "Close" }).click();
+    const inspector = page.getByRole("complementary", { name: "Inspector" });
+    await expect(inspector).toBeVisible();
+    await inspector.getByRole("button", { name: "Close design inspector" }).click();
     await assertCentered();
     await page.getByRole("button", { name: "Collapse sidebar" }).click();
     await assertCentered();

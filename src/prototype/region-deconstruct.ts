@@ -190,6 +190,8 @@ export interface RegionBreakdownParams {
   readonly onRegionNamed?: (renames: readonly { readonly id: string; readonly name: string }[]) => void
   /** Non-fatal per-region failure (one region's board/CV failed); the rest continue. */
   readonly onRegionError?: (regionId: string, message: string) => void
+  /** Retry only these failed regions. Omit for a complete page breakdown. */
+  readonly targetRegionIds?: readonly string[]
 }
 
 export interface RegionBreakdownResult {
@@ -208,7 +210,10 @@ export async function runRegionBreakdown(
   deps: RegionBreakdownDeps,
   params: RegionBreakdownParams,
 ): Promise<RegionBreakdownResult> {
-  const regions = selectBoardCutoutRegions(params.page)
+  const targets = params.targetRegionIds ? new Set(params.targetRegionIds) : null
+  const regions = selectBoardCutoutRegions(params.page).filter(
+    (region) => !targets || targets.has(region.id),
+  )
   const configs = await deps.providers.list()
   const kind = configs.find((provider) => provider.id === params.image.providerId)?.kind
   const useEdit = kind === 'openai' || kind === 'openai-compatible'

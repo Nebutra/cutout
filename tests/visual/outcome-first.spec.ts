@@ -35,7 +35,7 @@ async function openStableHome(page: Page) {
 }
 
 async function startProject(page: Page, brief: string) {
-  await page.getByRole('button', { name: 'New task' }).click()
+  await page.getByRole('button', { name: /New (task|project)/ }).click()
   await page.getByRole('textbox', { name: 'Describe what you want to design...' }).fill(brief)
   await page.getByRole('button', { name: 'Create from brief' }).click()
   await expect(page.getByRole('complementary', { name: 'Agent workspace' })).toBeVisible()
@@ -46,8 +46,9 @@ async function createProjectWithWorkspace(
   workspace: Record<string, unknown>,
   projectName: string,
 ) {
-  await page.getByRole('button', { name: 'New task' }).click()
-  await page.getByRole('textbox', { name: 'Describe what you want to design...' }).fill(projectName)
+  const composer = page.getByRole('textbox', { name: 'Describe what you want to design...' })
+  await expect(composer).toBeVisible()
+  await composer.fill(projectName)
   await page.getByRole('button', { name: 'Create from brief' }).click()
   await expect.poll(() => page.evaluate(async () => {
     const db = await new Promise<IDBDatabase>((resolve, reject) => {
@@ -412,10 +413,10 @@ test('Canvas keeps a responsive safe area while workspace panels change', async 
     await page.getByRole('button', { name: 'Files', exact: true }).click()
 
     await page.getByRole('button', { name: 'Inspector', exact: true }).click()
-    const inspectorDialog = page.getByRole('dialog')
-    await expect(inspectorDialog).toBeVisible()
-    await inspectorDialog.getByRole('button', { name: 'Close' }).click()
-    await expect(inspectorDialog).toHaveCount(0)
+    const inspectorPanel = page.getByRole('complementary', { name: 'Inspector' })
+    await expect(inspectorPanel).toBeVisible()
+    await inspectorPanel.getByRole('button', { name: 'Close design inspector' }).click()
+    await expect(inspectorPanel).toHaveCount(0)
     const afterInspector = await geometry()
     expect(afterInspector.controlsInside).toBe(true)
     expect(afterInspector.overlap).toBe(false)

@@ -75,11 +75,17 @@ test("Deliver is one inline responsive workspace while inspectors stay separate"
   await expect(deliver).toHaveCount(0);
   if (testInfo.project.name === "mobile-chrome") await page.setViewportSize({ width: 1024, height: 915 });
   await page.getByRole("button", { name: "Inspector", exact: true }).click();
-  const inspector = page.getByRole("dialog");
+  const canvasInspector = page.getByRole("complementary", { name: "Inspector" });
+  await expect(canvasInspector).toBeVisible();
+  await expect(canvasInspector.getByText("Select a result", { exact: true })).toBeVisible();
+  expect(await canvasInspector.innerText()).not.toMatch(/revision|provenance|host|json/i);
+  await canvasInspector.getByText("Advanced design system", { exact: true }).click();
+  await canvasInspector.getByRole("button", { name: "Open system inspector" }).click();
+  const inspector = page.getByRole("dialog", { name: "System inspector" });
   await expect(inspector).toBeVisible();
   await expect(inspector.getByRole("tablist", { name: "Deliver sections" })).toHaveCount(0);
   await expect(inspector.getByRole("tab", { name: /Delivery center|Kits|Components|Starter/ })).toHaveCount(0);
-  await expect(inspector.getByText("Canvas inspector", { exact: true }).first()).toBeVisible();
+  await expect(inspector.getByText("System inspector", { exact: true }).first()).toBeVisible();
   await inspector.getByRole("button", { name: "Close" }).click();
 
   await navigate(page, { version: 2, mode: "canvas", advanced: true });

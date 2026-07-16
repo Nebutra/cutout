@@ -13,6 +13,7 @@ import { Trans, useLingui } from "@lingui/react/macro";
 import { useStore } from "@/store";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
+import { Input } from "@/components/ui/input";
 import {
   useExportPrefs,
   useSetRememberDir,
@@ -29,6 +30,7 @@ import { getAiNativeDiagnostics } from "@/services/ai-native/diagnostics";
 import { getAuthorizedWorkspace, subscribeAuthorizedWorkspace, type AuthorizedWorkspace } from "@/platform/authorized-workspace";
 import { UpdatesSection } from "./UpdatesSection";
 import type { DesktopUpdateController } from "@/updater/service";
+import { loadPaidToolPreferences, savePaidToolPreferences } from "@/agent-runtime/paid-tool-preferences";
 
 /** One labelled preference row: title (+ hint) on the left, control on the right. */
 function Row({
@@ -69,6 +71,8 @@ export function GeneralSection({ prepareRecoverySnapshot = async () => true, upd
   const [developerMode, setDeveloperModeState] = useState(
     () => loadWorkspaceNavigation().advanced,
   );
+  const [paidPreferences,setPaidPreferences]=useState(loadPaidToolPreferences)
+  const updatePaidPreferences=(next:typeof paidPreferences)=>{savePaidToolPreferences(next);setPaidPreferences(next)}
   const [diagnosticsPreview, setDiagnosticsPreview] = useState<string>();
   const [authorizedWorkspace,setAuthorizedWorkspaceState]=useState<AuthorizedWorkspace|undefined>(getAuthorizedWorkspace)
   const [hostStatus,setHostStatus]=useState<{status:'unavailable'|'checking'|'ready'|'error';detail:string}>({status:getAuthorizedWorkspace()?'checking':'unavailable',detail:getAuthorizedWorkspace()?'Status not checked yet.':'Authorize a workspace before using host recovery.'})
@@ -124,6 +128,11 @@ export function GeneralSection({ prepareRecoverySnapshot = async () => true, upd
           aria-label="Developer mode"
         />
       </Row>
+
+      <section data-settings-anchor="paid-actions" tabIndex={-1} className="py-3 outline-none" aria-labelledby="paid-actions-title">
+        <div className="flex items-start justify-between gap-4"><div><h3 id="paid-actions-title" className="text-sm font-medium">Paid actions</h3><p className="mt-0.5 text-xs text-muted-foreground">Let the Agent proceed automatically only within this per-action ceiling.</p></div><Switch aria-label="Automatically approve paid actions within budget" checked={paidPreferences.approvalPolicy==='auto-within-budget'} onCheckedChange={checked=>updatePaidPreferences({...paidPreferences,approvalPolicy:checked?'auto-within-budget':'explicit'})}/></div>
+        <label className="mt-3 flex items-center justify-between gap-4 text-xs"><span>Maximum per action (USD)</span><Input aria-label="Maximum paid action cost in USD" className="h-8 w-24 text-right" type="number" min="0" step="0.01" value={paidPreferences.budgetCeiling.amount} onChange={event=>{const amount=Number(event.target.value);if(Number.isFinite(amount)&&amount>=0)updatePaidPreferences({...paidPreferences,budgetCeiling:{...paidPreferences.budgetCeiling,amount}})}}/></label>
+      </section>
 
       <UpdatesSection prepareRecoverySnapshot={prepareRecoverySnapshot} controller={updateController} />
 

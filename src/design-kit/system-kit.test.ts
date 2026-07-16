@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   designSystemArtifacts,
+  evaluateDesignSystemPlanOutputs,
   planDesignSystemKit,
   validateDesignSystemCatalog,
   type DesignSystemArtifact,
@@ -79,6 +80,33 @@ describe('Design System Kit material catalog', () => {
     ])
     expect(designSystemArtifacts.find((artifact) => artifact.id === 'ds.binding.web')?.modes).toEqual(['deterministic'])
     expect(designSystemArtifacts.find((artifact) => artifact.id === 'ds.package.release')?.modes).toEqual(['deterministic'])
+  })
+
+  it('marks ungenerated plan outputs as capability-required instead of claiming completion', () => {
+    const plan = planDesignSystemKit({ profile: 'complete' })
+    const coverage = evaluateDesignSystemPlanOutputs(plan, [
+      'tokens/tokens.json',
+      'tokens/tokens.css',
+      'tokens/tailwind.css',
+      'tokens/theme.ts',
+    ])
+    expect(coverage.complete).toBe(false)
+    expect(coverage.nodes.find((node) => node.artifactId === 'ds.binding.web')).toMatchObject({
+      status: 'ready',
+      missingOutputs: [],
+    })
+    expect(coverage.nodes.find((node) => node.artifactId === 'ds.foundation.imagery')).toMatchObject({
+      status: 'capability-required',
+      requiredExecutors: expect.arrayContaining(['visual-generation']),
+    })
+    expect(coverage.missingOutputs).toContain('assets/imagery/manifest.json')
+  })
+
+  it('accepts a concrete file receipt for a directory output', () => {
+    const plan = planDesignSystemKit({ profile: 'complete' })
+    const coverage = evaluateDesignSystemPlanOutputs(plan, ['packages/design-system/index.ts'])
+    const release = coverage.nodes.find((node) => node.artifactId === 'ds.package.release')
+    expect(release?.producedOutputs).toContain('packages/design-system')
   })
 
   it('rejects duplicate output ownership, missing dependencies and dependency cycles', () => {

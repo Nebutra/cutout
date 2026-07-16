@@ -22,6 +22,7 @@ describe('planPrototypeRepair', () => {
       generateDesignSystem: true,
       generatePages: true,
       deconstructPages: true,
+      targetRegionIds: [],
     })
   })
 
@@ -39,6 +40,7 @@ describe('planPrototypeRepair', () => {
       generateDesignSystem: false,
       generatePages: false,
       deconstructPages: false,
+      targetRegionIds: [],
     })
   })
 
@@ -56,6 +58,13 @@ describe('planPrototypeRepair', () => {
       generateDesignSystem: false,
       generatePages: true,
       deconstructPages: true,
+      targetRegionIds: [],
     })).toBe('Continue missing prototype pages, reusable materials')
+  })
+
+  it('carries failed region ids into the smallest retry plan', () => {
+    const outcome = createOutcomeRuntime(contract, 'run-1')
+    expect(planPrototypeRepair(outcome, true, ['hero', 'gallery'])?.targetRegionIds)
+      .toEqual(['hero', 'gallery'])
   })
 })

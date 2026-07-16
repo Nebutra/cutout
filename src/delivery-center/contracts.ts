@@ -2,7 +2,7 @@ import { z } from 'zod'
 
 export const DELIVERY_CENTER_PROTOCOL = 'cutout.delivery-center.v1' as const
 export const COMPOSITE_RECEIPT_PROTOCOL = 'cutout.delivery-receipt.v1' as const
-export const deliveryTargetKindSchema = z.enum(['brand-kit','design-system','visual-assets','starter','registry','github','notion'])
+export const deliveryTargetKindSchema = z.enum(['brand-kit','design-system','components','visual-assets','starter','registry','github','notion'])
 export type DeliveryTargetKind = z.infer<typeof deliveryTargetKindSchema>
 const sha = z.string().regex(/^[a-f0-9]{64}$/)
 const safeId = z.string().min(1).max(200).refine((value) => !secretShaped(value), 'Secret-shaped values are forbidden.')

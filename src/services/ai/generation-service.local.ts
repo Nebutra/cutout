@@ -403,7 +403,7 @@ export function createLocalGenerationService(
     const model = await buildModel(cfg, modelId,adapters)
     // Thinking strength → per-vendor providerOptions (`{}` when unset/unsafe).
     const providerOptions = reasoningProviderOptions(
-      cfg.kind,
+      input.reasoningProtocol ?? cfg.kind,
       input.reasoningEffort,
     )
 

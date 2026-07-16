@@ -9,9 +9,13 @@
  */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
+  clearCapabilityBinding,
+  loadCapabilityBindings,
   loadAssignments,
+  setCapabilityBinding,
   setAssignment,
 } from '@/services/ai/model-assignment.local'
+import type { ModelTaskKind } from '@/services/ai/model-capabilities'
 import { listEndpointModels } from '@/services/ai/list-models'
 import type {
   ModelAssignment,
@@ -24,9 +28,12 @@ import { useProviderStatus } from './providers'
 export const aiSettingsKeys = {
   all: ['ai-settings'] as const,
   assignments: () => [...aiSettingsKeys.all, 'assignments'] as const,
+  capabilityBindings: () => [...aiSettingsKeys.all, 'capability-bindings'] as const,
   endpointModels: (id: string) =>
     [...aiSettingsKeys.all, 'endpoint-models', id] as const,
 }
+export function useCapabilityBindings(){return useQuery({queryKey:aiSettingsKeys.capabilityBindings(),queryFn:loadCapabilityBindings})}
+export function useSetCapabilityBinding(){const qc=useQueryClient();return useMutation({mutationFn:(input:{task:ModelTaskKind;assignment?:ModelAssignment})=>input.assignment?setCapabilityBinding(input.task,input.assignment):clearCapabilityBinding(input.task),onSuccess:()=>Promise.all([qc.invalidateQueries({queryKey:aiSettingsKeys.capabilityBindings()}),qc.invalidateQueries({queryKey:aiSettingsKeys.assignments()})])})}
 
 /** The current model-assignment table. */
 export function useModelAssignments() {

@@ -9,6 +9,7 @@ import type {
   ModelAssignments,
   SlotId,
 } from '@/services/ai/model-assignment-types'
+import { providerEligibleForAuto } from '@/services/ai/provider-verification'
 import type { ProviderConfig } from '@/services/ai/provider-types'
 import type { ModelDescriptor, RoutePreferences } from './capability-router'
 
@@ -98,7 +99,7 @@ export function lockComposerRoute(input: {
 }
 
 const runtimeCapabilities:Readonly<Record<string,readonly ModelDescriptor['capabilities'][number][]>>={openai:['text','vision','reasoning','tools','image-generation','image-edit'],anthropic:['text','vision','reasoning','tools'],google:['text','vision','reasoning','tools','image-generation'],gateway:['text','vision','reasoning','tools'],'openai-compatible':['text','vision','tools','image-generation','image-edit']}
-export function runtimeModelDescriptors(assignments:ModelAssignments,providers:readonly ProviderConfig[]):ModelDescriptor[]{const rows:ModelDescriptor[]=[];for(const slot of ['chat','image'] as const){const assignment=assignments[slot];if(!assignment)continue;const provider=providers.find(value=>value.id===assignment.providerId),capabilities=provider?runtimeCapabilities[provider.kind]??[]:[];rows.push({providerId:assignment.providerId,model:assignment.model,slot,capabilities,quality:.5,cost:.5,speed:.5,region:'global',available:Boolean(provider?.enabled)})}return rows}
+export function runtimeModelDescriptors(assignments:ModelAssignments,providers:readonly ProviderConfig[],isVerified:(providerId:string)=>boolean=providerEligibleForAuto):ModelDescriptor[]{const rows:ModelDescriptor[]=[];for(const slot of ['chat','image'] as const){const assignment=assignments[slot];if(!assignment)continue;const provider=providers.find(value=>value.id===assignment.providerId),capabilities=provider?runtimeCapabilities[provider.kind]??[]:[],reasoningProtocol=provider?.kind==='openai'||provider?.kind==='anthropic'||provider?.kind==='google'?provider.kind:assignment.reasoningProtocol;rows.push({providerId:assignment.providerId,model:assignment.model,slot,capabilities,quality:.5,cost:.5,speed:.5,region:'global',available:Boolean(provider?.enabled&&isVerified(provider.id)),...(reasoningProtocol?{reasoningProtocol}:{})})}return rows}
 
 export function supportsWebSearch(
   assignment: ModelAssignment,
@@ -133,5 +134,5 @@ function routeError(label: string, result: ExecutionPolicyResult): string {
   if (result.degradations.includes('assignment-missing')) {
     return `Configure a ${label} model before generating.`
   }
-  return `The selected ${label} provider is unavailable.`
+  return `The selected ${label} provider is unavailable. Check that it is enabled and verified in Settings.`
 }

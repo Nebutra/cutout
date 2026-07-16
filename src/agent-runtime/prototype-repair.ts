@@ -5,6 +5,7 @@ export interface PrototypeRepairPlan {
   readonly generateDesignSystem: boolean
   readonly generatePages: boolean
   readonly deconstructPages: boolean
+  readonly targetRegionIds: readonly string[]
 }
 
 const EMPTY_REPAIR_PLAN: PrototypeRepairPlan = {
@@ -12,12 +13,14 @@ const EMPTY_REPAIR_PLAN: PrototypeRepairPlan = {
   generateDesignSystem: false,
   generatePages: false,
   deconstructPages: false,
+  targetRegionIds: [],
 }
 
 /** Maps verified outcome gaps to the smallest executable prototype repair. */
 export function planPrototypeRepair(
   outcome: OutcomeRuntimeState | null | undefined,
   hasDesignSystem: boolean,
+  failedRegionIds: readonly string[] = [],
 ): PrototypeRepairPlan | null {
   if (!outcome || outcome.evaluation.status === 'satisfied') return null
 
@@ -34,8 +37,11 @@ export function planPrototypeRepair(
     generateDesignSystem,
     generatePages,
     deconstructPages,
+    targetRegionIds: deconstructPages ? [...failedRegionIds] : [],
   }
-  return Object.values(plan).some(Boolean) ? plan : null
+  return Object.entries(plan).some(([key, value]) =>
+    key === 'targetRegionIds' ? false : Boolean(value),
+  ) ? plan : null
 }
 
 export function repairPlanLabel(plan: PrototypeRepairPlan): string {

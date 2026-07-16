@@ -24,6 +24,7 @@ import {
 } from '@/hooks/queries/providers'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { loadProviderVerifications, setProviderVerification } from '@/services/ai/provider-verification'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -76,7 +77,7 @@ interface ProviderRowProps {
 
 export function ProviderRow({ provider, onEdit }: ProviderRowProps) {
   const { t } = useLingui()
-  const [test, setTest] = useState<TestState>('idle')
+  const [test, setTest] = useState<TestState>(()=>{const status=loadProviderVerifications()[provider.id]?.status;return status==='verified'?'ok':status==='failed'?'fail':'idle'})
   const status = useProviderStatus(provider.id)
   const testKey = useTestKey()
   const removeProvider = useRemoveProvider()
@@ -94,11 +95,13 @@ export function ProviderRow({ provider, onEdit }: ProviderRowProps) {
     try {
       const { model } = await testKey.mutateAsync(provider.id)
       setTest('ok')
+      setProviderVerification(provider.id,{status:'verified',model,checkedAt:new Date().toISOString()})
       toast.success(t({ id: 'settings.status_verified', message: 'Verified' }), {
         description: `${provider.label} · ${model}`,
       })
     } catch (error) {
       setTest('fail')
+      setProviderVerification(provider.id,{status:'failed',checkedAt:new Date().toISOString(),detail:error instanceof Error?error.message:String(error)})
       toast.error(
         t({ id: 'settings.status_failed', message: 'Verification failed' }),
         {

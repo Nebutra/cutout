@@ -239,6 +239,54 @@ export interface DesignSystemBuildPlan {
   readonly order: readonly string[]
 }
 
+export interface DesignSystemNodeCoverage {
+  readonly artifactId: string
+  readonly status: 'ready' | 'capability-required'
+  readonly producedOutputs: readonly string[]
+  readonly missingOutputs: readonly string[]
+  readonly requiredExecutors: DesignSystemArtifact['executors']
+}
+
+export interface DesignSystemPlanCoverage {
+  readonly complete: boolean
+  readonly nodes: readonly DesignSystemNodeCoverage[]
+  readonly missingOutputs: readonly string[]
+}
+
+/**
+ * Reconcile a plan against actual compiler/runtime receipts. A planned node is
+ * never treated as delivered merely because it exists in the catalog.
+ */
+export function evaluateDesignSystemPlanOutputs(
+  plan: DesignSystemBuildPlan,
+  generatedPaths: readonly string[],
+): DesignSystemPlanCoverage {
+  const paths = new Set(generatedPaths)
+  const nodes = plan.nodes.map((node): DesignSystemNodeCoverage => {
+    const producedOutputs = node.outputs.filter((output) => hasOutput(paths, output))
+    const missingOutputs = node.outputs.filter((output) => !hasOutput(paths, output))
+    return {
+      artifactId: node.artifactId,
+      status: missingOutputs.length === 0 ? 'ready' : 'capability-required',
+      producedOutputs,
+      missingOutputs,
+      requiredExecutors: node.executors,
+    }
+  })
+  return {
+    complete: nodes.every((node) => node.status === 'ready'),
+    nodes,
+    missingOutputs: nodes.flatMap((node) => node.missingOutputs),
+  }
+}
+
+function hasOutput(paths: ReadonlySet<string>, output: string): boolean {
+  if (paths.has(output)) return true
+  const prefix = output.endsWith('/') ? output : `${output}/`
+  for (const path of paths) if (path.startsWith(prefix)) return true
+  return false
+}
+
 /** Build a deterministic, acyclic full or incremental material-production DAG. */
 export function planDesignSystemKit(input: {
   readonly profile: DesignSystemProfile

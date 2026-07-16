@@ -115,7 +115,7 @@ export function SlicesNode() {
               variant="outline"
               size="sm"
               className="w-full"
-              onClick={settings.open}
+              onClick={() => settings.open({section:'ai',anchor:'model-routing'})}
             >
               <Settings2 />
               <Trans id="slices.name_no_model_cta">

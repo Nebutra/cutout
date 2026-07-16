@@ -523,6 +523,7 @@ describe('project-repository.local', () => {
             height: 8,
             regionId: 'region-hero',
             pageId: 'page-1',
+            assetManifestItemId: 'page-1-region-hero-1',
           },
           {
             id: 'slice-grid',
@@ -546,18 +547,18 @@ describe('project-repository.local', () => {
       })
 
       // Saved record carries the linkage.
-      expect(record.slices?.map((s) => [s.regionId, s.pageId])).toEqual([
-        ['region-hero', 'page-1'],
-        ['region-grid', 'page-1'],
+      expect(record.slices?.map((s) => [s.regionId, s.pageId, s.assetManifestItemId])).toEqual([
+        ['region-hero', 'page-1', 'page-1-region-hero-1'],
+        ['region-grid', 'page-1', null],
       ])
 
       // Restore round-trip preserves it in the live store.
       const restoreInput = await createRestoreInputFromProject(record)
       getStoreState().restoreProject(restoreInput)
       const restored = getStoreState().analysis.slices
-      expect(restored.map((s) => [s.id, s.regionId, s.pageId])).toEqual([
-        ['slice-hero', 'region-hero', 'page-1'],
-        ['slice-grid', 'region-grid', 'page-1'],
+      expect(restored.map((s) => [s.id, s.regionId, s.pageId, s.assetManifestItemId])).toEqual([
+        ['slice-hero', 'region-hero', 'page-1', 'page-1-region-hero-1'],
+        ['slice-grid', 'region-grid', 'page-1', null],
       ])
     } finally {
       getStoreState().resetProject()

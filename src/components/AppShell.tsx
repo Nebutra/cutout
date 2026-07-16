@@ -24,7 +24,7 @@ import {
 import { toast } from "sonner";
 import { TopBar } from "./topbar/TopBar";
 import { ProjectHome } from "./home/ProjectHome";
-import { SettingsUIProvider } from "@/components/settings/settings-ui";
+import { SettingsUIProvider, type SettingsTarget } from "@/components/settings/settings-ui";
 import { HelpMenu } from "@/components/help/HelpMenu";
 import type {
   DesignOsReceipt,
@@ -36,6 +36,7 @@ import type { DesignOsWorkbenchModel } from "@/components/design-os-workbench/De
 import type { TokenValueChange } from "@/design-kit";
 import type { DesignOsCapabilityContext } from "@/components/design-os/model";
 import type { LiveDesignOsArtifacts } from "@/components/design-os-workbench/live-model";
+import { buildTokenContrastGovernance } from "@/components/design-os-workbench/token-governance";
 import { LibraryUIProvider } from "@/components/library/library-ui";
 import { useAnalysisBridge } from "@/hooks/useAnalysisBridge";
 import { useAiNativeControl } from "@/hooks/useAiNativeControl";
@@ -60,11 +61,12 @@ import {
 import { isErr } from "@/services/types";
 import type { BundleRepository } from "@/services/types";
 import type { DesignDocument } from "@/design-ir";
-import type { DeliveryExecutor } from "@/delivery-center";
+import type { StarterPlan } from "@/starter-compiler";
 import { useServices } from "@/services/context";
 import type {
   AuthoringKind,
   AuthoringPreview,
+  DesignOsAuthoringState,
 } from "@/design-os-operations/authoring";
 import type { FigmaSnapshotPreview } from "@/design-os-operations/figma-snapshot";
 import type { SourceIngestPreview } from "@/design-os-operations/operations";
@@ -76,6 +78,7 @@ import {
   textFingerprint,
   workspaceSnapshotFingerprint,
 } from "@/workspace/workspace-snapshot";
+import { bootstrapHomeDraftProject } from "@/workspace/home-draft-bootstrap";
 import {
   loadWorkspaceNavigation,
   enterWorkspaceSurface,
@@ -90,8 +93,15 @@ import {
 } from "@/workspace/navigation";
 import { cn } from "@/lib/utils";
 import { withViewTransition } from "@/lib/view-transition";
-import { createNewTaskGate, projectNewTaskIntent } from "@/workspace/new-task-transition";
-import { createLocalStorageCrashMarkerStore, markCleanExit, startCrashSession } from "@/local-recovery";
+import {
+  checkpointProjectForRecovery,
+  createIndexedDbRecoveryBackend,
+  createLocalStorageCrashMarkerStore,
+  createProjectProjectionAdapter,
+  LocalRecoveryService,
+  markCleanExit,
+  startCrashSession,
+} from "@/local-recovery";
 import { recordAiNativeDiagnostic } from "@/services/ai-native/diagnostics";
 import { getAuthorizedWorkspace, subscribeAuthorizedWorkspace } from "@/platform/authorized-workspace";
 import { bindTauriAgentHostLifecycle, createTauriAgentHostService } from "@/agent-host/tauri-service";
@@ -170,7 +180,6 @@ type ProjectShellAction =
     }
   | { readonly type: "projects-load-failed"; readonly error: string }
   | { readonly type: "open-home" }
-  | { readonly type: "new-task" }
   | { readonly type: "open-project"; readonly id: string }
   | { readonly type: "focus-project" }
   | { readonly type: "close-project" }
@@ -218,8 +227,6 @@ function projectShellReducer(
       };
     case "open-home":
       return { ...state, view: "home" };
-    case "new-task":
-      return { ...state, activeProjectId: null, view: "home", projectTabOpen: false, projectVersion: state.projectVersion + 1 };
     case "open-project":
       return {
         ...state,
@@ -336,6 +343,14 @@ export function AppShell() {
   const modelAssignments = useModelAssignments();
   const providerConfigurations = useProviders();
   const projectRepository = useMemo(() => createLocalProjectRepository(), []);
+  const recoveryBackend = useMemo(() => {
+    const projection = createProjectProjectionAdapter(projectRepository);
+    return createIndexedDbRecoveryBackend({
+      projectionExists: projection.exists,
+      rebuildProjection: projection.rebuild,
+    });
+  }, [projectRepository]);
+  const recoveryService = useMemo(() => new LocalRecoveryService(recoveryBackend), [recoveryBackend]);
   const [projectShell, dispatchProjectShell] = useReducer(
     projectShellReducer,
     INITIAL_PROJECT_SHELL_STATE,
@@ -387,10 +402,16 @@ export function AppShell() {
   const activeProjectIdRef = useRef<string | null>(activeProjectId);
   activeProjectIdRef.current = activeProjectId;
   const updateController = useMemo(() => createDesktopUpdateOrchestrator({
-    prepareRecoverySnapshot: () => activeProjectIdRef.current
-      ? saveActiveProjectNowRef.current(activeProjectIdRef.current)
-      : Promise.resolve(true),
-  }), []);
+    prepareRecoverySnapshot: async () => {
+      const projectId = activeProjectIdRef.current;
+      if (!projectId) return true;
+      if (!await saveActiveProjectNowRef.current(projectId)) return false;
+      const loaded = await projectRepository.load(projectId);
+      if (isErr(loaded)) return false;
+      await checkpointProjectForRecovery({ record: loaded.data, service: recoveryService, backend: recoveryBackend });
+      return true;
+    },
+  }), [projectRepository, recoveryBackend, recoveryService]);
   useEffect(() => {
     let timer: number | undefined;
     let disposed = false;
@@ -510,22 +531,21 @@ export function AppShell() {
   // Settings dialog open-state lives here so both the TopBar gear (via the
   // SettingsUI context) and the ⌘, hotkey can open it.
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsTarget,setSettingsTarget]=useState<SettingsTarget>();
   const [recentlyClosedTabs, setRecentlyClosedTabs] = useState<
     readonly { readonly id: string; readonly name: string }[]
   >([]);
-  const openSettings = useCallback(() => setSettingsOpen(true), []);
+  const openSettings = useCallback((target?:SettingsTarget) => {setSettingsTarget(target);setSettingsOpen(true)}, []);
   const settingsUI = useMemo(() => ({ open: openSettings }), [openSettings]);
 
   // The asset-library drawer open-state also lives here, so the TopBar button
   // (via the LibraryUI context) can open it.
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [openHomeLibrary, setOpenHomeLibrary] = useState(false);
-  const [newProjectSignal, setNewProjectSignal] = useState(0);
-  const newTaskGateRef = useRef(createNewTaskGate());
   const openLibrary = useCallback(() => setLibraryOpen(true), []);
 
-  const [designOsOpen, setDesignOsOpen] = useState(false);
   const [advancedAuditOpen, setAdvancedAuditOpen] = useState(false);
+  const [designOsOpen, setDesignOsOpen] = useState(false);
   const [sourceIngestOpen, setSourceIngestOpen] = useState(false);
   const [sourceIngestPreview, setSourceIngestPreview] = useState<
     SourceIngestPreview | undefined
@@ -668,9 +688,6 @@ export function AppShell() {
   ]);
   const [designOsDefaultTab, setDesignOsDefaultTab] =
     useState<DesignOsWorkbenchTab>("overview");
-  const [designOsSurfaceMode, setDesignOsSurfaceMode] = useState<
-    "inspector" | "deliver"
-  >("inspector");
   const openDesignOs = useCallback(
     (tab: DesignOsWorkbenchTab = "overview") => {
       const navigation = migrateLegacyDesignOsView(tab);
@@ -680,15 +697,13 @@ export function AppShell() {
         const session = enterWorkspaceSurface({ current: workspaceNavigation, returnTo: workspaceReturnToRef.current }, action);
         workspaceReturnToRef.current = session.returnTo;
         setWorkspaceNavigation(session.current);
-      } else setWorkspaceNavigation(navigation);
-      const deliver = surface.surface === "inline-main";
-      setDesignOsSurfaceMode(deliver ? "deliver" : "inspector");
-      setDesignOsDefaultTab(
-        tab === "delivery" && !designOsModel?.delivery ? "kits" : tab,
-      );
-      setDesignOsOpen(surface.surface === "canvas-inspector");
+      } else {
+        setWorkspaceNavigation({ version: 2, mode: "canvas", advanced: workspaceNavigation.advanced });
+        setDesignOsDefaultTab(tab);
+        setDesignOsOpen(true);
+      }
     },
-    [designOsModel, workspaceNavigation],
+    [workspaceNavigation],
   );
 
   const prepareWorkbenchSource = useCallback(
@@ -842,8 +857,39 @@ export function AppShell() {
       } = await import("@/design-os-operations/operations");
       const { headlessTokenAdapters } = await import("@/design-kit/headless");
       if (itemId === "kit:brand") {
+        const snapshot = getStoreState().workspaceSnapshot;
+        if (!snapshot) return;
+        if (!snapshot.brandViRun) {
+          const [{ planBrandViOperation }, { createBrandViRun }] =
+            await Promise.all([
+              import("@/design-os-operations/operations"),
+              import("@/brand-kit"),
+            ]);
+          const planned = planBrandViOperation({ profile: "core" });
+          if (isErr(planned)) {
+            toast.error("Brand VI plan is blocked", { description: planned.error });
+            return;
+          }
+          getStoreState().setWorkspaceSnapshot({
+            ...snapshot,
+            brandViRun: createBrandViRun(planned.data),
+          });
+          toast.info("Brand VI plan is ready for review", {
+            description: `${planned.data.nodes.length} dependency-ordered items; paid and master actions require item approval.`,
+          });
+          return;
+        }
+        const unfinished = snapshot.brandViRun.items.filter(
+          (item) => item.status !== "succeeded",
+        );
+        if (unfinished.length > 0) {
+          toast.info("Brand VI production is not complete", {
+            description: `${unfinished.length} items still require generation, approval, or a durable receipt.`,
+          });
+          return;
+        }
         const definition =
-          getStoreState().workspaceSnapshot?.designOsAuthoring?.brand;
+          snapshot.designOsAuthoring?.brand;
         const compiled = await compileBrandKitOperation(current, definition);
         if (isErr(compiled)) {
           toast.error("Brand Kit is blocked", { description: compiled.error });
@@ -874,6 +920,27 @@ export function AppShell() {
       );
       if (isErr(compiled)) {
         toast.error("Design Kit is blocked", { description: compiled.error });
+        return;
+      }
+      const { planDesignSystemKit, evaluateDesignSystemPlanOutputs } =
+        await import("@/design-kit");
+      const outputAliases: Readonly<Record<string, string>> = {
+          "tokens.json": "tokens/tokens.json",
+          "tokens.css": "tokens/tokens.css",
+          "tailwind.css": "tokens/tailwind.css",
+          "theme.ts": "tokens/theme.ts",
+      };
+      const outputPaths = compiled.data.files.map(
+        (file) => outputAliases[file.path] ?? file.path,
+      );
+      const coverage = evaluateDesignSystemPlanOutputs(
+        planDesignSystemKit({ profile: "complete" }),
+        outputPaths,
+      );
+      if (!coverage.complete) {
+        toast.error("Complete Design System Kit is capability-required", {
+          description: `${coverage.missingOutputs.length} planned outputs are not generated yet; the foundation bundle was not mislabeled as complete.`,
+        });
         return;
       }
       const exported = await exportCompiledBundle(current, services.bundles, {
@@ -1062,26 +1129,37 @@ export function AppShell() {
     async (targetIds: readonly string[]) => {
       const snapshot = getStoreState().workspaceSnapshot;
       const current = snapshot?.designDocument;
-      if (
-        !snapshot ||
-        !current ||
-        targetIds.length !== 1 ||
-        targetIds[0] !== "delivery:design-system"
-      ) {
+      if (!snapshot || !current || targetIds.length === 0) {
         toast.error(
           "Selected delivery targets are not executable in this host",
         );
         return;
       }
-      const { UnifiedDeliveryCenter } = await import("@/delivery-center");
-      const executor = await designSystemDeliveryExecutor(
+      const brandViComplete = Boolean(
+        snapshot.brandViRun?.items.length &&
+        snapshot.brandViRun.items.every((item) => item.status === "succeeded"),
+      );
+      const { center } = await buildUnifiedLocalDeliveryCenter(
         current,
         services.bundles,
+        snapshot.designOsAuthoring ?? undefined,
+        brandViComplete,
       );
-      const center = new UnifiedDeliveryCenter([executor]);
       const outcomeId =
         snapshot.outcome?.contract.id ?? `outcome:${current.meta.id}`;
       const outcomeRevision = snapshot.outcome?.runId ?? current.revision.id;
+      const starterRef = snapshot.designOsAuthoring?.starterConfigs?.[0]?.framework;
+      const targetSpecs = {
+        "delivery:design-system": { kind: "design-system", ref: "design" },
+        "delivery:brand-kit": { kind: "brand-kit", ref: "brand" },
+        "delivery:components": { kind: "components", ref: "components" },
+        "delivery:starter": { kind: "starter", ref: starterRef },
+      } as const;
+      const selected = targetIds.map((targetId) => ({ targetId, spec: targetSpecs[targetId as keyof typeof targetSpecs] }));
+      if (selected.some(({ spec }) => !spec?.ref)) {
+        toast.error("Selected delivery targets are not configured");
+        return;
+      }
       const request = {
         protocol: "cutout.delivery-center.v1" as const,
         id: `delivery-request:${crypto.randomUUID()}`,
@@ -1092,19 +1170,17 @@ export function AppShell() {
           revisionId: current.revision.id,
           revisionNumber: current.revision.number,
         },
-        targets: [
-          {
-            id: "delivery:design-system",
-            kind: "design-system" as const,
+        targets: selected.map(({ targetId, spec }) => ({
+            id: targetId,
+            kind: spec!.kind,
             destination: {
               kind: "managed-export" as const,
               ref: "native-folder-picker",
             },
             requiredGates: ["provenance" as const],
             dependsOn: [],
-            metadata: {},
-          },
-        ],
+            metadata: { ref: spec!.ref! },
+          })),
       };
       try {
         const plan = await center.preview(request);
@@ -1139,10 +1215,16 @@ export function AppShell() {
         toast.error("Delivery preview is no longer available");
         return;
       }
-      const { UnifiedDeliveryCenter } = await import("@/delivery-center");
-      const center = new UnifiedDeliveryCenter([
-        await designSystemDeliveryExecutor(current, services.bundles),
-      ]);
+      const brandViComplete = Boolean(
+        snapshot.brandViRun?.items.length &&
+        snapshot.brandViRun.items.every((item) => item.status === "succeeded"),
+      );
+      const { center, libraryBundles } = await buildUnifiedLocalDeliveryCenter(
+        current,
+        services.bundles,
+        snapshot.designOsAuthoring ?? undefined,
+        brandViComplete,
+      );
       try {
         const replayed = await center.preview(request);
         if (replayed.id !== persistedPlan.id)
@@ -1164,6 +1246,36 @@ export function AppShell() {
           deliveryPlan: replayed,
           deliveryReceipt: receipt,
         });
+        if (receipt.status === "succeeded") {
+          try {
+            const [libraryModule, blobModule, backendModule] = await Promise.all([
+              import("@/global-library"),
+              import("@/global-library/blob-store"),
+              import("@/global-library/indexeddb"),
+            ]);
+            const blobStore = new blobModule.IndexedDbLibraryBlobStore(indexedDB);
+            const libraryStore = new libraryModule.GlobalLibraryStore(
+              backendModule.createIndexedDbGlobalLibraryBackend(indexedDB),
+            );
+            for (const target of receipt.targets) {
+              const files = libraryBundles[target.targetId];
+              if (target.status !== "succeeded" || !files) continue;
+              const built = await libraryModule.buildDeliveryLibraryItem({
+                document: current,
+                receipt: target,
+                files,
+                contentSink: blobStore,
+                approvalId: receipt.approvalId,
+                createdAt: receipt.completedAt,
+              });
+              await libraryStore.saveApproved(built.item, built.approval);
+            }
+          } catch (libraryError) {
+            toast.error("Delivery completed, but Library indexing failed", {
+              description: libraryError instanceof Error ? libraryError.message : String(libraryError),
+            });
+          }
+        }
         if (receipt.status === "succeeded") toast.success("Delivery complete");
         else toast.error("Delivery needs attention");
       } catch (error) {
@@ -1267,6 +1379,10 @@ export function AppShell() {
           ? "next-app-router"
           : itemId === "starter:vite"
             ? "vite-react"
+            : itemId === "starter:nuxt"
+              ? "nuxt"
+              : itemId === "starter:tanstack"
+                ? "tanstack-start"
             : undefined;
       if (!framework) return;
       const snapshot = getStoreState().workspaceSnapshot;
@@ -1601,38 +1717,24 @@ export function AppShell() {
     queueMicrotask(() => {
       restoringRef.current = false;
     });
+    return project;
   }, [resetProject, saveActiveProjectNow]);
   const requestNewProject = useCallback(() => {
     void newProject();
   }, [newProject]);
-  const requestNewTask = useCallback(() => {
-    const requestId = crypto.randomUUID();
-    void newTaskGateRef.current.run(async () => {
-      const blankProject = view === "project" && !shouldPersistWorkspace(getStoreState());
-      const transition = projectNewTaskIntent({
-        view,
-        blankProject,
-        hasHomeDraft: false,
-        resetSignal: newProjectSignal,
-      }, requestId);
-      if (!transition.applied) return;
-      if (transition.saveActiveProject) await saveActiveProjectNow();
-      restoringRef.current = true;
-      resetProject();
-      activeRecordRef.current = null;
-      lastSavedFingerprintRef.current = "";
-      setOpenHomeLibrary(false);
-      setNewProjectSignal(transition.state.resetSignal);
-      withViewTransition(() => dispatchProjectShell({ type: "new-task" }));
-      queueMicrotask(() => { restoringRef.current = false; });
-    });
-  }, [newProjectSignal, resetProject, saveActiveProjectNow, view]);
   const startProjectWithBrief = useCallback(
     (brief: string, attachments: readonly File[] = []) => {
       void (async () => {
-        await newProject();
+        const project = await newProject();
         const state = getStoreState();
         state.setBrief(brief);
+        state.setWorkspaceSnapshot(await bootstrapHomeDraftProject({
+          project,
+          brief,
+          videos: attachments
+            .filter((file) => file.type.startsWith("video/"))
+            .map((file) => ({ name: file.name, mediaType: file.type })),
+        }));
         const inputs: EverythingInput[] = [];
         for (const file of attachments) {
           if (file.type.startsWith("video/")) continue;
@@ -1651,9 +1753,10 @@ export function AppShell() {
         }
         if (inputs.length) await prepareWorkbenchSources(inputs);
         state.requestAgentRun("create-assets");
+        await saveActiveProjectNow(project.id);
       })();
     },
-    [newProject, prepareWorkbenchSources],
+    [newProject, prepareWorkbenchSources, saveActiveProjectNow],
   );
   const importBoardIntoNewProject = useCallback(() => {
     pickFile((file) => {
@@ -1853,7 +1956,53 @@ export function AppShell() {
   );
   useHotkeys(handlers);
 
+  // Re-run the token-contrast governance check on the current design tokens and
+  // surface the outcome. "Repair" here means re-verify (the user fixes flagged
+  // token colors; there is no silent auto-correction) — it runs through the real
+  // createGovernanceRepairTask/rerunGovernanceRepair orchestration.
+  const handleGovernanceRepair = useCallback(async () => {
+    if (!designDocument) return;
+    const current = buildTokenContrastGovernance(designDocument.tokens, Date.now());
+    if (!current) {
+      toast.message("No color tokens to check for contrast.");
+      return;
+    }
+    const hardFailures = current.receipt.findings.filter(
+      (finding) => finding.status === "failed" && finding.severity === "hard",
+    );
+    if (hardFailures.length === 0) {
+      toast.success("Governance re-checked — all color-contrast checks pass.");
+      return;
+    }
+    const { createGovernanceRepairTask, rerunGovernanceRepair } = await import(
+      "@/design-governance"
+    );
+    try {
+      const task = createGovernanceRepairTask(current.receipt, current.scenarios);
+      const result = await rerunGovernanceRepair(task, {
+        // No silent auto-fix — the user adjusts the flagged token colors; we
+        // re-evaluate the current tokens to see whether the blockers cleared.
+        repair: async () => ({ receiptRef: "in-app:token-contrast" }),
+        rerun: async () =>
+          buildTokenContrastGovernance(designDocument.tokens, Date.now())!.receipt,
+      });
+      if (result.status === "repaired") {
+        toast.success("Governance re-checked — contrast blockers resolved.");
+      } else {
+        toast.warning(
+          `Governance re-checked — ${hardFailures.length} contrast blocker(s) remain. ` +
+            "Adjust the flagged token colors and re-check.",
+        );
+      }
+    } catch (error) {
+      toast.error("Governance re-check failed", {
+        description: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }, [designDocument]);
+
   const workbenchCallbacks: DesignOsWorkbenchCallbacks = {
+    onRequestGovernanceRepair: () => void handleGovernanceRepair(),
     onRequestSourceIngest: () => setSourceIngestOpen(true),
     onApproveSourceIngest: approveWorkbenchSource,
     onOpenSource: (sourceId) => {
@@ -1877,8 +2026,16 @@ export function AppShell() {
     onExportFigmaVariables: exportWorkbenchFigma,
     onPreviewDelivery: previewUnifiedDelivery,
     onApproveDelivery: approveUnifiedDelivery,
-    onPrepareMissingDelivery: () => setDesignOsOpen(false),
-    onAddDeliveryDestination: openSettings,
+    onPrepareMissingDelivery: () => {
+      const state = getStoreState();
+      state.setBrief(
+        "Prepare every missing deliverable required by the current delivery plan. Preserve approved Brand locks, Design IR provenance, and governance gates; generate only the missing evidence and assets.",
+      );
+      state.requestAgentRun("create-assets");
+      workspaceReturnToRef.current = undefined;
+      setWorkspaceNavigation({ version: 2, mode: "agent", advanced: workspaceNavigation.advanced });
+    },
+    onAddDeliveryDestination: () => openSettings({section:'integrations',anchor:'connections'}),
   };
 
   return (
@@ -1898,17 +2055,16 @@ export function AppShell() {
               onOpenHome={openHome}
               onOpenProject={openProject}
               onCloseProject={closeProject}
-              onNewProject={requestNewTask}
+              onNewProject={requestNewProject}
               onRerun={rerun}
               onArchiveProject={() => {
                 if (activeProjectId) void archiveProject(activeProjectId);
               }}
-              onOpenDesignOs={() => openDesignOs("overview")}
             />
             {view === "home" ? (
               <ProjectHome
                 initialSection={openHomeLibrary ? "library" : "start"}
-                resetToStartSignal={newProjectSignal}
+                resetToStartSignal={0}
                 activeProjectId={activeProjectId}
                 projects={projects}
                 loadState={projectLoadState}
@@ -1989,6 +2145,7 @@ export function AppShell() {
                 onDeleteProject={(id) => void deleteProject(id)}
                 prepareUpdateRecoverySnapshot={() => activeProjectId ? saveActiveProjectNowRef.current(activeProjectId) : Promise.resolve(true)}
                 updateController={updateController}
+                target={settingsTarget}
               />
             </Suspense>
           ) : null}
@@ -2004,38 +2161,35 @@ export function AppShell() {
               <LibraryDrawer open onOpenChange={setLibraryOpen} />
             </Suspense>
           ) : null}
-          <Dialog open={designOsOpen && workspaceSurface.surface === "canvas-inspector"} onOpenChange={setDesignOsOpen}>
+          <Dialog open={designOsOpen} onOpenChange={setDesignOsOpen}>
             <DialogContent className="h-[min(48rem,88vh)] w-[calc(100vw-1rem)] min-w-0 max-w-5xl gap-0 overflow-hidden p-0">
               <DialogHeader className="sr-only">
-                <DialogTitle>{designOsSurfaceMode === "deliver" ? "Deliver" : "Canvas inspector"}</DialogTitle>
+                <DialogTitle>System inspector</DialogTitle>
                 <DialogDescription>
-                  Inspect, ingest, compile, and export verified project
-                  deliverables.
+                  Inspect project sources, specimens, workflows, and authorized integrations.
                 </DialogDescription>
               </DialogHeader>
               <div className="min-h-0 flex-1">
                 {designOsModel ? (
-                  <Suspense
-                    fallback={
-                      <DeferredSurfaceFallback label={designOsSurfaceMode === "deliver" ? "Loading delivery workspace" : "Loading canvas inspector"} />
-                    }
-                  >
+                  <Suspense fallback={<DeferredSurfaceFallback label="Loading system inspector" />}>
                     <DesignOsWorkbench
                       key={designOsDefaultTab}
                       model={designOsModel}
                       defaultTab={designOsDefaultTab}
-                      surfaceMode={designOsSurfaceMode}
+                      surfaceMode="inspector"
                       className="h-full"
                       callbacks={workbenchCallbacks}
                     />
                   </Suspense>
                 ) : (
-                  <p
-                    role="status"
-                    className="border border-dashed border-border px-3 py-8 text-center text-sm text-muted-foreground"
-                  >
-                    No DesignDocument is available for this project yet.
-                  </p>
+                  <div className="grid h-full place-items-center p-6 text-center">
+                    <div className="max-w-xs">
+                      <p className="text-sm font-medium">Nothing to inspect yet</p>
+                      <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                        Add a source or ask the Agent to create a result first.
+                      </p>
+                    </div>
+                  </div>
                 )}
               </div>
             </DialogContent>
@@ -2121,117 +2275,127 @@ function sourcePreviewId(preview: SourceIngestPreview): string {
   ].join("|");
 }
 
-async function designSystemDeliveryExecutor(
+async function buildUnifiedLocalDeliveryCenter(
   document: DesignDocument,
   bundles: BundleRepository,
-): Promise<DeliveryExecutor> {
-  const { compileDesignKitOperation, exportCompiledBundle } =
-    await import("@/design-os-operations/operations");
+  authoring: DesignOsAuthoringState | undefined,
+  brandViComplete: boolean,
+) {
+  const [operations, designKitModule, componentModule, deliveryModule] =
+    await Promise.all([
+      import("@/design-os-operations/operations"),
+      import("@/design-kit"),
+      import("@/components-compiler"),
+      import("@/delivery-center"),
+    ]);
   const { headlessTokenAdapters } = await import("@/design-kit/headless");
-  const compile = async () => {
-    const result = await compileDesignKitOperation(
-      document,
-      headlessTokenAdapters(document.tokens),
-    );
-    if (isErr(result)) throw new Error(result.error);
-    return result.data;
+  const designKitResult = await operations.compileDesignKitOperation(
+    document,
+    headlessTokenAdapters(document.tokens),
+  );
+  if (isErr(designKitResult)) throw new Error(designKitResult.error);
+  const designKit = designKitResult.data;
+  const plan = designKitModule.planDesignSystemKit({ profile: "complete" });
+  const outputAliases: Readonly<Record<string, string>> = {
+      "tokens.json": "tokens/tokens.json",
+      "tokens.css": "tokens/tokens.css",
+      "tailwind.css": "tokens/tailwind.css",
+      "theme.ts": "tokens/theme.ts",
+  };
+  const generatedPaths = designKit.files.map(
+    (file) => outputAliases[file.path] ?? file.path,
+  );
+  const coverage = designKitModule.evaluateDesignSystemPlanOutputs(
+    plan,
+    generatedPaths,
+  );
+
+  const componentsResult = authoring?.componentCandidates?.length
+    ? await operations.compileComponentsOperation(
+        document,
+        authoring.componentCandidates,
+      )
+    : null;
+  if (componentsResult && isErr(componentsResult))
+    throw new Error(componentsResult.error);
+  const components = componentsResult?.data;
+  const manifestFile = components?.files.find(
+    (file) => file.path === "components.manifest.json",
+  );
+  const manifest = manifestFile
+    ? componentModule.componentManifestSchema.parse(
+        JSON.parse(manifestFile.content),
+      )
+    : null;
+
+  const starters: Record<string, StarterPlan> = {};
+  if (manifest) {
+    for (const config of authoring?.starterConfigs ?? []) {
+      const compiled = await operations.compileStarterOperation(document, {
+        framework: config.framework,
+        kit: designKit,
+        candidates: manifest,
+        assetBindings: config.assetBindings,
+        existingPaths: config.existingPaths,
+      });
+      if (isErr(compiled)) throw new Error(compiled.error);
+      starters[config.framework] = compiled.data;
+    }
+  }
+
+  const brandResult = authoring?.brand && brandViComplete
+    ? await operations.compileBrandKitOperation(document, authoring.brand)
+    : null;
+  if (brandResult && isErr(brandResult)) throw new Error(brandResult.error);
+
+  async function exportBundle(
+    kind: "design-kit" | "brand-kit" | "components" | "starter",
+    bundle: Parameters<typeof operations.exportCompiledBundle>[2]["bundle"],
+    suffix: string,
+  ) {
+    const exported = await operations.exportCompiledBundle(document, bundles, {
+      kind,
+      bundle,
+      name: safeBundleName(`${document.meta.title}-${suffix}`),
+    });
+    if (isErr(exported)) throw new Error(exported.error);
+    if (exported.data.canceled) throw new Error("The folder selection was cancelled.");
+    return {
+      artifacts: exported.data.files.map((file) => ({
+        path: file.path,
+        sha256: file.sha256,
+        mediaType: mediaTypeForDelivery(file.path),
+      })),
+    };
+  }
+
+  const executors = deliveryModule.createLocalDeliveryExecutors(
+    {
+      ...(brandResult && !isErr(brandResult) ? { brandKits: { brand: brandResult.data } } : {}),
+      ...(coverage.complete ? { designKits: { design: designKit } } : {}),
+      ...(components ? { componentBundles: { components } } : {}),
+      ...(Object.keys(starters).length ? { starters } : {}),
+    },
+    {
+      exportBrandKit: (bundle) => exportBundle("brand-kit", bundle, "brand-kit"),
+      exportDesignKit: (bundle) => exportBundle("design-kit", bundle, "design-kit"),
+      exportComponents: (bundle) => exportBundle("components", bundle, "components"),
+      exportStarter: (bundle) => exportBundle("starter", bundle, `starter-${bundle.framework}`),
+      installRegistry: async () => {
+        throw new Error("Registry host is not configured.");
+      },
+    },
+  );
+  const libraryBundles: Readonly<Record<string, readonly { path: string; content: string }[]>> = {
+    ...(brandResult && !isErr(brandResult) ? { "delivery:brand-kit": brandResult.data.files } : {}),
+    ...(coverage.complete ? { "delivery:design-system": designKit.files } : {}),
+    ...(components ? { "delivery:components": components.files } : {}),
+    ...(Object.values(starters)[0] ? { "delivery:starter": Object.values(starters)[0]!.files } : {}),
   };
   return {
-    kind: "design-system",
-    async preview(target) {
-      const kit = await compile();
-      return {
-        targetId: target.id,
-        kind: "design-system",
-        destination: target.destination,
-        effects: ["managed-export"],
-        estimatedCostUsd: 0,
-        currency: "USD",
-        files: kit.files.map((file) => ({
-          path: file.path,
-          sha256: file.sha256,
-        })),
-        warnings: [],
-      };
-    },
-    async execute(target) {
-      const startedAt = new Date().toISOString();
-      try {
-        const kit = await compile();
-        const exported = await exportCompiledBundle(document, bundles, {
-          kind: "design-kit",
-          bundle: kit,
-          name: safeBundleName(`${document.meta.title}-design-kit`),
-        });
-        if (isErr(exported)) throw new Error(exported.error);
-        if (exported.data.canceled)
-          return {
-            targetId: target.id,
-            kind: "design-system",
-            status: "cancelled",
-            destination: target.destination,
-            startedAt,
-            completedAt: new Date().toISOString(),
-            artifacts: [],
-            quality: [],
-            kitManifests: [],
-            error: {
-              code: "user-cancelled",
-              message: "The folder selection was cancelled.",
-            },
-          };
-        const manifest = kit.files.find(
-          (file) => file.path === "manifest.json",
-        );
-        if (!manifest) throw new Error("Design Kit manifest is missing.");
-        return {
-          targetId: target.id,
-          kind: "design-system",
-          status: "succeeded",
-          destination: target.destination,
-          startedAt,
-          completedAt: new Date().toISOString(),
-          artifacts: exported.data.files.map((file) => ({
-            path: file.path,
-            sha256: file.sha256,
-            mediaType: mediaTypeForDelivery(file.path),
-          })),
-          quality: [
-            {
-              gate: "provenance",
-              status: "passed",
-              evidenceIds: [manifest.sha256],
-            },
-          ],
-          kitManifests: [
-            {
-              kind: "design-system",
-              id: `design-kit:${document.revision.id}`,
-              sha256: manifest.sha256,
-            },
-          ],
-        };
-      } catch (error) {
-        return {
-          targetId: target.id,
-          kind: "design-system",
-          status: "failed",
-          destination: target.destination,
-          startedAt,
-          completedAt: new Date().toISOString(),
-          artifacts: [],
-          quality: [],
-          kitManifests: [],
-          error: {
-            code: "delivery-failed",
-            message:
-              error instanceof Error
-                ? error.message
-                : "Design System delivery failed.",
-          },
-        };
-      }
-    },
+    center: new deliveryModule.UnifiedDeliveryCenter(executors),
+    coverage,
+    libraryBundles,
   };
 }
 

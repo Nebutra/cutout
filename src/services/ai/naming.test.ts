@@ -103,6 +103,49 @@ describe('nameSlices', () => {
     expect(result).toEqual(err('boom'))
   })
 
+  it('retries a transient upstream failure and succeeds', async () => {
+    const generateObject = vi
+      .fn<GenObjectFn>()
+      .mockResolvedValueOnce(err('Upstream request failed'))
+      .mockResolvedValueOnce(ok({ names: [{ index: 0, name: 'primary-button' }] }))
+    const gen = fakeGeneration(generateObject)
+    const result = await nameSlices(gen, {
+      providerId: 'p',
+      model: 'm',
+      imageBytes: new Uint8Array([1]),
+      slices: [{ index: 0, box: box(0) }],
+    })
+    expect(result).toEqual(ok([{ index: 0, name: 'primary-button' }]))
+    expect(generateObject).toHaveBeenCalledTimes(2)
+  })
+
+  it('gives up after retrying a persistent transient failure (3 attempts)', async () => {
+    const generateObject = vi
+      .fn<GenObjectFn>()
+      .mockResolvedValue(err('Upstream request failed'))
+    const gen = fakeGeneration(generateObject)
+    const result = await nameSlices(gen, {
+      providerId: 'p',
+      model: 'm',
+      imageBytes: new Uint8Array([1]),
+      slices: [{ index: 0, box: box(0) }],
+    })
+    expect(result).toEqual(err('Upstream request failed'))
+    expect(generateObject).toHaveBeenCalledTimes(3)
+  })
+
+  it('does not retry a non-transient failure', async () => {
+    const generateObject = vi.fn<GenObjectFn>().mockResolvedValue(err('invalid schema'))
+    const gen = fakeGeneration(generateObject)
+    await nameSlices(gen, {
+      providerId: 'p',
+      model: 'm',
+      imageBytes: new Uint8Array([1]),
+      slices: [{ index: 0, box: box(0) }],
+    })
+    expect(generateObject).toHaveBeenCalledTimes(1)
+  })
+
   it('errors when the model returns no usable names', async () => {
     const generateObject = vi
       .fn<GenObjectFn>()

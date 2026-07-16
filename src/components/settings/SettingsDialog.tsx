@@ -6,7 +6,7 @@
  * No router — `section` is local state. General and AI are the only sections;
  * About is a footer line. Every control inside applies instantly.
  */
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Trans } from '@lingui/react/macro'
 import {
   Dialog,
@@ -24,6 +24,7 @@ import { ArchivedSection } from './sections/ArchivedSection'
 import { PersonalizationSection } from './sections/PersonalizationSection'
 import { SpeechSection } from './sections/SpeechSection'
 import type { DesktopUpdateController } from '@/updater/service'
+import { focusSettingsTarget, type SettingsTarget } from './settings-ui'
 
 interface SettingsDialogProps {
   readonly open: boolean
@@ -34,6 +35,7 @@ interface SettingsDialogProps {
   readonly onDeleteProject?: (id: string) => void
   readonly prepareUpdateRecoverySnapshot?: () => Promise<boolean>
   readonly updateController?: DesktopUpdateController
+  readonly target?: SettingsTarget
 }
 
 export function SettingsDialog({
@@ -45,9 +47,11 @@ export function SettingsDialog({
   onDeleteProject = () => {},
   prepareUpdateRecoverySnapshot = async () => true,
   updateController,
+  target,
 }: SettingsDialogProps) {
-  const [section, setSection] = useState<SettingsSection>(initialSection)
+  const [section, setSection] = useState<SettingsSection>(target?.section??initialSection)
   const archivedCount = projects.filter((project) => project.archivedAt).length
+  useEffect(()=>{if(!open)return;setSection(target?.section??initialSection);if(target?.anchor)requestAnimationFrame(()=>{focusSettingsTarget(target)})},[initialSection,open,target])
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

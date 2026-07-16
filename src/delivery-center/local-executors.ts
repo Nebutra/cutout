@@ -1,6 +1,8 @@
 import { brandKitSchema, type BrandKit } from '@/brand-kit'
 import { RegistryItemSchema, type RegistryInstallReceipt, type RegistryItem } from '@/registry'
 import { starterPlanSchema, type StarterPlan } from '@/starter-compiler'
+import { designKitSchema, type DesignKit } from '@/design-kit'
+import { componentCompilerOutputSchema, type ComponentCompilerOutput } from '@/components-compiler'
 import { targetExecutionReceiptSchema, type TargetExecutionReceipt } from './contracts'
 import type { DeliveryExecutor } from './runtime'
 
@@ -13,18 +15,67 @@ export interface LocalExportResult {
 
 export interface LocalDeliveryHosts {
   exportBrandKit(kit: BrandKit, approvalId: string): Promise<LocalExportResult>
+  exportDesignKit(kit: DesignKit, approvalId: string): Promise<LocalExportResult>
+  exportComponents(bundle: ComponentCompilerOutput, approvalId: string): Promise<LocalExportResult>
   exportStarter(plan: StarterPlan, approvalId: string): Promise<LocalExportResult>
   installRegistry(item: RegistryItem, approvalId: string): Promise<RegistryInstallReceipt>
 }
 
 export interface LocalDeliveryInputs {
   readonly brandKits?: Readonly<Record<string, BrandKit>>
+  readonly designKits?: Readonly<Record<string, DesignKit>>
+  readonly componentBundles?: Readonly<Record<string, ComponentCompilerOutput>>
   readonly starters?: Readonly<Record<string, StarterPlan>>
   readonly registryItems?: Readonly<Record<string, RegistryItem>>
 }
 
 export function createLocalDeliveryExecutors(input: LocalDeliveryInputs, hosts: LocalDeliveryHosts, now: () => string = () => new Date().toISOString()): readonly DeliveryExecutor[] {
-  return [brandExecutor(input, hosts, now), starterExecutor(input, hosts, now), registryExecutor(input, hosts, now)]
+  return [
+    input.brandKits && Object.keys(input.brandKits).length ? brandExecutor(input, hosts, now) : null,
+    input.designKits && Object.keys(input.designKits).length ? designSystemExecutor(input, hosts, now) : null,
+    input.componentBundles && Object.keys(input.componentBundles).length ? componentsExecutor(input, hosts, now) : null,
+    input.starters && Object.keys(input.starters).length ? starterExecutor(input, hosts, now) : null,
+    input.registryItems && Object.keys(input.registryItems).length ? registryExecutor(input, hosts, now) : null,
+  ].filter((executor): executor is DeliveryExecutor => executor !== null)
+}
+
+function designSystemExecutor(input: LocalDeliveryInputs, hosts: LocalDeliveryHosts, now: () => string): DeliveryExecutor {
+  return {
+    kind: 'design-system',
+    async preview(target) {
+      requireManaged(target.destination.kind)
+      const kit = designKitSchema.parse(select(input.designKits, metadataRef(target.metadata), 'Design System Kit'))
+      return { targetId: target.id, kind: 'design-system', destination: target.destination, effects: ['managed-export'], estimatedCostUsd: 0, currency: 'USD', files: kit.files.map(({ path, sha256 }) => ({ path, sha256 })), warnings: [] }
+    },
+    async execute(target, context) {
+      requireManaged(target.destination.kind)
+      const startedAt = now()
+      const kit = designKitSchema.parse(select(input.designKits, metadataRef(target.metadata), 'Design System Kit'))
+      const result = await hosts.exportDesignKit(kit, context.approvalId)
+      verifyArtifacts(kit.files, result.artifacts)
+      const manifest = kit.files.find((file) => file.path === 'manifest.json')!
+      return targetExecutionReceiptSchema.parse({ targetId: target.id, kind: 'design-system', status: 'succeeded', destination: target.destination, startedAt, completedAt: now(), artifacts: result.artifacts, quality: provenanceQuality(manifest.sha256), kitManifests: [{ kind: 'design-system', id: `design-kit:${kit.source.revisionId}`, sha256: manifest.sha256 }] })
+    },
+  }
+}
+
+function componentsExecutor(input: LocalDeliveryInputs, hosts: LocalDeliveryHosts, now: () => string): DeliveryExecutor {
+  return {
+    kind: 'components',
+    async preview(target) {
+      requireManaged(target.destination.kind)
+      const bundle = componentCompilerOutputSchema.parse(select(input.componentBundles, metadataRef(target.metadata), 'Component bundle'))
+      return { targetId: target.id, kind: 'components', destination: target.destination, effects: ['managed-export'], estimatedCostUsd: 0, currency: 'USD', files: bundle.files.map(({ path, sha256 }) => ({ path, sha256 })), warnings: ['Component source is emitted only for explicit candidates; screenshot inference is not claimed.'] }
+    },
+    async execute(target, context) {
+      requireManaged(target.destination.kind)
+      const startedAt = now()
+      const bundle = componentCompilerOutputSchema.parse(select(input.componentBundles, metadataRef(target.metadata), 'Component bundle'))
+      const result = await hosts.exportComponents(bundle, context.approvalId)
+      verifyArtifacts(bundle.files, result.artifacts)
+      return targetExecutionReceiptSchema.parse({ targetId: target.id, kind: 'components', status: 'succeeded', destination: target.destination, startedAt, completedAt: now(), artifacts: result.artifacts, quality: provenanceQuality(bundle.source.documentFingerprint), kitManifests: [] })
+    },
+  }
 }
 
 function brandExecutor(input: LocalDeliveryInputs, hosts: LocalDeliveryHosts, now: () => string): DeliveryExecutor {

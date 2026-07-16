@@ -1,3 +1,5 @@
 export * from './contracts'
 export * from './service'
 export * from './host-controller'
+export * from './indexeddb-backend'
+export * from './project-checkpoint'

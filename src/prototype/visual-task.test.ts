@@ -1,0 +1,9 @@
+import { describe, expect, it } from 'vitest'
+import { createPrototypePageVisualTask } from './visual-task'
+import type { PrototypePlan } from './prototype-plan'
+
+const plan = { version:'prototype-plan.v0',product:{name:'Cutout',summary:'Design',audience:'Teams',primaryGoal:'Ship',platform:'web'},designSystem:{styleSummary:'Quiet',palette:['#fff'],typography:'Sans',spacing:'4px',componentPrinciples:['Clear'],assetDirection:'Approved'},pages:[{id:'home',name:'Home',route:'/',purpose:'Convert',viewport:{platform:'web',width:1440,height:900,scroll:'single-screen'},regions:[{id:'hero',name:'Hero',role:'hero',summary:'Offer',complexity:'low',decompositionStrategy:'direct',assetRoute:'ignore-code-ui',assetOpportunities:[]}],overlays:[],states:[],interactions:[]}],flows:[],humanLoop:{mode:'continue',rationale:'Proceed'}} as PrototypePlan
+describe('prototype visual task adapter',()=>{
+  it('projects a page and immutable content-addressed references into the canonical visual contract',()=>{const task=createPrototypePageVisualTask({runId:'run:1',plan,page:plan.pages[0]!,image:{providerId:'p',model:'gpt-image-2'},prompt:'Create Home',referenceArtifactIds:['artifact:sha256:'+'a'.repeat(64)],preferences:{version:'paid-tool-preferences.v1',approvalPolicy:'auto-within-budget',budgetCeiling:{currency:'USD',amount:2}}});expect(task).toMatchObject({taskId:'prototype:run:1:home',catalogItemId:'prototype.page.home',routing:{preferredModel:'gpt-image-2'},references:[{sha256:'a'.repeat(64),immutable:true}],publication:{intendedUse:'raster-master'}})})
+  it('rejects an ephemeral reference id before any paid action',()=>{expect(()=>createPrototypePageVisualTask({runId:'run',plan,page:plan.pages[0]!,image:{providerId:'p',model:'gpt-image-2'},prompt:'Create',referenceArtifactIds:['desktop-artifact:1'],preferences:{version:'paid-tool-preferences.v1',approvalPolicy:'explicit',budgetCeiling:{currency:'USD',amount:1}}})).toThrow('content-addressed')})
+})

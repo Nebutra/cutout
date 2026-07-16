@@ -1,0 +1,5 @@
+import {describe,expect,it,vi}from'vitest'
+import{focusSettingsTarget,type SettingsUI}from'./settings-ui'
+describe('contextual Settings navigation',()=>{it('carries section and anchor without weakening the default open action',()=>{const open=vi.fn<SettingsUI['open']>(),ui:SettingsUI={open};ui.open();ui.open({section:'ai',anchor:'model-routing'});ui.open({section:'integrations',anchor:'connections'});expect(open.mock.calls).toEqual([[],[{section:'ai',anchor:'model-routing'}],[{section:'integrations',anchor:'connections'}]])})})
+
+describe('Settings target keyboard focus',()=>{it('focuses the requested integration heading after navigation',()=>{const heading=document.createElement('h2');heading.id='settings-integrations-heading';heading.tabIndex=-1;heading.scrollIntoView=vi.fn();document.body.append(heading);expect(focusSettingsTarget({section:'integrations',anchor:'connections'})).toBe(heading);expect(document.activeElement).toBe(heading);expect(heading.scrollIntoView).toHaveBeenCalledWith({block:'center'});heading.remove()})})

@@ -16,6 +16,8 @@ const renameSchema = z.string().trim().min(1)
 export interface SelectionSlice {
   selectSlice(id: string): void
   renameSlice(id: string, name: string): void
+  updateSliceBounds(id: string, box: Slice['box']): void
+  setSliceIncluded(id: string, included: boolean): void
   clearSelection(): void
 }
 
@@ -65,4 +67,25 @@ export const createSelectionSlice: StateCreator<
       },
     }))
   },
+  updateSliceBounds: (id, box) => {
+    if (![box.x, box.y, box.width, box.height].every(Number.isFinite)) return
+    if (box.x < 0 || box.y < 0 || box.width <= 0 || box.height <= 0) return
+    set((state) => ({
+      analysis: {
+        ...state.analysis,
+        slices: state.analysis.slices.map((slice) =>
+          slice.id === id ? { ...slice, box } : slice,
+        ),
+      },
+    }))
+  },
+  setSliceIncluded: (id, included) =>
+    set((state) => ({
+      analysis: {
+        ...state.analysis,
+        slices: state.analysis.slices.map((slice) =>
+          slice.id === id ? { ...slice, included } : slice,
+        ),
+      },
+    })),
 })

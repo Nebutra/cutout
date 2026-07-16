@@ -14,7 +14,9 @@ test("Updates stays truthful and configurable without a desktop runtime", async 
   await openGeneral(page);
   const updates = page.getByRole("region", { name: "Updates" });
   await expect(updates).toBeVisible();
-  await expect(updates).toContainText("Current version 0.1.0");
+  // The browser fallback cannot truthfully know the packaged desktop version.
+  // Tauri resolves the real version through getVersion at runtime.
+  await expect(updates).toContainText("Current version unknown");
   await expect(updates.getByRole("status")).toContainText("available only in the Cutout desktop app");
   await expect(updates.getByRole("button", { name: "Check now" })).toBeDisabled();
 

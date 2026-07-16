@@ -4,5 +4,12 @@
   "description": "Grants only Cutout's policy-checked updater commands; raw updater and process plugin commands remain unavailable to JavaScript.",
   "windows": ["main"],
   "platforms": ["macOS", "windows", "linux"],
-  "permissions": ["updater-runtime"]
+  "permissions": [
+    "updater-runtime",
+    "workspace-revision-bridge",
+    "project-files",
+    "provider-secrets-network",
+    "registry-and-agent-host",
+    "speech-host"
+  ]
 }

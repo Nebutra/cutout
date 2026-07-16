@@ -45,7 +45,7 @@ describe('routeExecutionPolicy', () => {
     const result=routeExecutionPolicy({model:{mode:'auto'},thinking:'auto',task:{stage:'understand',multimodal:true,paidAction:'none'},assignments,providers,modelCatalog:modelCatalog.filter(model=>!model.capabilities.some(capability=>capability==='vision'))})
     expect(result.status).toBe('blocked');expect(result.routeReceipt).toMatchObject({requiredCapabilities:['text','vision']});expect(result.routeReceipt?.selected).toBeUndefined();expect(result.routeReceipt?.candidates.every(candidate=>!candidate.eligible)).toBe(true)
   })
-  it('routes planning to chat with high automatic thinking', () => {
+  it('keeps ordinary planning at medium automatic thinking', () => {
     expect(
       routeExecutionPolicy({
         model: { mode: 'auto' },
@@ -58,7 +58,7 @@ describe('routeExecutionPolicy', () => {
       status: 'ready',
       slot: 'chat',
       assignment: assignments.chat,
-      reasoningEffort: 'high',
+      reasoningEffort: 'medium',
       requestedThinking: 'auto',
       thinkingSupport: 'supported',
       degradations: [],
@@ -71,7 +71,30 @@ describe('routeExecutionPolicy', () => {
         assignments,
         providers,
       }).rationaleCodes,
-    ).toEqual(['auto-route-chat', 'auto-thinking-high'])
+    ).toEqual(['auto-route-chat', 'auto-thinking-medium'])
+  })
+
+  it('raises effort only from explicit complexity, ambiguity, DAG, risk and retry signals', () => {
+    const result = routeExecutionPolicy({ model: { mode: 'auto' }, thinking: 'auto', task: { stage: 'plan', multimodal: false, paidAction: 'none', effortSignals: { complexity: .9, ambiguity: .8, dagDepth: 9, risk: 'high', retryCount: 1, budgetPressure: .1 } }, assignments, providers })
+    expect(result.reasoningEffort).toBe('high')
+    expect(result.effortReceipt).toMatchObject({ protocol: 'cutout.effort-decision.v1', selected: 'high', manualOverride: false })
+    expect(result.effortReceipt?.score).toBeGreaterThanOrEqual(.68)
+  })
+
+  it('keeps a manual effort override separate from model binding', () => {
+    const result = routeExecutionPolicy({ model: { mode: 'fixed', slot: 'chat', assignment: assignments.chat! }, thinking: 'low', task: { stage: 'review', multimodal: false, paidAction: 'none', effortSignals: { complexity: 1, ambiguity: 1, dagDepth: 20, risk: 'high', retryCount: 3 } }, assignments, providers })
+    expect(result.assignment).toEqual(assignments.chat)
+    expect(result.reasoningEffort).toBe('low')
+    expect(result.effortReceipt).toMatchObject({ selected: 'low', manualOverride: true })
+  })
+
+  it('uses verified compatible reasoning protocol evidence and rejects undeclared compatible thinking', () => {
+    const mox = { id: 'mox', kind: 'openai-compatible', label: 'MOX', defaultModel: 'gpt-5.5', enabled: true }
+    const verified = routeExecutionPolicy({ model: { mode: 'auto' }, thinking: 'auto', task: { stage: 'plan', multimodal: false, paidAction: 'none' }, assignments: { chat: { providerId: 'mox', model: 'gpt-5.5' } }, providers: [mox], modelCatalog: [{ providerId: 'mox', model: 'gpt-5.5', slot: 'chat', capabilities: ['text', 'reasoning'], reasoningProtocol: 'openai', quality: .9, cost: .5, speed: .7, region: 'global', available: true }] })
+    expect(verified).toMatchObject({ status: 'ready', reasoningEffort: 'medium', assignment: { providerId: 'mox', model: 'gpt-5.5', reasoningProtocol: 'openai' } })
+    expect(verified.routeReceipt?.effort).toMatchObject({ selected: 'medium', manualOverride: false })
+    const undeclared = routeExecutionPolicy({ model: { mode: 'fixed', slot: 'chat', assignment: { providerId: 'mox', model: 'gpt-5.5' } }, thinking: 'auto', task: { stage: 'plan', multimodal: false, paidAction: 'none' }, assignments: {}, providers: [mox] })
+    expect(undeclared).toMatchObject({ status: 'degraded', thinkingSupport: 'unsupported', reasoningEffort: undefined })
   })
 
   it('keeps multimodal understanding on the vision-capable chat slot', () => {
@@ -230,5 +253,21 @@ describe('routeExecutionPolicy', () => {
 
     expect(result.status).toBe('blocked')
     expect(result.degradations).toContain('provider-unavailable')
+  })
+
+  it('reports provider-unavailable, not assignment-missing, when a configured slot loses every catalog candidate', () => {
+    const result = routeExecutionPolicy({
+      model: { mode: 'auto' },
+      thinking: 'auto',
+      task: { stage: 'plan', multimodal: false, paidAction: 'none' },
+      assignments,
+      providers,
+      modelCatalog: modelCatalog.map((descriptor) => ({ ...descriptor, available: false })),
+    })
+
+    expect(result.status).toBe('blocked')
+    expect(result.degradations).toContain('provider-unavailable')
+    expect(result.degradations).not.toContain('assignment-missing')
+    expect(result.assignment).toEqual(assignments.chat)
   })
 })

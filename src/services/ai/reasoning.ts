@@ -11,9 +11,9 @@
  * so a selection never errors regardless of which model the user typed. "Default"
  * is the absence of a value: we send nothing and the model uses its own default.
  *
- * For `gateway` / `openai-compatible` the upstream vendor can't be known from a
- * free-text `provider/model` slug, so we deliberately send nothing rather than
- * risk the wrong field. This module is pure + framework-free (unit-tested).
+ * Compatible providers must first resolve a verified protocol in the model
+ * route. Callers then pass that protocol here; a free-text model slug alone is
+ * never used to guess an option shape.
  */
 import type { ProviderKind } from './provider-types'
 

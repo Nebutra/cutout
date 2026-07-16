@@ -46,6 +46,7 @@ import {
 } from '@/components/ui/select'
 import { KeyField } from './KeyField'
 import { createBuiltinProviderRegistry } from '@/services/ai/provider-registry'
+import { setProviderVerification } from '@/services/ai/provider-verification'
 
 /**
  * Brand kind labels. These are product names and stay verbatim across locales;
@@ -147,6 +148,7 @@ export function ProviderForm({ initial, initialKind, onDone }: ProviderFormProps
       }
       const providedKey = secret.trim().length > 0
       const saved = await upsert.mutateAsync(draft)
+      setProviderVerification(saved.id,{status:'unverified'})
       if (providedKey) {
         await setKey.mutateAsync({ id: saved.id, secret })
         setSecret('') // wipe the secret from JS the moment Rust has it
@@ -165,20 +167,22 @@ export function ProviderForm({ initial, initialKind, onDone }: ProviderFormProps
       if (!needsKey || providedKey || hasKey) {
         void testKey
           .mutateAsync(saved.id)
-          .then(({ model }) =>
+          .then(({ model }) => {
+            setProviderVerification(saved.id,{status:'verified',model,checkedAt:new Date().toISOString()})
             toast.success(
               t({ id: 'settings.status_verified', message: 'Verified' }),
               { description: `${saved.label} · ${model}` },
-            ),
+            )},
           )
-          .catch((error: unknown) =>
+          .catch((error: unknown) => {
+            setProviderVerification(saved.id,{status:'failed',checkedAt:new Date().toISOString(),detail:error instanceof Error?error.message:String(error)})
             toast.error(
               t({ id: 'settings.status_failed', message: 'Verification failed' }),
               {
                 description:
                   error instanceof Error ? error.message : String(error),
               },
-            ),
+            )},
           )
       }
     } catch (error) {

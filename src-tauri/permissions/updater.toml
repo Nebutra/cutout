@@ -8,3 +8,12 @@ commands.allow = [
   "updater_cancel",
   "updater_install_and_relaunch",
 ]
+
+[[permission]]
+identifier = "workspace-revision-bridge"
+description = "Allows conflict-checked Design IR revision import and explicitly approved export for an authorized workspace."
+commands.allow = [
+  "workspace_revision_read",
+  "workspace_revision_preview_export",
+  "workspace_revision_apply_export",
+]

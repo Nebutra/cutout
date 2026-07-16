@@ -1,5 +1,5 @@
 import type { DesktopToolLoop } from "@/agent-runtime/desktop-tool-loop";
-import type { MoneyEstimate } from "@/control-protocol/paid-tool-contract";
+import type { MoneyEstimate, PaidToolRequest } from "@/control-protocol/paid-tool-contract";
 import type {
   VisualToolInvoker,
   VisualToolInvocation,
@@ -28,10 +28,20 @@ export function createDesktopVisualToolInvoker(input: {
   readonly estimateFor: (
     capability: "generate-image" | "edit-image",
   ) => MoneyEstimate;
+  readonly authorize?: (input: { readonly runId: string; readonly requestId: string; readonly request: PaidToolRequest }) => Promise<{ readonly capabilityLeaseId: string; readonly requestDigest: string }>;
 }): VisualToolInvoker {
   return {
     async invoke(invocation: VisualToolInvocation): Promise<VisualToolResult> {
       const toolCallId = `visual-tool:${invocation.taskId}:${invocation.nodeId}`;
+      const request: PaidToolRequest = {
+        capability: invocation.capability,
+        model: invocation.allowCompatibleFallback ? undefined : invocation.preferredModel,
+        intent: invocation.prompt,
+        inputArtifactIds: [...invocation.inputArtifactIds, ...invocation.references],
+        budgetCeiling: invocation.budgetCeiling,
+        approvalPolicy: invocation.approvalPolicy,
+      };
+      const authorization = input.authorize ? await input.authorize({ runId: invocation.runId, requestId: invocation.requestId, request }) : {};
       await input.loop.request({
         runId: invocation.runId,
         toolCallId,
@@ -42,22 +52,8 @@ export function createDesktopVisualToolInvoker(input: {
             ? "Generate visual variant"
             : "Refine selected visual",
         expectedRevision: input.expectedRevision(),
-        request: {
-          capability: invocation.capability,
-          // Omitting the model allows the existing capability registry to route
-          // to a compatible assigned image model when the preferred model is
-          // unavailable. The receipt records the actual provider/model used.
-          model: invocation.allowCompatibleFallback
-            ? undefined
-            : invocation.preferredModel,
-          intent: invocation.prompt,
-          inputArtifactIds: [
-            ...invocation.inputArtifactIds,
-            ...invocation.references,
-          ],
-          budgetCeiling: invocation.budgetCeiling,
-          approvalPolicy: invocation.approvalPolicy,
-        },
+        request,
+        ...authorization,
       });
       const result = await input.loop.settled(toolCallId, invocation.requestId);
       if (!result.ok) throw new Error(result.error);

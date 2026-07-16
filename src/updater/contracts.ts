@@ -21,6 +21,7 @@ export interface UpdateBackend {
     release: UpdateRelease,
     onProgress: (downloaded: number, total?: number) => void,
   ): Promise<void>;
+  cancel(): Promise<void>;
   installAndRestart(release: UpdateRelease): Promise<void>;
 }
 

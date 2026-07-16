@@ -54,6 +54,7 @@ export async function composeDemoHtmlWithAgent(input: ComposeDemoHtmlInput): Pro
     model: input.chat.model,
     prompt: composeDemoHtmlPrompt(input.document, input.tokensCss),
     reasoningEffort: input.chat.effort,
+    reasoningProtocol: input.chat.reasoningProtocol,
     signal: input.signal,
   }
   const result = await input.generation.generateText(request)

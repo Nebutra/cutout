@@ -8,6 +8,7 @@ function fixture(overrides: Partial<UpdateBackend> = {}, safetyOverrides: Partia
     capability: vi.fn(async () => ({ available: true, currentVersion: "1.1.0", endpointConfigured: true, pubkeyConfigured: true })),
     check: vi.fn(async () => release),
     download: vi.fn(async (_release, progress) => { progress(25, 100); progress(100, 100) }),
+    cancel: vi.fn(async () => {}),
     installAndRestart: vi.fn(async () => {}),
     ...overrides,
   };
@@ -47,6 +48,20 @@ describe("update orchestration", () => {
     expect(orchestrator.getState()).toMatchObject({ phase: "error", error: "snapshot failed" });
     expect(safety.shutdownDurableHost).not.toHaveBeenCalled();
     expect(backend.installAndRestart).not.toHaveBeenCalled();
+  });
+
+  it("cancels a native download and returns to the available release", async () => {
+    let releaseDownload!: () => void;
+    const { orchestrator, backend } = fixture({
+      download: vi.fn(() => new Promise<void>((resolve) => { releaseDownload = resolve; })),
+    });
+    await orchestrator.initialize(); await orchestrator.check();
+    const downloading = orchestrator.download();
+    expect(orchestrator.getState().phase).toBe("downloading");
+    await orchestrator.cancel();
+    expect(backend.cancel).toHaveBeenCalledOnce();
+    expect(orchestrator.getState()).toMatchObject({ phase: "available", downloaded: 0 });
+    releaseDownload(); await downloading;
   });
 
   it("truthfully reports an unavailable backend", async () => {

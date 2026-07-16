@@ -93,7 +93,7 @@ export function BoardNode() {
                 )}
               </Button>
             ) : (
-              <Button variant="outline" size="sm" onClick={settings.open}>
+              <Button variant="outline" size="sm" onClick={() => settings.open({section:'ai',anchor:'model-routing'})}>
                 <Settings2 />
                 <Trans id="generate.no_model_cta">
                   Configure an image model in Settings

@@ -277,7 +277,7 @@ export function DesignOsWorkbench({
   );
   return (
     <section
-      aria-label={surfaceMode === "deliver" ? "Deliver" : "Canvas inspector"}
+      aria-label={surfaceMode === "deliver" ? "Deliver" : "System inspector"}
       data-slot="design-os-workbench"
       className={cn(
         "flex min-h-0 min-w-0 flex-col overflow-hidden bg-background text-foreground",
@@ -291,13 +291,10 @@ export function DesignOsWorkbench({
           </div>
           <div className="min-w-0">
             <h2 data-governance-probe="title" className="text-sm font-semibold">
-              Canvas inspector
+              System inspector
             </h2>
-            <p
-              className="truncate text-xs text-muted-foreground"
-              title={`${model.summary.documentId} · ${model.summary.revisionId}`}
-            >
-              Revision {model.summary.revisionNumber}
+            <p className="truncate text-xs text-muted-foreground">
+              Project sources and design system
             </p>
           </div>
         </div>
@@ -318,7 +315,7 @@ export function DesignOsWorkbench({
           ) : null}
           <div className="min-w-0 flex-1 overflow-x-auto">
           <TabsList
-            aria-label={surfaceMode === "deliver" ? "Deliver sections" : "Canvas inspector sections"}
+            aria-label={surfaceMode === "deliver" ? "Deliver sections" : "System inspector sections"}
             variant="line"
             className={deliveryWorkspaceClasses.subnav}
           >
@@ -1188,29 +1185,28 @@ function Overview({ model }: { readonly model: DesignOsWorkbenchModel }) {
   ].filter((item) => item.readiness === "blocked").length;
 
   return (
-    <div className="grid min-w-0 gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(16rem,0.72fr)]">
-      <DesignOsPanel model={model.summary} className="min-w-0" />
-      <Card size="sm" className="min-w-0 rounded-lg">
-        <CardHeader>
-          <CardTitle>Delivery readiness</CardTitle>
-          <CardDescription>
-            Ready items have everything needed to export. Blocked items are
-            missing something required first.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="grid grid-cols-2 gap-2">
-          <Metric
-            label="Ready"
-            value={ready}
-            icon={<CheckCircle2 className="size-4 text-emerald-600" />}
-          />
-          <Metric
-            label="Blocked"
-            value={blocked}
-            icon={<CircleAlert className="size-4 text-destructive" />}
-          />
-        </CardContent>
-      </Card>
+    <div className="min-w-0 space-y-4">
+      <div className="rounded-md border border-border p-4">
+        <h3 className="text-sm font-medium">Project system</h3>
+        <p className="mt-1 max-w-prose text-xs leading-5 text-muted-foreground">
+          Manage reusable sources, specimens, workflows, and authorized Figma snapshots from the sections above.
+        </p>
+        <dl className="mt-4 grid grid-cols-3 gap-2 text-center">
+          <div className="rounded-md bg-muted/40 px-2 py-3"><dt className="text-[11px] text-muted-foreground">Sources</dt><dd className="mt-1 text-base font-semibold">{model.summary.counts.sources}</dd></div>
+          <div className="rounded-md bg-muted/40 px-2 py-3"><dt className="text-[11px] text-muted-foreground">Tokens</dt><dd className="mt-1 text-base font-semibold">{model.summary.counts.tokens}</dd></div>
+          <div className="rounded-md bg-muted/40 px-2 py-3"><dt className="text-[11px] text-muted-foreground">Components</dt><dd className="mt-1 text-base font-semibold">{model.summary.counts.components}</dd></div>
+        </dl>
+      </div>
+      <details className="rounded-md border border-border text-xs">
+        <summary className="min-h-11 cursor-pointer px-4 py-3 font-medium text-muted-foreground">Advanced system evidence</summary>
+        <div className="space-y-3 border-t border-border p-3">
+          <DesignOsPanel model={model.summary} className="min-w-0" />
+          <div className="grid grid-cols-2 gap-2">
+            <Metric label="Delivery ready" value={ready} icon={<CheckCircle2 className="size-4 text-emerald-600" />} />
+            <Metric label="Blocked" value={blocked} icon={<CircleAlert className="size-4 text-destructive" />} />
+          </div>
+        </div>
+      </details>
     </div>
   );
 }

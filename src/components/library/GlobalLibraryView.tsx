@@ -67,6 +67,7 @@ const VIEW_ICONS: readonly { kind: LibraryItemKind; icon: typeof Palette }[] = [
   { kind: "brand-kit", icon: Palette },
   { kind: "design-system-kit", icon: Boxes },
   { kind: "component-library-item", icon: Component },
+  { kind: "starter-kit", icon: PackageOpen },
   { kind: "visual-asset", icon: Image },
 ];
 const MEDIA_FILTER_VALUES: readonly VisualAssetFilter[] = [
@@ -87,6 +88,7 @@ export function GlobalLibraryView({
     "brand-kit": t({ id: "global_library.tab_brand_kits", message: "Brand Kits" }),
     "design-system-kit": t({ id: "global_library.tab_design_systems", message: "Design Systems" }),
     "component-library-item": t({ id: "global_library.tab_components", message: "Components" }),
+    "starter-kit": t({ id: "global_library.tab_starters", message: "Starter Kits" }),
     "visual-asset": t({ id: "global_library.tab_visual_assets", message: "Visual Assets" }),
   };
   const VIEWS = VIEW_ICONS.map((view) => ({ ...view, label: VIEW_LABELS[view.kind] }));

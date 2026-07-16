@@ -149,6 +149,33 @@ describe('workspace snapshot helpers', () => {
       workspaceSnapshotFingerprint(changed),
     )
   })
+
+  it('persists canvas guidance and capability-required video receipts', () => {
+    const base = snapshot(outcome('running', []))
+    const annotated = {
+      ...base,
+      canvasAnnotations: [
+        { kind: 'note', id: 'note:1', x: 12, y: 24, text: 'Make this clearer' },
+      ],
+      capabilityReceipts: [
+        {
+          protocol: 'cutout.workspace-capability-receipt.v1',
+          id: 'capability:video:1',
+          capability: 'video-understanding',
+          status: 'required',
+          sourceName: 'reference.mp4',
+          mediaType: 'video/mp4',
+          createdAt: '2026-07-15T00:00:00.000Z',
+          message: 'Configure a verified video-understanding provider to process this source.',
+        },
+      ],
+    } satisfies WorkspaceSnapshot
+
+    expect(isWorkspaceSnapshotEmpty(annotated)).toBe(false)
+    expect(workspaceSnapshotFingerprint(annotated)).not.toBe(
+      workspaceSnapshotFingerprint(base),
+    )
+  })
 })
 
 function snapshot(outcomeState: OutcomeRuntimeState): WorkspaceSnapshot {

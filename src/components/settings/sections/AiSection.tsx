@@ -290,7 +290,7 @@ const ModelAssignments = memo(function ModelAssignments({
     );
 
   return (
-    <div className="mt-2 flex flex-col gap-3 border-t border-border pt-4">
+    <div data-settings-anchor="model-routing" tabIndex={-1} className="mt-2 flex flex-col gap-3 border-t border-border pt-4 outline-none">
       <div className="flex items-start justify-between gap-3">
         <div>
           <h3 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">

@@ -20,6 +20,23 @@ import { err, isErr, ok } from '@/services/types'
 import type { GenerationService } from './types'
 import type { ReasoningEffort } from './reasoning'
 
+/** Whether a failed naming call looks like a transient upstream/network blip worth retrying. */
+function isTransientError(message: string): boolean {
+  const lower = message.toLowerCase()
+  return (
+    lower.includes('upstream') ||
+    lower.includes('request failed') ||
+    lower.includes('fetch failed') ||
+    lower.includes('network') ||
+    lower.includes('timed out') ||
+    lower.includes('timeout') ||
+    lower.includes('econnreset') ||
+    lower.includes('502') ||
+    lower.includes('503') ||
+    lower.includes('504')
+  )
+}
+
 /** One slice's identity for naming: which index, framed by which box. */
 export interface SliceBox {
   readonly index: number
@@ -91,7 +108,11 @@ export async function nameSlices(
     { type: 'text', text: `Slice bounding boxes (JSON):\n${boxesJson}` },
   ]
 
-  const result = await generation.generateObject(
+  // The gateway's `/responses` upstream is intermittently unreliable for this
+  // vision + structured-output call (verified: the identical request 200s or
+  // fails as "Upstream request failed" at random). Naming is best-effort, so
+  // retry a transient failure a couple of times before giving up.
+  let result = await generation.generateObject(
     {
       providerId: params.providerId,
       model: params.model,
@@ -102,6 +123,20 @@ export async function nameSlices(
     },
     sliceNamesSchema,
   )
+  for (let attempt = 0; attempt < 2 && isErr(result) && isTransientError(result.error); attempt++) {
+    params.signal?.throwIfAborted()
+    result = await generation.generateObject(
+      {
+        providerId: params.providerId,
+        model: params.model,
+        promptRef: { id: 'ui-slice-naming' },
+        input: parts,
+        reasoningEffort: params.effort,
+        signal: params.signal,
+      },
+      sliceNamesSchema,
+    )
+  }
   if (isErr(result)) return result
 
   const requested = new Set(params.slices.map((s) => s.index))

@@ -97,7 +97,7 @@ export function BriefNode() {
             )}
           </Button>
         ) : (
-          <Button variant="outline" onClick={settings.open}>
+          <Button variant="outline" onClick={() => settings.open({section:'ai',anchor:'model-routing'})}>
             <Settings2 />
             <Trans id="generate.no_model_cta">
               Configure an image model in Settings

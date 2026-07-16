@@ -10,7 +10,9 @@ import {
   type ReactNode,
 } from "react";
 import {
+  Boxes,
   Check,
+  ChevronUp,
   ChevronRight,
   ExternalLink,
   Files as FilesIcon,
@@ -20,6 +22,7 @@ import {
   Loader2,
   MessageCircle,
   MessageSquare,
+  MousePointer2,
   MousePointerClick,
   PackageCheck,
   PackageOpen,
@@ -34,7 +37,6 @@ import {
   Scissors,
   ShieldCheck,
   Sparkles,
-  SwatchBook,
   Tag,
   Trash2,
   WandSparkles,
@@ -42,13 +44,14 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { getStoreState, useStore } from "@/store";
-import { useSource, useSlices, useStatus } from "@/store/selectors";
+import { useSelectedSlice, useSource, useSlices, useStatus } from "@/store/selectors";
 import { useImageImportActions } from "@/hooks/image-import-actions";
 import { useExport } from "@/hooks/useExport";
 import { useServices } from "@/services/context";
 import { createCutoutResultSink } from "@/services/cutout-result-sink";
 import { isErr } from "@/services/types";
 import type { ModelAssignment } from "@/services/ai/model-assignment-types";
+import { ensureProviderVerification } from "@/services/ai/provider-verification";
 import type {
   ComposerModelPolicy,
   ComposerThinkingPolicy,
@@ -130,9 +133,11 @@ import {
   configurePageTargetingTool,
   configureRegenerationTool,
   conversationalReplyTool,
+  proceedWithGenerationTool,
 } from "@/agent-runtime/tool-registry";
 import { createClarificationBridge } from "@/agent-runtime/clarification-bridge";
 import type { RegenerationDecision } from "@/prototype/regeneration-tool";
+import type { GenerationDecision } from "@/prototype/generation-tool";
 import type { PageTargetingDecision } from "@/prototype/page-targeting-tool";
 import type { ConversationalReplyInput } from "@/prototype/conversational-reply-tool";
 import type { AskClarifyingQuestionInput } from "@/prototype/ask-clarifying-question-tool";
@@ -155,7 +160,8 @@ import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { SourceCanvas } from "@/components/source/SourceCanvas";
-import { SliceGrid } from "@/components/slices/SliceGrid";
+import { SliceOutcomeTabs } from "@/components/slices/SliceOutcomeTabs";
+import { InspectorPanel } from "@/components/inspector/InspectorPanel";
 import {
   OutputCanvas,
   type CanvasImageItem,
@@ -196,6 +202,7 @@ import {
 } from "@/agent-runtime/prototype-repair";
 import { buildAgentViewModel } from "@/components/agent-workspace/agent-view-model";
 import { shouldShowDesignInspector } from "./workspace-inspector-state";
+import { projectCanvasSelection } from "./canvas-inspector-model";
 import {
   assertImpactPlanCurrent,
   buildMaterialImpactPlan,
@@ -218,6 +225,7 @@ import {
   type CreativeBoardState,
   type CreativeVariantDecision,
 } from "@/agent-runtime/creative-board-decisions";
+import { createPrototypePageVisualTask } from "@/prototype/visual-task";
 
 type AssetStageId =
   | "idle"
@@ -407,7 +415,7 @@ export function IntentWorkspace({
   });
   const [canvasAnnotations, setCanvasAnnotations] = useState<
     readonly CanvasAnnotation[]
-  >([]);
+  >(() => initialWorkspace?.canvasAnnotations ?? []);
   const { openPicker } = useImageImportActions();
   const { exportAll, exportAllPending } = useExport();
   const focusAgentComposer = useCallback(() => {
@@ -443,9 +451,13 @@ export function IntentWorkspace({
   const [namingStatus, setNamingStatus] = useState<NamingStatus>(
     () => initialWorkspace?.namingStatus ?? "idle",
   );
+  const [failedRegionIds, setFailedRegionIds] = useState<readonly string[]>(
+    () => initialWorkspace?.failedRegionIds ?? [],
+  );
   const autoNamePendingRef = useRef(false);
   const brief = useStore((s) => s.brief);
   const setBrief = useStore((s) => s.setBrief);
+  const pendingAgentRunId = useStore((s) => s.pendingAgentRun?.id ?? null);
   const setMockup = useStore((s) => s.setMockup);
   const mockup = useStore((s) => s.mockup);
   const importedDesignMarkdown = useStore((s) => s.designMarkdown);
@@ -454,6 +466,7 @@ export function IntentWorkspace({
   const genError = useStore((s) => s.genError);
   const source = useSource();
   const slices = useSlices();
+  const selectedSlice = useSelectedSlice();
   const analysisStatus = useStatus();
   const settings = useSettingsUI();
   const assignments = useModelAssignments();
@@ -476,6 +489,7 @@ export function IntentWorkspace({
     [],
   );
   const hasInspectorContent = Boolean(
+    selectedMaterial ||
     prototypePlan ||
     prototypeDesignSystem ||
     importedDesignMarkdown?.content.trim(),
@@ -765,6 +779,7 @@ export function IntentWorkspace({
   const repairPlan = planPrototypeRepair(
     outcome,
     Boolean(prototypeDesignSystem),
+    failedRegionIds,
   );
   const agentViewModel = buildAgentViewModel({
     brief,
@@ -826,6 +841,7 @@ export function IntentWorkspace({
       selectedPrototypePageId,
       runError,
       namingStatus,
+      failedRegionIds,
       liveAgentOutput,
       attachments: attachments.map(persistReferenceAttachment),
       webSearchEnabled,
@@ -837,6 +853,8 @@ export function IntentWorkspace({
       agentRunEvents,
       designDocument,
       approvedDeliverables,
+      canvasAnnotations,
+      capabilityReceipts: initialWorkspace?.capabilityReceipts,
       creativeBoard:
         creativeBoard.decisions.length || creativeBoard.branches.length
           ? creativeBoard
@@ -846,6 +864,8 @@ export function IntentWorkspace({
     attachments,
     agentRunEvents,
     approvedDeliverables,
+    canvasAnnotations,
+    initialWorkspace?.capabilityReceipts,
     composerModelPolicy,
     composerThinkingPolicy,
     creativeBoard,
@@ -854,6 +874,7 @@ export function IntentWorkspace({
     humanLoopCustomAnswer,
     liveAgentOutput,
     namingStatus,
+    failedRegionIds,
     outcome,
     prototypeDesignSystem,
     prototypePages,
@@ -1061,6 +1082,7 @@ export function IntentWorkspace({
       providerId: chat.providerId,
       model: chat.model,
       reasoningEffort: chat.effort,
+      reasoningProtocol: chat.reasoningProtocol,
       prompt: [
         "Research this product brief on the web. Return a concise, factual grounding",
         "summary: key facts, domain conventions, notable brands/competitors, and",
@@ -1122,7 +1144,7 @@ export function IntentWorkspace({
     const repair =
       targetedRepair ??
       (mode === "repair"
-        ? planPrototypeRepair(outcome, Boolean(prototypeDesignSystem))
+        ? planPrototypeRepair(outcome, Boolean(prototypeDesignSystem), failedRegionIds)
         : null);
     if ((mode === "repair" || selectedMaterial) && (!prototypePlan || !repair))
       return;
@@ -1142,6 +1164,29 @@ export function IntentWorkspace({
     );
     const assignmentTable = assignments.data ?? {};
     const providerList = providers.data ?? (await services.providers.list());
+    // Auto routing is fail-closed on provider verification. Installs that
+    // predate verification receipts have assigned providers with no record —
+    // settle those with one probe here instead of blocking the run.
+    await Promise.all(
+      [
+        ...new Set(
+          [
+            assignmentTable.chat?.providerId,
+            assignmentTable.image?.providerId,
+          ].filter((id): id is string => Boolean(id)),
+        ),
+      ]
+        .filter((id) =>
+          providerList.some((provider) => provider.id === id && provider.enabled),
+        )
+        .map((id) =>
+          ensureProviderVerification(id, async () => {
+            const result = await services.providers.test(id);
+            if (isErr(result)) throw new Error(result.error);
+            return result.data;
+          }),
+        ),
+    );
     const routePolicy = await import("@/agent-runtime/route-policy");
     let route: LockedComposerRoute;
     try {
@@ -1204,7 +1249,9 @@ export function IntentWorkspace({
       }
       regenerationDecision = toolGate.regenerationDecision;
       pageTargetingDecision = toolGate.pageTargetingDecision;
-      clarifiedBrief = toolGate.clarifiedBrief;
+      // A clarifying answer already folds into the brief; otherwise use the
+      // model's distilled brief from proceed_with_generation, if any.
+      clarifiedBrief = toolGate.clarifiedBrief ?? toolGate.refinedBrief;
     }
 
     setRunStartedAt(Date.now());
@@ -1374,6 +1421,8 @@ export function IntentWorkspace({
     regenerationDecision: RegenerationDecision | null;
     pageTargetingDecision: PageTargetingDecision | null;
     clarifiedBrief: string | null;
+    /** A model-distilled brief (from proceed_with_generation) to generate from. */
+    refinedBrief: string | null;
   }> {
     const designMarkdownContent =
       prototypeDesignSystem?.designMarkdown.trim() ||
@@ -1409,6 +1458,9 @@ export function IntentWorkspace({
     // system, no colors yet) is exactly where "hello" would otherwise have
     // nothing to opt out with and fall straight into the fixed pipeline.
     const replyTool = conversationalReplyTool();
+    // The model's explicit "run the pipeline" decision — it can distill a
+    // cleaner brief from a rambling message before the expensive generation.
+    const proceedTool = proceedWithGenerationTool();
     const toolRunId = `workspace:tool:${crypto.randomUUID()}`;
     const askTool = askClarifyingQuestionTool(
       clarificationBridge,
@@ -1419,6 +1471,7 @@ export function IntentWorkspace({
       astryxTool,
       regenerationTool,
       pageTargetingTool,
+      proceedTool,
       askTool,
       replyTool,
     ].filter((tool) => tool !== null);
@@ -1426,6 +1479,7 @@ export function IntentWorkspace({
       astryxTool,
       regenerationTool,
       pageTargetingTool,
+      proceedTool,
     ].filter((tool) => tool !== null).length;
     // askTool is always offered, and its execute() can call clarificationBridge.ask()
     // which emits a `human-loop-asked` run event LIVE, synchronously, from inside the
@@ -1465,8 +1519,12 @@ export function IntentWorkspace({
           "(platform, primary user, a must-have feature) is genuinely ambiguous enough that guessing " +
           "would likely produce the wrong direction. Do not ask for politeness or a detail you can " +
           "reasonably decide yourself.",
-        "For an actual request to design or build something new that is clear enough to proceed, " +
-          "call none of these — it falls through to the design pipeline.",
+        "- `proceed_with_generation`: the message is a real design/build request that is clear enough " +
+          "to proceed. Prefer calling this (with a distilled, self-contained brief) over doing nothing " +
+          "— especially when the message is rambling or buried in asides and a cleaned-up brief would " +
+          "produce a better result. Preserve every concrete requirement; do not add scope.",
+        "If none of these fit, call nothing — it falls through to the design pipeline with the " +
+          "original message unchanged.",
         "",
         `User: ${text}`,
       ]
@@ -1490,6 +1548,7 @@ export function IntentWorkspace({
         regenerationDecision: null,
         pageTargetingDecision: null,
         clarifiedBrief: null,
+        refinedBrief: null,
       };
     }
     if (!toolLoop.ok) {
@@ -1499,6 +1558,7 @@ export function IntentWorkspace({
         regenerationDecision: null,
         pageTargetingDecision: null,
         clarifiedBrief: null,
+        refinedBrief: null,
       };
     }
     if (!toolLoop.data.called) {
@@ -1507,6 +1567,7 @@ export function IntentWorkspace({
         regenerationDecision: null,
         pageTargetingDecision: null,
         clarifiedBrief: null,
+        refinedBrief: null,
       };
     }
 
@@ -1522,6 +1583,13 @@ export function IntentWorkspace({
     const pageTargetingCall = toolLoop.data.calls.find(
       (call) => call.toolName === "select_pages_to_regenerate",
     );
+    const proceedCall = toolLoop.data.calls.find(
+      (call) => call.toolName === "proceed_with_generation",
+    );
+    const refinedBrief =
+      proceedCall && !proceedCall.error
+        ? (proceedCall.toolOutput as GenerationDecision).refinedBrief
+        : null;
     // A single tryToolGate turn can call ask_clarifying_question more than
     // once (e.g. the model asks, gets an answer, and still finds a second
     // ambiguity within the same step budget). Keep every call in order so
@@ -1570,6 +1638,7 @@ export function IntentWorkspace({
         regenerationDecision: null,
         pageTargetingDecision: null,
         clarifiedBrief: null,
+        refinedBrief: null,
       };
     }
 
@@ -1582,6 +1651,7 @@ export function IntentWorkspace({
         regenerationDecision: null,
         pageTargetingDecision: null,
         clarifiedBrief: null,
+        refinedBrief: null,
       };
     }
 
@@ -1611,6 +1681,7 @@ export function IntentWorkspace({
           regenerationDecision: null,
           pageTargetingDecision: null,
           clarifiedBrief: null,
+          refinedBrief: null,
         };
       }
 
@@ -1635,6 +1706,7 @@ export function IntentWorkspace({
         regenerationDecision: null,
         pageTargetingDecision: null,
         clarifiedBrief: null,
+        refinedBrief: null,
       };
     }
 
@@ -1695,6 +1767,7 @@ export function IntentWorkspace({
             ? (pageTargetingCall.toolOutput as PageTargetingDecision)
             : null,
         clarifiedBrief,
+        refinedBrief,
       };
     }
 
@@ -1709,6 +1782,7 @@ export function IntentWorkspace({
           ? (pageTargetingCall.toolOutput as PageTargetingDecision)
           : null,
       clarifiedBrief: null,
+      refinedBrief,
     };
   }
 
@@ -1721,7 +1795,7 @@ export function IntentWorkspace({
     // The store request is a one-shot mount handoff. Re-running this effect for
     // changing workspace state would risk duplicate paid generation.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [assignments.isPending]);
+  }, [assignments.isPending, pendingAgentRunId]);
 
   async function planPrototypeSuite(
     text: string,
@@ -1952,14 +2026,15 @@ export function IntentWorkspace({
     const boardRegions = selectBoardCutoutRegions(first.page);
     if (boardRegions.length > 0) {
       const cutoutParams = getStoreState().params;
-      const regionRunId = getStoreState().beginRegionSlices();
+      const retryRegions = options.repair?.targetRegionIds ?? [];
+      const regionRunId = getStoreState().beginRegionSlices(retryRegions);
       // The per-region path names each region's slices itself (below), so the
       // whole-board auto-naming effect must NOT also fire — it reads
       // source.bitmap (never set here) and would throw, flipping namingStatus
       // to 'error' on an otherwise-successful, already-named run.
       autoNamePendingRef.current = false;
       try {
-        await runRegionBreakdown(
+        const breakdown = await runRegionBreakdown(
           {
             generation: personalizedGenerationRef.current,
             providers: { list: async () => providers.data ?? [] },
@@ -1984,11 +2059,22 @@ export function IntentWorkspace({
             referenceImages: referenceBytes,
             image,
             signal: lease.controller.signal,
-            onRegionSliced: (_regionId, slices) => {
+            targetRegionIds: options.repair?.targetRegionIds.length
+              ? options.repair.targetRegionIds
+              : undefined,
+            onRegionSliced: (regionId, slices) => {
               // A newer submission may have superseded this run mid-stream; the
               // store's runId guard drops the append, but skip the work too.
               if (!agentRunCoordinatorRef.current.isActive(lease)) return;
-              getStoreState().appendRegionSlices(regionRunId, { slices });
+              const manifestItems = assetManifest.assets.filter(
+                (item) => item.pageId === first.page.id && item.regionId === regionId,
+              );
+              getStoreState().appendRegionSlices(regionRunId, {
+                slices: slices.map((slice, index) => ({
+                  ...slice,
+                  assetManifestItemId: manifestItems[index]?.id ?? null,
+                })),
+              });
             },
             onRegionNamed: (renames) => {
               if (!agentRunCoordinatorRef.current.isActive(lease)) return;
@@ -2000,6 +2086,13 @@ export function IntentWorkspace({
           },
         );
         agentRunCoordinatorRef.current.checkpoint(lease);
+        if (breakdown.failedRegionIds.length > 0) {
+          setFailedRegionIds(breakdown.failedRegionIds);
+          throw new Error(
+            `Reusable material extraction failed for regions: ${breakdown.failedRegionIds.join(", ")}. Retry will target only these regions.`,
+          );
+        }
+        setFailedRegionIds([]);
       } finally {
         // Always clear the streaming run's 'running' status — even when
         // runRegionBreakdown throws on cancel — so the cutout edge doesn't
@@ -2100,6 +2193,7 @@ export function IntentWorkspace({
         { type: "image" as const, image: imageBytes },
       ],
       reasoningEffort: chat.effort,
+      reasoningProtocol: chat.reasoningProtocol,
       signal: lease.controller.signal,
     };
 
@@ -2240,32 +2334,12 @@ export function IntentWorkspace({
     agentRunCoordinatorRef.current.checkpoint(lease);
     const prompt = prototypePagePrompt(plan, page, designMarkdown);
     const runId = `workspace:${lease.id}`;
-    const toolBase = `tool:${lease.id}:page:${page.id}`;
-    const edited = await invokeDesktopImageTool({
-      capability: "edit-image",
-      runId,
-      label: `Generate ${page.name}`,
-      prompt,
-      image,
-      references: referenceImages,
-      toolCallId: `${toolBase}:edit`,
-      lease,
-    }).catch(() => null);
+    const referenceIds = await Promise.all(referenceImages.map((bytes) => desktopTools.persistReference(bytes, "image/png", runId)));
+    const preferences = desktopTools.visualPreferences();
+    const task = createPrototypePageVisualTask({ runId: String(lease.id), plan, page, image, prompt, referenceArtifactIds: referenceIds, preferences });
+    const execution = await desktopTools.visualRuntime.execute(runId, task, lease.controller.signal);
     agentRunCoordinatorRef.current.checkpoint(lease);
-    const result =
-      edited ??
-      (await invokeDesktopImageTool({
-        capability: "generate-image",
-        runId,
-        label: `Generate ${page.name}`,
-        prompt,
-        image,
-        references: [],
-        toolCallId: `${toolBase}:generate`,
-        lease,
-      }));
-    agentRunCoordinatorRef.current.checkpoint(lease);
-    const asset = result[0];
+    const asset = execution.promotion ? await desktopTools.resolveArtifact(execution.promotion.masterArtifactId) : null;
     if (!asset) throw new Error(`No image returned for ${page.name}.`);
 
     return assetToPageArtifact(page, asset);
@@ -2429,10 +2503,10 @@ export function IntentWorkspace({
           }}
           onOpenAssets={library.open}
           onOpenDesign={() => {
-            setInspectorOpen(true);
-            setInspectorDismissed(false);
+            setInspectorOpen((open) => !open);
+            setInspectorDismissed(inspectorOpen);
           }}
-          onOpenTools={() => onOpenDesignOs()}
+          inspectorActive={showDesignInspector}
           onOpenDeliver={() => onOpenDesignOs("delivery")}
           advanced={advanced}
           onOpenAdvanced={onOpenAdvanced}
@@ -2662,7 +2736,7 @@ export function IntentWorkspace({
               onRetryTool={(toolCallId, requestId) =>
                 void desktopTools.loop.retry(toolCallId, requestId)
               }
-              onOpenBudget={settings.open}
+              onOpenBudget={() => settings.open({section:'general',anchor:'paid-actions'})}
               onOpenArtifact={(kind) => {
                 if (kind === "design-system" || kind === "design-markdown") {
                   setInspectorOpen(true);
@@ -2895,12 +2969,23 @@ export function IntentWorkspace({
         </section>
       </main>
 
-      {showDesignInspector ? (
+      {selectedSlice ? (
+        <aside aria-label="Inspector" className="absolute inset-y-0 right-0 z-20 flex h-full min-h-0 w-full max-w-[22rem] shrink-0 flex-col border-l border-border bg-background shadow-xl xl:relative xl:z-auto xl:w-[18.5rem] xl:shadow-none">
+          <div className="flex h-12 shrink-0 items-center gap-2 border-b border-border px-3"><div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold">Result</p><p className="truncate text-[11px] text-muted-foreground">Review and correct</p></div><Button type="button" variant="ghost" size="icon" className="ml-auto size-7" aria-label="Close result inspector" onClick={() => getStoreState().clearSelection()}><X className="size-3.5"/></Button></div>
+          <div className="min-h-0 flex-1 overflow-y-auto"><InspectorPanel/></div>
+        </aside>
+      ) : showDesignInspector ? (
         <DesignMarkdownInspector
+          selectedMaterial={selectedMaterial}
           prototypePlan={prototypePlan}
           prototypeDesignSystem={prototypeDesignSystem}
           importedDesignMarkdown={importedDesignMarkdown}
           onChange={updateDesignMarkdownContent}
+          onAskAgent={focusAgentComposer}
+          onRequestSelectedChanges={() => {
+            if (selectedMaterial) focusAgentComposer();
+          }}
+          onOpenSystem={() => onOpenDesignOs("overview")}
           onClose={() => {
             setInspectorOpen(false);
             setInspectorDismissed(true);
@@ -2971,17 +3056,25 @@ function emptyInspectorMessage(
 }
 
 function DesignMarkdownInspector({
+  selectedMaterial,
   prototypePlan,
   prototypeDesignSystem,
   importedDesignMarkdown,
   onChange,
+  onAskAgent,
+  onRequestSelectedChanges,
+  onOpenSystem,
   onClose,
   onOpenSpecimen,
 }: {
+  readonly selectedMaterial: MaterialRef | null;
   readonly prototypePlan: PrototypePlan | null;
   readonly prototypeDesignSystem: PrototypeDesignSystemArtifact | null;
   readonly importedDesignMarkdown: DesignMarkdownAsset;
   readonly onChange: (content: string) => void;
+  readonly onAskAgent: () => void;
+  readonly onRequestSelectedChanges: () => void;
+  readonly onOpenSystem: () => void;
   readonly onClose: () => void;
   readonly onOpenSpecimen?: () => void;
 }) {
@@ -3007,6 +3100,7 @@ function DesignMarkdownInspector({
     ? "Generated DESIGN.md"
     : (importedDesignMarkdown?.name ?? "DESIGN.md");
   const model = content ? parseEditableDesignMarkdown(content) : null;
+  const selectionDetails = projectCanvasSelection(selectedMaterial);
 
   const activeFormat: DesignSourceFormat | "astryx" =
     mode === "source" ? sourceFormat : "design-md";
@@ -3037,19 +3131,12 @@ function DesignMarkdownInspector({
       className="absolute inset-y-0 right-0 z-20 flex h-full min-h-0 w-full max-w-[22rem] shrink-0 flex-col border-l border-border bg-background shadow-xl xl:relative xl:z-auto xl:w-[18.5rem] xl:shadow-none"
     >
       <div className="flex h-12 items-center gap-2 border-b border-border px-3">
-        <button
-          type="button"
-          className="rounded-md bg-muted px-2.5 py-1 text-xs font-semibold text-foreground"
-        >
-          Design
-        </button>
-        <button
-          type="button"
-          disabled
-          className="rounded-md px-2.5 py-1 text-xs font-medium text-muted-foreground"
-        >
-          Prototype
-        </button>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-semibold">Inspector</p>
+          <p className="truncate text-[11px] text-muted-foreground">
+            {selectionDetails ? "Selected result" : "Canvas"}
+          </p>
+        </div>
         <Button
           type="button"
           variant="ghost"
@@ -3063,6 +3150,49 @@ function DesignMarkdownInspector({
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto">
+        <section aria-label={selectionDetails ? "Selected result details" : "Inspector empty state"} className="border-b border-border p-4">
+          {selectionDetails ? (
+            <div className="space-y-3">
+              <div>
+                <p className="truncate text-sm font-semibold">{selectionDetails.title}</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {selectionDetails.kind} · {selectionDetails.status}
+                </p>
+              </div>
+              <dl className="grid grid-cols-[4.5rem_minmax(0,1fr)] gap-x-2 gap-y-1.5 text-xs">
+                <dt className="text-muted-foreground">Source</dt>
+                <dd className="truncate">{selectionDetails.source}</dd>
+                <dt className="text-muted-foreground">Version</dt>
+                <dd className="truncate font-mono text-[11px]">{selectionDetails.version}</dd>
+              </dl>
+              <Button type="button" className="w-full" size="sm" onClick={onRequestSelectedChanges}>
+                <MessageSquare className="size-3.5" />
+                {selectionDetails.actionLabel}
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-3 py-2 text-center">
+              <div className="mx-auto flex size-8 items-center justify-center rounded-md bg-muted text-muted-foreground">
+                <MousePointer2 className="size-4" />
+              </div>
+              <div>
+                <p className="text-sm font-medium">Select a result</p>
+                <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                  Choose a page, asset, or design system on the canvas to inspect or change it.
+                </p>
+              </div>
+              <Button type="button" variant="outline" size="sm" onClick={onAskAgent}>
+                <MessageSquare className="size-3.5" /> Ask Agent
+              </Button>
+            </div>
+          )}
+        </section>
+
+        <details className="group/advanced">
+          <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between border-b border-border px-4 text-xs font-medium text-muted-foreground hover:text-foreground">
+            Advanced design system
+            <ChevronUp className="size-3.5 rotate-180 transition-transform group-open/advanced:rotate-0" />
+          </summary>
         <section className="border-b border-border p-4">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
@@ -3085,6 +3215,9 @@ function DesignMarkdownInspector({
               View specimen
             </button>
           ) : null}
+          <Button type="button" variant="outline" size="sm" className="mt-3 w-full" onClick={onOpenSystem}>
+            <Boxes className="size-3.5" /> Open system inspector
+          </Button>
           {activeFormat !== "astryx" ? (
             <Button
               type="button"
@@ -3192,6 +3325,7 @@ function DesignMarkdownInspector({
             </div>
           </section>
         )}
+        </details>
       </div>
     </aside>
   );
@@ -4319,6 +4453,7 @@ function repairForMaterialImpact(
       generateDesignSystem: true,
       generatePages: false,
       deconstructPages: false,
+      targetRegionIds: [],
     };
   }
   if (plan.scope === "page") {
@@ -4327,6 +4462,7 @@ function repairForMaterialImpact(
       generateDesignSystem: false,
       generatePages: true,
       deconstructPages: true,
+      targetRegionIds: [],
     };
   }
   return null;
@@ -4714,8 +4850,8 @@ function OutputSurface({
             />
           </div>
         ) : null}
-        <div className="min-h-0 flex-1 overflow-y-auto p-3">
-          <SliceGrid />
+        <div className="min-h-0 flex-1">
+          <SliceOutcomeTabs />
         </div>
       </div>
     );
@@ -6134,7 +6270,7 @@ function WorkspaceRail({
   onToggleFiles,
   onOpenAssets,
   onOpenDesign,
-  onOpenTools,
+  inspectorActive,
   onOpenDeliver,
   advanced,
   onOpenAdvanced,
@@ -6146,7 +6282,7 @@ function WorkspaceRail({
   readonly onToggleFiles: () => void;
   readonly onOpenAssets: () => void;
   readonly onOpenDesign: () => void;
-  readonly onOpenTools: () => void;
+  readonly inspectorActive: boolean;
   readonly onOpenDeliver: () => void;
   readonly advanced?: boolean;
   readonly onOpenAdvanced?: () => void;
@@ -6185,14 +6321,10 @@ function WorkspaceRail({
         onClick={onOpenAssets}
       />
       <RailItem
-        icon={<SwatchBook className="size-4" />}
-        label="Design"
-        onClick={onOpenDesign}
-      />
-      <RailItem
         icon={<PanelRight className="size-4" />}
         label="Inspector"
-        onClick={onOpenTools}
+        active={inspectorActive}
+        onClick={onOpenDesign}
       />
       <RailItem
         icon={<PackageCheck className="size-4" />}

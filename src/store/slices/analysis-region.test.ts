@@ -48,6 +48,24 @@ describe('per-region streaming slice actions', () => {
     expect(getStoreState().analysis.status).toBe('done')
   })
 
+  it('targeted retry preserves successful regions and replaces only the targets', () => {
+    const first = getStoreState().beginRegionSlices()
+    getStoreState().appendRegionSlices(
+      first,
+      result(sliceInput('hero-old', 'hero', 'p1'), sliceInput('grid-old', 'grid', 'p1')),
+    )
+    getStoreState().finishRegionSlices(first)
+
+    const retry = getStoreState().beginRegionSlices(['grid'])
+    expect(getStoreState().analysis.slices.map((slice) => slice.id)).toEqual(['hero-old'])
+    getStoreState().appendRegionSlices(retry, result(sliceInput('grid-new', 'grid', 'p1')))
+    getStoreState().finishRegionSlices(retry)
+    expect(getStoreState().analysis.slices.map((slice) => slice.id)).toEqual([
+      'hero-old',
+      'grid-new',
+    ])
+  })
+
   it('drops appends for a superseded run', () => {
     const stale = getStoreState().beginRegionSlices()
     const fresh = getStoreState().beginRegionSlices()

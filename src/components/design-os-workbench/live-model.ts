@@ -1,4 +1,5 @@
 import type { DesignOsWorkbenchModel, DesignOsReceipt } from './DesignOsWorkbench'
+import { buildTokenContrastGovernance } from './token-governance'
 import { designDocumentToDesignOsPanelModel, type DesignOsCapabilityContext } from '@/components/design-os/model'
 import { authoringForDocument, buildDesignOsReadiness, type AuthoringPreview, type DesignOsAuthoringState, type SourceIngestPreview } from '@/design-os-operations'
 import type { DesignDocument, SourceLicense } from '@/design-ir'
@@ -37,8 +38,13 @@ export function buildLiveDesignOsWorkbenchModel(
     ? artifacts.ingestPreview
     : undefined
 
+  // Live governance from the design's color tokens (WCAG text contrast) — the
+  // data source that makes `model.governance` / the "Request repair" UI real.
+  const governance = buildTokenContrastGovernance(document.tokens)
+
   return {
     summary: designDocumentToDesignOsPanelModel(document, capabilities),
+    ...(governance ? { governance } : {}),
     sources: document.sources.map((source) => ({
       id: source.id,
       label: source.title,
@@ -113,8 +119,9 @@ export function buildLiveDesignOsWorkbenchModel(
     delivery: {
       targets: [
         { id: 'delivery:design-system', kind: 'design-system', label: 'Design System Kit', destinationLabel: 'Choose a local export folder', available: designKit.state === 'ready', ...(designKit.state === 'ready' ? {} : { unavailableReason: designKit.reasons[0]?.message ?? 'Design System is not ready.' }) },
-        { id: 'delivery:brand-kit', kind: 'brand-kit', label: 'Brand VI Kit', destinationLabel: 'Choose a local export folder', available: false, unavailableReason: 'Unified receipt adapter is not installed for Brand Kit yet.' },
-        { id: 'delivery:starter', kind: 'starter', label: 'Starter project', destinationLabel: 'Controlled project export', available: false, unavailableReason: 'Choose and validate a Starter configuration first.' },
+        { id: 'delivery:brand-kit', kind: 'brand-kit', label: 'Brand VI Kit', destinationLabel: 'Choose a local export folder', available: brandKit.state === 'ready' && Boolean(authoring?.brand), ...(brandKit.state === 'ready' && authoring?.brand ? {} : { unavailableReason: brandKit.reasons[0]?.message ?? 'Store an explicit Brand Kit definition first.' }) },
+        { id: 'delivery:components', kind: 'components', label: 'Components', destinationLabel: 'Choose a local export folder', available: components.state === 'ready' && Boolean(authoring?.componentCandidates?.length), ...(components.state === 'ready' && authoring?.componentCandidates?.length ? {} : { unavailableReason: components.reasons[0]?.message ?? 'Declare component candidates first.' }) },
+        { id: 'delivery:starter', kind: 'starter', label: 'Starter project', destinationLabel: 'Choose a local export folder', available: starter.state === 'ready' && Boolean(authoring?.starterConfigs?.length), ...(starter.state === 'ready' && authoring?.starterConfigs?.length ? {} : { unavailableReason: starter.reasons[0]?.message ?? 'Choose and validate a Starter configuration first.' }) },
         { id: 'delivery:registry', kind: 'registry', label: 'Source registry', destinationLabel: 'Controlled repository', available: false, unavailableReason: 'Desktop repository host is not connected.' },
         { id: 'delivery:github', kind: 'github', label: 'GitHub', destinationLabel: 'Branch or pull request', available: false, unavailableReason: 'No authorized GitHub host/session.' },
         { id: 'delivery:notion', kind: 'notion', label: 'Notion', destinationLabel: 'Guideline page', available: false, unavailableReason: 'No authorized Notion host/session.' },

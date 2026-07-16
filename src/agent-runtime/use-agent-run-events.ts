@@ -1,4 +1,5 @@
 import { useCallback, useState } from 'react'
+import { publishAgentNotification } from '@/services/local/local-notifications'
 import {
   appendRunEvent,
   createRunEvent,
@@ -41,10 +42,12 @@ export function useAgentRunEvents(
   const record = useCallback<AgentRunEventWriter['record']>((runId, event, options) => {
     const recorded = createRunEvent(runId, event, options)
     setStore((current) => appendRunEvent(current, recorded))
+    publishAgentNotification(recorded)
   }, [])
 
   const recordMany = useCallback<AgentRunEventWriter['recordMany']>((events) => {
     setStore((current) => events.reduce(appendRunEvent, current))
+    events.forEach(publishAgentNotification)
   }, [])
 
   return { store, startRun, record, recordMany }

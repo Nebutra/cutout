@@ -1,4 +1,5 @@
 import { compositeDeliveryReceiptSchema, deliveryPlanSchema, deliveryRequestSchema, targetExecutionReceiptSchema, type CompositeDeliveryReceipt, type DeliveryPlan, type DeliveryRequest, type DeliveryTargetKind, type TargetExecutionReceipt, type TargetPreview } from './contracts'
+import { publishDeliveryNotification } from '@/services/local/local-notifications'
 
 export interface DeliveryExecutor {
   readonly kind: DeliveryTargetKind
@@ -33,7 +34,9 @@ export class UnifiedDeliveryCenter {
       receipts.push(enforceGates(receipt, target.requiredGates))
     }
     const status = receipts.every((receipt) => receipt.status === 'succeeded') ? 'succeeded' : signal.aborted ? 'cancelled' : 'completed-with-failures'
-    return compositeDeliveryReceiptSchema.parse({ protocol: 'cutout.delivery-receipt.v1', id: stableId(planId, approvalId), planId, requestId: prepared.request.id, approvalId, outcome: { id: prepared.request.outcomeId, revision: prepared.request.outcomeRevision }, designRevision: prepared.request.designRevision, status, targets: receipts, artifactHashes: receipts.flatMap((receipt) => receipt.artifacts.map((artifact) => ({ targetId: receipt.targetId, path: artifact.path, sha256: artifact.sha256 }))), completedAt: this.now() })
+    const receipt = compositeDeliveryReceiptSchema.parse({ protocol: 'cutout.delivery-receipt.v1', id: stableId(planId, approvalId), planId, requestId: prepared.request.id, approvalId, outcome: { id: prepared.request.outcomeId, revision: prepared.request.outcomeRevision }, designRevision: prepared.request.designRevision, status, targets: receipts, artifactHashes: receipts.flatMap((receipt) => receipt.artifacts.map((artifact) => ({ targetId: receipt.targetId, path: artifact.path, sha256: artifact.sha256 }))), completedAt: this.now() })
+    publishDeliveryNotification(receipt)
+    return receipt
   }
 }
 function enforceGates(receipt: TargetExecutionReceipt, required: readonly TargetExecutionReceipt['quality'][number]['gate'][]): TargetExecutionReceipt { if (receipt.status !== 'succeeded') return receipt; const missing = required.filter((gate) => !receipt.quality.some((quality) => quality.gate === gate && quality.status === 'passed')); return missing.length ? { ...receipt, status:'failed', error:{ code:'quality-gate-failed', message:`Required quality gates did not pass: ${missing.join(', ')}.` } } : receipt }

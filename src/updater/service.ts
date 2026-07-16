@@ -1,4 +1,5 @@
 import { getStoreState } from "@/store";
+import { getVersion } from "@tauri-apps/api/app";
 import { getAuthorizedWorkspace } from "@/platform/authorized-workspace";
 import { createTauriAgentHostService } from "@/agent-host/tauri-service";
 import { createTauriUpdaterRuntime, type UpdateSnapshot } from "./runtime";
@@ -6,8 +7,6 @@ import type { UpdateBackend, UpdateInstallSafety, UpdatePreferenceStore, UpdateP
 import { createUpdateOrchestrator } from "./orchestrator";
 
 const PREFERENCES_KEY = "cutout.updates.preferences.v1";
-const APP_VERSION = "0.1.0";
-
 type RuntimeSnapshot = UpdateSnapshot & { releaseNotes?: string; publishedAt?: string };
 
 export function createLocalUpdatePreferences(storage: Pick<Storage, "getItem" | "setItem">): UpdatePreferenceStore {
@@ -32,15 +31,17 @@ function hasActiveAgentRun() {
 export function createDesktopUpdateOrchestrator(input: {
   readonly prepareRecoverySnapshot: () => Promise<boolean>;
   readonly storage?: Pick<Storage, "getItem" | "setItem">;
+  readonly getAppVersion?: () => Promise<string>;
 }) {
   const runtime = createTauriUpdaterRuntime();
+  const readVersion = input.getAppVersion ?? getVersion;
   const backend: UpdateBackend = {
     async capability() {
       const status = await runtime.getStatus();
       const unavailable = status.unavailableReason;
       return {
         available: !unavailable,
-        currentVersion: APP_VERSION,
+        currentVersion: await readVersion().catch(() => "unknown"),
         reason: unavailable,
         endpointConfigured: !unavailable,
         pubkeyConfigured: !unavailable,
@@ -61,6 +62,7 @@ export function createDesktopUpdateOrchestrator(input: {
         unsubscribe();
       }
     },
+    async cancel() { await runtime.cancel(); },
     async installAndRestart() {
       await runtime.installAndRelaunch(getAuthorizedWorkspace()?.handle);
     },
