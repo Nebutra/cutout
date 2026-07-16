@@ -109,6 +109,22 @@ describe('AgentWorkspaceDock', () => {
     expect(html).toContain('data-slot="agent-message"')
     expect(html).toContain('mt-2 max-w-full')
   })
+  it('keeps the conversation as the scrollable flex region when run details exist', () => {
+    const html = renderToStaticMarkup(createElement(AgentWorkspaceDock, {
+      viewModel: {
+        ...stoppedModel,
+        feed: [
+          ...stoppedModel.feed,
+          { id: 'user', type: 'message', role: 'user', status: 'complete', title: 'You', detail: 'Keep this visible', provenance: 'runtime' },
+          { id: 'agent', type: 'message', role: 'agent', status: 'complete', title: 'Agent', detail: 'This remains scrollable.', provenance: 'runtime' },
+        ],
+      },
+      composer: { value: '', onChange: vi.fn(), onSubmit: vi.fn() },
+    }))
+
+    expect(html).toMatch(/data-slot="agent-conversation" class="[^"]*min-h-0 flex-1 overflow-y-auto/)
+    expect(html).toMatch(/data-slot="agent-details" class="[^"]*shrink-0 overflow-y-auto/)
+  })
   it('renders approval actions, route/cost facts, receipt evidence, and a compact budget entry', () => {
     const onApproveTool = vi.fn()
     const html = renderToStaticMarkup(createElement(AgentWorkspaceDock, {

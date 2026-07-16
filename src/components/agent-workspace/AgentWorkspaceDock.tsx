@@ -232,10 +232,7 @@ export function AgentWorkspaceDock({
       {conversationItems.length > 0 ? (
         <div
           data-slot="agent-conversation"
-          className={cn(
-            'min-h-0 overflow-y-auto overscroll-contain',
-            !hasRunDetails ? 'flex-1' : 'shrink-0 border-b border-border',
-          )}
+          className="min-h-0 flex-1 overflow-y-auto overscroll-contain border-b border-border"
         >
           <AgentRunFeed
             items={conversationItems}
@@ -254,7 +251,7 @@ export function AgentWorkspaceDock({
           <div aria-hidden="true" data-slot="agent-draft-spacer" className="min-h-8 flex-1" />
         ) : null
       ) : (
-        <details data-slot="agent-details" className="group/details min-h-0 flex-1 overflow-y-auto overscroll-contain border-b border-border">
+        <details data-slot="agent-details" className="group/details shrink-0 overflow-y-auto overscroll-contain border-b border-border">
           <summary className="sticky top-0 z-10 flex cursor-pointer list-none items-center gap-2 bg-background px-3 py-2 text-xs font-medium text-muted-foreground hover:text-foreground [&::-webkit-details-marker]:hidden">
             <ChevronRight className="size-3.5 transition-transform group-open/details:rotate-90" />
             Details
