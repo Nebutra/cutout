@@ -1,17 +1,18 @@
 import { expect, test, type Page } from "@playwright/test";
 
-async function openGeneral(page: Page) {
+async function openUpdatesAndSupport(page: Page) {
   const viewport = page.viewportSize();
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/");
   await page.getByRole("button", { name: /Workspace menu|工作区菜单/ }).click();
   await page.getByRole("menuitem", { name: /Settings|设置/ }).click();
+  await page.getByText("Updates & Support", { exact: true }).click();
   if (viewport) await page.setViewportSize(viewport);
   await expect(page.getByRole("region", { name: "Updates" })).toBeVisible();
 }
 
 test("Updates stays truthful and configurable without a desktop runtime", async ({ page }) => {
-  await openGeneral(page);
+  await openUpdatesAndSupport(page);
   const updates = page.getByRole("region", { name: "Updates" });
   await expect(updates).toBeVisible();
   // The browser fallback cannot truthfully know the packaged desktop version.

@@ -45,6 +45,51 @@ const draftModel: AgentWorkspaceViewModel = {
 }
 
 describe('AgentWorkspaceDock', () => {
+  it('renders conversational turns as left/right chat bubbles, without ops Details chrome', () => {
+    const onAgentAction = vi.fn()
+    const html = renderToStaticMarkup(createElement(AgentWorkspaceDock, {
+      viewModel: {
+        ...draftModel,
+        feed: [
+          {
+            id: 'user-1',
+            type: 'message',
+            role: 'user',
+            status: 'complete',
+            title: 'You',
+            detail: 'hi',
+            provenance: 'runtime',
+          },
+          {
+            id: 'message-1',
+            type: 'message',
+            role: 'agent',
+            status: 'complete',
+            title: 'Agent',
+            detail: "Hi! Tell me what you'd like to design or build.",
+            provenance: 'runtime',
+            action: { type: 'proceed-anyway', label: 'Build it anyway', brief: 'hi' },
+          },
+        ],
+      },
+      composer: { value: 'hi', onChange: vi.fn(), onSubmit: vi.fn() },
+      onAgentAction,
+    }))
+
+    expect(html).toContain('data-slot="agent-conversation"')
+    expect(html).toContain('data-slot="user-message"')
+    expect(html).toContain('data-slot="agent-message"')
+    expect(html).toContain('justify-end')
+    expect(html).toContain('justify-start')
+    expect(html).toContain('>hi</p>')
+    expect(html).toContain("Hi! Tell me what you&#x27;d like to design or build.")
+    expect(html).toContain('Build it anyway')
+    expect(html).toContain('data-slot="agent-composer"')
+    expect(html).not.toContain('data-slot="agent-details"')
+    expect(html).not.toContain('Agent activity')
+    expect(html).not.toContain('RUNTIME')
+    expect(html).not.toContain('data-sonner-toast')
+  })
   it('renders approval actions, route/cost facts, receipt evidence, and a compact budget entry', () => {
     const onApproveTool = vi.fn()
     const html = renderToStaticMarkup(createElement(AgentWorkspaceDock, {
@@ -111,6 +156,33 @@ describe('AgentWorkspaceDock', () => {
     expect(html).toContain('Creating Plan')
   })
 
+  it('keeps one stop action when the composer owns cancellation', () => {
+    const html = renderToStaticMarkup(createElement(AgentWorkspaceDock, {
+      viewModel: {
+        ...draftModel,
+        summary: {
+          status: 'running',
+          title: 'Reviewing the request',
+          detail: 'Checking intent and routing before generation.',
+          intent: 'Hello',
+          elapsedLabel: null,
+        },
+      },
+      composer: {
+        value: 'Hello',
+        busy: true,
+        disabled: true,
+        onChange: vi.fn(),
+        onSubmit: vi.fn(),
+        onStop: vi.fn(),
+      },
+      onCancel: vi.fn(),
+    }))
+
+    expect(html).toContain(' Stop</button>')
+    expect(html).not.toContain('>Cancel</button>')
+  })
+
   it('keeps draft capability notices visible without expanding the run overview', () => {
     const html = renderToStaticMarkup(createElement(AgentWorkspaceDock, {
       viewModel: {
@@ -134,7 +206,7 @@ describe('AgentWorkspaceDock', () => {
     expect(html).toContain('Web search is unavailable.')
   })
 
-  it('expands draft context when human intervention is required', () => {
+  it('expands draft overview for human intervention without empty ops activity', () => {
     const html = renderToStaticMarkup(createElement(AgentWorkspaceDock, {
       viewModel: draftModel,
       composer: { value: '', onChange: vi.fn(), onSubmit: vi.fn() },
@@ -144,8 +216,10 @@ describe('AgentWorkspaceDock', () => {
 
     expect(html).not.toContain('data-slot="agent-draft-prompt"')
     expect(html).toContain('Describe the result you need')
-    expect(html).toContain('Agent activity')
     expect(html).toContain('Approve scope')
+    // No fabricated empty Agent activity log just because intervention is open.
+    expect(html).not.toContain('Agent activity')
+    expect(html).not.toContain('data-slot="agent-details"')
     expect(html).not.toContain('aria-label="Run controls"')
   })
 
@@ -288,6 +362,12 @@ describe('AgentWorkspaceDock', () => {
     expect(html).not.toContain('aria-label="Model: Auto"')
     expect(html).toContain('aria-label="Thinking: High"')
     expect(html).toContain('>1</span>')
+    // Single shell wraps text + tools — no nested textarea surface.
+    expect(html).toContain('data-slot="agent-composer-surface"')
+    const surfaceStart = html.indexOf('data-slot="agent-composer-surface"')
+    const contextStart = html.indexOf('data-slot="agent-composer-context"')
+    expect(surfaceStart).toBeGreaterThan(-1)
+    expect(contextStart).toBeGreaterThan(surfaceStart)
   })
 
   it('locks every context control and exposes a running status while busy', () => {

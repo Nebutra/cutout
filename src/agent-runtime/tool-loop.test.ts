@@ -45,6 +45,35 @@ describe('runToolLoop', () => {
     expect(result.data.events.map((event) => event.type)).toEqual(['tool-started', 'tool-succeeded'])
     expect(result.data.events.every((event) => event.runId === 'run:1')).toBe(true)
     expect(result.data.events.every((event) => 'toolCallId' in event && event.toolCallId === 'call:1')).toBe(true)
+    // Labels are short human titles — never the model-facing description.
+    expect(result.data.events.every((event) => 'label' in event && event.label === 'echo')).toBe(true)
+    expect(JSON.stringify(result.data.events)).not.toContain('Echoes the given value')
+  })
+
+  it('maps chat-surface tools to short labels instead of instruction prose', async () => {
+    const replyTool: AgentToolDefinition<{ reply: string }, { reply: string }> = {
+      name: 'reply_conversationally',
+      description:
+        'Call this INSTEAD of any other tool when the message is not a request to build, edit, or configure a design.',
+      inputSchema: z.object({ reply: z.string() }),
+      async execute(input) { return input },
+    }
+    const generation = fakeGeneration(() => ok({
+      text: '',
+      toolCalls: [{
+        toolCallId: 'call:1',
+        toolName: 'reply_conversationally',
+        input: { reply: '你好' },
+        output: { reply: '你好' },
+      }],
+    }))
+    const result = await runToolLoop(generation, {
+      runId: 'run:chat', providerId: 'p1', prompt: '你是谁', tools: [replyTool],
+    })
+    expect(result.ok).toBe(true)
+    if (!result.ok) throw new Error('expected ok')
+    expect(result.data.events.every((event) => 'label' in event && event.label === 'Replying')).toBe(true)
+    expect(JSON.stringify(result.data.events)).not.toContain('Call this INSTEAD')
   })
 
   it('records tool-failed when the model calls a tool that was never registered', async () => {

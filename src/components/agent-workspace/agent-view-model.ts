@@ -7,6 +7,7 @@ import type {
   AgentRunEvent,
   AgentRunEventStore,
 } from '@/agent-runtime/run-events'
+import { CHAT_SURFACE_TOOLS, toolEventLabel } from '@/agent-runtime/tool-loop'
 import type { MoneyEstimate } from '@/control-protocol'
 
 export type AgentStageStatus = 'pending' | 'running' | 'done'
@@ -24,6 +25,8 @@ export interface AgentViewModelInput {
   readonly stages: readonly AgentStageFact[]
   readonly outcome: OutcomeRuntimeState | null | undefined
   readonly working: boolean
+  /** The request is being classified before a workflow phase has begun. */
+  readonly preparing?: boolean
   readonly elapsedSeconds: number
   readonly runError: string | null
   readonly notices?: readonly string[]
@@ -31,6 +34,21 @@ export interface AgentViewModelInput {
 }
 
 export type AgentFeedItem =
+  | {
+      readonly id: string
+      readonly type: 'message'
+      /** Chat bubble role — user right, agent left. */
+      readonly role: 'user' | 'agent'
+      readonly status: 'complete'
+      readonly title: 'You' | 'Agent'
+      readonly detail: string
+      readonly provenance: 'runtime'
+      readonly action?: {
+        readonly type: 'proceed-anyway'
+        readonly label: string
+        readonly brief: string
+      }
+    }
   | {
       readonly id: string
       readonly type: 'notice'
@@ -47,6 +65,8 @@ export type AgentFeedItem =
       readonly detail: string
       readonly provenance: 'runtime'
       readonly toolCallId: string
+      /** Registry tool name when known — used to hide chat-surface tools from ops feed. */
+      readonly toolName?: string
       readonly requestId?: string
       readonly providerModel?: string
       readonly estimatedCost?: MoneyEstimate
@@ -137,9 +157,23 @@ function summarizeCosts(feed: readonly AgentFeedItem[]): AgentWorkspaceViewModel
 }
 
 function buildFeed(input: AgentViewModelInput): readonly AgentFeedItem[] {
-  const eventItems = input.runEvents?.activeRunId
-    ? input.runEvents.events.flatMap((event) =>
-      event.runId === input.runEvents?.activeRunId ? feedItemFromRunEvent(event) : [],
+  const events = input.runEvents?.events ?? []
+  const activeRunId = input.runEvents?.activeRunId
+
+  // Chat transcript spans every run so multi-turn dialogue stays visible.
+  const conversationItems = events.flatMap((event) => {
+    if (event.type !== 'intent-recorded' && event.type !== 'agent-message') return []
+    return feedItemFromRunEvent(event)
+  })
+
+  // Ops rows (tools/stages/materials/errors) stay scoped to the active run.
+  const activeOpsItems = activeRunId
+    ? collapseToolLifecycle(
+      events.flatMap((event) => {
+        if (event.runId !== activeRunId) return []
+        if (event.type === 'intent-recorded' || event.type === 'agent-message') return []
+        return feedItemFromRunEvent(event)
+      }),
     )
     : []
 
@@ -186,6 +220,7 @@ function buildFeed(input: AgentViewModelInput): readonly AgentFeedItem[] {
   }))
 
   const fallbackItems = [...noticeItems, ...stageItems, ...materialItems, ...errorItems]
+  const eventItems = [...conversationItems, ...activeOpsItems]
   if (eventItems.length === 0) return fallbackItems
 
   // Durable events are authoritative for facts they contain, but the current
@@ -199,16 +234,67 @@ function buildFeed(input: AgentViewModelInput): readonly AgentFeedItem[] {
   ]
 }
 
+type ToolFeedItem = Extract<AgentFeedItem, { type: 'tool' }>
+
+/**
+ * Lifecycle rows come from tool-started / succeeded / failed / cancelled.
+ * Approval gates and execution receipts share a toolCallId but must stay as
+ * their own rows — collapsing everything by toolCallId would hide approvals.
+ */
+function isLifecycleToolRow(item: ToolFeedItem): boolean {
+  if (item.title === 'Execution receipt') return false
+  if (item.title === 'Tool approved' || item.title === 'Tool denied') return false
+  if (item.title === 'Tool retry prepared') return false
+  if (item.status === 'waiting') return false
+  return true
+}
+
+/**
+ * Each tool call emits started + succeeded/failed as separate events. Project
+ * them to a single feed row so a completed tool never leaves a stuck spinner.
+ */
+function collapseToolLifecycle(items: readonly AgentFeedItem[]): AgentFeedItem[] {
+  const latestLifecycle = new Map<string, ToolFeedItem>()
+  for (const item of items) {
+    if (item.type === 'tool' && isLifecycleToolRow(item)) {
+      latestLifecycle.set(item.toolCallId, item)
+    }
+  }
+  const emittedLifecycle = new Set<string>()
+  const result: AgentFeedItem[] = []
+  for (const item of items) {
+    if (item.type !== 'tool' || !isLifecycleToolRow(item)) {
+      result.push(item)
+      continue
+    }
+    if (emittedLifecycle.has(item.toolCallId)) continue
+    emittedLifecycle.add(item.toolCallId)
+    result.push(latestLifecycle.get(item.toolCallId)!)
+  }
+  return result
+}
+
+function humanToolTitle(toolName: string | undefined, label: string): string {
+  if (toolName) {
+    const known = toolEventLabel(toolName)
+    // Prefer the short registry label when the event still carries a model instruction.
+    if (label.length > 48 || label.startsWith('Call this') || label === toolName) return known
+  }
+  return label
+}
+
 function feedItemFromRunEvent(event: AgentRunEvent): readonly AgentFeedItem[] {
   switch (event.type) {
     case 'run-started':
       return []
     case 'intent-recorded':
+      // User turn in the conversation — right-side bubble, not an ops stage row.
       return [{
         id: event.eventId,
-        type: 'stage',
+        type: 'message',
+        role: 'user',
         status: 'complete',
-        title: 'Intent recorded',
+        title: 'You',
         detail: event.intent,
         provenance: 'runtime',
       }]
@@ -232,27 +318,31 @@ function feedItemFromRunEvent(event: AgentRunEvent): readonly AgentFeedItem[] {
         provenance: 'runtime',
       }]
     case 'tool-started':
+      if (CHAT_SURFACE_TOOLS.has(event.tool)) return []
       return [{
         id: event.eventId,
         type: 'tool',
         status: 'running',
-        title: event.label,
+        title: humanToolTitle(event.tool, event.label),
         detail: `Tool: ${event.tool}${event.model ? ` · ${event.model.providerId}/${event.model.model}` : ''}`,
         provenance: 'runtime',
         toolCallId: event.toolCallId,
+        toolName: event.tool,
         providerModel: event.model ? `${event.model.providerId}/${event.model.model}` : undefined,
         approval: { status: 'automatic', reason: 'No explicit approval was required by the recorded execution policy.' },
         actions: ['cancel'],
       }]
     case 'tool-approval-requested':
+      if (CHAT_SURFACE_TOOLS.has(event.tool)) return []
       return [{
         id: event.eventId,
         type: 'tool',
         status: 'waiting',
-        title: event.label,
+        title: humanToolTitle(event.tool, event.label),
         detail: `Tool: ${event.tool}`,
         provenance: 'runtime',
         toolCallId: event.toolCallId,
+        toolName: event.tool,
         requestId: event.requestId,
         providerModel: event.model ? `${event.model.providerId}/${event.model.model}` : undefined,
         estimatedCost: event.estimatedCost,
@@ -302,24 +392,48 @@ function feedItemFromRunEvent(event: AgentRunEvent): readonly AgentFeedItem[] {
         actions: event.receipt.status === 'failed' ? ['retry'] : undefined,
       }]
     case 'tool-succeeded':
+      if (CHAT_SURFACE_TOOLS.has(event.tool)) return []
       return [{
         id: event.eventId,
         type: 'tool',
         status: 'complete',
-        title: event.label,
+        title: humanToolTitle(event.tool, event.label),
         detail: event.outputRefs.length > 0 ? `Produced ${event.outputRefs.join(', ')}` : `Tool ${event.tool} completed.`,
         provenance: 'runtime',
         toolCallId: event.toolCallId,
+        toolName: event.tool,
         outputRefs: event.outputRefs,
       }]
     case 'step-failed':
       return [{ id: event.eventId, type: 'error', status: 'stopped', title: 'Run stopped', detail: `${event.label}: ${event.detail}`, provenance: 'runtime' }]
     case 'tool-failed':
-      return [{ id: event.eventId, type: 'tool', status: 'stopped', title: event.label, detail: event.detail, provenance: 'runtime', toolCallId: event.toolCallId, actions: ['retry'] }]
+      if (CHAT_SURFACE_TOOLS.has(event.tool)) return []
+      return [{
+        id: event.eventId,
+        type: 'tool',
+        status: 'stopped',
+        title: humanToolTitle(event.tool, event.label),
+        detail: event.detail,
+        provenance: 'runtime',
+        toolCallId: event.toolCallId,
+        toolName: event.tool,
+        actions: ['retry'],
+      }]
     case 'step-cancelled':
       return [{ id: event.eventId, type: 'notice', status: 'complete', title: event.label, detail: event.detail, provenance: 'runtime' }]
     case 'tool-cancelled':
-      return [{ id: event.eventId, type: 'tool', status: 'complete', title: event.label, detail: event.detail, provenance: 'runtime', toolCallId: event.toolCallId, actions: ['retry'] }]
+      if (CHAT_SURFACE_TOOLS.has(event.tool)) return []
+      return [{
+        id: event.eventId,
+        type: 'tool',
+        status: 'complete',
+        title: humanToolTitle(event.tool, event.label),
+        detail: event.detail,
+        provenance: 'runtime',
+        toolCallId: event.toolCallId,
+        toolName: event.tool,
+        actions: ['retry'],
+      }]
     case 'material-recorded':
       return [{
         id: event.eventId,
@@ -358,6 +472,17 @@ function feedItemFromRunEvent(event: AgentRunEvent): readonly AgentFeedItem[] {
         title: 'Run cancelled',
         detail: event.reason,
         provenance: 'runtime',
+      }]
+    case 'agent-message':
+      return [{
+        id: event.eventId,
+        type: 'message',
+        role: 'agent',
+        status: 'complete',
+        title: 'Agent',
+        detail: event.message,
+        provenance: 'runtime',
+        action: event.action,
       }]
     case 'human-loop-asked':
       return [{
@@ -449,6 +574,15 @@ function buildRunSummary(input: AgentViewModelInput): AgentRunSummary {
     }
   }
   if (input.working) {
+    if (input.preparing) {
+      return {
+        status: 'running',
+        title: 'Reviewing the request',
+        detail: 'Checking intent and routing before generation.',
+        intent,
+        elapsedLabel,
+      }
+    }
     const activeStage = input.stages.find((stage) => stage.status === 'running')
     return {
       status: 'running',

@@ -27,7 +27,7 @@ export function HelpMenu() {
   const { open: openSettings } = useSettingsUI()
 
   return (
-    <div className="pointer-events-none absolute bottom-4 right-4 z-40">
+    <div className="pointer-events-none absolute bottom-4 right-4 z-40 hidden sm:block">
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button

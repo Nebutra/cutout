@@ -23,6 +23,8 @@ import { IntegrationsSection } from './sections/IntegrationsSection'
 import { ArchivedSection } from './sections/ArchivedSection'
 import { PersonalizationSection } from './sections/PersonalizationSection'
 import { SpeechSection } from './sections/SpeechSection'
+import { AdvancedSection } from './sections/AdvancedSection'
+import { UpdatesSupportSection } from './sections/UpdatesSupportSection'
 import type { DesktopUpdateController } from '@/updater/service'
 import { focusSettingsTarget, type SettingsTarget } from './settings-ui'
 
@@ -75,7 +77,7 @@ export function SettingsDialog({
 
           <div className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain p-3 sm:p-5">
             {section === 'general' ? (
-              <GeneralSection prepareRecoverySnapshot={prepareUpdateRecoverySnapshot} updateController={updateController} />
+              <GeneralSection />
             ) : section === 'speech' ? (
               <SpeechSection />
             ) : section === 'personalization' ? (
@@ -88,6 +90,10 @@ export function SettingsDialog({
                 onRestoreProject={onRestoreProject}
                 onDeleteProject={onDeleteProject}
               />
+            ) : section === 'advanced' ? (
+              <AdvancedSection />
+            ) : section === 'updates-support' ? (
+              <UpdatesSupportSection prepareRecoverySnapshot={prepareUpdateRecoverySnapshot} updateController={updateController} />
             ) : (
               <AiSection />
             )}

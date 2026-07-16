@@ -1,13 +1,13 @@
 import { expect, test, type Page } from '@playwright/test'
 
-async function openGeneral(page: Page) {
+async function openUpdatesAndSupport(page: Page) {
   const viewport = page.viewportSize()
   await page.setViewportSize({ width: 1440, height: 900 })
   await page.goto('/')
   await page.getByRole('button', { name: /Workspace menu|工作区菜单/ }).click()
   await page.getByRole('menuitem', { name: /Settings|设置/ }).click()
   if (viewport) await page.setViewportSize(viewport)
-  await page.getByText('General', { exact: true }).click()
+  await page.getByText('Updates & Support', { exact: true }).click()
 }
 
 test('Local recovery is truthful, redacted, and never deletes project data', async ({ page }) => {
@@ -17,7 +17,7 @@ test('Local recovery is truthful, redacted, and never deletes project data', asy
     localStorage.setItem('cutout.canvas-grid', 'hidden')
     ;(globalThis as typeof globalThis & { __SECRET_SENTINEL__?: string }).__SECRET_SENTINEL__ = 'MOX_API_KEY=must-not-appear'
   })
-  await openGeneral(page)
+  await openUpdatesAndSupport(page)
   const recovery = page.getByText('Local recovery', { exact: true }).locator('..')
   await expect(recovery).toContainText('Project data is not deleted.')
   await expect(recovery.getByRole('status')).toContainText('Authorize a workspace before using host recovery.')

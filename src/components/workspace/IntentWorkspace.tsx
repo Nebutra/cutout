@@ -787,6 +787,7 @@ export function IntentWorkspace({
     stages,
     outcome,
     working,
+    preparing: agentBusy && workflowPhase === "idle",
     elapsedSeconds,
     runError:
       runError ??
@@ -1235,8 +1236,12 @@ export function IntentWorkspace({
     let regenerationDecision: RegenerationDecision | null = null;
     let pageTargetingDecision: PageTargetingDecision | null = null;
     let clarifiedBrief: string | null = null;
+    // tryToolGate records intent-recorded for the chat transcript; skip a second
+    // user bubble when the same turn falls through into the build pipeline.
+    let intentAlreadyRecorded = false;
     if (mode === "create" && !selectedMaterial && !options.skipToolGate) {
       const toolGate = await tryToolGate(text, chatAssignment, lease);
+      intentAlreadyRecorded = true;
       // A newer submission may have superseded this lease while tryToolGate
       // awaited its model call. Stop here instead of falling through into
       // the pipeline below for a turn that's no longer the active run.
@@ -1268,7 +1273,9 @@ export function IntentWorkspace({
     ]);
     const runId = `workspace:${lease.id}`;
     startAgentRun(mode, { runId });
-    emitRunEvent(runId, { type: "intent-recorded", intent: text });
+    if (!intentAlreadyRecorded) {
+      emitRunEvent(runId, { type: "intent-recorded", intent: text });
+    }
     setRunCancelled(false);
     try {
       let plan = prototypePlan;
@@ -1490,6 +1497,9 @@ export function IntentWorkspace({
     // resolve. The astryx/regeneration branches below call startAgentRun again with
     // the same runId, which is a no-op once the run is already active.
     startAgentRun("create", { runId: toolRunId });
+    // Project the user's turn into the conversation before the model replies
+    // (greetings, questions, and build requests all share this chat surface).
+    emitRunEvent(toolRunId, { type: "intent-recorded", intent: text });
 
     const toolLoop = await runToolLoop(personalizedGenerationRef.current, {
       runId: toolRunId,
@@ -1608,29 +1618,16 @@ export function IntentWorkspace({
     if (conversationalCall && !conversationalCall.error) {
       const reply = (conversationalCall.toolOutput as ConversationalReplyInput)
         .reply;
-      // Fixed id so a newer conversational reply replaces (rather than stacks
-      // on top of) any earlier one still visible — otherwise a user who sends
-      // several vague briefs in a row could leave multiple stale "Build it
-      // anyway" actions on screen, each bound to a different frozen brief.
-      toast.message("Agent", {
-        id: "tool-gate-reply",
-        description: reply,
+      setAgentDockVisible(true);
+      setFilesDockVisible(false);
+      emitRunEvents(toolLoop.data.events);
+      emitRunEvent(toolRunId, {
+        type: "agent-message",
+        message: reply,
         action: {
+          type: "proceed-anyway",
           label: "Build it anyway",
-          // Deliberately does NOT call setBrief(text): this closure is bound
-          // to the brief text from the render that created this toast. If
-          // the user has since edited the (shared, global) brief field and
-          // clicks this action, overwriting their live input with the old
-          // rejected text — then generating from it — would silently discard
-          // whatever they just typed. Passing briefOverride lets createAssets
-          // build from exactly this toast's frozen text without touching
-          // component/store state at all.
-          onClick: () => {
-            void createAssets("create", {
-              skipToolGate: true,
-              briefOverride: text,
-            });
-          },
+          brief: text,
         },
       });
       return {
@@ -2579,7 +2576,7 @@ export function IntentWorkspace({
               viewModel={agentViewModel}
               mode="sheet"
               compact
-              className="h-full w-full"
+              className="h-full w-full pt-10"
               composer={{
                 value: activeAsk ? humanLoopCustomAnswer : brief,
                 placeholder: activeAsk
@@ -2736,7 +2733,14 @@ export function IntentWorkspace({
               onRetryTool={(toolCallId, requestId) =>
                 void desktopTools.loop.retry(toolCallId, requestId)
               }
-              onOpenBudget={() => settings.open({section:'general',anchor:'paid-actions'})}
+              onAgentAction={(_eventId, action, actionBrief) => {
+                if (action !== "proceed-anyway") return;
+                void createAssets("create", {
+                  skipToolGate: true,
+                  briefOverride: actionBrief,
+                });
+              }}
+              onOpenBudget={() => settings.open({section:'ai',anchor:'paid-actions'})}
               onOpenArtifact={(kind) => {
                 if (kind === "design-system" || kind === "design-markdown") {
                   setInspectorOpen(true);
@@ -4919,7 +4923,23 @@ function OutputSurface({
   }
 
   if (working) {
-    return <PlannedResultSkeleton pages={plannedPages} />;
+    return (
+      <div className="relative h-full min-h-0">
+        <OutputCanvas
+          showMinimap={showMinimap}
+          showGrid={showGrid}
+          background={canvasBackground}
+          toolbar={canvasToolbar}
+          actions={canvasActions}
+          annotations={canvasAnnotations}
+          onAnnotationsChange={onCanvasAnnotationsChange}
+          designSystem={null}
+          pages={[]}
+          assets={[]}
+          emptyHint="Results will appear here when ready"
+        />
+      </div>
+    );
   }
 
   return (
@@ -4937,62 +4957,6 @@ function OutputSurface({
         assets={[]}
         emptyHint="Get started by describing your idea to the Agent"
       />
-    </div>
-  );
-}
-
-function PlannedResultSkeleton({
-  pages,
-}: {
-  readonly pages: readonly PrototypePage[];
-}) {
-  const plannedPages =
-    pages.length > 0
-      ? pages
-      : [
-          { id: "planned-page-1", name: "Primary result" },
-          { id: "planned-page-2", name: "Supporting result" },
-        ];
-
-  return (
-    <div
-      className="h-full overflow-y-auto p-6"
-      aria-label="Planned deliverables"
-    >
-      <div className="mx-auto grid w-full max-w-5xl gap-6">
-        <div>
-          <h3 className="text-sm font-semibold">Building your deliverables</h3>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Results will replace these planned frames as they become available.
-          </p>
-        </div>
-
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          <div className="overflow-hidden rounded-lg border border-border bg-card">
-            <div className="aspect-[4/3] animate-pulse bg-muted/50" />
-            <div className="border-t border-border/60 px-3 py-2">
-              <p className="text-xs font-medium">Design system</p>
-              <p className="mt-1 text-[11px] text-muted-foreground">
-                Planned foundation
-              </p>
-            </div>
-          </div>
-          {plannedPages.map((page) => (
-            <div
-              key={page.id}
-              className="overflow-hidden rounded-lg border border-border bg-card"
-            >
-              <div className="aspect-[4/3] animate-pulse bg-muted/35" />
-              <div className="border-t border-border/60 px-3 py-2">
-                <p className="truncate text-xs font-medium">{page.name}</p>
-                <p className="mt-1 text-[11px] text-muted-foreground">
-                  Planned prototype page
-                </p>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
     </div>
   );
 }

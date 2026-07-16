@@ -128,6 +128,7 @@ export interface AgentWorkspaceDockProps {
   readonly onDenyTool?: (toolCallId: string, requestId: string) => void
   readonly onCancelTool?: (toolCallId: string, requestId?: string) => void
   readonly onRetryTool?: (toolCallId: string, requestId?: string) => void
+  readonly onAgentAction?: (eventId: string, action: 'proceed-anyway', brief: string) => void
   readonly onOpenBudget?: () => void
   /** Cost disclosure is transactional, not permanent workspace chrome. */
   readonly showCostNotice?: boolean
@@ -172,6 +173,7 @@ export function AgentWorkspaceDock({
   onDenyTool,
   onCancelTool,
   onRetryTool,
+  onAgentAction,
   onOpenBudget,
   showCostNotice = false,
 }: AgentWorkspaceDockProps) {
@@ -179,8 +181,17 @@ export function AgentWorkspaceDock({
   const presentation = deriveDockPresentation(viewModel, {
     hasIntervention: Boolean(intervention),
   })
-  const hasRunDetails = presentation.showFeed || presentation.showChecklist
+  // The composer owns the active-run stop action. Do not render a second,
+  // visually disconnected cancel button for the same operation.
+  const runCancel = composer.onStop ? undefined : onCancel
   const gateItems = viewModel.feed.filter((item) => item.type === 'tool' && item.status === 'waiting')
+  const conversationItems = viewModel.feed.filter((item) => item.type === 'message')
+  // Ops activity only — conversation messages are the primary surface, not "Details".
+  const activityItems = viewModel.feed.filter(
+    (item) => item.type !== 'message' && !(item.type === 'tool' && item.status === 'waiting'),
+  )
+  const hasActivity = activityItems.length > 0
+  const hasRunDetails = hasActivity || presentation.showChecklist
 
   return (
     <aside
@@ -209,11 +220,33 @@ export function AgentWorkspaceDock({
           onDenyTool={onDenyTool}
           onCancelTool={onCancelTool}
           onRetryTool={onRetryTool}
+          onAgentAction={onAgentAction}
         />
       ) : null}
 
+      {conversationItems.length > 0 ? (
+        <div
+          data-slot="agent-conversation"
+          className={cn(
+            'min-h-0 overflow-y-auto overscroll-contain',
+            !hasRunDetails ? 'flex-1' : 'shrink-0 border-b border-border',
+          )}
+        >
+          <AgentRunFeed
+            items={conversationItems}
+            emptyLabel={labels.noActivity}
+            detailsLabel={labels.toolDetails}
+            heading="Conversation"
+            compact
+            onAgentAction={onAgentAction}
+          />
+        </div>
+      ) : null}
+
       {!hasRunDetails ? (
-        <div aria-hidden="true" data-slot="agent-draft-spacer" className="min-h-8 flex-1" />
+        conversationItems.length === 0 ? (
+          <div aria-hidden="true" data-slot="agent-draft-spacer" className="min-h-8 flex-1" />
+        ) : null
       ) : (
         <details data-slot="agent-details" className="group/details min-h-0 flex-1 overflow-y-auto overscroll-contain border-b border-border">
           <summary className="sticky top-0 z-10 flex cursor-pointer list-none items-center gap-2 bg-background px-3 py-2 text-xs font-medium text-muted-foreground hover:text-foreground [&::-webkit-details-marker]:hidden">
@@ -223,9 +256,9 @@ export function AgentWorkspaceDock({
               <span className="ml-auto tabular-nums">{viewModel.checklist.filter((item) => item.status === 'complete').length}/{viewModel.checklist.length}</span>
             ) : null}
           </summary>
-          {presentation.showFeed ? (
+          {hasActivity ? (
             <AgentRunFeed
-              items={viewModel.feed.filter((item) => !gateItems.includes(item))}
+              items={activityItems}
               emptyLabel={labels.noActivity}
               detailsLabel={labels.toolDetails}
               heading={labels.feed}
@@ -234,6 +267,7 @@ export function AgentWorkspaceDock({
               onDenyTool={onDenyTool}
               onCancelTool={onCancelTool}
               onRetryTool={onRetryTool}
+              onAgentAction={onAgentAction}
             />
           ) : null}
           {presentation.showChecklist ? (
@@ -261,7 +295,7 @@ export function AgentWorkspaceDock({
             labels={labels}
             onPause={onPause}
             onResume={onResume}
-            onCancel={onCancel}
+            onCancel={runCancel}
             onRetry={onRetry}
             compact={compact}
           />
@@ -329,6 +363,7 @@ export function AgentRunFeed({
   onDenyTool,
   onCancelTool,
   onRetryTool,
+  onAgentAction,
 }: {
   readonly items: readonly AgentFeedItem[]
   readonly heading: string
@@ -339,6 +374,7 @@ export function AgentRunFeed({
   readonly onDenyTool?: AgentWorkspaceDockProps['onDenyTool']
   readonly onCancelTool?: AgentWorkspaceDockProps['onCancelTool']
   readonly onRetryTool?: AgentWorkspaceDockProps['onRetryTool']
+  readonly onAgentAction?: AgentWorkspaceDockProps['onAgentAction']
 }) {
   const endRef = useRef<HTMLDivElement | null>(null)
   const previousCountRef = useRef(items.length)
@@ -350,14 +386,26 @@ export function AgentRunFeed({
     previousCountRef.current = items.length
   }, [items.length])
 
+  const isConversation = items.every((item) => item.type === 'message')
+
   return (
-    <section data-slot="agent-run-feed" aria-labelledby="agent-feed-heading" className={cn(compact ? 'p-3' : 'px-3 py-3')}>
-      <SectionHeading id="agent-feed-heading">{heading}</SectionHeading>
-      <div aria-live="polite" aria-relevant="additions" className="mt-2 space-y-1">
+    <section
+      data-slot="agent-run-feed"
+      aria-labelledby="agent-feed-heading"
+      className={cn(compact ? 'p-3' : 'px-3 py-3')}
+    >
+      {!isConversation ? <SectionHeading id="agent-feed-heading">{heading}</SectionHeading> : (
+        <h2 id="agent-feed-heading" className="sr-only">{heading}</h2>
+      )}
+      <div
+        aria-live="polite"
+        aria-relevant="additions"
+        className={cn(isConversation ? 'mt-0 space-y-2.5' : 'mt-2 space-y-1')}
+      >
         {items.length === 0 ? (
           <p className="max-w-[30ch] break-words py-2 text-xs leading-4 text-muted-foreground">{emptyLabel}</p>
         ) : items.map((item) => (
-          <FeedRow key={item.id} item={item} detailsLabel={detailsLabel} onApproveTool={onApproveTool} onDenyTool={onDenyTool} onCancelTool={onCancelTool} onRetryTool={onRetryTool} />
+          <FeedRow key={item.id} item={item} detailsLabel={detailsLabel} onApproveTool={onApproveTool} onDenyTool={onDenyTool} onCancelTool={onCancelTool} onRetryTool={onRetryTool} onAgentAction={onAgentAction} />
         ))}
         <div ref={endRef} />
       </div>
@@ -365,16 +413,53 @@ export function AgentRunFeed({
   )
 }
 
-function FeedRow({ item, detailsLabel, onApproveTool, onDenyTool, onCancelTool, onRetryTool }: {
+function FeedRow({ item, detailsLabel, onApproveTool, onDenyTool, onCancelTool, onRetryTool, onAgentAction }: {
   readonly item: AgentFeedItem
   readonly detailsLabel: string
   readonly onApproveTool?: AgentWorkspaceDockProps['onApproveTool']
   readonly onDenyTool?: AgentWorkspaceDockProps['onDenyTool']
   readonly onCancelTool?: AgentWorkspaceDockProps['onCancelTool']
   readonly onRetryTool?: AgentWorkspaceDockProps['onRetryTool']
+  readonly onAgentAction?: AgentWorkspaceDockProps['onAgentAction']
 }) {
   const isError = item.type === 'error'
   const tool = item.type === 'tool' ? item : null
+
+  // Conversation turns: left/right chat bubbles (user right, agent left).
+  if (item.type === 'message') {
+    const isUser = item.role === 'user'
+    return (
+      <div
+        data-slot={isUser ? 'user-message' : 'agent-message'}
+        className={cn('flex w-full', isUser ? 'justify-end' : 'justify-start')}
+      >
+        <article
+          className={cn(
+            'max-w-[92%] rounded-2xl px-3 py-2 text-sm leading-5',
+            isUser
+              ? 'rounded-br-md bg-primary text-primary-foreground'
+              : 'rounded-bl-md bg-muted text-foreground',
+          )}
+        >
+          <p className="whitespace-pre-wrap break-words">{item.detail}</p>
+          {item.action && onAgentAction ? (
+            <div className="mt-2">
+              <Button
+                type="button"
+                size="sm"
+                variant={isUser ? 'secondary' : 'outline'}
+                className={cn(isUser && 'border-primary-foreground/20')}
+                onClick={() => onAgentAction(item.id, item.action!.type, item.action!.brief)}
+              >
+                {item.action.label}
+              </Button>
+            </div>
+          ) : null}
+        </article>
+      </div>
+    )
+  }
+
   return (
     <article
       className={cn(
@@ -642,7 +727,11 @@ export function AgentComposer({
           </div>
         </div>
       ) : null}
-      <div className="rounded-xl border border-border bg-background p-1.5 shadow-[0_8px_24px_rgb(0_0_0/0.08)] transition-shadow focus-within:border-foreground/20 focus-within:shadow-[0_10px_28px_rgb(0_0_0/0.12)]">
+      {/* Single shell: text + tools share one border — no nested textarea surface. */}
+      <div
+        data-slot="agent-composer-surface"
+        className="rounded-xl border border-border bg-background shadow-[0_8px_24px_rgb(0_0_0/0.08)] transition-shadow focus-within:border-foreground/20 focus-within:shadow-[0_10px_28px_rgb(0_0_0/0.12)]"
+      >
         <Textarea
           aria-label="Message the Agent"
           value={model.value}
@@ -651,10 +740,10 @@ export function AgentComposer({
           onChange={(event) => model.onChange(event.target.value)}
           onKeyDown={handleKeyDown}
           rows={2}
-          className="min-h-12 resize-none border-0 px-2.5 py-2 text-sm leading-5 shadow-none focus-visible:border-0 focus-visible:ring-0"
+          className="min-h-12 resize-none rounded-none border-0 bg-transparent px-3 pt-2.5 pb-1.5 text-sm leading-5 shadow-none outline-none focus-visible:border-0 focus-visible:ring-0 dark:bg-transparent"
         />
         <TooltipProvider>
-        <div data-slot="agent-composer-context" className="flex min-w-0 flex-wrap items-center justify-between gap-1 px-1 pb-0.5">
+        <div data-slot="agent-composer-context" className="flex min-w-0 flex-wrap items-center justify-between gap-1 px-2 pb-2 pt-0.5">
           <div className="flex min-w-0 flex-1 flex-wrap items-center gap-0.5">
             {model.onAttach ? (
               <Tooltip>

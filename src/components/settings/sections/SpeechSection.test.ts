@@ -1,5 +1,127 @@
 // @vitest-environment jsdom
-import{act,createElement}from'react';import{createRoot,type Root}from'react-dom/client';import{afterEach,describe,expect,it,vi}from'vitest';import{defaultSpeechPreferences}from'@/speech';import{SpeechSection}from'./SpeechSection'
-const save=vi.fn(async value=>value),reset=vi.fn(async()=>defaultSpeechPreferences),query={data:defaultSpeechPreferences,isLoading:false,isError:false,refetch:vi.fn()};vi.mock('@/hooks/queries/speech',()=>({useSpeechPreferences:()=>query,useSaveSpeechPreferences:()=>({mutateAsync:save,isPending:false}),useResetSpeechPreferences:()=>({mutateAsync:reset,isPending:false})}));vi.mock('sonner',()=>({toast:{success:vi.fn(),error:vi.fn()}}));vi.mock('../ModelSlot',()=>({ModelSlot:({label}:{label:string})=>createElement('div',{'data-model-slot':label})}));let root:Root|undefined,host:HTMLDivElement|undefined;afterEach(()=>{act(()=>root?.unmount());host?.remove();root=undefined;host=undefined});function mount(){host=document.createElement('div');document.body.append(host);act(()=>{root=createRoot(host!);root.render(createElement(SpeechSection))});return host}
-describe('Speech settings',()=>{it('truthfully gates host and TTS-only controls',()=>{const node=mount();expect(node.textContent).toContain('Host required');expect(node.textContent).toContain('Capability required');expect((node.querySelector('[aria-label="TTS voice"]')as HTMLInputElement).disabled).toBe(true);expect((node.querySelector('[aria-label="Auto-play TTS responses"]')as HTMLButtonElement).disabled).toBe(true)});
-  it('disables the whole dictation form instead of just Save when the host is unavailable, without repeating the warning',()=>{(query as {storageAvailable?:boolean}).storageAvailable=false;const node=mount();const alerts=[...node.querySelectorAll('[role="alert"]')].filter(el=>el.textContent?.includes('Host required'));expect(alerts).toHaveLength(1);expect(node.textContent).toContain("can't be saved");expect((node.querySelector('[aria-label="Microphone device ID"]')as HTMLInputElement).disabled).toBe(true);expect((node.querySelector('[aria-label="Speech shortcut"]')as HTMLInputElement).disabled).toBe(true);expect((node.querySelector('[aria-label="Keep dictation visible"]')as HTMLButtonElement).disabled).toBe(true);(query as {storageAvailable?:boolean}).storageAvailable=undefined});it('keeps ASR/TTS model slots progressively disclosed',()=>{const node=mount();expect(node.querySelectorAll('[data-model-slot]')).toHaveLength(0);const advanced=[...node.querySelectorAll('button')].find(item=>item.textContent==='Advanced')!;expect(advanced.getAttribute('aria-expanded')).toBe('false');act(()=>advanced.click());expect(node.querySelectorAll('[data-model-slot]')).toHaveLength(2)});it('requires confirmation before reset and exposes accessible dictation controls',()=>{const node=mount();expect(node.querySelector('[aria-label="Microphone device ID"]')).toBeTruthy();expect(node.querySelector('[aria-label="Speech shortcut"]')).toBeTruthy();expect(node.querySelector('[aria-label="Keep dictation visible"]')).toBeTruthy();const button=[...node.querySelectorAll('button')].find(item=>item.textContent?.includes('Reset'))!;act(()=>button.click());expect(document.body.textContent).toContain('Reset speech preferences?');expect(reset).not.toHaveBeenCalled()})})
+import { act, createElement } from "react";
+import { createRoot, type Root } from "react-dom/client";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { i18n } from "@lingui/core";
+import { I18nProvider } from "@lingui/react";
+import { defaultSpeechPreferences } from "@/speech";
+import { SpeechSection } from "./SpeechSection";
+
+const save = vi.fn(async (value) => value),
+  reset = vi.fn(async () => defaultSpeechPreferences),
+  query = {
+    data: defaultSpeechPreferences,
+    isLoading: false,
+    isError: false,
+    refetch: vi.fn(),
+  };
+
+vi.mock("@/hooks/queries/speech", () => ({
+  useSpeechPreferences: () => query,
+  useSaveSpeechPreferences: () => ({ mutateAsync: save, isPending: false }),
+  useResetSpeechPreferences: () => ({ mutateAsync: reset, isPending: false }),
+}));
+vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
+vi.mock("../ModelSlot", () => ({
+  ModelSlot: ({ label }: { label: string }) =>
+    createElement("div", { "data-model-slot": label }),
+}));
+
+i18n.loadAndActivate({ locale: "en", messages: {} });
+
+let root: Root | undefined, host: HTMLDivElement | undefined;
+afterEach(() => {
+  act(() => root?.unmount());
+  host?.remove();
+  root = undefined;
+  host = undefined;
+});
+
+function mount() {
+  host = document.createElement("div");
+  document.body.append(host);
+  act(() => {
+    root = createRoot(host!);
+    root.render(
+      createElement(I18nProvider, { i18n }, createElement(SpeechSection)),
+    );
+  });
+  return host;
+}
+
+describe("Speech settings", () => {
+  it("truthfully gates host and TTS-only controls", () => {
+    const node = mount();
+    expect(node.textContent).toContain("Host required");
+    expect(node.textContent).toContain("Capability required");
+    expect(
+      (node.querySelector('[aria-label="TTS voice"]') as HTMLInputElement)
+        .disabled,
+    ).toBe(true);
+    expect(
+      (
+        node.querySelector(
+          '[aria-label="Auto-play TTS responses"]',
+        ) as HTMLButtonElement
+      ).disabled,
+    ).toBe(true);
+  });
+
+  it("disables the whole dictation form instead of just Save when the host is unavailable, without repeating the warning", () => {
+    (query as { storageAvailable?: boolean }).storageAvailable = false;
+    const node = mount();
+    const alerts = [...node.querySelectorAll('[role="alert"]')].filter((el) =>
+      el.textContent?.includes("Host required"),
+    );
+    expect(alerts).toHaveLength(1);
+    expect(node.textContent).toContain("can't be saved");
+    expect(
+      (
+        node.querySelector(
+          '[aria-label="Microphone device ID"]',
+        ) as HTMLInputElement
+      ).disabled,
+    ).toBe(true);
+    expect(
+      (
+        node.querySelector(
+          '[aria-label="Speech shortcut"]',
+        ) as HTMLInputElement
+      ).disabled,
+    ).toBe(true);
+    expect(
+      (
+        node.querySelector(
+          '[aria-label="Keep dictation visible"]',
+        ) as HTMLButtonElement
+      ).disabled,
+    ).toBe(true);
+    (query as { storageAvailable?: boolean }).storageAvailable = undefined;
+  });
+
+  it("keeps ASR/TTS model slots progressively disclosed", () => {
+    const node = mount();
+    expect(node.querySelectorAll("[data-model-slot]")).toHaveLength(0);
+    const advanced = [...node.querySelectorAll("button")].find(
+      (item) => item.textContent === "Advanced",
+    )!;
+    expect(advanced.getAttribute("aria-expanded")).toBe("false");
+    act(() => advanced.click());
+    expect(node.querySelectorAll("[data-model-slot]")).toHaveLength(2);
+  });
+
+  it("requires confirmation before reset and exposes accessible dictation controls", () => {
+    const node = mount();
+    expect(node.querySelector('[aria-label="Microphone device ID"]')).toBeTruthy();
+    expect(node.querySelector('[aria-label="Speech shortcut"]')).toBeTruthy();
+    expect(
+      node.querySelector('[aria-label="Keep dictation visible"]'),
+    ).toBeTruthy();
+    const button = [...node.querySelectorAll("button")].find((item) =>
+      item.textContent?.includes("Reset"),
+    )!;
+    act(() => button.click());
+    expect(document.body.textContent).toContain("Reset speech preferences?");
+    expect(reset).not.toHaveBeenCalled();
+  });
+});

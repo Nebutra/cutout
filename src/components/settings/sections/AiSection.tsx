@@ -31,6 +31,7 @@ import { VectorizerPanel } from "../VectorizerPanel";
 import { ProviderDirectory } from "../ProviderDirectory";
 import type { ProviderDefinition } from "@/services/ai/provider-registry";
 import { modelRoutingCoverage } from "../model-routing-summary";
+import { PaidActionsSection } from "./PaidActionsSection";
 
 type View =
   | { readonly mode: "list" }
@@ -153,6 +154,7 @@ export function AiSection() {
       </Button>
 
       <ModelAssignments onConnect={() => setView({ mode: "add" })} />
+      <PaidActionsSection />
     </div>
   );
 }

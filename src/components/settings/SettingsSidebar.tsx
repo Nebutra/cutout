@@ -6,11 +6,11 @@
  * workspace view; Settings is an overlay).
  */
 import type { ReactNode } from 'react'
-import { Settings2, KeyRound, Layers, Archive, Sparkles, Mic } from 'lucide-react'
+import { Settings2, KeyRound, Layers, Archive, Sparkles, Mic, SlidersHorizontal, LifeBuoy } from 'lucide-react'
 import { Trans } from '@lingui/react/macro'
 import { cn } from '@/lib/utils'
 
-export type SettingsSection = 'general' | 'ai' | 'speech' | 'personalization' | 'integrations' | 'archived'
+export type SettingsSection = 'general' | 'ai' | 'advanced' | 'updates-support' | 'speech' | 'personalization' | 'integrations' | 'archived'
 
 interface SidebarItem {
   readonly id: SettingsSection
@@ -37,6 +37,8 @@ export function SettingsSidebar({ value, onChange, archivedCount = 0 }: Settings
       icon: KeyRound,
       label: <Trans id="settings.section_ai">AI</Trans>,
     },
+    { id: 'advanced', icon: SlidersHorizontal, label: <Trans id="settings.section_advanced">Advanced</Trans> },
+    { id: 'updates-support', icon: LifeBuoy, label: <Trans id="settings.section_updates_support">Updates & Support</Trans> },
     { id: 'personalization', icon: Sparkles, label: <Trans id="settings.section_personalization">Personalization</Trans> },
     { id: 'speech', icon: Mic, label: <Trans id="settings.section_speech">Speech</Trans> },
     {

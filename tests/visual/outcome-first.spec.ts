@@ -36,8 +36,16 @@ async function openStableHome(page: Page) {
 
 async function startProject(page: Page, brief: string) {
   await page.getByRole('button', { name: /New (task|project)/ }).click()
-  await page.getByRole('textbox', { name: 'Describe what you want to design...' }).fill(brief)
-  await page.getByRole('button', { name: 'Create from brief' }).click()
+  const homeComposer = page.getByRole('textbox', { name: 'Describe what you want to design...' })
+  const workspaceComposer = page.getByRole('textbox', { name: 'Message the Agent' })
+  await expect(homeComposer.or(workspaceComposer)).toBeVisible()
+  if (await homeComposer.isVisible()) {
+    await homeComposer.fill(brief)
+    await page.getByRole('button', { name: 'Create from brief' }).click()
+  } else {
+    await workspaceComposer.fill(brief)
+    await page.getByRole('button', { name: 'Send' }).click()
+  }
   await expect(page.getByRole('complementary', { name: 'Agent workspace' })).toBeVisible()
 }
 
@@ -230,6 +238,20 @@ function overBudgetWorkspace() {
   })
 }
 
+function conversationalWorkspace() {
+  const events = [
+    { eventId: 'run', runId: 'run-chat', at: 1, type: 'run-started', mode: 'create' },
+    {
+      eventId: 'reply', runId: 'run-chat', at: 2, type: 'agent-message',
+      message: "Hi! Tell me what you'd like to design or build.",
+      action: { type: 'proceed-anyway', label: 'Build it anyway', brief: 'hi' },
+    },
+  ]
+  return baseWorkspace({
+    agentRunEvents: { version: 'agent-run-events.v1', activeRunId: 'run-chat', activeRun: null, events },
+  })
+}
+
 async function expectNoInternalVocabulary(surface: Locator) {
   for (const term of INTERNAL_TERMS) {
     await expect(surface.getByText(term)).toHaveCount(0)
@@ -290,6 +312,25 @@ test('a vague goal asks only for direction and offers delegation', async ({ page
   // not turn the user into the implementation manager.
   await expect(directionGate.getByText(/token|component API|executor|model|provider|DAG/i)).toHaveCount(0)
   await expect(directionGate.getByRole('button', { name: 'Use your judgment' })).toBeEnabled()
+})
+
+test('conversational Agent replies stay in the panel and never cover the canvas', async ({ page }) => {
+  await createProjectWithWorkspace(page, conversationalWorkspace(), 'Conversation fixture')
+
+  const panel = page.getByRole('complementary', { name: 'Agent workspace' })
+  const reply = panel.getByText("Hi! Tell me what you'd like to design or build.")
+  await expect(reply).toBeVisible()
+  await expect(panel.getByRole('button', { name: 'Build it anyway' })).toBeVisible()
+  await expect(page.locator('[data-sonner-toast]').filter({ hasText: 'Build it anyway' })).toHaveCount(0)
+
+  const contained = await Promise.all([panel.boundingBox(), reply.boundingBox()]).then(([panelBox, replyBox]) =>
+    Boolean(panelBox && replyBox
+      && replyBox.x >= panelBox.x
+      && replyBox.x + replyBox.width <= panelBox.x + panelBox.width
+      && replyBox.y >= panelBox.y
+      && replyBox.y + replyBox.height <= panelBox.y + panelBox.height),
+  )
+  expect(contained).toBe(true)
 })
 
 test('details are progressive disclosure and do not leak internals by default', async ({ page }) => {
@@ -457,6 +498,10 @@ test('cost appears only when an over-budget action requires a decision', async (
 
 test('primary controls do not overlap and remain keyboard reachable', async ({ page }, testInfo: TestInfo) => {
   await startProject(page, 'Check responsive controls')
+
+  await expect(page.getByText('Primary result', { exact: true })).toHaveCount(0)
+  await expect(page.getByText('Supporting result', { exact: true })).toHaveCount(0)
+  await expect(page.getByText('Planned prototype page', { exact: true })).toHaveCount(0)
 
   const composer = page.getByPlaceholder(/Describe a result/i)
   const send = page.getByRole('button', { name: /send/i })

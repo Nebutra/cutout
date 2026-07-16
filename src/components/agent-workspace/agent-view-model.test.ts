@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { OutcomeRuntimeState } from '@/agent-runtime/outcome-runtime'
-import { replayRunEvents } from '@/agent-runtime/run-events'
+import { createRunEvent, replayRunEvents } from '@/agent-runtime/run-events'
 import {
   buildAgentViewModel,
   type AgentStageFact,
@@ -93,6 +93,25 @@ describe('buildAgentViewModel', () => {
     expect(JSON.stringify(model)).not.toMatch(/thinking|reasoning|heartbeat|request sent/i)
   })
 
+  it('describes request routing before a workflow phase begins', () => {
+    const model = buildAgentViewModel({
+      brief: 'Hello',
+      workflowPhase: 'idle',
+      stages: [],
+      outcome: null,
+      working: true,
+      preparing: true,
+      elapsedSeconds: 1,
+      runError: null,
+    })
+
+    expect(model.summary).toMatchObject({
+      status: 'running',
+      title: 'Reviewing the request',
+      detail: 'Checking intent and routing before generation.',
+    })
+  })
+
   it('prefers replayed durable events over inferred stage activity', () => {
     const model = buildAgentViewModel({
       brief: 'Checkout',
@@ -119,13 +138,14 @@ describe('buildAgentViewModel', () => {
     })
 
     expect(model.feed.map((item) => item.title)).toEqual([
-      'Intent recorded',
+      'You',
       'Generate checkout page',
       'Plan completed',
       'Creating Design system',
       'Checkout design system',
       'Cart page',
     ])
+    expect(model.feed[0]).toMatchObject({ type: 'message', role: 'user', detail: 'Checkout' })
     expect(model.feed[1]?.detail).toContain('openai/gpt-image-1')
     expect(JSON.stringify(model.feed)).not.toMatch(/chain.of.thought|reasoning/i)
   })
@@ -275,5 +295,177 @@ describe('buildAgentViewModel', () => {
     })
     expect(model.feed).toEqual([])
     expect(model.checklist).toEqual([])
+  })
+
+  it('projects durable Agent messages and their explicit action into the feed', () => {
+    const runId = 'run:conversation'
+    const runEvents = replayRunEvents([
+      createRunEvent(runId, { type: 'run-started', mode: 'create' }, { eventId: 'start', at: 1 }),
+      createRunEvent(runId, {
+        type: 'agent-message',
+        message: 'Tell me what you would like to design.',
+        action: { type: 'proceed-anyway', label: 'Build it anyway', brief: 'hi' },
+      }, { eventId: 'reply', at: 2 }),
+    ])
+    const model = buildAgentViewModel({
+      brief: 'hi',
+      workflowPhase: 'idle',
+      stages: [],
+      outcome: null,
+      working: false,
+      elapsedSeconds: 0,
+      runError: null,
+      runEvents,
+    })
+
+    expect(model.feed).toEqual([expect.objectContaining({
+      id: 'reply',
+      type: 'message',
+      role: 'agent',
+      detail: 'Tell me what you would like to design.',
+      action: { type: 'proceed-anyway', label: 'Build it anyway', brief: 'hi' },
+    })])
+  })
+
+  it('projects user intent and agent replies as an ordered multi-turn chat transcript', () => {
+    const runEvents = replayRunEvents([
+      createRunEvent('run:1', { type: 'run-started', mode: 'create' }, { eventId: 's1', at: 1 }),
+      createRunEvent('run:1', { type: 'intent-recorded', intent: '你好' }, { eventId: 'u1', at: 2 }),
+      createRunEvent('run:1', {
+        type: 'agent-message',
+        message: '你好！想让我帮你设计或搭建什么原型吗？',
+      }, { eventId: 'a1', at: 3 }),
+      createRunEvent('run:2', { type: 'run-started', mode: 'create' }, { eventId: 's2', at: 4 }),
+      createRunEvent('run:2', { type: 'intent-recorded', intent: '做一个 landing page' }, { eventId: 'u2', at: 5 }),
+    ])
+    const model = buildAgentViewModel({
+      brief: '做一个 landing page',
+      workflowPhase: 'idle',
+      stages: [],
+      outcome: null,
+      working: true,
+      elapsedSeconds: 1,
+      runError: null,
+      runEvents,
+    })
+
+    expect(model.feed.filter((item) => item.type === 'message')).toEqual([
+      expect.objectContaining({ role: 'user', detail: '你好' }),
+      expect.objectContaining({ role: 'agent', detail: '你好！想让我帮你设计或搭建什么原型吗？' }),
+      expect.objectContaining({ role: 'user', detail: '做一个 landing page' }),
+    ])
+  })
+
+  it('collapses tool started+succeeded into one complete row and never leaves a spinner', () => {
+    const runId = 'run:tools'
+    const runEvents = replayRunEvents([
+      createRunEvent(runId, { type: 'run-started', mode: 'create' }, { eventId: 'start', at: 1 }),
+      createRunEvent(runId, {
+        type: 'tool-started',
+        toolCallId: 'call:1',
+        tool: 'image.generate',
+        label: 'Generate hero',
+        model: { providerId: 'openai', model: 'gpt-image-1' },
+      }, { eventId: 'started', at: 2 }),
+      createRunEvent(runId, {
+        type: 'tool-succeeded',
+        toolCallId: 'call:1',
+        tool: 'image.generate',
+        label: 'Generate hero',
+        outputRefs: ['hero.png'],
+      }, { eventId: 'done', at: 3 }),
+    ])
+    const model = buildAgentViewModel({
+      brief: 'hero',
+      workflowPhase: 'idle',
+      stages: [],
+      outcome: null,
+      working: false,
+      elapsedSeconds: 0,
+      runError: null,
+      runEvents,
+    })
+
+    const tools = model.feed.filter((item) => item.type === 'tool')
+    expect(tools).toHaveLength(1)
+    expect(tools[0]).toMatchObject({
+      id: 'done',
+      status: 'complete',
+      title: 'Generate hero',
+      toolCallId: 'call:1',
+      toolName: 'image.generate',
+    })
+    expect(tools.some((item) => item.status === 'running')).toBe(false)
+  })
+
+  it('hides reply_conversationally tool rows so only the agent message remains', () => {
+    const runId = 'run:chat'
+    const longDescription =
+      'Call this INSTEAD of any other tool when the message is not a request to build'
+    const runEvents = replayRunEvents([
+      createRunEvent(runId, { type: 'run-started', mode: 'create' }, { eventId: 'start', at: 1 }),
+      createRunEvent(runId, {
+        type: 'tool-started',
+        toolCallId: 'call:reply',
+        tool: 'reply_conversationally',
+        label: longDescription,
+      }, { eventId: 'tool-start', at: 2 }),
+      createRunEvent(runId, {
+        type: 'tool-succeeded',
+        toolCallId: 'call:reply',
+        tool: 'reply_conversationally',
+        label: longDescription,
+        outputRefs: [],
+      }, { eventId: 'tool-done', at: 3 }),
+      createRunEvent(runId, {
+        type: 'agent-message',
+        message: '我是你的设计工具 Agent。',
+      }, { eventId: 'reply', at: 4 }),
+    ])
+    const model = buildAgentViewModel({
+      brief: '你是谁',
+      workflowPhase: 'idle',
+      stages: [],
+      outcome: null,
+      working: false,
+      elapsedSeconds: 0,
+      runError: null,
+      runEvents,
+    })
+
+    expect(model.feed).toEqual([expect.objectContaining({
+      type: 'message',
+      role: 'agent',
+      detail: '我是你的设计工具 Agent。',
+    })])
+    expect(JSON.stringify(model.feed)).not.toMatch(/Call this INSTEAD|reply_conversationally/)
+  })
+
+  it('uses a short human title when an event still carries a model-facing description', () => {
+    const runId = 'run:label'
+    const runEvents = replayRunEvents([
+      createRunEvent(runId, { type: 'run-started', mode: 'create' }, { eventId: 'start', at: 1 }),
+      createRunEvent(runId, {
+        type: 'tool-started',
+        toolCallId: 'call:1',
+        tool: 'compile_astryx_theme',
+        label: 'Call this INSTEAD of any other tool when mapping DESIGN.md colors to Astryx variables for a long instruction string',
+      }, { eventId: 'tool', at: 2 }),
+    ])
+    const model = buildAgentViewModel({
+      brief: 'astryx',
+      workflowPhase: 'idle',
+      stages: [],
+      outcome: null,
+      working: true,
+      elapsedSeconds: 1,
+      runError: null,
+      runEvents,
+    })
+
+    expect(model.feed.find((item) => item.type === 'tool')).toMatchObject({
+      title: 'Compiling Astryx theme',
+      status: 'running',
+    })
   })
 })

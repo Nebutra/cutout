@@ -230,6 +230,27 @@ msgstr ""
 #~ msgstr "查看者"
 
 #. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+#~ msgid "home.published_empty_description"
+#~ msgstr "你发布的项目会在这里列出并附带在线链接。这依赖账号与社区服务，目前尚未构建。"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+#~ msgid "home.published_projects"
+#~ msgstr "已发布项目"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+#~ msgid "home.published_empty_title"
+#~ msgstr "发布功能开发中"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+#: src/components/settings/SettingsSidebar.tsx
+#~ msgid "home.wip_badge"
+#~ msgstr "WIP"
+
+#. js-lingui-explicit-id
 #. placeholder {0}: project.name
 #: src/components/home/ProjectHome.tsx
 msgid "home.archive_project_description"
@@ -284,6 +305,12 @@ msgstr "{0} · {1, plural, other {已验证 # 个文件}}"
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.toast_added_to_project"
 msgstr "{0} 已添加到项目"
+
+#. js-lingui-explicit-id
+#. placeholder {0}: state.downloaded
+#: src/components/settings/sections/UpdatesSection.tsx
+msgid "settings.updates.bytes_downloaded"
+msgstr "已下载 {0} 字节"
 
 #. js-lingui-explicit-id
 #. placeholder {0}: confirmed.size
@@ -375,6 +402,11 @@ msgid "team.pending_reviews_count"
 msgstr "{pending} 项待审评论"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/UpdatesSection.tsx
+msgid "settings.updates.percent_downloaded"
+msgstr "已下载 {progress}%"
+
+#. js-lingui-explicit-id
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.lineage_results_count"
 msgstr "{relatedCount, plural, other {# 个血缘结果}}"
@@ -405,9 +437,19 @@ msgid "intent.questions_title"
 msgstr "先澄清一下"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/SpeechSection.tsx
+msgid "settings.speech.activation"
+msgstr "激活方式"
+
+#. js-lingui-explicit-id
 #: src/components/preview/PreviewToolbar.tsx
 msgid "preview.zoom_actual"
 msgstr "实际大小 (1:1)"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/PersonalizationSection.tsx
+msgid "settings.personalization.personality_auto_desc"
+msgstr "根据任务与期望结果自适应。"
 
 #. js-lingui-explicit-id
 #: src/components/settings/ProviderDirectory.tsx
@@ -416,6 +458,7 @@ msgstr "适配器可用"
 
 #. js-lingui-explicit-id
 #: src/components/settings/ProviderForm.tsx
+#: src/components/settings/sections/SpeechSection.tsx
 msgid "settings.add"
 msgstr "添加"
 
@@ -460,7 +503,13 @@ msgid "mockup.toast_added_to_library"
 msgstr "已加入素材库"
 
 #. js-lingui-explicit-id
+#: src/components/settings/SettingsSidebar.tsx
+msgid "settings.section_advanced"
+msgstr "高级"
+
+#. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
+#: src/components/settings/sections/SpeechSection.tsx
 msgid "settings.advanced"
 msgstr "高级"
 
@@ -468,6 +517,11 @@ msgstr "高级"
 #: src/components/settings/sections/AiSection.tsx
 msgid "settings.advanced_model_bindings_aria"
 msgstr "高级模型绑定"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/PersonalizationSection.tsx
+msgid "settings.personalization.personality_aria"
+msgstr "Agent 个性"
 
 #. js-lingui-explicit-id
 #: src/components/settings/SettingsSidebar.tsx
@@ -513,6 +567,11 @@ msgstr "全部项目"
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.all_quality"
 msgstr "全部质量"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/PersonalizationSection.tsx
+msgid "settings.personalization.memory_description"
+msgstr "让有用的偏好在本地工作中延续。"
 
 #. js-lingui-explicit-id
 #: src/components/library/GlobalLibraryView.tsx
@@ -671,6 +730,11 @@ msgid "home.attach_reference"
 msgstr "添加参考物料"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/RecoverySection.tsx
+msgid "settings.recovery.host_unauthorized"
+msgstr "请先授权一个工作区，再使用主机恢复。"
+
+#. js-lingui-explicit-id
 #: src/components/library/RegistryInstallPanel.tsx
 msgid "registry_install.authorize_workspace"
 msgstr "授权工作区"
@@ -686,6 +750,11 @@ msgid "settings.model_slot_auto"
 msgstr "自动"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/PersonalizationSection.tsx
+msgid "settings.personalization.personality_auto"
+msgstr "自动"
+
+#. js-lingui-explicit-id
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.policy_auto_compatible"
 msgstr "自动兼容"
@@ -696,9 +765,29 @@ msgid "settings.model_routing_description"
 msgstr "自动路由只会把每个任务分配给具备所需能力的可用适配器。"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/SpeechSection.tsx
+msgid "settings.speech.models_description"
+msgstr "默认使用自动路由。在连接兼容适配器之前，语音识别（ASR）与语音合成（TTS）仍需对应能力。"
+
+#. js-lingui-explicit-id
 #: src/components/settings/ModelSlot.tsx
 msgid "settings.auto_will_choose"
 msgstr "自动从已连接的提供方中选择"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/SpeechSection.tsx
+msgid "settings.speech.auto_play_responses"
+msgstr "自动播放回复"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/SpeechSection.tsx
+msgid "settings.speech.auto_play_aria"
+msgstr "自动播放 TTS 回复"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/PaidActionsSection.tsx
+msgid "settings.paid_actions.auto_approve_aria"
+msgstr "在预算范围内自动批准付费操作"
 
 #. js-lingui-explicit-id
 #: src/components/home/ProjectHome.tsx
@@ -714,6 +803,11 @@ msgstr "返回线性视图"
 #: src/components/settings/ProviderForm.tsx
 msgid "settings.provider_baseurl_label"
 msgstr "Base URL"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/UpdatesSection.tsx
+msgid "settings.updates.beta"
+msgstr "测试版"
 
 #. js-lingui-explicit-id
 #: src/components/canvas/nodes/dag-node-common.tsx
@@ -764,6 +858,8 @@ msgstr "字节"
 #: src/components/settings/ProviderForm.tsx
 #: src/components/settings/ProviderRow.tsx
 #: src/components/settings/sections/AiSection.tsx
+#: src/components/settings/sections/PersonalizationSection.tsx
+#: src/components/settings/sections/SpeechSection.tsx
 msgid "settings.cancel"
 msgstr "取消"
 
@@ -784,6 +880,11 @@ msgid "settings.capability_evidence_unavailable"
 msgstr "能力证据不可用"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/SpeechSection.tsx
+msgid "settings.speech.spoken_output_capability"
+msgstr "需要能力支持：在可用 TTS 适配器就绪前，音色发现与播放将保持禁用。"
+
+#. js-lingui-explicit-id
 #: src/components/settings/ProviderDirectory.tsx
 msgid "settings.catalog_availability_disclaimer"
 msgstr "目录中列出并不代表已安装适配器、拥有有效授权，或支持每一种模型能力。"
@@ -802,6 +903,46 @@ msgstr "切换语言..."
 #: src/components/home/SidebarAccount.tsx
 msgid "home.change_theme"
 msgstr "切换主题"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/SpeechSection.tsx
+msgid "settings.speech.host_unavailable_suffix"
+msgstr "在此之前，此处的更改无法保存。"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/UpdatesSection.tsx
+msgid "settings.updates.check_automatically"
+msgstr "自动检查"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/UpdatesSection.tsx
+msgid "settings.updates.check_automatically_aria"
+msgstr "自动检查更新"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/RecoverySection.tsx
+msgid "settings.recovery.check_host"
+msgstr "检查主机"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/UpdatesSection.tsx
+msgid "settings.updates.check_now"
+msgstr "立即检查"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/UpdatesSection.tsx
+msgid "settings.updates.checking"
+msgstr "正在检查更新…"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/RecoverySection.tsx
+msgid "settings.recovery.host_checking"
+msgstr "正在检查主机状态..."
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/UpdatesSection.tsx
+msgid "settings.updates.checking_availability"
+msgstr "正在检查更新可用性…"
 
 #. js-lingui-explicit-id
 #: src/components/settings/ProviderDirectory.tsx
@@ -827,6 +968,11 @@ msgstr "清除"
 #: src/components/home/ProjectHome.tsx
 msgid "home.clear_search"
 msgstr "清除搜索"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/PersonalizationSection.tsx
+msgid "settings.personalization.personality_direct_desc"
+msgstr "清晰权衡，果断建议。"
 
 #. js-lingui-explicit-id
 #: src/hooks/useCopyPng.ts
@@ -855,6 +1001,16 @@ msgid "kit_library.density_compact"
 msgstr "紧凑"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/PersonalizationSection.tsx
+msgid "settings.personalization.compatibility"
+msgstr "兼容性：这些偏好保存在本地。外部 Agent 只会收到隐私安全的能力状态，绝不会收到你的指令文本。"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/IntegrationsSection.tsx
+msgid "settings.integrations.authorizing"
+msgstr "请在提供方窗口中完成授权。"
+
+#. js-lingui-explicit-id
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.tab_components"
 msgstr "组件"
@@ -873,6 +1029,11 @@ msgstr "合成失败"
 #: src/components/canvas/nodes/BoardNode.tsx
 msgid "board.toast_compose_failed"
 msgstr "合成失败"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/PersonalizationSection.tsx
+msgid "settings.personalization.personality_concise"
+msgstr "简洁"
 
 #. js-lingui-explicit-id
 #: src/components/canvas/nodes/IntentPanel.tsx
@@ -907,6 +1068,11 @@ msgid "library.no_model"
 msgstr "在设置中配置图像模型后即可生成。"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/SpeechSection.tsx
+msgid "settings.speech.description"
+msgstr "配置听写与语音输出，不会改变 Agent 如何规划你的工作。"
+
+#. js-lingui-explicit-id
 #: src/components/settings/ProviderRow.tsx
 #: src/components/settings/VectorizerPanel.tsx
 msgid "settings.status_configured"
@@ -922,6 +1088,11 @@ msgstr "已配置，输入以替换"
 #: src/components/library/KitLibraryInspector.tsx
 msgid "kit_library.audit_conflicts"
 msgstr "冲突"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/IntegrationsSection.tsx
+msgid "settings.integrations.connect"
+msgstr "连接"
 
 #. js-lingui-explicit-id
 #. placeholder {0}: definition.label
@@ -953,6 +1124,16 @@ msgstr "先连接一个提供方，Cutout 会自动为文本、视觉、语音�
 #: src/components/settings/sections/AiSection.tsx
 msgid "settings.connect_provider"
 msgstr "连接提供方"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/IntegrationsSection.tsx
+msgid "settings.integrations.connected"
+msgstr "已连接主机托管的会话。"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/IntegrationsSection.tsx
+msgid "settings.integrations.connection_failed"
+msgstr "连接失败。"
 
 #. js-lingui-explicit-id
 #: src/components/library/KitLibraryInspector.tsx
@@ -1023,6 +1204,16 @@ msgid "library.toast_remove_failed"
 msgstr "无法移除素材"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/PersonalizationSection.tsx
+msgid "settings.personalization.save_failed_toast"
+msgstr "无法保存个性化设置"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/SpeechSection.tsx
+msgid "settings.speech.save_failed_toast"
+msgstr "无法保存语音偏好"
+
+#. js-lingui-explicit-id
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.toast_update_failed"
 msgstr "无法更新素材"
@@ -1044,8 +1235,14 @@ msgstr "根据简报创建"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
+#: src/components/settings/sections/SpeechSection.tsx
 msgid "settings.dimension_tts_description"
 msgstr "生成语音音频。"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/IntegrationsSection.tsx
+msgid "settings.integrations.description"
+msgstr "凭证保留在桌面主机中。Cutout 仅存储不透明、可撤销的会话句柄。"
 
 #. js-lingui-explicit-id
 #: src/components/library/TeamGovernancePanel.tsx
@@ -1053,9 +1250,30 @@ msgid "team.current_project_revision"
 msgstr "当前项目修订版本"
 
 #. js-lingui-explicit-id
+#. placeholder {0}: state.capability?.currentVersion ?? "checking..."
+#: src/components/settings/sections/UpdatesSection.tsx
+msgid "settings.updates.current_version"
+msgstr "当前版本 {0}"
+
+#. js-lingui-explicit-id
 #: src/components/settings/ProviderDirectory.tsx
 msgid "settings.provider_category_custom"
 msgstr "自定义"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/PersonalizationSection.tsx
+msgid "settings.personalization.personality_custom"
+msgstr "自定义"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/PersonalizationSection.tsx
+msgid "settings.personalization.custom_instructions"
+msgstr "自定义指令"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/PersonalizationSection.tsx
+msgid "settings.personalization.custom_requires_instructions"
+msgstr "自定义个性需要先填写指令才能保存。"
 
 #. js-lingui-explicit-id
 #: src/components/canvas/edges/TransitionEdge.tsx
@@ -1063,12 +1281,18 @@ msgid "pipeline.transition_cutout"
 msgstr "抠图"
 
 #. js-lingui-explicit-id
+#. placeholder {0}: state.preferences.channel
+#: src/components/settings/sections/UpdatesSection.tsx
+msgid "settings.updates.up_to_date"
+msgstr "Cutout 在 {0} 通道上已是最新。"
+
+#. js-lingui-explicit-id
 #: src/components/source/ParameterControls.tsx
 msgid "source.params_aria"
 msgstr "抠图参数"
 
 #. js-lingui-explicit-id
-#: src/components/settings/sections/GeneralSection.tsx
+#: src/components/settings/sections/AdvancedSection.tsx
 msgid "settings.reset_params_label"
 msgstr "切图参数"
 
@@ -1126,6 +1350,11 @@ msgid "home.delete_permanently_title"
 msgstr "永久删除？"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/PersonalizationSection.tsx
+msgid "settings.personalization.custom_instructions_placeholder"
+msgstr "描述稳定的偏好、约束，或你希望结果如何呈现。"
+
+#. js-lingui-explicit-id
 #: src/components/canvas/nodes/BriefNode.tsx
 msgid "brief.placeholder"
 msgstr "描述产品及其主界面——面向谁、展示什么……"
@@ -1181,14 +1410,54 @@ msgid "home.preset_desktop"
 msgstr "桌面端"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/IntegrationsSection.tsx
+msgid "settings.integrations.desktop_not_installed"
+msgstr "未安装桌面提供方。"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AdvancedSection.tsx
+msgid "settings.developer_mode.title"
+msgstr "开发者模式"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/RecoverySection.tsx
+msgid "settings.recovery.diagnostic_preview_aria"
+msgstr "诊断包预览"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/SpeechSection.tsx
+msgid "settings.speech.dictation"
+msgstr "听写"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/SpeechSection.tsx
+msgid "settings.speech.dictionary_entry"
+msgstr "词典条目"
+
+#. js-lingui-explicit-id
 #: src/components/canvas/nodes/IntentPanel.tsx
 msgid "intent.dimensions"
 msgstr "维度"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/PersonalizationSection.tsx
+msgid "settings.personalization.personality_direct"
+msgstr "直接"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/IntegrationsSection.tsx
+msgid "settings.integrations.disconnect"
+msgstr "断开连接"
+
+#. js-lingui-explicit-id
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.discover_references"
 msgstr "发现参考资料"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/PersonalizationSection.tsx
+msgid "settings.personalization.custom_instructions_help"
+msgstr "请勿包含 API 密钥或私人凭证。项目特定需求应写在项目简报中。"
 
 #. js-lingui-explicit-id
 #: src/components/help/HelpMenu.tsx
@@ -1204,6 +1473,11 @@ msgstr "完成"
 #: src/components/library/KitLibraryInspector.tsx
 msgid "kit_library.download"
 msgstr "下载"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/UpdatesSection.tsx
+msgid "settings.updates.download"
+msgstr "下载更新"
 
 #. js-lingui-explicit-id
 #: src/components/home/ProjectHome.tsx
@@ -1302,6 +1576,11 @@ msgid "inspector.export_all_tooltip"
 msgstr "导出全部切片"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/RecoverySection.tsx
+msgid "settings.recovery.export_diagnostics"
+msgstr "导出诊断信息"
+
+#. js-lingui-explicit-id
 #: src/hooks/useExport.ts
 msgid "export.toast_failed"
 msgstr "导出失败：{reason}"
@@ -1372,6 +1651,11 @@ msgid "global_library.policy_follow_updates"
 msgstr "跟随更新"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/PersonalizationSection.tsx
+msgid "settings.personalization.personality_custom_desc"
+msgstr "遵循你保存的指令。"
+
+#. js-lingui-explicit-id
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.reference_following"
 msgstr "跟随中"
@@ -1380,6 +1664,11 @@ msgstr "跟随中"
 #: src/components/home/ProjectHome.tsx
 msgid "home.nav_forward"
 msgstr "前进"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/PersonalizationSection.tsx
+msgid "settings.personalization.personality_friendly"
+msgstr "友好"
 
 #. js-lingui-explicit-id
 #: src/components/settings/ProviderDirectory.tsx
@@ -1469,9 +1758,29 @@ msgid "settings.key_hide"
 msgstr "隐藏"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/RecoverySection.tsx
+msgid "settings.recovery.host_ready"
+msgstr "主机已就绪。"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/RecoverySection.tsx
+msgid "settings.recovery.host_error"
+msgstr "无法完成主机恢复。"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/RecoverySection.tsx
+msgid "settings.recovery.host_status"
+msgstr "主机恢复："
+
+#. js-lingui-explicit-id
 #: src/components/library/TeamGovernancePanel.tsx
 msgid "team.host_required"
 msgstr "需要主机"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/SpeechSection.tsx
+msgid "settings.speech.host_required"
+msgstr "需要主机：麦克风枚举与系统级快捷键需要已授权的桌面主机。"
 
 #. js-lingui-explicit-id
 #: src/components/settings/ProviderDirectory.tsx
@@ -1549,6 +1858,17 @@ msgid "slices.inspector_tab"
 msgstr "检视"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/UpdatesSection.tsx
+msgid "settings.updates.install_restart"
+msgstr "安装并重启"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/PersonalizationSection.tsx
+msgid "settings.personalization.instructions_saved_toast"
+msgstr "指令已保存"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/IntegrationsSection.tsx
 #: src/components/settings/SettingsSidebar.tsx
 msgid "settings.section_integrations"
 msgstr "集成"
@@ -1557,6 +1877,11 @@ msgstr "集成"
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.empty_fallback_label"
 msgstr "项目"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/SpeechSection.tsx
+msgid "settings.speech.keep_dictation_visible"
+msgstr "保持听写界面可见"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
@@ -1572,6 +1897,16 @@ msgstr "套件审计"
 #: src/components/settings/sections/GeneralSection.tsx
 msgid "topbar.language_label"
 msgstr "语言"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/PersonalizationSection.tsx
+msgid "settings.personalization.tool_assisted_memory_desc"
+msgstr "允许已批准的工具贡献偏好信号。"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/PaidActionsSection.tsx
+msgid "settings.paid_actions.hint"
+msgstr "仅在单次操作不超过此额度时，允许 Agent 自动继续。"
 
 #. js-lingui-explicit-id
 #: src/components/library/GlobalLibraryView.tsx
@@ -1604,9 +1939,19 @@ msgid "home.layout_list"
 msgstr "列表视图"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/PersonalizationSection.tsx
+msgid "settings.personalization.loading"
+msgstr "正在加载个性化…"
+
+#. js-lingui-explicit-id
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.loading_registry_installer"
 msgstr "正在加载注册表安装程序…"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/SpeechSection.tsx
+msgid "settings.speech.loading"
+msgstr "正在加载语音设置…"
 
 #. js-lingui-explicit-id
 #: src/components/settings/ProviderDirectory.tsx
@@ -1622,6 +1967,11 @@ msgstr "本地库存储不可用。"
 #: src/components/home/ProjectHome.tsx
 msgid "home.local_projects"
 msgstr "本地项目"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/RecoverySection.tsx
+msgid "settings.recovery.title"
+msgstr "本地恢复"
 
 #. js-lingui-explicit-id
 #: src/components/library/TeamGovernancePanel.tsx
@@ -1657,6 +2007,36 @@ msgstr "已锁定"
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.kit_editor_description"
 msgstr "管理已批准的、内容寻址的套件投影。"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/PaidActionsSection.tsx
+msgid "settings.paid_actions.maximum_cost_aria"
+msgstr "单次付费操作的最高美元成本"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/PaidActionsSection.tsx
+msgid "settings.paid_actions.maximum_cost"
+msgstr "单次最高额度（USD）"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/PersonalizationSection.tsx
+msgid "settings.personalization.memory"
+msgstr "记忆"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/PersonalizationSection.tsx
+msgid "settings.personalization.memory_disabled_toast"
+msgstr "已关闭记忆"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/PersonalizationSection.tsx
+msgid "settings.personalization.memory_enabled_toast"
+msgstr "已启用记忆"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/SpeechSection.tsx
+msgid "settings.speech.microphone_device_id"
+msgstr "麦克风设备 ID"
 
 #. js-lingui-explicit-id
 #: src/components/home/ProjectHome.tsx
@@ -1821,6 +2201,16 @@ msgid "settings.status_unconfigured"
 msgstr "未配置"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/IntegrationsSection.tsx
+msgid "settings.integrations.not_connected"
+msgstr "未连接。"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/SpeechSection.tsx
+msgid "settings.speech.not_set"
+msgstr "未设置"
+
+#. js-lingui-explicit-id
 #: src/components/library/KitLibraryInspector.tsx
 msgid "kit_library.not_used_by_project"
 msgstr "尚未被任何项目使用"
@@ -1868,12 +2258,17 @@ msgid "source.dropzone_hint"
 msgstr "或点击浏览 · PNG、JPEG、WebP"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/PaidActionsSection.tsx
+msgid "settings.paid_actions.title"
+msgstr "付费操作"
+
+#. js-lingui-explicit-id
 #: src/components/source/ParameterControls.tsx
 msgid "source.params_heading"
 msgstr "参数"
 
 #. js-lingui-explicit-id
-#: src/components/settings/sections/GeneralSection.tsx
+#: src/components/settings/sections/AdvancedSection.tsx
 msgid "settings.reset_done_toast"
 msgstr "参数已重置"
 
@@ -1883,9 +2278,30 @@ msgid "kit_library.parser_host_not_configured"
 msgstr "此界面尚未配置解析器主机。请导入其签名的 JSON 结果以查看候选项。"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/PersonalizationSection.tsx
+msgid "settings.personalization.personality"
+msgstr "个性"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/PersonalizationSection.tsx
+msgid "settings.personalization.personality_updated_toast"
+msgstr "个性已更新"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/PersonalizationSection.tsx
 #: src/components/settings/SettingsSidebar.tsx
 msgid "settings.section_personalization"
 msgstr "个性化"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/PersonalizationSection.tsx
+msgid "settings.personalization.load_failed"
+msgstr "无法加载个性化设置。"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/PersonalizationSection.tsx
+msgid "settings.personalization.reset_done_toast"
+msgstr "个性化已重置"
 
 #. js-lingui-explicit-id
 #: src/components/home/ProjectHome.tsx
@@ -1930,6 +2346,11 @@ msgid "dag.toast_plan_failed"
 msgstr "规划失败"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/IntegrationsSection.tsx
+msgid "settings.integrations.handshake_note"
+msgstr "插件、MCP、CLI 与本地保险库集成仅在主机握手验证通过后可用。"
+
+#. js-lingui-explicit-id
 #: src/components/topbar/TopBarActions.tsx
 msgid "export.menu_png_svg_api"
 msgstr "PNG + SVG · API"
@@ -1971,6 +2392,11 @@ msgid "kit_library.preview_heading"
 msgstr "预览"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/RecoverySection.tsx
+msgid "settings.recovery.preview_diagnostics"
+msgstr "预览诊断信息"
+
+#. js-lingui-explicit-id
 #: src/components/library/RegistryInstallPanel.tsx
 msgid "registry_install.preview_install"
 msgstr "预览安装"
@@ -1979,6 +2405,11 @@ msgstr "预览安装"
 #: src/components/settings/VectorizerPanel.tsx
 msgid "vectorizer.mode_production"
 msgstr "生产"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/PersonalizationSection.tsx
+msgid "settings.personalization.personality_professional"
+msgstr "专业"
 
 #. js-lingui-explicit-id
 #: src/components/home/ProjectHome.tsx
@@ -2004,11 +2435,6 @@ msgstr "项目保存在这台设备上"
 #: src/components/home/ProjectHome.tsx
 msgid "home.drafts_empty_description"
 msgstr "尚未产出结果的项目会汇总在这里。"
-
-#. js-lingui-explicit-id
-#: src/components/home/ProjectHome.tsx
-msgid "home.published_empty_description"
-msgstr "你发布的项目会在这里列出并附带在线链接。这依赖账号与社区服务，目前尚未构建。"
 
 #. js-lingui-explicit-id
 #: src/components/library/LibraryDrawer.tsx
@@ -2063,19 +2489,14 @@ msgid "global_library.toast_published"
 msgstr "已发布 {0} v{1}"
 
 #. js-lingui-explicit-id
-#: src/components/home/ProjectHome.tsx
-msgid "home.published_projects"
-msgstr "已发布项目"
-
-#. js-lingui-explicit-id
-#: src/components/home/ProjectHome.tsx
-msgid "home.published_empty_title"
-msgstr "发布功能开发中"
-
-#. js-lingui-explicit-id
 #: src/components/library/KitLibraryInspector.tsx
 msgid "kit_library.publishing"
 msgstr "发布中…"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/SpeechSection.tsx
+msgid "settings.speech.push_to_talk"
+msgstr "按住说话"
 
 #. js-lingui-explicit-id
 #: src/components/library/ReviewBranchEditor.tsx
@@ -2113,6 +2534,11 @@ msgid "settings.provider_category_recommended"
 msgstr "推荐"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/RecoverySection.tsx
+msgid "settings.recovery.recover_host"
+msgstr "恢复主机"
+
+#. js-lingui-explicit-id
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.hosts_not_configured"
 msgstr "尚未配置参考资料提供方主机。"
@@ -2126,6 +2552,16 @@ msgstr "参考资料"
 #: src/components/canvas/nodes/IntentPanel.tsx
 msgid "intent.questions_hint"
 msgstr "在上方补充需求以回答这些问题，然后重新规划。"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/IntegrationsSection.tsx
+msgid "settings.integrations.refresh_session"
+msgstr "刷新会话"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/IntegrationsSection.tsx
+msgid "settings.integrations.refreshing"
+msgstr "正在刷新会话…"
 
 #. js-lingui-explicit-id
 #: src/components/canvas/nodes/MockupNode.tsx
@@ -2152,6 +2588,11 @@ msgstr "记住导出目录"
 #: src/components/settings/VectorizerPanel.tsx
 msgid "settings.remove_action"
 msgstr "删除"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/SpeechSection.tsx
+msgid "settings.speech.remove_entry"
+msgstr "移除 {value}"
 
 #. js-lingui-explicit-id
 #: src/components/settings/ProviderRow.tsx
@@ -2200,7 +2641,27 @@ msgid "source.params_reset"
 msgstr "重置"
 
 #. js-lingui-explicit-id
-#: src/components/settings/sections/GeneralSection.tsx
+#: src/components/settings/sections/PersonalizationSection.tsx
+msgid "settings.personalization.reset"
+msgstr "重置"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/SpeechSection.tsx
+msgid "settings.speech.reset"
+msgstr "重置"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/PersonalizationSection.tsx
+msgid "settings.personalization.reset_failed_toast"
+msgstr "重置失败"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/RecoverySection.tsx
+msgid "settings.recovery.hint"
+msgstr "重置界面偏好，或导出已脱敏的本地诊断包。不会删除项目数据。"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AdvancedSection.tsx
 msgid "settings.reset_params"
 msgstr "重置参数"
 
@@ -2208,6 +2669,31 @@ msgstr "重置参数"
 #: src/components/source/ParameterControls.tsx
 msgid "source.params_reset_title"
 msgstr "将参数重置为默认值"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/PersonalizationSection.tsx
+msgid "settings.personalization.reset_confirm"
+msgstr "重置个性化"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/PersonalizationSection.tsx
+msgid "settings.personalization.reset_title"
+msgstr "重置个性化？"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/SpeechSection.tsx
+msgid "settings.speech.reset_confirm"
+msgstr "重置语音"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/SpeechSection.tsx
+msgid "settings.speech.reset_title"
+msgstr "重置语音偏好？"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/RecoverySection.tsx
+msgid "settings.recovery.reset_ui"
+msgstr "重置界面状态"
 
 #. js-lingui-explicit-id
 #. placeholder {0}: conflicts.map(({ kind }) => kind).join(', ')
@@ -2221,20 +2707,45 @@ msgid "review_branch.resolved"
 msgstr "已解决"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/UpdatesSection.tsx
+msgid "settings.updates.install_note"
+msgstr "仅在你选择「安装并重启」后才会重启。进行中的 Agent 工作会阻止安装。"
+
+#. js-lingui-explicit-id
 #: src/components/home/ProjectHome.tsx
 #: src/components/settings/sections/ArchivedSection.tsx
 msgid "home.restore"
 msgstr "恢复"
 
 #. js-lingui-explicit-id
-#: src/components/settings/sections/GeneralSection.tsx
+#: src/components/settings/sections/AdvancedSection.tsx
 msgid "settings.reset_params_hint"
 msgstr "将白底阈值、最小面积、合并间距与内边距恢复为默认值。"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/PersonalizationSection.tsx
+msgid "settings.personalization.retry"
+msgstr "重试"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/SpeechSection.tsx
+msgid "settings.speech.retry"
+msgstr "重试"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/UpdatesSection.tsx
+msgid "settings.updates.retry"
+msgstr "重试"
 
 #. js-lingui-explicit-id
 #: src/components/home/ProjectHome.tsx
 msgid "home.retry"
 msgstr "重试"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/PersonalizationSection.tsx
+msgid "settings.personalization.use_memory_desc"
+msgstr "在后续会话中复用已批准的偏好。"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/GeneralSection.tsx
@@ -2262,6 +2773,11 @@ msgid "review_branch.comment_aria"
 msgstr "评审评论"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/IntegrationsSection.tsx
+msgid "settings.integrations.revoking"
+msgstr "正在撤销会话…"
+
+#. js-lingui-explicit-id
 #: src/components/home/ProjectHome.tsx
 msgid "home.status_running"
 msgstr "进行中"
@@ -2281,6 +2797,16 @@ msgstr "运行中…"
 #: src/components/settings/VectorizerPanel.tsx
 msgid "settings.save"
 msgstr "保存"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/PersonalizationSection.tsx
+msgid "settings.personalization.save_changes"
+msgstr "保存更改"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/SpeechSection.tsx
+msgid "settings.speech.save_changes"
+msgstr "保存更改"
 
 #. js-lingui-explicit-id
 #: src/components/settings/ProviderForm.tsx
@@ -2335,10 +2861,20 @@ msgid "slices.name"
 msgstr "语义命名"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/IntegrationsSection.tsx
+msgid "settings.integrations.expired"
+msgstr "会话已过期。请刷新或重新连接。"
+
+#. js-lingui-explicit-id
 #: src/components/home/SidebarAccount.tsx
 #: src/components/settings/SettingsDialog.tsx
 msgid "settings.menu_label"
 msgstr "设置"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/PersonalizationSection.tsx
+msgid "settings.personalization.description"
+msgstr "塑造 Agent 与你协作的方式，同时让每个项目都聚焦结果。"
 
 #. js-lingui-explicit-id
 #: src/components/library/TeamGovernancePanel.tsx
@@ -2346,10 +2882,25 @@ msgid "team.share_review"
 msgstr "分享与评审"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/PersonalizationSection.tsx
+msgid "settings.personalization.personality_concise_desc"
+msgstr "简短、直接的回复。"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/SpeechSection.tsx
+msgid "settings.speech.shortcut"
+msgstr "快捷键"
+
+#. js-lingui-explicit-id
 #: src/components/settings/KeyField.tsx
 #: src/components/settings/VectorizerPanel.tsx
 msgid "settings.key_show"
 msgstr "显示"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AdvancedSection.tsx
+msgid "settings.developer_mode.hint"
+msgstr "在项目内显示只读的 DAG、Design IR 和回执审计工具。"
 
 #. js-lingui-explicit-id
 #: src/components/inspector/SliceDimensions.tsx
@@ -2399,14 +2950,46 @@ msgid "settings.provider_category_speech"
 msgstr "语音"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/SpeechSection.tsx
 #: src/components/settings/SettingsSidebar.tsx
 msgid "settings.section_speech"
 msgstr "语音"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/SpeechSection.tsx
+msgid "settings.speech.models_title"
+msgstr "语音模型"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/SpeechSection.tsx
+msgid "settings.speech.saved_toast"
+msgstr "语音偏好已保存"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/SpeechSection.tsx
+msgid "settings.speech.load_failed"
+msgstr "无法加载语音设置。"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/SpeechSection.tsx
+msgid "settings.speech.shortcut_aria"
+msgstr "语音快捷键"
+
+#. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
+#: src/components/settings/sections/SpeechSection.tsx
 msgid "settings.dimension_asr_label"
 msgstr "语音转文本"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/SpeechSection.tsx
+msgid "settings.speech.spoken_output"
+msgstr "语音输出"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/UpdatesSection.tsx
+msgid "settings.updates.stable"
+msgstr "稳定版"
 
 #. js-lingui-explicit-id
 #: src/components/home/ProjectHome.tsx
@@ -2414,9 +2997,19 @@ msgid "home.projects_empty_description"
 msgstr "从一个想法开始，或导入视觉板。"
 
 #. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.tab_starters"
+msgstr "入门套件"
+
+#. js-lingui-explicit-id
 #: src/components/canvas/nodes/IntentPanel.tsx
 msgid "intent.strategy"
 msgstr "策略"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/PersonalizationSection.tsx
+msgid "settings.personalization.personality_professional_desc"
+msgstr "结构化且正式。"
 
 #. js-lingui-explicit-id
 #: src/components/help/HelpMenu.tsx
@@ -2477,6 +3070,7 @@ msgstr "测试"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
+#: src/components/settings/sections/SpeechSection.tsx
 msgid "settings.dimension_tts_label"
 msgstr "文本转语音"
 
@@ -2529,14 +3123,60 @@ msgid "settings.remove_confirm_desc"
 msgstr "将删除「{label}」的配置及其保存在系统钥匙串中的密钥，此操作无法撤销。"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/SpeechSection.tsx
+msgid "settings.speech.reset_description"
+msgstr "这将把听写、词典、快捷键与 TTS 偏好恢复为默认值。"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/PersonalizationSection.tsx
+msgid "settings.personalization.reset_description"
+msgstr "这将把个性、自定义指令和记忆权限恢复为默认值。此操作无法撤销。"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/SpeechSection.tsx
+msgid "settings.speech.toggle"
+msgstr "切换"
+
+#. js-lingui-explicit-id
 #: src/components/preview/PreviewToolbar.tsx
 msgid "preview.toggle_checker"
 msgstr "切换棋盘格"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/PersonalizationSection.tsx
+msgid "settings.personalization.tool_assisted_memory"
+msgstr "工具辅助记忆"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/PersonalizationSection.tsx
+msgid "settings.personalization.tool_memory_disabled_toast"
+msgstr "已关闭工具辅助记忆"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/PersonalizationSection.tsx
+msgid "settings.personalization.tool_memory_enabled_toast"
+msgstr "已启用工具辅助记忆"
+
+#. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
+#: src/components/settings/sections/SpeechSection.tsx
 msgid "settings.dimension_asr_description"
 msgstr "转录语音音频。"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/SpeechSection.tsx
+msgid "settings.speech.tts_adapter_required"
+msgstr "需要 TTS 适配器"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/SpeechSection.tsx
+msgid "settings.speech.tts_rate"
+msgstr "TTS 语速"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/SpeechSection.tsx
+msgid "settings.speech.tts_voice"
+msgstr "TTS 音色"
 
 #. js-lingui-explicit-id
 #: src/components/settings/ProviderForm.tsx
@@ -2547,6 +3187,11 @@ msgstr "类型"
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.meta_type"
 msgstr "类型"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/RecoverySection.tsx
+msgid "settings.recovery.ui_reset"
+msgstr "界面状态已重置"
 
 #. js-lingui-explicit-id
 #: src/components/settings/ModelSlot.tsx
@@ -2596,6 +3241,31 @@ msgid "source.meta_untitled"
 msgstr "未命名"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/UpdatesSection.tsx
+msgid "settings.updates.channel_aria"
+msgstr "更新通道"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/UpdatesSection.tsx
+msgid "settings.updates.download_progress_aria"
+msgstr "更新下载进度"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/UpdatesSection.tsx
+msgid "settings.updates.title"
+msgstr "更新"
+
+#. js-lingui-explicit-id
+#: src/components/settings/SettingsSidebar.tsx
+msgid "settings.section_updates_support"
+msgstr "更新与支持"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/UpdatesSection.tsx
+msgid "settings.updates.unavailable"
+msgstr "更新功能仅在 Cutout 桌面版中可用。"
+
+#. js-lingui-explicit-id
 #. placeholder {0}: item.name
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.use_in_project_aria"
@@ -2615,6 +3285,11 @@ msgstr "在项目中使用…"
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.use_masonry_preview"
 msgstr "使用瀑布流预览"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/PersonalizationSection.tsx
+msgid "settings.personalization.use_memory"
+msgstr "使用记忆"
 
 #. js-lingui-explicit-id
 #. placeholder {0}: previous.version
@@ -2668,6 +3343,12 @@ msgid "global_library.meta_version"
 msgstr "版本"
 
 #. js-lingui-explicit-id
+#. placeholder {0}: state.release.version
+#: src/components/settings/sections/UpdatesSection.tsx
+msgid "settings.updates.version_available"
+msgstr "版本 {0} 可用。"
+
+#. js-lingui-explicit-id
 #: src/components/library/KitLibraryInspector.tsx
 msgid "kit_library.version_diff_aria"
 msgstr "版本差异"
@@ -2708,9 +3389,19 @@ msgid "global_library.tab_visual_assets"
 msgstr "视觉素材"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/IntegrationsSection.tsx
+msgid "settings.integrations.waiting_callback"
+msgstr "等待回调"
+
+#. js-lingui-explicit-id
 #: src/components/canvas/nodes/dag-node-common.tsx
 msgid "dag.idle"
 msgstr "等待运行…"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/PersonalizationSection.tsx
+msgid "settings.personalization.personality_friendly_desc"
+msgstr "温暖且善于协作。"
 
 #. js-lingui-explicit-id
 #: src/components/home/ProjectHome.tsx
@@ -2726,12 +3417,6 @@ msgstr "网页开发"
 #: src/components/home/ProjectHome.tsx
 msgid "home.start_title"
 msgstr "我们要设计什么？"
-
-#. js-lingui-explicit-id
-#: src/components/home/ProjectHome.tsx
-#: src/components/settings/SettingsSidebar.tsx
-msgid "home.wip_badge"
-msgstr "WIP"
 
 #. js-lingui-explicit-id
 #: src/components/home/ProjectHome.tsx

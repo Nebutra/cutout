@@ -64,6 +64,28 @@ export interface ToolLoopResult {
 
 const DEFAULT_MAX_STEPS = 2
 
+/**
+ * Short labels for durable run events and the Agent activity UI.
+ * Model-facing `description` strings are instructions, not human titles.
+ */
+const TOOL_EVENT_LABELS: Readonly<Record<string, string>> = {
+  reply_conversationally: 'Replying',
+  ask_clarifying_question: 'Asking for clarification',
+  proceed_with_generation: 'Preparing generation',
+  compile_astryx_theme: 'Compiling Astryx theme',
+  configure_prototype_regeneration: 'Configuring regeneration',
+  select_pages_to_regenerate: 'Selecting pages',
+}
+
+/** Tools that only produce conversation (or silence). They must not appear as ops log rows. */
+export const CHAT_SURFACE_TOOLS: ReadonlySet<string> = new Set([
+  'reply_conversationally',
+])
+
+export function toolEventLabel(toolName: string): string {
+  return TOOL_EVENT_LABELS[toolName] ?? toolName.replaceAll('_', ' ')
+}
+
 export async function runToolLoop(
   generation: Pick<GenerationService, 'generateWithTools'>,
   input: ToolLoopInput,
@@ -84,11 +106,14 @@ export async function runToolLoop(
   for (const call of result.data.toolCalls) {
     const tool = byName.get(call.toolName)
     const toolCallId = call.toolCallId
+    // Event labels are human UI copy. Never reuse the model-facing description
+    // (often a multi-sentence "Call this INSTEAD…" instruction).
+    const label = toolEventLabel(call.toolName)
     events.push(createRunEvent(input.runId, {
       type: 'tool-started',
       toolCallId,
       tool: call.toolName,
-      label: tool?.description ?? call.toolName,
+      label,
     }))
 
     if (!tool) {
@@ -96,7 +121,7 @@ export async function runToolLoop(
         type: 'tool-failed',
         toolCallId,
         tool: call.toolName,
-        label: call.toolName,
+        label,
         detail: `The model called an unregistered tool: ${call.toolName}`,
       }))
       calls.push({ toolCallId, toolName: call.toolName, toolInput: call.input, toolOutput: undefined, registered: false })
@@ -108,7 +133,7 @@ export async function runToolLoop(
         type: 'tool-failed',
         toolCallId,
         tool: call.toolName,
-        label: tool.description,
+        label,
         detail: call.error,
       }))
       calls.push({
@@ -126,7 +151,7 @@ export async function runToolLoop(
       type: 'tool-succeeded',
       toolCallId,
       tool: call.toolName,
-      label: tool.description,
+      label,
       outputRefs: [],
     }))
     calls.push({ toolCallId, toolName: call.toolName, toolInput: call.input, toolOutput: call.output, registered: true })

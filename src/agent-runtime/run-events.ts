@@ -56,6 +56,15 @@ export const agentRunEventSchema = z.discriminatedUnion('type', [
   runEventBaseSchema.extend({ type: z.literal('outcome-evaluated'), status: z.enum(['satisfied', 'needs-repair']), missing: z.array(missingRequirementSchema) }).strict(),
   runEventBaseSchema.extend({ type: z.literal('run-cancelled'), reason: eventText }).strict(),
   runEventBaseSchema.extend({
+    type: z.literal('agent-message'),
+    message: eventText,
+    action: z.object({
+      type: z.literal('proceed-anyway'),
+      label: eventText,
+      brief: eventText,
+    }).strict().optional(),
+  }).strict(),
+  runEventBaseSchema.extend({
     type: z.literal('human-loop-asked'),
     askId: eventText,
     question: eventText,
@@ -176,6 +185,15 @@ export type AgentRunEvent =
   | (RunEventBase & {
       readonly type: 'run-cancelled'
       readonly reason: string
+    })
+  | (RunEventBase & {
+      readonly type: 'agent-message'
+      readonly message: string
+      readonly action?: {
+        readonly type: 'proceed-anyway'
+        readonly label: string
+        readonly brief: string
+      }
     })
   | (RunEventBase & {
       readonly type: 'human-loop-asked'
@@ -540,6 +558,7 @@ function reduceActiveRun(
           : [...run.materials, event.material],
       }
     case 'capability-fallback':
+    case 'agent-message':
       return run
     case 'outcome-evaluated':
       return {

@@ -230,6 +230,27 @@ msgstr ""
 #~ msgstr "Viewer"
 
 #. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+#~ msgid "home.published_empty_description"
+#~ msgstr "Projects you publish will be listed here with their live links. This needs accounts and a community service, which are not built yet."
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+#~ msgid "home.published_projects"
+#~ msgstr "Published Projects"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+#~ msgid "home.published_empty_title"
+#~ msgstr "Publishing is on the way"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+#: src/components/settings/SettingsSidebar.tsx
+#~ msgid "home.wip_badge"
+#~ msgstr "WIP"
+
+#. js-lingui-explicit-id
 #. placeholder {0}: project.name
 #: src/components/home/ProjectHome.tsx
 msgid "home.archive_project_description"
@@ -284,6 +305,12 @@ msgstr "{0} · {1, plural, one {# verified file} other {# verified files}}"
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.toast_added_to_project"
 msgstr "{0} added to project"
+
+#. js-lingui-explicit-id
+#. placeholder {0}: state.downloaded
+#: src/components/settings/sections/UpdatesSection.tsx
+msgid "settings.updates.bytes_downloaded"
+msgstr "{0} bytes downloaded"
 
 #. js-lingui-explicit-id
 #. placeholder {0}: confirmed.size
@@ -375,6 +402,11 @@ msgid "team.pending_reviews_count"
 msgstr "{pending} pending reviews"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/UpdatesSection.tsx
+msgid "settings.updates.percent_downloaded"
+msgstr "{progress}% downloaded"
+
+#. js-lingui-explicit-id
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.lineage_results_count"
 msgstr "{relatedCount, plural, one {# lineage result} other {# lineage results}}"
@@ -405,9 +437,19 @@ msgid "intent.questions_title"
 msgstr "A quick clarification first"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/SpeechSection.tsx
+msgid "settings.speech.activation"
+msgstr "Activation"
+
+#. js-lingui-explicit-id
 #: src/components/preview/PreviewToolbar.tsx
 msgid "preview.zoom_actual"
 msgstr "Actual size (1:1)"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/PersonalizationSection.tsx
+msgid "settings.personalization.personality_auto_desc"
+msgstr "Adapt to the task and requested result."
 
 #. js-lingui-explicit-id
 #: src/components/settings/ProviderDirectory.tsx
@@ -416,6 +458,7 @@ msgstr "Adapter available"
 
 #. js-lingui-explicit-id
 #: src/components/settings/ProviderForm.tsx
+#: src/components/settings/sections/SpeechSection.tsx
 msgid "settings.add"
 msgstr "Add"
 
@@ -460,7 +503,13 @@ msgid "mockup.toast_added_to_library"
 msgstr "Added to library"
 
 #. js-lingui-explicit-id
+#: src/components/settings/SettingsSidebar.tsx
+msgid "settings.section_advanced"
+msgstr "Advanced"
+
+#. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
+#: src/components/settings/sections/SpeechSection.tsx
 msgid "settings.advanced"
 msgstr "Advanced"
 
@@ -468,6 +517,11 @@ msgstr "Advanced"
 #: src/components/settings/sections/AiSection.tsx
 msgid "settings.advanced_model_bindings_aria"
 msgstr "Advanced model bindings"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/PersonalizationSection.tsx
+msgid "settings.personalization.personality_aria"
+msgstr "Agent personality"
 
 #. js-lingui-explicit-id
 #: src/components/settings/SettingsSidebar.tsx
@@ -513,6 +567,11 @@ msgstr "All projects"
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.all_quality"
 msgstr "All quality"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/PersonalizationSection.tsx
+msgid "settings.personalization.memory_description"
+msgstr "Allow useful preferences to carry across your local work."
 
 #. js-lingui-explicit-id
 #: src/components/library/GlobalLibraryView.tsx
@@ -671,6 +730,11 @@ msgid "home.attach_reference"
 msgstr "Attach a reference"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/RecoverySection.tsx
+msgid "settings.recovery.host_unauthorized"
+msgstr "Authorize a workspace before using host recovery."
+
+#. js-lingui-explicit-id
 #: src/components/library/RegistryInstallPanel.tsx
 msgid "registry_install.authorize_workspace"
 msgstr "Authorize workspace"
@@ -686,6 +750,11 @@ msgid "settings.model_slot_auto"
 msgstr "Auto"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/PersonalizationSection.tsx
+msgid "settings.personalization.personality_auto"
+msgstr "Auto"
+
+#. js-lingui-explicit-id
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.policy_auto_compatible"
 msgstr "Auto compatible"
@@ -696,9 +765,29 @@ msgid "settings.model_routing_description"
 msgstr "Auto routes each task only to an available adapter with the required capability."
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/SpeechSection.tsx
+msgid "settings.speech.models_description"
+msgstr "Auto routing is used by default. ASR and TTS remain capability-required until compatible adapters are connected."
+
+#. js-lingui-explicit-id
 #: src/components/settings/ModelSlot.tsx
 msgid "settings.auto_will_choose"
 msgstr "Auto will choose from connected providers"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/SpeechSection.tsx
+msgid "settings.speech.auto_play_responses"
+msgstr "Auto-play responses"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/SpeechSection.tsx
+msgid "settings.speech.auto_play_aria"
+msgstr "Auto-play TTS responses"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/PaidActionsSection.tsx
+msgid "settings.paid_actions.auto_approve_aria"
+msgstr "Automatically approve paid actions within budget"
 
 #. js-lingui-explicit-id
 #: src/components/home/ProjectHome.tsx
@@ -714,6 +803,11 @@ msgstr "Back to the linear chain"
 #: src/components/settings/ProviderForm.tsx
 msgid "settings.provider_baseurl_label"
 msgstr "Base URL"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/UpdatesSection.tsx
+msgid "settings.updates.beta"
+msgstr "Beta"
 
 #. js-lingui-explicit-id
 #: src/components/canvas/nodes/dag-node-common.tsx
@@ -764,6 +858,8 @@ msgstr "Bytes"
 #: src/components/settings/ProviderForm.tsx
 #: src/components/settings/ProviderRow.tsx
 #: src/components/settings/sections/AiSection.tsx
+#: src/components/settings/sections/PersonalizationSection.tsx
+#: src/components/settings/sections/SpeechSection.tsx
 msgid "settings.cancel"
 msgstr "Cancel"
 
@@ -784,6 +880,11 @@ msgid "settings.capability_evidence_unavailable"
 msgstr "Capability evidence unavailable"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/SpeechSection.tsx
+msgid "settings.speech.spoken_output_capability"
+msgstr "Capability required: voice discovery and playback stay disabled until a TTS adapter is available."
+
+#. js-lingui-explicit-id
 #: src/components/settings/ProviderDirectory.tsx
 msgid "settings.catalog_availability_disclaimer"
 msgstr "Catalog availability does not imply an installed adapter, valid authorization, or support for every model capability."
@@ -802,6 +903,46 @@ msgstr "Change language..."
 #: src/components/home/SidebarAccount.tsx
 msgid "home.change_theme"
 msgstr "Change theme"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/SpeechSection.tsx
+msgid "settings.speech.host_unavailable_suffix"
+msgstr "Changes here can't be saved until then."
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/UpdatesSection.tsx
+msgid "settings.updates.check_automatically"
+msgstr "Check automatically"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/UpdatesSection.tsx
+msgid "settings.updates.check_automatically_aria"
+msgstr "Check for updates automatically"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/RecoverySection.tsx
+msgid "settings.recovery.check_host"
+msgstr "Check host"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/UpdatesSection.tsx
+msgid "settings.updates.check_now"
+msgstr "Check now"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/UpdatesSection.tsx
+msgid "settings.updates.checking"
+msgstr "Checking for updates..."
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/RecoverySection.tsx
+msgid "settings.recovery.host_checking"
+msgstr "Checking host status..."
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/UpdatesSection.tsx
+msgid "settings.updates.checking_availability"
+msgstr "Checking update availability..."
 
 #. js-lingui-explicit-id
 #: src/components/settings/ProviderDirectory.tsx
@@ -827,6 +968,11 @@ msgstr "Clear"
 #: src/components/home/ProjectHome.tsx
 msgid "home.clear_search"
 msgstr "Clear search"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/PersonalizationSection.tsx
+msgid "settings.personalization.personality_direct_desc"
+msgstr "Clear trade-offs and decisive recommendations."
 
 #. js-lingui-explicit-id
 #: src/hooks/useCopyPng.ts
@@ -855,6 +1001,16 @@ msgid "kit_library.density_compact"
 msgstr "Compact"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/PersonalizationSection.tsx
+msgid "settings.personalization.compatibility"
+msgstr "Compatibility: these preferences are stored locally. External Agents receive only privacy-safe capability status, never your instruction text."
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/IntegrationsSection.tsx
+msgid "settings.integrations.authorizing"
+msgstr "Complete authorization in the provider window."
+
+#. js-lingui-explicit-id
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.tab_components"
 msgstr "Components"
@@ -873,6 +1029,11 @@ msgstr "Composition failed"
 #: src/components/canvas/nodes/BoardNode.tsx
 msgid "board.toast_compose_failed"
 msgstr "Composition failed"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/PersonalizationSection.tsx
+msgid "settings.personalization.personality_concise"
+msgstr "Concise"
 
 #. js-lingui-explicit-id
 #: src/components/canvas/nodes/IntentPanel.tsx
@@ -907,6 +1068,11 @@ msgid "library.no_model"
 msgstr "Configure an image model in Settings to generate."
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/SpeechSection.tsx
+msgid "settings.speech.description"
+msgstr "Configure dictation and spoken output without changing how the Agent plans your work."
+
+#. js-lingui-explicit-id
 #: src/components/settings/ProviderRow.tsx
 #: src/components/settings/VectorizerPanel.tsx
 msgid "settings.status_configured"
@@ -922,6 +1088,11 @@ msgstr "Configured — type to replace"
 #: src/components/library/KitLibraryInspector.tsx
 msgid "kit_library.audit_conflicts"
 msgstr "Conflicts"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/IntegrationsSection.tsx
+msgid "settings.integrations.connect"
+msgstr "Connect"
 
 #. js-lingui-explicit-id
 #. placeholder {0}: definition.label
@@ -953,6 +1124,16 @@ msgstr "Connect one provider first. Cutout will then route text, vision, speech,
 #: src/components/settings/sections/AiSection.tsx
 msgid "settings.connect_provider"
 msgstr "Connect provider"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/IntegrationsSection.tsx
+msgid "settings.integrations.connected"
+msgstr "Connected with a host-owned session."
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/IntegrationsSection.tsx
+msgid "settings.integrations.connection_failed"
+msgstr "Connection failed."
 
 #. js-lingui-explicit-id
 #: src/components/library/KitLibraryInspector.tsx
@@ -1023,6 +1204,16 @@ msgid "library.toast_remove_failed"
 msgstr "Could not remove asset"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/PersonalizationSection.tsx
+msgid "settings.personalization.save_failed_toast"
+msgstr "Could not save personalization"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/SpeechSection.tsx
+msgid "settings.speech.save_failed_toast"
+msgstr "Could not save speech preferences"
+
+#. js-lingui-explicit-id
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.toast_update_failed"
 msgstr "Could not update assets"
@@ -1044,8 +1235,14 @@ msgstr "Create from brief"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
+#: src/components/settings/sections/SpeechSection.tsx
 msgid "settings.dimension_tts_description"
 msgstr "Create spoken audio."
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/IntegrationsSection.tsx
+msgid "settings.integrations.description"
+msgstr "Credentials remain in the desktop host. Cutout stores only opaque, revocable session handles."
 
 #. js-lingui-explicit-id
 #: src/components/library/TeamGovernancePanel.tsx
@@ -1053,9 +1250,30 @@ msgid "team.current_project_revision"
 msgstr "Current project revision"
 
 #. js-lingui-explicit-id
+#. placeholder {0}: state.capability?.currentVersion ?? "checking..."
+#: src/components/settings/sections/UpdatesSection.tsx
+msgid "settings.updates.current_version"
+msgstr "Current version {0}"
+
+#. js-lingui-explicit-id
 #: src/components/settings/ProviderDirectory.tsx
 msgid "settings.provider_category_custom"
 msgstr "Custom"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/PersonalizationSection.tsx
+msgid "settings.personalization.personality_custom"
+msgstr "Custom"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/PersonalizationSection.tsx
+msgid "settings.personalization.custom_instructions"
+msgstr "Custom instructions"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/PersonalizationSection.tsx
+msgid "settings.personalization.custom_requires_instructions"
+msgstr "Custom personality requires instructions before it can be saved."
 
 #. js-lingui-explicit-id
 #: src/components/canvas/edges/TransitionEdge.tsx
@@ -1063,12 +1281,18 @@ msgid "pipeline.transition_cutout"
 msgstr "Cutout"
 
 #. js-lingui-explicit-id
+#. placeholder {0}: state.preferences.channel
+#: src/components/settings/sections/UpdatesSection.tsx
+msgid "settings.updates.up_to_date"
+msgstr "Cutout is up to date on the {0} channel."
+
+#. js-lingui-explicit-id
 #: src/components/source/ParameterControls.tsx
 msgid "source.params_aria"
 msgstr "Cutout parameters"
 
 #. js-lingui-explicit-id
-#: src/components/settings/sections/GeneralSection.tsx
+#: src/components/settings/sections/AdvancedSection.tsx
 msgid "settings.reset_params_label"
 msgstr "Cutout parameters"
 
@@ -1126,6 +1350,11 @@ msgid "home.delete_permanently_title"
 msgstr "Delete permanently?"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/PersonalizationSection.tsx
+msgid "settings.personalization.custom_instructions_placeholder"
+msgstr "Describe stable preferences, constraints, or how you want results presented."
+
+#. js-lingui-explicit-id
 #: src/components/canvas/nodes/BriefNode.tsx
 msgid "brief.placeholder"
 msgstr "Describe the product and its main screen — who it is for, what it shows…"
@@ -1181,14 +1410,54 @@ msgid "home.preset_desktop"
 msgstr "Desktop"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/IntegrationsSection.tsx
+msgid "settings.integrations.desktop_not_installed"
+msgstr "Desktop provider is not installed."
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AdvancedSection.tsx
+msgid "settings.developer_mode.title"
+msgstr "Developer mode"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/RecoverySection.tsx
+msgid "settings.recovery.diagnostic_preview_aria"
+msgstr "Diagnostic bundle preview"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/SpeechSection.tsx
+msgid "settings.speech.dictation"
+msgstr "Dictation"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/SpeechSection.tsx
+msgid "settings.speech.dictionary_entry"
+msgstr "Dictionary entry"
+
+#. js-lingui-explicit-id
 #: src/components/canvas/nodes/IntentPanel.tsx
 msgid "intent.dimensions"
 msgstr "Dimensions"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/PersonalizationSection.tsx
+msgid "settings.personalization.personality_direct"
+msgstr "Direct"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/IntegrationsSection.tsx
+msgid "settings.integrations.disconnect"
+msgstr "Disconnect"
+
+#. js-lingui-explicit-id
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.discover_references"
 msgstr "Discover references"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/PersonalizationSection.tsx
+msgid "settings.personalization.custom_instructions_help"
+msgstr "Do not include API keys or private credentials. Project-specific requirements belong in the project brief."
 
 #. js-lingui-explicit-id
 #: src/components/help/HelpMenu.tsx
@@ -1204,6 +1473,11 @@ msgstr "Done"
 #: src/components/library/KitLibraryInspector.tsx
 msgid "kit_library.download"
 msgstr "Download"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/UpdatesSection.tsx
+msgid "settings.updates.download"
+msgstr "Download update"
 
 #. js-lingui-explicit-id
 #: src/components/home/ProjectHome.tsx
@@ -1302,6 +1576,11 @@ msgid "inspector.export_all_tooltip"
 msgstr "Export all slices"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/RecoverySection.tsx
+msgid "settings.recovery.export_diagnostics"
+msgstr "Export diagnostics"
+
+#. js-lingui-explicit-id
 #: src/hooks/useExport.ts
 msgid "export.toast_failed"
 msgstr "Export failed: {reason}"
@@ -1372,6 +1651,11 @@ msgid "global_library.policy_follow_updates"
 msgstr "Follow updates"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/PersonalizationSection.tsx
+msgid "settings.personalization.personality_custom_desc"
+msgstr "Follow your saved instructions."
+
+#. js-lingui-explicit-id
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.reference_following"
 msgstr "Following"
@@ -1380,6 +1664,11 @@ msgstr "Following"
 #: src/components/home/ProjectHome.tsx
 msgid "home.nav_forward"
 msgstr "Forward"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/PersonalizationSection.tsx
+msgid "settings.personalization.personality_friendly"
+msgstr "Friendly"
 
 #. js-lingui-explicit-id
 #: src/components/settings/ProviderDirectory.tsx
@@ -1469,9 +1758,29 @@ msgid "settings.key_hide"
 msgstr "Hide"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/RecoverySection.tsx
+msgid "settings.recovery.host_ready"
+msgstr "Host is ready."
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/RecoverySection.tsx
+msgid "settings.recovery.host_error"
+msgstr "Host recovery could not be completed."
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/RecoverySection.tsx
+msgid "settings.recovery.host_status"
+msgstr "Host recovery:"
+
+#. js-lingui-explicit-id
 #: src/components/library/TeamGovernancePanel.tsx
 msgid "team.host_required"
 msgstr "Host required"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/SpeechSection.tsx
+msgid "settings.speech.host_required"
+msgstr "Host required: microphone enumeration and system-level shortcuts need an authorized desktop host."
 
 #. js-lingui-explicit-id
 #: src/components/settings/ProviderDirectory.tsx
@@ -1549,6 +1858,17 @@ msgid "slices.inspector_tab"
 msgstr "Inspector"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/UpdatesSection.tsx
+msgid "settings.updates.install_restart"
+msgstr "Install & restart"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/PersonalizationSection.tsx
+msgid "settings.personalization.instructions_saved_toast"
+msgstr "Instructions saved"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/IntegrationsSection.tsx
 #: src/components/settings/SettingsSidebar.tsx
 msgid "settings.section_integrations"
 msgstr "Integrations"
@@ -1557,6 +1877,11 @@ msgstr "Integrations"
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.empty_fallback_label"
 msgstr "items"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/SpeechSection.tsx
+msgid "settings.speech.keep_dictation_visible"
+msgstr "Keep dictation visible"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
@@ -1572,6 +1897,16 @@ msgstr "Kit audit"
 #: src/components/settings/sections/GeneralSection.tsx
 msgid "topbar.language_label"
 msgstr "Language"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/PersonalizationSection.tsx
+msgid "settings.personalization.tool_assisted_memory_desc"
+msgstr "Let approved tools contribute preference signals."
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/PaidActionsSection.tsx
+msgid "settings.paid_actions.hint"
+msgstr "Let the Agent proceed automatically only within this per-action ceiling."
 
 #. js-lingui-explicit-id
 #: src/components/library/GlobalLibraryView.tsx
@@ -1604,9 +1939,19 @@ msgid "home.layout_list"
 msgstr "List view"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/PersonalizationSection.tsx
+msgid "settings.personalization.loading"
+msgstr "Loading personalization…"
+
+#. js-lingui-explicit-id
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.loading_registry_installer"
 msgstr "Loading Registry installer…"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/SpeechSection.tsx
+msgid "settings.speech.loading"
+msgstr "Loading speech settings…"
 
 #. js-lingui-explicit-id
 #: src/components/settings/ProviderDirectory.tsx
@@ -1622,6 +1967,11 @@ msgstr "Local Library storage is unavailable."
 #: src/components/home/ProjectHome.tsx
 msgid "home.local_projects"
 msgstr "Local projects"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/RecoverySection.tsx
+msgid "settings.recovery.title"
+msgstr "Local recovery"
 
 #. js-lingui-explicit-id
 #: src/components/library/TeamGovernancePanel.tsx
@@ -1657,6 +2007,36 @@ msgstr "Locked"
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.kit_editor_description"
 msgstr "Manage the approved, content-addressed kit projection."
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/PaidActionsSection.tsx
+msgid "settings.paid_actions.maximum_cost_aria"
+msgstr "Maximum paid action cost in USD"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/PaidActionsSection.tsx
+msgid "settings.paid_actions.maximum_cost"
+msgstr "Maximum per action (USD)"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/PersonalizationSection.tsx
+msgid "settings.personalization.memory"
+msgstr "Memory"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/PersonalizationSection.tsx
+msgid "settings.personalization.memory_disabled_toast"
+msgstr "Memory disabled"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/PersonalizationSection.tsx
+msgid "settings.personalization.memory_enabled_toast"
+msgstr "Memory enabled"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/SpeechSection.tsx
+msgid "settings.speech.microphone_device_id"
+msgstr "Microphone device ID"
 
 #. js-lingui-explicit-id
 #: src/components/home/ProjectHome.tsx
@@ -1821,6 +2201,16 @@ msgid "settings.status_unconfigured"
 msgstr "Not configured"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/IntegrationsSection.tsx
+msgid "settings.integrations.not_connected"
+msgstr "Not connected."
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/SpeechSection.tsx
+msgid "settings.speech.not_set"
+msgstr "Not set"
+
+#. js-lingui-explicit-id
 #: src/components/library/KitLibraryInspector.tsx
 msgid "kit_library.not_used_by_project"
 msgstr "Not used by a project"
@@ -1868,12 +2258,17 @@ msgid "source.dropzone_hint"
 msgstr "or click to browse · PNG, JPEG, WebP"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/PaidActionsSection.tsx
+msgid "settings.paid_actions.title"
+msgstr "Paid actions"
+
+#. js-lingui-explicit-id
 #: src/components/source/ParameterControls.tsx
 msgid "source.params_heading"
 msgstr "Parameters"
 
 #. js-lingui-explicit-id
-#: src/components/settings/sections/GeneralSection.tsx
+#: src/components/settings/sections/AdvancedSection.tsx
 msgid "settings.reset_done_toast"
 msgstr "Parameters reset"
 
@@ -1883,9 +2278,30 @@ msgid "kit_library.parser_host_not_configured"
 msgstr "Parser host not configured in this surface. Import its signed JSON result to review candidates."
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/PersonalizationSection.tsx
+msgid "settings.personalization.personality"
+msgstr "Personality"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/PersonalizationSection.tsx
+msgid "settings.personalization.personality_updated_toast"
+msgstr "Personality updated"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/PersonalizationSection.tsx
 #: src/components/settings/SettingsSidebar.tsx
 msgid "settings.section_personalization"
 msgstr "Personalization"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/PersonalizationSection.tsx
+msgid "settings.personalization.load_failed"
+msgstr "Personalization could not be loaded."
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/PersonalizationSection.tsx
+msgid "settings.personalization.reset_done_toast"
+msgstr "Personalization reset"
 
 #. js-lingui-explicit-id
 #: src/components/home/ProjectHome.tsx
@@ -1930,6 +2346,11 @@ msgid "dag.toast_plan_failed"
 msgstr "Planning failed"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/IntegrationsSection.tsx
+msgid "settings.integrations.handshake_note"
+msgstr "Plugin, MCP, CLI and local-vault integrations become available only after their host handshake is verified."
+
+#. js-lingui-explicit-id
 #: src/components/topbar/TopBarActions.tsx
 msgid "export.menu_png_svg_api"
 msgstr "PNG + SVG · API"
@@ -1971,6 +2392,11 @@ msgid "kit_library.preview_heading"
 msgstr "Preview"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/RecoverySection.tsx
+msgid "settings.recovery.preview_diagnostics"
+msgstr "Preview diagnostics"
+
+#. js-lingui-explicit-id
 #: src/components/library/RegistryInstallPanel.tsx
 msgid "registry_install.preview_install"
 msgstr "Preview install"
@@ -1979,6 +2405,11 @@ msgstr "Preview install"
 #: src/components/settings/VectorizerPanel.tsx
 msgid "vectorizer.mode_production"
 msgstr "Production"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/PersonalizationSection.tsx
+msgid "settings.personalization.personality_professional"
+msgstr "Professional"
 
 #. js-lingui-explicit-id
 #: src/components/home/ProjectHome.tsx
@@ -2004,11 +2435,6 @@ msgstr "Projects stay on this device"
 #: src/components/home/ProjectHome.tsx
 msgid "home.drafts_empty_description"
 msgstr "Projects that have not produced results yet will collect here."
-
-#. js-lingui-explicit-id
-#: src/components/home/ProjectHome.tsx
-msgid "home.published_empty_description"
-msgstr "Projects you publish will be listed here with their live links. This needs accounts and a community service, which are not built yet."
 
 #. js-lingui-explicit-id
 #: src/components/library/LibraryDrawer.tsx
@@ -2063,19 +2489,14 @@ msgid "global_library.toast_published"
 msgstr "Published {0} v{1}"
 
 #. js-lingui-explicit-id
-#: src/components/home/ProjectHome.tsx
-msgid "home.published_projects"
-msgstr "Published Projects"
-
-#. js-lingui-explicit-id
-#: src/components/home/ProjectHome.tsx
-msgid "home.published_empty_title"
-msgstr "Publishing is on the way"
-
-#. js-lingui-explicit-id
 #: src/components/library/KitLibraryInspector.tsx
 msgid "kit_library.publishing"
 msgstr "Publishing…"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/SpeechSection.tsx
+msgid "settings.speech.push_to_talk"
+msgstr "Push to talk"
 
 #. js-lingui-explicit-id
 #: src/components/library/ReviewBranchEditor.tsx
@@ -2113,6 +2534,11 @@ msgid "settings.provider_category_recommended"
 msgstr "Recommended"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/RecoverySection.tsx
+msgid "settings.recovery.recover_host"
+msgstr "Recover host"
+
+#. js-lingui-explicit-id
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.hosts_not_configured"
 msgstr "Reference provider host is not configured."
@@ -2126,6 +2552,16 @@ msgstr "References"
 #: src/components/canvas/nodes/IntentPanel.tsx
 msgid "intent.questions_hint"
 msgstr "Refine the brief above to answer these, then plan again."
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/IntegrationsSection.tsx
+msgid "settings.integrations.refresh_session"
+msgstr "Refresh session"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/IntegrationsSection.tsx
+msgid "settings.integrations.refreshing"
+msgstr "Refreshing session..."
 
 #. js-lingui-explicit-id
 #: src/components/canvas/nodes/MockupNode.tsx
@@ -2152,6 +2588,11 @@ msgstr "Remember export folder"
 #: src/components/settings/VectorizerPanel.tsx
 msgid "settings.remove_action"
 msgstr "Remove"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/SpeechSection.tsx
+msgid "settings.speech.remove_entry"
+msgstr "Remove {value}"
 
 #. js-lingui-explicit-id
 #: src/components/settings/ProviderRow.tsx
@@ -2200,7 +2641,27 @@ msgid "source.params_reset"
 msgstr "Reset"
 
 #. js-lingui-explicit-id
-#: src/components/settings/sections/GeneralSection.tsx
+#: src/components/settings/sections/PersonalizationSection.tsx
+msgid "settings.personalization.reset"
+msgstr "Reset"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/SpeechSection.tsx
+msgid "settings.speech.reset"
+msgstr "Reset"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/PersonalizationSection.tsx
+msgid "settings.personalization.reset_failed_toast"
+msgstr "Reset failed"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/RecoverySection.tsx
+msgid "settings.recovery.hint"
+msgstr "Reset interface preferences or export a redacted local diagnostic bundle. Project data is not deleted."
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AdvancedSection.tsx
 msgid "settings.reset_params"
 msgstr "Reset parameters"
 
@@ -2208,6 +2669,31 @@ msgstr "Reset parameters"
 #: src/components/source/ParameterControls.tsx
 msgid "source.params_reset_title"
 msgstr "Reset parameters to defaults"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/PersonalizationSection.tsx
+msgid "settings.personalization.reset_confirm"
+msgstr "Reset personalization"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/PersonalizationSection.tsx
+msgid "settings.personalization.reset_title"
+msgstr "Reset personalization?"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/SpeechSection.tsx
+msgid "settings.speech.reset_confirm"
+msgstr "Reset speech"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/SpeechSection.tsx
+msgid "settings.speech.reset_title"
+msgstr "Reset speech preferences?"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/RecoverySection.tsx
+msgid "settings.recovery.reset_ui"
+msgstr "Reset UI state"
 
 #. js-lingui-explicit-id
 #. placeholder {0}: conflicts.map(({ kind }) => kind).join(', ')
@@ -2221,20 +2707,45 @@ msgid "review_branch.resolved"
 msgstr "resolved"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/UpdatesSection.tsx
+msgid "settings.updates.install_note"
+msgstr "Restart happens only after you choose Install & restart. Active Agent work blocks installation."
+
+#. js-lingui-explicit-id
 #: src/components/home/ProjectHome.tsx
 #: src/components/settings/sections/ArchivedSection.tsx
 msgid "home.restore"
 msgstr "Restore"
 
 #. js-lingui-explicit-id
-#: src/components/settings/sections/GeneralSection.tsx
+#: src/components/settings/sections/AdvancedSection.tsx
 msgid "settings.reset_params_hint"
 msgstr "Restore threshold, min area, gap and padding to defaults."
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/PersonalizationSection.tsx
+msgid "settings.personalization.retry"
+msgstr "Retry"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/SpeechSection.tsx
+msgid "settings.speech.retry"
+msgstr "Retry"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/UpdatesSection.tsx
+msgid "settings.updates.retry"
+msgstr "Retry"
 
 #. js-lingui-explicit-id
 #: src/components/home/ProjectHome.tsx
 msgid "home.retry"
 msgstr "Retry"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/PersonalizationSection.tsx
+msgid "settings.personalization.use_memory_desc"
+msgstr "Reuse approved preferences in future sessions."
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/GeneralSection.tsx
@@ -2262,6 +2773,11 @@ msgid "review_branch.comment_aria"
 msgstr "Review comment"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/IntegrationsSection.tsx
+msgid "settings.integrations.revoking"
+msgstr "Revoking session..."
+
+#. js-lingui-explicit-id
 #: src/components/home/ProjectHome.tsx
 msgid "home.status_running"
 msgstr "Running"
@@ -2281,6 +2797,16 @@ msgstr "Running…"
 #: src/components/settings/VectorizerPanel.tsx
 msgid "settings.save"
 msgstr "Save"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/PersonalizationSection.tsx
+msgid "settings.personalization.save_changes"
+msgstr "Save changes"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/SpeechSection.tsx
+msgid "settings.speech.save_changes"
+msgstr "Save changes"
 
 #. js-lingui-explicit-id
 #: src/components/settings/ProviderForm.tsx
@@ -2335,10 +2861,20 @@ msgid "slices.name"
 msgstr "Semantic naming"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/IntegrationsSection.tsx
+msgid "settings.integrations.expired"
+msgstr "Session expired. Refresh or reconnect."
+
+#. js-lingui-explicit-id
 #: src/components/home/SidebarAccount.tsx
 #: src/components/settings/SettingsDialog.tsx
 msgid "settings.menu_label"
 msgstr "Settings"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/PersonalizationSection.tsx
+msgid "settings.personalization.description"
+msgstr "Shape how the Agent works with you while keeping every project focused on the result."
 
 #. js-lingui-explicit-id
 #: src/components/library/TeamGovernancePanel.tsx
@@ -2346,10 +2882,25 @@ msgid "team.share_review"
 msgstr "Share and review"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/PersonalizationSection.tsx
+msgid "settings.personalization.personality_concise_desc"
+msgstr "Short, direct responses."
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/SpeechSection.tsx
+msgid "settings.speech.shortcut"
+msgstr "Shortcut"
+
+#. js-lingui-explicit-id
 #: src/components/settings/KeyField.tsx
 #: src/components/settings/VectorizerPanel.tsx
 msgid "settings.key_show"
 msgstr "Show"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AdvancedSection.tsx
+msgid "settings.developer_mode.hint"
+msgstr "Show read-only DAG, Design IR and receipt audit tools inside projects."
 
 #. js-lingui-explicit-id
 #: src/components/inspector/SliceDimensions.tsx
@@ -2399,14 +2950,46 @@ msgid "settings.provider_category_speech"
 msgstr "Speech"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/SpeechSection.tsx
 #: src/components/settings/SettingsSidebar.tsx
 msgid "settings.section_speech"
 msgstr "Speech"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/SpeechSection.tsx
+msgid "settings.speech.models_title"
+msgstr "Speech models"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/SpeechSection.tsx
+msgid "settings.speech.saved_toast"
+msgstr "Speech preferences saved"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/SpeechSection.tsx
+msgid "settings.speech.load_failed"
+msgstr "Speech settings could not be loaded."
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/SpeechSection.tsx
+msgid "settings.speech.shortcut_aria"
+msgstr "Speech shortcut"
+
+#. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
+#: src/components/settings/sections/SpeechSection.tsx
 msgid "settings.dimension_asr_label"
 msgstr "Speech to text"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/SpeechSection.tsx
+msgid "settings.speech.spoken_output"
+msgstr "Spoken output"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/UpdatesSection.tsx
+msgid "settings.updates.stable"
+msgstr "Stable"
 
 #. js-lingui-explicit-id
 #: src/components/home/ProjectHome.tsx
@@ -2414,9 +2997,19 @@ msgid "home.projects_empty_description"
 msgstr "Start with an idea or bring in a visual board."
 
 #. js-lingui-explicit-id
+#: src/components/library/GlobalLibraryView.tsx
+msgid "global_library.tab_starters"
+msgstr "Starter Kits"
+
+#. js-lingui-explicit-id
 #: src/components/canvas/nodes/IntentPanel.tsx
 msgid "intent.strategy"
 msgstr "Strategy"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/PersonalizationSection.tsx
+msgid "settings.personalization.personality_professional_desc"
+msgstr "Structured and formal."
 
 #. js-lingui-explicit-id
 #: src/components/help/HelpMenu.tsx
@@ -2477,6 +3070,7 @@ msgstr "Test"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
+#: src/components/settings/sections/SpeechSection.tsx
 msgid "settings.dimension_tts_label"
 msgstr "Text to speech"
 
@@ -2529,14 +3123,60 @@ msgid "settings.remove_confirm_desc"
 msgstr "This removes the configuration for “{label}” and its key stored in the system keychain. This action cannot be undone."
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/SpeechSection.tsx
+msgid "settings.speech.reset_description"
+msgstr "This restores dictation, dictionary, shortcut and TTS preferences to defaults."
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/PersonalizationSection.tsx
+msgid "settings.personalization.reset_description"
+msgstr "This restores personality, custom instructions, and memory permissions to their defaults. It cannot be undone."
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/SpeechSection.tsx
+msgid "settings.speech.toggle"
+msgstr "Toggle"
+
+#. js-lingui-explicit-id
 #: src/components/preview/PreviewToolbar.tsx
 msgid "preview.toggle_checker"
 msgstr "Toggle checkerboard"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/PersonalizationSection.tsx
+msgid "settings.personalization.tool_assisted_memory"
+msgstr "Tool-assisted memory"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/PersonalizationSection.tsx
+msgid "settings.personalization.tool_memory_disabled_toast"
+msgstr "Tool-assisted memory disabled"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/PersonalizationSection.tsx
+msgid "settings.personalization.tool_memory_enabled_toast"
+msgstr "Tool-assisted memory enabled"
+
+#. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
+#: src/components/settings/sections/SpeechSection.tsx
 msgid "settings.dimension_asr_description"
 msgstr "Transcribe spoken audio."
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/SpeechSection.tsx
+msgid "settings.speech.tts_adapter_required"
+msgstr "TTS adapter required"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/SpeechSection.tsx
+msgid "settings.speech.tts_rate"
+msgstr "TTS rate"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/SpeechSection.tsx
+msgid "settings.speech.tts_voice"
+msgstr "TTS voice"
 
 #. js-lingui-explicit-id
 #: src/components/settings/ProviderForm.tsx
@@ -2547,6 +3187,11 @@ msgstr "Type"
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.meta_type"
 msgstr "Type"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/RecoverySection.tsx
+msgid "settings.recovery.ui_reset"
+msgstr "UI state reset"
 
 #. js-lingui-explicit-id
 #: src/components/settings/ModelSlot.tsx
@@ -2596,6 +3241,31 @@ msgid "source.meta_untitled"
 msgstr "untitled"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/UpdatesSection.tsx
+msgid "settings.updates.channel_aria"
+msgstr "Update channel"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/UpdatesSection.tsx
+msgid "settings.updates.download_progress_aria"
+msgstr "Update download progress"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/UpdatesSection.tsx
+msgid "settings.updates.title"
+msgstr "Updates"
+
+#. js-lingui-explicit-id
+#: src/components/settings/SettingsSidebar.tsx
+msgid "settings.section_updates_support"
+msgstr "Updates & Support"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/UpdatesSection.tsx
+msgid "settings.updates.unavailable"
+msgstr "Updates are available only in the Cutout desktop app."
+
+#. js-lingui-explicit-id
 #. placeholder {0}: item.name
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.use_in_project_aria"
@@ -2615,6 +3285,11 @@ msgstr "Use in project…"
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.use_masonry_preview"
 msgstr "Use masonry preview"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/PersonalizationSection.tsx
+msgid "settings.personalization.use_memory"
+msgstr "Use memory"
 
 #. js-lingui-explicit-id
 #. placeholder {0}: previous.version
@@ -2668,6 +3343,12 @@ msgid "global_library.meta_version"
 msgstr "Version"
 
 #. js-lingui-explicit-id
+#. placeholder {0}: state.release.version
+#: src/components/settings/sections/UpdatesSection.tsx
+msgid "settings.updates.version_available"
+msgstr "Version {0} is available."
+
+#. js-lingui-explicit-id
 #: src/components/library/KitLibraryInspector.tsx
 msgid "kit_library.version_diff_aria"
 msgstr "Version diff"
@@ -2708,9 +3389,19 @@ msgid "global_library.tab_visual_assets"
 msgstr "Visual Assets"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/IntegrationsSection.tsx
+msgid "settings.integrations.waiting_callback"
+msgstr "Waiting for callback"
+
+#. js-lingui-explicit-id
 #: src/components/canvas/nodes/dag-node-common.tsx
 msgid "dag.idle"
 msgstr "Waiting to run…"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/PersonalizationSection.tsx
+msgid "settings.personalization.personality_friendly_desc"
+msgstr "Warm and collaborative."
 
 #. js-lingui-explicit-id
 #: src/components/home/ProjectHome.tsx
@@ -2726,12 +3417,6 @@ msgstr "Web development"
 #: src/components/home/ProjectHome.tsx
 msgid "home.start_title"
 msgstr "What will we design?"
-
-#. js-lingui-explicit-id
-#: src/components/home/ProjectHome.tsx
-#: src/components/settings/SettingsSidebar.tsx
-msgid "home.wip_badge"
-msgstr "WIP"
 
 #. js-lingui-explicit-id
 #: src/components/home/ProjectHome.tsx
