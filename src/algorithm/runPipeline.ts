@@ -1,7 +1,7 @@
 import type { Box, CutoutParams, PixelFrame } from './types'
 import { floodBackground } from './floodBackground'
 import { applyAlphaCut } from './applyAlphaCut'
-import { featherEdges } from './featherEdges'
+import { softenMaskEdges } from './softenMaskEdges'
 import { findComponents } from './findComponents'
 import { mergeBoxes } from './mergeBoxes'
 import { splitCompositeBoxes } from './splitCompositeBoxes'
@@ -11,7 +11,7 @@ import { sortBoxes } from './sortBoxes'
 
 /** Result of a full pipeline run: the mutated frame plus final slice boxes. */
 export interface PipelineResult {
-  /** The same `PixelFrame` passed in, now background-cut and feathered in place. */
+  /** The same `PixelFrame` passed in, now background-cut and edge-matted in place. */
   readonly frame: PixelFrame
   /** Final slice boxes in reading order (padded, clamped to image bounds). */
   readonly boxes: Box[]
@@ -40,7 +40,9 @@ export class PipelineAbortError extends Error {
  * Stage order is ported verbatim from the original Electron renderer:
  *   1. floodBackground  → background mask
  *   2. applyAlphaCut    → zero background alpha
- *   3. featherEdges     → 1px anti-halo
+ *   3. softenMaskEdges  → soft white-matting alpha ramp + de-fringe on the
+ *      1px boundary band (deliberate replacement of the original feather hack;
+ *      detection stages are unaffected — band alpha never drops to 0)
  *   4. findComponents   → foreground bounding boxes (>= NOISE_FLOOR only)
  *   5. mergeBoxes       → merge boxes within mergeGap, THEN cull those < minArea
  *   6. splitCompositeBoxes / filterUiContainers → refine, drop UI chrome
@@ -67,7 +69,7 @@ export function runPipeline(
   applyAlphaCut(frame, background)
   checkAbort()
 
-  featherEdges(frame, background)
+  softenMaskEdges(frame, background)
   checkAbort()
 
   // Keep sub-`minArea` strokes so they can merge into their parent asset; the

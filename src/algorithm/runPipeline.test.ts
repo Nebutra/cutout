@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { runPipeline, PipelineAbortError } from './runPipeline'
 import { floodBackground } from './floodBackground'
 import { applyAlphaCut } from './applyAlphaCut'
-import { featherEdges } from './featherEdges'
+import { softenMaskEdges } from './softenMaskEdges'
 import { findComponents } from './findComponents'
 import { mergeBoxes } from './mergeBoxes'
 import { padBox } from './boxGeometry'
@@ -32,11 +32,11 @@ function frameWithSquares(
   return paintedFrame(width, height, WHITE, paint)
 }
 
-/** Verbatim reference: the full original pipeline (flood→cut→feather→comp→merge→pad→sort). */
+/** Reference pipeline stages inlined (flood→cut→soften→comp→merge→pad→sort). */
 function referencePipeline(frame: PixelFrame, params: CutoutParams): Box[] {
   const bg = floodBackground(frame, params.threshold)
   applyAlphaCut(frame, bg)
-  featherEdges(frame, bg)
+  softenMaskEdges(frame, bg)
   const comps = findComponents(frame, params.minArea)
   const merged = mergeBoxes(comps, params.mergeGap)
   const padded = merged.map((b) => padBox(b, params.padding, frame.width, frame.height))

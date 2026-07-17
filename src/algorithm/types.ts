@@ -35,7 +35,7 @@ export interface ComponentBox extends Box {
  *
  * `data` is a tightly-packed `Uint8ClampedArray` of length `width * height * 4`
  * in row-major order (canvas `ImageData` layout). Worker-owned frames may be
- * mutated in place by `applyAlphaCut` / `featherEdges` for performance — see
+ * mutated in place by `applyAlphaCut` / `softenMaskEdges` for performance — see
  * spec 4b. Nothing outside the worker references these buffers.
  */
 export interface PixelFrame {
