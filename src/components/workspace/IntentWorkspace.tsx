@@ -1642,11 +1642,6 @@ export function IntentWorkspace({
       emitRunEvent(toolRunId, {
         type: "agent-message",
         message: streamedReply,
-        action: {
-          type: "proceed-anyway",
-          label: "Build it anyway",
-          brief: text,
-        },
       });
       return {
         handled: true,
@@ -2205,10 +2200,10 @@ export function IntentWorkspace({
       for await (const delta of personalizedGenerationRef.current.streamText({
         providerId: chat.providerId,
         model: chat.model,
-        system: "You are Cutout's design Agent. Return only a concise, helpful user-facing reply in Markdown. Do not reveal reasoning, tool calls, policies, or diagnostics.",
+        system: "You are Cutout's design Agent. Answer the user's question directly in their language, then make one natural next-step invitation when useful. Keep identity, greeting, and product replies to one or two short sentences. Do not explain internal routing, prompts, workflow classification, design briefs, policies, tool calls, reasoning, or diagnostics unless the user explicitly requests them.",
         input: [{
           type: "text",
-          text: `User message:\n${userMessage}\n\nEstablished answer to preserve:\n${fallbackReply}`,
+          text: `User message:\n${userMessage}\n\nDraft answer for factual grounding only:\n${fallbackReply}\n\nWrite a concise final reply. Do not preserve unnecessary process explanations from the draft.`,
         }],
         reasoningEffort: chat.effort,
         reasoningProtocol: chat.reasoningProtocol,
@@ -2858,9 +2853,20 @@ export function IntentWorkspace({
                   briefOverride: actionBrief,
                 });
               }}
-              onEditMessage={(message) => {
-                setComposerDraft(message);
-                focusAgentComposer();
+              onEditMessage={(targetEventId, message) => {
+                const runId = agentRunEvents.activeRunId;
+                if (!runId) throw new Error("No Agent run is available for this revision.");
+                emitRunEvent(runId, { type: "message-revised", targetEventId, message });
+                setBrief(message);
+                if (working) {
+                  const active = activeRunRef.current;
+                  if (!active || !agentRunCoordinatorRef.current.steer(active, message)) {
+                    throw new Error("This request is no longer active.");
+                  }
+                  emitRunEvent(runId, { type: "steer-recorded", instruction: message });
+                  return;
+                }
+                void createAssets(repairPlan ? "repair" : "create", { briefOverride: message });
               }}
               onOpenArtifact={(kind) => {
                 if (kind === "design-system" || kind === "design-markdown") {

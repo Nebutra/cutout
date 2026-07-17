@@ -17,4 +17,10 @@ describe('conversationalReplyTool', () => {
   it('is marked read-only', () => {
     expect(conversationalReplyTool().isReadOnly).toBe(true)
   })
+
+  it('asks for a concise user-facing reply instead of workflow narration', () => {
+    const description = conversationalReplyTool().inputSchema.shape.reply.description ?? ''
+    expect(description).toMatch(/one or two short sentences/i)
+    expect(description).toMatch(/Never explain internal routing/i)
+  })
 })
