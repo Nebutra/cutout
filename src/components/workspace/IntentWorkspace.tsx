@@ -2604,7 +2604,7 @@ export function IntentWorkspace({
         }
         className={cn(
           !agentDockVisible && !filesDockVisible && !designDockVisible && "hidden",
-          "absolute inset-x-0 bottom-0 z-30 h-[min(70dvh,42rem)] min-h-[19rem] w-full overflow-hidden border-t border-border bg-background shadow-2xl lg:inset-y-0 lg:bottom-auto lg:right-auto lg:h-full lg:w-[24rem] lg:border-r lg:border-t-0 lg:transition-[left] lg:duration-300 lg:ease-in-out",
+          "absolute inset-x-0 bottom-0 z-30 h-[min(70dvh,42rem)] min-h-[19rem] w-full overflow-hidden border-t border-border bg-background shadow-2xl lg:inset-y-0 lg:bottom-auto lg:right-auto lg:h-full lg:w-[24rem] lg:border-r lg:border-t-0 lg:transition-[left] lg:duration-300 lg:ease-in-out 2xl:w-[27rem]",
           sidebarCollapsed ? "lg:left-0" : "lg:left-14",
         )}
       >
@@ -3065,7 +3065,7 @@ export function IntentWorkspace({
       </main>
 
       {selectedSlice ? (
-        <aside aria-label="Inspector" className="absolute inset-y-0 right-0 z-20 flex h-full min-h-0 w-full max-w-[22rem] shrink-0 flex-col border-l border-border bg-background shadow-xl xl:relative xl:z-auto xl:w-[18.5rem] xl:shadow-none">
+        <aside aria-label="Inspector" className="absolute inset-y-0 right-0 z-20 flex h-full min-h-0 w-full max-w-[22rem] shrink-0 flex-col border-l border-border bg-background shadow-xl xl:relative xl:z-auto xl:w-[18.5rem] xl:shadow-none 2xl:w-[21rem]">
           <div className="flex h-12 shrink-0 items-center gap-2 border-b border-border px-3"><div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold">Result</p><p className="truncate text-[11px] text-muted-foreground">Review and correct</p></div><Button type="button" variant="ghost" size="icon" className="ml-auto size-7" aria-label="Close result inspector" onClick={() => getStoreState().clearSelection()}><X className="size-3.5"/></Button></div>
           <div className="min-h-0 flex-1 overflow-y-auto"><InspectorPanel/></div>
         </aside>
@@ -3209,7 +3209,7 @@ function DesignMarkdownInspector({
         "flex h-full min-h-0 w-full shrink-0 flex-col bg-background",
         docked
           ? "border-r border-border"
-          : "absolute inset-y-0 right-0 z-20 max-w-[22rem] border-l border-border shadow-xl xl:relative xl:z-auto xl:w-[18.5rem] xl:shadow-none",
+          : "absolute inset-y-0 right-0 z-20 max-w-[22rem] border-l border-border shadow-xl xl:relative xl:z-auto xl:w-[18.5rem] xl:shadow-none 2xl:w-[21rem]",
       )}
     >
       <div className="flex h-12 items-center gap-2 border-b border-border px-3">

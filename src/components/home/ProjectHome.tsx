@@ -639,13 +639,13 @@ function StartWorkspace({
   };
 
   return (
-    <div className="mx-auto flex min-h-full w-full max-w-5xl flex-col px-4 py-8 sm:px-6 lg:px-10">
-      <div className="flex flex-1 flex-col justify-center py-6 sm:py-10">
-        <div className="mx-auto w-full max-w-3xl">
-          <h1 className="text-center text-3xl font-semibold tracking-tight sm:text-4xl">
+    <div className="mx-auto flex min-h-full w-full max-w-6xl flex-col px-4 py-8 sm:px-6 lg:px-10 lg:py-10">
+      <div className="flex flex-1 flex-col justify-center py-8 sm:py-12 lg:py-16">
+        <div className="mx-auto w-full max-w-4xl">
+          <h1 className="text-center text-3xl font-semibold tracking-tight sm:text-4xl lg:text-5xl">
             {t({ id: "home.start_title", message: "What will we design?" })}
           </h1>
-          <p className="mx-auto mt-2 max-w-xl text-center text-sm leading-6 text-muted-foreground">
+          <p className="mx-auto mt-3 max-w-2xl text-center text-sm leading-6 text-muted-foreground sm:text-base sm:leading-7">
             {t({
               id: "home.start_description",
               message:
@@ -654,7 +654,7 @@ function StartWorkspace({
           </p>
 
           <form
-            className="mt-9 w-full"
+            className="mt-10 w-full sm:mt-12"
             onSubmit={(event) => {
               event.preventDefault();
               submitBrief();
@@ -725,11 +725,11 @@ function StartWorkspace({
                   id: "home.brief_placeholder",
                   message: "Describe the result you want...",
                 })}
-                className="min-h-28 w-full resize-none rounded-none border-0 bg-transparent px-4 pt-3 pb-2 text-base shadow-none outline-none focus-visible:border-0 focus-visible:ring-0 dark:bg-transparent sm:min-h-24"
+                className="min-h-32 w-full resize-none rounded-none border-0 bg-transparent px-5 pt-4 pb-2 text-base shadow-none outline-none focus-visible:border-0 focus-visible:ring-0 dark:bg-transparent sm:min-h-28 sm:text-lg"
               />
               <div
                 data-testid="home-composer-actions"
-                className="flex min-h-12 w-full items-center justify-between gap-3 px-3 pt-1 pb-3"
+                className="flex min-h-14 w-full items-center justify-between gap-3 px-4 pt-1 pb-4"
               >
                 <div className="flex items-center gap-1">
                   {onOpenEverythingInbox ? (
@@ -830,8 +830,8 @@ function StartWorkspace({
                   {t({ id: "home.local_projects", message: "Local projects" })}
                 </span>
               </div>
-              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                {recentProjects.slice(0, 3).map((project) => (
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                {recentProjects.slice(0, 4).map((project) => (
                   <ProjectListItem
                     key={project.id}
                     project={project}
@@ -927,13 +927,13 @@ function ProjectDirectory({
   };
 
   return (
-    <div className="mx-auto w-full max-w-5xl px-6 py-10 lg:px-10">
+    <div className="mx-auto w-full max-w-6xl px-6 py-10 lg:px-10 lg:py-12">
       <header className="border-b border-border pb-5">
         <p className="text-sm text-muted-foreground">
           {t({ id: "home.workspace", message: "Workspace" })}
         </p>
         <div className="mt-1 flex flex-wrap items-center justify-between gap-3">
-          <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
+          <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">{title}</h1>
           {loadState === "ready" && projects.length ? (
             <div className="relative w-full sm:w-64">
               <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -1004,7 +1004,7 @@ function ProjectDirectory({
         ) : !matchedProjects.length ? (
           <EmptySearchResults query={query} onClear={() => setQuery("")} />
         ) : layout === "grid" ? (
-          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {matchedProjects.map((project) => (
               <ProjectCard
                 key={project.id}
