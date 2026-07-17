@@ -17,6 +17,33 @@
 `frame.data` is worker-owned; stages 2–3 mutate it in place (spec 4b). This is
 deliberate, not an immutability violation.
 
+## Board Compliance Diagnostics (task `07-17-board-compliance-diagnostics`)
+
+The white pipeline silently degrades when the image model ignores the
+pure-white board instruction. `computeBoardDiagnostics(frame, threshold)`
+(`src/algorithm/boardDiagnostics.ts`, pure, single pass, no mutation) measures
+this BEFORE `runPipeline` mutates the frame:
+
+- border band = `max(2, round(min(w,h) * 0.025))`; `borderWhiteRatio` /
+  `whiteRatio` use `isBackgroundPixel` with the ACTIVE threshold (never a
+  hard-coded 246) so compliance agrees with floodBackground.
+- `compliant = borderWhiteRatio >= BOARD_BORDER_WHITE_MIN_RATIO (0.55)`,
+  tunable, outside the verbatim-port contract.
+- Wiring: `sliceRegionBoardBitmap` returns `{ slices, diagnostics }`;
+  `runRegionBreakdown` fires optional `onRegionDiagnostics` (before
+  `onRegionSliced`) and returns `diagnosticsByRegion` (succeeded regions only).
+  **Measurement only** — non-compliant boards still slice; the console.info in
+  `IntentWorkspace` is the observable.
+- `regionBoardPrompt` forbids model-added text labels/captions/numbering/
+  watermarks (redrawn text becomes garbled pixel "assets").
+
+**Decision record**: LayerForge's adaptive background keying (border color
+histogram → flood with detected key colors, rejection guard
+removedRatio ∈ [0.08, 0.92]) and vision-model bounds with focused retry were
+evaluated and deferred — adaptive keying only after `diagnosticsByRegion`
+data shows material non-compliance frequency; vision bounds only as a
+CV-suspect fallback, never unconditionally (cost/latency negative otherwise).
+
 ## Signatures
 
 ```typescript

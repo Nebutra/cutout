@@ -31,3 +31,11 @@ export const MATTE_ALPHA_FLOOR = 1
 
 /** Default white-background RGB threshold (user default). */
 export const DEFAULT_THRESHOLD = 246
+
+/**
+ * Board compliance: minimum fraction of border-band pixels that must be
+ * background-white for a generated region board to count as compliant with the
+ * pure-white-background instruction (see `boardDiagnostics.ts`). NEW, tunable —
+ * NOT part of the verbatim-port contract.
+ */
+export const BOARD_BORDER_WHITE_MIN_RATIO = 0.55
