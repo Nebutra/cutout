@@ -83,7 +83,7 @@ describe('AgentWorkspaceDock', () => {
     expect(html).toContain('justify-start')
     expect(html).toContain('>hi</p>')
     expect(html).toContain("Hi! Tell me what you&#x27;d like to design or build.")
-    expect(html).toContain('Build it anyway')
+    expect(html).toContain('aria-label="Build it anyway"')
     expect(html).toContain('aria-label="Copy message"')
     expect(html).toContain('data-slot="agent-composer"')
     expect(html).not.toContain('data-slot="agent-details"')
@@ -91,7 +91,7 @@ describe('AgentWorkspaceDock', () => {
     expect(html).not.toContain('RUNTIME')
     expect(html).not.toContain('data-sonner-toast')
   })
-  it('offers edit only for user messages and keeps Agent suggestions below the bubble', () => {
+  it('offers edit only for user messages and keeps the latest Agent suggestion in message actions', () => {
     const html = renderToStaticMarkup(createElement(AgentWorkspaceDock, {
       viewModel: {
         ...draftModel,
@@ -107,7 +107,22 @@ describe('AgentWorkspaceDock', () => {
 
     expect(html.match(/aria-label="Edit message"/g)).toHaveLength(1)
     expect(html).toContain('data-slot="agent-message"')
-    expect(html).toContain('mt-2 max-w-full')
+    expect(html).toContain('aria-label="Build it anyway"')
+    expect(html).not.toContain('mt-2 max-w-full')
+  })
+  it('renders only the latest actionable Agent message control', () => {
+    const html = renderToStaticMarkup(createElement(AgentWorkspaceDock, {
+      viewModel: {
+        ...draftModel,
+        feed: [
+          { id: 'old', type: 'message', role: 'agent', status: 'complete', title: 'Agent', detail: 'Earlier reply.', provenance: 'runtime', action: { type: 'proceed-anyway', label: 'Build it anyway', brief: 'old' } },
+          { id: 'new', type: 'message', role: 'agent', status: 'complete', title: 'Agent', detail: 'Latest reply.', provenance: 'runtime', action: { type: 'proceed-anyway', label: 'Build it anyway', brief: 'new' } },
+        ],
+      },
+      composer: { value: '', onChange: vi.fn(), onSubmit: vi.fn() },
+      onAgentAction: vi.fn(),
+    }))
+    expect(html.match(/aria-label="Build it anyway"/g)).toHaveLength(1)
   })
   it('keeps the conversation scrollable and hides failed-output diagnostics from the dock', () => {
     const html = renderToStaticMarkup(createElement(AgentWorkspaceDock, {

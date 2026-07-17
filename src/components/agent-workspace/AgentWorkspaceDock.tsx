@@ -23,6 +23,7 @@ import {
   Copy,
   Pencil,
   CheckCheck,
+  WandSparkles,
 } from 'lucide-react'
 import type {
   AgentFeedItem,
@@ -364,16 +365,19 @@ export function AgentRunFeed({
       >
         {items.length === 0 ? (
           <p className="max-w-[30ch] break-words py-2 text-xs leading-4 text-muted-foreground">{emptyLabel}</p>
-        ) : items.map((item, index) => (
-          <FeedRow key={item.id} item={item} detailsLabel={detailsLabel} onApproveTool={onApproveTool} onDenyTool={onDenyTool} onCancelTool={onCancelTool} onRetryTool={onRetryTool} onAgentAction={onAgentAction} onEditMessage={onEditMessage} onRetry={index === items.length - 1 ? onRetry : undefined} retryLabel={retryLabel} />
-        ))}
+        ) : (() => {
+          const latestActionId = [...items].reverse().find((item) => item.type === 'message' && item.action)?.id
+          return items.map((item, index) => (
+            <FeedRow key={item.id} item={item} detailsLabel={detailsLabel} onApproveTool={onApproveTool} onDenyTool={onDenyTool} onCancelTool={onCancelTool} onRetryTool={onRetryTool} onAgentAction={onAgentAction} onEditMessage={onEditMessage} showMessageAction={item.id === latestActionId} onRetry={index === items.length - 1 ? onRetry : undefined} retryLabel={retryLabel} />
+          ))
+        })()}
         <div ref={endRef} />
       </div>
     </section>
   )
 }
 
-function FeedRow({ item, detailsLabel, onApproveTool, onDenyTool, onCancelTool, onRetryTool, onAgentAction, onEditMessage, onRetry, retryLabel }: {
+function FeedRow({ item, detailsLabel, onApproveTool, onDenyTool, onCancelTool, onRetryTool, onAgentAction, onEditMessage, showMessageAction = false, onRetry, retryLabel }: {
   readonly item: AgentFeedItem
   readonly detailsLabel: string
   readonly onApproveTool?: AgentWorkspaceDockProps['onApproveTool']
@@ -382,6 +386,7 @@ function FeedRow({ item, detailsLabel, onApproveTool, onDenyTool, onCancelTool, 
   readonly onRetryTool?: AgentWorkspaceDockProps['onRetryTool']
   readonly onAgentAction?: AgentWorkspaceDockProps['onAgentAction']
   readonly onEditMessage?: AgentWorkspaceDockProps['onEditMessage']
+  readonly showMessageAction?: boolean
   readonly onRetry?: () => void
   readonly retryLabel?: string
 }) {
@@ -426,18 +431,9 @@ function FeedRow({ item, detailsLabel, onApproveTool, onDenyTool, onCancelTool, 
               message={item.detail}
               allowEdit={isUser && Boolean(onEditMessage)}
               onEdit={onEditMessage}
+              action={showMessageAction ? item.action : undefined}
+              onAction={onAgentAction ? () => onAgentAction(item.id, item.action!.type, item.action!.brief) : undefined}
             />
-          ) : null}
-          {item.action && onAgentAction ? (
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              className="mt-2 max-w-full"
-              onClick={() => onAgentAction(item.id, item.action!.type, item.action!.brief)}
-            >
-              {item.action.label}
-            </Button>
           ) : null}
         </div>
       </div>
@@ -506,11 +502,15 @@ function MessageActions({
   message,
   allowEdit,
   onEdit,
+  action,
+  onAction,
 }: {
   readonly align: 'start' | 'end'
   readonly message: string
   readonly allowEdit: boolean
   readonly onEdit?: (message: string) => void
+  readonly action?: Extract<AgentFeedItem, { readonly type: 'message' }>['action']
+  readonly onAction?: () => void
 }) {
   const [copied, setCopied] = useState(false)
   const copy = async () => {
@@ -545,6 +545,16 @@ function MessageActions({
               </Button>
             </TooltipTrigger>
             <TooltipContent>Edit</TooltipContent>
+          </Tooltip>
+        ) : null}
+        {action && onAction ? (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button type="button" variant="ghost" size="icon-sm" aria-label={action.label} onClick={onAction}>
+                <WandSparkles />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>{action.label}</TooltipContent>
           </Tooltip>
         ) : null}
       </div>
