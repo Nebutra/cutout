@@ -1,0 +1,2 @@
+{"file":".trellis/spec/frontend/index.md","reason":"Frontend component and state conventions for the Agent dock and canvas."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Streaming adds an event and service-to-UI contract across persistence boundaries."}

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
+import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 import {
   AlertTriangle,
   Check,
@@ -19,9 +19,7 @@ import {
   ChevronDown,
   BrainCircuit,
   Bot,
-  BadgeDollarSign,
   Ban,
-  ReceiptText,
   Copy,
   Pencil,
   CheckCheck,
@@ -45,6 +43,7 @@ import {
 import { Textarea } from '@/components/ui/textarea'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
+import { AgentRichText } from './AgentRichText'
 import { ConnectorMenu } from '@/components/integrations/ConnectorMenu'
 
 export interface AgentComposerChoice {
@@ -70,6 +69,8 @@ export interface AgentComposerModel {
   readonly value: string
   readonly placeholder?: string
   readonly disabled?: boolean
+  /** Disables attachments and routing controls without locking message input. */
+  readonly controlsDisabled?: boolean
   readonly busy?: boolean
   readonly submitDisabled?: boolean
   /** True when an empty composer value is still a valid submission (e.g. a human-loop question already has a selected/default choice; typed text is optional extra context). */
@@ -85,8 +86,6 @@ export interface AgentComposerModel {
   readonly thinkingSelection?: AgentComposerSelection
   readonly materialContext?: {
     readonly label: string
-    readonly detail: string
-    readonly blockedReason?: string | null
     readonly onClear: () => void
   }
 }
@@ -133,9 +132,6 @@ export interface AgentWorkspaceDockProps {
   readonly onRetryTool?: (toolCallId: string, requestId?: string) => void
   readonly onAgentAction?: (eventId: string, action: 'proceed-anyway', brief: string) => void
   readonly onEditMessage?: (message: string) => void
-  readonly onOpenBudget?: () => void
-  /** Cost disclosure is transactional, not permanent workspace chrome. */
-  readonly showCostNotice?: boolean
 }
 
 const DEFAULT_LABELS: AgentDockLabels = {
@@ -172,15 +168,12 @@ export function AgentWorkspaceDock({
   onResume,
   onCancel,
   onRetry,
-  onOpenArtifact,
   onApproveTool,
   onDenyTool,
   onCancelTool,
   onRetryTool,
   onAgentAction,
   onEditMessage,
-  onOpenBudget,
-  showCostNotice = false,
 }: AgentWorkspaceDockProps) {
   const labels = { ...DEFAULT_LABELS, ...labelOverrides }
   const presentation = deriveDockPresentation(viewModel, {
@@ -189,14 +182,11 @@ export function AgentWorkspaceDock({
   // The composer owns the active-run stop action. Do not render a second,
   // visually disconnected cancel button for the same operation.
   const runCancel = composer.onStop ? undefined : onCancel
-  const gateItems = viewModel.feed.filter((item) => item.type === 'tool' && item.status === 'waiting')
-  const conversationItems = viewModel.feed.filter((item) => item.type === 'message')
-  // Ops activity only — conversation messages are the primary surface, not "Details".
-  const activityItems = viewModel.feed.filter(
-    (item) => item.type !== 'message' && !(item.type === 'tool' && item.status === 'waiting'),
-  )
-  const hasActivity = activityItems.length > 0
-  const hasRunDetails = hasActivity || presentation.showChecklist
+  const runIsTerminal = ['ready', 'needs-repair', 'stopped', 'cancelled'].includes(viewModel.summary.status)
+  const gateItems = !runIsTerminal
+    ? viewModel.feed.filter((item) => item.type === 'tool' && item.status === 'waiting')
+    : []
+  const conversationItems = viewModel.feed.filter((item) => item.type === 'message' || item.type === 'error')
 
   return (
     <aside
@@ -242,56 +232,21 @@ export function AgentWorkspaceDock({
             compact
             onAgentAction={onAgentAction}
             onEditMessage={onEditMessage}
+            onRetry={presentation.mode === 'repair' ? onRetry : undefined}
+            retryLabel={labels.retry}
           />
         </div>
       ) : null}
 
-      {!hasRunDetails ? (
-        conversationItems.length === 0 ? (
-          <div aria-hidden="true" data-slot="agent-draft-spacer" className="min-h-8 flex-1" />
-        ) : null
-      ) : (
-        <details data-slot="agent-details" className="group/details shrink-0 overflow-y-auto overscroll-contain border-b border-border">
-          <summary className="sticky top-0 z-10 flex cursor-pointer list-none items-center gap-2 bg-background px-3 py-2 text-xs font-medium text-muted-foreground hover:text-foreground [&::-webkit-details-marker]:hidden">
-            <ChevronRight className="size-3.5 transition-transform group-open/details:rotate-90" />
-            Details
-            {viewModel.checklist.length > 0 ? (
-              <span className="ml-auto tabular-nums">{viewModel.checklist.filter((item) => item.status === 'complete').length}/{viewModel.checklist.length}</span>
-            ) : null}
-          </summary>
-          {hasActivity ? (
-            <AgentRunFeed
-              items={activityItems}
-              emptyLabel={labels.noActivity}
-              detailsLabel={labels.toolDetails}
-              heading={labels.feed}
-              compact={compact}
-              onApproveTool={onApproveTool}
-              onDenyTool={onDenyTool}
-              onCancelTool={onCancelTool}
-              onRetryTool={onRetryTool}
-              onAgentAction={onAgentAction}
-            />
-          ) : null}
-          {presentation.showChecklist ? (
-            <OutcomeChecklist
-              items={viewModel.checklist}
-              heading={labels.outcomes}
-              onOpenArtifact={onOpenArtifact}
-              compact={compact}
-            />
-          ) : null}
-        </details>
-      )}
+      {conversationItems.length === 0 ? (
+        <div aria-hidden="true" data-slot="agent-draft-spacer" className="min-h-8 flex-1" />
+      ) : null}
 
       <div className="shrink-0 border-t border-border bg-background">
-        {gateItems.length > 0 && viewModel.cost && (viewModel.cost.estimated.length > 0 || viewModel.cost.charged.length > 0) ? (
-          <CostSummary cost={viewModel.cost} onOpenBudget={onOpenBudget} label={labels.budget} />
-        ) : null}
         {presentation.showIntervention ? (
           <div className="border-b border-border px-3 py-2.5">{intervention}</div>
         ) : null}
-        {presentation.showControls ? (
+        {presentation.showControls && presentation.mode !== 'repair' ? (
           <AgentRunControls
             summary={viewModel.summary}
             heading={labels.controls}
@@ -302,11 +257,6 @@ export function AgentWorkspaceDock({
             onRetry={onRetry}
             compact={compact}
           />
-        ) : null}
-        {showCostNotice && gateItems.length > 0 ? (
-          <p className="border-t border-border px-3 py-2 text-[11px] leading-4 text-muted-foreground">
-            {viewModel.costNotice}
-          </p>
         ) : null}
         <AgentComposer model={composer} labels={labels} compact={compact} />
       </div>
@@ -368,6 +318,8 @@ export function AgentRunFeed({
   onRetryTool,
   onAgentAction,
   onEditMessage,
+  onRetry,
+  retryLabel,
 }: {
   readonly items: readonly AgentFeedItem[]
   readonly heading: string
@@ -380,7 +332,10 @@ export function AgentRunFeed({
   readonly onRetryTool?: AgentWorkspaceDockProps['onRetryTool']
   readonly onAgentAction?: AgentWorkspaceDockProps['onAgentAction']
   readonly onEditMessage?: AgentWorkspaceDockProps['onEditMessage']
+  readonly onRetry?: () => void
+  readonly retryLabel?: string
 }) {
+  const headingId = useId()
   const endRef = useRef<HTMLDivElement | null>(null)
   const previousCountRef = useRef(items.length)
 
@@ -391,16 +346,16 @@ export function AgentRunFeed({
     previousCountRef.current = items.length
   }, [items.length])
 
-  const isConversation = items.every((item) => item.type === 'message')
+  const isConversation = items.every((item) => item.type === 'message' || item.type === 'error')
 
   return (
     <section
       data-slot="agent-run-feed"
-      aria-labelledby="agent-feed-heading"
+      aria-labelledby={headingId}
       className={cn(compact ? 'p-3' : 'px-3 py-3')}
     >
-      {!isConversation ? <SectionHeading id="agent-feed-heading">{heading}</SectionHeading> : (
-        <h2 id="agent-feed-heading" className="sr-only">{heading}</h2>
+      {!isConversation ? <SectionHeading id={headingId}>{heading}</SectionHeading> : (
+        <h2 id={headingId} className="sr-only">{heading}</h2>
       )}
       <div
         aria-live="polite"
@@ -409,8 +364,8 @@ export function AgentRunFeed({
       >
         {items.length === 0 ? (
           <p className="max-w-[30ch] break-words py-2 text-xs leading-4 text-muted-foreground">{emptyLabel}</p>
-        ) : items.map((item) => (
-          <FeedRow key={item.id} item={item} detailsLabel={detailsLabel} onApproveTool={onApproveTool} onDenyTool={onDenyTool} onCancelTool={onCancelTool} onRetryTool={onRetryTool} onAgentAction={onAgentAction} onEditMessage={onEditMessage} />
+        ) : items.map((item, index) => (
+          <FeedRow key={item.id} item={item} detailsLabel={detailsLabel} onApproveTool={onApproveTool} onDenyTool={onDenyTool} onCancelTool={onCancelTool} onRetryTool={onRetryTool} onAgentAction={onAgentAction} onEditMessage={onEditMessage} onRetry={index === items.length - 1 ? onRetry : undefined} retryLabel={retryLabel} />
         ))}
         <div ref={endRef} />
       </div>
@@ -418,7 +373,7 @@ export function AgentRunFeed({
   )
 }
 
-function FeedRow({ item, detailsLabel, onApproveTool, onDenyTool, onCancelTool, onRetryTool, onAgentAction, onEditMessage }: {
+function FeedRow({ item, detailsLabel, onApproveTool, onDenyTool, onCancelTool, onRetryTool, onAgentAction, onEditMessage, onRetry, retryLabel }: {
   readonly item: AgentFeedItem
   readonly detailsLabel: string
   readonly onApproveTool?: AgentWorkspaceDockProps['onApproveTool']
@@ -427,6 +382,8 @@ function FeedRow({ item, detailsLabel, onApproveTool, onDenyTool, onCancelTool, 
   readonly onRetryTool?: AgentWorkspaceDockProps['onRetryTool']
   readonly onAgentAction?: AgentWorkspaceDockProps['onAgentAction']
   readonly onEditMessage?: AgentWorkspaceDockProps['onEditMessage']
+  readonly onRetry?: () => void
+  readonly retryLabel?: string
 }) {
   const isError = item.type === 'error'
   const tool = item.type === 'tool' ? item : null
@@ -449,13 +406,18 @@ function FeedRow({ item, detailsLabel, onApproveTool, onDenyTool, onCancelTool, 
                 : 'rounded-bl-md bg-muted text-foreground',
             )}
           >
-            {pending ? (
+            {pending && !isUser && !item.detail ? (
               <p role="status" className="flex items-center gap-2 text-muted-foreground">
                 <LoaderCircle className="size-3.5 animate-spin" />
-                <span>{item.detail}</span>
+                <span>{item.detail || 'Thinking…'}</span>
               </p>
             ) : (
-              <p className="whitespace-pre-wrap break-words">{item.detail}</p>
+              <>
+                {isUser
+                  ? <p className="whitespace-pre-wrap break-words">{item.detail}</p>
+                  : <AgentRichText markdown={item.detail} />}
+                {pending && !isUser ? <span role="status" aria-label="Agent is responding" className="ml-1 inline-block size-1.5 animate-pulse rounded-full bg-muted-foreground" /> : null}
+              </>
             )}
           </article>
           {!pending ? (
@@ -507,8 +469,7 @@ function FeedRow({ item, detailsLabel, onApproveTool, onDenyTool, onCancelTool, 
             {tool ? (
               <dl className="mt-1 grid grid-cols-[auto_minmax(0,1fr)] gap-x-2 gap-y-0.5 pl-4 text-[11px] leading-4">
                 {tool.providerModel ? <><dt>Route</dt><dd className="break-all text-foreground/80">{tool.providerModel}</dd></> : null}
-                {tool.estimatedCost ? <><dt>Estimate</dt><dd>{formatMoney(tool.estimatedCost)}</dd></> : null}
-                {tool.charged ? <><dt>Charged</dt><dd>{formatMoney(tool.charged)}</dd></> : null}
+                {tool.estimatedCost && tool.estimatedCost.amount > 0 ? <><dt>Provider estimate</dt><dd>{formatMoney(tool.estimatedCost)}</dd></> : null}
                 {tool.approval ? <><dt>Policy</dt><dd>{tool.approval.status} · {tool.approval.reason}</dd></> : null}
                 {tool.receiptId ? <><dt>Receipt</dt><dd className="break-all">{tool.receiptId}</dd></> : null}
                 {tool.outputRefs?.length ? <><dt>Evidence</dt><dd className="break-all">{tool.outputRefs.join(', ')}</dd></> : null}
@@ -516,17 +477,22 @@ function FeedRow({ item, detailsLabel, onApproveTool, onDenyTool, onCancelTool, 
               </dl>
             ) : null}
           </details>
+          {isError && onRetry ? (
+            <Button type="button" size="sm" variant="outline" className="mt-2" onClick={onRetry}>
+              <RefreshCw /> {retryLabel ?? 'Retry'}
+            </Button>
+          ) : null}
           {tool?.actions?.length ? (
-            <div className="mt-2 flex flex-wrap gap-1.5">
+            <div className="mt-2 flex flex-wrap items-center gap-1.5">
+              {tool.status === 'waiting' && tool.estimatedCost && tool.estimatedCost.amount > 0 ? (
+                <span data-slot="tool-cost-estimate" className="mr-auto text-[11px] text-muted-foreground">
+                  Provider estimate {formatMoney(tool.estimatedCost)}
+                </span>
+              ) : null}
               {tool.actions.includes('approve') && tool.requestId && onApproveTool ? <Button size="sm" onClick={() => onApproveTool(tool.toolCallId, tool.requestId!)}><Check /> Approve</Button> : null}
               {tool.actions.includes('deny') && tool.requestId && onDenyTool ? <Button size="sm" variant="outline" onClick={() => onDenyTool(tool.toolCallId, tool.requestId!)}><Ban /> Deny</Button> : null}
               {tool.actions.includes('cancel') && onCancelTool ? <Button size="sm" variant="outline" onClick={() => onCancelTool(tool.toolCallId, tool.requestId)}><CircleStop /> Cancel</Button> : null}
               {tool.actions.includes('retry') && onRetryTool ? <Button size="sm" variant="outline" onClick={() => onRetryTool(tool.toolCallId, tool.requestId)}><RefreshCw /> Retry</Button> : null}
-            </div>
-          ) : null}
-          {isError ? (
-            <div className="mt-2 rounded-sm bg-destructive/8 px-2 py-1.5 text-[11px] leading-4 text-destructive">
-              Completed materials remain available. Retry to repair missing outcomes.
             </div>
           ) : null}
         </div>
@@ -584,33 +550,6 @@ function MessageActions({
       </div>
     </TooltipProvider>
   )
-}
-
-function CostSummary({ cost, onOpenBudget, label }: {
-  readonly cost: NonNullable<AgentWorkspaceViewModel['cost']>
-  readonly onOpenBudget?: () => void
-  readonly label: string
-}) {
-  const estimated = aggregateMoney(cost.estimated)
-  const charged = aggregateMoney(cost.charged)
-  return (
-    <div data-slot="agent-cost-summary" className="flex min-w-0 items-center justify-between gap-2 border-b border-border px-3 py-2 text-[11px] text-muted-foreground">
-      <div className="flex min-w-0 items-center gap-1.5">
-        <ReceiptText className="size-3.5 shrink-0" />
-        <span className="truncate">{charged.length ? `Charged ${charged.join(' + ')}` : `Estimated ${estimated.join(' + ')}`}</span>
-      </div>
-      {onOpenBudget ? <Button type="button" variant="ghost" size="sm" className="h-7 shrink-0 px-2" onClick={onOpenBudget}><BadgeDollarSign /> {label}</Button> : null}
-    </div>
-  )
-}
-
-function aggregateMoney(values: readonly { readonly currency: string; readonly amount: number; readonly credits?: number }[]): string[] {
-  const totals = new Map<string, { amount: number; credits: number }>()
-  for (const value of values) {
-    const current = totals.get(value.currency) ?? { amount: 0, credits: 0 }
-    totals.set(value.currency, { amount: current.amount + value.amount, credits: current.credits + (value.credits ?? 0) })
-  }
-  return [...totals].map(([currency, total]) => `${currency} ${total.amount.toFixed(2)}${total.credits ? ` · ${total.credits} credits` : ''}`)
 }
 
 function formatMoney(value: { readonly currency: string; readonly amount: number; readonly credits?: number }): string {
@@ -744,6 +683,7 @@ export function AgentComposer({
 }) {
   const canSubmit = (model.value.trim().length > 0 || Boolean(model.allowEmptySubmit)) && !model.disabled && (Boolean(model.allowEmptySubmit) || !model.submitDisabled)
   const attachmentCount = model.attachments?.length ?? 0
+  const controlsDisabled = Boolean(model.disabled || model.controlsDisabled)
   const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
       event.preventDefault()
@@ -764,7 +704,7 @@ export function AgentComposer({
                 <button
                   type="button"
                   aria-label={`Remove ${attachment.label}`}
-                  disabled={model.disabled}
+                  disabled={controlsDisabled}
                   onClick={() => model.onRemoveAttachment?.(attachment.id)}
                   className="rounded-sm text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"
                 >
@@ -775,36 +715,28 @@ export function AgentComposer({
           ))}
         </div>
       ) : null}
-      {model.materialContext ? (
-        <div data-slot="agent-material-context" className="mb-1 rounded-md border border-border bg-muted/30 px-2 py-1.5">
-          <div className="flex min-w-0 items-start justify-between gap-2">
-            <div className="min-w-0">
-              <p className="truncate text-xs font-medium">Editing {model.materialContext.label}</p>
-              <p className={cn(
-                'mt-0.5 text-[11px] leading-4',
-                model.materialContext.blockedReason ? 'text-destructive' : 'text-muted-foreground',
-              )}>
-                {model.materialContext.blockedReason ?? model.materialContext.detail}
-              </p>
-            </div>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-sm"
-              aria-label="Clear material context"
-              disabled={model.disabled}
-              onClick={model.materialContext.onClear}
-            >
-              <X />
-            </Button>
-          </div>
-        </div>
-      ) : null}
       {/* Single shell: text + tools share one border — no nested textarea surface. */}
       <div
         data-slot="agent-composer-surface"
         className="rounded-xl border border-border bg-background shadow-[0_8px_24px_rgb(0_0_0/0.08)] transition-shadow focus-within:border-foreground/20 focus-within:shadow-[0_10px_28px_rgb(0_0_0/0.12)]"
       >
+        {model.materialContext ? (
+          <div data-slot="agent-material-context" className="flex items-center gap-1 border-b border-border px-2 py-1.5">
+            <span className="inline-flex min-w-0 items-center gap-1 rounded-md bg-muted px-2 py-1 text-xs font-medium">
+              <span aria-hidden="true" className="text-muted-foreground">@</span>
+              <span className="max-w-48 truncate">{model.materialContext.label}</span>
+              <button
+                type="button"
+                aria-label={`Remove ${model.materialContext.label} reference`}
+                disabled={controlsDisabled}
+                onClick={model.materialContext.onClear}
+                className="rounded-sm text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"
+              >
+                <X className="size-3" />
+              </button>
+            </span>
+          </div>
+        ) : null}
         <Textarea
           aria-label="Message the Agent"
           value={model.value}
@@ -826,7 +758,7 @@ export function AgentComposer({
                     variant="ghost"
                     size="icon-sm"
                     aria-label={labels.attach}
-                    disabled={model.disabled}
+                    disabled={controlsDisabled}
                     onClick={model.onAttach}
                     className="relative"
                   >
@@ -841,7 +773,7 @@ export function AgentComposer({
                 <TooltipContent side="top">{labels.attach}</TooltipContent>
               </Tooltip>
             ) : null}
-            <ConnectorMenu disabled={model.disabled} />
+            <ConnectorMenu disabled={controlsDisabled} />
             {model.webSearch ? (
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -851,7 +783,7 @@ export function AgentComposer({
                     size="sm"
                     aria-label={labels.webSearch}
                     aria-pressed={model.webSearch.enabled}
-                    disabled={model.disabled || model.webSearch.disabled}
+                    disabled={controlsDisabled || model.webSearch.disabled}
                     onClick={() => model.webSearch?.onChange(!model.webSearch.enabled)}
                     className="px-2"
                   >
@@ -867,7 +799,7 @@ export function AgentComposer({
                 icon={<Bot />}
                 label={labels.model}
                 selection={model.modelSelection}
-                disabled={model.disabled}
+                disabled={controlsDisabled}
               />
             ) : null}
             {model.thinkingSelection && model.thinkingSelection.value !== 'auto' ? (
@@ -875,13 +807,14 @@ export function AgentComposer({
                 icon={<BrainCircuit />}
                 label={labels.thinking}
                 selection={model.thinkingSelection}
-                disabled={model.disabled}
+                disabled={controlsDisabled}
               />
             ) : null}
           </div>
+          <div className="flex shrink-0 items-center gap-1">
           {model.busy && model.onStop ? (
-            <Button type="button" variant="outline" size="sm" onClick={model.onStop}>
-              <CircleStop /> {labels.stop}
+            <Button type="button" variant="outline" size="icon-sm" title={labels.stop} aria-label={labels.stop} onClick={model.onStop} className="rounded-full">
+              <CircleStop />
             </Button>
           ) : model.busy ? (
             <span
@@ -892,11 +825,11 @@ export function AgentComposer({
               <LoaderCircle className="size-3 animate-spin" />
               {labels.running}
             </span>
-          ) : (
-            <Button type="button" size="icon-sm" title={labels.send} aria-label={labels.send} disabled={!canSubmit} onClick={model.onSubmit}>
+          ) : null}
+            <Button type="button" size="icon-sm" title={labels.send} aria-label={labels.send} disabled={!canSubmit} onClick={model.onSubmit} className="rounded-full">
               <Send />
             </Button>
-          )}
+          </div>
         </div>
         </TooltipProvider>
       </div>

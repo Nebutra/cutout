@@ -1,7 +1,7 @@
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it, vi } from 'vitest'
-import { AgentComposer, AgentRunFeed, AgentWorkspaceDock } from './AgentWorkspaceDock'
+import { AgentComposer, AgentRunFeed, AgentWorkspaceDock, OutcomeChecklist } from './AgentWorkspaceDock'
 import type { AgentWorkspaceViewModel } from './agent-view-model'
 
 const stoppedModel: AgentWorkspaceViewModel = {
@@ -109,7 +109,7 @@ describe('AgentWorkspaceDock', () => {
     expect(html).toContain('data-slot="agent-message"')
     expect(html).toContain('mt-2 max-w-full')
   })
-  it('keeps the conversation as the scrollable flex region when run details exist', () => {
+  it('keeps the conversation scrollable and hides failed-output diagnostics from the dock', () => {
     const html = renderToStaticMarkup(createElement(AgentWorkspaceDock, {
       viewModel: {
         ...stoppedModel,
@@ -123,9 +123,9 @@ describe('AgentWorkspaceDock', () => {
     }))
 
     expect(html).toMatch(/data-slot="agent-conversation" class="[^"]*min-h-0 flex-1 overflow-y-auto/)
-    expect(html).toMatch(/data-slot="agent-details" class="[^"]*shrink-0 overflow-y-auto/)
+    expect(html).not.toContain('data-slot="agent-details"')
   })
-  it('renders approval actions, route/cost facts, receipt evidence, and a compact budget entry', () => {
+  it('keeps a provider estimate on its approval action without BYOK billing chrome', () => {
     const onApproveTool = vi.fn()
     const html = renderToStaticMarkup(createElement(AgentWorkspaceDock, {
       viewModel: {
@@ -137,15 +137,16 @@ describe('AgentWorkspaceDock', () => {
       composer: { value: '', disabled: true, onChange: vi.fn(), onSubmit: vi.fn() },
       onApproveTool,
       onDenyTool: vi.fn(),
-      onOpenBudget: vi.fn(),
     }))
     expect(html).toContain('openai/gpt-image-1')
     expect(html).toContain('USD 0.08')
     expect(html).toContain('Explicit approval is required.')
     expect(html).toContain('Approve')
     expect(html).toContain('Deny')
-    expect(html).toContain('data-slot="agent-cost-summary"')
-    expect(html).toContain('Budget')
+    expect(html).toContain('data-slot="tool-cost-estimate"')
+    expect(html).not.toContain('data-slot="agent-cost-summary"')
+    expect(html).not.toContain('Charged')
+    expect(html).not.toContain('Budget')
   })
   it('renders an empty draft as a compact intent prompt without empty run chrome', () => {
     const html = renderToStaticMarkup(createElement(AgentWorkspaceDock, {
@@ -162,7 +163,7 @@ describe('AgentWorkspaceDock', () => {
     expect(html).not.toContain('Run controls')
   })
 
-  it('progressively reveals run overview and activity while running', () => {
+  it('progressively reveals the run overview without an activity log while running', () => {
     const html = renderToStaticMarkup(createElement(AgentWorkspaceDock, {
       viewModel: {
         ...draftModel,
@@ -187,8 +188,8 @@ describe('AgentWorkspaceDock', () => {
 
     expect(html).not.toContain('data-slot="agent-draft-prompt"')
     expect(html).toContain('Planning the outcome')
-    expect(html).toContain('Agent activity')
-    expect(html).toContain('Creating Plan')
+    expect(html).not.toContain('Agent activity')
+    expect(html).not.toContain('Creating Plan')
   })
 
   it('keeps one stop action when the composer owns cancellation', () => {
@@ -214,7 +215,7 @@ describe('AgentWorkspaceDock', () => {
       onCancel: vi.fn(),
     }))
 
-    expect(html).toContain(' Stop</button>')
+    expect(html.match(/aria-label="Stop"/g)).toHaveLength(1)
     expect(html).not.toContain('>Cancel</button>')
   })
 
@@ -240,7 +241,7 @@ describe('AgentWorkspaceDock', () => {
     expect(html).not.toContain('data-slot="agent-run-overview"')
   })
 
-  it('keeps draft capability notices visible without expanding the run overview', () => {
+  it('does not place draft capability notices in the conversation dock', () => {
     const html = renderToStaticMarkup(createElement(AgentWorkspaceDock, {
       viewModel: {
         ...draftModel,
@@ -258,9 +259,9 @@ describe('AgentWorkspaceDock', () => {
 
     expect(html).not.toContain('data-slot="agent-draft-prompt"')
     expect(html).not.toContain('data-slot="agent-run-overview"')
-    expect(html).toContain('Agent activity')
-    expect(html).toContain('Capability fallback')
-    expect(html).toContain('Web search is unavailable.')
+    expect(html).not.toContain('Agent activity')
+    expect(html).not.toContain('Capability fallback')
+    expect(html).not.toContain('Web search is unavailable.')
   })
 
   it('expands draft overview for human intervention without empty ops activity', () => {
@@ -280,7 +281,7 @@ describe('AgentWorkspaceDock', () => {
     expect(html).not.toContain('aria-label="Run controls"')
   })
 
-  it('keeps verified outcomes visible when the run is ready', () => {
+  it('keeps verified outcomes out of the chat dock when the run is ready', () => {
     const html = renderToStaticMarkup(createElement(AgentWorkspaceDock, {
       viewModel: {
         ...draftModel,
@@ -304,13 +305,13 @@ describe('AgentWorkspaceDock', () => {
     }))
 
     expect(html).not.toContain('data-slot="agent-draft-prompt"')
-    expect(html).toContain('Materials ready')
-    expect(html).toContain('Outcome checklist')
-    expect(html).toContain('2 of 2 verified')
+    expect(html).not.toContain('data-slot="agent-run-overview"')
+    expect(html).not.toContain('Outcome checklist')
+    expect(html).not.toContain('2 of 2 verified')
     expect(html).not.toContain('Agent activity')
   })
 
-  it('keeps recovery, evidence, controls, and intervention visible after an error', () => {
+  it('keeps recovery controls and intervention visible after an error without an outcome checklist', () => {
     const html = renderToStaticMarkup(createElement(AgentWorkspaceDock, {
       viewModel: stoppedModel,
       composer: { value: '', onChange: vi.fn(), onSubmit: vi.fn() },
@@ -318,31 +319,22 @@ describe('AgentWorkspaceDock', () => {
       onRetry: vi.fn(),
     }))
 
-    expect(html).toContain('Completed materials remain available')
-    expect(html).toContain('1 of 2 verified')
+    expect(html.match(/Run stopped/g)).toHaveLength(1)
+    expect(html).not.toContain('data-slot="agent-run-overview"')
+    expect(html).not.toContain('1 of 2 verified')
     expect(html).toContain('Repair and retry')
     expect(html).toContain('Approve repair')
-    expect(html).toContain('<details')
+    expect(html).not.toContain('data-slot="agent-details"')
   })
 
   it('only renders outcome rows with existing evidence as navigation buttons', () => {
     const onOpenArtifact = vi.fn()
-    const html = renderToStaticMarkup(createElement(AgentWorkspaceDock, {
-      viewModel: {
-        ...stoppedModel,
-        checklist: [
-          ...stoppedModel.checklist,
-          {
-            id: 'design-system',
-            label: 'Design system',
-            status: 'missing',
-            completedCount: 0,
-            requiredCount: 1,
-            detail: '0 of 1 verified; 1 remaining',
-          },
-        ],
-      },
-      composer: { value: '', onChange: vi.fn(), onSubmit: vi.fn() },
+    const html = renderToStaticMarkup(createElement(OutcomeChecklist, {
+      heading: 'Outcome checklist',
+      items: [
+        { id: 'prototype-page', label: 'Prototype pages', status: 'complete', completedCount: 2, requiredCount: 2, detail: '2 of 2 verified' },
+        { id: 'design-system', label: 'Design system', status: 'missing', completedCount: 0, requiredCount: 1, detail: '0 of 1 verified; 1 remaining' },
+      ],
       onOpenArtifact,
     }))
 
@@ -355,14 +347,29 @@ describe('AgentWorkspaceDock', () => {
       viewModel: stoppedModel,
       composer: { value: '', onChange: vi.fn(), onSubmit: vi.fn() },
     }))
-    const visible = renderToStaticMarkup(createElement(AgentWorkspaceDock, {
-      viewModel: stoppedModel,
+    expect(hidden).not.toContain(stoppedModel.costNotice)
+    expect(hidden).not.toContain('Charged')
+    expect(hidden).not.toContain('Budget')
+  })
+
+  it('drops stale approval gates after a run stops', () => {
+    const html = renderToStaticMarkup(createElement(AgentWorkspaceDock, {
+      viewModel: {
+        ...stoppedModel,
+        feed: [
+          ...stoppedModel.feed,
+          { id: 'stale-approval', type: 'tool', status: 'waiting', title: 'Generate design system', detail: 'Old approval', provenance: 'runtime', toolCallId: 'tool-stale', requestId: 'request-stale', estimatedCost: { currency: 'USD', amount: 0.08 }, actions: ['approve', 'deny'] },
+        ],
+      },
       composer: { value: '', onChange: vi.fn(), onSubmit: vi.fn() },
-      showCostNotice: true,
+      onApproveTool: vi.fn(),
+      onDenyTool: vi.fn(),
     }))
 
-    expect(hidden).not.toContain(stoppedModel.costNotice)
-    expect(visible).not.toContain(stoppedModel.costNotice)
+    expect(html).not.toContain('Decision needed')
+    expect(html).not.toContain('Approve')
+    expect(html).not.toContain('Deny')
+    expect(html).not.toContain('USD 0.08')
   })
 
   it('renders a compact, accessible Agent context bar', () => {
@@ -421,6 +428,7 @@ describe('AgentWorkspaceDock', () => {
     expect(html).toContain('>1</span>')
     // Single shell wraps text + tools — no nested textarea surface.
     expect(html).toContain('data-slot="agent-composer-surface"')
+    expect(html).toMatch(/class="[^"]*rounded-full[^"]*"[^>]*aria-label="Send"/)
     const surfaceStart = html.indexOf('data-slot="agent-composer-surface"')
     const contextStart = html.indexOf('data-slot="agent-composer-context"')
     expect(surfaceStart).toBeGreaterThan(-1)
@@ -457,7 +465,7 @@ describe('AgentWorkspaceDock', () => {
     expect(html.match(/disabled=""/g)?.length).toBeGreaterThanOrEqual(4)
   })
 
-  it('shows and clears the selected material context before submission', () => {
+  it('shows and clears the selected material as a composer reference', () => {
     const html = renderToStaticMarkup(createElement(AgentComposer, {
       labels: {
         feed: 'Agent activity', outcomes: 'Outcome checklist', controls: 'Run controls',
@@ -472,16 +480,15 @@ describe('AgentWorkspaceDock', () => {
         onSubmit: vi.fn(),
         materialContext: {
           label: 'Checkout',
-          detail: 'Redo Checkout and its derived slices; preserve Home and the design system.',
           onClear: vi.fn(),
         },
       },
     }))
 
     expect(html).toContain('data-slot="agent-material-context"')
-    expect(html).toContain('Editing Checkout')
-    expect(html).toContain('Redo Checkout')
-    expect(html).toContain('aria-label="Clear material context"')
+    expect(html).toContain('>@</span>')
+    expect(html).toContain('Checkout')
+    expect(html).toContain('aria-label="Remove Checkout reference"')
   })
 
   it('keeps clear available while blocking submit for an uneditable material', () => {
@@ -499,15 +506,12 @@ describe('AgentWorkspaceDock', () => {
         onSubmit: vi.fn(),
         materialContext: {
           label: 'Unknown slice',
-          detail: '',
-          blockedReason: 'Source page unavailable.',
           onClear: vi.fn(),
         },
       },
     }))
 
-    expect(html).toContain('Source page unavailable.')
-    expect(html).toContain('aria-label="Clear material context"')
+    expect(html).toContain('aria-label="Remove Unknown slice reference"')
     expect(html).toContain('aria-label="Send" disabled=""')
   })
 

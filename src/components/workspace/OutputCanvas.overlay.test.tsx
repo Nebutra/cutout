@@ -2,7 +2,7 @@
 import { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import { afterEach, describe, expect, it } from 'vitest'
-import { OutputCanvas } from './OutputCanvas'
+import { OutputCanvas, type CanvasImageItem } from './OutputCanvas'
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 class TestResizeObserver { observe() {} disconnect() {} unobserve() {} }
@@ -24,5 +24,39 @@ describe('OutputCanvas overlays', () => {
     expect(hint?.style.left).toMatch(/px$/)
     expect(hint?.style.left).not.toBe('50%')
     expect(hint?.className).toContain('text-center')
+  })
+
+  it('keeps selected-deliverable actions and canvas tools in one control dock', () => {
+    const selected = {
+      id: 'design-system',
+      label: 'Design system',
+      material: {
+        id: 'design-system',
+        kind: 'design-system',
+        label: 'Design system',
+        version: 'v1',
+        provenance: { source: 'prototype-generation' },
+      },
+    } satisfies CanvasImageItem
+    host = document.createElement('div')
+    document.body.append(host)
+    root = createRoot(host)
+
+    act(() => root?.render(
+      <OutputCanvas
+        designSystem={selected}
+        pages={[]}
+        assets={[]}
+        selectedMaterialId={selected.material.id}
+      />,
+    ))
+
+    const dock = host.querySelector<HTMLElement>('[data-slot="canvas-control-dock"]')
+    const selection = host.querySelector<HTMLElement>('[aria-label="Selected deliverable"]')
+    const toolbar = host.querySelector<HTMLElement>('[role="toolbar"][aria-label="Canvas controls"]')
+    expect(dock).not.toBeNull()
+    expect(dock?.contains(selection)).toBe(true)
+    expect(dock?.contains(toolbar)).toBe(true)
+    expect(selection?.className).toContain('border-b')
   })
 })

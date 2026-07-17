@@ -185,6 +185,7 @@ type ProjectShellAction =
   | { readonly type: "close-project" }
   | { readonly type: "create-project"; readonly project: LocalProjectSummary }
   | { readonly type: "project-updated"; readonly project: LocalProjectSummary }
+  | { readonly type: "project-archived"; readonly project: LocalProjectSummary }
   | { readonly type: "delete-project"; readonly id: string }
   | { readonly type: "autosaved"; readonly project: LocalProjectSummary };
 
@@ -262,6 +263,22 @@ function projectShellReducer(
           ...state.projects.filter((item) => item.id !== action.project.id),
         ].sort((a, b) => b.updatedAt - a.updatedAt),
       };
+    case "project-archived": {
+      const archivingActive = state.activeProjectId === action.project.id;
+      return {
+        ...state,
+        projects: [
+          action.project,
+          ...state.projects.filter((item) => item.id !== action.project.id),
+        ].sort((a, b) => b.updatedAt - a.updatedAt),
+        activeProjectId: archivingActive ? null : state.activeProjectId,
+        view: archivingActive ? "home" : state.view,
+        projectTabOpen: archivingActive ? false : state.projectTabOpen,
+        projectVersion: archivingActive
+          ? state.projectVersion + 1
+          : state.projectVersion,
+      };
+    }
     case "delete-project": {
       const deletingActive = state.activeProjectId === action.id;
       return {
@@ -1794,6 +1811,10 @@ export function AppShell() {
   );
   const archiveProject = useCallback(
     async (id: string) => {
+      if (saveTimerRef.current) {
+        clearTimeout(saveTimerRef.current);
+        saveTimerRef.current = null;
+      }
       if (activeProjectId === id) await saveActiveProjectNow(id);
       const archived = await projectRepository.archive(id, Date.now());
       if (isErr(archived)) {
@@ -1803,26 +1824,23 @@ export function AppShell() {
         return;
       }
 
-      if (saveTimerRef.current) {
-        clearTimeout(saveTimerRef.current);
-        saveTimerRef.current = null;
-      }
       if (activeProjectId === id) {
         restoringRef.current = true;
         activeRecordRef.current = null;
         resetProject();
-        withViewTransition(() =>
-          dispatchProjectShell({ type: "close-project" }),
-        );
+      }
+
+      withViewTransition(() =>
+        dispatchProjectShell({
+          type: "project-archived",
+          project: projectSummaryFromRecord(archived.data),
+        }),
+      );
+      if (activeProjectId === id) {
         queueMicrotask(() => {
           restoringRef.current = false;
         });
       }
-
-      dispatchProjectShell({
-        type: "project-updated",
-        project: projectSummaryFromRecord(archived.data),
-      });
       toast.success("Project archived");
     },
     [activeProjectId, projectRepository, resetProject, saveActiveProjectNow],

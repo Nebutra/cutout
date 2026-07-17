@@ -115,6 +115,31 @@ describe('buildAgentViewModel', () => {
     }))
   })
 
+  it('projects one ephemeral provider stream without adding a second durable turn', () => {
+    const model = buildAgentViewModel({
+      brief: 'Create a checkout',
+      workflowPhase: 'design-system',
+      stages: [],
+      outcome: null,
+      working: true,
+      elapsedSeconds: 2,
+      runError: null,
+      liveAgentMessage: {
+        id: 'runtime:stream:run-1',
+        label: 'Drafting design system',
+        text: '## Checkout\n\nUsing a clear primary action.',
+      },
+    })
+
+    expect(model.feed).toEqual([expect.objectContaining({
+      id: 'runtime:stream:run-1',
+      type: 'message',
+      role: 'agent',
+      status: 'pending',
+      detail: '## Checkout\n\nUsing a clear primary action.',
+    })])
+  })
+
   it('prefers replayed durable events over inferred stage activity', () => {
     const model = buildAgentViewModel({
       brief: 'Checkout',
@@ -151,6 +176,24 @@ describe('buildAgentViewModel', () => {
     expect(model.feed[0]).toMatchObject({ type: 'message', role: 'user', detail: 'Checkout' })
     expect(model.feed[1]?.detail).toContain('openai/gpt-image-1')
     expect(JSON.stringify(model.feed)).not.toMatch(/chain.of.thought|reasoning/i)
+  })
+
+  it('projects a steer as one user turn without replacing the original intent', () => {
+    const runEvents = replayRunEvents([
+      createRunEvent('run', { type: 'run-started', mode: 'create' }, { eventId: 'start', at: 1 }),
+      createRunEvent('run', { type: 'intent-recorded', intent: 'Create a fitness app' }, { eventId: 'intent', at: 2 }),
+      createRunEvent('run', { type: 'steer-recorded', instruction: 'Use a quieter green' }, { eventId: 'steer', at: 3 }),
+    ])
+    const model = buildAgentViewModel({
+      brief: 'Create a fitness app', workflowPhase: 'planning', stages: [], outcome: null,
+      working: true, elapsedSeconds: 1, runError: null, runEvents,
+    })
+
+    expect(runEvents.activeRun?.intent).toBe('Create a fitness app')
+    expect(model.feed.filter((item) => item.type === 'message').map((item) => item.detail)).toEqual([
+      'Create a fitness app',
+      'Use a quieter green',
+    ])
   })
 
   it('keeps cancellation terminal before an outcome contract exists', () => {
@@ -357,6 +400,52 @@ describe('buildAgentViewModel', () => {
       expect.objectContaining({ role: 'agent', detail: '你好！想让我帮你设计或搭建什么原型吗？' }),
       expect.objectContaining({ role: 'user', detail: '做一个 landing page' }),
     ])
+  })
+
+  it('collapses an identical retry intent until the Agent produces a reply', () => {
+    const runEvents = replayRunEvents([
+      createRunEvent('run:1', { type: 'run-started', mode: 'create' }, { eventId: 's1', at: 1 }),
+      createRunEvent('run:1', { type: 'intent-recorded', intent: '做一个健身打卡 App 首页' }, { eventId: 'u1', at: 2 }),
+      createRunEvent('run:1', { type: 'step-failed', stepId: 'generate', label: 'Generate', detail: 'Provider timed out.' }, { eventId: 'f1', at: 3 }),
+      createRunEvent('run:2', { type: 'run-started', mode: 'repair' }, { eventId: 's2', at: 4 }),
+      createRunEvent('run:2', { type: 'intent-recorded', intent: '做一个健身打卡 App 首页' }, { eventId: 'u2', at: 5 }),
+    ])
+    const model = buildAgentViewModel({
+      brief: '做一个健身打卡 App 首页',
+      workflowPhase: 'idle',
+      stages: [],
+      outcome: null,
+      working: true,
+      elapsedSeconds: 1,
+      runError: null,
+      runEvents,
+    })
+
+    expect(model.feed.filter((item) => item.type === 'message')).toEqual([
+      expect.objectContaining({ id: 'u1', role: 'user', detail: '做一个健身打卡 App 首页' }),
+    ])
+  })
+
+  it('preserves identical user text when an Agent reply starts a new turn', () => {
+    const runEvents = replayRunEvents([
+      createRunEvent('run:1', { type: 'run-started', mode: 'create' }, { eventId: 's1', at: 1 }),
+      createRunEvent('run:1', { type: 'intent-recorded', intent: '继续' }, { eventId: 'u1', at: 2 }),
+      createRunEvent('run:1', { type: 'agent-message', message: '请确认继续。' }, { eventId: 'a1', at: 3 }),
+      createRunEvent('run:2', { type: 'run-started', mode: 'create' }, { eventId: 's2', at: 4 }),
+      createRunEvent('run:2', { type: 'intent-recorded', intent: '继续' }, { eventId: 'u2', at: 5 }),
+    ])
+    const model = buildAgentViewModel({
+      brief: '继续',
+      workflowPhase: 'idle',
+      stages: [],
+      outcome: null,
+      working: true,
+      elapsedSeconds: 1,
+      runError: null,
+      runEvents,
+    })
+
+    expect(model.feed.filter((item) => item.type === 'message')).toHaveLength(3)
   })
 
   it('collapses tool started+succeeded into one complete row and never leaves a spinner', () => {

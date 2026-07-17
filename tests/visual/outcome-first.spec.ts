@@ -252,6 +252,21 @@ function conversationalWorkspace() {
   })
 }
 
+function retriedIntentWorkspace() {
+  const intent = '做一个健身打卡 App 首页'
+  const events = [
+    { eventId: 'start-1', runId: 'run-1', at: 1, type: 'run-started', mode: 'create' },
+    { eventId: 'intent-1', runId: 'run-1', at: 2, type: 'intent-recorded', intent },
+    { eventId: 'failed-1', runId: 'run-1', at: 3, type: 'step-failed', stepId: 'generate', label: 'Generate', detail: 'Provider timed out.' },
+    { eventId: 'start-2', runId: 'run-2', at: 4, type: 'run-started', mode: 'repair' },
+    { eventId: 'intent-2', runId: 'run-2', at: 5, type: 'intent-recorded', intent },
+  ]
+  return baseWorkspace({
+    brief: intent,
+    agentRunEvents: { version: 'agent-run-events.v1', activeRunId: 'run-2', activeRun: null, events },
+  })
+}
+
 async function expectNoInternalVocabulary(surface: Locator) {
   for (const term of INTERNAL_TERMS) {
     await expect(surface.getByText(term)).toHaveCount(0)
@@ -333,24 +348,24 @@ test('conversational Agent replies stay in the panel and never cover the canvas'
   expect(contained).toBe(true)
 })
 
-test('details are progressive disclosure and do not leak internals by default', async ({ page }) => {
+test('design details open in the left workspace drawer and do not leak internals by default', async ({ page }) => {
   await createProjectWithWorkspace(page, completedWorkspace(), 'Inspect the result details')
   const workspace = page.getByRole('main')
 
   await expectNoInternalVocabulary(workspace)
-  await expect(page.getByRole('complementary', { name: 'Inspector' })).toHaveCount(0)
+  await expect(page.getByRole('complementary', { name: 'Design system' })).toHaveCount(0)
 
-  const details = page.getByRole('button', { name: 'Details', exact: true })
-  await expect(details).toBeVisible(); await details.click()
-  await expect(page.getByRole('complementary', { name: 'Inspector' })).toBeVisible()
+  const design = page.getByRole('button', { name: 'Design', exact: true })
+  await expect(design).toBeVisible(); await design.click()
+  await expect(page.getByRole('complementary', { name: 'Design system' })).toBeVisible()
 })
 
-test('completed result exposes decisions, while ordinary states hide cost', async ({ page }) => {
+test('completed result keeps the canvas free of review controls, while ordinary states hide cost', async ({ page }) => {
   await createProjectWithWorkspace(page, completedWorkspace(), 'Completed result fixture')
 
-  await expect(page.getByRole('button', { name: /Approve deliverables/i })).toBeVisible()
-  await expect(page.getByRole('button', { name: /Request changes/i })).toBeVisible()
-  await expect(page.getByRole('button', { name: /Compare deliverables/i })).toBeVisible()
+  await expect(page.getByRole('button', { name: /Approve deliverables/i })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: /Request changes/i })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: /Compare deliverables/i })).toHaveCount(0)
   await expect(page.getByText(/\$\d|USD|credits?/i)).toHaveCount(0)
 })
 
@@ -453,8 +468,8 @@ test('Canvas keeps a responsive safe area while workspace panels change', async 
     expect(files.overlap).toBe(false)
     await page.getByRole('button', { name: 'Files', exact: true }).click()
 
-    await page.getByRole('button', { name: 'Inspector', exact: true }).click()
-    const inspectorPanel = page.getByRole('complementary', { name: 'Inspector' })
+    await page.getByRole('button', { name: 'Design', exact: true }).click()
+    const inspectorPanel = page.getByRole('complementary', { name: 'Design system' })
     await expect(inspectorPanel).toBeVisible()
     await inspectorPanel.getByRole('button', { name: 'Close design inspector' }).click()
     await expect(inspectorPanel).toHaveCount(0)
@@ -486,14 +501,23 @@ test('Canvas keeps a responsive safe area while workspace panels change', async 
   }
 })
 
-test('cost appears only when an over-budget action requires a decision', async ({ page }) => {
+test('provider estimate stays attached to the action that requires approval', async ({ page }) => {
   await createProjectWithWorkspace(page, overBudgetWorkspace(), 'Budget decision fixture')
 
   const budgetGate = page.getByRole('region', { name: 'Decision needed' })
   await expect(budgetGate).toBeVisible()
-  await expect(page.locator('[data-slot="agent-cost-summary"]').getByText(/USD 0\.80/)).toBeVisible()
+  await expect(budgetGate.locator('[data-slot="tool-cost-estimate"]').getByText(/USD 0\.80/)).toBeVisible()
   await expect(budgetGate.getByRole('button', { name: /approve/i })).toBeVisible()
   await expect(budgetGate.getByRole('button', { name: /deny/i })).toBeVisible()
+  await expect(page.locator('[data-slot="agent-cost-summary"]')).toHaveCount(0)
+  await expect(page.getByText(/Charged USD/)).toHaveCount(0)
+})
+
+test('continuing a failed run does not repeat the same user bubble', async ({ page }) => {
+  await createProjectWithWorkspace(page, retriedIntentWorkspace(), 'Retry transcript fixture')
+
+  await expect(page.locator('[data-slot="user-message"]')).toHaveCount(1)
+  await expect(page.locator('[data-slot="user-message"]')).toContainText('做一个健身打卡 App 首页')
 })
 
 test('primary controls do not overlap and remain keyboard reachable', async ({ page }, testInfo: TestInfo) => {
@@ -505,7 +529,7 @@ test('primary controls do not overlap and remain keyboard reachable', async ({ p
 
   const composer = page.getByPlaceholder(/Describe a result/i)
   const send = page.getByRole('button', { name: /send/i })
-  const details = page.getByRole('button', { name: 'Inspector', exact: true })
+  const details = page.getByRole('button', { name: 'Design', exact: true })
   await expect(composer).toBeVisible()
   await expect(send).toBeVisible()
   if (testInfo.project.name !== 'mobile-chrome') await expect(details).toBeVisible()

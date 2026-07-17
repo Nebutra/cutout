@@ -83,7 +83,7 @@ describe('deriveDockPresentation', () => {
 
     expect(presentation).toMatchObject({
       mode: 'result',
-      showOverview: true,
+      showOverview: false,
       showFeed: false,
       showChecklist: true,
       showControls: false,
@@ -114,7 +114,7 @@ describe('deriveDockPresentation', () => {
 
     expect(presentation).toEqual({
       mode: 'repair',
-      showOverview: true,
+      showOverview: false,
       showFeed: true,
       showChecklist: true,
       showIntervention: false,

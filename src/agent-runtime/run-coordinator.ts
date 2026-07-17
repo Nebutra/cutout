@@ -18,14 +18,19 @@ export interface AgentRunLease {
 export class AgentRunCoordinator {
   private active: AgentRunLease | null = null
   private nextId = 0
+  private readonly steerInbox = new Map<number, string[]>()
 
   begin(): AgentRunLease {
-    this.active?.controller.abort('superseded')
+    if (this.active) {
+      this.active.controller.abort('superseded')
+      this.steerInbox.delete(this.active.id)
+    }
     const lease = {
       id: ++this.nextId,
       controller: new AbortController(),
     }
     this.active = lease
+    this.steerInbox.set(lease.id, [])
     return lease
   }
 
@@ -43,15 +48,41 @@ export class AgentRunCoordinator {
     return true
   }
 
+  /**
+   * Queues a user correction for the exact active execution lease. Steers do
+   * not abort work already in flight; the owner drains them at the next safe
+   * model/tool boundary.
+   */
+  steer(lease: AgentRunLease, instruction: string): boolean {
+    const normalized = instruction.trim()
+    if (!normalized || !this.isActive(lease)) return false
+    const inbox = this.steerInbox.get(lease.id)
+    if (!inbox) return false
+    inbox.push(normalized)
+    return true
+  }
+
+  /** Drains pending corrections in arrival order for the exact active lease. */
+  drainSteers(lease: AgentRunLease): readonly string[] {
+    if (!this.isActive(lease)) return []
+    const inbox = this.steerInbox.get(lease.id)
+    if (!inbox?.length) return []
+    return inbox.splice(0, inbox.length)
+  }
+
   cancel(lease: AgentRunLease, reason = 'user'): boolean {
     if (this.active !== lease) return false
     lease.controller.abort(reason)
     this.active = null
+    this.steerInbox.delete(lease.id)
     return true
   }
 
   finish(lease: AgentRunLease): void {
-    if (this.active === lease) this.active = null
+    if (this.active === lease) {
+      this.active = null
+      this.steerInbox.delete(lease.id)
+    }
   }
 }
 

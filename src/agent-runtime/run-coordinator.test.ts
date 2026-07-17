@@ -63,4 +63,32 @@ describe('AgentRunCoordinator', () => {
     }).toThrow(AgentRunCancelledError)
     expect(paidCall).not.toHaveBeenCalled()
   })
+
+  it('queues steers for the exact active lease and drains them FIFO', () => {
+    const coordinator = new AgentRunCoordinator()
+    const lease = coordinator.begin()
+
+    expect(coordinator.steer(lease, '  keep the navigation compact  ')).toBe(true)
+    expect(coordinator.steer(lease, 'use the existing green')).toBe(true)
+    expect(coordinator.steer(lease, '   ')).toBe(false)
+    expect(coordinator.drainSteers(lease)).toEqual([
+      'keep the navigation compact',
+      'use the existing green',
+    ])
+    expect(coordinator.drainSteers(lease)).toEqual([])
+  })
+
+  it('rejects stale steers and clears queued input when a lease ends', () => {
+    const coordinator = new AgentRunCoordinator()
+    const stale = coordinator.begin()
+    expect(coordinator.steer(stale, 'old direction')).toBe(true)
+    const active = coordinator.begin()
+
+    expect(coordinator.steer(stale, 'late direction')).toBe(false)
+    expect(coordinator.drainSteers(stale)).toEqual([])
+    expect(coordinator.drainSteers(active)).toEqual([])
+    expect(coordinator.steer(active, 'current direction')).toBe(true)
+    coordinator.finish(active)
+    expect(coordinator.drainSteers(active)).toEqual([])
+  })
 })

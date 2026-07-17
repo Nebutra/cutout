@@ -26,7 +26,7 @@ import {
   type ReactFlowInstance,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import { Ban, Boxes, CheckCircle2, ChevronUp, Circle, DownloadCloud, GitBranch, Heart, ImageOff, ImagePlus, Lock, Maximize, MessageSquare, Minus, MousePointer2, MoveUpRight, Pencil, Plus, Scan, Slash, Sparkles, Square, StickyNote, Type, WandSparkles, X } from 'lucide-react'
+import { Ban, Boxes, CheckCircle2, ChevronUp, Circle, DownloadCloud, GitBranch, Heart, ImageOff, ImagePlus, LoaderCircle, Lock, Maximize, MessageSquare, Minus, MousePointer2, MoveUpRight, Pencil, Plus, Scan, Slash, Sparkles, Square, StickyNote, Type, WandSparkles, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import type { CreativeBranchRequest, CreativeVariantDecision } from '@/agent-runtime/creative-board-decisions'
 import type { MaterialRef } from '@/agent-runtime/material-impact'
@@ -72,6 +72,9 @@ export interface OutputCanvasProps {
   readonly designSystem: CanvasImageItem | null
   readonly pages: readonly CanvasImageItem[]
   readonly assets: readonly CanvasImageItem[]
+  readonly pendingDesignSystem?: CanvasImageItem | null
+  readonly pendingPages?: readonly CanvasImageItem[]
+  readonly pendingAssets?: readonly CanvasImageItem[]
   /** Artifact id requested by an external outcome/navigation surface. */
   readonly focusArtifactId?: string | null
   /** Changes for every explicit navigation request, even when the id repeats. */
@@ -126,6 +129,16 @@ interface BandData {
   readonly [key: string]: unknown
 }
 
+function mergeTaskCards(
+  pending: readonly CanvasImageItem[],
+  ready: readonly CanvasImageItem[],
+): readonly CanvasImageItem[] {
+  const readyById = new Map(ready.map((item) => [item.id, item]));
+  const merged = pending.map((item) => readyById.get(item.id) ?? item);
+  const known = new Set(merged.map((item) => item.id));
+  return [...merged, ...ready.filter((item) => !known.has(item.id))];
+}
+
 /** Lazily turn an item's blob into an object URL (or use its ready url). */
 function useItemUrl(item: CanvasImageItem): string | null {
   const [url, setUrl] = useState<string | null>(item.url ?? null)
@@ -148,6 +161,7 @@ function useItemUrl(item: CanvasImageItem): string | null {
 function CardNode({ data }: NodeProps) {
   const { item, selected } = data as CardData
   const url = useItemUrl(item)
+  const taskStatus = item.status
   // A click selects the material for the Agent; double-click keeps the larger
   // visual preview available without conflating inspection with selection.
   return (
@@ -164,6 +178,10 @@ function CardNode({ data }: NodeProps) {
       <div className="flex h-32 items-center justify-center overflow-hidden rounded-t-lg bg-muted/20">
         {url ? (
           <img src={url} alt="" className="max-h-full max-w-full object-contain" />
+        ) : taskStatus === 'generating' ? (
+          <LoaderCircle className="size-5 animate-spin text-muted-foreground" />
+        ) : taskStatus === 'failed' ? (
+          <Ban className="size-5 text-destructive" />
         ) : (
           <ImageOff className="size-5 text-muted-foreground opacity-70" />
         )}
@@ -173,7 +191,7 @@ function CardNode({ data }: NodeProps) {
       </p>
       <div className="flex items-center justify-between gap-2 border-t border-border/40 px-2 py-1 text-[10px] text-muted-foreground">
         <span className="flex min-w-0 items-center gap-1"><GitBranch className="size-3" /><span className="truncate">{item.material.version}</span></span>
-        <span className="flex items-center gap-1 text-emerald-700 dark:text-emerald-400"><CheckCircle2 className="size-3" />Ready</span>
+        {taskStatus ? <span className={cn('flex items-center gap-1', taskStatus === 'failed' ? 'text-destructive' : 'text-muted-foreground')}><Circle className={cn('size-3', taskStatus === 'generating' && 'animate-pulse')} />{item.statusDetail ?? (taskStatus === 'generating' ? 'Generating' : taskStatus === 'queued' ? 'Queued' : 'Failed')}</span> : <span className="flex items-center gap-1 text-emerald-700 dark:text-emerald-400"><CheckCircle2 className="size-3" />Ready</span>}
       </div>
       <Handle type="source" position={Position.Bottom} className="!size-2 !border-background !bg-border" />
     </div>
@@ -296,6 +314,9 @@ export function OutputCanvas({
   designSystem,
   pages,
   assets,
+  pendingDesignSystem = null,
+  pendingPages = [],
+  pendingAssets = [],
   focusArtifactId,
   focusRequestId = 0,
   selectedMaterialId = null,
@@ -327,34 +348,43 @@ export function OutputCanvas({
   const [zoom, setZoom] = useState(1)
   const [tool, setTool] = useState<CanvasTool>('select')
   const [shapeVariant, setShapeVariant] = useState<ToolShapeVariant>('rect')
+  const [spacePanning, setSpacePanning] = useState(false)
   const draftRef = useRef<{ readonly origin: DOMRect; readonly points: { x: number; y: number }[] } | null>(null)
   const [draftPoints, setDraftPoints] = useState<readonly { x: number; y: number }[] | null>(null)
   const viewportStateRef = useRef(initialCanvasViewportState)
   const lastFocusRequestRef = useRef(-1)
   const safeAreaRef = useRef<CanvasSafeArea | null>(null)
   const [safeArea, setSafeArea] = useState<CanvasSafeArea>(() => projectCanvasSafeArea({ viewport: { width: 0, height: 0 } }))
-  const itemCount = Number(Boolean(designSystem)) + pages.length + assets.length
+  const itemCount = Number(Boolean(designSystem ?? pendingDesignSystem)) + Math.max(pages.length, pendingPages.length) + Math.max(assets.length, pendingAssets.length)
   const centerOverlay = projectCanvasOverlayAnchor(safeArea, 'center')
   const bottomOverlay = projectCanvasOverlayAnchor(safeArea, 'bottom')
+  const selectedItem = selectedMaterialId
+    ? [designSystem, ...pages, ...assets].find((item) => item?.material.id === selectedMaterialId) ?? null
+    : null
+  const selectedSource = selectedItem
+    ? selectedItem.material.provenance.source === 'prototype-generation'
+      ? 'Generated from approved outcome'
+      : `Derived from ${selectedItem.material.provenance.sourcePageId ? 'prototype page' : 'source material'}`
+    : null
 
   const { nodes, edges } = useMemo(() => {
     const lanes: CanvasLane[] = [
       {
         key: 'design',
         title: 'Design system',
-        items: designSystem ? [designSystem] : [],
+        items: designSystem ? [designSystem] : pendingDesignSystem ? [pendingDesignSystem] : [],
         perRow: 1,
       },
-      { key: 'pages', title: 'Prototype flow', items: pages, perRow: PAGES_PER_ROW },
+      { key: 'pages', title: 'Prototype flow', items: mergeTaskCards(pendingPages, pages), perRow: PAGES_PER_ROW },
       {
         key: 'assets',
         title: 'Assets & materials',
-        items: assets,
+        items: mergeTaskCards(pendingAssets, assets),
         perRow: ASSETS_PER_ROW,
       },
     ]
     return buildOutputCanvasNodes(lanes, selectedMaterialId)
-  }, [designSystem, pages, assets, selectedMaterialId])
+  }, [designSystem, pages, assets, pendingDesignSystem, pendingPages, pendingAssets, selectedMaterialId])
 
   const annotationNodes = useMemo(
     () =>
@@ -385,7 +415,7 @@ export function OutputCanvas({
     const measure = () => {
       const bounds = root.getBoundingClientRect()
       const toolbarBounds = toolbarRef.current?.getBoundingClientRect()
-      const panels = [...(workspace?.querySelectorAll<HTMLElement>('[data-workspace-panel="agent-drawer"], [data-workspace-panel="files-drawer"], [aria-label="Inspector"]') ?? [])]
+      const panels = [...(workspace?.querySelectorAll<HTMLElement>('[data-workspace-panel="agent-drawer"], [data-workspace-panel="files-drawer"], [data-workspace-panel="design-drawer"], [aria-label="Inspector"]') ?? [])]
       const occupied = projectVisiblePanelInsets(bounds, panels.map((panel) => ({ bounds: panel.getBoundingClientRect(), visible: visiblyOccupiesSpace(panel) })))
       const { left, right, bottom } = occupied
       const next = projectCanvasSafeArea({
@@ -455,6 +485,28 @@ export function OutputCanvas({
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [onAnnotationsChange])
+
+  useEffect(() => {
+    const isEditable = (target: EventTarget | null) =>
+      target instanceof HTMLElement && Boolean(target.closest('input, textarea, [contenteditable="true"]'))
+    const startSpacePan = (event: KeyboardEvent) => {
+      if (event.code !== 'Space' || isEditable(event.target)) return
+      event.preventDefault()
+      setSpacePanning(true)
+    }
+    const stopSpacePan = (event: KeyboardEvent) => {
+      if (event.code === 'Space') setSpacePanning(false)
+    }
+    const clearSpacePan = () => setSpacePanning(false)
+    window.addEventListener('keydown', startSpacePan)
+    window.addEventListener('keyup', stopSpacePan)
+    window.addEventListener('blur', clearSpacePan)
+    return () => {
+      window.removeEventListener('keydown', startSpacePan)
+      window.removeEventListener('keyup', stopSpacePan)
+      window.removeEventListener('blur', clearSpacePan)
+    }
+  }, [])
 
   const commitDraft = (upPoint: { x: number; y: number }) => {
     const draft = draftRef.current
@@ -553,6 +605,10 @@ export function OutputCanvas({
         nodesDraggable={false}
         nodesConnectable={false}
         elementsSelectable={false}
+        panOnDrag={spacePanning ? [0, 1, 2] : [1, 2]}
+        panOnScroll
+        zoomOnScroll={false}
+        zoomOnPinch
         onlyRenderVisibleElements
         deleteKeyCode={null}
         proOptions={{ hideAttribution: true }}
@@ -568,8 +624,27 @@ export function OutputCanvas({
           {toolbar}
         </Panel>
         <Panel position="top-left" className="!m-0" style={{ transform: `translate(${safeArea.controlAnchors.bottomToolbar.x}px, ${safeArea.controlAnchors.bottomToolbar.y - 12}px) translate(-50%, -100%)` }}>
-          <div ref={toolbarRef} className="max-w-[calc(100vw-1.5rem)] overflow-x-auto rounded-xl">
-          <div className="flex w-max items-center gap-0.5 rounded-xl bg-foreground/95 p-1 text-background shadow-[0_8px_24px_rgb(0_0_0/0.25)] backdrop-blur">
+          <div
+            ref={toolbarRef}
+            data-slot="canvas-control-dock"
+            className="pointer-events-auto w-fit max-w-[calc(100vw-1.5rem)] overflow-hidden rounded-xl border border-border bg-popover/95 text-popover-foreground shadow-[0_8px_24px_rgb(0_0_0/0.25)] backdrop-blur"
+            style={selectedItem ? { width: `min(46rem, ${bottomOverlay.maxWidth}px)` } : undefined}
+          >
+          {selectedItem && selectedSource ? (
+            <section aria-label="Selected deliverable" className="flex min-w-0 flex-wrap items-center gap-2 border-b border-border px-3 py-2 sm:flex-nowrap">
+              <div className="min-w-0 flex-1 basis-full sm:basis-auto"><p className="truncate text-sm font-medium">{selectedItem.material.label}</p><p className="truncate text-xs text-muted-foreground">Ready · {selectedItem.material.version} · {selectedSource}{variantDecision?.referenceLocked ? ` · Locked ${variantDecision.referenceGroup}` : ''}{branchRequestCount ? ` · ${branchRequestCount} branch requested` : ''}</p>{creativeBranches?.length ? <p role="status" className="truncate text-[11px] text-muted-foreground">{creativeBranches.map((branch) => branch.status === 'completed' ? `Completed → ${branch.resultMaterialId ?? 'result returned to board'}` : branch.status === 'failed' ? `Failed${branch.error ? ` · ${branch.error}` : ''}` : branch.status === 'running' ? 'Generating variant…' : 'Queued for Agent execution').join(' · ')}</p> : null}</div>
+              <div className="flex shrink-0 items-center gap-1" aria-label="Variant decisions">
+                <Button type="button" size="icon-sm" variant={variantDecision?.decision === 'favorite' ? 'secondary' : 'ghost'} aria-label={`Favorite ${selectedItem.material.label}`} aria-pressed={variantDecision?.decision === 'favorite'} onClick={() => onVariantDecision?.('favorite')}><Heart className="size-4" /></Button>
+                <Button type="button" size="icon-sm" variant={variantDecision?.decision === 'rejected' ? 'secondary' : 'ghost'} aria-label={`Reject ${selectedItem.material.label}`} aria-pressed={variantDecision?.decision === 'rejected'} onClick={() => onVariantDecision?.('rejected')}><Ban className="size-4" /></Button>
+                <Button type="button" size="icon-sm" variant={variantDecision?.referenceLocked ? 'secondary' : 'ghost'} aria-label={`Lock ${selectedItem.material.label} as reference`} aria-pressed={variantDecision?.referenceLocked ?? false} onClick={onToggleReferenceLock}><Lock className="size-4" /></Button>
+                <Button type="button" size="icon-sm" variant="ghost" aria-label={`More like ${selectedItem.material.label}`} onClick={() => onMoreLikeThis?.(selectedItem.material)}><Sparkles className="size-4" /></Button>
+              </div>
+              {onRequestMaterialChanges ? <Button type="button" size="sm" variant="outline" onClick={() => onRequestMaterialChanges(selectedItem.material)} aria-label={`Request changes to ${selectedItem.material.label}`}><MessageSquare className="size-4" /><span className="hidden sm:inline">Request changes</span></Button> : null}
+              {onSaveToLibrary && selectedItem.evidenceMaterialId ? <Button type="button" size="sm" variant="outline" disabled={librarySavedMaterialIds?.has(selectedItem.evidenceMaterialId)} onClick={() => onSaveToLibrary(selectedItem)} aria-label={`Save ${selectedItem.material.label} to library`}><Boxes className="size-4" /><span className="hidden sm:inline">{librarySavedMaterialIds?.has(selectedItem.evidenceMaterialId) ? 'In library' : 'Save to library'}</span></Button> : null}
+            </section>
+          ) : null}
+          <div role="toolbar" aria-label="Canvas controls" className="max-w-full overflow-x-auto">
+          <div className={cn('flex w-max items-center gap-0.5 p-1', selectedItem && 'min-w-full justify-center')}>
             {actions?.onImport ? (
               <span className="hidden sm:contents">
                 <CanvasToolButton label="Import image" onClick={actions.onImport}>
@@ -586,7 +661,7 @@ export function OutputCanvas({
             ) : null}
             {onAnnotationsChange ? (
               <>
-                <span aria-hidden="true" className="mx-1 h-5 w-px bg-background/25" />
+                <span aria-hidden="true" className="mx-1 h-5 w-px bg-border" />
                 <CanvasToolButton label="Select (V)" active={tool === 'select'} onClick={() => setTool('select')}>
                   <MousePointer2 className="size-4" />
                 </CanvasToolButton>
@@ -603,8 +678,8 @@ export function OutputCanvas({
                       aria-label="Shape tools"
                       title="Shapes"
                       className={cn(
-                        'flex h-8 items-center justify-center gap-0.5 rounded-lg px-1.5 text-background/85 transition-colors hover:bg-background/15 hover:text-background',
-                        tool === 'shape' && 'bg-background/20 text-background',
+                        'flex h-8 items-center justify-center gap-0.5 rounded-lg px-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground',
+                        tool === 'shape' && 'bg-accent text-accent-foreground',
                       )}
                     >
                       <ShapeVariantIcon variant={shapeVariant} />
@@ -635,7 +710,7 @@ export function OutputCanvas({
                 </CanvasToolButton>
               </>
             ) : null}
-            <span aria-hidden="true" className="mx-1 h-5 w-px bg-background/25" />
+            <span aria-hidden="true" className="mx-1 h-5 w-px bg-border" />
             <CanvasToolButton label="Zoom out" onClick={() => void instance?.zoomOut({ duration: 150 })}>
               <Minus className="size-4" />
             </CanvasToolButton>
@@ -643,7 +718,7 @@ export function OutputCanvas({
               type="button"
               aria-label="Zoom to 100%"
               title="Zoom to 100%"
-              className="flex h-8 min-w-12 items-center justify-center rounded-lg px-1.5 font-mono text-[11px] tabular-nums text-background/85 transition-colors hover:bg-background/15 hover:text-background"
+              className="flex h-8 min-w-12 items-center justify-center rounded-lg px-1.5 font-mono text-[11px] tabular-nums text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
               onClick={() => void instance?.zoomTo(1, { duration: 200 })}
             >
               {Math.round(zoom * 100)}%
@@ -656,7 +731,7 @@ export function OutputCanvas({
             </CanvasToolButton>
             {actions?.onExportAll ? (
               <span className="hidden sm:contents">
-                <span aria-hidden="true" className="mx-1 h-5 w-px bg-background/25" />
+                <span aria-hidden="true" className="mx-1 h-5 w-px bg-border" />
                 <CanvasToolButton
                   label="Export all"
                   disabled={actions.exportDisabled}
@@ -666,6 +741,7 @@ export function OutputCanvas({
                 </CanvasToolButton>
               </span>
             ) : null}
+          </div>
           </div>
           </div>
         </Panel>
@@ -736,24 +812,6 @@ export function OutputCanvas({
           ) : null}
         </div>
       ) : null}
-      {selectedMaterialId ? (() => {
-        const selected = [designSystem, ...pages, ...assets].find((item) => item?.material.id === selectedMaterialId) ?? null
-        if (!selected) return null
-        const source = selected.material.provenance.source === 'prototype-generation'
-          ? 'Generated from approved outcome'
-          : `Derived from ${selected.material.provenance.sourcePageId ? 'prototype page' : 'source material'}`
-        return <section aria-label="Selected deliverable" className="pointer-events-none absolute z-30 flex -translate-x-1/2 -translate-y-full flex-wrap items-center gap-2 rounded-md border border-border bg-background/95 px-3 py-2 shadow-lg backdrop-blur sm:flex-nowrap" style={{ left: bottomOverlay.x, top: bottomOverlay.y, width: `min(46rem, ${bottomOverlay.maxWidth}px)` }}>
-          <div className="min-w-0 flex-1 basis-full sm:basis-auto"><p className="truncate text-sm font-medium">{selected.material.label}</p><p className="truncate text-xs text-muted-foreground">Ready · {selected.material.version} · {source}{variantDecision?.referenceLocked ? ` · Locked ${variantDecision.referenceGroup}` : ''}{branchRequestCount ? ` · ${branchRequestCount} branch requested` : ''}</p>{creativeBranches?.length ? <p role="status" className="truncate text-[11px] text-muted-foreground">{creativeBranches.map((branch) => branch.status === 'completed' ? `Completed → ${branch.resultMaterialId ?? 'result returned to board'}` : branch.status === 'failed' ? `Failed${branch.error ? ` · ${branch.error}` : ''}` : branch.status === 'running' ? 'Generating variant…' : 'Queued for Agent execution').join(' · ')}</p> : null}</div>
-          <div className="pointer-events-auto flex shrink-0 items-center gap-1" aria-label="Variant decisions">
-            <Button type="button" size="icon-sm" variant={variantDecision?.decision === 'favorite' ? 'secondary' : 'ghost'} aria-label={`Favorite ${selected.material.label}`} aria-pressed={variantDecision?.decision === 'favorite'} onClick={() => onVariantDecision?.('favorite')}><Heart className="size-4" /></Button>
-            <Button type="button" size="icon-sm" variant={variantDecision?.decision === 'rejected' ? 'secondary' : 'ghost'} aria-label={`Reject ${selected.material.label}`} aria-pressed={variantDecision?.decision === 'rejected'} onClick={() => onVariantDecision?.('rejected')}><Ban className="size-4" /></Button>
-            <Button type="button" size="icon-sm" variant={variantDecision?.referenceLocked ? 'secondary' : 'ghost'} aria-label={`Lock ${selected.material.label} as reference`} aria-pressed={variantDecision?.referenceLocked ?? false} onClick={onToggleReferenceLock}><Lock className="size-4" /></Button>
-            <Button type="button" size="icon-sm" variant="ghost" aria-label={`More like ${selected.material.label}`} onClick={() => onMoreLikeThis?.(selected.material)}><Sparkles className="size-4" /></Button>
-          </div>
-          {onRequestMaterialChanges ? <Button type="button" size="sm" variant="outline" className="pointer-events-auto relative z-10" onClick={() => onRequestMaterialChanges(selected.material)} aria-label={`Request changes to ${selected.material.label}`}><MessageSquare className="size-4" /><span className="hidden sm:inline">Request changes</span></Button> : null}
-          {onSaveToLibrary && selected.evidenceMaterialId ? <Button type="button" size="sm" variant="outline" className="pointer-events-auto relative z-10" disabled={librarySavedMaterialIds?.has(selected.evidenceMaterialId)} onClick={() => onSaveToLibrary(selected)} aria-label={`Save ${selected.material.label} to library`}><Boxes className="size-4" /><span className="hidden sm:inline">{librarySavedMaterialIds?.has(selected.evidenceMaterialId) ? 'In library' : 'Save to library'}</span></Button> : null}
-        </section>
-      })() : null}
       <CardPreviewDialog
         item={previewItem}
         onPromoteRegion={onPromoteRegion}
@@ -792,8 +850,8 @@ function CanvasToolButton({
       disabled={disabled}
       aria-pressed={active || undefined}
       className={cn(
-        'flex size-8 items-center justify-center rounded-lg text-background/85 transition-colors hover:bg-background/15 hover:text-background disabled:pointer-events-none disabled:opacity-40',
-        active && 'bg-background/20 text-background',
+        'flex size-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground disabled:pointer-events-none disabled:opacity-40',
+        active && 'bg-accent text-accent-foreground',
       )}
       onClick={onClick}
     >

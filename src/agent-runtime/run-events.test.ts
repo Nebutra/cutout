@@ -9,6 +9,16 @@ import {
 } from './run-events'
 
 describe('agent run events', () => {
+  it('records steer history without replacing the run intent', () => {
+    const store = replayRunEvents([
+      createRunEvent('run', { type: 'run-started', mode: 'create' }, { eventId: 'start', at: 1 }),
+      createRunEvent('run', { type: 'intent-recorded', intent: 'Create a fitness app' }, { eventId: 'intent', at: 2 }),
+      createRunEvent('run', { type: 'steer-recorded', instruction: 'Use a quieter green' }, { eventId: 'steer', at: 3 }),
+    ])
+
+    expect(store.activeRun?.intent).toBe('Create a fitness app')
+    expect(store.events.at(-1)).toMatchObject({ type: 'steer-recorded', instruction: 'Use a quieter green' })
+  })
   it('requires retries to use a new request id and preserves the predecessor link', () => {
     expect(createToolRetryEvent('run', 'tool', 'request-1', { requestId: 'request-2' })).toMatchObject({ previousRequestId: 'request-1', requestId: 'request-2' })
     expect(() => createToolRetryEvent('run', 'tool', 'request-1', { requestId: 'request-1' })).toThrow('new request id')

@@ -16,13 +16,11 @@ import {
   ChevronRight,
   ExternalLink,
   Files as FilesIcon,
-  GitCompareArrows,
   ImageIcon,
   Layers3,
   Loader2,
   MessageCircle,
   MessageSquare,
-  MousePointer2,
   MousePointerClick,
   PackageCheck,
   PackageOpen,
@@ -31,7 +29,6 @@ import {
   Map as MapIcon,
   PanelLeft,
   PanelLeftClose,
-  PanelRight,
   Plus,
   Route,
   Scissors,
@@ -73,7 +70,6 @@ import {
   useNameSlices,
   usePrepareDeconstructMockup,
 } from "@/hooks/queries/pipeline";
-import { useSettingsUI } from "@/components/settings/settings-ui";
 import { useLibraryUI } from "@/components/library/library-ui";
 import { planPrototype } from "@/prototype/planner";
 import type {
@@ -114,6 +110,7 @@ import {
   type EditableDesignSection,
   type EditableDesignTable,
 } from "@/prototype/design-md";
+import { designSystemValidationError } from "@/prototype/design-system-validation";
 import {
   renderDesignSource,
   type DesignSourceFormat,
@@ -197,11 +194,9 @@ import {
 import { projectPrototypeOutcome } from "@/agent-runtime/prototype-outcome";
 import {
   planPrototypeRepair,
-  repairPlanLabel,
   type PrototypeRepairPlan,
 } from "@/agent-runtime/prototype-repair";
 import { buildAgentViewModel } from "@/components/agent-workspace/agent-view-model";
-import { shouldShowDesignInspector } from "./workspace-inspector-state";
 import { projectCanvasSelection } from "./canvas-inspector-model";
 import {
   assertImpactPlanCurrent,
@@ -216,6 +211,7 @@ import {
   type AgentRunLease,
 } from "@/agent-runtime/run-coordinator";
 import { useAgentRunEvents } from "@/agent-runtime/use-agent-run-events";
+import { consumeComposerDraft } from "./composer-draft";
 import { useDesktopToolLoop } from "@/agent-runtime/use-desktop-tool-loop";
 import {
   decideVariant,
@@ -354,12 +350,6 @@ export function IntentWorkspace({
   const [savedLibraryItems, setSavedLibraryItems] = useState<
     readonly GlobalLibraryItem[]
   >([]);
-  const resultsApproved =
-    approvedDeliverables.length > 0 &&
-    approvedDeliverables.every(
-      (receipt) =>
-        receipt.designRevision.revisionId === designDocument?.revision.id,
-    );
   useEffect(() => {
     if (typeof indexedDB === "undefined") return;
     const libraryStore = new GlobalLibraryStore(
@@ -392,9 +382,9 @@ export function IntentWorkspace({
       );
     });
   }, [approvedDeliverables]);
-  const [inspectorOpen, setInspectorOpen] = useState(false);
   const [agentDockVisible, setAgentDockVisible] = useState(true);
   const [filesDockVisible, setFilesDockVisible] = useState(false);
+  const [designDockVisible, setDesignDockVisible] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [canvasBackground, setCanvasBackground] = useState<string | null>(
     readCanvasBackground,
@@ -428,7 +418,6 @@ export function IntentWorkspace({
     }, 50);
   }, []);
   const library = useLibraryUI();
-  const [inspectorDismissed, setInspectorDismissed] = useState(false);
   const [focusedArtifactId, setFocusedArtifactId] = useState<string | null>(
     null,
   );
@@ -442,9 +431,11 @@ export function IntentWorkspace({
   const [humanLoopCustomAnswer, setHumanLoopCustomAnswer] = useState(
     () => initialWorkspace?.humanLoopCustomAnswer ?? "",
   );
+  const [composerDraft, setComposerDraft] = useState("");
   const [liveAgentOutput, setLiveAgentOutput] = useState(
     () => initialWorkspace?.liveAgentOutput ?? "",
   );
+  const [liveAgentLabel, setLiveAgentLabel] = useState<string | null>(null);
   const [runError, setRunError] = useState<string | null>(
     () => initialWorkspace?.runError ?? null,
   );
@@ -468,7 +459,6 @@ export function IntentWorkspace({
   const slices = useSlices();
   const selectedSlice = useSelectedSlice();
   const analysisStatus = useStatus();
-  const settings = useSettingsUI();
   const assignments = useModelAssignments();
   const providers = useProviders();
   const desktopTools = useDesktopToolLoop({
@@ -488,18 +478,6 @@ export function IntentWorkspace({
       }),
     [],
   );
-  const hasInspectorContent = Boolean(
-    selectedMaterial ||
-    prototypePlan ||
-    prototypeDesignSystem ||
-    importedDesignMarkdown?.content.trim(),
-  );
-  const showDesignInspector = shouldShowDesignInspector({
-    explicitlyOpen: inspectorOpen,
-    dismissed: inspectorDismissed,
-    hasContent: hasInspectorContent,
-  });
-
   const { mutateAsync: deconstructMockup, isPending: deconstructing } =
     useDeconstructMockup(() => lockedRouteRef.current?.image);
   const prepareDeconstruct = usePrepareDeconstructMockup();
@@ -607,8 +585,8 @@ export function IntentWorkspace({
     if (approvedDeliverables.length > 0) {
       folders.push({
         kind: "folder",
-        id: "folder:approved",
-        name: "Approved",
+        id: "folder:library",
+        name: "Library",
         children: approvedDeliverables.map((receipt) => {
           const saved = savedLibraryItems.find(
             (item) =>
@@ -742,6 +720,7 @@ export function IntentWorkspace({
         : projectedOutcome,
     [projectedOutcome, runCancelled],
   );
+  const canSaveToLibrary = Boolean(designDocument && outcome);
 
   useEffect(() => {
     const runId = agentRunEvents.activeRunId;
@@ -794,6 +773,13 @@ export function IntentWorkspace({
       (genError ? userFacingGenerationError(genError.message) : null),
     notices: executionNotices,
     runEvents: agentRunEvents,
+    liveAgentMessage: liveAgentOutput
+      ? {
+          id: `runtime:stream:${agentRunEvents.activeRunId ?? "design-markdown"}`,
+          text: liveAgentOutput,
+          label: liveAgentLabel ?? "Agent is responding",
+        }
+      : null,
   });
   const humanLoop = prototypePlan?.humanLoop ?? null;
   // A suspended ask_clarifying_question call (mid model-turn, tool-gate
@@ -906,7 +892,7 @@ export function IntentWorkspace({
           true,
         );
         setNamingStatus(fallbackCount > 0 ? "done" : "skipped");
-        agentRunCoordinatorRef.current.finish(lease);
+        finishActiveRun(lease);
         if (activeRunRef.current === lease) activeRunRef.current = null;
       }
       return;
@@ -938,7 +924,7 @@ export function IntentWorkspace({
           error instanceof Error ? error.message : String(error),
         );
       } finally {
-        agentRunCoordinatorRef.current.finish(lease);
+        finishActiveRun(lease);
         if (activeRunRef.current === lease) activeRunRef.current = null;
       }
     })();
@@ -980,6 +966,34 @@ export function IntentWorkspace({
     );
   }
 
+  function applyPendingSteers(lease: AgentRunLease, prompt: string): string {
+    const instructions = agentRunCoordinatorRef.current.drainSteers(lease);
+    if (instructions.length === 0) return prompt;
+    return [
+      prompt,
+      "",
+      "[User steering received during this run]",
+      ...instructions.map((instruction, index) => `${index + 1}. ${instruction}`),
+      "Apply these instructions to remaining work. Do not redo completed work unless explicitly requested.",
+    ].join("\n");
+  }
+
+  function finishActiveRun(lease: AgentRunLease): void {
+    const pending = agentRunCoordinatorRef.current.drainSteers(lease);
+    agentRunCoordinatorRef.current.finish(lease);
+    if (pending.length === 0) return;
+    // A correction can arrive after the final paid call has begun. Never
+    // replay that call: retain the correction as the next editable draft and
+    // make the deferred boundary explicit instead of silently dropping it.
+    setComposerDraft((current) =>
+      [...pending, current.trim()].filter(Boolean).join("\n"),
+    );
+    setExecutionNotices((current) => [
+      ...current,
+      "A late direction arrived after the final execution boundary and was kept as your next message.",
+    ]);
+  }
+
   useEffect(
     () => () => {
       const active = activeRunRef.current;
@@ -994,20 +1008,6 @@ export function IntentWorkspace({
     const timer = window.setTimeout(() => setRunStartedAt(null), 900);
     return () => window.clearTimeout(timer);
   }, [runStartedAt, working]);
-
-  function updateBrief(text: string): void {
-    setBrief(text);
-    setPrototypePlan(null);
-    setPrototypePages([]);
-    setPrototypeDesignSystem(null);
-    setSelectedPrototypePageId(null);
-    setHumanLoopChoiceId(null);
-    setHumanLoopCustomAnswer("");
-    setLiveAgentOutput("");
-    setRunError(null);
-    setNamingStatus("idle");
-    setWorkflowPhase("idle");
-  }
 
   function updateDesignMarkdownContent(content: string): void {
     const normalized = content.replace(/\r\n?/g, "\n");
@@ -1236,9 +1236,9 @@ export function IntentWorkspace({
     let regenerationDecision: RegenerationDecision | null = null;
     let pageTargetingDecision: PageTargetingDecision | null = null;
     let clarifiedBrief: string | null = null;
-    // tryToolGate records intent-recorded for the chat transcript; skip a second
-    // user bubble when the same turn falls through into the build pipeline.
-    let intentAlreadyRecorded = false;
+    // Both the tool gate and a repair reuse an existing conversation turn. Do
+    // not project either path as a second user bubble in the transcript.
+    let intentAlreadyRecorded = mode === "repair";
     if (mode === "create" && !selectedMaterial && !options.skipToolGate) {
       const toolGate = await tryToolGate(text, chatAssignment, lease);
       intentAlreadyRecorded = true;
@@ -1247,7 +1247,7 @@ export function IntentWorkspace({
       // the pipeline below for a turn that's no longer the active run.
       if (!agentRunCoordinatorRef.current.isActive(lease)) return;
       if (toolGate.handled) {
-        agentRunCoordinatorRef.current.finish(lease);
+        finishActiveRun(lease);
         if (activeRunRef.current === lease) activeRunRef.current = null;
         setAgentBusy(false);
         return;
@@ -1279,7 +1279,7 @@ export function IntentWorkspace({
     setRunCancelled(false);
     try {
       let plan = prototypePlan;
-      const plannerBrief = repair
+      let plannerBrief = repair
         ? text
         : await researchedBrief(
             clarifiedBrief ?? text,
@@ -1288,6 +1288,7 @@ export function IntentWorkspace({
             lease,
             runId,
           );
+      plannerBrief = applyPendingSteers(lease, plannerBrief);
       let generationBrief = plannerBrief;
 
       if (!plan) {
@@ -1306,11 +1307,13 @@ export function IntentWorkspace({
           plan.humanLoop,
           answer,
         );
+        generationBrief = applyPendingSteers(lease, generationBrief);
         plan = await planPrototypeSuite(generationBrief, chatAssignment, lease);
         if (plan.humanLoop.mode === "ask") return;
       }
 
       autoNamePendingRef.current = repair ? repair.deconstructPages : true;
+      generationBrief = applyPendingSteers(lease, generationBrief);
       if (!repair || repair.deconstructPages) setNamingStatus("pending");
       const resolvedTargetPageIds = pageTargetingDecision
         ? pagesForScope(plan, prototypeScope)
@@ -1390,7 +1393,7 @@ export function IntentWorkspace({
             : phase,
         );
         if (!autoNamePendingRef.current) {
-          agentRunCoordinatorRef.current.finish(lease);
+          finishActiveRun(lease);
           if (activeRunRef.current === lease) activeRunRef.current = null;
         }
       }
@@ -1621,9 +1624,24 @@ export function IntentWorkspace({
       setAgentDockVisible(true);
       setFilesDockVisible(false);
       emitRunEvents(toolLoop.data.events);
+      const streamedReply = await streamConversationalReply(
+        text,
+        reply,
+        chat,
+        lease,
+      );
+      if (!agentRunCoordinatorRef.current.isActive(lease)) {
+        return {
+          handled: true,
+          regenerationDecision: null,
+          pageTargetingDecision: null,
+          clarifiedBrief: null,
+          refinedBrief: null,
+        };
+      }
       emitRunEvent(toolRunId, {
         type: "agent-message",
-        message: reply,
+        message: streamedReply,
         action: {
           type: "proceed-anyway",
           label: "Build it anyway",
@@ -2117,7 +2135,10 @@ export function IntentWorkspace({
     lease: AgentRunLease,
   ): Promise<PrototypeDesignSystemArtifact> {
     agentRunCoordinatorRef.current.checkpoint(lease);
-    const prompt = prototypeDesignSystemPrompt(plan, designMarkdown);
+    const prompt = applyPendingSteers(
+      lease,
+      prototypeDesignSystemPrompt(plan, designMarkdown),
+    );
     // Attached reference images condition the design system on the user's visual
     // direction (垫图, via editImage). editImage is provider-specific, so on
     // failure — or with no attachments — fall back to a plain prompt generate.
@@ -2171,6 +2192,46 @@ export function IntentWorkspace({
     );
   }
 
+  async function streamConversationalReply(
+    userMessage: string,
+    fallbackReply: string,
+    chat: ModelAssignment,
+    lease: AgentRunLease,
+  ): Promise<string> {
+    let streamed = "";
+    setLiveAgentLabel("Agent is responding");
+    setLiveAgentOutput("");
+    try {
+      for await (const delta of personalizedGenerationRef.current.streamText({
+        providerId: chat.providerId,
+        model: chat.model,
+        system: "You are Cutout's design Agent. Return only a concise, helpful user-facing reply in Markdown. Do not reveal reasoning, tool calls, policies, or diagnostics.",
+        input: [{
+          type: "text",
+          text: `User message:\n${userMessage}\n\nEstablished answer to preserve:\n${fallbackReply}`,
+        }],
+        reasoningEffort: chat.effort,
+        reasoningProtocol: chat.reasoningProtocol,
+        signal: lease.controller.signal,
+      })) {
+        agentRunCoordinatorRef.current.checkpoint(lease);
+        streamed += delta;
+        setLiveAgentOutput(trimLiveAgentOutput(streamed));
+      }
+      return streamed.trim() || fallbackReply;
+    } catch (error) {
+      if (lease.controller.signal.aborted) throw error;
+      console.info(
+        "[Cutout] conversational stream fell back:",
+        error instanceof Error ? error.message : String(error),
+      );
+      return fallbackReply;
+    } finally {
+      setLiveAgentOutput("");
+      setLiveAgentLabel(null);
+    }
+  }
+
   async function synthesizeDesignMarkdownFromReference(
     plan: PrototypePlan,
     chat: ModelAssignment,
@@ -2196,6 +2257,7 @@ export function IntentWorkspace({
 
     let streamed = "";
     try {
+      setLiveAgentLabel("Drafting design system");
       setLiveAgentOutput("");
       for await (const delta of personalizedGenerationRef.current.streamText(
         input,
@@ -2225,6 +2287,8 @@ export function IntentWorkspace({
       setLiveAgentOutput(trimLiveAgentOutput(streamed));
     }
 
+    setLiveAgentOutput("");
+    setLiveAgentLabel(null);
     const markdown = stripMarkdownFence(streamed).trim();
     if (!markdown.startsWith("---")) {
       console.info(
@@ -2329,7 +2393,10 @@ export function IntentWorkspace({
     lease: AgentRunLease,
   ): Promise<PrototypePageArtifact> {
     agentRunCoordinatorRef.current.checkpoint(lease);
-    const prompt = prototypePagePrompt(plan, page, designMarkdown);
+    const prompt = applyPendingSteers(
+      lease,
+      prototypePagePrompt(plan, page, designMarkdown),
+    );
     const runId = `workspace:${lease.id}`;
     const referenceIds = await Promise.all(referenceImages.map((bytes) => desktopTools.persistReference(bytes, "image/png", runId)));
     const preferences = desktopTools.visualPreferences();
@@ -2372,11 +2439,14 @@ export function IntentWorkspace({
     asset: { readonly bytes: Uint8Array; readonly mediaType: string },
     designMarkdown: string,
   ): Promise<PrototypeDesignSystemArtifact> {
-    return await decodePrototypeImage(asset, (base) => ({
+    const artifact = await decodePrototypeImage(asset, (base) => ({
       ...base,
       name: "Design system",
       designMarkdown,
     }));
+    const error = designSystemValidationError(artifact);
+    if (error) throw new Error(error);
+    return artifact;
   }
 
   async function assetToPageArtifact(
@@ -2482,6 +2552,7 @@ export function IntentWorkspace({
       />
 
       <div
+        data-workspace-rail
         className={cn(
           "hidden shrink-0 lg:block lg:h-full lg:overflow-hidden lg:transition-[width] lg:duration-300 lg:ease-in-out",
           sidebarCollapsed ? "lg:w-0" : "lg:w-14",
@@ -2492,18 +2563,21 @@ export function IntentWorkspace({
           onToggleAgent={() => {
             setAgentDockVisible((visible) => !visible);
             setFilesDockVisible(false);
+            setDesignDockVisible(false);
           }}
           filesActive={filesDockVisible}
           onToggleFiles={() => {
             setFilesDockVisible((visible) => !visible);
             setAgentDockVisible(false);
+            setDesignDockVisible(false);
           }}
           onOpenAssets={library.open}
           onOpenDesign={() => {
-            setInspectorOpen((open) => !open);
-            setInspectorDismissed(inspectorOpen);
+            setDesignDockVisible((visible) => !visible);
+            setAgentDockVisible(false);
+            setFilesDockVisible(false);
           }}
-          inspectorActive={showDesignInspector}
+          inspectorActive={designDockVisible}
           onOpenDeliver={() => onOpenDesignOs("delivery")}
           advanced={advanced}
           onOpenAdvanced={onOpenAdvanced}
@@ -2516,7 +2590,7 @@ export function IntentWorkspace({
         aria-label="Expand sidebar"
         title="Expand sidebar"
         className={cn(
-          "group/expand absolute left-3 top-3 z-30 hidden size-8 items-center justify-center rounded-md bg-foreground text-background shadow-md transition-opacity duration-300 lg:flex",
+          "group/expand absolute left-3 top-3 z-40 hidden size-8 items-center justify-center rounded-md bg-foreground text-background shadow-md transition-opacity duration-300 lg:flex",
           sidebarCollapsed ? "opacity-100" : "pointer-events-none opacity-0",
         )}
         onClick={() => setSidebarCollapsed(false)}
@@ -2526,13 +2600,35 @@ export function IntentWorkspace({
       </button>
 
       <div
-        data-workspace-panel={filesDockVisible ? "files-drawer" : "agent-drawer"}
+        data-workspace-panel={
+          designDockVisible
+            ? "design-drawer"
+            : filesDockVisible
+              ? "files-drawer"
+              : "agent-drawer"
+        }
         className={cn(
-          !agentDockVisible && !filesDockVisible && "hidden",
-          "absolute inset-x-0 bottom-0 z-30 h-[min(70dvh,42rem)] min-h-[19rem] w-full overflow-hidden border-t border-border bg-background shadow-2xl lg:inset-y-0 lg:bottom-auto lg:left-14 lg:right-auto lg:h-full lg:w-[24rem] lg:border-r lg:border-t-0",
+          !agentDockVisible && !filesDockVisible && !designDockVisible && "hidden",
+          "absolute inset-x-0 bottom-0 z-30 h-[min(70dvh,42rem)] min-h-[19rem] w-full overflow-hidden border-t border-border bg-background shadow-2xl lg:inset-y-0 lg:bottom-auto lg:right-auto lg:h-full lg:w-[24rem] lg:border-r lg:border-t-0 lg:transition-[left] lg:duration-300 lg:ease-in-out",
+          sidebarCollapsed ? "lg:left-0" : "lg:left-14",
         )}
       >
-        {filesDockVisible ? (
+        {designDockVisible ? (
+          <DesignMarkdownInspector
+            docked
+            selectedMaterial={selectedMaterial}
+            prototypePlan={prototypePlan}
+            prototypeDesignSystem={prototypeDesignSystem}
+            importedDesignMarkdown={importedDesignMarkdown}
+            onChange={updateDesignMarkdownContent}
+            onRequestSelectedChanges={() => {
+              if (selectedMaterial) focusAgentComposer();
+            }}
+            onOpenSystem={() => onOpenDesignOs("overview")}
+            onClose={() => setDesignDockVisible(false)}
+            onOpenSpecimen={() => onOpenDesignOs("specimen")}
+          />
+        ) : filesDockVisible ? (
           <>
             <button
               type="button"
@@ -2549,8 +2645,8 @@ export function IntentWorkspace({
               className="h-full w-full"
               onSelectFile={(id) => {
                 if (id === "design-system") {
-                  setInspectorOpen(true);
-                  setInspectorDismissed(false);
+                  setDesignDockVisible(true);
+                  setFilesDockVisible(false);
                 } else if (
                   prototypePages.some((artifact) => artifact.page.id === id)
                 ) {
@@ -2578,12 +2674,15 @@ export function IntentWorkspace({
               compact
               className="h-full w-full pt-10"
               composer={{
-                value: activeAsk ? humanLoopCustomAnswer : brief,
+                value: activeAsk ? humanLoopCustomAnswer : composerDraft,
                 placeholder: activeAsk
                   ? "Add a constraint or describe another direction…"
                   : "Describe a result, correction, or next step…",
-                disabled: working,
-                submitDisabled: Boolean(impactPlan.blockedReason),
+                disabled: false,
+                controlsDisabled: working,
+                submitDisabled: working
+                  ? false
+                  : Boolean(impactPlan.blockedReason),
                 // A question always has a selected/default choice — the composer
                 // text is optional extra context, per HumanLoopQuestion's own copy
                 // ("Choose one direction... then press the arrow"). Without this,
@@ -2606,7 +2705,7 @@ export function IntentWorkspace({
                   if (activeAsk) {
                     setHumanLoopCustomAnswer(value);
                   } else {
-                    updateBrief(value);
+                    setComposerDraft(value);
                   }
                 },
                 onSubmit: () => {
@@ -2636,7 +2735,33 @@ export function IntentWorkspace({
                     setAgentBusy(true);
                     return;
                   }
-                  void createAssets();
+                  const consumed = consumeComposerDraft(composerDraft);
+                  if (!consumed.submitted) return;
+                  setComposerDraft(consumed.nextValue);
+                  if (working) {
+                    const active = activeRunRef.current;
+                    const runId = agentRunEvents.activeRunId;
+                    if (
+                      !active ||
+                      !runId ||
+                      !agentRunCoordinatorRef.current.steer(
+                        active,
+                        consumed.submitted,
+                      )
+                    ) {
+                      toast.error("This request is no longer active.");
+                      return;
+                    }
+                    emitRunEvent(runId, {
+                      type: "steer-recorded",
+                      instruction: consumed.submitted,
+                    });
+                    return;
+                  }
+                  setBrief(consumed.submitted);
+                  void createAssets("create", {
+                    briefOverride: consumed.submitted,
+                  });
                 },
                 onStop:
                   working && activeRunRef.current ? stopActiveRun : undefined,
@@ -2681,8 +2806,6 @@ export function IntentWorkspace({
                 materialContext: selectedMaterial
                   ? {
                       label: selectedMaterial.label,
-                      detail: materialImpactDetail(impactPlan),
-                      blockedReason: impactPlan.blockedReason,
                       onClear: () => setSelectedMaterial(null),
                     }
                   : undefined,
@@ -2705,13 +2828,8 @@ export function IntentWorkspace({
                   />
                 ) : null
               }
-              showCostNotice={
-                working ||
-                Boolean(repairPlan) ||
-                Boolean(selectedMaterial && impactPlan.paidActionRequired)
-              }
               labels={
-                repairPlan ? { retry: repairPlanLabel(repairPlan) } : undefined
+                repairPlan ? { retry: "Continue" } : undefined
               }
               onCancel={
                 working && activeRunRef.current ? stopActiveRun : undefined
@@ -2741,14 +2859,14 @@ export function IntentWorkspace({
                 });
               }}
               onEditMessage={(message) => {
-                setBrief(message);
+                setComposerDraft(message);
                 focusAgentComposer();
               }}
-              onOpenBudget={() => settings.open({section:'ai',anchor:'paid-actions'})}
               onOpenArtifact={(kind) => {
                 if (kind === "design-system" || kind === "design-markdown") {
-                  setInspectorOpen(true);
-                  setInspectorDismissed(false);
+                  setDesignDockVisible(true);
+                  setAgentDockVisible(false);
+                  setFilesDockVisible(false);
                   setFocusedArtifactId("design-system");
                   setFocusRequestId((id) => id + 1);
                   return;
@@ -2779,58 +2897,6 @@ export function IntentWorkspace({
         data-workspace-panel="canvas-main"
         className="order-1 flex min-h-0 min-w-0 flex-1 flex-col lg:order-none"
       >
-        {slices.length > 0 ||
-        prototypePages.length > 0 ||
-        prototypeDesignSystem ||
-        hasInspectorContent ? (
-          <OutputHeader
-            sliceCount={slices.length}
-            prototypePageCount={prototypePages.length}
-            hasDesignSystem={Boolean(prototypeDesignSystem)}
-            namingStatus={namingStatus}
-            inspectorOpen={showDesignInspector}
-            onToggleInspector={() => {
-              if (showDesignInspector) {
-                setInspectorOpen(false);
-                setInspectorDismissed(true);
-              } else {
-                setInspectorOpen(true);
-                setInspectorDismissed(false);
-              }
-            }}
-            approved={resultsApproved}
-            onApprove={() => {
-              if (!designDocument || !outcome) return;
-              void approveCurrentDeliverables({
-                document: designDocument,
-                outcome,
-                approvalId: `approval.${crypto.randomUUID()}`,
-                approvedAt: new Date().toISOString(),
-              })
-                .then(setApprovedDeliverables)
-                .catch((error) =>
-                  toast.error("Could not approve deliverables", {
-                    description:
-                      error instanceof Error ? error.message : String(error),
-                  }),
-                );
-            }}
-            onRequestChanges={focusAgentComposer}
-            onCompare={
-              prototypePages.length > 1
-                ? () => {
-                    const currentIndex = prototypePages.findIndex(
-                      (page) => page.page.id === selectedPrototypePageId,
-                    );
-                    const next =
-                      prototypePages[(currentIndex + 1) % prototypePages.length];
-                    if (next) setSelectedPrototypePageId(next.page.id);
-                  }
-                : undefined
-            }
-          />
-        ) : null}
-
         <section
           className={cn(
             "relative min-h-0 flex-1 overflow-hidden",
@@ -2855,16 +2921,30 @@ export function IntentWorkspace({
             onCanvasAnnotationsChange={setCanvasAnnotations}
             designDocument={designDocument}
             librarySavedMaterialIds={librarySavedMaterialIds}
-            canSaveApproved={resultsApproved}
+            canSaveApproved={canSaveToLibrary}
             onSaveApprovedToLibrary={async (item) => {
               if (!item.evidenceMaterialId) return;
-              const receipt = approvedDeliverables.find(
+              let receipts = approvedDeliverables;
+              let receipt = receipts.find(
                 (candidate) =>
                   candidate.material.id === item.evidenceMaterialId,
               );
               if (!receipt) {
-                toast.error("Approve the current deliverables before saving.");
-                return;
+                if (!designDocument || !outcome) return;
+                receipts = await approveCurrentDeliverables({
+                  document: designDocument,
+                  outcome,
+                  approvalId: `library-save.${crypto.randomUUID()}`,
+                  approvedAt: new Date().toISOString(),
+                });
+                setApprovedDeliverables(receipts);
+                receipt = receipts.find(
+                  (candidate) =>
+                    candidate.material.id === item.evidenceMaterialId,
+                );
+                if (!receipt) {
+                  throw new Error("The selected result cannot be saved to Library.");
+                }
               }
               const libraryItem = await libraryItemFromApproval(receipt);
               const libraryStore = new GlobalLibraryStore(
@@ -2909,6 +2989,7 @@ export function IntentWorkspace({
             working={working}
             analysisStatus={analysisStatus}
             runError={runError}
+            failedRegionIds={failedRegionIds}
             focusedArtifactId={focusedArtifactId}
             focusRequestId={focusRequestId}
             selectedMaterial={selectedMaterial}
@@ -2982,24 +3063,6 @@ export function IntentWorkspace({
           <div className="flex h-12 shrink-0 items-center gap-2 border-b border-border px-3"><div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold">Result</p><p className="truncate text-[11px] text-muted-foreground">Review and correct</p></div><Button type="button" variant="ghost" size="icon" className="ml-auto size-7" aria-label="Close result inspector" onClick={() => getStoreState().clearSelection()}><X className="size-3.5"/></Button></div>
           <div className="min-h-0 flex-1 overflow-y-auto"><InspectorPanel/></div>
         </aside>
-      ) : showDesignInspector ? (
-        <DesignMarkdownInspector
-          selectedMaterial={selectedMaterial}
-          prototypePlan={prototypePlan}
-          prototypeDesignSystem={prototypeDesignSystem}
-          importedDesignMarkdown={importedDesignMarkdown}
-          onChange={updateDesignMarkdownContent}
-          onAskAgent={focusAgentComposer}
-          onRequestSelectedChanges={() => {
-            if (selectedMaterial) focusAgentComposer();
-          }}
-          onOpenSystem={() => onOpenDesignOs("overview")}
-          onClose={() => {
-            setInspectorOpen(false);
-            setInspectorDismissed(true);
-          }}
-          onOpenSpecimen={() => onOpenDesignOs("specimen")}
-        />
       ) : null}
     </div>
   );
@@ -3064,23 +3127,23 @@ function emptyInspectorMessage(
 }
 
 function DesignMarkdownInspector({
+  docked = false,
   selectedMaterial,
   prototypePlan,
   prototypeDesignSystem,
   importedDesignMarkdown,
   onChange,
-  onAskAgent,
   onRequestSelectedChanges,
   onOpenSystem,
   onClose,
   onOpenSpecimen,
 }: {
+  readonly docked?: boolean;
   readonly selectedMaterial: MaterialRef | null;
   readonly prototypePlan: PrototypePlan | null;
   readonly prototypeDesignSystem: PrototypeDesignSystemArtifact | null;
   readonly importedDesignMarkdown: DesignMarkdownAsset;
   readonly onChange: (content: string) => void;
-  readonly onAskAgent: () => void;
   readonly onRequestSelectedChanges: () => void;
   readonly onOpenSystem: () => void;
   readonly onClose: () => void;
@@ -3135,12 +3198,17 @@ function DesignMarkdownInspector({
 
   return (
     <aside
-      aria-label="Inspector"
-      className="absolute inset-y-0 right-0 z-20 flex h-full min-h-0 w-full max-w-[22rem] shrink-0 flex-col border-l border-border bg-background shadow-xl xl:relative xl:z-auto xl:w-[18.5rem] xl:shadow-none"
+      aria-label="Design system"
+      className={cn(
+        "flex h-full min-h-0 w-full shrink-0 flex-col bg-background",
+        docked
+          ? "border-r border-border"
+          : "absolute inset-y-0 right-0 z-20 max-w-[22rem] border-l border-border shadow-xl xl:relative xl:z-auto xl:w-[18.5rem] xl:shadow-none",
+      )}
     >
       <div className="flex h-12 items-center gap-2 border-b border-border px-3">
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold">Inspector</p>
+          <p className="truncate text-sm font-semibold">Design system</p>
           <p className="truncate text-[11px] text-muted-foreground">
             {selectionDetails ? "Selected result" : "Canvas"}
           </p>
@@ -3158,8 +3226,8 @@ function DesignMarkdownInspector({
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto">
-        <section aria-label={selectionDetails ? "Selected result details" : "Inspector empty state"} className="border-b border-border p-4">
-          {selectionDetails ? (
+        {selectionDetails ? (
+          <section aria-label="Selected result details" className="border-b border-border p-4">
             <div className="space-y-3">
               <div>
                 <p className="truncate text-sm font-semibold">{selectionDetails.title}</p>
@@ -3178,23 +3246,8 @@ function DesignMarkdownInspector({
                 {selectionDetails.actionLabel}
               </Button>
             </div>
-          ) : (
-            <div className="space-y-3 py-2 text-center">
-              <div className="mx-auto flex size-8 items-center justify-center rounded-md bg-muted text-muted-foreground">
-                <MousePointer2 className="size-4" />
-              </div>
-              <div>
-                <p className="text-sm font-medium">Select a result</p>
-                <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                  Choose a page, asset, or design system on the canvas to inspect or change it.
-                </p>
-              </div>
-              <Button type="button" variant="outline" size="sm" onClick={onAskAgent}>
-                <MessageSquare className="size-3.5" /> Ask Agent
-              </Button>
-            </div>
-          )}
-        </section>
+          </section>
+        ) : null}
 
         <details className="group/advanced">
           <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between border-b border-border px-4 text-xs font-medium text-muted-foreground hover:text-foreground">
@@ -4476,133 +4529,6 @@ function repairForMaterialImpact(
   return null;
 }
 
-function materialImpactDetail(plan: MaterialImpactPlan): string {
-  if (plan.blockedReason) return plan.blockedReason;
-  const redo = plan.redo.map(impactTokenLabel).join(", ");
-  const preserve = plan.preserve.map(impactTokenLabel).join(", ");
-  const summary = `Redo ${redo || "nothing"}${preserve ? `; preserve ${preserve}` : ""}.`;
-  return plan.degradation ? `${plan.degradation} ${summary}` : summary;
-}
-
-function impactTokenLabel(token: string): string {
-  if (token === "all-slices") return "all derived slices";
-  if (token.startsWith("design:")) return "design system";
-  if (token.startsWith("page:")) return token.slice("page:".length);
-  if (token.startsWith("slice:")) return token.slice("slice:".length);
-  if (token.startsWith("slices-from:"))
-    return `slices from ${token.slice("slices-from:".length)}`;
-  return token;
-}
-
-export function OutputHeader({
-  sliceCount,
-  prototypePageCount,
-  hasDesignSystem,
-  namingStatus,
-  inspectorOpen,
-  onToggleInspector,
-  approved,
-  onApprove,
-  onRequestChanges,
-  onCompare,
-}: {
-  readonly sliceCount: number;
-  readonly prototypePageCount: number;
-  readonly hasDesignSystem: boolean;
-  readonly namingStatus:
-    "idle" | "pending" | "running" | "done" | "skipped" | "error";
-  readonly inspectorOpen: boolean;
-  readonly onToggleInspector: () => void;
-  readonly approved: boolean;
-  readonly onApprove: () => void;
-  readonly onRequestChanges: () => void;
-  readonly onCompare?: () => void;
-}) {
-  const resultCount = sliceCount + prototypePageCount + Number(hasDesignSystem);
-  const resultParts = [
-    hasDesignSystem ? "Design system" : null,
-    prototypePageCount > 0
-      ? `${prototypePageCount} prototype page${prototypePageCount === 1 ? "" : "s"}`
-      : null,
-    sliceCount > 0
-      ? `${sliceCount} extracted asset${sliceCount === 1 ? "" : "s"}`
-      : null,
-  ].filter((part): part is string => Boolean(part));
-  const detail =
-    sliceCount > 0 && namingStatus === "skipped"
-      ? `${resultParts.join(" · ")} · Semantic naming unavailable`
-      : sliceCount > 0 && namingStatus === "error"
-        ? `${resultParts.join(" · ")} · Using generic filenames`
-        : resultParts.length > 0
-          ? resultParts.join(" · ")
-          : "Generated deliverables will collect here.";
-  return (
-    <div className="flex h-14 shrink-0 items-center justify-between border-b border-border px-6">
-      <div className="min-w-0">
-        <h2 className="truncate text-base font-semibold tracking-tight">
-          {resultCount > 0
-            ? `${resultCount} deliverable${resultCount === 1 ? "" : "s"}`
-            : "Output"}
-        </h2>
-        <p className="truncate text-xs text-muted-foreground">{detail}</p>
-      </div>
-
-      <div className="flex items-center gap-1 text-xs text-muted-foreground">
-        {resultCount > 0 ? (
-          <>
-            {onCompare ? (
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={onCompare}
-                aria-label="Compare deliverables"
-              >
-                <GitCompareArrows className="size-4" />{" "}
-                <span className="hidden xl:inline">Compare</span>
-              </Button>
-            ) : null}
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={onRequestChanges}
-              aria-label="Request changes"
-            >
-              <MessageSquare className="size-4" />{" "}
-              <span className="hidden xl:inline">Request changes</span>
-            </Button>
-            <Button
-              type="button"
-              variant={approved ? "secondary" : "default"}
-              size="sm"
-              onClick={onApprove}
-              aria-label="Approve deliverables"
-              aria-pressed={approved}
-            >
-              <Check className="size-4" />{" "}
-              <span className="hidden xl:inline">
-                {approved ? "Approved" : "Approve"}
-              </span>
-            </Button>
-          </>
-        ) : null}
-        <Button
-          type="button"
-          variant={inspectorOpen ? "secondary" : "ghost"}
-          size="icon"
-          className="size-8"
-          aria-label="Details"
-          aria-pressed={inspectorOpen}
-          onClick={onToggleInspector}
-        >
-          <PanelRight className="size-4" />
-        </Button>
-      </div>
-    </div>
-  );
-}
-
 function OutputSurface({
   canvasBackground,
   showMinimap,
@@ -4628,6 +4554,7 @@ function OutputSurface({
   working,
   analysisStatus,
   runError,
+  failedRegionIds,
   focusedArtifactId,
   focusRequestId,
   selectedMaterial,
@@ -4666,6 +4593,7 @@ function OutputSurface({
   readonly working: boolean;
   readonly analysisStatus: ReturnType<typeof useStatus>;
   readonly runError: string | null;
+  readonly failedRegionIds: readonly string[];
   readonly focusedArtifactId: string | null;
   readonly focusRequestId: number;
   readonly selectedMaterial: MaterialRef | null;
@@ -4776,6 +4704,59 @@ function OutputSurface({
         revisionId: evidence?.revisionId,
       };
     });
+    const taskStatus = runError
+      ? "failed" as const
+      : working
+        ? "generating" as const
+        : "queued" as const;
+    const pendingDesignSystem: CanvasImageItem | null = prototypePlan && !prototypeDesignSystem
+      ? {
+          id: "design-system",
+          label: "Design system",
+          material: {
+            id: "design-system",
+            kind: "design-system",
+            label: "Design system",
+            version: "pending",
+            provenance: { source: "prototype-generation" },
+          },
+          status: taskStatus,
+          statusDetail: taskStatus === "generating" ? "Generating" : taskStatus === "failed" ? "Needs retry" : "Queued",
+        }
+      : null;
+    const pendingPages: CanvasImageItem[] = plannedPages
+      .filter((page) => !generatedPageIds.has(page.id))
+      .map((page) => ({
+        id: page.id,
+        label: page.name,
+        material: {
+          id: page.id,
+          kind: "prototype-page",
+          label: page.name,
+          version: "pending",
+          provenance: { source: "prototype-generation" },
+        },
+        status: taskStatus,
+        statusDetail: taskStatus === "generating" ? "Generating" : taskStatus === "failed" ? "Needs retry" : "Queued",
+      }));
+    const pendingAssets: CanvasImageItem[] = prototypePages.length > 0
+      ? prototypePlan?.pages.flatMap((page) => page.regions)
+          .filter((region) => region.assetRoute === "board-cutout")
+          .filter((region) => !canvasSlices.some((slice) => slice.regionId === region.id))
+          .map((region) => ({
+            id: `task:region:${region.id}`,
+            label: region.name,
+            material: {
+              id: `task:region:${region.id}`,
+              kind: "cutout-slice",
+              label: region.name,
+              version: "pending",
+              provenance: { source: "page-deconstruction" },
+            },
+            status: failedRegionIds.includes(region.id) ? "failed" as const : taskStatus,
+            statusDetail: failedRegionIds.includes(region.id) ? "Needs retry" : taskStatus === "generating" ? "Extracting" : "Queued",
+          })) ?? []
+      : [];
     return (
       <div className="relative h-full min-h-0">
         <OutputCanvas
@@ -4789,6 +4770,9 @@ function OutputSurface({
           designSystem={canvasDesignSystem}
           pages={canvasPages}
           assets={canvasAssets}
+          pendingDesignSystem={pendingDesignSystem}
+          pendingPages={pendingPages}
+          pendingAssets={pendingAssets}
           focusArtifactId={focusedArtifactId}
           focusRequestId={focusRequestId}
           selectedMaterialId={selectedMaterial?.id}
@@ -4869,8 +4853,8 @@ function OutputSurface({
     return (
       <CenteredState
         icon={PackageOpen}
-        title="Generation stopped"
-        detail={runError}
+        title="No result yet"
+        detail="Review the Agent timeline, then retry when ready."
       />
     );
   }
@@ -5824,7 +5808,7 @@ function useCenteredSafeArea() {
     const measure = () => {
       const bounds = element.parentElement?.getBoundingClientRect();
       if (!bounds) return;
-      const panels = [...(workspace?.querySelectorAll<HTMLElement>('[data-workspace-panel="agent-drawer"], [data-workspace-panel="files-drawer"], [aria-label="Inspector"]') ?? [])];
+      const panels = [...(workspace?.querySelectorAll<HTMLElement>('[data-workspace-panel="agent-drawer"], [data-workspace-panel="files-drawer"], [data-workspace-panel="design-drawer"], [aria-label="Inspector"]') ?? [])];
       const { left, right, bottom } = projectVisiblePanelInsets(bounds, panels.map((panel) => ({ bounds: panel.getBoundingClientRect(), visible: visiblyOccupiesSpace(panel) })));
       const area = projectCanvasSafeArea({ viewport: { width: bounds.width, height: bounds.height }, agentDrawer: { open: left > 0, size: left }, inspector: { open: right > 0, size: right }, bottomOverlay: { open: bottom > 0, size: bottom }, centeredOverlay: { maxWidth: 448, margin: 24 } });
       const anchor = projectCanvasOverlayAnchor(area, "center");
@@ -6122,7 +6106,7 @@ function recoverWorkflowPhase(
 function restorePrototypeDesignSystem(
   artifact: PersistedPrototypeDesignSystem | null,
 ): PrototypeDesignSystemArtifact | null {
-  if (!artifact) return null;
+  if (!artifact || designSystemValidationError(artifact)) return null;
   return {
     ...artifact,
     blob: bytesToBlob(artifact.bytes, artifact.mediaType),
@@ -6289,8 +6273,8 @@ function WorkspaceRail({
         onClick={onOpenAssets}
       />
       <RailItem
-        icon={<PanelRight className="size-4" />}
-        label="Inspector"
+        icon={<PanelLeft className="size-4" />}
+        label="Design"
         active={inspectorActive}
         onClick={onOpenDesign}
       />

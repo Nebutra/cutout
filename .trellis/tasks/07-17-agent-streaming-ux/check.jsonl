@@ -1,0 +1,2 @@
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Quality gate reference for focused frontend verification."}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"Live turn and material state must have one shared projection rather than duplicate UI state."}

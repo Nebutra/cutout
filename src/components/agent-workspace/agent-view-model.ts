@@ -31,6 +31,12 @@ export interface AgentViewModelInput {
   readonly runError: string | null
   readonly notices?: readonly string[]
   readonly runEvents?: AgentRunEventStore | null
+  /** Ephemeral provider text. Durable history remains in `agent-message` events. */
+  readonly liveAgentMessage?: {
+    readonly id: string
+    readonly text: string
+    readonly label: string
+  } | null
 }
 
 export type AgentFeedItem =
@@ -161,11 +167,19 @@ function buildFeed(input: AgentViewModelInput): readonly AgentFeedItem[] {
   const activeRunId = input.runEvents?.activeRunId
 
   // Chat transcript spans every run so multi-turn dialogue stays visible.
-  const conversationItems = events.flatMap((event) => {
-    if (event.type !== 'intent-recorded' && event.type !== 'agent-message') return []
-    return feedItemFromRunEvent(event)
-  })
-  const preparationItem: AgentFeedItem[] = input.preparing
+  const conversationItems = collapseRepeatedIntentTurns(events).flatMap(feedItemFromRunEvent)
+  const liveMessageItem: AgentFeedItem[] = input.liveAgentMessage
+    ? [{
+        id: input.liveAgentMessage.id,
+        type: 'message',
+        role: 'agent',
+        status: 'pending',
+        title: 'Agent',
+        detail: input.liveAgentMessage.text,
+        provenance: 'runtime',
+      }]
+    : []
+  const preparationItem: AgentFeedItem[] = input.preparing && !input.liveAgentMessage
     ? [{
         id: 'runtime:preparing',
         type: 'message',
@@ -182,7 +196,7 @@ function buildFeed(input: AgentViewModelInput): readonly AgentFeedItem[] {
     ? collapseToolLifecycle(
       events.flatMap((event) => {
         if (event.runId !== activeRunId) return []
-        if (event.type === 'intent-recorded' || event.type === 'agent-message') return []
+        if (event.type === 'intent-recorded' || event.type === 'steer-recorded' || event.type === 'agent-message') return []
         return feedItemFromRunEvent(event)
       }),
     )
@@ -231,7 +245,7 @@ function buildFeed(input: AgentViewModelInput): readonly AgentFeedItem[] {
   }))
 
   const fallbackItems = [...noticeItems, ...stageItems, ...materialItems, ...errorItems]
-  const eventItems = [...conversationItems, ...preparationItem, ...activeOpsItems]
+  const eventItems = [...conversationItems, ...preparationItem, ...liveMessageItem, ...activeOpsItems]
   if (eventItems.length === 0) return fallbackItems
 
   // Durable events are authoritative for facts they contain, but the current
@@ -243,6 +257,28 @@ function buildFeed(input: AgentViewModelInput): readonly AgentFeedItem[] {
     ...eventItems,
     ...fallbackItems.filter((item) => !(hasDurableError && item.type === 'error')),
   ]
+}
+
+/**
+ * A retry may create a new run, but it does not create a new conversational
+ * turn. Preserve repeated text after an Agent reply while collapsing identical
+ * intents that have no intervening reply (including legacy failed-run logs).
+ */
+function collapseRepeatedIntentTurns(
+  events: readonly AgentRunEvent[],
+): readonly Extract<AgentRunEvent, { type: 'intent-recorded' | 'steer-recorded' | 'agent-message' }>[] {
+  const result: Extract<AgentRunEvent, { type: 'intent-recorded' | 'steer-recorded' | 'agent-message' }>[] = []
+  for (const event of events) {
+    if (event.type !== 'intent-recorded' && event.type !== 'steer-recorded' && event.type !== 'agent-message') continue
+    const previous = result.at(-1)
+    if (
+      event.type === 'intent-recorded'
+      && previous?.type === 'intent-recorded'
+      && event.intent.trim() === previous.intent.trim()
+    ) continue
+    result.push(event)
+  }
+  return result
 }
 
 type ToolFeedItem = Extract<AgentFeedItem, { type: 'tool' }>
@@ -307,6 +343,16 @@ function feedItemFromRunEvent(event: AgentRunEvent): readonly AgentFeedItem[] {
         status: 'complete',
         title: 'You',
         detail: event.intent,
+        provenance: 'runtime',
+      }]
+    case 'steer-recorded':
+      return [{
+        id: event.eventId,
+        type: 'message',
+        role: 'user',
+        status: 'complete',
+        title: 'You',
+        detail: event.instruction,
         provenance: 'runtime',
       }]
     case 'plan-recorded':

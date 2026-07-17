@@ -38,7 +38,7 @@ export function deriveDockPresentation(
 
   return {
     mode,
-    showOverview: mode !== 'empty',
+    showOverview: mode === 'active',
     showFeed: viewModel.feed.length > 0 || mode === 'active',
     showChecklist: viewModel.checklist.length > 0,
     showIntervention: context.hasIntervention,

@@ -39,7 +39,7 @@ use super::auth_header::{auth_headers, STRIPPED_INBOUND_HEADERS};
 use super::keys::{read_secret, KeyError};
 
 const DEFAULT_BUFFERED_TIMEOUT_SECS: u64 = 120;
-const IMAGE_BUFFERED_TIMEOUT_SECS: u64 = 600;
+const GENERATION_BUFFERED_TIMEOUT_SECS: u64 = 600;
 
 /// Buffered proxy response returned to JS.
 #[derive(Debug, Serialize)]
@@ -318,12 +318,17 @@ pub(crate) fn build_client(overall: Option<u64>) -> reqwest::Client {
     builder.build().unwrap_or_else(|_| reqwest::Client::new())
 }
 
-/// Image generation/edit endpoints are materially slower than text calls. Keep
-/// chat/model probes bounded at 120s, but let image requests run long enough for
-/// production-grade models before surfacing a timeout.
+/// Generative endpoints can run substantially longer than catalog and health
+/// probes. Keep probes bounded at 120s while allowing one non-retried model
+/// request to use the same ten-minute lease as the desktop runtime.
 pub(crate) fn buffered_timeout_for_url(url: &str) -> u64 {
-    if url.contains("/images/generations") || url.contains("/images/edits") {
-        IMAGE_BUFFERED_TIMEOUT_SECS
+    if url.contains("/images/generations")
+        || url.contains("/images/edits")
+        || url.contains("/chat/completions")
+        || url.ends_with("/responses")
+        || url.contains("/responses?")
+    {
+        GENERATION_BUFFERED_TIMEOUT_SECS
     } else {
         DEFAULT_BUFFERED_TIMEOUT_SECS
     }
@@ -614,17 +619,25 @@ mod tests {
     }
 
     #[test]
-    fn image_endpoints_get_longer_buffered_timeout() {
+    fn generation_endpoints_get_longer_buffered_timeout() {
         assert_eq!(
             buffered_timeout_for_url("https://api.example.com/v1/images/generations"),
-            IMAGE_BUFFERED_TIMEOUT_SECS
+            GENERATION_BUFFERED_TIMEOUT_SECS
         );
         assert_eq!(
             buffered_timeout_for_url("https://api.example.com/v1/images/edits"),
-            IMAGE_BUFFERED_TIMEOUT_SECS
+            GENERATION_BUFFERED_TIMEOUT_SECS
         );
         assert_eq!(
             buffered_timeout_for_url("https://api.example.com/v1/chat/completions"),
+            GENERATION_BUFFERED_TIMEOUT_SECS
+        );
+        assert_eq!(
+            buffered_timeout_for_url("https://api.example.com/v1/responses"),
+            GENERATION_BUFFERED_TIMEOUT_SECS
+        );
+        assert_eq!(
+            buffered_timeout_for_url("https://api.example.com/v1/models"),
             DEFAULT_BUFFERED_TIMEOUT_SECS
         );
     }

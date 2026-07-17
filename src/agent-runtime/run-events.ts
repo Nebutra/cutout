@@ -29,6 +29,7 @@ const missingRequirementSchema = z.object({
 export const agentRunEventSchema = z.discriminatedUnion('type', [
   runEventBaseSchema.extend({ type: z.literal('run-started'), mode: z.enum(['create', 'repair']) }).strict(),
   runEventBaseSchema.extend({ type: z.literal('intent-recorded'), intent: eventText }).strict(),
+  runEventBaseSchema.extend({ type: z.literal('steer-recorded'), instruction: eventText }).strict(),
   runEventBaseSchema.extend({ type: z.literal('plan-recorded'), planId: eventText, summary: eventText, stepIds: z.array(eventText) }).strict(),
   runEventBaseSchema.extend({ type: z.enum(['step-started', 'step-succeeded']), stepId: eventText, label: eventText, detail: eventText.optional() }).strict(),
   runEventBaseSchema.extend({ type: z.enum(['step-failed', 'step-cancelled']), stepId: eventText, label: eventText, detail: eventText }).strict(),
@@ -93,6 +94,10 @@ export type AgentRunEvent =
   | (RunEventBase & {
       readonly type: 'intent-recorded'
       readonly intent: string
+    })
+  | (RunEventBase & {
+      readonly type: 'steer-recorded'
+      readonly instruction: string
     })
   | (RunEventBase & {
       readonly type: 'plan-recorded'
@@ -421,6 +426,8 @@ function reduceActiveRun(
   switch (event.type) {
     case 'intent-recorded':
       return { ...run, intent: event.intent }
+    case 'steer-recorded':
+      return run
     case 'plan-recorded':
       return {
         ...run,

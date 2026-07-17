@@ -15,7 +15,7 @@ async function centeredGeometry(page: Page) {
     const content = overlay.firstElementChild as HTMLElement;
     const bounds = overlay.getBoundingClientRect();
     let left = 0, right = 0, bottom = 0;
-    document.querySelectorAll<HTMLElement>('[data-workspace-panel="agent-drawer"], [data-workspace-panel="files-drawer"], [aria-label="Inspector"]').forEach((panel) => {
+    document.querySelectorAll<HTMLElement>('[data-workspace-panel="agent-drawer"], [data-workspace-panel="files-drawer"], [data-workspace-panel="design-drawer"], [aria-label="Inspector"]').forEach((panel) => {
       if (panel.offsetParent === null) return;
       const rect = panel.getBoundingClientRect();
       const overlapX = Math.max(0, Math.min(bounds.right, rect.right) - Math.max(bounds.left, rect.left));
@@ -71,8 +71,8 @@ test("Canvas centered states follow the responsive safe content rectangle", asyn
     await page.getByRole("button", { name: "Files", exact: true }).click();
     await assertCentered();
     await page.getByRole("button", { name: "Files", exact: true }).click();
-    await page.getByRole("button", { name: "Inspector", exact: true }).click();
-    const inspector = page.getByRole("complementary", { name: "Inspector" });
+    await page.getByRole("button", { name: "Design", exact: true }).click();
+    const inspector = page.getByRole("complementary", { name: "Design system" });
     await expect(inspector).toBeVisible();
     await inspector.getByRole("button", { name: "Close design inspector" }).click();
     await assertCentered();

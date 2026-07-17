@@ -224,7 +224,6 @@ test('pinning promotes a project without losing the unpinned project', async ({ 
 })
 
 test('archive leaves Recent and restore returns the project', async ({ page }) => {
-  test.skip(true, 'Archived projects moved out of the current Home navigation contract')
   await createNamedProject(page, 'Archive candidate')
   const directory = page.getByRole('main')
   await directoryProjectCard(directory, 'Archive candidate').getByRole('button', { name: 'More actions for Archive candidate' }).click()
@@ -232,13 +231,25 @@ test('archive leaves Recent and restore returns the project', async ({ page }) =
   await page.getByRole('button', { name: 'Archive', exact: true }).click()
   await expect(directoryProjectButton(directory, 'Archive candidate')).toHaveCount(0)
 
-  await page.getByRole('button', { name: /^Archived\b/ }).click()
-  const archivedDirectory = page.getByRole('main')
-  await expect(directoryProjectButton(archivedDirectory, 'Archive candidate')).toBeVisible()
-  await directoryProjectCard(archivedDirectory, 'Archive candidate').getByRole('button', { name: 'More actions for Archive candidate' }).click()
-  await page.getByRole('menuitem', { name: 'Restore' }).click()
-  await expect(page.getByRole('heading', { name: 'Nothing archived' })).toBeVisible()
+  await page.reload()
+  await page.getByRole('button', { name: /^All projects\b/ }).click()
+  await expect(directoryProjectButton(page.getByRole('main'), 'Archive candidate')).toHaveCount(0)
 
+  const workspaceMenu = page.getByRole('button', { name: /Workspace menu|工作区菜单/ })
+  if (await workspaceMenu.isVisible()) {
+    await workspaceMenu.click()
+    await page.getByRole('menuitem', { name: /Settings|设置/ }).click()
+  } else {
+    await page.keyboard.press('Control+,')
+  }
+  await page.getByText(/^Archived$/, { exact: true }).click()
+  const settings = page.getByRole('dialog')
+  await expect(settings.getByText('Archive candidate', { exact: true })).toBeVisible()
+  await settings.getByRole('button', { name: 'Restore', exact: true }).click()
+  await expect(settings.getByText('Nothing archived', { exact: true })).toBeVisible()
+  await page.keyboard.press('Escape')
+
+  await page.reload()
   await page.getByRole('button', { name: /^All projects\b/ }).click()
   await expect(directoryProjectButton(
     page.getByRole('main'),

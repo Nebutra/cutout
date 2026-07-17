@@ -84,6 +84,46 @@ test("Agent, Design and Deliver retain their consumers in the workspace panel ra
   await expect(deliver).toHaveScreenshot("workspace-navigation.png");
 });
 
+test("collapsing the workspace rail does not leave a dead gutter beside the Agent drawer", async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== "desktop-chrome");
+  await createProject(page, "Rail collapse regression");
+
+  const workspace = page.locator("[data-workspace-root]");
+  const railFrame = page.locator("[data-workspace-rail]");
+  const rail = page.getByRole("navigation", { name: "Workspace panels" });
+  const drawer = page.locator('[data-workspace-panel="agent-drawer"]');
+  await expect(rail).toBeVisible();
+  await expect(drawer).toBeVisible();
+
+  const expanded = await Promise.all([
+    workspace.boundingBox(),
+    rail.boundingBox(),
+    drawer.boundingBox(),
+  ]);
+  expect(expanded.every(Boolean)).toBe(true);
+  expect(Math.abs(expanded[2]!.x - (expanded[1]!.x + expanded[1]!.width))).toBeLessThanOrEqual(1);
+
+  await page.getByRole("button", { name: "Collapse sidebar" }).click();
+  await expect(page.getByRole("button", { name: "Expand sidebar" })).toBeVisible();
+  await expect.poll(async () => (await railFrame.boundingBox())?.width).toBe(0);
+  await expect.poll(async () => (await drawer.boundingBox())?.x).toBe(expanded[0]!.x);
+
+  await page.setViewportSize({ width: 1100, height: 720 });
+  await expect.poll(async () => (await drawer.boundingBox())?.x).toBe(0);
+
+  await page.getByRole("button", { name: "Expand sidebar" }).click();
+  await expect(rail).toBeVisible();
+  await expect.poll(async () => {
+    const railBox = await rail.boundingBox();
+    const drawerBox = await drawer.boundingBox();
+    return railBox && drawerBox
+      ? Math.abs(drawerBox.x - (railBox.x + railBox.width))
+      : Number.POSITIVE_INFINITY;
+  }).toBeLessThanOrEqual(1);
+});
+
 for (const [legacyView, expectedMode] of [
   ["figma", "Design"],
   ["kits", "Deliver"],

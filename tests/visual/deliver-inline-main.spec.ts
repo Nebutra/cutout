@@ -74,10 +74,9 @@ test("Deliver is one inline responsive workspace while inspectors stay separate"
   await navigate(page, { version: 2, mode: "canvas", advanced: false });
   await expect(deliver).toHaveCount(0);
   if (testInfo.project.name === "mobile-chrome") await page.setViewportSize({ width: 1024, height: 915 });
-  await page.getByRole("button", { name: "Inspector", exact: true }).click();
-  const canvasInspector = page.getByRole("complementary", { name: "Inspector" });
+  await page.getByRole("button", { name: "Design", exact: true }).click();
+  const canvasInspector = page.getByRole("complementary", { name: "Design system" });
   await expect(canvasInspector).toBeVisible();
-  await expect(canvasInspector.getByText("Select a result", { exact: true })).toBeVisible();
   expect(await canvasInspector.innerText()).not.toMatch(/revision|provenance|host|json/i);
   await canvasInspector.getByText("Advanced design system", { exact: true }).click();
   await canvasInspector.getByRole("button", { name: "Open system inspector" }).click();

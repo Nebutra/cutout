@@ -11,6 +11,9 @@ export interface CanvasImageItem {
   readonly pageId?: string
   readonly evidenceMaterialId?: string
   readonly revisionId?: string
+  /** A task card has no bitmap yet; a ready artifact replaces it by the same id. */
+  readonly status?: 'queued' | 'generating' | 'failed'
+  readonly statusDetail?: string
 }
 
 export interface CanvasLane {

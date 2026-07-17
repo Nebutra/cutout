@@ -21,7 +21,7 @@ test('Design inspector exposes governance evidence without claiming an unavailab
   await page.getByRole('button',{name:'Create from brief'}).click()
   await expect(page.getByRole('complementary',{name:'Agent workspace'})).toBeVisible()
   await page.getByRole('button',{name:'Design',exact:true}).click()
-  const inspector=page.getByRole('complementary',{name:'Inspector'});await expect(inspector).toBeVisible()
+  const inspector=page.getByRole('complementary',{name:'Design system'});await expect(inspector).toBeVisible()
   await expect(inspector).toContainText('DESIGN.md')
   await expect(inspector.getByRole('button',{name:'Inspect accessibility'})).toHaveCount(0)
   expect(await page.evaluate(()=>Object.keys(localStorage).filter((key)=>key.startsWith('cutout.governance-inspection.')))).toEqual([])
