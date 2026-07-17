@@ -21,6 +21,7 @@ This directory contains guidelines for frontend development. Fill in each file w
 | [Quality Guidelines](./quality-guidelines.md) | Code standards, forbidden patterns | To fill |
 | [Type Safety](./type-safety.md) | Type patterns, validation | To fill |
 | [Cutout Pipeline](./cutout-pipeline.md) | `src/algorithm/` edge-matting contract & invariants | Filled |
+| [BYOK User Copy](./byok-user-copy.md) | No billing-estimate copy; approval-notification & transport-error contracts | Filled |
 
 ---
 

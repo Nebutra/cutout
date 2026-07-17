@@ -38,7 +38,8 @@ export function deriveDockPresentation(
 
   return {
     mode,
-    showOverview: mode === 'active',
+    // Execution belongs in the latest Agent bubble, not a second status bar.
+    showOverview: false,
     showFeed: viewModel.feed.length > 0 || mode === 'active',
     showChecklist: viewModel.checklist.length > 0,
     showIntervention: context.hasIntervention,

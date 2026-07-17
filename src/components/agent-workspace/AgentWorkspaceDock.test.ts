@@ -28,7 +28,6 @@ const stoppedModel: AgentWorkspaceViewModel = {
     requiredCount: 2,
     detail: '1 of 2 verified; 1 remaining',
   }],
-  costNotice: '自动执行付费模型，费用以提供商为准',
 }
 
 const draftModel: AgentWorkspaceViewModel = {
@@ -41,7 +40,6 @@ const draftModel: AgentWorkspaceViewModel = {
   },
   feed: [],
   checklist: [],
-  costNotice: '自动执行付费模型，费用以提供商为准',
 }
 
 describe('AgentWorkspaceDock', () => {
@@ -140,28 +138,28 @@ describe('AgentWorkspaceDock', () => {
     expect(html).toMatch(/data-slot="agent-conversation" class="[^"]*min-h-0 flex-1 overflow-y-auto/)
     expect(html).not.toContain('data-slot="agent-details"')
   })
-  it('keeps a provider estimate on its approval action without BYOK billing chrome', () => {
+  it('keeps approval focused on the requested action, not provider billing', () => {
     const onApproveTool = vi.fn()
     const html = renderToStaticMarkup(createElement(AgentWorkspaceDock, {
       viewModel: {
         ...draftModel,
         summary: { status: 'running', title: 'Waiting for approval', detail: 'One paid tool is paused.', intent: 'Generate hero', elapsedLabel: '0:02' },
         feed: [{ id: 'approval', type: 'tool', status: 'waiting', title: 'Generate hero', detail: 'Tool: image.generate', provenance: 'runtime', toolCallId: 'tool-1', requestId: 'request-1', providerModel: 'openai/gpt-image-1', estimatedCost: { currency: 'USD', amount: 0.08, credits: 8 }, approval: { status: 'required', reason: 'Explicit approval is required.' }, actions: ['approve', 'deny'] }],
-        cost: { estimated: [{ currency: 'USD', amount: 0.08, credits: 8 }], charged: [] },
       },
       composer: { value: '', disabled: true, onChange: vi.fn(), onSubmit: vi.fn() },
       onApproveTool,
       onDenyTool: vi.fn(),
     }))
-    expect(html).toContain('openai/gpt-image-1')
-    expect(html).toContain('USD 0.08')
     expect(html).toContain('Explicit approval is required.')
     expect(html).toContain('Approve')
     expect(html).toContain('Deny')
-    expect(html).toContain('data-slot="tool-cost-estimate"')
+    expect(html).toContain('data-slot="agent-decision-bubble"')
+    expect(html).not.toContain('Tool: image.generate')
     expect(html).not.toContain('data-slot="agent-cost-summary"')
     expect(html).not.toContain('Charged')
     expect(html).not.toContain('Budget')
+    expect(html).not.toContain('USD 0.08')
+    expect(html).not.toContain('Provider estimate')
   })
   it('renders an empty draft as a compact intent prompt without empty run chrome', () => {
     const html = renderToStaticMarkup(createElement(AgentWorkspaceDock, {
@@ -178,7 +176,7 @@ describe('AgentWorkspaceDock', () => {
     expect(html).not.toContain('Run controls')
   })
 
-  it('progressively reveals the run overview without an activity log while running', () => {
+  it('renders active execution as the latest Agent bubble instead of a separate run overview', () => {
     const html = renderToStaticMarkup(createElement(AgentWorkspaceDock, {
       viewModel: {
         ...draftModel,
@@ -190,21 +188,24 @@ describe('AgentWorkspaceDock', () => {
           elapsedLabel: '0:03',
         },
         feed: [{
-          id: 'stage:planning',
-          type: 'stage',
-          status: 'running',
-          title: 'Creating Plan',
+          id: 'runtime:activity:planning',
+          type: 'message',
+          role: 'agent',
+          status: 'pending',
+          title: 'Agent',
           detail: 'Mapping deliverables.',
           provenance: 'runtime',
+          activity: { label: 'Creating Plan', elapsedLabel: '0:03' },
         }],
       },
       composer: { value: '', busy: true, disabled: true, onChange: vi.fn(), onSubmit: vi.fn() },
     }))
 
     expect(html).not.toContain('data-slot="agent-draft-prompt"')
-    expect(html).toContain('Planning the outcome')
-    expect(html).not.toContain('Agent activity')
-    expect(html).not.toContain('Creating Plan')
+    expect(html).toContain('data-slot="agent-activity-bubble"')
+    expect(html).toContain('Creating Plan')
+    expect(html).toContain('Mapping deliverables.')
+    expect(html).not.toContain('data-slot="agent-run-overview"')
   })
 
   it('keeps one stop action when the composer owns cancellation', () => {
@@ -288,7 +289,6 @@ describe('AgentWorkspaceDock', () => {
     }))
 
     expect(html).not.toContain('data-slot="agent-draft-prompt"')
-    expect(html).toContain('Describe the result you need')
     expect(html).toContain('Approve scope')
     // No fabricated empty Agent activity log just because intervention is open.
     expect(html).not.toContain('Agent activity')
@@ -342,6 +342,44 @@ describe('AgentWorkspaceDock', () => {
     expect(html).not.toContain('data-slot="agent-details"')
   })
 
+  it('renders a failed tool run as one Agent error, not a second execution card', () => {
+    const html = renderToStaticMarkup(createElement(AgentWorkspaceDock, {
+      viewModel: {
+        ...stoppedModel,
+        execution: {
+          runId: 'failed-run',
+          steps: [{
+            id: 'visual',
+            label: 'Tools',
+            status: 'failed',
+            startedAt: 1,
+            endedAt: 2,
+            tools: [{
+              id: 'image-call',
+              label: 'Generate design system',
+              tool: 'image.generate',
+              status: 'failed',
+              startedAt: 1,
+              endedAt: 2,
+              detail: 'tls handshake eof',
+              route: 'mox/gpt-image-2',
+              receiptId: 'receipt-internal',
+              outputRefs: [],
+            }],
+          }],
+        },
+      },
+      composer: { value: '', onChange: vi.fn(), onSubmit: vi.fn() },
+      onRetry: vi.fn(),
+    }))
+
+    expect(html.match(/Run stopped/g)).toHaveLength(1)
+    expect(html).not.toContain('>Tools<')
+    expect(html).not.toContain('tls handshake eof')
+    expect(html).not.toContain('mox/gpt-image-2')
+    expect(html).not.toContain('receipt-internal')
+  })
+
   it('only renders outcome rows with existing evidence as navigation buttons', () => {
     const onOpenArtifact = vi.fn()
     const html = renderToStaticMarkup(createElement(OutcomeChecklist, {
@@ -362,7 +400,8 @@ describe('AgentWorkspaceDock', () => {
       viewModel: stoppedModel,
       composer: { value: '', onChange: vi.fn(), onSubmit: vi.fn() },
     }))
-    expect(hidden).not.toContain(stoppedModel.costNotice)
+    expect(hidden).not.toContain('自动执行付费模型，费用以提供商为准')
+    expect(hidden).not.toContain('USD')
     expect(hidden).not.toContain('Charged')
     expect(hidden).not.toContain('Budget')
   })
@@ -542,7 +581,6 @@ describe('AgentWorkspaceDock', () => {
         },
         feed: [],
         checklist: [],
-        costNotice: '自动执行付费模型，费用以提供商为准',
       },
       composer: { value: '', onChange: vi.fn(), onSubmit: vi.fn() },
     }))
@@ -567,14 +605,13 @@ describe('AgentWorkspaceDock', () => {
         },
         feed: [],
         checklist: [],
-        costNotice: '自动执行付费模型，费用以提供商为准',
       },
       labels: { noActivity: longChinese },
       composer: { value: '', onChange: vi.fn(), onSubmit: vi.fn() },
     }))
 
-    expect(html).toContain(longChinese)
-    expect(html).toContain('line-clamp-2 break-words')
+    expect(html).not.toContain(longChinese)
+    expect(html).not.toContain('line-clamp-2 break-words')
     expect(html).toContain('rows="2"')
     expect(html).toContain('sm:max-w-[23rem]')
   })

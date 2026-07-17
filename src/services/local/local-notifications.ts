@@ -81,7 +81,8 @@ export function notificationFromAgentEvent(event: AgentRunEvent): LocalNotificat
   const base = { id: `agent:${event.eventId}`, source: 'agent' as const, createdAt: event.at, read: false }
   switch (event.type) {
     case 'tool-approval-requested':
-      return { ...base, kind: 'attention', title: 'Approval needed', detail: safe(`${event.label} estimates ${event.estimatedCost.amount} ${event.estimatedCost.currency}.`, 500) }
+      if (event.pendingApproval !== true) return null
+      return { ...base, kind: 'attention', title: 'Approval needed', detail: safe(`${event.label} requires your approval before it can run.`, 500) }
     case 'human-loop-asked':
       return { ...base, kind: 'attention', title: 'Agent needs a decision', detail: safe(event.question, 500) }
     case 'tool-failed':

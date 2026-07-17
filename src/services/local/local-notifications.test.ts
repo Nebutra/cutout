@@ -30,6 +30,27 @@ describe('local notification projection', () => {
     expect(notificationFromAgentEvent(event({ type: 'tool-failed', toolCallId: 't', tool: 'image', label: 'Generate image', detail: 'Provider unavailable' }))).toMatchObject({ kind: 'failure', detail: 'Provider unavailable' })
   })
 
+  it('stays silent for auto-approved tool calls and never surfaces billing amounts', () => {
+    const approval = {
+      type: 'tool-approval-requested' as const,
+      toolCallId: 't',
+      requestId: 'r',
+      tool: 'image',
+      label: 'Generate design system',
+      estimatedCost: { currency: 'USD' as const, amount: 0 },
+      budgetCeiling: { currency: 'USD' as const, amount: 1 },
+      approvalPolicy: 'auto-within-budget' as const,
+      reason: 'Eligible for automatic approval within budget.',
+    }
+    expect(notificationFromAgentEvent(event(approval))).toBeNull()
+    expect(notificationFromAgentEvent(event({ ...approval, pendingApproval: false }))).toBeNull()
+
+    const pending = notificationFromAgentEvent(event({ ...approval, approvalPolicy: 'explicit', reason: 'Explicit approval is required.', pendingApproval: true }))
+    expect(pending).toMatchObject({ kind: 'attention', title: 'Approval needed' })
+    expect(pending?.detail).toContain('Generate design system')
+    expect(`${pending?.title} ${pending?.detail}`).not.toMatch(/USD|estimates|\d+(\.\d+)?\s*(USD|\$|¥)|[$¥]\s*\d/)
+  })
+
   it('deduplicates, bounds, marks read, and clears local history', () => {
     const storage = memory()
     for (let index = 0; index < 60; index += 1) appendLocalNotification({ id: `n:${index}`, source: 'agent', kind: 'success', title: 'Done', detail: 'Complete', createdAt: index, read: false }, storage)

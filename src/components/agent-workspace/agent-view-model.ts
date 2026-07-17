@@ -9,6 +9,7 @@ import type {
 } from '@/agent-runtime/run-events'
 import { CHAT_SURFACE_TOOLS, toolEventLabel } from '@/agent-runtime/tool-loop'
 import type { MoneyEstimate } from '@/control-protocol'
+import { projectExecutionTimeline, type ExecutionTimeline } from './execution-timeline'
 
 export type AgentStageStatus = 'pending' | 'running' | 'done'
 
@@ -53,6 +54,11 @@ export type AgentFeedItem =
         readonly type: 'proceed-anyway'
         readonly label: string
         readonly brief: string
+      }
+      /** Ephemeral execution status rendered as the latest Agent bubble. */
+      readonly activity?: {
+        readonly label: string
+        readonly elapsedLabel: string | null
       }
     }
   | {
@@ -132,33 +138,17 @@ export interface AgentRunSummary {
 export interface AgentWorkspaceViewModel {
   readonly summary: AgentRunSummary
   readonly feed: readonly AgentFeedItem[]
+  readonly execution?: ExecutionTimeline | null
   readonly checklist: readonly OutcomeChecklistItem[]
-  /** Policy disclosure only. Provider billing is the source of truth. */
-  readonly costNotice: '自动执行付费模型，费用以提供商为准'
-  readonly cost?: {
-    readonly estimated: readonly MoneyEstimate[]
-    readonly charged: readonly MoneyEstimate[]
-  }
 }
-
-const COST_NOTICE = '自动执行付费模型，费用以提供商为准' as const
 
 export function buildAgentViewModel(input: AgentViewModelInput): AgentWorkspaceViewModel {
   const feed = buildFeed(input)
   return {
     summary: buildRunSummary(input),
     feed,
+    execution: projectExecutionTimeline(input.runEvents),
     checklist: buildOutcomeChecklist(input.outcome),
-    costNotice: COST_NOTICE,
-    cost: summarizeCosts(feed),
-  }
-}
-
-function summarizeCosts(feed: readonly AgentFeedItem[]): AgentWorkspaceViewModel['cost'] {
-  const tools = feed.filter((item): item is Extract<AgentFeedItem, { type: 'tool' }> => item.type === 'tool')
-  return {
-    estimated: tools.flatMap((item) => item.estimatedCost ? [item.estimatedCost] : []),
-    charged: tools.flatMap((item) => item.charged ? [item.charged] : []),
   }
 }
 
@@ -167,7 +157,16 @@ function buildFeed(input: AgentViewModelInput): readonly AgentFeedItem[] {
   const activeRunId = input.runEvents?.activeRunId
 
   // Chat transcript spans every run so multi-turn dialogue stays visible.
-  const conversationItems = collapseRepeatedIntentTurns(events).flatMap(feedItemFromRunEvent)
+  const revisions = new Map(
+    events.flatMap((event) => event.type === 'message-revised' ? [[event.targetEventId, event.message] as const] : []),
+  )
+  const conversationItems = collapseRepeatedIntentTurns(events).flatMap((event) => {
+    const items = feedItemFromRunEvent(event)
+    const revision = revisions.get(event.eventId)
+    return revision
+      ? items.map((item) => item.type === 'message' && item.role === 'user' ? { ...item, detail: revision } : item)
+      : items
+  })
   const liveMessageItem: AgentFeedItem[] = input.liveAgentMessage
     ? [{
         id: input.liveAgentMessage.id,
@@ -179,40 +178,37 @@ function buildFeed(input: AgentViewModelInput): readonly AgentFeedItem[] {
         provenance: 'runtime',
       }]
     : []
-  const preparationItem: AgentFeedItem[] = input.preparing && !input.liveAgentMessage
+  const activeStage = input.stages.find((stage) => stage.status === 'running')
+  const hasDurableActivity = Boolean(projectExecutionTimeline(input.runEvents))
+  const activityItem: AgentFeedItem[] = input.working && !input.liveAgentMessage && !hasDurableActivity && (input.preparing || activeStage)
     ? [{
-        id: 'runtime:preparing',
+        id: `runtime:activity:${activeStage?.id ?? input.workflowPhase}`,
         type: 'message',
         role: 'agent',
         status: 'pending',
         title: 'Agent',
-        detail: 'Checking your request…',
+        detail: activeStage?.detail ?? (input.preparing ? 'Checking your request…' : 'Working on your request…'),
         provenance: 'runtime',
+        activity: {
+          label: activeStage ? `Creating ${activeStage.label}` : phaseTitle(input.workflowPhase),
+          elapsedLabel: input.elapsedSeconds > 0 ? formatElapsed(input.elapsedSeconds) : null,
+        },
       }]
     : []
 
-  // Ops rows (tools/stages/materials/errors) stay scoped to the active run.
+  // Retain the typed operational feed for non-conversation consumers. The
+  // Agent dock renders these facts through the grouped execution timeline.
   const activeOpsItems = activeRunId
-    ? collapseToolLifecycle(
-      events.flatMap((event) => {
-        if (event.runId !== activeRunId) return []
-        if (event.type === 'intent-recorded' || event.type === 'steer-recorded' || event.type === 'agent-message') return []
+    ? (() => {
+      const activeEvents = events.filter((event) => event.runId === activeRunId)
+      const unresolvedApprovalIds = unresolvedToolApprovalEventIds(activeEvents)
+      return collapseToolLifecycle(activeEvents.flatMap((event) => {
+        if (event.type === 'intent-recorded' || event.type === 'steer-recorded' || event.type === 'message-revised' || event.type === 'agent-message') return []
+        if (event.type === 'tool-approval-requested' && !unresolvedApprovalIds.has(event.eventId)) return []
         return feedItemFromRunEvent(event)
-      }),
-    )
+      }))
+    })()
     : []
-
-  const stageItems: AgentFeedItem[] = input.stages.flatMap((stage) => {
-    if (stage.status === 'pending') return []
-    return [{
-      id: `stage:${stage.id}`,
-      type: 'stage',
-      status: stage.status === 'done' ? 'complete' : 'running',
-      title: stage.status === 'done' ? `${stage.label} completed` : `Creating ${stage.label}`,
-      detail: stage.detail,
-      provenance: 'runtime',
-    }]
-  })
 
   const materialItems: AgentFeedItem[] = (input.outcome?.materials ?? []).map((material) => ({
     id: `material:${material.id}`,
@@ -244,8 +240,8 @@ function buildFeed(input: AgentViewModelInput): readonly AgentFeedItem[] {
     provenance: 'runtime',
   }))
 
-  const fallbackItems = [...noticeItems, ...stageItems, ...materialItems, ...errorItems]
-  const eventItems = [...conversationItems, ...preparationItem, ...liveMessageItem, ...activeOpsItems]
+  const fallbackItems = [...noticeItems, ...materialItems, ...errorItems]
+  const eventItems = [...conversationItems, ...liveMessageItem, ...activityItem, ...activeOpsItems]
   if (eventItems.length === 0) return fallbackItems
 
   // Durable events are authoritative for facts they contain, but the current
@@ -321,6 +317,53 @@ function collapseToolLifecycle(items: readonly AgentFeedItem[]): AgentFeedItem[]
   return result
 }
 
+/**
+ * Approval events are append-only, so a resolved request remains in the log.
+ * Reconcile attempts by both identifiers: retries reuse toolCallId with a
+ * fresh requestId, and only the latest unresolved request may be actionable.
+ */
+function unresolvedToolApprovalEventIds(
+  events: readonly AgentRunEvent[],
+): ReadonlySet<string> {
+  const pendingByTool = new Map<string, Map<string, string>>()
+
+  const resolveRequest = (toolCallId: string, requestId: string) => {
+    const attempts = pendingByTool.get(toolCallId)
+    attempts?.delete(requestId)
+    if (attempts?.size === 0) pendingByTool.delete(toolCallId)
+  }
+
+  for (const event of events) {
+    switch (event.type) {
+      case 'tool-approval-requested':
+        pendingByTool.set(event.toolCallId, new Map([[event.requestId, event.eventId]]))
+        break
+      case 'tool-approved':
+      case 'tool-denied':
+        resolveRequest(event.toolCallId, event.requestId)
+        break
+      case 'tool-retry-linked':
+        resolveRequest(event.toolCallId, event.previousRequestId)
+        break
+      case 'tool-receipt-recorded':
+        resolveRequest(event.toolCallId, event.receipt.requestId)
+        break
+      case 'tool-succeeded':
+      case 'tool-failed':
+      case 'tool-cancelled':
+        if (event.receipt) resolveRequest(event.toolCallId, event.receipt.requestId)
+        else pendingByTool.delete(event.toolCallId)
+        break
+      default:
+        break
+    }
+  }
+
+  return new Set(
+    [...pendingByTool.values()].flatMap((attempts) => [...attempts.values()]),
+  )
+}
+
 function humanToolTitle(toolName: string | undefined, label: string): string {
   if (toolName) {
     const known = toolEventLabel(toolName)
@@ -355,6 +398,8 @@ function feedItemFromRunEvent(event: AgentRunEvent): readonly AgentFeedItem[] {
         detail: event.instruction,
         provenance: 'runtime',
       }]
+    case 'message-revised':
+      return []
     case 'plan-recorded':
       return [{
         id: event.eventId,

@@ -50,16 +50,108 @@ function outcome(
 }
 
 describe('buildAgentViewModel', () => {
-  it('projects paid tool approval, provider route, receipt evidence, and cost totals from durable events', () => {
+  it('projects a revision into the targeted user bubble without adding a turn', () => {
+    const runEvents = replayRunEvents([
+      createRunEvent('run', { type: 'run-started', mode: 'create' }, { eventId: 'start', at: 1 }),
+      createRunEvent('run', { type: 'intent-recorded', intent: 'Make it blue' }, { eventId: 'intent', at: 2 }),
+      createRunEvent('run', { type: 'message-revised', targetEventId: 'intent', message: 'Make it green' }, { eventId: 'revision', at: 3 }),
+    ])
+    const model = buildAgentViewModel({ brief: 'Make it blue', workflowPhase: 'idle', stages: [], outcome: null, working: false, elapsedSeconds: 0, runError: null, runEvents })
+    expect(model.feed.filter((item) => item.type === 'message')).toEqual([
+      expect.objectContaining({ id: 'intent', role: 'user', detail: 'Make it green' }),
+    ])
+  })
+  it('reconciles a matching receipt so the stale approval is no longer actionable', () => {
     const runEvents = replayRunEvents([
       { eventId: 'start-paid', runId: 'paid', at: 1, type: 'run-started', mode: 'create' },
       { eventId: 'approval-paid', runId: 'paid', at: 2, type: 'tool-approval-requested', toolCallId: 'image-1', requestId: 'request-1', tool: 'image.generate', label: 'Generate hero', model: { providerId: 'openai', model: 'gpt-image-1' }, estimatedCost: { currency: 'USD', amount: 0.08, credits: 8 }, budgetCeiling: { currency: 'USD', amount: 0.2, credits: 20 }, approvalPolicy: 'explicit', reason: 'Explicit approval is required.' },
       { eventId: 'receipt-paid', runId: 'paid', at: 3, type: 'tool-receipt-recorded', toolCallId: 'image-1', receipt: { receiptId: 'receipt-1', requestId: 'request-1', capability: 'generate-image', providerId: 'openai', model: 'gpt-image-1', status: 'succeeded', charged: { currency: 'USD', amount: 0.07, credits: 7 }, outputArtifactIds: ['hero.png'], startedAt: 2, completedAt: 3 } },
     ])
     const model = buildAgentViewModel({ brief: 'Hero', workflowPhase: 'planning', stages: [], outcome: null, working: true, elapsedSeconds: 1, runError: null, runEvents })
-    expect(model.feed[0]).toMatchObject({ type: 'tool', status: 'waiting', providerModel: 'openai/gpt-image-1', actions: ['approve', 'deny'] })
-    expect(model.feed[1]).toMatchObject({ type: 'tool', receiptId: 'receipt-1', outputRefs: ['hero.png'] })
-    expect(model.cost).toEqual({ estimated: [{ currency: 'USD', amount: 0.08, credits: 8 }], charged: [{ currency: 'USD', amount: 0.07, credits: 7 }] })
+    expect(model.feed).toEqual([expect.objectContaining({ type: 'tool', status: 'complete', providerModel: 'openai/gpt-image-1', receiptId: 'receipt-1', outputRefs: ['hero.png'] })])
+    expect(model).not.toHaveProperty('cost')
+  })
+
+  it('keeps a request-only approval actionable', () => {
+    const runEvents = replayRunEvents([
+      createRunEvent('approval', { type: 'run-started', mode: 'create' }, { eventId: 'start', at: 1 }),
+      createRunEvent('approval', {
+        type: 'tool-approval-requested', toolCallId: 'call', requestId: 'request', tool: 'generate-image', label: 'Generate design system',
+        estimatedCost: { currency: 'USD', amount: 0.1 }, budgetCeiling: { currency: 'USD', amount: 0.2 }, approvalPolicy: 'explicit', reason: 'Explicit approval is required.',
+      }, { eventId: 'approval', at: 2 }),
+    ])
+    const model = buildAgentViewModel({ brief: 'Kit', workflowPhase: 'design-system', stages: [], outcome: null, working: true, elapsedSeconds: 1, runError: null, runEvents })
+
+    expect(model.feed).toContainEqual(expect.objectContaining({ id: 'approval', requestId: 'request', status: 'waiting', actions: ['approve', 'deny'] }))
+  })
+
+  it('removes an auto-approved request once execution starts', () => {
+    const runEvents = replayRunEvents([
+      createRunEvent('auto', { type: 'run-started', mode: 'create' }, { eventId: 'start', at: 1 }),
+      createRunEvent('auto', {
+        type: 'tool-approval-requested', toolCallId: 'call', requestId: 'request', tool: 'generate-image', label: 'Generate design system',
+        estimatedCost: { currency: 'USD', amount: 0.1 }, budgetCeiling: { currency: 'USD', amount: 0.2 }, approvalPolicy: 'auto-within-budget', reason: 'Eligible for automatic approval within budget.',
+      }, { eventId: 'approval', at: 2 }),
+      createRunEvent('auto', { type: 'tool-approved', toolCallId: 'call', requestId: 'request', reason: 'Automatically approved within the configured budget.' }, { eventId: 'approved', at: 3 }),
+      createRunEvent('auto', { type: 'tool-started', toolCallId: 'call', tool: 'generate-image', label: 'Generate design system' }, { eventId: 'started', at: 4 }),
+    ])
+    const model = buildAgentViewModel({ brief: 'Kit', workflowPhase: 'design-system', stages: [], outcome: null, working: true, elapsedSeconds: 1, runError: null, runEvents })
+
+    expect(model.feed.some((item) => item.type === 'tool' && item.actions?.includes('approve'))).toBe(false)
+    expect(model.feed).toContainEqual(expect.objectContaining({ id: 'started', status: 'running' }))
+  })
+
+  it('removes manually approved and denied requests', () => {
+    const base = (runId: string, resolution: 'tool-approved' | 'tool-denied') => replayRunEvents([
+      createRunEvent(runId, { type: 'run-started', mode: 'create' }, { eventId: `${runId}:start`, at: 1 }),
+      createRunEvent(runId, {
+        type: 'tool-approval-requested', toolCallId: 'call', requestId: 'request', tool: 'generate-image', label: 'Generate design system',
+        estimatedCost: { currency: 'USD', amount: 0.1 }, budgetCeiling: { currency: 'USD', amount: 0.2 }, approvalPolicy: 'explicit', reason: 'Explicit approval is required.',
+      }, { eventId: `${runId}:approval`, at: 2 }),
+      createRunEvent(runId, { type: resolution, toolCallId: 'call', requestId: 'request', reason: resolution === 'tool-approved' ? 'Approved by user.' : 'Denied by user.' }, { eventId: `${runId}:resolution`, at: 3 }),
+    ])
+    for (const runEvents of [base('approved', 'tool-approved'), base('denied', 'tool-denied')]) {
+      const model = buildAgentViewModel({ brief: 'Kit', workflowPhase: 'design-system', stages: [], outcome: null, working: false, elapsedSeconds: 0, runError: null, runEvents })
+      expect(model.feed.some((item) => item.type === 'tool' && item.actions?.includes('approve'))).toBe(false)
+    }
+  })
+
+  it('shows only the fresh pending approval when a tool call is retried', () => {
+    const runEvents = replayRunEvents([
+      createRunEvent('retry', { type: 'run-started', mode: 'create' }, { eventId: 'start', at: 1 }),
+      createRunEvent('retry', {
+        type: 'tool-approval-requested', toolCallId: 'call', requestId: 'old', tool: 'generate-image', label: 'Generate design system',
+        estimatedCost: { currency: 'USD', amount: 0.1 }, budgetCeiling: { currency: 'USD', amount: 0.2 }, approvalPolicy: 'explicit', reason: 'Explicit approval is required.',
+      }, { eventId: 'old-approval', at: 2 }),
+      createRunEvent('retry', { type: 'tool-denied', toolCallId: 'call', requestId: 'old', reason: 'Denied by user.' }, { eventId: 'old-denied', at: 3 }),
+      createRunEvent('retry', { type: 'tool-retry-linked', toolCallId: 'call', previousRequestId: 'old', requestId: 'fresh' }, { eventId: 'retry-linked', at: 4 }),
+      createRunEvent('retry', {
+        type: 'tool-approval-requested', toolCallId: 'call', requestId: 'fresh', tool: 'generate-image', label: 'Generate design system',
+        estimatedCost: { currency: 'USD', amount: 0.1 }, budgetCeiling: { currency: 'USD', amount: 0.2 }, approvalPolicy: 'explicit', reason: 'Explicit approval is required.',
+      }, { eventId: 'fresh-approval', at: 5 }),
+    ])
+    const model = buildAgentViewModel({ brief: 'Kit', workflowPhase: 'design-system', stages: [], outcome: null, working: true, elapsedSeconds: 1, runError: null, runEvents })
+    const approvals = model.feed.filter((item) => item.type === 'tool' && item.actions?.includes('approve'))
+
+    expect(approvals).toEqual([expect.objectContaining({ id: 'fresh-approval', requestId: 'fresh' })])
+  })
+
+  it('uses a later legacy terminal event to close an unresolved approval', () => {
+    for (const terminal of ['tool-succeeded', 'tool-failed', 'tool-cancelled'] as const) {
+      const terminalEvent = terminal === 'tool-succeeded'
+        ? { type: terminal, toolCallId: 'call', tool: 'generate-image', label: 'Generate design system', outputRefs: [] } as const
+        : { type: terminal, toolCallId: 'call', tool: 'generate-image', label: 'Generate design system', detail: 'Legacy terminal state.' } as const
+      const runEvents = replayRunEvents([
+        createRunEvent(terminal, { type: 'run-started', mode: 'create' }, { eventId: `${terminal}:start`, at: 1 }),
+        createRunEvent(terminal, {
+          type: 'tool-approval-requested', toolCallId: 'call', requestId: 'request', tool: 'generate-image', label: 'Generate design system',
+          estimatedCost: { currency: 'USD', amount: 0.1 }, budgetCeiling: { currency: 'USD', amount: 0.2 }, approvalPolicy: 'explicit', reason: 'Explicit approval is required.',
+        }, { eventId: `${terminal}:approval`, at: 2 }),
+        createRunEvent(terminal, terminalEvent, { eventId: `${terminal}:terminal`, at: 3 }),
+      ])
+      const model = buildAgentViewModel({ brief: 'Kit', workflowPhase: 'design-system', stages: [], outcome: null, working: false, elapsedSeconds: 0, runError: null, runEvents })
+      expect(model.feed.some((item) => item.type === 'tool' && item.actions?.includes('approve'))).toBe(false)
+    }
   })
   it('projects a typed, factual run feed without fabricated thinking or events', () => {
     const model = buildAgentViewModel({
@@ -79,13 +171,11 @@ describe('buildAgentViewModel', () => {
       intent: 'Create a reusable mobile checkout prototype',
     })
     expect(model.feed.map((item) => [item.type, item.title])).toEqual([
-      ['stage', 'Plan completed'],
-      ['stage', 'Creating Design system'],
+      ['message', 'Agent'],
       ['material', 'Checkout design system'],
       ['material', 'Cart page'],
     ])
     expect(model.feed.map((item) => item.provenance)).toEqual([
-      'runtime',
       'runtime',
       'agent',
       'agent',
@@ -107,7 +197,7 @@ describe('buildAgentViewModel', () => {
 
     expect(model.summary.status).toBe('draft')
     expect(model.feed).toContainEqual(expect.objectContaining({
-      id: 'runtime:preparing',
+      id: 'runtime:activity:idle',
       type: 'message',
       role: 'agent',
       status: 'pending',
@@ -140,6 +230,26 @@ describe('buildAgentViewModel', () => {
     })])
   })
 
+  it('keeps internal design synthesis represented as activity instead of conversation text', () => {
+    const model = buildAgentViewModel({
+      brief: 'Create a checkout',
+      workflowPhase: 'design-system',
+      stages,
+      outcome: null,
+      working: true,
+      elapsedSeconds: 2,
+      runError: null,
+    })
+
+    expect(model.feed).toEqual([expect.objectContaining({
+      id: 'runtime:activity:design',
+      type: 'message',
+      activity: expect.objectContaining({ label: 'Creating Design system' }),
+      detail: 'Create the visual system.',
+    })])
+    expect(model.feed.some((item) => item.id.startsWith('runtime:stream:'))).toBe(false)
+  })
+
   it('prefers replayed durable events over inferred stage activity', () => {
     const model = buildAgentViewModel({
       brief: 'Checkout',
@@ -168,8 +278,6 @@ describe('buildAgentViewModel', () => {
     expect(model.feed.map((item) => item.title)).toEqual([
       'You',
       'Generate checkout page',
-      'Plan completed',
-      'Creating Design system',
       'Checkout design system',
       'Cart page',
     ])
@@ -317,8 +425,8 @@ describe('buildAgentViewModel', () => {
     })
 
     expect(model.summary).toMatchObject({ status: 'ready', title: 'Materials ready' })
-    expect(model.costNotice).toBe('自动执行付费模型，费用以提供商为准')
-    expect(model.costNotice).not.toMatch(/[¥$]\s*\d|\d+\.\d{2}/)
+    expect(model).not.toHaveProperty('costNotice')
+    expect(model).not.toHaveProperty('cost')
   })
 
   it('returns an honest draft model when no run facts exist', () => {

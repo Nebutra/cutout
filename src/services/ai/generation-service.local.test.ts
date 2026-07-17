@@ -166,6 +166,36 @@ describe('GenerationService.generateObject', () => {
     }
     expect(generateTextMock).toHaveBeenCalledTimes(1)
   })
+
+  it('rewrites transport-level failures with the gateway host and a BYOK hint', async () => {
+    generateTextMock.mockRejectedValueOnce(
+      new Error(
+        'request failed: error sending request for url (https://aigw.mox.ktvsky.com/v1/images/generations)',
+      ),
+    )
+
+    const generation = createLocalGenerationService(
+      providersWith([cfg()]),
+      prompts,
+    )
+
+    const result = await generation.generateObject(
+      {
+        providerId: 'p1',
+        promptRef: { id: 'test-json' },
+        input: [{ type: 'text', text: 'brief' }],
+      },
+      z.object({ name: z.string() }),
+    )
+
+    expect(result.ok).toBe(false)
+    if (!result.ok) {
+      expect(result.error).toContain('Could not reach https://aigw.mox.ktvsky.com')
+      expect(result.error).toContain('Check your BYOK provider base URL and network connectivity')
+      expect(result.error.length).toBeLessThanOrEqual(500)
+    }
+    expect(generateTextMock).toHaveBeenCalledTimes(1)
+  })
 })
 
 describe('GenerationService.generateImages', () => {

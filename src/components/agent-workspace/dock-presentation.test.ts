@@ -12,7 +12,6 @@ const draftModel: AgentWorkspaceViewModel = {
   },
   feed: [],
   checklist: [],
-  costNotice: '自动执行付费模型，费用以提供商为准',
 }
 
 describe('deriveDockPresentation', () => {
@@ -45,7 +44,7 @@ describe('deriveDockPresentation', () => {
     expect(presentation.showOverview).toBe(false)
   })
 
-  it('classifies a running agent as active and shows factual run context', () => {
+  it('classifies a running agent as active without reserving a separate status bar', () => {
     const presentation = deriveDockPresentation({
       ...draftModel,
       summary: { ...draftModel.summary, status: 'running' },
@@ -61,7 +60,7 @@ describe('deriveDockPresentation', () => {
 
     expect(presentation).toMatchObject({
       mode: 'active',
-      showOverview: true,
+      showOverview: false,
       showFeed: true,
       showControls: true,
     })
@@ -122,12 +121,12 @@ describe('deriveDockPresentation', () => {
     })
   })
 
-  it('keeps overview and activity context around a human-loop intervention', () => {
+  it('keeps a human-loop intervention without a duplicate run overview', () => {
     const presentation = deriveDockPresentation(draftModel, { hasIntervention: true })
 
     expect(presentation).toEqual({
       mode: 'active',
-      showOverview: true,
+      showOverview: false,
       showFeed: true,
       showChecklist: false,
       showIntervention: true,

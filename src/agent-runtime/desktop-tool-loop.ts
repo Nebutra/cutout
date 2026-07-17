@@ -239,6 +239,7 @@ export function createDesktopToolLoop(
           reason: plan.executable
             ? "Eligible for automatic approval within budget."
             : (plan.reason ?? "Explicit approval is required."),
+          pendingApproval: !(plan.executable && Boolean(capability)),
         },
         {
           eventId: `event:${input.requestId}:tool-approval-requested`,

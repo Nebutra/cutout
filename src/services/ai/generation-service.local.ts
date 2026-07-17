@@ -183,10 +183,37 @@ function apiErrorText(error: unknown): string | null {
   return null
 }
 
+const TRANSPORT_ERROR_PATTERNS = [
+  /error sending request/i,
+  /sending request for url/i,
+  /failed to fetch/i,
+  /fetch failed/i,
+  /network\s?error/i,
+  /connection (?:refused|reset|closed)/i,
+  /dns error/i,
+]
+const TRANSPORT_HINT =
+  'Check your BYOK provider base URL and network connectivity in AI settings.'
+
+function transportErrorText(message: string): string | null {
+  if (!TRANSPORT_ERROR_PATTERNS.some((pattern) => pattern.test(message))) return null
+  const urlMatch = message.match(/https?:\/\/[^\s()<>"']+/)
+  let target = 'the provider gateway'
+  if (urlMatch) {
+    try {
+      target = new URL(urlMatch[0]).origin
+    } catch {
+      target = urlMatch[0]
+    }
+  }
+  return `Could not reach ${target}. ${TRANSPORT_HINT}`.slice(0, 500)
+}
+
 function errorText(error: unknown): string {
   const apiError = apiErrorText(error)
   if (apiError) return apiError
-  return error instanceof Error ? error.message : String(error)
+  const message = error instanceof Error ? error.message : String(error)
+  return transportErrorText(message) ?? message
 }
 
 function dataUrlParts(value: string): { mediaType: string; base64: string } | null {

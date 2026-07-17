@@ -19,6 +19,7 @@ const materialEvidenceSchema = z.object({
   label: z.string(),
   source: z.enum(['agent', 'algorithm', 'user']),
   evidenceKey: z.string().optional(),
+  revision: z.string().optional(),
 }).strict()
 const missingRequirementSchema = z.object({
   kind: z.enum(['design-system', 'prototype-page', 'cutout-slice', 'design-markdown']),
@@ -30,6 +31,7 @@ export const agentRunEventSchema = z.discriminatedUnion('type', [
   runEventBaseSchema.extend({ type: z.literal('run-started'), mode: z.enum(['create', 'repair']) }).strict(),
   runEventBaseSchema.extend({ type: z.literal('intent-recorded'), intent: eventText }).strict(),
   runEventBaseSchema.extend({ type: z.literal('steer-recorded'), instruction: eventText }).strict(),
+  runEventBaseSchema.extend({ type: z.literal('message-revised'), targetEventId: eventText, message: eventText }).strict(),
   runEventBaseSchema.extend({ type: z.literal('plan-recorded'), planId: eventText, summary: eventText, stepIds: z.array(eventText) }).strict(),
   runEventBaseSchema.extend({ type: z.enum(['step-started', 'step-succeeded']), stepId: eventText, label: eventText, detail: eventText.optional() }).strict(),
   runEventBaseSchema.extend({ type: z.enum(['step-failed', 'step-cancelled']), stepId: eventText, label: eventText, detail: eventText }).strict(),
@@ -46,6 +48,8 @@ export const agentRunEventSchema = z.discriminatedUnion('type', [
     budgetCeiling: moneyEstimateSchema,
     approvalPolicy: z.enum(['explicit', 'auto-within-budget']),
     reason: eventText,
+    /** True only when a human must approve before the tool can run. Optional so previously persisted events still parse. */
+    pendingApproval: z.boolean().optional(),
   }).strict(),
   runEventBaseSchema.extend({ type: z.enum(['tool-approved', 'tool-denied']), toolCallId: eventText, requestId: eventText, reason: eventText }).strict(),
   runEventBaseSchema.extend({ type: z.literal('tool-retry-linked'), toolCallId: eventText, previousRequestId: eventText, requestId: eventText }).strict(),
@@ -100,6 +104,11 @@ export type AgentRunEvent =
       readonly instruction: string
     })
   | (RunEventBase & {
+      readonly type: 'message-revised'
+      readonly targetEventId: string
+      readonly message: string
+    })
+  | (RunEventBase & {
       readonly type: 'plan-recorded'
       readonly planId: string
       readonly summary: string
@@ -137,6 +146,7 @@ export type AgentRunEvent =
       readonly budgetCeiling: MoneyEstimate
       readonly approvalPolicy: 'explicit' | 'auto-within-budget'
       readonly reason: string
+      readonly pendingApproval?: boolean
     })
   | (RunEventBase & {
       readonly type: 'tool-approved' | 'tool-denied'
@@ -307,6 +317,29 @@ export function replayRunEvents(
   return events.reduce(appendRunEvent, createRunEventStore())
 }
 
+/** A renderer restart cannot resume in-memory provider calls. Close any
+ * persisted running lifecycle so historical timers do not keep advancing. */
+export function recoverInterruptedRunEvents(
+  store: Pick<AgentRunEventStore, 'events'>,
+  at = Date.now(),
+): AgentRunEventStore {
+  const replayed = replayRunEvents(store.events)
+  const run = replayed.activeRun
+  if (!run || run.status !== 'running') return replayed
+  const recoveredAt = Math.max(at, replayed.events.at(-1)?.at ?? 0)
+  return appendRunEvent(
+    replayed,
+    createRunEvent(
+      run.runId,
+      { type: 'run-cancelled', reason: 'Interrupted when the app closed.' },
+      {
+        eventId: `recovered-interruption:${run.runId}`.slice(0, 160),
+        at: recoveredAt,
+      },
+    ),
+  )
+}
+
 /**
  * Pure append/replay reducer. It never invokes tools or reads external state.
  * Event payloads intentionally expose observable facts only, never hidden
@@ -427,6 +460,7 @@ function reduceActiveRun(
     case 'intent-recorded':
       return { ...run, intent: event.intent }
     case 'steer-recorded':
+    case 'message-revised':
       return run
     case 'plan-recorded':
       return {
@@ -558,10 +592,15 @@ function reduceActiveRun(
       }
     }
     case 'material-recorded':
+      // A repair emits the same logical material id with fresh evidence. Keep
+      // the projection aligned with the newest persisted workspace artifact
+      // instead of retaining the first version seen in the run.
       return {
         ...run,
         materials: run.materials.some((item) => item.id === event.material.id)
-          ? run.materials
+          ? run.materials.map((item) =>
+              item.id === event.material.id ? event.material : item,
+            )
           : [...run.materials, event.material],
       }
     case 'capability-fallback':

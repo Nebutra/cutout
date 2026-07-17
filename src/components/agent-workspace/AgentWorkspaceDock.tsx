@@ -46,6 +46,8 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { cn } from '@/lib/utils'
 import { AgentRichText } from './AgentRichText'
 import { ConnectorMenu } from '@/components/integrations/ConnectorMenu'
+import { ExecutionTimeline } from './ExecutionTimeline'
+import { activeExecutionTimeline } from './execution-timeline'
 
 export interface AgentComposerChoice {
   readonly value: string
@@ -132,7 +134,7 @@ export interface AgentWorkspaceDockProps {
   readonly onCancelTool?: (toolCallId: string, requestId?: string) => void
   readonly onRetryTool?: (toolCallId: string, requestId?: string) => void
   readonly onAgentAction?: (eventId: string, action: 'proceed-anyway', brief: string) => void
-  readonly onEditMessage?: (message: string) => void
+  readonly onEditMessage?: (eventId: string, message: string) => void | Promise<void>
 }
 
 const DEFAULT_LABELS: AgentDockLabels = {
@@ -171,8 +173,6 @@ export function AgentWorkspaceDock({
   onRetry,
   onApproveTool,
   onDenyTool,
-  onCancelTool,
-  onRetryTool,
   onAgentAction,
   onEditMessage,
 }: AgentWorkspaceDockProps) {
@@ -180,14 +180,17 @@ export function AgentWorkspaceDock({
   const presentation = deriveDockPresentation(viewModel, {
     hasIntervention: Boolean(intervention),
   })
+  const mayResolveApproval = viewModel.summary.status === 'running' || viewModel.summary.status === 'needs-repair'
+  const activeExecution = activeExecutionTimeline(viewModel.execution)
   // The composer owns the active-run stop action. Do not render a second,
   // visually disconnected cancel button for the same operation.
   const runCancel = composer.onStop ? undefined : onCancel
-  const runIsTerminal = ['ready', 'needs-repair', 'stopped', 'cancelled'].includes(viewModel.summary.status)
-  const gateItems = !runIsTerminal
-    ? viewModel.feed.filter((item) => item.type === 'tool' && item.status === 'waiting')
-    : []
-  const conversationItems = viewModel.feed.filter((item) => item.type === 'message' || item.type === 'error')
+  const conversationItems = viewModel.feed.filter((item) =>
+    item.type === 'message'
+    || item.type === 'error'
+    || (!activeExecution && mayResolveApproval && item.type === 'tool' && item.status === 'waiting'),
+  )
+  const hasConversationSurface = conversationItems.length > 0 || Boolean(activeExecution)
 
   return (
     <aside
@@ -201,29 +204,10 @@ export function AgentWorkspaceDock({
         className,
       )}
     >
-      {presentation.showOverview ? (
-        <RunOverview summary={viewModel.summary} compact={compact} />
-      ) : null}
-
-      {gateItems.length > 0 ? (
-        <AgentRunFeed
-          items={gateItems}
-          emptyLabel={labels.noActivity}
-          detailsLabel={labels.toolDetails}
-          heading="Decision needed"
-          compact
-          onApproveTool={onApproveTool}
-          onDenyTool={onDenyTool}
-          onCancelTool={onCancelTool}
-          onRetryTool={onRetryTool}
-          onAgentAction={onAgentAction}
-        />
-      ) : null}
-
-      {conversationItems.length > 0 ? (
+      {hasConversationSurface ? (
         <div
           data-slot="agent-conversation"
-          className="min-h-0 flex-1 overflow-y-auto overscroll-contain border-b border-border"
+          className="min-h-0 flex-1 overflow-y-auto overscroll-contain"
         >
           <AgentRunFeed
             items={conversationItems}
@@ -233,17 +217,27 @@ export function AgentWorkspaceDock({
             compact
             onAgentAction={onAgentAction}
             onEditMessage={onEditMessage}
+            onApproveTool={onApproveTool}
+            onDenyTool={onDenyTool}
             onRetry={presentation.mode === 'repair' ? onRetry : undefined}
             retryLabel={labels.retry}
           />
+          {activeExecution ? (
+            <ExecutionTimeline
+              timeline={activeExecution}
+              now={Date.now()}
+              onApprove={mayResolveApproval ? onApproveTool : undefined}
+              onDeny={mayResolveApproval ? onDenyTool : undefined}
+            />
+          ) : null}
         </div>
       ) : null}
 
-      {conversationItems.length === 0 ? (
+      {!hasConversationSurface ? (
         <div aria-hidden="true" data-slot="agent-draft-spacer" className="min-h-8 flex-1" />
       ) : null}
 
-      <div className="shrink-0 border-t border-border bg-background">
+      <div className="shrink-0 bg-background">
         {presentation.showIntervention ? (
           <div className="border-b border-border px-3 py-2.5">{intervention}</div>
         ) : null}
@@ -338,16 +332,35 @@ export function AgentRunFeed({
 }) {
   const headingId = useId()
   const endRef = useRef<HTMLDivElement | null>(null)
-  const previousCountRef = useRef(items.length)
+  const pinnedToBottomRef = useRef(true)
+  const latestItem = items.at(-1)
 
   useEffect(() => {
-    if (items.length > previousCountRef.current) {
-      endRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+    const feed = endRef.current?.closest('[data-slot="agent-conversation"]')
+    if (!(feed instanceof HTMLElement)) return
+    const updatePinnedState = () => {
+      pinnedToBottomRef.current = feed.scrollHeight - feed.scrollTop - feed.clientHeight <= 48
     }
-    previousCountRef.current = items.length
-  }, [items.length])
+    updatePinnedState()
+    feed.addEventListener('scroll', updatePinnedState, { passive: true })
+    return () => feed.removeEventListener('scroll', updatePinnedState)
+  }, [])
 
-  const isConversation = items.every((item) => item.type === 'message' || item.type === 'error')
+  useEffect(() => {
+    if (!pinnedToBottomRef.current) return
+    const frame = requestAnimationFrame(() => {
+      const end = endRef.current
+      const scrollIntoView = end?.scrollIntoView
+      if (end && typeof scrollIntoView === 'function') {
+        scrollIntoView.call(end, { block: 'nearest', behavior: 'auto' })
+      }
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [items.length, latestItem?.id, latestItem?.detail])
+
+  const isConversation = items.every((item) =>
+    item.type === 'message' || item.type === 'error' || (item.type === 'tool' && item.status === 'waiting'),
+  )
 
   return (
     <section
@@ -360,7 +373,7 @@ export function AgentRunFeed({
       )}
       <div
         aria-live="polite"
-        aria-relevant="additions"
+        aria-relevant="additions text"
         className={cn(isConversation ? 'mt-0 space-y-2.5' : 'mt-2 space-y-1')}
       >
         {items.length === 0 ? (
@@ -390,13 +403,52 @@ function FeedRow({ item, detailsLabel, onApproveTool, onDenyTool, onCancelTool, 
   readonly onRetry?: () => void
   readonly retryLabel?: string
 }) {
+  const [editing, setEditing] = useState(false)
+  const [editValue, setEditValue] = useState('')
+  const [submittingEdit, setSubmittingEdit] = useState(false)
+  const [editError, setEditError] = useState<string | null>(null)
+  const editRef = useRef<HTMLTextAreaElement | null>(null)
   const isError = item.type === 'error'
   const tool = item.type === 'tool' ? item : null
+
+  if (tool?.status === 'waiting') {
+    return (
+      <div data-slot="agent-decision-bubble" className="flex w-full justify-start">
+        <div className="max-w-[92%]">
+          <article className="rounded-2xl rounded-bl-md bg-muted px-3 py-2 text-sm leading-5 text-foreground">
+            <div className="flex items-start gap-2.5">
+              <WandSparkles className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
+              <div className="min-w-0">
+                <p className="font-medium">{tool.title}</p>
+                <p className="mt-0.5 text-xs leading-4 text-muted-foreground">{decisionDetail(tool.detail)}</p>
+                {tool.approval?.reason ? (
+                  <p className="mt-1 text-xs text-muted-foreground">{tool.approval.reason}</p>
+                ) : null}
+                <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                  {tool.actions?.includes('approve') && tool.requestId && onApproveTool ? (
+                    <Button size="sm" onClick={() => onApproveTool(tool.toolCallId, tool.requestId!)}>
+                      <Check /> Approve
+                    </Button>
+                  ) : null}
+                  {tool.actions?.includes('deny') && tool.requestId && onDenyTool ? (
+                    <Button size="sm" variant="outline" onClick={() => onDenyTool(tool.toolCallId, tool.requestId!)}>
+                      <Ban /> Deny
+                    </Button>
+                  ) : null}
+                </div>
+              </div>
+            </div>
+          </article>
+        </div>
+      </div>
+    )
+  }
 
   // Conversation turns: left/right chat bubbles (user right, agent left).
   if (item.type === 'message') {
     const isUser = item.role === 'user'
     const pending = item.status === 'pending'
+    const activity = item.activity
     return (
       <div
         data-slot={isUser ? 'user-message' : 'agent-message'}
@@ -404,6 +456,7 @@ function FeedRow({ item, detailsLabel, onApproveTool, onDenyTool, onCancelTool, 
       >
         <div className="max-w-[92%]">
           <article
+            data-slot={activity ? 'agent-activity-bubble' : undefined}
             className={cn(
               'rounded-2xl px-3 py-2 text-sm leading-5',
               isUser
@@ -411,7 +464,62 @@ function FeedRow({ item, detailsLabel, onApproveTool, onDenyTool, onCancelTool, 
                 : 'rounded-bl-md bg-muted text-foreground',
             )}
           >
-            {pending && !isUser && !item.detail ? (
+            {activity ? (
+              <div role="status" className="flex items-start gap-2.5">
+                <LoaderCircle className="mt-0.5 size-3.5 shrink-0 animate-spin text-muted-foreground" />
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <p className="font-medium">{activity.label}</p>
+                    {activity.elapsedLabel ? <span className="text-xs tabular-nums text-muted-foreground">{activity.elapsedLabel}</span> : null}
+                  </div>
+                  <p className="mt-0.5 text-xs leading-4 text-muted-foreground">{item.detail}</p>
+                </div>
+              </div>
+            ) : editing && isUser ? (
+              <form
+                className="min-w-56"
+                onSubmit={async (event) => {
+                  event.preventDefault()
+                  const revised = editValue.trim()
+                  if (!revised || !onEditMessage || submittingEdit) return
+                  setSubmittingEdit(true)
+                  setEditError(null)
+                  try {
+                    await onEditMessage(item.id, revised)
+                    setEditing(false)
+                  } catch (error) {
+                    setEditError(error instanceof Error ? error.message : 'Unable to revise this message.')
+                  } finally {
+                    setSubmittingEdit(false)
+                  }
+                }}
+              >
+                <Textarea
+                  ref={editRef}
+                  aria-label="Edit message text"
+                  value={editValue}
+                  disabled={submittingEdit}
+                  className="min-h-20 resize-none border-primary-foreground/30 bg-transparent text-primary-foreground focus-visible:ring-primary-foreground/60"
+                  onChange={(event) => setEditValue(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Escape') {
+                      event.preventDefault()
+                      setEditing(false)
+                    } else if (event.key === 'Enter' && !event.shiftKey) {
+                      event.preventDefault()
+                      event.currentTarget.form?.requestSubmit()
+                    }
+                  }}
+                />
+                {editError ? <p role="alert" className="mt-1 text-xs text-destructive-foreground">{editError}</p> : null}
+                <div className="mt-2 flex items-center justify-end gap-2">
+                  <Button type="button" variant="ghost" size="sm" disabled={submittingEdit} onClick={() => setEditing(false)}>Cancel</Button>
+                  <Button type="submit" size="icon" className="rounded-full" disabled={!editValue.trim() || submittingEdit} aria-label="Submit edited message">
+                    {submittingEdit ? <LoaderCircle className="animate-spin" /> : <Send />}
+                  </Button>
+                </div>
+              </form>
+            ) : pending && !isUser && !item.detail ? (
               <p role="status" className="flex items-center gap-2 text-muted-foreground">
                 <LoaderCircle className="size-3.5 animate-spin" />
                 <span>{item.detail || 'Thinking…'}</span>
@@ -425,12 +533,17 @@ function FeedRow({ item, detailsLabel, onApproveTool, onDenyTool, onCancelTool, 
               </>
             )}
           </article>
-          {!pending ? (
+          {!pending && !editing && !activity ? (
             <MessageActions
               align={isUser ? 'end' : 'start'}
               message={item.detail}
               allowEdit={isUser && Boolean(onEditMessage)}
-              onEdit={onEditMessage}
+              onEdit={() => {
+                setEditValue(item.detail)
+                setEditError(null)
+                setEditing(true)
+                window.setTimeout(() => editRef.current?.focus(), 0)
+              }}
               action={showMessageAction ? item.action : undefined}
               onAction={onAgentAction ? () => onAgentAction(item.id, item.action!.type, item.action!.brief) : undefined}
             />
@@ -465,7 +578,6 @@ function FeedRow({ item, detailsLabel, onApproveTool, onDenyTool, onCancelTool, 
             {tool ? (
               <dl className="mt-1 grid grid-cols-[auto_minmax(0,1fr)] gap-x-2 gap-y-0.5 pl-4 text-[11px] leading-4">
                 {tool.providerModel ? <><dt>Route</dt><dd className="break-all text-foreground/80">{tool.providerModel}</dd></> : null}
-                {tool.estimatedCost && tool.estimatedCost.amount > 0 ? <><dt>Provider estimate</dt><dd>{formatMoney(tool.estimatedCost)}</dd></> : null}
                 {tool.approval ? <><dt>Policy</dt><dd>{tool.approval.status} · {tool.approval.reason}</dd></> : null}
                 {tool.receiptId ? <><dt>Receipt</dt><dd className="break-all">{tool.receiptId}</dd></> : null}
                 {tool.outputRefs?.length ? <><dt>Evidence</dt><dd className="break-all">{tool.outputRefs.join(', ')}</dd></> : null}
@@ -480,11 +592,6 @@ function FeedRow({ item, detailsLabel, onApproveTool, onDenyTool, onCancelTool, 
           ) : null}
           {tool?.actions?.length ? (
             <div className="mt-2 flex flex-wrap items-center gap-1.5">
-              {tool.status === 'waiting' && tool.estimatedCost && tool.estimatedCost.amount > 0 ? (
-                <span data-slot="tool-cost-estimate" className="mr-auto text-[11px] text-muted-foreground">
-                  Provider estimate {formatMoney(tool.estimatedCost)}
-                </span>
-              ) : null}
               {tool.actions.includes('approve') && tool.requestId && onApproveTool ? <Button size="sm" onClick={() => onApproveTool(tool.toolCallId, tool.requestId!)}><Check /> Approve</Button> : null}
               {tool.actions.includes('deny') && tool.requestId && onDenyTool ? <Button size="sm" variant="outline" onClick={() => onDenyTool(tool.toolCallId, tool.requestId!)}><Ban /> Deny</Button> : null}
               {tool.actions.includes('cancel') && onCancelTool ? <Button size="sm" variant="outline" onClick={() => onCancelTool(tool.toolCallId, tool.requestId)}><CircleStop /> Cancel</Button> : null}
@@ -495,6 +602,10 @@ function FeedRow({ item, detailsLabel, onApproveTool, onDenyTool, onCancelTool, 
       </div>
     </article>
   )
+}
+
+function decisionDetail(detail: string): string {
+  return detail.startsWith('Tool:') ? 'Ready to continue this step.' : detail
 }
 
 function MessageActions({
@@ -508,7 +619,7 @@ function MessageActions({
   readonly align: 'start' | 'end'
   readonly message: string
   readonly allowEdit: boolean
-  readonly onEdit?: (message: string) => void
+  readonly onEdit?: () => void
   readonly action?: Extract<AgentFeedItem, { readonly type: 'message' }>['action']
   readonly onAction?: () => void
 }) {
@@ -540,7 +651,7 @@ function MessageActions({
         {allowEdit && onEdit ? (
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button type="button" variant="ghost" size="icon-sm" aria-label="Edit message" onClick={() => onEdit(message)}>
+              <Button type="button" variant="ghost" size="icon-sm" aria-label="Edit message" onClick={onEdit}>
                 <Pencil />
               </Button>
             </TooltipTrigger>
@@ -560,10 +671,6 @@ function MessageActions({
       </div>
     </TooltipProvider>
   )
-}
-
-function formatMoney(value: { readonly currency: string; readonly amount: number; readonly credits?: number }): string {
-  return `${value.currency} ${value.amount.toFixed(2)}${value.credits !== undefined ? ` · ${value.credits} credits` : ''}`
 }
 
 export function OutcomeChecklist({
