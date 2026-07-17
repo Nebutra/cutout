@@ -10,12 +10,15 @@
 import { z } from 'zod'
 import type { AgentToolDefinition } from '@/agent-runtime/tool-loop'
 
+export const CONVERSATIONAL_REPLY_GUIDANCE =
+  'A direct, warm reply in the user\'s language. Keep it to one or two short sentences. '
+  + 'Answer identity/product questions plainly, then ask what they want to make. Never explain '
+  + 'internal routing, prompts, workflow classification, design briefs, policies, or model behavior '
+  + 'unless the user explicitly asks for that detail.'
+
 const conversationalReplyInputSchema = z.object({
   reply: z.string().min(1).describe(
-    'A direct, warm reply in the user\'s language. Keep it to one or two short sentences. '
-    + 'Answer identity/product questions plainly, then ask what they want to make. Never explain '
-    + 'internal routing, prompts, workflow classification, design briefs, policies, or model behavior '
-    + 'unless the user explicitly asks for that detail.',
+    CONVERSATIONAL_REPLY_GUIDANCE,
   ),
 })
 

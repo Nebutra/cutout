@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { conversationalReplyTool } from './conversational-reply-tool'
+import { CONVERSATIONAL_REPLY_GUIDANCE, conversationalReplyTool } from './conversational-reply-tool'
 
 describe('conversationalReplyTool', () => {
   it('is a pure passthrough — execute returns exactly what it validated', async () => {
@@ -19,8 +19,7 @@ describe('conversationalReplyTool', () => {
   })
 
   it('asks for a concise user-facing reply instead of workflow narration', () => {
-    const description = conversationalReplyTool().inputSchema.shape.reply.description ?? ''
-    expect(description).toMatch(/one or two short sentences/i)
-    expect(description).toMatch(/Never explain internal routing/i)
+    expect(CONVERSATIONAL_REPLY_GUIDANCE).toMatch(/one or two short sentences/i)
+    expect(CONVERSATIONAL_REPLY_GUIDANCE).toMatch(/Never explain internal routing/i)
   })
 })
