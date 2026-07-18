@@ -32,6 +32,29 @@ describe('cutout.control.v1 request schema', () => {
       expect(controlRequestSchema.safeParse({ ...request(), operation }).success).toBe(true)
     }
   })
+
+  it('accepts a bounded audit intent with a larger paid-tool execution prompt', () => {
+    const prompt = 'render context '.repeat(2_000)
+    const parsed = controlRequestSchema.parse(request({
+      operation: {
+        type: 'tool.invoke',
+        tool: {
+          capability: 'generate-image',
+          intent: 'Generate the approved prototype page.',
+          prompt,
+          inputArtifactIds: [],
+          budgetCeiling: { currency: 'USD', amount: 1 },
+          approvalPolicy: 'auto-within-budget',
+        },
+      },
+    }))
+
+    expect(parsed.operation).toMatchObject({
+      type: 'tool.invoke',
+      tool: { intent: 'Generate the approved prototype page.', prompt },
+    })
+  })
+
   it('allows only the published operation vocabulary', () => {
     const parsed = controlRequestSchema.parse(request())
     expect(parsed.operation.type).toBe('tokens.patch')

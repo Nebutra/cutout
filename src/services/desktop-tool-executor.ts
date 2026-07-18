@@ -1,6 +1,7 @@
 import type { CutoutParams } from '@/algorithm/types'
 import {
   paidToolReceiptSchema,
+  paidToolExecutionPrompt,
   planPaidTool,
   type MoneyEstimate,
   type PaidToolExecutorCapability,
@@ -205,7 +206,7 @@ async function executeCapability(
 ): Promise<{ readonly assets: readonly GeneratedAsset[]; readonly cutoutSlices?: readonly CutoutSlice[] }> {
   if (input.request.capability === 'generate-image') {
     const result = await dependencies.services.generation.generateImages({
-      providerId: capability.providerId, model: capability.model, prompt: input.request.intent, signal: input.signal,
+      providerId: capability.providerId, model: capability.model, prompt: paidToolExecutionPrompt(input.request), signal: input.signal,
     })
     if (!result.ok) throw new Error(result.error)
     return { assets: result.data }
@@ -214,7 +215,7 @@ async function executeCapability(
   if (!source) throw new Error('The paid tool requires an input image artifact.')
   if (input.request.capability === 'edit-image') {
     const result = await dependencies.services.generation.editImage({
-      providerId: capability.providerId, model: capability.model, prompt: input.request.intent,
+      providerId: capability.providerId, model: capability.model, prompt: paidToolExecutionPrompt(input.request),
       images: [source.bytes], signal: input.signal,
     })
     if (!result.ok) throw new Error(result.error)

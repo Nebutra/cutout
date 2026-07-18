@@ -6,6 +6,9 @@ import type { ProviderConfig } from '@/services/ai/provider-types'
 const CREDENTIAL_VALUE = /(?:\b(?:sk|rk|pk)-[A-Za-z0-9_-]{8,}\b|\bBearer\s+[A-Za-z0-9._~+/-]+\b)/i
 const safeText = z.string().refine((value) => !CREDENTIAL_VALUE.test(value), 'Credential-shaped values are not accepted.')
 
+export const paidToolIntentMaxLength = 20_000
+export const paidToolPromptMaxLength = 200_000
+
 export const paidToolCapabilitySchema = z.enum(['generate-image', 'edit-image', 'cutout'])
 export type PaidToolCapability = z.infer<typeof paidToolCapabilitySchema>
 
@@ -20,12 +23,21 @@ export const paidToolRequestSchema = z.object({
   capability: paidToolCapabilitySchema,
   providerId: safeText.min(1).max(160).optional(),
   model: safeText.min(1).max(300).optional(),
-  intent: safeText.min(1).max(20_000),
+  intent: safeText.min(1).max(paidToolIntentMaxLength),
+  prompt: safeText.min(1).max(paidToolPromptMaxLength).optional(),
   inputArtifactIds: z.array(safeText.min(1).max(300)).max(32).default([]),
   budgetCeiling: moneyEstimateSchema,
   approvalPolicy: z.enum(['explicit', 'auto-within-budget']).default('auto-within-budget'),
 }).strict()
 export type PaidToolRequest = z.infer<typeof paidToolRequestSchema>
+
+/** The bounded intent is for approval and audit. Only this projection crosses
+ * into provider execution, preserving legacy requests without a prompt. */
+export function paidToolExecutionPrompt(
+  request: Pick<PaidToolRequest, 'intent' | 'prompt'>,
+): string {
+  return request.prompt ?? request.intent
+}
 
 /** Host-owned declaration. It contains routing metadata, never credentials. */
 export const paidToolExecutorCapabilitySchema = z.object({
@@ -139,6 +151,7 @@ export function desktopPaidToolCapabilities(
 export function composerRouteToPaidToolRequest(input: {
   readonly capability: PaidToolCapability
   readonly intent: string
+  readonly prompt?: string
   readonly image: ModelAssignment
   readonly inputArtifactIds?: readonly string[]
   readonly budgetCeiling: MoneyEstimate
@@ -149,6 +162,7 @@ export function composerRouteToPaidToolRequest(input: {
     providerId: input.image.providerId,
     model: input.image.model,
     intent: input.intent,
+    ...(input.prompt !== undefined ? { prompt: input.prompt } : {}),
     inputArtifactIds: input.inputArtifactIds ?? [],
     budgetCeiling: input.budgetCeiling,
     approvalPolicy: input.approvalPolicy ?? 'auto-within-budget',

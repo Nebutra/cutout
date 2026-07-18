@@ -2423,7 +2423,8 @@ export function IntentWorkspace({
       toolCallId: input.toolCallId,
       label: input.label,
       capability: input.capability,
-      intent: input.prompt,
+      intent: input.label,
+      prompt: input.prompt,
       image: input.image,
       inputs: input.references.map((bytes, index) => ({
         id: `${input.toolCallId}:input:${index}`,

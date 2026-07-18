@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { composerRouteToPaidToolRequest, desktopPaidToolCapabilities, paidToolReceiptSchema, paidToolRequestSchema, planPaidTool } from './paid-tool-contract'
+import { composerRouteToPaidToolRequest, desktopPaidToolCapabilities, paidToolExecutionPrompt, paidToolPromptMaxLength, paidToolReceiptSchema, paidToolRequestSchema, planPaidTool } from './paid-tool-contract'
 
 const request = paidToolRequestSchema.parse({
   capability: 'generate-image', intent: 'Create the approved hero visual', inputArtifactIds: [],
@@ -33,8 +33,20 @@ describe('paid tool planning', () => {
 })
 
 describe('paid tool boundaries', () => {
+  it('keeps audit intent bounded while carrying a larger execution prompt', () => {
+    const prompt = 'visual context '.repeat(2_000)
+    expect(prompt.length).toBeGreaterThan(20_000)
+
+    const parsed = paidToolRequestSchema.parse({ ...request, prompt })
+    expect(parsed.intent).toBe('Create the approved hero visual')
+    expect(paidToolExecutionPrompt(parsed)).toBe(prompt)
+    expect(paidToolExecutionPrompt(request)).toBe(request.intent)
+    expect(() => paidToolRequestSchema.parse({ ...request, prompt: 'x'.repeat(paidToolPromptMaxLength + 1) })).toThrow()
+  })
+
   it('rejects credentials in requests and receipts', () => {
     expect(() => paidToolRequestSchema.parse({ ...request, intent: 'use Bearer secret-token' })).toThrow('Credential-shaped')
+    expect(() => paidToolRequestSchema.parse({ ...request, prompt: 'use Bearer secret-token' })).toThrow('Credential-shaped')
     expect(() => paidToolReceiptSchema.parse({
       receiptId: 'receipt-1', requestId: 'request-1', capability: 'generate-image', providerId: 'provider-1',
       model: 'sk-secret-model-value', status: 'succeeded', charged: { currency: 'USD', amount: 0.1 },
@@ -54,13 +66,17 @@ describe('paid tool boundaries', () => {
   })
 
   it('maps the locked composer image route into the shared request contract', () => {
-    expect(composerRouteToPaidToolRequest({
+    const prompt = 'Full generated repair context. '.repeat(1_000)
+    expect(prompt.length).toBeGreaterThan(20_000)
+    const mapped = composerRouteToPaidToolRequest({
       capability: 'edit-image', intent: 'Repair the selected hero material',
+      prompt,
       image: { providerId: 'provider-1', model: 'image-model' }, inputArtifactIds: ['material:hero'],
       budgetCeiling: { currency: 'USD', amount: 0.2 },
-    })).toEqual({
+    })
+    expect(mapped).toEqual({
       capability: 'edit-image', providerId: 'provider-1', model: 'image-model',
-      intent: 'Repair the selected hero material', inputArtifactIds: ['material:hero'],
+      intent: 'Repair the selected hero material', prompt, inputArtifactIds: ['material:hero'],
       budgetCeiling: { currency: 'USD', amount: 0.2 }, approvalPolicy: 'auto-within-budget',
     })
   })

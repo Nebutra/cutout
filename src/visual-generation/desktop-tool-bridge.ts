@@ -1,5 +1,9 @@
 import type { DesktopToolLoop } from "@/agent-runtime/desktop-tool-loop";
-import type { MoneyEstimate, PaidToolRequest } from "@/control-protocol/paid-tool-contract";
+import {
+  paidToolRequestSchema,
+  type MoneyEstimate,
+  type PaidToolRequest,
+} from "@/control-protocol/paid-tool-contract";
 import type {
   VisualToolInvoker,
   VisualToolInvocation,
@@ -33,14 +37,15 @@ export function createDesktopVisualToolInvoker(input: {
   return {
     async invoke(invocation: VisualToolInvocation): Promise<VisualToolResult> {
       const toolCallId = `visual-tool:${invocation.taskId}:${invocation.nodeId}`;
-      const request: PaidToolRequest = {
+      const request = paidToolRequestSchema.parse({
         capability: invocation.capability,
         model: invocation.allowCompatibleFallback ? undefined : invocation.preferredModel,
-        intent: invocation.prompt,
+        intent: `${invocation.capability === "generate-image" ? "Generate" : "Edit"} visual for ${invocation.taskId} (${invocation.nodeId})`,
+        prompt: invocation.prompt,
         inputArtifactIds: [...invocation.inputArtifactIds, ...invocation.references],
         budgetCeiling: invocation.budgetCeiling,
         approvalPolicy: invocation.approvalPolicy,
-      };
+      });
       const authorization = input.authorize ? await input.authorize({ runId: invocation.runId, requestId: invocation.requestId, request }) : {};
       await input.loop.request({
         runId: invocation.runId,

@@ -20,6 +20,7 @@ export interface DesktopToolInvocation {
   readonly label: string
   readonly capability: PaidToolCapability
   readonly intent: string
+  readonly prompt?: string
   readonly image: ModelAssignment
   readonly inputs?: readonly { readonly id: string; readonly mediaType: string; readonly bytes: Uint8Array }[]
 }
@@ -92,6 +93,7 @@ export function useDesktopToolLoop(input: {
     const request = applyPaidToolPreferences(composerRouteToPaidToolRequest({
       capability: invocation.capability,
       intent: invocation.intent,
+      prompt: invocation.prompt,
       image: invocation.capability === 'cutout' ? { providerId: 'local', model: 'cutout-v1' } : invocation.image,
       inputArtifactIds: inputIds,
       budgetCeiling: preferences.budgetCeiling,

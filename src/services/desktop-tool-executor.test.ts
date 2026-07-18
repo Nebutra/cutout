@@ -9,11 +9,15 @@ const imageCapability: PaidToolExecutorCapability = {
   estimatedCost: { currency: 'USD', amount: 0.1, credits: 1 },
 }
 
-function request(capability: 'generate-image' | 'edit-image' | 'cutout' = 'generate-image') {
+function request(
+  capability: 'generate-image' | 'edit-image' | 'cutout' = 'generate-image',
+  prompt?: string,
+) {
   return paidToolRequestSchema.parse({
     capability,
     ...(capability === 'cutout' ? { providerId: 'local', model: 'cutout-v1' } : { providerId: 'provider-1', model: 'image-1' }),
     intent: 'Create the approved visual',
+    ...(prompt !== undefined ? { prompt } : {}),
     inputArtifactIds: capability === 'generate-image' ? [] : ['artifact:input'],
     budgetCeiling: { currency: 'USD', amount: 0.2, credits: 2 },
     approvalPolicy: 'auto-within-budget',
@@ -110,6 +114,20 @@ describe('desktop paid tool executor', () => {
     expect(result.events.map((event) => event.type)).toEqual(['tool-started', 'tool-succeeded', 'material-recorded'])
     expect(result.receipt).toMatchObject({ status: 'succeeded', charged: { currency: 'USD', amount: 0.1, credits: 1 }, outputArtifactIds: ['artifact:generate-image:1'] })
     expect(JSON.stringify(result)).not.toContain('secret')
+  })
+
+  it('uses the complete execution prompt for generation and editing while retaining legacy fallback', async () => {
+    const generated = harness()
+    await generated.executor.execute(execution(request('generate-image', 'Complete generated page prompt')))
+    expect(generated.generation.generateImages).toHaveBeenCalledWith(
+      expect.objectContaining({ prompt: 'Complete generated page prompt' }),
+    )
+
+    const edited = harness({ capability: { ...imageCapability, capability: 'edit-image' } })
+    await edited.executor.execute(execution(request('edit-image', 'Complete image repair prompt')))
+    expect(edited.generation.editImage).toHaveBeenCalledWith(
+      expect.objectContaining({ prompt: 'Complete image repair prompt' }),
+    )
   })
 
   it('rejects missing key, over-budget, stale revision and explicit approval before calling a provider', async () => {
