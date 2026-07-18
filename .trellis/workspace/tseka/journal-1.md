@@ -70,3 +70,36 @@ Fixed long generated prompts being rejected by the 20,000-character audit intent
 ### Next Steps
 
 - None - task complete
+
+
+## Session 3: Fix prototype recovery state
+
+**Date**: 2026-07-18
+**Task**: Fix prototype recovery state
+**Branch**: `main`
+
+### Summary
+
+Separated visual artifact recovery from DESIGN.md health, preserved raster dimensions through Design IR, added legacy header recovery and truthful minimal-repair canvas state, validated and installed the macOS app.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `f710b5f` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
