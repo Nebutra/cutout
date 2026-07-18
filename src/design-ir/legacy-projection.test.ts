@@ -70,6 +70,10 @@ describe('legacy workspace Design IR projection', () => {
       'provenance:legacy:project:acme',
     ])
     expect(document.materials.every((item) => item.revisions[0]?.content.sha256)).toBe(true)
+    expect(
+      document.materials.find((item) => item.id === 'material:design-system')
+        ?.revisions[0]?.content.pixelSize,
+    ).toEqual({ width: 100, height: 200 })
     expect(JSON.stringify(document)).not.toContain('AQID')
     expect(JSON.stringify(document)).not.toContain('BAUG')
   })
@@ -153,6 +157,10 @@ describe('legacy workspace Design IR projection', () => {
     expect(restored.ok).toBe(true)
     if (!restored.ok) return
     expect(restored.data.snapshot.prototypePlan).toEqual(source.prototypePlan)
+    expect(restored.data.snapshot.prototypeDesignSystem).toMatchObject({
+      width: 100,
+      height: 200,
+    })
     expect(restored.data.snapshot.prototypePages[0]?.page.id).toBe('home')
     expect(restored.data.snapshot.prototypePages[0]?.bytes).toEqual(
       source.prototypePages[0]?.bytes,
@@ -160,6 +168,54 @@ describe('legacy workspace Design IR projection', () => {
     expect(restored.data.snapshot.attachments[0]?.id).toBe('ref:logo')
     expect(restored.data.snapshot.outcome).toBeUndefined()
     expect(restored.data.snapshot.agentRunEvents).toBeUndefined()
+  })
+
+  it('recovers intrinsic size from old IR image bytes without pixel metadata', async () => {
+    const png = new Uint8Array(24)
+    png.set([0x89, 0x50, 0x4e, 0x47], 0)
+    new DataView(png.buffer).setUint32(16, 640, false)
+    new DataView(png.buffer).setUint32(20, 480, false)
+    const base = snapshot({ designBytes: png })
+    const source = {
+      ...base,
+      prototypeDesignSystem: base.prototypeDesignSystem
+        ? { ...base.prototypeDesignSystem, width: 0, height: 0 }
+        : null,
+    }
+    const projected = await projectWorkspaceSnapshotToDesignDocument({
+      project: project(),
+      workspace: source,
+    })
+    expect(
+      projected.materials.find((item) => item.id === 'material:design-system')
+        ?.revisions[0]?.content.pixelSize,
+    ).toEqual({ width: 640, height: 480 })
+    const document = {
+      ...projected,
+      materials: projected.materials.map((item) =>
+        item.id !== 'material:design-system'
+          ? item
+          : {
+              ...item,
+              revisions: item.revisions.map((revision) => ({
+                ...revision,
+                content: { ...revision.content, pixelSize: undefined },
+              })),
+            },
+      ),
+    }
+    const content = contentByUri(source, projected)
+
+    const restored = await designDocumentToWorkspaceSnapshot(document, {
+      resolveContent: (reference) => content.get(reference.uri) ?? null,
+    })
+
+    expect(restored.ok).toBe(true)
+    if (!restored.ok) return
+    expect(restored.data.snapshot.prototypeDesignSystem).toMatchObject({
+      width: 640,
+      height: 480,
+    })
   })
 })
 
@@ -173,7 +229,10 @@ function project() {
   }
 }
 
-function snapshot(options: { readonly pageBytes?: Uint8Array } = {}): WorkspaceSnapshot {
+function snapshot(options: {
+  readonly pageBytes?: Uint8Array
+  readonly designBytes?: Uint8Array
+} = {}): WorkspaceSnapshot {
   return {
     version: 'workspace.v1',
     workflowPhase: 'idle',
@@ -184,7 +243,7 @@ function snapshot(options: { readonly pageBytes?: Uint8Array } = {}): WorkspaceS
     prototypeDesignSystem: {
       name: 'System board',
       designMarkdown: '# Acme\nUse a compact grid.',
-      bytes: new Uint8Array([1, 2, 3]),
+      bytes: options.designBytes ?? new Uint8Array([1, 2, 3]),
       mediaType: 'image/png',
       width: 100,
       height: 200,

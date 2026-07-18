@@ -5,6 +5,7 @@ import { validateDesignDocument } from './validate'
 import { err, isOk, ok, type Result } from '@/services/types'
 import type { WorkspaceSnapshot } from '@/workspace/workspace-snapshot'
 import type { LocalProjectRecord } from '@/services/local/project-repository.local'
+import { readRasterDimensions } from '@/lib/raster-dimensions'
 
 const LEGACY_ACTOR_ID = 'cutout-legacy-workspace'
 
@@ -316,6 +317,12 @@ export async function designDocumentToWorkspaceSnapshot(
   if (designSystem && !designImage) {
     return err(`Missing or invalid content for material "${designSystem.id}".`)
   }
+  const designImageSize = designSystem && designImage
+    ? currentContent(designSystem).pixelSize ?? readRasterDimensions(designImage)
+    : null
+  if (designSystem && designImage && !designImageSize) {
+    return err(`Missing intrinsic dimensions for material "${designSystem.id}".`)
+  }
 
   const pageArtifacts = []
   for (const material of pages) {
@@ -356,8 +363,8 @@ export async function designDocumentToWorkspaceSnapshot(
           designMarkdown: markdownContent ?? '',
           bytes: designImage,
           mediaType: currentContent(designSystem).mediaType ?? 'application/octet-stream',
-          width: 0,
-          height: 0,
+          width: designImageSize?.width ?? 1,
+          height: designImageSize?.height ?? 1,
         }
       : null,
     prototypePages: pageArtifacts,
@@ -409,6 +416,7 @@ async function legacyMaterials(input: {
       uri: legacyUri(input.projectId, 'workspace/design-system/image'),
       mediaType: system.mediaType,
       bytes: system.bytes,
+      pixelSize: intrinsicSize(system.width, system.height, system.bytes),
       provenanceId: input.provenanceId,
       createdAt: input.createdAt,
     }))
@@ -438,6 +446,7 @@ async function legacyMaterials(input: {
       uri: legacyUri(input.projectId, `workspace/pages/${artifact.page.id}`),
       mediaType: artifact.mediaType,
       bytes: artifact.bytes,
+      pixelSize: intrinsicSize(artifact.width, artifact.height, artifact.bytes),
       provenanceId: input.provenanceId,
       createdAt: input.createdAt,
     }))
@@ -451,6 +460,7 @@ async function legacyMaterials(input: {
       uri: legacyUri(input.projectId, `slices/${slice.id}`),
       mediaType: slice.mediaType,
       bytes: slice.bytes,
+      pixelSize: intrinsicSize(slice.width, slice.height, slice.bytes),
       provenanceId: input.provenanceId,
       createdAt: input.createdAt,
     }))
@@ -466,6 +476,7 @@ async function material(input: {
   readonly uri: string
   readonly mediaType: string
   readonly bytes: Uint8Array
+  readonly pixelSize?: { readonly width: number; readonly height: number }
   readonly provenanceId: string
   readonly createdAt: string
 }): Promise<Material> {
@@ -474,6 +485,7 @@ async function material(input: {
     input.uri,
     input.mediaType,
     input.bytes,
+    input.pixelSize,
   )
   const revisionId = `${input.id}:revision:${content.sha256}`
   return {
@@ -496,14 +508,31 @@ async function contentReference(
   uri: string,
   mediaType: string,
   bytes: Uint8Array,
+  pixelSize?: { readonly width: number; readonly height: number },
 ): Promise<ContentReference> {
-  return { id, uri, mediaType, sha256: await sha256(bytes) }
+  return { id, uri, mediaType, sha256: await sha256(bytes), pixelSize }
 }
 
 function currentContent(material: Material): ContentReference {
   const revision = material.revisions.find((item) => item.id === material.currentRevisionId)
   if (!revision) throw new Error(`Material "${material.id}" has no current revision.`)
   return revision.content
+}
+
+function intrinsicSize(
+  width: number,
+  height: number,
+  bytes: Uint8Array,
+): { readonly width: number; readonly height: number } | undefined {
+  if (
+    Number.isInteger(width)
+    && Number.isInteger(height)
+    && width > 0
+    && height > 0
+  ) {
+    return { width, height }
+  }
+  return readRasterDimensions(bytes) ?? undefined
 }
 
 async function resolveBytes(

@@ -191,7 +191,7 @@ function CardNode({ data }: NodeProps) {
       </p>
       <div className="flex items-center justify-between gap-2 border-t border-border/40 px-2 py-1 text-[10px] text-muted-foreground">
         <span className="flex min-w-0 items-center gap-1"><GitBranch className="size-3" /><span className="truncate">{item.material.version}</span></span>
-        {taskStatus ? <span className={cn('flex items-center gap-1', taskStatus === 'failed' ? 'text-destructive' : 'text-muted-foreground')}><Circle className={cn('size-3', taskStatus === 'generating' && 'animate-pulse')} />{item.statusDetail ?? (taskStatus === 'generating' ? 'Generating' : taskStatus === 'queued' ? 'Queued' : 'Failed')}</span> : <span className="flex items-center gap-1 text-emerald-700 dark:text-emerald-400"><CheckCircle2 className="size-3" />Ready</span>}
+        {taskStatus ? <span className={cn('flex items-center gap-1', taskStatus === 'failed' ? 'text-destructive' : 'text-muted-foreground')}><Circle className={cn('size-3', taskStatus === 'generating' && 'animate-pulse')} />{item.statusDetail ?? (taskStatus === 'generating' ? 'Generating' : taskStatus === 'queued' ? 'Queued' : 'Failed')}</span> : item.healthDetail ? <span className="flex min-w-0 items-center gap-1 text-amber-600 dark:text-amber-400"><Circle className="size-3 shrink-0" /><span className="truncate">{item.healthDetail}</span></span> : <span className="flex items-center gap-1 text-emerald-700 dark:text-emerald-400"><CheckCircle2 className="size-3" />Ready</span>}
       </div>
       <Handle type="source" position={Position.Bottom} className="!size-2 !border-background !bg-border" />
     </div>

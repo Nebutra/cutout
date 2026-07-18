@@ -77,6 +77,11 @@ export const contentReferenceSchema = z.object({
   uri: z.string().min(1),
   mediaType: z.string().min(1).optional(),
   sha256: sha256Schema.optional(),
+  /** Intrinsic raster size; avoids re-decoding or manufacturing 0x0 on restore. */
+  pixelSize: z.object({
+    width: z.number().int().positive(),
+    height: z.number().int().positive(),
+  }).strict().optional(),
 }).strict()
 
 /**

@@ -14,6 +14,8 @@ export interface CanvasImageItem {
   /** A task card has no bitmap yet; a ready artifact replaces it by the same id. */
   readonly status?: 'queued' | 'generating' | 'failed'
   readonly statusDetail?: string
+  /** Non-blocking artifact health; the bitmap remains ready and selectable. */
+  readonly healthDetail?: string
 }
 
 export interface CanvasLane {

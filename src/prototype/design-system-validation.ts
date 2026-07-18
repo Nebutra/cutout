@@ -7,14 +7,8 @@ export interface DesignSystemValidationInput {
   readonly designMarkdown: string
 }
 
-export function designSystemValidationError(
-  input: DesignSystemValidationInput,
-): string | null {
-  if (!Number.isInteger(input.width) || !Number.isInteger(input.height) || input.width < 1 || input.height < 1) {
-    return 'Design system image has invalid dimensions.'
-  }
-
-  const markdown = input.designMarkdown.trim()
+export function designSystemMarkdownValidationError(designMarkdown: string): string | null {
+  const markdown = designMarkdown.trim()
   if (!markdown.startsWith('---')) {
     return 'Design system documentation is missing YAML frontmatter.'
   }
@@ -29,6 +23,14 @@ export function designSystemValidationError(
   if (!model.controls.some((control) => control.kind === 'color')) {
     return 'Design system documentation has no color tokens.'
   }
-
   return null
+}
+
+export function designSystemValidationError(
+  input: DesignSystemValidationInput,
+): string | null {
+  if (!Number.isInteger(input.width) || !Number.isInteger(input.height) || input.width < 1 || input.height < 1) {
+    return 'Design system image has invalid dimensions.'
+  }
+  return designSystemMarkdownValidationError(input.designMarkdown)
 }

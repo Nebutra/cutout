@@ -27,6 +27,8 @@ export interface MaterialEvidence {
   readonly source: 'agent' | 'algorithm' | 'user'
   /** Optional plan/run provenance. Unkeyed material cannot satisfy keyed requirements. */
   readonly evidenceKey?: string
+  /** Content revision used to distinguish a repaired material from its prior output. */
+  readonly revision?: string
 }
 
 export interface MissingRequirement {

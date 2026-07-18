@@ -59,4 +59,42 @@ describe('OutputCanvas overlays', () => {
     expect(dock?.contains(toolbar)).toBe(true)
     expect(selection?.className).toContain('border-b')
   })
+
+  it('shows documentation repair as ready-artifact health, not task status', () => {
+    const degraded = {
+      id: 'design-system',
+      label: 'Design system',
+      healthDetail: 'DESIGN.md needs repair',
+      material: {
+        id: 'design-system',
+        kind: 'design-system',
+        label: 'Design system',
+        version: 'v1',
+        provenance: { source: 'prototype-generation' },
+      },
+    } satisfies CanvasImageItem
+    host = document.createElement('div')
+    Object.defineProperty(host, 'getBoundingClientRect', {
+      value: () => ({
+        x: 0,
+        y: 0,
+        left: 0,
+        top: 0,
+        right: 800,
+        bottom: 600,
+        width: 800,
+        height: 600,
+        toJSON() {},
+      }),
+    })
+    document.body.append(host)
+    root = createRoot(host)
+
+    act(() => root?.render(
+      <OutputCanvas designSystem={degraded} pages={[]} assets={[]} />,
+    ))
+
+    expect(host.textContent).toContain('DESIGN.md needs repair')
+    expect(host.textContent).not.toContain('Queued')
+  })
 })

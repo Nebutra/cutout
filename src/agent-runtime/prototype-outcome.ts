@@ -14,8 +14,12 @@ export interface PrototypeOutcomeInput {
   readonly scope: PrototypeSuiteScope
   readonly hasDesignSystem: boolean
   readonly hasDesignMarkdown: boolean
-  readonly pages: readonly { readonly page: { readonly id: string; readonly name: string } }[]
-  readonly slices: readonly { readonly id: string; readonly name: string }[]
+  readonly designSystemRevision?: string
+  readonly pages: readonly {
+    readonly page: { readonly id: string; readonly name: string }
+    readonly revision?: string
+  }[]
+  readonly slices: readonly { readonly id: string; readonly name: string; readonly revision?: string }[]
   /** True only after this run's cutout/naming pass has settled. */
   readonly slicesReady: boolean
 }
@@ -45,6 +49,7 @@ export function projectPrototypeOutcome(
       kind: 'design-system',
       label: 'Shared design system',
       source: 'agent',
+      revision: input.designSystemRevision,
     })
   }
   if (input.hasDesignMarkdown) {
@@ -64,6 +69,7 @@ export function projectPrototypeOutcome(
       evidenceKey: scopedPageIds.has(artifact.page.id)
         ? `page:${artifact.page.id}`
         : undefined,
+      revision: artifact.revision,
     })
   }
   for (const slice of input.slicesReady ? input.slices : []) {
@@ -74,6 +80,7 @@ export function projectPrototypeOutcome(
       label: slice.name,
       source: 'algorithm',
       evidenceKey: asset ? `asset:${asset.id}` : undefined,
+      revision: slice.revision,
     })
   }
 

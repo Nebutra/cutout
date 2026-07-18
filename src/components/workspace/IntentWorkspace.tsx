@@ -113,7 +113,17 @@ import {
   type EditableDesignSection,
   type EditableDesignTable,
 } from "@/prototype/design-md";
-import { designSystemValidationError } from "@/prototype/design-system-validation";
+import {
+  designSystemMarkdownValidationError,
+} from "@/prototype/design-system-validation";
+import {
+  projectPrototypeArtifacts,
+  prototypeMediaValidationError,
+  recoverPrototypeArtifacts,
+  type PrototypeDesignSystemArtifact,
+  type PrototypeImageArtifact,
+  type PrototypePageArtifact,
+} from "@/prototype/prototype-artifact-recovery";
 import {
   renderDesignSource,
   type DesignSourceFormat,
@@ -248,20 +258,6 @@ interface AssetStage {
   readonly status: "pending" | "running" | "done";
 }
 
-interface PrototypeImageArtifact extends PersistedPrototypeImage {
-  readonly blob: Blob;
-}
-
-interface PrototypeDesignSystemArtifact
-  extends
-    PrototypeImageArtifact,
-    Omit<PersistedPrototypeDesignSystem, keyof PersistedPrototypeImage> {}
-
-interface PrototypePageArtifact
-  extends
-    PrototypeImageArtifact,
-    Omit<PersistedPrototypePage, keyof PersistedPrototypeImage> {}
-
 const CUSTOM_HUMAN_LOOP_ID = "__custom__";
 const SERIAL_REFERENCE_PAGE_LIMIT = 4;
 type DesignMarkdownAsset = ReturnType<
@@ -320,8 +316,14 @@ export function IntentWorkspace({
   const lockedRouteRef = useRef<LockedComposerRoute | null>(null);
   const personalizedGenerationRef = useRef(services.generation);
   const [runStartedAt, setRunStartedAt] = useState<number | null>(null);
+  const [initialPrototypeArtifacts] = useState(() =>
+    recoverPrototypeArtifacts({
+      designSystem: initialWorkspace?.prototypeDesignSystem ?? null,
+      pages: initialWorkspace?.prototypePages ?? [],
+    }),
+  );
   const [workflowPhase, setWorkflowPhase] = useState<WorkflowPhase>(() =>
-    recoverWorkflowPhase(initialWorkspace),
+    recoverWorkflowPhase(initialWorkspace, initialPrototypeArtifacts),
   );
   const [prototypePlan, setPrototypePlan] = useState<PrototypePlan | null>(
     () => initialWorkspace?.prototypePlan ?? null,
@@ -334,13 +336,19 @@ export function IntentWorkspace({
   );
   const [prototypePages, setPrototypePages] = useState<
     readonly PrototypePageArtifact[]
-  >(() => restorePrototypePages(initialWorkspace?.prototypePages ?? []));
+  >(() => initialPrototypeArtifacts.pages);
   const [prototypeDesignSystem, setPrototypeDesignSystem] =
-    useState<PrototypeDesignSystemArtifact | null>(() =>
-      restorePrototypeDesignSystem(
-        initialWorkspace?.prototypeDesignSystem ?? null,
-      ),
+    useState<PrototypeDesignSystemArtifact | null>(
+      () => initialPrototypeArtifacts.designSystem,
     );
+  const prototypeArtifacts = useMemo(
+    () =>
+      projectPrototypeArtifacts({
+        designSystem: prototypeDesignSystem,
+        pages: prototypePages,
+      }),
+    [prototypeDesignSystem, prototypePages],
+  );
   const [selectedPrototypePageId, setSelectedPrototypePageId] = useState<
     string | null
   >(() => initialWorkspace?.selectedPrototypePageId ?? null);
@@ -696,12 +704,27 @@ export function IntentWorkspace({
       projectPrototypeOutcome({
         plan: prototypePlan,
         scope: prototypeScope,
-        hasDesignSystem: Boolean(prototypeDesignSystem),
-        hasDesignMarkdown: Boolean(
-          prototypeDesignSystem?.designMarkdown.trim(),
-        ),
-        pages: prototypePages,
-        slices,
+        hasDesignSystem: Boolean(prototypeArtifacts.designSystem),
+        designSystemRevision: prototypeArtifacts.designSystem
+          ? prototypeImageVersion(prototypeArtifacts.designSystem)
+          : undefined,
+        hasDesignMarkdown:
+          prototypeArtifacts.hasValidDesignMarkdown ||
+          Boolean(
+            importedDesignMarkdown?.content &&
+              !designSystemMarkdownValidationError(
+                importedDesignMarkdown.content,
+              ),
+          ),
+        pages: prototypeArtifacts.pages.map((artifact) => ({
+          page: artifact.page,
+          revision: prototypeImageVersion(artifact),
+        })),
+        slices: slices.map((slice) => ({
+          id: slice.id,
+          name: slice.name,
+          revision: `${slice.blob.size}:${slice.width}x${slice.height}:${slice.box.x},${slice.box.y}`,
+        })),
         // Only a completed naming pass may turn existing slices into evidence for
         // this plan. Preserved canvas output from an older run stays visible but
         // cannot close the current outcome contract.
@@ -709,8 +732,8 @@ export function IntentWorkspace({
       }),
     [
       namingStatus,
-      prototypeDesignSystem,
-      prototypePages,
+      importedDesignMarkdown?.content,
+      prototypeArtifacts,
       prototypePlan,
       prototypeScope,
       slices,
@@ -734,7 +757,7 @@ export function IntentWorkspace({
         runId,
         { type: "material-recorded", material },
         {
-          eventId: `${runId}:material:${material.id}:${material.evidenceKey ?? ""}`,
+          eventId: `${runId}:material:${material.id}:${material.evidenceKey ?? ""}:${material.revision ?? ""}`,
         },
       );
     }
@@ -760,7 +783,7 @@ export function IntentWorkspace({
   ]);
   const repairPlan = planPrototypeRepair(
     outcome,
-    Boolean(prototypeDesignSystem),
+    Boolean(prototypeArtifacts.designSystem),
     failedRegionIds,
   );
   const agentViewModel = buildAgentViewModel({
@@ -1126,31 +1149,42 @@ export function IntentWorkspace({
 
   async function createAssets(
     mode: "create" | "repair" = "create",
-    options: { skipToolGate?: boolean; briefOverride?: string } = {},
+    options: {
+      skipToolGate?: boolean;
+      briefOverride?: string;
+      ignoreSelectedMaterial?: boolean;
+    } = {},
   ): Promise<void> {
     const baseText = (options.briefOverride ?? brief).trim();
     if (!baseText) return;
     const text = withCanvasAnnotations(baseText, canvasAnnotations);
-    const plannedImpact = buildMaterialImpactPlan(selectedMaterial, {
+    const requestedMaterial = options.ignoreSelectedMaterial
+      ? null
+      : selectedMaterial;
+    const plannedImpact = buildMaterialImpactPlan(requestedMaterial, {
       designSystemId: prototypeDesignSystem ? "design-system" : null,
       pageIds: prototypePages.map((artifact) => artifact.page.id),
       sliceIds: slices.map((slice) => slice.id),
     });
     try {
-      assertImpactPlanCurrent(plannedImpact, selectedMaterial);
+      assertImpactPlanCurrent(plannedImpact, requestedMaterial);
     } catch (error) {
       setRunError(errorMessage(error));
       return;
     }
-    const targetedRepair = selectedMaterial
+    const targetedRepair = requestedMaterial
       ? repairForMaterialImpact(plannedImpact)
       : null;
     const repair =
       targetedRepair ??
       (mode === "repair"
-        ? planPrototypeRepair(outcome, Boolean(prototypeDesignSystem), failedRegionIds)
+        ? planPrototypeRepair(
+            outcome,
+            Boolean(prototypeArtifacts.designSystem),
+            failedRegionIds,
+          )
         : null);
-    if ((mode === "repair" || selectedMaterial) && (!prototypePlan || !repair))
+    if ((mode === "repair" || requestedMaterial) && (!prototypePlan || !repair))
       return;
     const [
       { createPersonalizationService },
@@ -2443,7 +2477,7 @@ export function IntentWorkspace({
       name: "Design system",
       designMarkdown,
     }));
-    const error = designSystemValidationError(artifact);
+    const error = prototypeMediaValidationError(artifact);
     if (error) throw new Error(error);
     return artifact;
   }
@@ -2993,7 +3027,12 @@ export function IntentWorkspace({
             onPrototypePageSelect={setSelectedPrototypePageId}
             prototypeScope={prototypeScope}
             onScopeChange={setPrototypeScope}
-            onPrimaryAction={() => void createAssets()}
+            onPrimaryAction={() => {
+              setSelectedMaterial(null);
+              void createAssets(repairPlan ? "repair" : "create", {
+                ignoreSelectedMaterial: true,
+              });
+            }}
             hasSource={hasSource}
             hasSlices={hasSlices}
             working={working}
@@ -4620,28 +4659,38 @@ function OutputSurface({
   readonly creativeBranches: CreativeBoardState["branches"];
 }) {
   const [previewPageId, setPreviewPageId] = useState<string | null>(null);
+  const prototypeArtifacts = useMemo(
+    () =>
+      projectPrototypeArtifacts({
+        designSystem: prototypeDesignSystem,
+        pages: prototypePages,
+      }),
+    [prototypeDesignSystem, prototypePages],
+  );
   const previewArtifact =
-    prototypePages.find((artifact) => artifact.page.id === previewPageId) ??
+    prototypeArtifacts.pages.find(
+      (artifact) => artifact.page.id === previewPageId,
+    ) ??
     null;
   const canvasSlices = useSlices();
   const plannedPages = prototypePlan
     ? pagesForScope(prototypePlan, prototypeScope)
     : [];
   const generatedPageIds = new Set(
-    prototypePages.map((artifact) => artifact.page.id),
+    prototypeArtifacts.pages.map((artifact) => artifact.page.id),
   );
   const missingPageCount = plannedPages.filter(
     (page) => !generatedPageIds.has(page.id),
   ).length;
   const hasPrototypeArtifacts =
-    Boolean(prototypeDesignSystem) || prototypePages.length > 0;
+    Boolean(prototypeArtifacts.designSystem) || prototypeArtifacts.pages.length > 0;
   const needsContinuation =
     Boolean(prototypePlan) &&
     hasPrototypeArtifacts &&
     !hasSlices &&
     !working &&
     prototypePlan?.humanLoop.mode !== "ask";
-  const continuationDetail = !prototypeDesignSystem
+  const continuationDetail = !prototypeArtifacts.designSystem
     ? "The design system is not finished yet."
     : missingPageCount > 0
       ? `${missingPageCount} prototype page${missingPageCount === 1 ? "" : "s"} still needs to be generated.`
@@ -4649,7 +4698,7 @@ function OutputSurface({
 
   // Constrained orchestration board: once a prototype result exists, results +
   // materials are arranged on one governed canvas (design system · pages · assets).
-  if (prototypeDesignSystem || prototypePages.length > 0) {
+  if (prototypeArtifacts.designSystem || prototypeArtifacts.pages.length > 0) {
     const evidenceFor = (materialId: string) => {
       const material = designDocument?.materials.find(
         (candidate) => candidate.id === materialId,
@@ -4659,23 +4708,27 @@ function OutputSurface({
         : null;
     };
     const designSystemEvidence = evidenceFor("material:design-system");
-    const canvasDesignSystem: CanvasImageItem | null = prototypeDesignSystem
+    const canvasDesignSystem: CanvasImageItem | null = prototypeArtifacts.designSystem
       ? {
           id: "design-system",
-          label: prototypeDesignSystem.name || "Design system",
-          blob: prototypeDesignSystem.blob,
+          label: prototypeArtifacts.designSystem.name || "Design system",
+          blob: prototypeArtifacts.designSystem.blob,
           material: {
             id: "design-system",
             kind: "design-system",
-            label: prototypeDesignSystem.name || "Design system",
-            version: prototypeImageVersion(prototypeDesignSystem),
+            label: prototypeArtifacts.designSystem.name || "Design system",
+            version: prototypeImageVersion(prototypeArtifacts.designSystem),
             provenance: { source: "prototype-generation" },
           },
           evidenceMaterialId: designSystemEvidence?.materialId,
           revisionId: designSystemEvidence?.revisionId,
+          healthDetail:
+            prototypeArtifacts.documentation.status === "repair-required"
+              ? "DESIGN.md needs repair"
+              : undefined,
         }
       : null;
-    const canvasPages: CanvasImageItem[] = prototypePages.map((artifact) => {
+    const canvasPages: CanvasImageItem[] = prototypeArtifacts.pages.map((artifact) => {
       const evidence = evidenceFor(
         `material:prototype-page:${artifact.page.id}`,
       );
@@ -4722,7 +4775,12 @@ function OutputSurface({
       : working
         ? "generating" as const
         : "queued" as const;
-    const pendingDesignSystem: CanvasImageItem | null = prototypePlan && !prototypeDesignSystem
+    const missingDesignSystemStatus = working
+      ? "generating" as const
+      : prototypeArtifacts.pages.length > 0 || runError
+        ? "failed" as const
+        : "queued" as const;
+    const pendingDesignSystem: CanvasImageItem | null = prototypePlan && !prototypeArtifacts.designSystem
       ? {
           id: "design-system",
           label: "Design system",
@@ -4733,8 +4791,13 @@ function OutputSurface({
             version: "pending",
             provenance: { source: "prototype-generation" },
           },
-          status: taskStatus,
-          statusDetail: taskStatus === "generating" ? "Generating" : taskStatus === "failed" ? "Needs retry" : "Queued",
+          status: missingDesignSystemStatus,
+          statusDetail:
+            missingDesignSystemStatus === "generating"
+              ? "Generating"
+              : missingDesignSystemStatus === "failed"
+                ? "Needs repair"
+                : "Queued",
         }
       : null;
     const pendingPages: CanvasImageItem[] = plannedPages
@@ -5934,30 +5997,12 @@ function userFacingGenerationError(message: string): string {
 
 function recoverWorkflowPhase(
   snapshot: WorkspaceSnapshot | null | undefined,
+  artifacts: ReturnType<typeof recoverPrototypeArtifacts>,
 ): WorkflowPhase {
   if (!snapshot?.prototypePlan) return "idle";
-  if (snapshot.prototypePages.length > 0 || snapshot.prototypeDesignSystem)
+  if (artifacts.pages.length > 0 || artifacts.designSystem)
     return "idle";
   return "review";
-}
-
-function restorePrototypeDesignSystem(
-  artifact: PersistedPrototypeDesignSystem | null,
-): PrototypeDesignSystemArtifact | null {
-  if (!artifact || designSystemValidationError(artifact)) return null;
-  return {
-    ...artifact,
-    blob: bytesToBlob(artifact.bytes, artifact.mediaType),
-  };
-}
-
-function restorePrototypePages(
-  artifacts: readonly PersistedPrototypePage[],
-): PrototypePageArtifact[] {
-  return artifacts.map((artifact) => ({
-    ...artifact,
-    blob: bytesToBlob(artifact.bytes, artifact.mediaType),
-  }));
 }
 
 function persistPrototypeImage(

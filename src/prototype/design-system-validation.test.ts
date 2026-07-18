@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { designSystemValidationError } from './design-system-validation'
+import { designSystemMarkdownValidationError, designSystemValidationError } from './design-system-validation'
 
 const validMarkdown = [
   '---',
@@ -15,8 +15,14 @@ describe('designSystemValidationError', () => {
     expect(designSystemValidationError({ width: 1024, height: 768, designMarkdown: validMarkdown })).toBeNull()
   })
 
-  it('rejects zero-sized imagery and documentation without exportable tokens', () => {
+  it('rejects invalid imagery and documentation without exportable tokens', () => {
     expect(designSystemValidationError({ width: 0, height: 768, designMarkdown: validMarkdown })).toContain('invalid dimensions')
     expect(designSystemValidationError({ width: 1024, height: 768, designMarkdown: '---\ncolors:\n  intent:\n    - green\n---\n# Overview' })).toContain('no exportable')
+    expect(designSystemValidationError({ width: 1024, height: 768, designMarkdown: '# Overview' })).toContain('missing YAML')
+  })
+
+  it('shares the same token contract with image-grounded synthesis', () => {
+    expect(designSystemMarkdownValidationError(validMarkdown)).toBeNull()
+    expect(designSystemMarkdownValidationError('---\nname: Visual direction\n---\n# Overview')).toContain('no exportable')
   })
 })
