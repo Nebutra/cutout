@@ -103,3 +103,36 @@ Separated visual artifact recovery from DESIGN.md health, preserved raster dimen
 ### Next Steps
 
 - None - task complete
+
+
+## Session 4: Cutout Codex plugin infrastructure
+
+**Date**: 2026-07-18
+**Task**: Cutout Codex plugin infrastructure
+**Branch**: `main`
+
+### Summary
+
+Built and installed a self-contained local Cutout Codex plugin with bundled stdio MCP runtime, capability-driven skills, project binding diagnostics, synchronized validation/docs/roadmap, and end-to-end build, type, lint, contract, and focused test coverage.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `bc74caa` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
