@@ -1,0 +1,224 @@
+{
+  "$schema": "./schema.json",
+  "version": "cutout.product-skills.v1",
+  "skills": [
+    {
+      "id": "design-governance",
+      "path": "skills/design-governance",
+      "status": "available",
+      "operations": ["governance.preview", "governance.validate", "governance.report"],
+      "mcpTools": ["cutout_governance_preview", "cutout_governance_validate", "cutout_governance_report"],
+      "reference": "skills/design-governance/references/contract.md"
+    },
+    {
+      "id": "outcome-brief",
+      "path": "skills/outcome-brief",
+      "status": "available",
+      "operations": [
+        "project.context",
+        "validate"
+      ],
+      "mcpTools": [
+        "cutout_project_context",
+        "cutout_validate"
+      ],
+      "reference": "skills/outcome-brief/references/contract.md"
+    },
+    {
+      "id": "ingest-everything",
+      "path": "skills/ingest-everything",
+      "status": "available",
+      "operations": [
+        "source.ingest"
+      ],
+      "mcpTools": [
+        "cutout_plan_source_ingest",
+        "cutout_apply_source_ingest"
+      ],
+      "reference": "skills/ingest-everything/references/contract.md"
+    },
+    {
+      "id": "repository-ingest",
+      "path": "skills/repository-ingest",
+      "status": "desktop-only",
+      "operations": [
+        "source.ingest"
+      ],
+      "mcpTools": [
+        "cutout_plan_source_ingest",
+        "cutout_apply_source_ingest"
+      ],
+      "reference": "skills/repository-ingest/references/contract.md"
+    },
+    {
+      "id": "brand-vi-kit",
+      "path": "skills/brand-vi-kit",
+      "status": "available",
+      "operations": [
+        "export.brand-kit"
+      ],
+      "mcpTools": [
+        "cutout_plan_brand_kit_export",
+        "cutout_export_brand_kit"
+      ],
+      "reference": "skills/brand-vi-kit/references/contract.md"
+    },
+    {
+      "id": "design-system-kit",
+      "path": "skills/design-system-kit",
+      "status": "available",
+      "operations": [
+        "export.design-kit"
+      ],
+      "mcpTools": [
+        "cutout_plan_design_kit_export",
+        "cutout_export_design_kit"
+      ],
+      "reference": "skills/design-system-kit/references/contract.md"
+    },
+    {
+      "id": "visual-generation",
+      "path": "skills/visual-generation",
+      "status": "provider-required",
+      "operations": [
+        "tool.invoke"
+      ],
+      "mcpTools": [],
+      "reference": "skills/visual-generation/references/contract.md"
+    },
+    {
+      "id": "prototype",
+      "path": "skills/prototype",
+      "status": "internal-only",
+      "operations": [
+        "validate"
+      ],
+      "mcpTools": [
+        "cutout_validate"
+      ],
+      "reference": "skills/prototype/references/contract.md"
+    },
+    {
+      "id": "component-delivery",
+      "path": "skills/component-delivery",
+      "status": "internal-only",
+      "operations": [],
+      "mcpTools": [],
+      "reference": "skills/component-delivery/references/contract.md"
+    },
+    {
+      "id": "starter-delivery",
+      "path": "skills/starter-delivery",
+      "status": "available",
+      "operations": [
+        "export.starter"
+      ],
+      "mcpTools": [
+        "cutout_plan_starter_export",
+        "cutout_export_starter"
+      ],
+      "reference": "skills/starter-delivery/references/contract.md"
+    },
+    {
+      "id": "coding-delivery",
+      "path": "skills/coding-delivery",
+      "status": "provider-required",
+      "operations": [
+        "coding.execute",
+        "coding.review",
+        "coding.repair"
+      ],
+      "mcpTools": [
+        "cutout_plan_coding_task",
+        "cutout_apply_coding_task"
+      ],
+      "reference": "skills/coding-delivery/references/contract.md"
+    },
+    {
+      "id": "delivery-quality",
+      "path": "skills/delivery-quality",
+      "status": "provider-required",
+      "operations": [
+        "coding.review",
+        "coding.repair"
+      ],
+      "mcpTools": [
+        "cutout_plan_coding_task",
+        "cutout_apply_coding_task"
+      ],
+      "reference": "skills/delivery-quality/references/contract.md"
+    },
+    {
+      "id": "production-plan",
+      "path": "skills/production-plan",
+      "status": "internal-only",
+      "operations": ["validate"],
+      "mcpTools": ["cutout_validate"],
+      "reference": "skills/production-plan/references/contract.md"
+    },
+    {
+      "id": "figma-snapshot",
+      "path": "skills/figma-snapshot",
+      "status": "internal-only",
+      "operations": [],
+      "mcpTools": [],
+      "reference": "skills/figma-snapshot/references/contract.md"
+    },
+    {
+      "id": "notion-delivery",
+      "path": "skills/notion-delivery",
+      "status": "internal-only",
+      "operations": [],
+      "mcpTools": [],
+      "reference": "skills/notion-delivery/references/contract.md"
+    },
+    {
+      "id": "inspect-agent-run",
+      "path": "skills/inspect-agent-run",
+      "status": "available",
+      "operations": [
+        "run.get",
+        "run.events",
+        "run.cancel"
+      ],
+      "mcpTools": [
+        "cutout_run_get",
+        "cutout_run_events",
+        "cutout_run_cancel"
+      ],
+      "reference": "skills/inspect-agent-run/references/contract.md"
+    },
+    {
+      "id": "motion-lottie",
+      "path": "skills/motion-lottie",
+      "status": "internal-only",
+      "operations": [],
+      "mcpTools": [],
+      "reference": "skills/motion-lottie/references/contract.md"
+    },
+    {
+      "id": "registry-delivery",
+      "path": "skills/registry-delivery",
+      "status": "internal-only",
+      "operations": [],
+      "mcpTools": ["cutout_registry_list", "cutout_registry_search", "cutout_registry_get", "cutout_registry_plan_install", "cutout_registry_apply_install", "cutout_registry_install_receipt"],
+      "reference": "skills/registry-delivery/references/contract.md"
+    },
+    {
+      "id": "delivery-center",
+      "path": "skills/delivery-center",
+      "status": "internal-only",
+      "operations": [],
+      "mcpTools": [],
+      "reference": "skills/delivery-center/references/contract.md"
+    },
+    {
+      "id": "workflow-packs",
+      "path": "skills/workflow-packs",
+      "status": "available",
+      "operations": ["project.context", "validate"],
+      "mcpTools": ["cutout_workflow_pack_list", "cutout_workflow_pack_get", "cutout_workflow_pack_compatibility"],
+      "reference": "skills/workflow-packs/references/contract.md"
+    }
+  ]
+}

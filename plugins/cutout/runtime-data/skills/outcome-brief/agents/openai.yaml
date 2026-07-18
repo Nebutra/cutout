@@ -1,0 +1,4 @@
+interface:
+  display_name: "Outcome Brief"
+  short_description: "Turn a high-level intent into an outcome contract"
+  default_prompt: "Use $outcome-brief to turn my direction into an outcome-focused brief."

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Design Governance"
+  short_description: "Validate measured design evidence and request scoped repairs"
+  default_prompt: "Use $design-governance to preview and validate this revision, explain blockers without a score, and request only evidence-scoped repairs."

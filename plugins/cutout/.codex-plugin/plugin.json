@@ -1,0 +1,28 @@
+{
+  "name": "cutout",
+  "version": "0.1.0",
+  "description": "Repo-native Cutout design control for Codex",
+  "author": {
+    "name": "Cutout"
+  },
+  "license": "Apache-2.0",
+  "keywords": ["cutout", "design", "design-system", "prototype", "brand", "codex", "mcp"],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Cutout",
+    "shortDescription": "Control verified Cutout design projects from Codex",
+    "longDescription": "Use Cutout's repo-native Design IR, workflow skills, previews, explicit approvals, managed exports, and verified deliverable metadata from Codex. The local MCP runtime stays bound to one explicitly configured project and does not provide cloud sync, web search, video processing, or a bundled model provider.",
+    "developerName": "Cutout",
+    "category": "Design",
+    "capabilities": ["Read", "Write"],
+    "defaultPrompt": [
+      "Inspect and validate this Cutout design project.",
+      "Create a reviewed Cutout design or brand kit export.",
+      "Show the verified Cutout deliverables for this project."
+    ],
+    "brandColor": "#111111",
+    "composerIcon": "./assets/logo.png",
+    "logo": "./assets/logo.png"
+  },
+  "mcpServers": "./.mcp.json"
+}

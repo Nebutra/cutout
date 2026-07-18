@@ -1,0 +1,4 @@
+interface:
+  display_name: "Notion Delivery"
+  short_description: "Import selected Notion briefs and publish approved guideline pages."
+  default_prompt: "Use $notion-delivery to preview selected content, preserve provenance, and require approval before apply."

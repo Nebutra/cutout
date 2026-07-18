@@ -10,8 +10,8 @@ const parse = async (path) => JSON.parse(await read(path))
 const manifest = await parse('cutout.agent-capabilities.json')
 const schema = await parse('schemas/cutout.agent-capabilities.schema.json')
 const packageJson = await parse('package.json')
-const [headlessSchema, mcpSource, cliSource, designSchema] = await Promise.all([
-  read('src/headless/schema.ts'), read('scripts/cutout-mcp.mjs'),
+const [headlessSchema, cliSource, designSchema] = await Promise.all([
+  read('src/headless/schema.ts'),
   read('scripts/cutout.mjs'), read('src/design-ir/schema.ts'),
 ])
 
@@ -23,7 +23,8 @@ validateJsonSchema(schema, manifest, '$', failures)
 assert(schema?.properties?.version?.const === manifest.version, 'Manifest version must match the JSON Schema const.')
 assert(manifest.$schema === './schemas/cutout.agent-capabilities.schema.json', 'Manifest must point to the repository JSON Schema.')
 assert(manifest.product?.packageVersion === packageJson.version, 'Manifest packageVersion must match package.json.')
-assert(packageJson.scripts?.['agent:validate'] === 'node scripts/validate-agent-capabilities.mjs && node scripts/validate-product-skills.mjs', 'package.json must expose both Agent and product Skill validation.')
+assert(packageJson.scripts?.['agent:validate'] === 'node scripts/validate-agent-capabilities.mjs && node scripts/validate-product-skills.mjs && node scripts/validate-codex-plugin.mjs', 'package.json must expose Agent, product Skill, and Codex plugin validation.')
+assert(manifest.discovery?.codexPlugin === 'plugins/cutout/.codex-plugin/plugin.json', 'Discovery must point to the Cutout Codex plugin manifest.')
 assert(manifest.protocol?.control === 'cutout.control.v1', 'Unexpected control protocol version.')
 assert(designSchema.includes(`z.literal('${manifest.protocol?.designIr}')`), 'Design IR version drifted.')
 assert(headlessSchema.includes(`HEADLESS_MANIFEST_VERSION = '${manifest.protocol?.manifest}'`), 'Headless manifest version drifted.')
@@ -37,7 +38,8 @@ assert(sourceOperations.length > 0, 'Could not discover the headless operation e
 assert(unique(manifestOperations), 'Manifest operations must be unique.')
 assert(equalSets(sourceOperations, manifestOperations), `Operation drift: source=[${sourceOperations}] manifest=[${manifestOperations}].`)
 
-const sourceMcpTools = [...mcpSource.matchAll(/\bname: '(cutout_[a-z0-9_]+)',/g)].map((match) => match[1])
+const serverSource = await read('scripts/cutout-mcp-server.mjs')
+const sourceMcpTools = [...serverSource.matchAll(/\bname: '(cutout_[a-z0-9_]+)',/g)].map((match) => match[1])
 const manifestMcpTools = manifest.mcp?.tools ?? []
 assert(sourceMcpTools.length > 0, 'Could not discover MCP tools.')
 assert(unique(manifestMcpTools), 'Manifest MCP tools must be unique.')

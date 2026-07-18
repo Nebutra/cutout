@@ -52,6 +52,13 @@ Design Kit and component provenance.
 Both clients can call the CLI directly. For tool discovery and structured
 calls, configure the stdio MCP server:
 
+Cutout also packages the same contract as a local Codex plugin under
+`plugins/cutout`. See [Cutout Codex Plugin](./CODEX_PLUGIN.md) for build,
+marketplace, installation, project-binding, and new-session verification steps.
+The plugin runtime is self-contained, but local project binding still requires
+the host-owned `CUTOUT_PROJECT_ROOT`; installation does not create a cloud
+service or infer a project by scanning the filesystem.
+
 ```json
 {
   "mcpServers": {

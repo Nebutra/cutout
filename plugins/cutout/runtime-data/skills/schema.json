@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cutout.local/skills/schema.json",
+  "title": "Cutout Product Skills Catalog",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "skills"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "version": {
+      "const": "cutout.product-skills.v1"
+    },
+    "skills": {
+      "type": "array",
+      "minItems": 20,
+      "maxItems": 20,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "path",
+          "status",
+          "operations",
+          "mcpTools",
+          "reference"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z0-9-]+$"
+          },
+          "path": {
+            "type": "string",
+            "pattern": "^skills/[a-z0-9-]+$"
+          },
+          "status": {
+            "enum": [
+              "available",
+              "desktop-only",
+              "provider-required",
+              "internal-only"
+            ]
+          },
+          "operations": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "string"
+            }
+          },
+          "mcpTools": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "pattern": "^cutout_[a-z0-9_]+$"
+            }
+          },
+          "reference": {
+            "type": "string",
+            "pattern": "^skills/[a-z0-9-]+/references/[^/]+\\\\.md$"
+          }
+        }
+      }
+    }
+  }
+}

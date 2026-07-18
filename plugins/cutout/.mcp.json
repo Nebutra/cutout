@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "cutout": {
+      "command": "node",
+      "args": ["./runtime/cutout-mcp.mjs"],
+      "cwd": ".",
+      "env_vars": ["CUTOUT_PROJECT_ROOT"],
+      "tool_timeout_sec": 900
+    }
+  }
+}

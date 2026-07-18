@@ -1,0 +1,4 @@
+interface:
+  display_name: "Coding Delivery"
+  short_description: "Run scoped coding delivery through an injected backend"
+  default_prompt: "Use $coding-delivery to plan a controlled coding task for this repository."

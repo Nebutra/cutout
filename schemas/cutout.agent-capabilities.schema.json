@@ -33,14 +33,15 @@
     "discovery": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["documentation", "schema", "validationCommand", "skillsCatalog", "skillsSchema", "skillsValidationCommand"],
+      "required": ["documentation", "schema", "validationCommand", "skillsCatalog", "skillsSchema", "skillsValidationCommand", "codexPlugin"],
       "properties": {
         "documentation": { "type": "string", "minLength": 1 },
         "schema": { "type": "string", "minLength": 1 },
         "validationCommand": { "type": "string", "minLength": 1 },
         "skillsCatalog": { "const": "skills/index.json" },
         "skillsSchema": { "const": "skills/schema.json" },
-        "skillsValidationCommand": { "const": "node scripts/validate-product-skills.mjs" }
+        "skillsValidationCommand": { "const": "node scripts/validate-product-skills.mjs" },
+        "codexPlugin": { "const": "plugins/cutout/.codex-plugin/plugin.json" }
       }
     },
     "externalControllers": {

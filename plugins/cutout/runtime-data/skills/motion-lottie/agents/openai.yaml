@@ -1,0 +1,4 @@
+interface:
+  display_name: "Motion and Lottie"
+  short_description: "Build verified Motion IR and supported Lottie deliverables"
+  default_prompt: "Use $motion-lottie to validate and deliver a motion asset with reduced-motion evidence."

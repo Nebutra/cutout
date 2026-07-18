@@ -1,0 +1,4 @@
+interface:
+  display_name: "Design System Kit"
+  short_description: "Compile verified design tokens and system artifacts"
+  default_prompt: "Use $design-system-kit to produce a verified design system kit."

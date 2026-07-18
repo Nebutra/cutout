@@ -1,0 +1,4 @@
+interface:
+  display_name: "Delivery Quality"
+  short_description: "Verify delivery with build browser and accessibility evidence"
+  default_prompt: "Use $delivery-quality to evaluate and repair this delivery against acceptance criteria."

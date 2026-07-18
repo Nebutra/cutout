@@ -24,6 +24,7 @@ This directory contains guidelines for frontend development. Fill in each file w
 | [BYOK User Copy](./byok-user-copy.md) | No billing-estimate copy; approval-notification & transport-error contracts | Filled |
 | [AI Rich-Text Artifacts](./ai-rich-text-artifacts.md) | Structured execution data with safe AI-authored Markdown review artifacts | Filled |
 | [Paid-Tool Prompt Contract](./paid-tool-prompt-contract.md) | Separate bounded audit intent from complete provider execution prompts | Filled |
+| [Codex Plugin Infrastructure](./codex-plugin.md) | Self-contained plugin runtime, project binding, packaging and drift validation | Filled |
 
 ---
 

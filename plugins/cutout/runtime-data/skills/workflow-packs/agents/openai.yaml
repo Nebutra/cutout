@@ -1,0 +1,4 @@
+interface:
+  display_name: "Workflow Packs"
+  short_description: "Discover and validate portable Cutout workflows."
+  default_prompt: "Use $workflow-packs to inspect a repo-native workflow pack and verify version and capability compatibility before execution."

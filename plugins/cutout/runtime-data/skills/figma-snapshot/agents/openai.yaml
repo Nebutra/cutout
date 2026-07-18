@@ -1,0 +1,4 @@
+interface:
+  display_name: "Figma Snapshot"
+  short_description: "Adapt authorized Figma snapshots without live sync claims"
+  default_prompt: "Use $figma-snapshot to inspect an authorized Figma snapshot and plan an export."

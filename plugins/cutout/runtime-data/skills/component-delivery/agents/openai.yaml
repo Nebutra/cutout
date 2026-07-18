@@ -1,0 +1,4 @@
+interface:
+  display_name: "Component Delivery"
+  short_description: "Deliver components from explicit verified candidates"
+  default_prompt: "Use $component-delivery to prepare verified component delivery."

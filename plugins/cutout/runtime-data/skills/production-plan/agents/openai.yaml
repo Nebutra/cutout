@@ -1,0 +1,4 @@
+interface:
+  display_name: "Production Plan"
+  short_description: "Plan a validated outcome-oriented production DAG"
+  default_prompt: "Use $production-plan to turn the accepted outcome and explicit materials into a reviewable local-first production DAG."
