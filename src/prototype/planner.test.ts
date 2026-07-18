@@ -10,7 +10,7 @@ import {
   shouldUseLocalSemanticFallback,
 } from './planner'
 import {
-  prototypePlanSchema,
+  generatedPrototypePlanSchema,
   validatePrototypePlan,
   type PrototypePlan,
 } from './prototype-plan'
@@ -132,6 +132,11 @@ const samplePlan: PrototypePlan = {
       ],
     },
   ],
+  reviewDocument: {
+    format: 'markdown',
+    primaryFlow: '# Book a VIP table\n\nReview the core booking flow.',
+    fullPlan: '# VIP booking prototype\n\nReview all planned surfaces.',
+  },
   humanLoop: {
     mode: 'continue',
     rationale: 'The booking flow is specific enough to proceed.',
@@ -160,6 +165,7 @@ describe('planPrototype', () => {
     })
 
     expect(result).toEqual(ok(samplePlan))
+    expect(result.ok && result.data.reviewDocument?.fullPlan).toContain('all planned surfaces')
     const [input, schema] = generateObject.mock.calls[0]
     expect(input.promptRef).toEqual({ id: 'ui-prototype-planner' })
     expect(input.model).toBe('gpt-5.5')
@@ -167,7 +173,7 @@ describe('planPrototype', () => {
       type: 'text',
       text: '脱衣舞娘俱乐部',
     })
-    expect(schema).toBe(prototypePlanSchema)
+    expect(schema).toBe(generatedPrototypePlanSchema)
   })
 
   it('composes reconstructed intent into the planner input', async () => {

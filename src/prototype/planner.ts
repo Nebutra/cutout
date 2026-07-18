@@ -4,7 +4,7 @@ import type { GenerationService } from '@/services/ai/types'
 import type { ReasoningEffort } from '@/services/ai/reasoning'
 import type { IntentProfile } from '@/dag/intent-types'
 import {
-  prototypePlanSchema,
+  generatedPrototypePlanSchema,
   validatePrototypePlan,
   type PrototypePlan,
 } from './prototype-plan'
@@ -225,7 +225,7 @@ export async function planPrototype(
       reasoningEffort: params.effort,
       signal: params.signal,
     },
-    prototypePlanSchema,
+    generatedPrototypePlanSchema,
   )
   if (isErr(result)) {
     if (shouldUseLocalSemanticFallback(result.error)) {

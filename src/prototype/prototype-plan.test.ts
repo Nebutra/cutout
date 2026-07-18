@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  generatedPrototypePlanSchema,
   prototypePlanSchema,
   validatePrototypePlan,
   type PrototypePlan,
@@ -144,6 +145,23 @@ describe('PrototypePlan', () => {
       mode: 'continue',
       rationale: 'The requirement is clear enough to proceed.',
     })
+  })
+
+  it('accepts legacy plans without a review artifact and validates authored scope documents', () => {
+    const legacy = prototypePlanSchema.parse(structuredClone(validPlan))
+    expect(legacy.reviewDocument).toBeUndefined()
+
+    const authored = prototypePlanSchema.parse({
+      ...structuredClone(validPlan),
+      reviewDocument: {
+        format: 'markdown',
+        primaryFlow: '# Primary flow\n\nA focused review.',
+        fullPlan: '# Full plan\n\n| Page | Purpose |\n| --- | --- |\n| Home | Convert |',
+      },
+    })
+    expect(authored.reviewDocument?.primaryFlow).toContain('focused review')
+    expect(() => generatedPrototypePlanSchema.parse(legacy)).toThrow()
+    expect(generatedPrototypePlanSchema.parse(authored).reviewDocument.fullPlan).toContain('Full plan')
   })
 
   it('defaults old region output to board-cutout when assetRoute is omitted', () => {

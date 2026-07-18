@@ -14,14 +14,15 @@ import {
   Check,
   ChevronUp,
   ChevronRight,
-  ExternalLink,
+  Copy,
+  Download,
   Files as FilesIcon,
   ImageIcon,
   Layers3,
   Loader2,
   MessageCircle,
   MessageSquare,
-  MousePointerClick,
+  MessageSquareText,
   PackageCheck,
   PackageOpen,
   Palette,
@@ -71,7 +72,9 @@ import {
   usePrepareDeconstructMockup,
 } from "@/hooks/queries/pipeline";
 import { useLibraryUI } from "@/components/library/library-ui";
+import { RichTextArtifact } from "@/components/artifacts/RichTextArtifact";
 import { planPrototype } from "@/prototype/planner";
+import { prototypeReviewMarkdown } from "@/prototype/review-document";
 import type {
   HumanLoopAskLike,
   PrototypeHumanLoopAsk,
@@ -3001,6 +3004,7 @@ export function IntentWorkspace({
             selectedMaterial={selectedMaterial}
             onSelectMaterial={setSelectedMaterial}
             onRequestMaterialChanges={focusAgentComposer}
+            onRequestPlanChanges={focusAgentComposer}
             variantDecision={
               selectedMaterial
                 ? decisionFor(creativeBoard, selectedMaterial.id)
@@ -4566,6 +4570,7 @@ function OutputSurface({
   selectedMaterial,
   onSelectMaterial,
   onRequestMaterialChanges,
+  onRequestPlanChanges,
   variantDecision,
   onVariantDecision,
   onToggleReferenceLock,
@@ -4605,6 +4610,7 @@ function OutputSurface({
   readonly selectedMaterial: MaterialRef | null;
   readonly onSelectMaterial: (material: MaterialRef) => void;
   readonly onRequestMaterialChanges: (material: MaterialRef) => void;
+  readonly onRequestPlanChanges: () => void;
   readonly variantDecision?: CreativeVariantDecision;
   readonly onVariantDecision: (decision: "favorite" | "rejected") => void;
   readonly onToggleReferenceLock: () => void;
@@ -4881,6 +4887,7 @@ function OutputSurface({
         plan={prototypePlan}
         scope={prototypeScope}
         onScopeChange={onScopeChange}
+        onRequestChanges={onRequestPlanChanges}
       />
     );
   }
@@ -5012,124 +5019,61 @@ function PrototypePlanReview({
   plan,
   scope,
   onScopeChange,
+  onRequestChanges,
 }: {
   readonly plan: PrototypePlan;
   readonly scope: PrototypeSuiteScope;
   readonly onScopeChange: (scope: PrototypeSuiteScope) => void;
+  readonly onRequestChanges: () => void;
 }) {
   const scopedPages = pagesForScope(plan, scope);
-  const firstFlow = plan.flows[0];
   const primaryCount = pagesForScope(plan, "primary-flow").length;
   const fullCount = plan.pages.length;
+  const reviewMarkdown = prototypeReviewMarkdown(plan, scope);
+
+  const copyReview = async () => {
+    try {
+      await navigator.clipboard.writeText(reviewMarkdown);
+      toast.success("Plan copied");
+    } catch (error) {
+      toast.error("Copy failed", {
+        description: error instanceof Error ? error.message : String(error),
+      });
+    }
+  };
+
+  const downloadReview = () => {
+    const blob = new Blob([reviewMarkdown], { type: "text/markdown;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    const filename = plan.product.name
+      .trim()
+      .replace(/[^\p{L}\p{N}]+/gu, "-")
+      .replace(/^-|-$/g, "") || "plan-review";
+    anchor.href = url;
+    anchor.download = `${filename}.md`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+    toast.success("Plan downloaded");
+  };
 
   return (
-    <div className="h-full min-h-0 overflow-auto bg-muted/10 p-5">
-      <section className="mx-auto grid max-w-6xl gap-4 lg:grid-cols-[18rem_minmax(0,1fr)_18rem]">
-        <aside className="rounded-lg border border-border bg-background p-4 shadow-sm">
-          <p className="text-xs font-medium text-muted-foreground">
-            Agent read
-          </p>
-          <h2 className="mt-2 text-xl font-semibold tracking-tight">
-            {plan.product.name}
-          </h2>
-          <p className="mt-3 text-sm leading-6 text-muted-foreground">
-            {plan.product.summary}
-          </p>
-
-          <div className="mt-5 space-y-3">
-            <PlanFact label="Audience" value={plan.product.audience} />
-            <PlanFact label="Goal" value={plan.product.primaryGoal} />
-            <PlanFact label="Platform" value={plan.product.platform} />
-          </div>
-        </aside>
-
-        <div className="space-y-4">
-          <section className="rounded-lg border border-border bg-background p-4 shadow-sm">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <p className="text-xs font-medium text-muted-foreground">
-                  Flow
-                </p>
-                <h3 className="mt-1 text-base font-semibold">
-                  {firstFlow?.name ?? "Generated flow"}
-                </h3>
-              </div>
-              <span className="rounded-full border border-border bg-muted/20 px-2.5 py-1 text-xs text-muted-foreground">
-                {scopedPages.length} pages
-              </span>
-            </div>
-            <p className="mt-2 text-sm leading-6 text-muted-foreground">
-              {firstFlow?.goal ?? plan.product.primaryGoal}
-            </p>
-            <FlowTimeline plan={plan} pages={scopedPages} />
-          </section>
-
-          <section className="rounded-lg border border-border bg-background p-4 shadow-sm">
-            <div className="mb-3 flex items-center justify-between gap-3">
-              <div>
-                <p className="text-xs font-medium text-muted-foreground">
-                  Pages
-                </p>
-                <h3 className="mt-1 text-base font-semibold">
-                  Prototype structure
-                </h3>
-              </div>
-            </div>
-            <div className="grid gap-3 md:grid-cols-2">
-              {scopedPages.map((page) => (
-                <PlanPageCard key={page.id} page={page} />
-              ))}
-            </div>
-          </section>
-        </div>
-
-        <aside className="space-y-4">
+    <RichTextArtifact
+      label="Plan review"
+      title={plan.product.name}
+      meta={`${scopedPages.length} pages · ready for review`}
+      markdown={reviewMarkdown}
+      actions={
+        <>
           {primaryCount < fullCount ? (
-            <section className="rounded-lg border border-border bg-background p-4 shadow-sm">
-              <p className="mb-3 text-xs font-medium text-muted-foreground">
-                Generation range
-              </p>
-              <ScopePicker
-                scope={scope}
-                onScopeChange={onScopeChange}
-                disabled={false}
-                primaryCount={primaryCount}
-                fullCount={fullCount}
-              />
-            </section>
+            <ScopePicker scope={scope} onScopeChange={onScopeChange} disabled={false} primaryCount={primaryCount} fullCount={fullCount} />
           ) : null}
-
-          <section className="rounded-lg border border-border bg-background p-4 shadow-sm">
-            <p className="text-xs font-medium text-muted-foreground">
-              Design system
-            </p>
-            <h3 className="mt-1 text-sm font-semibold">Shared visual rules</h3>
-            <p className="mt-2 text-xs leading-5 text-muted-foreground">
-              {plan.designSystem.styleSummary}
-            </p>
-            <div className="mt-3 flex flex-wrap gap-1.5">
-              {plan.designSystem.palette.slice(0, 5).map((token) => (
-                <span
-                  key={token}
-                  className="rounded-full border border-border bg-muted/20 px-2 py-1 text-[11px] text-muted-foreground"
-                >
-                  {token}
-                </span>
-              ))}
-            </div>
-          </section>
-
-          <section className="rounded-lg border border-border bg-background p-4 shadow-sm">
-            <p className="text-xs font-medium text-muted-foreground">
-              Asset direction
-            </p>
-            <p className="mt-2 text-xs leading-5 text-muted-foreground">
-              {plan.designSystem.assetDirection}
-            </p>
-          </section>
-        </aside>
-      </section>
-    </div>
+          <Button type="button" variant="ghost" size="sm" onClick={() => void copyReview()}><Copy /> Copy</Button>
+          <Button type="button" variant="ghost" size="sm" onClick={downloadReview}><Download /> Download</Button>
+          <Button type="button" variant="ghost" size="sm" onClick={onRequestChanges}><MessageSquareText /> Request changes</Button>
+        </>
+      }
+    />
   );
 }
 
@@ -5229,119 +5173,6 @@ function HumanLoopQuestion({
           })}
       </div>
     </section>
-  );
-}
-
-function PlanFact({
-  label,
-  value,
-}: {
-  readonly label: string;
-  readonly value: string;
-}) {
-  return (
-    <div>
-      <p className="text-[11px] font-medium text-muted-foreground">{label}</p>
-      <p className="mt-1 text-sm leading-5">{value}</p>
-    </div>
-  );
-}
-
-function FlowTimeline({
-  plan,
-  pages,
-}: {
-  readonly plan: PrototypePlan;
-  readonly pages: readonly PrototypePage[];
-}) {
-  const pageById = new Map(plan.pages.map((page) => [page.id, page]));
-  const firstFlow = plan.flows[0];
-  const flowPageIds = firstFlow
-    ? [
-        firstFlow.startPageId,
-        ...firstFlow.steps
-          .map((step) => step.toPageId)
-          .filter((id): id is string => Boolean(id)),
-      ]
-    : pages.map((page) => page.id);
-  const uniqueIds = [...new Set(flowPageIds)].filter((id) =>
-    pages.some((page) => page.id === id),
-  );
-  const timelinePages =
-    uniqueIds.length > 0 ? uniqueIds : pages.map((page) => page.id);
-
-  return (
-    <div className="mt-4 flex flex-wrap items-center gap-2">
-      {timelinePages.map((id, index) => {
-        const page = pageById.get(id);
-        if (!page) return null;
-        return (
-          <div key={id} className="flex items-center gap-2">
-            <div className="rounded-md border border-border bg-muted/10 px-3 py-2">
-              <div className="flex items-center gap-2">
-                <Route className="size-3.5 text-muted-foreground" />
-                <span className="text-xs font-semibold">{page.name}</span>
-              </div>
-              <p className="mt-1 font-mono text-[10px] text-muted-foreground">
-                {page.route}
-              </p>
-            </div>
-            {index < timelinePages.length - 1 ? (
-              <ExternalLink className="size-3.5 text-muted-foreground/70" />
-            ) : null}
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-function PlanPageCard({ page }: { readonly page: PrototypePage }) {
-  const primaryInteraction = page.interactions[0];
-  const topAssets = page.regions
-    .flatMap((region) => region.assetOpportunities)
-    .slice(0, 3);
-  return (
-    <article className="rounded-md border border-border bg-muted/10 p-3">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h4 className="truncate text-sm font-semibold">{page.name}</h4>
-          <p className="mt-1 font-mono text-[10px] text-muted-foreground">
-            {page.route}
-          </p>
-        </div>
-        <span className="shrink-0 rounded-full bg-background px-2 py-1 text-[10px] text-muted-foreground">
-          {page.viewport.scroll === "long-scroll" ? "Long" : "Screen"}
-        </span>
-      </div>
-      <p className="mt-2 line-clamp-2 text-xs leading-5 text-muted-foreground">
-        {page.purpose}
-      </p>
-      <div className="mt-3 grid grid-cols-2 gap-2 text-[11px] text-muted-foreground">
-        <span>{page.regions.length} regions</span>
-        <span>{page.interactions.length} actions</span>
-      </div>
-      {primaryInteraction ? (
-        <div className="mt-3 flex items-start gap-2 rounded-md border border-border/70 bg-background px-2 py-2">
-          <MousePointerClick className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
-          <p className="min-w-0 truncate text-[11px] text-muted-foreground">
-            {primaryInteraction.sourceElement} · {primaryInteraction.intent}
-          </p>
-        </div>
-      ) : null}
-      {topAssets.length > 0 ? (
-        <div className="mt-3 flex flex-wrap gap-1">
-          {topAssets.map((asset) => (
-            <span
-              key={asset}
-              className="rounded-full border border-border bg-background px-2 py-0.5 text-[10px] text-muted-foreground"
-            >
-              {asset}
-            </span>
-          ))}
-        </div>
-      ) : null}
-    </article>
   );
 }
 

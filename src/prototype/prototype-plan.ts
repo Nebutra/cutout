@@ -110,6 +110,12 @@ export const prototypeHumanLoopSchema = z.discriminatedUnion('mode', [
   }),
 ])
 
+export const prototypeReviewDocumentSchema = z.object({
+  format: z.literal('markdown'),
+  primaryFlow: z.string().min(1).max(40_000),
+  fullPlan: z.string().min(1).max(40_000),
+})
+
 export const prototypePlanSchema = z.object({
   version: z.literal('prototype-plan.v0'),
   product: z.object({
@@ -130,10 +136,17 @@ export const prototypePlanSchema = z.object({
   }),
   pages: z.array(prototypePageSchema).min(1).max(12),
   flows: z.array(prototypeFlowSchema).min(1),
+  reviewDocument: prototypeReviewDocumentSchema.optional(),
   humanLoop: prototypeHumanLoopSchema.default({
     mode: 'continue',
     rationale: 'The requirement is clear enough to proceed.',
   }),
+})
+
+/** New planner runs must author both review artifacts. The persisted schema
+ * above stays backward-compatible with workspace records from older builds. */
+export const generatedPrototypePlanSchema = prototypePlanSchema.extend({
+  reviewDocument: prototypeReviewDocumentSchema,
 })
 
 export type PrototypeAction = z.infer<typeof prototypeActionSchema>
@@ -142,6 +155,7 @@ export type PrototypeRegion = z.infer<typeof prototypeRegionSchema>
 export type PrototypePage = z.infer<typeof prototypePageSchema>
 export type PrototypeFlow = z.infer<typeof prototypeFlowSchema>
 export type PrototypeHumanLoop = z.infer<typeof prototypeHumanLoopSchema>
+export type PrototypeReviewDocument = z.infer<typeof prototypeReviewDocumentSchema>
 export type PrototypeHumanLoopAsk = Extract<PrototypeHumanLoop, { mode: 'ask' }>
 export type PrototypePlan = z.infer<typeof prototypePlanSchema>
 

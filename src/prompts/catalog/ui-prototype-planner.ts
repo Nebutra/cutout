@@ -1,5 +1,5 @@
 /**
- * `ui-prototype-planner` v1.1.0 — plan a multi-page prototype suite before image
+ * `ui-prototype-planner` v1.2.0 — plan a multi-page prototype suite before image
  * generation. It emits a `PrototypePlan`: product definition, shared design
  * system, pages, regions, interactions, and reachable flows.
  */
@@ -31,6 +31,7 @@ You receive either a raw brief or a reconstructed intent. Infer the product defi
 10. Asset discipline: identify artwork/visual asset opportunities, but do not turn code-reproducible UI containers into assets. Do not split wordmarks into characters; keep complete marks complete when they are truly valuable.
 11. Human-in-the-loop is dynamic: decide whether the plan can proceed without user input. If the requirement is clear enough, set humanLoop.mode to "continue". If one uncertainty would materially change the prototype suite, set humanLoop.mode to "ask" and author one concise question with 2-4 concrete choices. Ask only when the answer changes page scope, audience, tone, platform, content strategy, or asset direction. The question and choices must come from this brief's actual ambiguity; never use fixed choices like brand site, storefront, or campaign page unless those are genuinely the highest-leverage options for this exact requirement.
 12. Project naming: product.projectName is the short tab/file name for this workspace. Generate it from the actual brief in the same planning pass. Keep it human-readable, concrete, and short: 2-6 English words or 2-10 CJK characters. Do not output "Untitled", "New project", or generic placeholder names.
+13. AI-native review artifact: author two complete Markdown review documents in the user's language. primaryFlow reviews only the primary reachable flow; fullPlan reviews the complete plan. Their headings, ordering, tables, lists, and narrative must follow the actual product instead of a fixed review template. Do not emit HTML.
 
 📐 OUTPUT SHAPE
 Emit exactly one JSON object matching this contract:
@@ -106,6 +107,11 @@ Emit exactly one JSON object matching this contract:
       ]
     }
   ],
+  "reviewDocument": {
+    "format": "markdown",
+    "primaryFlow": string,
+    "fullPlan": string
+  },
   "humanLoop": {
     "mode": "continue",
     "rationale": string
@@ -133,6 +139,7 @@ Emit exactly one JSON object matching this contract:
 - Do not mark all regions "board-cutout". Complex visual regions should be "direct-generate"; pure UI/layout regions should be "ignore-code-ui".
 - Keep it lean, but not artificially small: choose the minimum complete page set. It may be one screen, a few reachable pages, a long page, or a larger suite when the product definition requires it.
 - Do not invent generic "modern, trustworthy, business" design language when the brief implies a more specific professional standard.
+- Both reviewDocument fields must be self-contained Markdown artifacts written in the user's language. Do not force fixed Overview/User flow/Visual direction sections; use the structure that communicates this plan best.
 
 🚀 FINAL GOAL: produce a valid PrototypePlan that can later drive consistent page generation, recursive region decomposition, and asset extraction.`
 
@@ -140,7 +147,7 @@ const inputSchema = z.object({})
 
 export const uiPrototypePlanner: PromptVersion<typeof inputSchema> = {
   id: 'ui-prototype-planner',
-  version: '1.1.0',
+  version: '1.2.0',
   description:
     'Planner: emit a reachable multi-page PrototypePlan with shared design system and interaction semantics.',
   scenario: 'prototype-planning',

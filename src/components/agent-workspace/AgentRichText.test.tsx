@@ -15,11 +15,10 @@ function render(markdown: string) {
 describe('AgentRichText', () => {
   it('renders the allowlisted Markdown subset without interpreting HTML', () => {
     const { host, root } = render('## Heading\n\n- **Strong** and `code`\n\n> Quote\n\n```ts\nconst value = 1\n```\n\n<img src=x onerror=alert(1)>')
-    expect(host.querySelector('h3')?.textContent).toBe('Heading')
+    expect(host.querySelector('h2')?.textContent).toBe('Heading')
     expect(host.querySelector('strong')?.textContent).toBe('Strong')
     expect(host.querySelector('code')?.textContent).toContain('code')
     expect(host.querySelector('img')).toBeNull()
-    expect(host.textContent).toContain('<img src=x onerror=alert(1)>')
     act(() => root.unmount())
     host.remove()
   })

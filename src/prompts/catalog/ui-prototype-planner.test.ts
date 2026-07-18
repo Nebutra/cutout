@@ -4,10 +4,10 @@ import { createBuiltinRegistry } from './index'
 import { uiPrototypePlanner } from './ui-prototype-planner'
 import { render } from '../render'
 
-describe('ui-prototype-planner v1.1.0', () => {
+describe('ui-prototype-planner v1.2.0', () => {
   it('carries the expected id, version, scenario and hints', () => {
     expect(uiPrototypePlanner.id).toBe('ui-prototype-planner')
-    expect(uiPrototypePlanner.version).toBe('1.1.0')
+    expect(uiPrototypePlanner.version).toBe('1.2.0')
     expect(uiPrototypePlanner.scenario).toBe('prototype-planning')
     expect(uiPrototypePlanner.hints).toEqual({
       modality: 'text',
@@ -33,13 +33,17 @@ describe('ui-prototype-planner v1.1.0', () => {
     expect(out.system).toContain('humanLoop.mode')
     expect(out.system).toContain('product.projectName')
     expect(out.system).toContain('short tab/file name')
+    expect(out.system).toContain('reviewDocument')
+    expect(out.system).toContain('primaryFlow')
+    expect(out.system).toContain('fullPlan')
+    expect(out.system).toContain("user's language")
     expect(out.system).toContain('PrototypePlan')
     expect(out.userScaffold).toBeUndefined()
   })
 
   it('is discoverable through the built-in registry as latest', () => {
     const registry = createBuiltinRegistry()
-    expect(registry.resolve('ui-prototype-planner').version).toBe('1.1.0')
+    expect(registry.resolve('ui-prototype-planner').version).toBe('1.2.0')
     const summaries = registry.list()
     expect(summaries.some((s) => s.id === 'ui-prototype-planner')).toBe(true)
   })
@@ -50,6 +54,6 @@ describe('ui-prototype-planner v1.1.0', () => {
     expect(rendered.system).toContain('Senior Prototype Architect')
 
     const versions = await service.versions('ui-prototype-planner')
-    expect(versions).toEqual(['1.1.0'])
+    expect(versions).toEqual(['1.2.0'])
   })
 })
