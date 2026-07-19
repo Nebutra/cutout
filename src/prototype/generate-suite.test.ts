@@ -163,14 +163,15 @@ describe('prototype suite generation helpers', () => {
     expect(prompt).not.toContain('Current page: Products')
   })
 
-  it('injects imported DESIGN.md into page prompts as higher-priority context', () => {
+  it('injects the final DESIGN.md into page prompts as higher-priority context', () => {
     const prompt = prototypePagePrompt(
       plan,
       plan.pages[0],
       '---\nversion: alpha\nname: Imported\n---\n# Imported\nUse sharp editorial contrast.',
     )
 
-    expect(prompt).toContain('Imported DESIGN.md must be treated as the higher-priority design contract')
+    expect(prompt).toContain('Final DESIGN.md must be treated as the higher-priority design contract')
+    expect(prompt).toContain('Final DESIGN.md:')
     expect(prompt).toContain('Use sharp editorial contrast')
   })
 

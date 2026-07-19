@@ -31,6 +31,12 @@ function generatePrototypePageSet<Page, Artifact>(input: {
   readonly generate: (page: Page, anchor?: Artifact) => Promise<Artifact>
   readonly onProgress?: (artifacts: readonly Artifact[]) => void
 }): Promise<Artifact[]>
+
+function prototypePagePrompt(
+  plan: PrototypePlan,
+  page: PrototypePage,
+  finalDesignMarkdown?: string | null,
+): string
 ```
 
 ## 3. Contracts
@@ -49,6 +55,14 @@ function generatePrototypePageSet<Page, Artifact>(input: {
   parallel generation. Every later page receives the same design-system
   reference and the same first-page visual anchor.
 - Each page prompt contains the complete Agent-authored route and flow contract.
+- Page generation consumes the completed design-system artifact through two
+  coordinated channels: `designSystem.bytes` is the immutable visual identity
+  reference, and the validated `designSystem.designMarkdown` is the final text
+  contract. The pre-synthesis imported/correction context is only an input to
+  design-system creation and must not bypass the resulting document.
+- If the artifact's `designMarkdown` is invalid, page generation may fall back
+  to the earlier text context, while retaining the design-system image
+  reference. Invalid companion documentation must not erase valid visual media.
 - Downstream asset production and slicing may start only after the exact scoped
   page set has been produced. A partial suite is not success.
 - Keep the default scope in `src/prototype/scope.ts`. Persistence code must not
@@ -67,16 +81,22 @@ function generatePrototypePageSet<Page, Artifact>(input: {
 | Any scoped page is missing | generation throws `Prototype generation is incomplete` |
 | Empty page list | generation throws; no downstream production starts |
 | Existing explicit `primary-flow` workspace | preserve its selected scope |
+| Valid image-grounded `designSystem.designMarkdown` | include it in every page prompt as `Final DESIGN.md` |
+| Invalid final `designSystem.designMarkdown` | fall back to pre-synthesis text context; keep the image identity reference |
 
 ## 5. Good / Base / Bad Cases
 
 - Good: the Agent derives four routes across two workflows; all four images are
-  generated, share one visual anchor, and then become slicing sources.
+  generated, share one visual anchor, consume the image-grounded final
+  `DESIGN.md`, and then become slicing sources.
 - Base: a genuinely single-screen product yields one Agent-planned route and one
   image; no synthetic second screen is invented.
 - Bad: the Agent plans account and settings in a secondary flow, but the
   workspace silently defaults to the first flow and publishes only the home and
   catalog images.
+- Bad: the design-system image and final `DESIGN.md` are created, but page
+  generation receives only the imported text that existed before image
+  grounding, so the screens ignore refinements discovered from the visual.
 
 ## 6. Tests Required
 
@@ -89,7 +109,8 @@ function generatePrototypePageSet<Page, Artifact>(input: {
 - Rendered component E2E: submit a product intent to the real
   `IntentWorkspace`, mock only external model/desktop boundaries, then assert
   every Agent-planned route is persisted and every visual task carries the full
-  route contract and common series identity.
+  route contract, common series identity, shared design-system image reference,
+  and a rule unique to the synthesized final `DESIGN.md`.
 - Real-provider benchmark remains gated by credentials and reports transport
   failures separately from deterministic product regressions.
 
@@ -102,6 +123,9 @@ function generatePrototypePageSet<Page, Artifact>(input: {
 const pages = [homePage, pricingPage, aboutPage]
 const scope: PrototypeSuiteScope = 'primary-flow'
 await Promise.all(pages.map((page) => generate(page, designSystemOnly)))
+
+// Bypasses the image-grounded contract that was just synthesized.
+const pageDesignContext = preSynthesisContext
 ```
 
 ### Correct
@@ -115,4 +139,8 @@ await generatePrototypePageSet({
   concurrency: 2,
   generate: (page, anchor) => generatePage(page, designSystem, anchor),
 })
+
+const pageDesignContext = isValidDesignMarkdown(designSystem.designMarkdown)
+  ? designSystem.designMarkdown
+  : preSynthesisContext
 ```

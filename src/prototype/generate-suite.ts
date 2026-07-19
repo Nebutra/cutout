@@ -31,7 +31,7 @@ export function pagesForScope(
 export function prototypePagePrompt(
   plan: PrototypePlan,
   page: PrototypePage,
-  importedDesignMarkdown?: string | null,
+  designMarkdown?: string | null,
 ): string {
   const routeContract = plan.pages
     .map((candidate) =>
@@ -89,10 +89,10 @@ export function prototypePagePrompt(
     `- Spacing: ${plan.designSystem.spacing}`,
     `- Component principles: ${plan.designSystem.componentPrinciples.join('; ')}`,
     `- Asset direction: ${plan.designSystem.assetDirection}`,
-    importedDesignMarkdown
-      ? `- Imported DESIGN.md must be treated as the higher-priority design contract.`
+    designMarkdown
+      ? `- Final DESIGN.md must be treated as the higher-priority design contract.`
       : undefined,
-    importedDesignMarkdown ? ['', `Imported DESIGN.md:`, importedDesignMarkdown].join('\n') : undefined,
+    designMarkdown ? ['', `Final DESIGN.md:`, designMarkdown].join('\n') : undefined,
     ``,
     `Current page: ${page.name}`,
     `Route: ${page.route}`,

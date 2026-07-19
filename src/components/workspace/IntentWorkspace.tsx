@@ -2090,6 +2090,14 @@ export function IntentWorkspace({
     }
     setWorkflowPhase("generating-suite");
 
+    // The image-grounded DESIGN.md stored on the design-system artifact is the
+    // final text contract for page generation. The earlier generationContext
+    // is only an input to design-system synthesis and must not bypass its result.
+    const pageDesignContext =
+      !designSystemMarkdownValidationError(designSystem.designMarkdown)
+        ? designSystem.designMarkdown
+        : generationContext;
+
     const runSerial =
       options.forceParallel === undefined
         ? pages.length <= SERIAL_REFERENCE_PAGE_LIMIT
@@ -2105,7 +2113,7 @@ export function IntentWorkspace({
               route.chat,
               designSystem,
               lease,
-              generationContext,
+              pageDesignContext,
               reusablePages,
               options.materialReference,
             )
@@ -2116,7 +2124,7 @@ export function IntentWorkspace({
               route.chat,
               designSystem,
               lease,
-              generationContext,
+              pageDesignContext,
               reusablePages,
               options.materialReference,
             );

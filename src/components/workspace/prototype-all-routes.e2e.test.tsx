@@ -417,6 +417,10 @@ describe('brief → every planned route — rendered IntentWorkspace', () => {
     )
     for (const task of desktopHarness.tasks) {
       expect(task.prompt.objective).toContain('Suite route contract (all planned screens)')
+      expect(task.prompt.objective).toContain('Final DESIGN.md:')
+      expect(task.prompt.objective).toContain(
+        'Use one quiet navigation shell, stable typography, and consistent controls across every route.',
+      )
       for (const plannedPage of AGENT_PLAN.pages) {
         expect(task.prompt.objective).toContain(`${plannedPage.name}: ${plannedPage.route}`)
       }
