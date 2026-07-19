@@ -4,10 +4,10 @@ import { createBuiltinRegistry } from './index'
 import { uiPrototypePlanner } from './ui-prototype-planner'
 import { render } from '../render'
 
-describe('ui-prototype-planner v1.2.0', () => {
+describe('ui-prototype-planner v1.5.0', () => {
   it('carries the expected id, version, scenario and hints', () => {
     expect(uiPrototypePlanner.id).toBe('ui-prototype-planner')
-    expect(uiPrototypePlanner.version).toBe('1.2.0')
+    expect(uiPrototypePlanner.version).toBe('1.5.0')
     expect(uiPrototypePlanner.scenario).toBe('prototype-planning')
     expect(uiPrototypePlanner.hints).toEqual({
       modality: 'text',
@@ -23,6 +23,12 @@ describe('ui-prototype-planner v1.2.0', () => {
     expect(out.system).toContain('water-shaped')
     expect(out.system).toContain('Scene-native professionalism')
     expect(out.system).toContain('every page must be reachable')
+    expect(out.system).toContain('Explicit scope wins over minimality')
+    expect(out.system).toContain('Route completeness')
+    expect(out.system).toContain('route meta-planner')
+    expect(out.system).toContain('platform-native best practices')
+    expect(out.system).toContain('unique, stable logical destination')
+    expect(out.system).toContain('Complete route coverage')
     expect(out.system).toContain('shared design system')
     expect(out.system).toContain('recursive-region')
     expect(out.system).toContain('Asset routing')
@@ -43,7 +49,7 @@ describe('ui-prototype-planner v1.2.0', () => {
 
   it('is discoverable through the built-in registry as latest', () => {
     const registry = createBuiltinRegistry()
-    expect(registry.resolve('ui-prototype-planner').version).toBe('1.2.0')
+    expect(registry.resolve('ui-prototype-planner').version).toBe('1.5.0')
     const summaries = registry.list()
     expect(summaries.some((s) => s.id === 'ui-prototype-planner')).toBe(true)
   })
@@ -54,6 +60,6 @@ describe('ui-prototype-planner v1.2.0', () => {
     expect(rendered.system).toContain('Senior Prototype Architect')
 
     const versions = await service.versions('ui-prototype-planner')
-    expect(versions).toEqual(['1.2.0'])
+    expect(versions).toEqual(['1.5.0'])
   })
 })

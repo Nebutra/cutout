@@ -4446,9 +4446,12 @@ var prototypePlanSchema = object({
 prototypePlanSchema.extend({ reviewDocument: prototypeReviewDocumentSchema });
 function validatePrototypePlan(plan) {
 	const pageIds = /* @__PURE__ */ new Set();
+	const pageRoutes = /* @__PURE__ */ new Set();
 	for (const page of plan.pages) {
 		if (pageIds.has(page.id)) return err(`Duplicate page id: "${page.id}".`);
 		pageIds.add(page.id);
+		if (pageRoutes.has(page.route)) return err(`Duplicate page route: "${page.route}".`);
+		pageRoutes.add(page.route);
 		const regionIds = /* @__PURE__ */ new Set();
 		for (const region of page.regions) {
 			if (regionIds.has(region.id)) return err(`Page "${page.id}" has duplicate region id: "${region.id}".`);
@@ -4742,6 +4745,93 @@ var materialKindSchema$1 = _enum([
 	"design-specimen",
 	"design-demo"
 ]);
+var materialProductionEvidenceSchema = object({
+	planId: idSchema$2,
+	runId: idSchema$2,
+	taskId: idSchema$2,
+	manifestItemId: idSchema$2,
+	pageId: idSchema$2,
+	regionId: idSchema$2,
+	artifactId: idSchema$2,
+	artifactSha256: sha256Schema$6,
+	readiness: _enum([
+		"queued",
+		"generating",
+		"candidate-ready",
+		"reviewing",
+		"accepted",
+		"cutting",
+		"verifying",
+		"ready",
+		"needs-review",
+		"waived",
+		"failed",
+		"cancelled",
+		"legacy-ready"
+	]),
+	included: boolean(),
+	bounds: object({
+		x: number().nonnegative(),
+		y: number().nonnegative(),
+		width: number().positive(),
+		height: number().positive()
+	}).strict(),
+	sourceRevision: object({
+		projectRevisionId: idSchema$2,
+		designSystemArtifactId: idSchema$2.optional(),
+		pageArtifactId: idSchema$2.optional(),
+		pageArtifactSha256: sha256Schema$6.optional()
+	}).strict(),
+	cutoutParams: object({
+		threshold: number(),
+		minArea: number(),
+		mergeGap: number(),
+		padding: number()
+	}).strict().optional(),
+	boardDiagnostics: object({
+		borderWhiteRatio: number().min(0).max(1),
+		whiteRatio: number().min(0).max(1),
+		compliant: boolean()
+	}).strict().optional(),
+	qaVerdict: object({
+		pass: boolean(),
+		failures: array(string().min(1).max(2e3)),
+		unavailable: boolean().optional()
+	}).strict().optional(),
+	providerRoute: string().min(1).max(240).optional(),
+	lineage: object({
+		previousRunId: idSchema$2,
+		previousTaskId: idSchema$2,
+		previousArtifactSha256: sha256Schema$6
+	}).strict().optional(),
+	issues: array(object({
+		code: string().min(1).max(120),
+		kind: _enum([
+			"integrity",
+			"quality",
+			"warning"
+		]),
+		message: string().min(1).max(2e3),
+		waivable: boolean(),
+		source: _enum([
+			"runtime",
+			"deterministic-check",
+			"model-review",
+			"user"
+		]),
+		recordedAt: number().int().nonnegative()
+	}).strict()),
+	decision: object({
+		receiptId: idSchema$2,
+		decision: _enum(["approve", "waive"]),
+		issueCodes: array(string().min(1)),
+		actor: object({
+			kind: _enum(["human", "agent"]),
+			id: idSchema$2
+		}).strict(),
+		decidedAt: number().int().nonnegative()
+	}).strict().optional()
+}).strict();
 /**
 * Material revisions are append-only values. There is no mutable content field
 * on a material; a changed artifact is always a newly identified revision.
@@ -4751,7 +4841,8 @@ var materialRevisionSchema = object({
 	ordinal: number().int().positive(),
 	createdAt: isoDateTimeSchema,
 	content: contentReferenceSchema,
-	provenanceId: idSchema$2.optional()
+	provenanceId: idSchema$2.optional(),
+	production: materialProductionEvidenceSchema.optional()
 }).strict();
 var materialSchema = object({
 	id: idSchema$2,
@@ -5081,6 +5172,7 @@ function validateMaterial(material, provenanceIds) {
 		if (ordinals.has(revision.ordinal)) return err(`Material "${material.id}" has duplicate revision ordinal ${revision.ordinal}.`);
 		ordinals.add(revision.ordinal);
 		if (revision.provenanceId && !provenanceIds.has(revision.provenanceId)) return err(`Material revision "${revision.id}" references unknown provenance "${revision.provenanceId}".`);
+		if (revision.production && revision.content.sha256 !== revision.production.artifactSha256) return err(`Material revision "${revision.id}" production hash does not match its content.`);
 	}
 	if (!revisionIds.has(material.currentRevisionId)) return err(`Material "${material.id}" points to unknown current revision "${material.currentRevisionId}".`);
 	return ok$1(void 0);

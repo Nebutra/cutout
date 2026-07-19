@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { PrototypePlan } from './prototype-plan'
 import {
+  DEFAULT_PROTOTYPE_SUITE_SCOPE,
   pagesForScope,
   prototypeBoardExtractionBrief,
   prototypeDesignMarkdown,
@@ -8,6 +9,8 @@ import {
   prototypeDesignSystemPrompt,
   prototypePagePrompt,
 } from './generate-suite'
+import { hasExportableTokens } from './design-md-export'
+import { parseEditableDesignMarkdown } from './design-md'
 
 const plan: PrototypePlan = {
   version: 'prototype-plan.v0',
@@ -120,6 +123,15 @@ const plan: PrototypePlan = {
 }
 
 describe('prototype suite generation helpers', () => {
+  it('defaults new prototype suites to every planned route', () => {
+    expect(DEFAULT_PROTOTYPE_SUITE_SCOPE).toBe('full-plan')
+    expect(pagesForScope(plan, DEFAULT_PROTOTYPE_SUITE_SCOPE).map((page) => page.id)).toEqual([
+      'home',
+      'products',
+      'about',
+    ])
+  })
+
   it('selects only reachable primary-flow pages for the lean scope', () => {
     expect(pagesForScope(plan, 'primary-flow').map((page) => page.id)).toEqual([
       'home',
@@ -141,6 +153,10 @@ describe('prototype suite generation helpers', () => {
     expect(prompt).toContain('Generate exactly ONE high-fidelity prototype screen')
     expect(prompt).toContain('Shared design system')
     expect(prompt).toContain('Current page: Home')
+    expect(prompt).toContain('Suite route contract (all planned screens)')
+    expect(prompt).toContain('Products: /products')
+    expect(prompt).toContain('Reachable flow contract')
+    expect(prompt).toContain('navigation shell')
     expect(prompt).toContain('Hero banner')
     expect(prompt).toContain('Asset route: direct-generate')
     expect(prompt).toContain('navigate to products')
@@ -168,6 +184,8 @@ describe('prototype suite generation helpers', () => {
     expect(designMd).toContain('typography:')
     expect(designMd).toContain('spacing:')
     expect(designMd).toContain('components:')
+    expect(designMd).toContain('tokens:')
+    expect(hasExportableTokens(parseEditableDesignMarkdown(designMd))).toBe(true)
     expect(designMd).toContain('planner-authored visual contract')
     expect(designMd).toContain('# Overview')
     expect(designMd).toContain("## Do's and Don'ts")
@@ -194,6 +212,17 @@ describe('prototype suite generation helpers', () => {
     expect(designMd).not.toContain('board-cutout')
   })
 
+  it('adds a token contract when imported DESIGN.md is only semantic guidance', () => {
+    const designMd = prototypeDesignMarkdown(
+      plan,
+      '---\nname: Imported\ncolors:\n  intent:\n    - warm\n---\n# Imported\nFollow the external system.',
+    )
+
+    expect(designMd).toContain('name: Imported')
+    expect(designMd).toContain('tokens:')
+    expect(hasExportableTokens(parseEditableDesignMarkdown(designMd))).toBe(true)
+  })
+
   it('composes a visual design-system prompt from the DESIGN.md source', () => {
     const prompt = prototypeDesignSystemPrompt(plan)
 
@@ -211,6 +240,7 @@ describe('prototype suite generation helpers', () => {
     const system = prototypeDesignMarkdownSynthesisSystem(plan)
 
     expect(system).toContain('Do not include asset routing')
+    expect(system).toContain('MUST contain a `tokens` object')
     expect(system).not.toContain('Asset routing addendum')
     expect(system).not.toContain('Home / Hero banner: direct-generate')
     expect(system).not.toContain('Products / Product grid: board-cutout')

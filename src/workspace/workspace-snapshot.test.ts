@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { OutcomeRuntimeState } from '@/agent-runtime/outcome-runtime'
 import { replayRunEvents } from '@/agent-runtime/run-events'
 import {
+  createEmptyWorkspaceSnapshot,
   isWorkspaceSnapshotEmpty,
   textFingerprint,
   workspaceSnapshotFingerprint,
@@ -9,6 +10,10 @@ import {
 } from './workspace-snapshot'
 
 describe('workspace snapshot helpers', () => {
+  it('defaults new workspaces to the complete planned route suite', () => {
+    expect(createEmptyWorkspaceSnapshot().prototypeScope).toBe('full-plan')
+  })
+
   it('fingerprints same-length text changes', () => {
     expect(textFingerprint('16px')).not.toBe(textFingerprint('18px'))
   })

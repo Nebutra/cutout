@@ -1,5 +1,8 @@
 import type { PrototypePlan, PrototypePage } from '@/prototype/prototype-plan'
-import type { PrototypeSuiteScope } from '@/prototype/generate-suite'
+import {
+  DEFAULT_PROTOTYPE_SUITE_SCOPE,
+  type PrototypeSuiteScope,
+} from '@/prototype/scope'
 import type { OutcomeRuntimeState } from '@/agent-runtime/outcome-runtime'
 import type { AgentRunEventStore } from '@/agent-runtime/run-events'
 import type {
@@ -108,7 +111,7 @@ export function createEmptyWorkspaceSnapshot(
     version: 'workspace.v1',
     workflowPhase: 'idle',
     prototypePlan: null,
-    prototypeScope: 'primary-flow',
+    prototypeScope: DEFAULT_PROTOTYPE_SUITE_SCOPE,
     humanLoopChoiceId: null,
     humanLoopCustomAnswer: '',
     prototypeDesignSystem: null,

@@ -1,8 +1,13 @@
 import type { PrototypePage, PrototypePlan } from './prototype-plan'
-import { parseDesignMarkdown } from './design-md'
+import { parseDesignMarkdown, parseEditableDesignMarkdown } from './design-md'
+import { hasExportableTokens } from './design-md-export'
 import { createPrototypeAssetManifest } from './asset-manifest'
+import type { PrototypeSuiteScope } from './scope'
 
-export type PrototypeSuiteScope = 'primary-flow' | 'full-plan'
+export {
+  DEFAULT_PROTOTYPE_SUITE_SCOPE,
+  type PrototypeSuiteScope,
+} from './scope'
 
 export function pagesForScope(
   plan: PrototypePlan,
@@ -28,13 +33,26 @@ export function prototypePagePrompt(
   page: PrototypePage,
   importedDesignMarkdown?: string | null,
 ): string {
+  const routeContract = plan.pages
+    .map((candidate) =>
+      `- ${candidate.name}: ${candidate.route} — ${candidate.purpose}`,
+    )
+    .join('\n')
+  const flowContract = plan.flows
+    .map((flow) => {
+      const steps = flow.steps
+        .map((step) => `${step.fromPageId}${step.toPageId ? ` -> ${step.toPageId}` : ''}`)
+        .join(', ')
+      return `- ${flow.name}: starts at ${flow.startPageId}${steps ? `; ${steps}` : ''}`
+    })
+    .join('\n')
   const regions = page.regions
     .map((region) => {
       const assets =
         region.assetOpportunities.length > 0
           ? ` Asset opportunities: ${region.assetOpportunities.join(', ')}.`
           : ''
-      return `- ${region.name} (${region.role}, ${region.complexity}): ${region.summary}. Asset route: ${assetRouteCopy(region.assetRoute)}.${assets}`
+      return `- ${region.name} (${region.role}, ${region.complexity}): ${region.summary}. Asset route: ${assetRouteCopy(region.assetRoute)}.${assets} Render this region exactly once.`
     })
     .join('\n')
 
@@ -80,6 +98,10 @@ export function prototypePagePrompt(
     `Route: ${page.route}`,
     `Purpose: ${page.purpose}`,
     `Viewport: ${page.viewport.platform}, ${page.viewport.width}x${page.viewport.height}, ${page.viewport.scroll}`,
+    `Suite route contract (all planned screens):`,
+    routeContract,
+    `Reachable flow contract:`,
+    flowContract || '- No explicit flow steps.',
     ``,
     `Regions to compose:`,
     regions,
@@ -87,7 +109,9 @@ export function prototypePagePrompt(
     `Meaningful interactions to imply visually:`,
     interactions,
     ``,
-    `Rules: keep the same visual system as the provided design-system reference and preceding prototype reference; render only this page, no adjacent frames, no annotations, no device bezel, no asset sheet. Make the page feel reachable from the planned flow. Do not treat every UI module as a board asset: complex art-directed regions should remain visually complete for direct image/reference generation; repeated simple assets may be cleanly separable later; code-reproducible UI containers should stay as ordinary UI.`,
+    `Rules: keep the same visual system, navigation shell, component morphology, spacing rhythm, and content conventions as the provided design-system reference and anchor prototype reference. Preserve this page's exact route identity and make every declared navigation destination visually reachable. Render only this page, no adjacent frames, no annotations, no device bezel, no asset sheet. Do not treat every UI module as a board asset: complex art-directed regions should remain visually complete for direct image/reference generation; repeated simple assets may be cleanly separable later; code-reproducible UI containers should stay as ordinary UI.`,
+    ``,
+    `Text discipline (critical): all visible text must be real, short, on-domain copy rendered crisply and legibly — grounded in the plan above. Hard negatives: no lorem/pseudo-text walls, no garbled or melted glyphs, no duplicated characters, no dense fake paragraphs. If a long body-copy block cannot be rendered crisply at this viewport, prefer a clean placeholder bar over degraded text. Compose exactly the planned regions — no extra invented sections, no duplicated regions.`,
   ]
     .filter((line): line is string => typeof line === 'string')
     .join('\n')
@@ -124,7 +148,7 @@ export function prototypeDesignSystemPrompt(
     `Scene-driven reference strategy:`,
     referenceStrategy,
     ``,
-    `Rules: choose only the reference sections that are useful for this product, platform, and planned regions. Do not force a web/SaaS control board when the scene calls for a game UI, mobile app, embedded panel, editorial surface, marketplace, kiosk, or another interface type. Make the output cohesive, production-grade, crisp, organized, and directly usable as a senior design team’s internal visual contract. No device bezel, no marketing hero, no scattered asset sheet, no red measurement lines, no Figma chrome.`,
+    `Rules: choose only the reference sections that are useful for this product, platform, and planned regions. Do not force a web/SaaS control board when the scene calls for a game UI, mobile app, embedded panel, editorial surface, marketplace, kiosk, or another interface type. Make the output cohesive, production-grade, crisp, organized, and directly usable as a senior design team’s internal visual contract. No device bezel, no marketing hero, no scattered asset sheet, no red measurement lines, no Figma chrome. Text discipline: type specimens may only be short single-line samples; no paragraph pseudo-text, no lorem walls, no garbled or melted glyphs anywhere in the reference.`,
   ].join('\n')
 }
 
@@ -140,7 +164,9 @@ export function prototypeDesignMarkdownSynthesisSystem(
     'Output requirements:',
     '- Return only DESIGN.md Markdown. No code fences, no prose wrapper.',
     '- Start with YAML frontmatter between --- fences.',
-    '- Include concrete observed tokens whenever visible: colors with hex-like values or precise color names, typography scale, spacing, radii, component states, surfaces/elevation, icons/illustration treatment, asset direction, and usage rules.',
+    '- YAML frontmatter MUST contain a `tokens` object with at least five colors in #RRGGBB form, a spacing scale in px, and a radius scale in px. These are required even when the reference is more illustrative than UI-heavy.',
+    '- Keep semantic descriptions such as "warm" or "playful" in the Markdown body, never as a replacement for token values.',
+    '- Include observed typography scale, component states, surfaces/elevation, icons/illustration treatment, asset direction, and usage rules.',
     '- The Markdown body should be useful to another AI agent or design tool as portable design context.',
     '- Do not invent a different system than the image. If the image shows a token table, component samples, or example fragments, reflect those specifics.',
     '- Keep product/page planning details only where they affect reusable design rules.',
@@ -170,11 +196,17 @@ export function prototypeDesignMarkdown(
 ): string {
   const imported = importedDesignMarkdown?.trim()
   const parsedImported = imported ? parseDesignMarkdown(imported) : null
+  const importedHasTokens = imported
+    ? hasExportableTokens(parseEditableDesignMarkdown(imported))
+    : false
+  const tokenContract = plannerTokenContract()
 
   return [
     '---',
-    ...(parsedImported?.frontmatter
+    ...(parsedImported?.frontmatter && importedHasTokens
       ? [parsedImported.frontmatter]
+      : parsedImported?.frontmatter
+        ? [parsedImported.frontmatter, ...tokenContract]
       : [
           'version: alpha',
           'source: planner-design-contract',
@@ -192,6 +224,7 @@ export function prototypeDesignMarkdown(
           '  principles:',
           ...yamlList(plan.designSystem.componentPrinciples, 4),
           `assetDirection: ${yamlString(plan.designSystem.assetDirection)}`,
+          ...tokenContract,
         ]),
     '---',
     '',
@@ -244,6 +277,28 @@ export function prototypeDesignMarkdown(
     "- Don't redesign the brand language between pages.",
     "- Don't add unrelated decorative palettes, fonts, heavy shadows, device frames, or design-tool chrome.",
   ].join('\n')
+}
+
+function plannerTokenContract(): readonly string[] {
+  return [
+    'tokens:',
+    '  color:',
+    '    background: "#FFF8F2"',
+    '    surface: "#FFFFFF"',
+    '    text: "#2A211C"',
+    '    primary: "#C96A3D"',
+    '    accent: "#F2B84B"',
+    '    border: "#E7D8CB"',
+    '  spacing:',
+    '    xs: "4px"',
+    '    sm: "8px"',
+    '    md: "16px"',
+    '    lg: "24px"',
+    '  radius:',
+    '    sm: "8px"',
+    '    md: "12px"',
+    '    lg: "20px"',
+  ]
 }
 
 export function prototypeBoardExtractionBrief(

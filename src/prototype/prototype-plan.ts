@@ -185,9 +185,14 @@ export function validatePrototypePlan(
   plan: PrototypePlan,
 ): Result<PrototypePlanValidation> {
   const pageIds = new Set<string>()
+  const pageRoutes = new Set<string>()
   for (const page of plan.pages) {
     if (pageIds.has(page.id)) return err(`Duplicate page id: "${page.id}".`)
     pageIds.add(page.id)
+    if (pageRoutes.has(page.route)) {
+      return err(`Duplicate page route: "${page.route}".`)
+    }
+    pageRoutes.add(page.route)
 
     const regionIds = new Set<string>()
     for (const region of page.regions) {

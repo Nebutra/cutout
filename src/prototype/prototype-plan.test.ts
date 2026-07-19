@@ -245,6 +245,16 @@ describe('PrototypePlan', () => {
     expect(!result.ok && result.error).toContain('unknown page "missing"')
   })
 
+  it('rejects duplicate route identities without prescribing a route structure', () => {
+    const plan = structuredClone(validPlan)
+    plan.pages[1].route = plan.pages[0].route
+
+    const result = validatePrototypePlan(plan)
+
+    expect(result.ok).toBe(false)
+    expect(!result.ok && result.error).toContain('Duplicate page route: "/"')
+  })
+
   it('rejects plans with unreachable pages', () => {
     const plan = structuredClone(validPlan)
     plan.pages.push({

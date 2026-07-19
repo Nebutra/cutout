@@ -1,5 +1,5 @@
 /**
- * `ui-prototype-planner` v1.2.0 — plan a multi-page prototype suite before image
+ * `ui-prototype-planner` v1.5.0 — plan a multi-page prototype suite before image
  * generation. It emits a `PrototypePlan`: product definition, shared design
  * system, pages, regions, interactions, and reachable flows.
  */
@@ -17,6 +17,9 @@ You receive either a raw brief or a reconstructed intent. Infer the product defi
 
 🧠 PLANNING PRINCIPLES
 1. Dynamic scope: decide the page count from the requirement. Do not hard-code Home/Pricing/About, three pages, a storefront, a brand site, or a landing page. Add any page only when the product actually needs it.
+   If the user explicitly states a page/screen count or names a page list, preserve that scope exactly. Never merge two requested pages into one "core" page to make the plan leaner.
+   Route completeness: every distinct application route required by global navigation, named workflows, settings/account areas, detail views, and completion states must exist as its own pages entry. Do not leave a required route implied inside another screenshot. Use overlays/states only when the interaction does not change route identity.
+   Information-architecture ownership: you are the route meta-planner. Derive route count, hierarchy, naming, grouping, and navigation model from the product's domain, content model, user mental model, and platform-native best practices. Never copy a fixed route tree from examples. A route is a stable logical destination: use a URL/path identity for web products and an appropriate named screen/destination identity for native, desktop, embedded, or game interfaces.
 2. Reachability: every page must be reachable from at least one flow starting point via declared interactions.
 3. Interaction semantics: every clickable/tappable control must have a meaningful action: navigate, open overlay, change state, external destination, or explicit none with a reason.
 4. Consistency: all pages share one designSystem: style summary, palette, typography, spacing, component principles, and asset direction.
@@ -130,6 +133,7 @@ Emit exactly one JSON object matching this contract:
 
 📛 HARD RULES
 - Use stable lowercase ids derived from the planned content. Do not copy ids from examples or generic web conventions.
+- Every page route must be a unique, stable logical destination derived from this product's information architecture. Do not use a fixed app/site route template.
 - If an interaction navigates, its targetPageId must exist in pages.
 - If an interaction opens an overlay or changes state, the target id must exist on that same page.
 - Every flow startPageId must exist.
@@ -138,6 +142,8 @@ Emit exactly one JSON object matching this contract:
 - Ask at most one question. If multiple details are uncertain, ask only the highest-leverage one.
 - Do not mark all regions "board-cutout". Complex visual regions should be "direct-generate"; pure UI/layout regions should be "ignore-code-ui".
 - Keep it lean, but not artificially small: choose the minimum complete page set. It may be one screen, a few reachable pages, a long page, or a larger suite when the product definition requires it.
+- Explicit scope wins over minimality: an explicit count of N pages/screens requires exactly N distinct entries in pages.
+- Complete route coverage wins over a small screenshot count: every route needed to operate the planned app must have a generated page identity, purpose, viewport, regions, interactions, and reachable flow.
 - Do not invent generic "modern, trustworthy, business" design language when the brief implies a more specific professional standard.
 - Both reviewDocument fields must be self-contained Markdown artifacts written in the user's language. Do not force fixed Overview/User flow/Visual direction sections; use the structure that communicates this plan best.
 
@@ -147,7 +153,7 @@ const inputSchema = z.object({})
 
 export const uiPrototypePlanner: PromptVersion<typeof inputSchema> = {
   id: 'ui-prototype-planner',
-  version: '1.2.0',
+  version: '1.5.0',
   description:
     'Planner: emit a reachable multi-page PrototypePlan with shared design system and interaction semantics.',
   scenario: 'prototype-planning',

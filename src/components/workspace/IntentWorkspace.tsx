@@ -9,6 +9,7 @@ import {
   type ComponentType,
   type ReactNode,
 } from "react";
+import { useLingui } from "@lingui/react/macro";
 import {
   Boxes,
   Check,
@@ -21,7 +22,6 @@ import {
   Layers3,
   Loader2,
   MessageCircle,
-  MessageSquare,
   MessageSquareText,
   PackageCheck,
   PackageOpen,
@@ -32,7 +32,7 @@ import {
   PanelLeftClose,
   Plus,
   Route,
-  Scissors,
+  ScanLine,
   ShieldCheck,
   Sparkles,
   Tag,
@@ -42,7 +42,14 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { getStoreState, useStore } from "@/store";
-import { useSelectedSlice, useSource, useSlices, useStatus } from "@/store/selectors";
+import type { SliceInput } from "@/store/types";
+import {
+  isSliceConsumable,
+  useSelectedSlice,
+  useSource,
+  useSlices,
+  useStatus,
+} from "@/store/selectors";
 import { useImageImportActions } from "@/hooks/image-import-actions";
 import { useExport } from "@/hooks/useExport";
 import { useServices } from "@/services/context";
@@ -69,7 +76,6 @@ import { useProviders } from "@/hooks/queries/providers";
 import {
   useDeconstructMockup,
   useNameSlices,
-  usePrepareDeconstructMockup,
 } from "@/hooks/queries/pipeline";
 import { useLibraryUI } from "@/components/library/library-ui";
 import { RichTextArtifact } from "@/components/artifacts/RichTextArtifact";
@@ -84,13 +90,14 @@ import type {
 } from "@/prototype/prototype-plan";
 import {
   pagesForScope,
-  prototypeBoardExtractionBrief,
+  DEFAULT_PROTOTYPE_SUITE_SCOPE,
   prototypeDesignMarkdown,
   prototypeDesignMarkdownSynthesisSystem,
   prototypeDesignSystemPrompt,
   prototypePagePrompt,
   type PrototypeSuiteScope,
 } from "@/prototype/generate-suite";
+import { generatePrototypePageSet } from "@/prototype/page-generation";
 import {
   fallbackPrototypeSliceNames,
   isGenericSliceFilename,
@@ -130,13 +137,14 @@ import {
 } from "@/prototype/design-md-export";
 import {
   ASTRYX_COMMON_VARIABLES,
+  automaticAstryxMapping,
   astryxColorChoices,
   compileAstryxThemeFromDesignMarkdown,
-  suggestAstryxMapping,
   type AstryxColorChoice,
 } from "@/design-kit/astryx-design-md";
 import { astryxAgentPrompt, type AstryxBinding } from "@/design-kit/astryx";
 import { runToolLoop } from "@/agent-runtime/tool-loop";
+import { agentCapabilityContext } from "@/agent-runtime/agent-capability-context";
 import {
   askClarifyingQuestionTool,
   astryxThemeTool,
@@ -193,13 +201,25 @@ import {
   type FilesPanelNode,
 } from "@/components/files-panel/FilesPanel";
 import { bytesToBlob, blobToBytes, decodeImage } from "@/lib/image";
+import { forEachConcurrent } from "@/lib/async-pool";
 import {
   nameRegionSlices,
   runRegionBreakdown,
-  selectBoardCutoutRegions,
+  selectPagesWithBoardCutouts,
   sliceRegionBoardBitmap,
 } from "@/prototype/region-deconstruct";
+import {
+  buildPageChecklist,
+  generateWithQa,
+  reviewGeneratedImage,
+} from "@/prototype/generation-qa";
 import { cn } from "@/lib/utils";
+
+// Vision QA gate over generated pages and region boards (reject/re-roll with
+// lesson feedback). Retries are paid image calls — keep the budget small.
+const PROTOTYPE_QA_ENABLED = true;
+const PROTOTYPE_QA_MAX_RETRIES = 1;
+const PROTOTYPE_GENERATION_CONCURRENCY = 2;
 import {
   persistReferenceAttachment,
   useReferenceAttachments,
@@ -210,7 +230,6 @@ import {
   type PrototypeRepairPlan,
 } from "@/agent-runtime/prototype-repair";
 import { buildAgentViewModel } from "@/components/agent-workspace/agent-view-model";
-import { projectCanvasSelection } from "./canvas-inspector-model";
 import {
   assertImpactPlanCurrent,
   buildMaterialImpactPlan,
@@ -225,6 +244,7 @@ import {
 } from "@/agent-runtime/run-coordinator";
 import { useAgentRunEvents } from "@/agent-runtime/use-agent-run-events";
 import { consumeComposerDraft } from "./composer-draft";
+import { createLiveTextBatcher } from "./live-agent-output";
 import { useDesktopToolLoop } from "@/agent-runtime/use-desktop-tool-loop";
 import {
   decideVariant,
@@ -235,6 +255,26 @@ import {
   type CreativeVariantDecision,
 } from "@/agent-runtime/creative-board-decisions";
 import { createPrototypePageVisualTask } from "@/prototype/visual-task";
+import {
+  assignBoardCandidates,
+  beginPrototypeProduction,
+  cancelPrototypeProduction,
+  carryPrototypeTaskPublication,
+  compilePrototypeProductionPlan,
+  currentProductionRunId,
+  failPrototypeTask,
+  finalizePrototypeProduction,
+  integrityIssue,
+  isConsumableTask,
+  projectProductionMaterials,
+  prototypeDirectAssetChecklist,
+  prototypeDirectAssetPrompt,
+  publishPrototypeTaskArtifact,
+  qualityIssue,
+  type ProductionArtifactRef,
+  type ProductionIssue,
+  type ProductionRunStatus,
+} from "@/asset-production";
 
 type AssetStageId =
   | "idle"
@@ -259,7 +299,7 @@ interface AssetStage {
 }
 
 const CUSTOM_HUMAN_LOOP_ID = "__custom__";
-const SERIAL_REFERENCE_PAGE_LIMIT = 4;
+const SERIAL_REFERENCE_PAGE_LIMIT = 1;
 type DesignMarkdownAsset = ReturnType<
   typeof useStore.getState
 >["designMarkdown"];
@@ -273,6 +313,7 @@ export function IntentWorkspace({
   readonly advanced?: boolean;
   readonly onOpenAdvanced?: () => void;
 }) {
+  const { t } = useLingui();
   const services = useServices();
   const dockAttachInputRef = useRef<HTMLInputElement | null>(null);
   const initialWorkspace = useStore((s) => s.workspaceSnapshot);
@@ -329,7 +370,7 @@ export function IntentWorkspace({
     () => initialWorkspace?.prototypePlan ?? null,
   );
   const [prototypeScope, setPrototypeScope] = useState<PrototypeSuiteScope>(
-    () => initialWorkspace?.prototypeScope ?? "primary-flow",
+    () => initialWorkspace?.prototypeScope ?? DEFAULT_PROTOTYPE_SUITE_SCOPE,
   );
   const [humanLoopChoiceId, setHumanLoopChoiceId] = useState<string | null>(
     () => initialWorkspace?.humanLoopChoiceId ?? null,
@@ -470,6 +511,11 @@ export function IntentWorkspace({
   const slices = useSlices();
   const selectedSlice = useSelectedSlice();
   const analysisStatus = useStatus();
+  const assetProduction = useStore((state) => state.assetProduction);
+  const productionStatusRunId = currentProductionRunId(assetProduction);
+  const productionStatus = productionStatusRunId
+    ? assetProduction.runs[productionStatusRunId]?.status ?? null
+    : null;
   const assignments = useModelAssignments();
   const providers = useProviders();
   const desktopTools = useDesktopToolLoop({
@@ -489,17 +535,18 @@ export function IntentWorkspace({
       }),
     [],
   );
-  const { mutateAsync: deconstructMockup, isPending: deconstructing } =
+  const { isPending: deconstructing } =
     useDeconstructMockup(() => lockedRouteRef.current?.image);
-  const prepareDeconstruct = usePrepareDeconstructMockup();
   const { mutateAsync: nameSlices, isPending: naming } = useNameSlices(
     () => lockedRouteRef.current?.chat,
   );
 
   const hasSource = Boolean(source.bitmap);
   const hasSlices = slices.length > 0;
+  const exportableSliceCount = slices.filter(
+    (slice) => slice.included && isSliceConsumable(slice),
+  ).length;
   const materialRefs = useMemo<readonly MaterialRef[]>(() => {
-    const sourcePageId = prototypePages[0]?.page.id;
     return [
       ...(prototypeDesignSystem
         ? [
@@ -526,12 +573,26 @@ export function IntentWorkspace({
         version: `${slice.blob.size}:${slice.width}x${slice.height}:${slice.box.x},${slice.box.y}`,
         provenance: {
           source: "page-deconstruction" as const,
-          sourcePageId,
+          sourcePageId: slice.pageId ?? undefined,
           independentlyEditable: false,
         },
       })),
     ];
   }, [prototypeDesignSystem, prototypePages, slices]);
+
+  async function selectedMaterialReferenceBytes(
+    material: MaterialRef | null,
+  ): Promise<Uint8Array | undefined> {
+    if (!material) return undefined;
+    if (material.kind === "design-system") {
+      return prototypeDesignSystem?.bytes;
+    }
+    if (material.kind === "prototype-page") {
+      return prototypePages.find((page) => page.page.id === material.id)?.bytes;
+    }
+    const slice = slices.find((candidate) => candidate.id === material.id);
+    return slice ? blobToBytes(slice.blob) : undefined;
+  }
   const impactPlan = useMemo(
     () =>
       buildMaterialImpactPlan(selectedMaterial, {
@@ -687,6 +748,7 @@ export function IntentWorkspace({
     hasPlan: Boolean(prototypePlan),
     hasDesignSystem: Boolean(prototypeDesignSystem),
     hasPrototypePages: prototypePages.length > 0,
+    productionStatus,
   });
   const elapsedSeconds = useElapsedSeconds(runStartedAt, working);
   const stages = buildAssetStages({
@@ -698,6 +760,7 @@ export function IntentWorkspace({
     hasPlan: Boolean(prototypePlan),
     hasDesignSystem: Boolean(prototypeDesignSystem),
     hasPrototypePages: prototypePages.length > 0,
+    productionStatus,
   });
   const projectedOutcome = useMemo(
     () =>
@@ -720,18 +783,15 @@ export function IntentWorkspace({
           page: artifact.page,
           revision: prototypeImageVersion(artifact),
         })),
-        slices: slices.map((slice) => ({
-          id: slice.id,
-          name: slice.name,
-          revision: `${slice.blob.size}:${slice.width}x${slice.height}:${slice.box.x},${slice.box.y}`,
+        assets: projectProductionMaterials(assetProduction).map((material) => ({
+          id: material.taskId,
+          manifestItemId: material.manifestItemId,
+          label: slices.find((slice) => slice.productionTaskId === material.taskId)?.name,
+          revision: material.artifact.sha256,
         })),
-        // Only a completed naming pass may turn existing slices into evidence for
-        // this plan. Preserved canvas output from an older run stays visible but
-        // cannot close the current outcome contract.
-        slicesReady: namingStatus === "done" || namingStatus === "skipped",
       }),
     [
-      namingStatus,
+      assetProduction,
       importedDesignMarkdown?.content,
       prototypeArtifacts,
       prototypePlan,
@@ -1186,6 +1246,11 @@ export function IntentWorkspace({
         : null);
     if ((mode === "repair" || requestedMaterial) && (!prototypePlan || !repair))
       return;
+    const materialReference = await selectedMaterialReferenceBytes(requestedMaterial);
+    if (requestedMaterial && !materialReference) {
+      setRunError("The selected material is no longer available. Select it again before requesting changes.");
+      return;
+    }
     const [
       { createPersonalizationService },
       { createPersonalizationRuntimeContext, personalizeGenerationService },
@@ -1387,6 +1452,7 @@ export function IntentWorkspace({
                   plannedImpact.effectiveTarget?.kind === "prototype-page"
                 ? [plannedImpact.effectiveTarget.id]
                 : undefined,
+          materialReference,
         },
         lease,
       );
@@ -1522,6 +1588,7 @@ export function IntentWorkspace({
       askTool,
       replyTool,
     ].filter((tool) => tool !== null);
+    const capabilityContext = agentCapabilityContext(tools);
     const actionableToolCount = [
       astryxTool,
       regenerationTool,
@@ -1575,6 +1642,8 @@ export function IntentWorkspace({
           "produce a better result. Preserve every concrete requirement; do not add scope.",
         "If none of these fit, call nothing — it falls through to the design pipeline with the " +
           "original message unchanged.",
+        "",
+        capabilityContext,
         "",
         `User: ${text}`,
       ]
@@ -1666,6 +1735,7 @@ export function IntentWorkspace({
         reply,
         chat,
         lease,
+        capabilityContext,
       );
       if (!agentRunCoordinatorRef.current.isActive(lease)) {
         return {
@@ -1907,6 +1977,8 @@ export function IntentWorkspace({
       readonly startFresh?: boolean;
       readonly repair?: PrototypeRepairPlan;
       readonly targetPageIds?: readonly string[];
+      /** Exact selected material bytes, retained as a visual conditioning reference. */
+      readonly materialReference?: Uint8Array;
       /** Overrides the page-count heuristic below when the user explicitly asked for one or the other. */
       readonly forceParallel?: boolean;
     },
@@ -1972,14 +2044,11 @@ export function IntentWorkspace({
     }
     setWorkflowPhase("design-system");
 
-    const deconstructPreflight = prepareDeconstruct(
-      prototypeBoardExtractionBrief(plan, pages, text),
-      pages.length,
-    );
     const chat = route.chat;
     const generationContext = selectedMaterial
       ? [
           importedDesignMarkdown?.content,
+          `An exact visual reference of the selected material is attached. Preserve its identity unless the requested correction explicitly changes it.`,
           `Requested correction for ${selectedMaterial.kind} "${selectedMaterial.label}":\n${text}`,
         ]
           .filter(Boolean)
@@ -1993,6 +2062,7 @@ export function IntentWorkspace({
         image,
         chat,
         generationContext,
+        options.materialReference,
         lease,
       ));
     if (!reusableDesignSystem) setPrototypeDesignSystem(designSystem);
@@ -2032,19 +2102,23 @@ export function IntentWorkspace({
               plan,
               pages,
               image,
+              route.chat,
               designSystem,
               lease,
               generationContext,
               reusablePages,
+              options.materialReference,
             )
           : await generatePagesParallel(
               plan,
               pages,
               image,
+              route.chat,
               designSystem,
               lease,
               generationContext,
               reusablePages,
+              options.materialReference,
             );
     agentRunCoordinatorRef.current.checkpoint(lease);
     const first = options.targetPageIds?.length
@@ -2061,26 +2135,331 @@ export function IntentWorkspace({
     agentRunCoordinatorRef.current.checkpoint(lease);
     setMockup(nextMockup);
 
-    const referenceBytes = generated
-      .filter((artifact) => artifact.page.id !== first.page.id)
-      .map((artifact) => artifact.bytes);
+    const productionRunId = `asset-production:${lease.id}`;
+    const pageSources = await Promise.all(
+      generated.map(async (artifact) => ({
+        page: artifact.page,
+        bytes: artifact.bytes,
+        artifactId: await desktopTools.persistReference(
+          artifact.bytes,
+          artifact.mediaType,
+          productionRunId,
+        ),
+      })),
+    );
+    const designSystemArtifactId = await desktopTools.persistReference(
+      designSystem.bytes,
+      designSystem.mediaType,
+      productionRunId,
+    );
+    const productionPlan = await compilePrototypeProductionPlan({
+      projectRevisionId:
+        designDocument?.revision.id
+        ?? `workspace-revision:${designSystemArtifactId.slice(-24)}`,
+      designSystemArtifactId,
+      manifest: assetManifest,
+      pages: pageSources,
+    });
+    let productionSnapshot = getStoreState().assetProduction;
+    const startedProduction = beginPrototypeProduction({
+      snapshot: productionSnapshot,
+      plan: productionPlan,
+      runId: productionRunId,
+      at: Date.now(),
+    });
+    const commitProduction = (next: typeof productionSnapshot) => {
+      const expectedRevision = productionSnapshot.revision;
+      if (!getStoreState().commitAssetProduction(expectedRevision, next)) {
+        throw new Error("Asset production changed while this prototype run was active.");
+      }
+      productionSnapshot = next;
+    };
+    commitProduction(startedProduction);
 
-    // Per-region breakdown: when the page has board-cutout regions, deconstruct
-    // each region on its own scoped board (fewer dropped assets than one board
-    // for the whole page) and stream the region-tagged slices in as each
-    // finishes. Falls back to the legacy whole-page board when a page has no
-    // board-cutout regions.
-    const boardRegions = selectBoardCutoutRegions(first.page);
-    if (boardRegions.length > 0) {
+    const requestedRepairRegions = new Set(options.repair?.targetRegionIds ?? []);
+    const previousRun = Object.values(productionSnapshot.runs)
+      .filter(
+        (run) =>
+          run.runId !== productionRunId &&
+          run.planHash === productionPlan.planHash &&
+          run.status !== "cancelled",
+      )
+      .sort((left, right) => right.startedAt - left.startedAt)[0];
+    const targetsKnownTask = productionPlan.tasks.some((task) =>
+      requestedRepairRegions.has(task.regionId),
+    );
+    const canCarryRepair =
+      requestedRepairRegions.size > 0 &&
+      targetsKnownTask &&
+      Boolean(previousRun) &&
+      productionPlan.tasks
+        .filter((task) => !requestedRepairRegions.has(task.regionId))
+        .every((task) => {
+          const state = previousRun?.tasks[task.taskId];
+          return Boolean(
+            state &&
+            (state.output ?? state.candidate) &&
+            ["ready", "waived"].includes(state.status),
+          );
+        });
+    const executionTargetRegions = canCarryRepair ? requestedRepairRegions : null;
+    const carriedBindings: Array<{
+      taskId: string;
+      outputArtifactId: string;
+      readiness: "ready" | "waived";
+    }> = [];
+    if (executionTargetRegions && previousRun) {
+      for (const task of productionPlan.tasks) {
+        if (executionTargetRegions.has(task.regionId)) continue;
+        commitProduction(
+          carryPrototypeTaskPublication({
+            snapshot: productionSnapshot,
+            fromRunId: previousRun.runId,
+            toRunId: productionRunId,
+            taskId: task.taskId,
+            at: Date.now(),
+          }),
+        );
+        const state = productionSnapshot.runs[productionRunId]!.tasks[task.taskId]!;
+        const artifact = state.output ?? state.candidate;
+        if (artifact && (state.status === "ready" || state.status === "waived")) {
+          carriedBindings.push({
+            taskId: task.taskId,
+            outputArtifactId: artifact.artifactId,
+            readiness: state.status,
+          });
+        }
+      }
+    }
+
+    const regionRunId = getStoreState().beginSliceProjection(
+      executionTargetRegions ? [...executionTargetRegions] : undefined,
+    );
+    if (carriedBindings.length > 0) {
+      getStoreState().rebindProductionSliceProjection(
+        productionRunId,
+        carriedBindings,
+      );
+    }
+    autoNamePendingRef.current = false;
+    const failedRegions = new Set<string>();
+    const failOpenTasks = (message: string) => {
+      const run = productionSnapshot.runs[productionRunId];
+      if (!run) return;
+      for (const task of productionPlan.tasks) {
+        const status = run.tasks[task.taskId]?.status;
+        if (!status || ["ready", "waived", "legacy-ready", "failed", "cancelled"].includes(status)) {
+          continue;
+        }
+        commitProduction(
+          failPrototypeTask({
+            snapshot: productionSnapshot,
+            runId: productionRunId,
+            taskId: task.taskId,
+            issues: [integrityIssue("production-interrupted", message)],
+            at: Date.now(),
+          }),
+        );
+      }
+    };
+
+    try {
+      const directTasks = productionPlan.tasks.filter(
+        (candidate) =>
+          candidate.route === "direct-generate" &&
+          (!executionTargetRegions || executionTargetRegions.has(candidate.regionId)),
+      );
+      await forEachConcurrent(
+        directTasks,
+        PROTOTYPE_GENERATION_CONCURRENCY,
+        async (task) => {
+        const pageArtifact = generated.find(
+          (candidate) => candidate.page.id === task.pageId,
+        );
+        if (!pageArtifact) {
+          commitProduction(
+            failPrototypeTask({
+              snapshot: productionSnapshot,
+              runId: productionRunId,
+              taskId: task.taskId,
+              issues: [
+                integrityIssue(
+                  "direct-source-missing",
+                  `Source page ${task.pageId} is unavailable for ${task.manifestItemId}.`,
+                ),
+              ],
+              at: Date.now(),
+            }),
+          );
+          failedRegions.add(task.regionId);
+          return;
+        }
+        try {
+          agentRunCoordinatorRef.current.checkpoint(lease);
+          const directPrompt = prototypeDirectAssetPrompt({
+            task,
+            page: pageArtifact.page,
+            styleSummary: plan.designSystem.styleSummary,
+            assetDirection: plan.designSystem.assetDirection,
+          });
+          const providerKind = (providers.data ?? []).find(
+            (provider) => provider.id === image.providerId,
+          )?.kind;
+          const useEdit =
+            providerKind === "openai" || providerKind === "openai-compatible";
+          const references = [pageArtifact.bytes, designSystem.bytes];
+          let generatedAsset: { readonly bytes: Uint8Array; readonly mediaType: string } | null = null;
+          const directOutcome = await generateWithQa({
+            basePrompt: directPrompt,
+            generate: async (prompt, signal) => {
+              const result = useEdit
+                ? await personalizedGenerationRef.current.editImage({
+                    providerId: image.providerId,
+                    model: image.model,
+                    prompt,
+                    images: references,
+                    inputFidelity: "high",
+                    signal,
+                  })
+                : await personalizedGenerationRef.current.generateImages({
+                    providerId: image.providerId,
+                    model: image.model,
+                    system: prompt,
+                    input: [
+                      { type: "text", text: prompt },
+                      ...references.map((reference) => ({
+                        type: "image" as const,
+                        image: reference,
+                      })),
+                    ],
+                    signal,
+                  });
+              if (isErr(result)) throw new Error(result.error);
+              const asset = result.data[0];
+              if (!asset) throw new Error(`No direct asset returned for ${task.manifestItemId}.`);
+              generatedAsset = asset;
+              return asset.bytes;
+            },
+            review: (bytes, signal) =>
+              reviewGeneratedImage(
+                personalizedGenerationRef.current,
+                route.chat,
+                bytes,
+                prototypeDirectAssetChecklist(task),
+                signal,
+              ),
+            maxRetries: PROTOTYPE_QA_MAX_RETRIES,
+            signal: lease.controller.signal,
+          });
+          if (!generatedAsset) {
+            throw new Error(`No direct asset returned for ${task.manifestItemId}.`);
+          }
+          const decoded = await decodePrototypeImage(
+            generatedAsset,
+            (base) => base,
+          );
+          const persisted = await desktopTools.persistCutout(
+            decoded.bytes,
+            decoded.mediaType,
+            productionRunId,
+          );
+          const artifactRef: ProductionArtifactRef = {
+            ...persisted,
+            mediaType: decoded.mediaType,
+            width: decoded.width,
+            height: decoded.height,
+          };
+          const reviewIssues: ProductionIssue[] = directOutcome.verdict.pass
+            ? []
+            : [
+                qualityIssue(
+                  directOutcome.verdict.unavailable
+                    ? "direct-qa-unavailable"
+                    : "direct-qa-rejected",
+                  directOutcome.verdict.failures.join(" ") || "Direct asset QA rejected the output.",
+                ),
+              ];
+          commitProduction(
+            publishPrototypeTaskArtifact({
+              snapshot: productionSnapshot,
+              runId: productionRunId,
+              taskId: task.taskId,
+              artifact: artifactRef,
+              reviewIssues,
+              evidence: {
+                sourceArtifactId: pageSources.find(
+                  (source) => source.page.id === task.pageId,
+                )?.artifactId,
+                bounds: { x: 0, y: 0, width: decoded.width, height: decoded.height },
+                qaVerdict: {
+                  ...directOutcome.verdict,
+                  failures: [...directOutcome.verdict.failures],
+                },
+                providerRoute: `${image.providerId}/${image.model}`,
+              },
+              at: Date.now(),
+            }),
+          );
+          const taskState = productionSnapshot.runs[productionRunId]!.tasks[task.taskId]!;
+          getStoreState().appendSliceProjection(regionRunId, {
+            slices: [
+              {
+                id: `direct:${task.taskId}`,
+                index: 0,
+                box: { x: 0, y: 0, width: decoded.width, height: decoded.height },
+                blob: decoded.blob,
+                width: decoded.width,
+                height: decoded.height,
+                included: isConsumableTask(taskState),
+                reviewIssues: taskState.issues.map((issue) => issue.message),
+                regionId: task.regionId,
+                pageId: task.pageId,
+                assetManifestItemId: task.manifestItemId,
+                productionTaskId: task.taskId,
+                productionRunId,
+                outputArtifactId: artifactRef.artifactId,
+                readiness: taskState.status,
+              },
+            ],
+          });
+          getStoreState().renameSlice(
+            `direct:${task.taskId}`,
+            task.label ?? task.manifestItemId,
+          );
+        } catch (error) {
+          if (lease.controller.signal.aborted) throw error;
+          commitProduction(
+            failPrototypeTask({
+              snapshot: productionSnapshot,
+              runId: productionRunId,
+              taskId: task.taskId,
+              issues: [
+                integrityIssue(
+                  "direct-generation-failed",
+                  error instanceof Error ? error.message : String(error),
+                ),
+              ],
+              at: Date.now(),
+            }),
+          );
+          failedRegions.add(task.regionId);
+        }
+        },
+      );
+
+      const extractionPageIds = new Set(
+        selectPagesWithBoardCutouts(generated.map((artifact) => artifact.page)).map(
+          (page) => page.id,
+        ),
+      );
+      const extractionTargets = generated.filter((artifact) =>
+        extractionPageIds.has(artifact.page.id),
+      );
       const cutoutParams = getStoreState().params;
-      const retryRegions = options.repair?.targetRegionIds ?? [];
-      const regionRunId = getStoreState().beginRegionSlices(retryRegions);
-      // The per-region path names each region's slices itself (below), so the
-      // whole-board auto-naming effect must NOT also fire — it reads
-      // source.bitmap (never set here) and would throw, flipping namingStatus
-      // to 'error' on an otherwise-successful, already-named run.
-      autoNamePendingRef.current = false;
-      try {
+      for (const artifact of extractionTargets) {
+        const referenceBytes = generated
+          .filter((candidate) => candidate.page.id !== artifact.page.id)
+          .map((candidate) => candidate.bytes);
         const breakdown = await runRegionBreakdown(
           {
             generation: personalizedGenerationRef.current,
@@ -2088,8 +2467,6 @@ export function IntentWorkspace({
             decode: (bytes) => decodeImage(bytesToBlob(bytes, "image/png")),
             slice: (bitmap, regionId, pageId, signal) =>
               sliceRegionBoardBitmap(bitmap, cutoutParams, regionId, pageId, signal),
-            // Name each region's slices in one region-primed vision call, run
-            // concurrently with the next region's board generation.
             nameRegion: (boardBytes, slices, context, signal) =>
               nameRegionSlices(
                 personalizedGenerationRef.current,
@@ -2099,62 +2476,268 @@ export function IntentWorkspace({
                 context,
                 signal,
               ),
+            reviewBoard: PROTOTYPE_QA_ENABLED
+              ? (boardBytes, checklist, signal) =>
+                  reviewGeneratedImage(
+                    personalizedGenerationRef.current,
+                    route.chat,
+                    boardBytes,
+                    checklist,
+                    signal,
+                  )
+              : undefined,
           },
           {
-            page: first.page,
-            pageBytes: first.bytes,
+            page: artifact.page,
+            pageBytes: artifact.bytes,
             referenceImages: referenceBytes,
             image,
             signal: lease.controller.signal,
-            targetRegionIds: options.repair?.targetRegionIds.length
-              ? options.repair.targetRegionIds
+            targetRegionIds: executionTargetRegions
+              ? [...executionTargetRegions]
               : undefined,
-            onRegionSliced: (regionId, slices) => {
-              // A newer submission may have superseded this run mid-stream; the
-              // store's runId guard drops the append, but skip the work too.
-              if (!agentRunCoordinatorRef.current.isActive(lease)) return;
-              const manifestItems = assetManifest.assets.filter(
-                (item) => item.pageId === first.page.id && item.regionId === regionId,
+            qaMaxRetries: PROTOTYPE_QA_MAX_RETRIES,
+            regionConcurrency: PROTOTYPE_GENERATION_CONCURRENCY,
+            textFreeSource: true,
+            onTextFreeSourceError: (message) =>
+              console.info("[Cutout] text-free page variant failed, using original:", message),
+            onRegionSliced: async (regionId, slices, evidence) => {
+              agentRunCoordinatorRef.current.checkpoint(lease);
+              const tasks = productionPlan.tasks.filter(
+                (task) =>
+                  task.route === "board-cutout" &&
+                  task.pageId === artifact.page.id &&
+                  task.regionId === regionId,
               );
-              getStoreState().appendRegionSlices(regionRunId, {
-                slices: slices.map((slice, index) => ({
-                  ...slice,
-                  assetManifestItemId: manifestItems[index]?.id ?? null,
-                })),
-              });
+              const boardGroupId = tasks[0]?.boardGroupId;
+              const layout = productionPlan.boardLayouts.find(
+                (candidate) => candidate.boardGroupId === boardGroupId,
+              );
+              if (!layout || tasks.length === 0) {
+                throw new Error(`Board layout is unavailable for ${artifact.page.id}/${regionId}.`);
+              }
+              const persistedCandidates = await Promise.all(
+                slices.map(async (slice) => {
+                  const bytes = await blobToBytes(slice.blob);
+                  const persisted = await desktopTools.persistCutout(
+                    bytes,
+                    slice.blob.type || "image/png",
+                    productionRunId,
+                  );
+                  return {
+                    slice,
+                    candidate: {
+                      box: slice.box,
+                      artifact: {
+                        ...persisted,
+                        mediaType: slice.blob.type || "image/png",
+                        width: slice.width,
+                        height: slice.height,
+                      } satisfies ProductionArtifactRef,
+                    },
+                  };
+                }),
+              );
+              const assignment = assignBoardCandidates(
+                layout,
+                {
+                  width: evidence.boardWidth,
+                  height: evidence.boardHeight,
+                  candidates: persistedCandidates.map((item) => item.candidate),
+                },
+                Date.now(),
+              );
+              const qualityIssues: ProductionIssue[] = [];
+              if (!evidence.qaVerdict) {
+                qualityIssues.push(
+                  qualityIssue(
+                    "board-qa-unavailable",
+                    "Board QA did not produce a verdict.",
+                  ),
+                );
+              } else if (!evidence.qaVerdict.pass) {
+                qualityIssues.push(
+                  qualityIssue(
+                    evidence.qaVerdict.unavailable
+                      ? "board-qa-unavailable"
+                      : "board-qa-rejected",
+                    evidence.qaVerdict.failures.join(" ") || "Board QA rejected the output.",
+                  ),
+                );
+              }
+              if (!evidence.diagnostics.compliant) {
+                qualityIssues.push(
+                  qualityIssue(
+                    "board-background-noncompliant",
+                    `Board border white ratio ${(evidence.diagnostics.borderWhiteRatio * 100).toFixed(1)}% is below policy.`,
+                    "deterministic-check",
+                  ),
+                );
+              }
+
+              const projected: SliceInput[] = [];
+              for (const task of tasks) {
+                const assigned = assignment.byTaskId.get(task.taskId);
+                if (!assigned) {
+                  commitProduction(
+                    failPrototypeTask({
+                      snapshot: productionSnapshot,
+                      runId: productionRunId,
+                      taskId: task.taskId,
+                      issues:
+                        assignment.issues.length > 0
+                          ? assignment.issues
+                          : [
+                              integrityIssue(
+                                "board-slot-empty",
+                                `No output was assigned to ${task.manifestItemId}.`,
+                              ),
+                            ],
+                      at: Date.now(),
+                    }),
+                  );
+                  continue;
+                }
+                const source = persistedCandidates.find(
+                  (item) => item.candidate === assigned,
+                );
+                if (!source) {
+                  commitProduction(
+                    failPrototypeTask({
+                      snapshot: productionSnapshot,
+                      runId: productionRunId,
+                      taskId: task.taskId,
+                      issues: [
+                        integrityIssue(
+                          "board-candidate-source-missing",
+                          `Assigned output bytes are unavailable for ${task.manifestItemId}.`,
+                        ),
+                      ],
+                      at: Date.now(),
+                    }),
+                  );
+                  continue;
+                }
+                commitProduction(
+                  publishPrototypeTaskArtifact({
+                    snapshot: productionSnapshot,
+                    runId: productionRunId,
+                    taskId: task.taskId,
+                    artifact: assigned.artifact,
+                    reviewIssues: [...assignment.issues, ...qualityIssues],
+                    evidence: {
+                      sourceArtifactId: pageSources.find(
+                        (source) => source.page.id === task.pageId,
+                      )?.artifactId,
+                      bounds: source?.slice.box,
+                      cutoutParams,
+                      boardDiagnostics: evidence.diagnostics,
+                      qaVerdict: evidence.qaVerdict
+                        ? {
+                            ...evidence.qaVerdict,
+                            failures: [...evidence.qaVerdict.failures],
+                          }
+                        : undefined,
+                      providerRoute: `${image.providerId}/${image.model}`,
+                    },
+                    at: Date.now(),
+                  }),
+                );
+                const taskState = productionSnapshot.runs[productionRunId]!.tasks[task.taskId]!;
+                projected.push({
+                  ...source.slice,
+                  included: isConsumableTask(taskState),
+                  reviewIssues: taskState.issues.map((issue) => issue.message),
+                  assetManifestItemId: task.manifestItemId,
+                  productionTaskId: task.taskId,
+                  productionRunId,
+                  outputArtifactId: assigned.artifact.artifactId,
+                  readiness: taskState.status,
+                });
+              }
+              if (projected.length > 0) {
+                getStoreState().appendSliceProjection(regionRunId, { slices: projected });
+              }
+              if (assignment.issues.length > 0) {
+                failedRegions.add(regionId);
+                throw new Error(
+                  assignment.issues.map((issue) => issue.message).join(" "),
+                );
+              }
             },
             onRegionNamed: (renames) => {
               if (!agentRunCoordinatorRef.current.isActive(lease)) return;
-              const rename = getStoreState().renameSlice;
-              for (const { id, name } of renames) rename(id, name);
+              for (const { id, name } of renames) getStoreState().renameSlice(id, name);
             },
-            onRegionError: (regionId, message) =>
-              console.info("[Cutout] region deconstruct failed:", regionId, message),
+            onRegionQa: (regionId, attempt, verdict) => {
+              if (!verdict.pass) {
+                console.info("[Cutout] board QA rejected:", regionId, attempt, verdict.failures);
+              }
+            },
+            onRegionDiagnostics: (regionId, diagnostics) => {
+              if (!diagnostics.compliant) {
+                console.info(
+                  "[Cutout] board background non-compliant:",
+                  regionId,
+                  `border ${(diagnostics.borderWhiteRatio * 100).toFixed(1)}% white`,
+                );
+              }
+            },
+            onRegionError: (regionId, message) => {
+              failedRegions.add(regionId);
+              const tasks = productionPlan.tasks.filter(
+                (task) =>
+                  task.pageId === artifact.page.id &&
+                  task.regionId === regionId &&
+                  task.route === "board-cutout",
+              );
+              for (const task of tasks) {
+                const status = productionSnapshot.runs[productionRunId]?.tasks[task.taskId]?.status;
+                if (status !== "queued" && status !== "generating") continue;
+                commitProduction(
+                  failPrototypeTask({
+                    snapshot: productionSnapshot,
+                    runId: productionRunId,
+                    taskId: task.taskId,
+                    issues: [integrityIssue("board-production-failed", message)],
+                    at: Date.now(),
+                  }),
+                );
+              }
+            },
           },
         );
         agentRunCoordinatorRef.current.checkpoint(lease);
-        if (breakdown.failedRegionIds.length > 0) {
-          setFailedRegionIds(breakdown.failedRegionIds);
-          throw new Error(
-            `Reusable material extraction failed for regions: ${breakdown.failedRegionIds.join(", ")}. Retry will target only these regions.`,
+        for (const regionId of breakdown.failedRegionIds) failedRegions.add(regionId);
+      }
+
+      if (failedRegions.size > 0) {
+        setFailedRegionIds([...failedRegions]);
+        throw new Error(
+          `Reusable material production failed for regions: ${[...failedRegions].join(", ")}.`,
+        );
+      }
+      setFailedRegionIds([]);
+    } catch (error) {
+      if (lease.controller.signal.aborted || !agentRunCoordinatorRef.current.isActive(lease)) {
+        const status = productionSnapshot.runs[productionRunId]?.status;
+        if (status !== "completed" && status !== "cancelled") {
+          commitProduction(
+            cancelPrototypeProduction(productionSnapshot, productionRunId, Date.now()),
           );
         }
-        setFailedRegionIds([]);
-      } finally {
-        // Always clear the streaming run's 'running' status — even when
-        // runRegionBreakdown throws on cancel — so the cutout edge doesn't
-        // spin forever. runId-guarded: a no-op once a newer run took over.
-        getStoreState().finishRegionSlices(regionRunId);
-        if (agentRunCoordinatorRef.current.isActive(lease)) {
-          setNamingStatus("done");
-        }
+      } else {
+        failOpenTasks(error instanceof Error ? error.message : String(error));
       }
-    } else {
-      await deconstructMockup({
-        preflight: deconstructPreflight,
-        referenceImages: referenceBytes,
-        signal: lease.controller.signal,
-      });
+      throw error;
+    } finally {
+      if (productionSnapshot.runs[productionRunId]?.status !== "cancelled") {
+        commitProduction(
+          finalizePrototypeProduction(productionSnapshot, productionRunId, Date.now()),
+        );
+      }
+      getStoreState().finishSliceProjection(regionRunId);
+      if (agentRunCoordinatorRef.current.isActive(lease)) setNamingStatus("done");
     }
     agentRunCoordinatorRef.current.checkpoint(lease);
   }
@@ -2164,6 +2747,7 @@ export function IntentWorkspace({
     image: ModelAssignment,
     chat: ModelAssignment,
     designMarkdown: string | undefined,
+    materialReference: Uint8Array | undefined,
     lease: AgentRunLease,
   ): Promise<PrototypeDesignSystemArtifact> {
     agentRunCoordinatorRef.current.checkpoint(lease);
@@ -2174,9 +2758,12 @@ export function IntentWorkspace({
     // Attached reference images condition the design system on the user's visual
     // direction (垫图, via editImage). editImage is provider-specific, so on
     // failure — or with no attachments — fall back to a plain prompt generate.
-    const references = await Promise.all(
-      attachments.map((attachment) => blobToBytes(attachment.blob)),
-    );
+    const references = [
+      ...(await Promise.all(
+        attachments.map((attachment) => blobToBytes(attachment.blob)),
+      )),
+      ...(materialReference ? [materialReference] : []),
+    ];
     agentRunCoordinatorRef.current.checkpoint(lease);
     const runId = `workspace:${lease.id}`;
     const edited =
@@ -2195,6 +2782,11 @@ export function IntentWorkspace({
     // A provider may resolve an aborted edit as an error result instead of
     // throwing AbortError. Never enter the paid fallback after cancellation.
     agentRunCoordinatorRef.current.checkpoint(lease);
+    if (materialReference && !edited) {
+      throw new Error(
+        "The configured image provider could not preserve the selected material as an edit reference.",
+      );
+    }
     const result =
       edited ??
       (await invokeDesktopImageTool({
@@ -2218,10 +2810,13 @@ export function IntentWorkspace({
       designMarkdown,
       lease,
     );
-    return assetToDesignSystemArtifact(
-      asset,
-      groundedDesignMarkdown ?? prototypeDesignMarkdown(plan, designMarkdown),
-    );
+    const fallbackDesignMarkdown = prototypeDesignMarkdown(plan, designMarkdown);
+    const resolvedDesignMarkdown =
+      groundedDesignMarkdown &&
+      !designSystemMarkdownValidationError(groundedDesignMarkdown)
+        ? groundedDesignMarkdown
+        : fallbackDesignMarkdown;
+    return assetToDesignSystemArtifact(asset, resolvedDesignMarkdown);
   }
 
   async function streamConversationalReply(
@@ -2229,15 +2824,21 @@ export function IntentWorkspace({
     fallbackReply: string,
     chat: ModelAssignment,
     lease: AgentRunLease,
+    capabilityContext: string,
   ): Promise<string> {
     let streamed = "";
+    const liveOutput = createLiveTextBatcher(setLiveAgentOutput);
     setLiveAgentLabel("Agent is responding");
     setLiveAgentOutput("");
     try {
       for await (const delta of personalizedGenerationRef.current.streamText({
         providerId: chat.providerId,
         model: chat.model,
-        system: "You are Cutout's design Agent. Answer the user's question directly in their language, then make one natural next-step invitation when useful. Keep identity, greeting, and product replies to one or two short sentences. Do not explain internal routing, prompts, workflow classification, design briefs, policies, tool calls, reasoning, or diagnostics unless the user explicitly requests them.",
+        system: [
+          "You are Cutout's design Agent. Answer the user's question directly in their language, then make one natural next-step invitation when useful. Keep identity, greeting, and product replies to one or two short sentences. Do not explain internal routing, prompts, workflow classification, design briefs, policies, tool calls, reasoning, or diagnostics unless the user explicitly requests them.",
+          "",
+          capabilityContext,
+        ].join("\n"),
         input: [{
           type: "text",
           text: `User message:\n${userMessage}\n\nDraft answer for factual grounding only:\n${fallbackReply}\n\nWrite a concise final reply. Do not preserve unnecessary process explanations from the draft.`,
@@ -2248,10 +2849,12 @@ export function IntentWorkspace({
       })) {
         agentRunCoordinatorRef.current.checkpoint(lease);
         streamed += delta;
-        setLiveAgentOutput(trimLiveAgentOutput(streamed));
+        liveOutput.append(delta);
       }
+      liveOutput.flush();
       return streamed.trim() || fallbackReply;
     } catch (error) {
+      liveOutput.flush();
       if (lease.controller.signal.aborted) throw error;
       console.info(
         "[Cutout] conversational stream fell back:",
@@ -2271,6 +2874,18 @@ export function IntentWorkspace({
     importedMarkdown: string | undefined,
     lease: AgentRunLease,
   ): Promise<string | null> {
+    const runId = `workspace:${lease.id}`;
+    const stepId = `step:${lease.id}:design-markdown`;
+    emitRunEvent(
+      runId,
+      {
+        type: "step-started",
+        stepId,
+        label: "Create DESIGN.md",
+        detail: "Derive the design specification from the generated visual reference.",
+      },
+      { eventId: `${stepId}:started` },
+    );
     const input = {
       providerId: chat.providerId,
       model: chat.model,
@@ -2289,17 +2904,22 @@ export function IntentWorkspace({
 
     let streamed = "";
     try {
-      setLiveAgentLabel("Drafting design system");
-      setLiveAgentOutput("");
       for await (const delta of personalizedGenerationRef.current.streamText(
         input,
       )) {
         agentRunCoordinatorRef.current.checkpoint(lease);
         streamed += delta;
-        setLiveAgentOutput(trimLiveAgentOutput(streamed));
       }
     } catch (error) {
-      if (lease.controller.signal.aborted) throw error;
+      if (lease.controller.signal.aborted) {
+        emitRunEvent(runId, {
+          type: "step-cancelled",
+          stepId,
+          label: "Create DESIGN.md",
+          detail: "Stopped before the design specification was complete.",
+        }, { eventId: `${stepId}:cancelled` });
+        throw error;
+      }
       console.info(
         "[Cutout] image-grounded DESIGN.md stream fell back:",
         error instanceof Error ? error.message : String(error),
@@ -2312,22 +2932,36 @@ export function IntentWorkspace({
           "[Cutout] image-grounded DESIGN.md synthesis fell back:",
           result.error,
         );
-        setLiveAgentOutput("");
+        emitRunEvent(runId, {
+          type: "step-failed",
+          stepId,
+          label: "Create DESIGN.md",
+          detail: "The configured model did not return a design specification.",
+        }, { eventId: `${stepId}:failed` });
         return null;
       }
       streamed = result.data;
-      setLiveAgentOutput(trimLiveAgentOutput(streamed));
     }
 
-    setLiveAgentOutput("");
-    setLiveAgentLabel(null);
     const markdown = stripMarkdownFence(streamed).trim();
     if (!markdown.startsWith("---")) {
       console.info(
         "[Cutout] image-grounded DESIGN.md synthesis returned non-DESIGN.md text.",
       );
+      emitRunEvent(runId, {
+        type: "step-failed",
+        stepId,
+        label: "Create DESIGN.md",
+        detail: "The model response was not a valid DESIGN.md document.",
+      }, { eventId: `${stepId}:failed` });
       return null;
     }
+    emitRunEvent(runId, {
+      type: "step-succeeded",
+      stepId,
+      label: "Create DESIGN.md",
+      detail: "Created the image-grounded design specification.",
+    }, { eventId: `${stepId}:succeeded` });
     return markdown;
   }
 
@@ -2335,110 +2969,147 @@ export function IntentWorkspace({
     plan: PrototypePlan,
     pages: readonly PrototypePage[],
     image: ModelAssignment,
+    chat: ModelAssignment,
     designSystem: PrototypeDesignSystemArtifact,
     lease: AgentRunLease,
     designContext: string | undefined,
     existingPages: readonly PrototypePageArtifact[] = [],
+    materialReference?: Uint8Array,
   ): Promise<PrototypePageArtifact[]> {
-    const generated: PrototypePageArtifact[] = [...existingPages];
-    const generatedById = new Map(
-      generated.map((artifact) => [artifact.page.id, artifact]),
-    );
-    let previous: PrototypePageArtifact | null = null;
-    for (const page of pages) {
-      agentRunCoordinatorRef.current.checkpoint(lease);
-      const existing = generatedById.get(page.id);
-      if (existing) {
-        previous = existing;
-        continue;
-      }
-      const references = previous
-        ? [designSystem.bytes, previous.bytes]
-        : [designSystem.bytes];
-      const artifact = await generatePrototypePage(
-        plan,
-        page,
-        image,
-        references,
-        designContext,
-        lease,
-      );
-      agentRunCoordinatorRef.current.checkpoint(lease);
-      generated.push(artifact);
-      generatedById.set(page.id, artifact);
-      previous = artifact;
-      setPrototypePages(sortPrototypePages(generated, pages));
-    }
-    return sortPrototypePages(generated, pages);
+    return generatePrototypePageSet({
+      pages,
+      existingArtifacts: existingPages,
+      mode: "serial",
+      concurrency: PROTOTYPE_GENERATION_CONCURRENCY,
+      generate: async (page, predecessor) => {
+        agentRunCoordinatorRef.current.checkpoint(lease);
+        const artifact = await generatePrototypePage(
+          plan,
+          page,
+          image,
+          chat,
+          [
+            designSystem.bytes,
+            ...(materialReference ? [materialReference] : []),
+            ...(predecessor ? [predecessor.bytes] : []),
+          ],
+          designContext,
+          lease,
+        );
+        agentRunCoordinatorRef.current.checkpoint(lease);
+        return artifact;
+      },
+      onProgress: (artifacts) => setPrototypePages(artifacts),
+    });
   }
 
   async function generatePagesParallel(
     plan: PrototypePlan,
     pages: readonly PrototypePage[],
     image: ModelAssignment,
+    chat: ModelAssignment,
     designSystem: PrototypeDesignSystemArtifact,
     lease: AgentRunLease,
     designContext: string | undefined,
     existingPages: readonly PrototypePageArtifact[] = [],
+    materialReference?: Uint8Array,
   ): Promise<PrototypePageArtifact[]> {
-    const results = new Map<string, PrototypePageArtifact>(
-      existingPages.map((artifact) => [artifact.page.id, artifact]),
-    );
-    const missingPages = pages.filter((page) => !results.has(page.id));
-    let nextIndex = 0;
-    const limit = Math.min(2, missingPages.length);
-
-    async function worker(): Promise<void> {
-      while (nextIndex < missingPages.length) {
+    return generatePrototypePageSet({
+      pages,
+      existingArtifacts: existingPages,
+      mode: "anchor-parallel",
+      concurrency: PROTOTYPE_GENERATION_CONCURRENCY,
+      generate: async (page, anchor) => {
         agentRunCoordinatorRef.current.checkpoint(lease);
-        const page = missingPages[nextIndex];
-        nextIndex += 1;
-        if (!page) continue;
         const artifact = await generatePrototypePage(
           plan,
           page,
           image,
-          [designSystem.bytes],
+          chat,
+          [
+            designSystem.bytes,
+            ...(materialReference ? [materialReference] : []),
+            ...(anchor ? [anchor.bytes] : []),
+          ],
           designContext,
           lease,
         );
         agentRunCoordinatorRef.current.checkpoint(lease);
-        results.set(page.id, artifact);
-        setPrototypePages(sortPrototypePages([...results.values()], pages));
-      }
-    }
-
-    if (missingPages.length > 0) {
-      await Promise.all(Array.from({ length: limit }, () => worker()));
-    }
-    return pages
-      .map((page) => results.get(page.id))
-      .filter((item): item is PrototypePageArtifact => Boolean(item));
+        return artifact;
+      },
+      onProgress: (artifacts) => setPrototypePages(artifacts),
+    });
   }
 
   async function generatePrototypePage(
     plan: PrototypePlan,
     page: PrototypePage,
     image: ModelAssignment,
+    chat: ModelAssignment,
     referenceImages: readonly Uint8Array[],
     designMarkdown: string | undefined,
     lease: AgentRunLease,
   ): Promise<PrototypePageArtifact> {
     agentRunCoordinatorRef.current.checkpoint(lease);
-    const prompt = applyPendingSteers(
+    const basePrompt = applyPendingSteers(
       lease,
       prototypePagePrompt(plan, page, designMarkdown),
     );
     const runId = `workspace:${lease.id}`;
     const referenceIds = await Promise.all(referenceImages.map((bytes) => desktopTools.persistReference(bytes, "image/png", runId)));
     const preferences = desktopTools.visualPreferences();
-    const task = createPrototypePageVisualTask({ runId: String(lease.id), plan, page, image, prompt, referenceArtifactIds: referenceIds, preferences });
-    const execution = await desktopTools.visualRuntime.execute(runId, task, lease.controller.signal);
-    agentRunCoordinatorRef.current.checkpoint(lease);
-    const asset = execution.promotion ? await desktopTools.resolveArtifact(execution.promotion.masterArtifactId) : null;
-    if (!asset) throw new Error(`No image returned for ${page.name}.`);
 
-    return assetToPageArtifact(page, asset);
+    // Each attempt re-executes the visual task with the (possibly QA-corrected)
+    // prompt; the resolved asset is captured so the artifact keeps its media type.
+    // The task runId gets a per-attempt suffix on retries: the runtime's durable
+    // store keys results by taskId-derived idempotencyKey (prompt NOT included),
+    // so reusing the same taskId would replay attempt 1's cached image and turn
+    // every QA re-roll into a no-op. Attempt 1 keeps the plain id so durable
+    // recovery of an interrupted first attempt still works.
+    let lastAsset: { readonly bytes: Uint8Array; readonly mediaType: string } | null = null;
+    let attemptCount = 0;
+    const generatePage = async (prompt: string): Promise<Uint8Array> => {
+      attemptCount += 1;
+      const taskRunId = attemptCount === 1 ? String(lease.id) : `${lease.id}:qa${attemptCount}`;
+      const task = createPrototypePageVisualTask({ runId: taskRunId, plan, page, image, prompt, referenceArtifactIds: referenceIds, preferences });
+      const execution = await desktopTools.visualRuntime.execute(runId, task, lease.controller.signal);
+      agentRunCoordinatorRef.current.checkpoint(lease);
+      const asset = execution.promotion ? await desktopTools.resolveArtifact(execution.promotion.masterArtifactId) : null;
+      if (!asset) throw new Error(`No image returned for ${page.name}.`);
+      lastAsset = asset;
+      return asset.bytes;
+    };
+
+    if (PROTOTYPE_QA_ENABLED) {
+      // Reject/re-roll gate with lesson feedback: a rejected page is regenerated
+      // with the QA failures appended as binding corrections (bounded budget);
+      // the final attempt ships either way so QA never blocks the pipeline.
+      const checklist = buildPageChecklist(plan, page);
+      await generateWithQa({
+        basePrompt,
+        generate: generatePage,
+        review: (bytes, signal) =>
+          reviewGeneratedImage(
+            personalizedGenerationRef.current,
+            chat,
+            bytes,
+            checklist,
+            signal,
+            (message) => console.info("[Cutout] page QA review failed:", page.id, message),
+          ),
+        maxRetries: PROTOTYPE_QA_MAX_RETRIES,
+        onVerdict: (attempt, verdict) => {
+          if (!verdict.pass) {
+            console.info("[Cutout] page QA rejected:", page.id, attempt, verdict.failures);
+          }
+        },
+        signal: lease.controller.signal,
+      });
+    } else {
+      await generatePage(basePrompt);
+    }
+    if (!lastAsset) throw new Error(`No image returned for ${page.name}.`);
+    return assetToPageArtifact(page, lastAsset);
   }
 
   async function invokeDesktopImageTool(input: {
@@ -2606,9 +3277,10 @@ export function IntentWorkspace({
           }}
           onOpenAssets={library.open}
           onOpenDesign={() => {
-            setDesignDockVisible((visible) => !visible);
             setAgentDockVisible(false);
             setFilesDockVisible(false);
+            setDesignDockVisible(false);
+            onOpenDesignOs("specimen");
           }}
           inspectorActive={designDockVisible}
           onOpenDeliver={() => onOpenDesignOs("delivery")}
@@ -2623,13 +3295,12 @@ export function IntentWorkspace({
         aria-label="Expand sidebar"
         title="Expand sidebar"
         className={cn(
-          "group/expand absolute left-3 top-3 z-40 hidden size-8 items-center justify-center rounded-md bg-foreground text-background shadow-md transition-opacity duration-300 lg:flex",
+          "group/expand absolute left-3 top-3 z-40 hidden size-8 items-center justify-center text-foreground transition-opacity duration-300 hover:opacity-70 lg:flex",
           sidebarCollapsed ? "opacity-100" : "pointer-events-none opacity-0",
         )}
         onClick={() => setSidebarCollapsed(false)}
       >
-        <Scissors className="size-4 group-hover/expand:hidden" />
-        <PanelLeft className="hidden size-4 group-hover/expand:block" />
+        <PanelLeft className="size-4" />
       </button>
 
       <div
@@ -2649,14 +3320,10 @@ export function IntentWorkspace({
         {designDockVisible ? (
           <DesignMarkdownInspector
             docked
-            selectedMaterial={selectedMaterial}
             prototypePlan={prototypePlan}
             prototypeDesignSystem={prototypeDesignSystem}
             importedDesignMarkdown={importedDesignMarkdown}
             onChange={updateDesignMarkdownContent}
-            onRequestSelectedChanges={() => {
-              if (selectedMaterial) focusAgentComposer();
-            }}
             onOpenSystem={() => onOpenDesignOs("overview")}
             onClose={() => setDesignDockVisible(false)}
             onOpenSpecimen={() => onOpenDesignOs("specimen")}
@@ -2709,8 +3376,14 @@ export function IntentWorkspace({
               composer={{
                 value: activeAsk ? humanLoopCustomAnswer : composerDraft,
                 placeholder: activeAsk
-                  ? "Add a constraint or describe another direction…"
-                  : "Describe a result, correction, or next step…",
+                  ? t({
+                      id: "workspace.human_loop_optional_context_placeholder",
+                      message: "Add a constraint or describe another direction…",
+                    })
+                  : t({
+                      id: "workspace.agent_composer_placeholder",
+                      message: "Describe a result, correction, or next step…",
+                    }),
                 disabled: false,
                 controlsDisabled: working,
                 submitDisabled: working
@@ -2766,6 +3439,14 @@ export function IntentWorkspace({
                     setHumanLoopChoiceId(null);
                     setHumanLoopCustomAnswer("");
                     setAgentBusy(true);
+                    return;
+                  }
+                  if (activeAsk) {
+                    // The plan-level fallback ask already has its answer in
+                    // humanLoopChoiceId/humanLoopCustomAnswer. Resume the
+                    // existing plan instead of reading the unrelated message
+                    // draft, which is normally empty on this surface.
+                    void createAssets("create", { skipToolGate: true });
                     return;
                   }
                   const consumed = consumeComposerDraft(composerDraft);
@@ -2894,16 +3575,17 @@ export function IntentWorkspace({
               onEditMessage={(targetEventId, message) => {
                 const runId = agentRunEvents.activeRunId;
                 if (!runId) throw new Error("No Agent run is available for this revision.");
-                emitRunEvent(runId, { type: "message-revised", targetEventId, message });
-                setBrief(message);
                 if (working) {
                   const active = activeRunRef.current;
                   if (!active || !agentRunCoordinatorRef.current.steer(active, message)) {
                     throw new Error("This request is no longer active.");
                   }
-                  emitRunEvent(runId, { type: "steer-recorded", instruction: message });
+                  setBrief(message);
+                  emitRunEvent(runId, { type: "message-revised", targetEventId, message });
                   return;
                 }
+                setBrief(message);
+                emitRunEvent(runId, { type: "message-revised", targetEventId, message });
                 void createAssets(repairPlan ? "repair" : "create", { briefOverride: message });
               }}
               onOpenArtifact={(kind) => {
@@ -2959,7 +3641,7 @@ export function IntentWorkspace({
               onImport: openPicker,
               onAskAgent: focusAgentComposer,
               onExportAll: exportAll,
-              exportDisabled: exportAllPending || slices.length === 0,
+              exportDisabled: exportAllPending || exportableSliceCount === 0,
             }}
             canvasAnnotations={canvasAnnotations}
             onCanvasAnnotationsChange={setCanvasAnnotations}
@@ -3178,23 +3860,19 @@ function emptyInspectorMessage(
 
 function DesignMarkdownInspector({
   docked = false,
-  selectedMaterial,
   prototypePlan,
   prototypeDesignSystem,
   importedDesignMarkdown,
   onChange,
-  onRequestSelectedChanges,
   onOpenSystem,
   onClose,
   onOpenSpecimen,
 }: {
   readonly docked?: boolean;
-  readonly selectedMaterial: MaterialRef | null;
   readonly prototypePlan: PrototypePlan | null;
   readonly prototypeDesignSystem: PrototypeDesignSystemArtifact | null;
   readonly importedDesignMarkdown: DesignMarkdownAsset;
   readonly onChange: (content: string) => void;
-  readonly onRequestSelectedChanges: () => void;
   readonly onOpenSystem: () => void;
   readonly onClose: () => void;
   readonly onOpenSpecimen?: () => void;
@@ -3221,8 +3899,6 @@ function DesignMarkdownInspector({
     ? "Generated DESIGN.md"
     : (importedDesignMarkdown?.name ?? "DESIGN.md");
   const model = content ? parseEditableDesignMarkdown(content) : null;
-  const selectionDetails = projectCanvasSelection(selectedMaterial);
-
   const activeFormat: DesignSourceFormat | "astryx" =
     mode === "source" ? sourceFormat : "design-md";
   const formatLabels: Record<DesignSourceFormat, string> = {
@@ -3260,7 +3936,7 @@ function DesignMarkdownInspector({
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-semibold">Design system</p>
           <p className="truncate text-[11px] text-muted-foreground">
-            {selectionDetails ? "Selected result" : "Canvas"}
+            Canvas
           </p>
         </div>
         <Button
@@ -3276,29 +3952,6 @@ function DesignMarkdownInspector({
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto">
-        {selectionDetails ? (
-          <section aria-label="Selected result details" className="border-b border-border p-4">
-            <div className="space-y-3">
-              <div>
-                <p className="truncate text-sm font-semibold">{selectionDetails.title}</p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {selectionDetails.kind} · {selectionDetails.status}
-                </p>
-              </div>
-              <dl className="grid grid-cols-[4.5rem_minmax(0,1fr)] gap-x-2 gap-y-1.5 text-xs">
-                <dt className="text-muted-foreground">Source</dt>
-                <dd className="truncate">{selectionDetails.source}</dd>
-                <dt className="text-muted-foreground">Version</dt>
-                <dd className="truncate font-mono text-[11px]">{selectionDetails.version}</dd>
-              </dl>
-              <Button type="button" className="w-full" size="sm" onClick={onRequestSelectedChanges}>
-                <MessageSquare className="size-3.5" />
-                {selectionDetails.actionLabel}
-              </Button>
-            </div>
-          </section>
-        ) : null}
-
         <details className="group/advanced">
           <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between border-b border-border px-4 text-xs font-medium text-muted-foreground hover:text-foreground">
             Advanced design system
@@ -3451,7 +4104,7 @@ function AstryxMappingPanel({
   const choiceKey = choices.map((choice) => choice.controlId).join("|");
   const seedMapping = () =>
     Object.fromEntries(
-      [...suggestAstryxMapping(choices)].filter(
+      [...automaticAstryxMapping(choices)].filter(
         (entry): entry is [string, string] => entry[1] !== null,
       ),
     );
@@ -3552,21 +4205,29 @@ function AstryxMappingPanel({
         ) : null}
       </div>
 
-      <div className="space-y-2">
-        <p className="text-[11px] font-medium text-muted-foreground">
-          Map DESIGN.md colors to Astryx variables
+      <div className="rounded-md border border-border bg-muted/10 p-3">
+        <p className="text-xs font-medium">Automatic mapping</p>
+        <p className="mt-1 text-[11px] leading-4 text-muted-foreground">
+          {mappedCount} theme roles will be inferred from your palette. The remaining colors are preserved as custom tokens.
         </p>
-        {choices.map((choice) => (
-          <AstryxMappingRow
-            key={choice.controlId}
-            choice={choice}
-            value={mapping[choice.controlId] ?? ""}
-            onChange={(next) => {
-              setMapping((prev) => ({ ...prev, [choice.controlId]: next }));
-              setBinding(null);
-            }}
-          />
-        ))}
+        <details className="group/astryx mt-2">
+          <summary className="cursor-pointer text-[11px] text-muted-foreground hover:text-foreground">
+            Customize mapping
+          </summary>
+          <div className="mt-3 space-y-2">
+            {choices.map((choice) => (
+              <AstryxMappingRow
+                key={choice.controlId}
+                choice={choice}
+                value={mapping[choice.controlId] ?? ""}
+                onChange={(next) => {
+                  setMapping((prev) => ({ ...prev, [choice.controlId]: next }));
+                  setBinding(null);
+                }}
+              />
+            ))}
+          </div>
+        </details>
       </div>
 
       <Button
@@ -4761,11 +5422,11 @@ function OutputSurface({
           version: `${slice.blob.size}:${slice.width}x${slice.height}:${slice.box.x},${slice.box.y}`,
           provenance: {
             source: "page-deconstruction",
-            sourcePageId: prototypePages[0]?.page.id,
+          sourcePageId: slice.pageId ?? undefined,
             independentlyEditable: false,
           },
         },
-        pageId: prototypePages[0]?.page.id,
+        pageId: slice.pageId ?? undefined,
         evidenceMaterialId: evidence?.materialId,
         revisionId: evidence?.revisionId,
       };
@@ -5042,38 +5703,34 @@ function ScopePicker({
   if (primaryCount >= fullCount) return null;
 
   return (
-    <div className="grid grid-cols-2 gap-2">
+    <div role="group" aria-label="Generation range" className="inline-flex h-8 items-stretch border border-border bg-background">
       <button
         type="button"
         disabled={disabled}
         onClick={() => onScopeChange("primary-flow")}
         className={cn(
-          "rounded-md border px-3 py-2 text-left transition-colors disabled:pointer-events-none disabled:opacity-60",
+          "min-w-28 px-3 text-left text-xs transition-colors disabled:pointer-events-none disabled:opacity-60",
           scope === "primary-flow"
-            ? "border-primary bg-primary/10"
-            : "border-border bg-background hover:bg-muted/60",
+            ? "bg-foreground text-background"
+            : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
         )}
       >
-        <span className="block text-xs font-semibold">Primary flow</span>
-        <span className="mt-0.5 block text-[11px] text-muted-foreground">
-          {primaryCount} pages
-        </span>
+        <span className="font-medium">Primary flow</span>
+        <span className="ml-1 opacity-70">{primaryCount}</span>
       </button>
       <button
         type="button"
         disabled={disabled}
         onClick={() => onScopeChange("full-plan")}
         className={cn(
-          "rounded-md border px-3 py-2 text-left transition-colors disabled:pointer-events-none disabled:opacity-60",
+          "min-w-28 border-l border-border px-3 text-left text-xs transition-colors disabled:pointer-events-none disabled:opacity-60",
           scope === "full-plan"
-            ? "border-primary bg-primary/10"
-            : "border-border bg-background hover:bg-muted/60",
+            ? "bg-foreground text-background"
+            : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
         )}
       >
-        <span className="block text-xs font-semibold">Full plan</span>
-        <span className="mt-0.5 block text-[11px] text-muted-foreground">
-          {fullCount} pages
-        </span>
+        <span className="font-medium">Full plan</span>
+        <span className="ml-1 opacity-70">{fullCount}</span>
       </button>
     </div>
   );
@@ -5152,10 +5809,18 @@ function HumanLoopQuestion({
   readonly onChoiceChange: (id: string) => void;
   readonly compact?: boolean;
 }) {
+  const { t } = useLingui();
+  const useJudgmentLabel = t({
+    id: "workspace.human_loop_use_judgment",
+    message: "Use your judgment",
+  });
   return (
     <section
       role="group"
-      aria-label="Choose a direction"
+      aria-label={t({
+        id: "workspace.human_loop_choose_direction",
+        message: "Choose a direction",
+      })}
       className={cn(
         "rounded-lg border border-primary/35 bg-background shadow-sm",
         compact ? "p-3" : "p-4",
@@ -5171,8 +5836,10 @@ function HumanLoopQuestion({
           {loop.question}
         </h3>
         <p className="mt-1 text-xs leading-5 text-muted-foreground">
-          Choose one direction. Add optional context below, then press the
-          arrow.
+          {t({
+            id: "workspace.human_loop_instruction",
+            message: "Choose one direction. Add optional context below, then press the arrow.",
+          })}
         </p>
       </div>
 
@@ -5181,13 +5848,16 @@ function HumanLoopQuestion({
       >
         <button
           type="button"
-          aria-label="Use your judgment"
+          aria-label={useJudgmentLabel}
           onClick={() => onChoiceChange(loop.defaultChoiceId)}
           className="rounded-md border border-primary/50 bg-primary/10 p-2.5 text-left transition-colors hover:bg-primary/15"
         >
-          <span className="text-xs font-semibold">Use your judgment</span>
+          <span className="text-xs font-semibold">{useJudgmentLabel}</span>
           <p className="mt-1 text-xs leading-5 text-muted-foreground">
-            Continue with the Agent&apos;s recommended direction.
+            {t({
+              id: "workspace.human_loop_use_judgment_hint",
+              message: "Continue with the Agent's recommended direction.",
+            })}
           </p>
         </button>
         {loop.choices
@@ -5782,6 +6452,7 @@ function resolveAssetStage({
   hasPlan,
   hasDesignSystem,
   hasPrototypePages,
+  productionStatus,
 }: {
   readonly genPhase: ReturnType<typeof useStore.getState>["genPhase"];
   readonly analysisStatus: ReturnType<typeof useStatus>;
@@ -5794,6 +6465,7 @@ function resolveAssetStage({
   readonly hasPlan: boolean;
   readonly hasDesignSystem: boolean;
   readonly hasPrototypePages: boolean;
+  readonly productionStatus: ProductionRunStatus | null;
 }): AssetStageId {
   if (workflowPhase === "planning") return "planning";
   if (workflowPhase === "review") return "review";
@@ -5802,8 +6474,16 @@ function resolveAssetStage({
   if (genPhase === "generating-mockup") return "mockup";
   if (genPhase === "deconstructing") return "deconstruct";
   if (analysisStatus === "running") return "cutout";
+  if (hasPlan && productionStatus === "completed") return "done";
+  if (
+    hasPlan &&
+    productionStatus &&
+    ["running", "partial", "needs-review", "failed"].includes(productionStatus)
+  ) {
+    return "cutout";
+  }
   if (naming) return "naming";
-  if (hasSlices) return "done";
+  if (!hasPlan && hasSlices) return "done";
   if (hasPrototypePages) return "mockup";
   if (hasDesignSystem) return "design-system";
   if (hasPlan) return "review";
@@ -5851,6 +6531,7 @@ function buildAssetStages({
   hasPlan,
   hasDesignSystem,
   hasPrototypePages,
+  productionStatus,
 }: {
   readonly activeStage: AssetStageId;
   readonly hasMockup: boolean;
@@ -5861,6 +6542,7 @@ function buildAssetStages({
   readonly hasPlan: boolean;
   readonly hasDesignSystem: boolean;
   readonly hasPrototypePages: boolean;
+  readonly productionStatus: ProductionRunStatus | null;
 }): readonly AssetStage[] {
   const isDone = (id: AssetStage["id"]): boolean => {
     if (id === "planning")
@@ -5878,7 +6560,8 @@ function buildAssetStages({
     if (id === "mockup")
       return hasPrototypePages || hasMockup || hasSource || hasSlices;
     if (id === "deconstruct") return hasSource || hasSlices;
-    if (id === "cutout") return hasSlices;
+    if (id === "cutout")
+      return productionStatus === "completed" || (!hasPlan && hasSlices);
     if (id === "naming") return namingStatus === "done";
     return (
       activeStage !== "idle" &&
@@ -5916,15 +6599,9 @@ function buildAssetStages({
       "Regenerate valuable visual layers.",
       Layers3,
     ),
-    stage("cutout", "Cutout", "Detect and split atomic assets.", Scissors),
+    stage("cutout", "Cutout", "Detect and split atomic assets.", ScanLine),
     stage("naming", "Names", "Apply semantic filenames.", Tag),
   ];
-}
-
-function trimLiveAgentOutput(text: string): string {
-  const compact = text.replace(/\n{4,}/g, "\n\n\n").trimStart();
-  if (compact.length <= 1400) return compact;
-  return `...${compact.slice(-1400)}`;
 }
 
 function stripMarkdownFence(text: string): string {
@@ -5978,7 +6655,7 @@ function userFacingGenerationError(message: string): string {
     lower.includes("network") ||
     lower.includes("fetch failed")
   ) {
-    return "The AI provider timed out. Cutout kept the technical details for Agent diagnostics; try again or switch provider.";
+    return "The connection to the AI provider was interrupted. Try again to continue.";
   }
 
   if (
@@ -5986,12 +6663,12 @@ function userFacingGenerationError(message: string): string {
     lower.includes("json") ||
     lower.includes("structured")
   ) {
-    return "The AI planner returned invalid structured data. Cutout kept the raw response for Agent diagnostics.";
+    return "The AI response could not be processed. Try again to continue.";
   }
 
   if (message.trim().length === 0) return "Generation stopped.";
   return message.length > 180
-    ? "Generation stopped. Details are available in Agent diagnostics."
+    ? "Generation stopped. Try again to continue."
     : message;
 }
 
@@ -6132,11 +6809,10 @@ function WorkspaceRail({
         type="button"
         aria-label="Collapse sidebar"
         title="Collapse sidebar"
-        className="group/logo mb-2 flex size-8 shrink-0 items-center justify-center rounded-md bg-foreground text-background transition-colors hover:bg-muted hover:text-foreground"
+        className="group/logo mb-2 flex size-8 shrink-0 items-center justify-center text-foreground transition-opacity hover:opacity-70"
         onClick={onCollapseSidebar}
       >
-        <Scissors className="size-4 group-hover/logo:hidden" />
-        <PanelLeftClose className="hidden size-4 group-hover/logo:block" />
+        <PanelLeftClose className="size-4" />
       </button>
       <RailItem
         icon={<Sparkles className="size-4" />}
