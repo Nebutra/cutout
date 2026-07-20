@@ -2131,6 +2131,7 @@ export function AppShell() {
                   setSourceIngestOpen(true);
                 }}
                 onRetryProjects={() => void loadProjects()}
+                updateController={updateController}
               />
             ) : null}
             <div

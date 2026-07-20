@@ -3,6 +3,7 @@
 ## Version and source
 
 - Synchronize `package.json`, `src-tauri/Cargo.toml`, and `src-tauri/tauri.conf.json`.
+- Require the pushed `v<semver>` tag to equal that synchronized source version; the release workflow never rewrites reviewed source after tagging.
 - Record user-visible changes in `CHANGELOG.md` and review generated diffs.
 - Run `scripts/release-macos.sh --local` for the provider-free local gate.
 
@@ -32,12 +33,23 @@
 - Ship `.app` and `.dmg` from this macOS gate.
 - Verify `CI=true npm run tauri build -- --bundles app,dmg` succeeds headlessly without requiring Finder automation or a globally installed package manager.
 - The desktop updater runtime is unavailable unless a release public key, stable/beta HTTPS endpoints, and an exact endpoint host allowlist are injected at build or process launch. Never commit the private signing key.
-- Inject `CUTOUT_UPDATER_PUBKEY`, `CUTOUT_UPDATER_STABLE_ENDPOINTS`, optional `CUTOUT_UPDATER_BETA_ENDPOINTS`, and `CUTOUT_UPDATER_ALLOWED_HOSTS`. The runtime rejects non-HTTPS and non-allowlisted manifest or artifact hosts.
+- Inject `CUTOUT_UPDATER_PUBKEY`. GitHub releases default the stable endpoint to `https://github.com/<owner>/<repo>/releases/latest/download/latest.json` and the exact host allowlist to `github.com`; override `CUTOUT_UPDATER_STABLE_ENDPOINTS` or `CUTOUT_UPDATER_ALLOWED_HOSTS` only for an approved HTTPS distribution host. `CUTOUT_UPDATER_BETA_ENDPOINTS` remains optional and must point to separately published beta metadata. The runtime rejects non-HTTPS and non-allowlisted manifest or artifact hosts.
 - Exercise check, verified download, Agent Host checkpoint, install, and relaunch against a staged signed release before enabling rollout. Signature verification remains mandatory in the official Tauri updater plugin.
 - Keep `bundle.createUpdaterArtifacts` enabled and require the macOS `.app.tar.gz` plus sibling `.sig`; the static manifest embeds signature content, never a path or URL.
 - Inject `TAURI_SIGNING_PRIVATE_KEY` and optional `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` only through release CI secrets. Missing signing material must hard fail.
 - Generate and validate separate stable/beta manifests with SHA-256, SPDX SBOM, provenance, rollback metadata and previous-version compatibility. Deterministic rollout metadata must not modify the signed artifact or its signature.
 - Run `pnpm test:update-artifacts` for update, 204/no-update, bad signature, bad URL, unauthorized rollback and staged cohort cases.
+
+## Cross-platform GitHub Release
+
+- Require all four native build artifacts before publication: Apple Silicon macOS, Intel macOS, x64 Windows, and x64 Linux.
+- Use explicit bundle targets per platform (`app,dmg`, `nsis,msi`, and `appimage,deb`); do not reuse the macOS defaults on Windows or Linux.
+- Matrix jobs have read-only repository access and upload uniquely named workflow artifacts. Only the final job receives `contents: write`.
+- Collect platform outputs under collision-free names, require expected installer/updater files, reject symlinks, and publish `SHA256SUMS` with the release.
+- Create the GitHub Release as a draft, upload and validate the complete asset set, then make it public. Never publish a partial matrix as a successful release.
+- The current static updater manifest is validated for the signed Apple Silicon macOS archive. Windows and Linux installers are downloadable assets, not a claim that automatic updates were validated on those platforms.
+- The packaged desktop app checks after an 8-second startup delay and at most once per 24 hours by default. Home shows the Update action only after a newer signed release is discovered; the action opens Updates & Support for download and verified install/restart.
+- The Tauri updater signature is not Apple notarization or Windows Authenticode. Keep those distribution claims blocked until their independent credentials and verification evidence exist.
 
 ## Truthful status
 

@@ -82,6 +82,7 @@ import { sortProjects } from "./project-order";
 import { filterProjects } from "./project-search";
 import { ConnectorMenu } from "@/components/integrations/ConnectorMenu";
 import { SidebarAccount } from "./SidebarAccount";
+import type { DesktopUpdateController } from "@/updater/service";
 
 const GlobalLibraryView = lazy(() =>
   import("@/components/library/GlobalLibraryView").then((module) => ({
@@ -137,6 +138,7 @@ interface ProjectHomeProps {
   readonly onImportBoard: () => void;
   readonly onOpenEverythingInbox?: () => void;
   readonly onRetryProjects: () => void;
+  readonly updateController?: DesktopUpdateController;
 }
 
 export function ProjectHome({
@@ -156,6 +158,7 @@ export function ProjectHome({
   onImportBoard,
   onOpenEverythingInbox,
   onRetryProjects,
+  updateController,
 }: ProjectHomeProps) {
   const [sectionNav, setSectionNav] = useState<{
     readonly stack: readonly HomeSection[];
@@ -256,6 +259,7 @@ export function ProjectHome({
         onArchiveProject={onArchiveProject}
         onRenameProject={onRenameProject}
         onPinProject={onPinProject}
+        updateController={updateController}
       />
 
       <section className="flex min-w-0 flex-1 flex-col overflow-hidden bg-muted/[0.18]">
@@ -510,6 +514,7 @@ function WorkspaceSidebar({
   onArchiveProject,
   onRenameProject,
   onPinProject,
+  updateController,
 }: NavigationProps & {
   readonly recentProjects: readonly LocalProjectSummary[];
   readonly onOpenProject: (id: string) => void;
@@ -523,12 +528,13 @@ function WorkspaceSidebar({
     project: LocalProjectSummary,
     pinned: boolean,
   ) => void;
+  readonly updateController?: DesktopUpdateController;
 }) {
   const { t } = useLingui();
 
   return (
     <aside className="hidden w-64 shrink-0 flex-col border-r border-border bg-background px-3 py-4 md:flex">
-      <SidebarAccount />
+      <SidebarAccount updateController={updateController} />
 
       <ProjectNavigation
         section={section}

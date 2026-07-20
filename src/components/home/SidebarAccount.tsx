@@ -5,7 +5,7 @@
  * workspace rather than a signed-in account; theme and settings moved here
  * from the TopBar.
  */
-import { Bell, Check, CheckCircle2, ChevronDown, CircleAlert, Monitor, Moon, Settings2, Sun, SwatchBook, TriangleAlert } from 'lucide-react'
+import { Bell, Check, CheckCircle2, ChevronDown, CircleAlert, Monitor, Moon, RefreshCw, Settings2, Sun, SwatchBook, TriangleAlert } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useTheme } from 'next-themes'
 import { useLingui } from '@lingui/react/macro'
@@ -27,13 +27,61 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useSettingsUI } from '@/components/settings/settings-ui'
 import { clearLocalNotifications, loadLocalNotifications, markLocalNotificationsRead, subscribeLocalNotifications, type LocalNotification } from '@/services/local/local-notifications'
+import type { DesktopUpdateController } from '@/updater/service'
+import type { UpdateState } from '@/updater'
 
-export function SidebarAccount() {
+export function SidebarAccount({ updateController }: { readonly updateController?: DesktopUpdateController }) {
   return (
-    <div className="flex items-center justify-between gap-2">
+    <div className="flex items-center gap-1">
       <AccountMenu />
-      <NotificationsMenu />
+      <div className="ml-auto flex items-center gap-1">
+        <HomeUpdateAction controller={updateController} />
+        <NotificationsMenu />
+      </div>
     </div>
+  )
+}
+
+function hasActionableHomeUpdate(state: UpdateState) {
+  return Boolean(state.release) && ['available', 'downloading', 'ready', 'installing', 'error'].includes(state.phase)
+}
+
+function HomeUpdateAction({ controller }: { readonly controller?: DesktopUpdateController }) {
+  const { t } = useLingui()
+  const { open: openSettings } = useSettingsUI()
+  const [state, setState] = useState<UpdateState | null>(() => controller?.getState() ?? null)
+  useEffect(() => {
+    if (!controller) return
+    setState(controller.getState())
+    return controller.subscribe(setState)
+  }, [controller])
+  if (!state || !hasActionableHomeUpdate(state)) return null
+
+  const label = t({ id: 'settings.updates.title', message: 'Updates' })
+  const version = state.release?.version
+  const busy = state.phase === 'downloading' || state.phase === 'installing'
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          type="button"
+          size="sm"
+          variant="secondary"
+          className="h-7 gap-1.5 px-2 text-xs"
+          aria-label={version ? `${label} ${version}` : label}
+          data-testid="home-update-action"
+          onClick={() => openSettings({ section: 'updates-support', anchor: 'updates' })}
+        >
+          <RefreshCw className={`size-3.5 ${busy ? 'animate-spin' : ''}`} />
+          <span>{label}</span>
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent side="bottom">
+        {version
+          ? t({ id: 'settings.updates.version_available', message: `Version ${version} is available.` })
+          : label}
+      </TooltipContent>
+    </Tooltip>
   )
 }
 

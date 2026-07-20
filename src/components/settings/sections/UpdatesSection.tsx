@@ -77,7 +77,7 @@ export function UpdatesSection(props: {
   })();
 
   return (
-    <section aria-labelledby="updates-title" className="py-3">
+    <section aria-labelledby="updates-title" className="py-3" data-settings-anchor="updates" tabIndex={-1}>
       <div className="flex items-start justify-between gap-3">
         <div>
           <h3 id="updates-title" className="text-sm font-medium">
