@@ -22,6 +22,16 @@ describe('cross-platform CI contracts', () => {
     expect(steps.indexOf(installs[1])).toBeLessThan(testIndex)
   })
 
+  it('runs screenshot baselines on their canonical macOS Chrome platform', async () => {
+    const source = await readFile('.github/workflows/ci.yml', 'utf8')
+    const workflow = YAML.parse(source)
+
+    expect(workflow.jobs.browser['runs-on']).toBe('macos-latest')
+    expect(workflow.jobs.browser.steps).toContainEqual(expect.objectContaining({
+      run: 'pnpm exec playwright install chromium',
+    }))
+  })
+
   it('uses bundled Playwright browsers away from macOS unless overridden', () => {
     expect(resolveChromeExecutable(undefined, 'linux')).toBeUndefined()
     expect(resolveChromeExecutable(undefined, 'win32')).toBeUndefined()

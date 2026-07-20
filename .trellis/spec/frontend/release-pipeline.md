@@ -48,6 +48,8 @@ installer version differs from their release version.
   plugin source fingerprints and mirrored text trees normalize both forms.
   Cross-platform tests use native path parsing and Windows `.cmd` shims for
   package executables; unsupported Windows process-tree control fails closed.
+  Screenshot baselines run on macOS Chrome, while platform-neutral contract
+  tests remain matrixed across macOS, Linux, and Windows.
 - AppShell initializes once, delays automatic checking for 8 seconds, and uses
   the persisted 24-hour preference gate. The Home action subscribes to this
   state; it does not call GitHub or the native updater directly.
