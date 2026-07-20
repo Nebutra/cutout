@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 4
-- **Last Active**: 2026-07-18
+- **Total Sessions**: 5
+- **Last Active**: 2026-07-20
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~138 | Active |
+| `journal-1.md` | ~171 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 5 | 2026-07-20 | Close Cutout production pipeline and fix project archiving | `e2ea8fc` | `main` |
 | 4 | 2026-07-18 | Cutout Codex plugin infrastructure | `bc74caa` | `main` |
 | 3 | 2026-07-18 | Fix prototype recovery state | `f710b5f` | `main` |
 | 2 | 2026-07-18 | Separate paid-tool intent from generation prompt | `eab1483` | `main` |

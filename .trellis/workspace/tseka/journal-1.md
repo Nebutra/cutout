@@ -136,3 +136,36 @@ Built and installed a self-contained local Cutout Codex plugin with bundled stdi
 ### Next Steps
 
 - None - task complete
+
+
+## Session 5: Close Cutout production pipeline and fix project archiving
+
+**Date**: 2026-07-20
+**Task**: Close Cutout production pipeline and fix project archiving
+**Branch**: `main`
+
+### Summary
+
+Closed asset production authority loops, removed legacy canvas paths, shipped canonical brand assets, and serialized project saves so archive cannot be overwritten by autosave.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `e2ea8fc` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
