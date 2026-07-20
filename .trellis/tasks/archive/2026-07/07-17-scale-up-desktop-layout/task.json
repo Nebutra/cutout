@@ -3,7 +3,7 @@
   "name": "scale-up-desktop-layout",
   "title": "Scale up desktop layout",
   "description": "",
-  "status": "in_progress",
+  "status": "completed",
   "dev_type": null,
   "scope": null,
   "package": null,
@@ -11,7 +11,7 @@
   "creator": "tseka",
   "assignee": "tseka",
   "createdAt": "2026-07-17",
-  "completedAt": null,
+  "completedAt": "2026-07-20",
   "branch": null,
   "base_branch": "main",
   "worktree_path": null,
@@ -21,6 +21,6 @@
   "children": [],
   "parent": null,
   "relatedFiles": [],
-  "notes": "",
+  "notes": "Completed in 1970430 with focused 1440x960 and 1040x720 browser evidence recorded on 2026-07-20.",
   "meta": {}
 }

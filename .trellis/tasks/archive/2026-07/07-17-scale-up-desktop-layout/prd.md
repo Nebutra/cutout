@@ -27,9 +27,9 @@ Make Cutout feel more spacious and visually confident on contemporary desktop di
 - [x] AC3: Home remains single-column and overflow-free on narrow viewports, with existing mobile navigation behavior intact.
 - [x] AC4: At wide desktop sizes, the workspace drawer and inspector gain usable width while the main canvas remains a bounded flexible track.
 - [x] AC5: Existing component tests pass, new assertions cover the revised layout contract, and the frontend production bundle succeeds.
-- [ ] AC6: Visual inspection at desktop and minimum supported viewports shows no overlap, clipping, blank canvas, or incoherent text wrapping.
+- [x] AC6: Visual inspection at desktop and the minimum supported viewport shows no overlap, clipping, blank canvas, or incoherent text wrapping.
 
-AC6 remains unverified because no in-app or Chrome browser instance was available in the current environment.
+Playwright visual checks cover the `1440px` desktop layout, the exact `1040x720` minimum desktop window, and the narrower mobile branch. The Home composer geometry assertions verify that controls remain inside the surface without overlap, while the workspace checks verify bounded panels, a visible canvas, and no global horizontal overflow.
 
 ## Out Of Scope
 

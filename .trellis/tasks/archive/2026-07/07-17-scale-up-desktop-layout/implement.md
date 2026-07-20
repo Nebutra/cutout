@@ -5,11 +5,11 @@
 - [x] Expand workspace drawer and inspector dimensions at wide desktop breakpoints.
 - [x] Add focused tests that pin the intended layout classes without coupling to unrelated markup.
 - [x] Run targeted tests, lint/type/build checks, and repository agent validation if the build invokes it.
-- [ ] Run the app and inspect desktop plus minimum-size screenshots for overflow and hierarchy.
+- [x] Run the app and inspect desktop plus minimum-size geometry for overflow and hierarchy.
 
-The app is running at `http://127.0.0.1:1420/`, but screenshot inspection was unavailable because the browser runtime reported no available browser instances.
+Playwright inspection passes at the `1440px` desktop viewport, the exact `1040x720` minimum desktop window, and the narrower mobile branch. Home composer snapshots capture the intentional `896px` desktop measure; focused geometry assertions confirm Home controls and workspace panels remain bounded and non-overlapping without global horizontal overflow.
 
-The full `pnpm build` remains blocked by pre-existing TypeScript errors in `src/prototype/generation-qa.test.ts` and `src/prototype/region-deconstruct.ts`; `pnpm exec vite build` passes.
+The focused layout checks pass. A current full `pnpm exec tsc -b --pretty false` run is blocked by concurrent, task-external `src/design-governance/` changes that mix the removed `nonColorCue` field with the new required `nonColorCueEvidence` contract; none of the reported diagnostics point to this task's files.
 
 ## Risk And Rollback Points
 
