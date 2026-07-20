@@ -169,3 +169,36 @@ Closed asset production authority loops, removed legacy canvas paths, shipped ca
 ### Next Steps
 
 - None - task complete
+
+
+## Session 6: Publish bilingual Cutout README
+
+**Date**: 2026-07-20
+**Task**: Publish bilingual Cutout README
+**Branch**: `main`
+
+### Summary
+
+Reworked the root README into equivalent Simplified Chinese and English product, macOS, Codex plugin, project-binding, capability-boundary, CLI, and development guides.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `b30dcc8` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
