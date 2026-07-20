@@ -3,7 +3,7 @@
   "name": "board-compliance-diagnostics",
   "title": "Board background compliance diagnostics",
   "description": "Measure and surface white-background compliance per region board; provenance diagnostics; prompt guard against model-drawn text labels",
-  "status": "in_progress",
+  "status": "completed",
   "dev_type": null,
   "scope": null,
   "package": null,
@@ -11,7 +11,7 @@
   "creator": "tseka",
   "assignee": "tseka",
   "createdAt": "2026-07-17",
-  "completedAt": null,
+  "completedAt": "2026-07-20",
   "branch": null,
   "base_branch": "main",
   "worktree_path": null,
@@ -21,6 +21,6 @@
   "children": [],
   "parent": null,
   "relatedFiles": [],
-  "notes": "",
+  "notes": "Completed across efb10e8 and subsequent region-breakdown wiring; focused algorithm/prototype tests passed during the 2026-07-20 audit.",
   "meta": {}
 }

@@ -3,7 +3,7 @@
   "name": "00-bootstrap-guidelines",
   "title": "Bootstrap Guidelines",
   "description": "Fill in project development guidelines for AI agents",
-  "status": "in_progress",
+  "status": "completed",
   "dev_type": "docs",
   "scope": null,
   "package": null,
@@ -11,7 +11,7 @@
   "creator": "tseka",
   "assignee": "tseka",
   "createdAt": "2026-07-16",
-  "completedAt": null,
+  "completedAt": "2026-07-20",
   "branch": null,
   "base_branch": null,
   "worktree_path": null,
@@ -23,6 +23,6 @@
   "relatedFiles": [
     ".trellis/spec/frontend/"
   ],
-  "notes": "First-time setup task created by trellis init (frontend project)",
+  "notes": "Completed: the frontend spec set is populated with repository-specific rules and real file examples.",
   "meta": {}
 }

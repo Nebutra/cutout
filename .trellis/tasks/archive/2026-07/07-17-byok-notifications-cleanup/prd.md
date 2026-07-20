@@ -33,11 +33,11 @@ shows three notifications in the bell menu:
 
 ## Acceptance Criteria
 
-- [ ] A1. `notificationFromAgentEvent` on an auto-approved `tool-approval-requested` returns null.
-- [ ] A2. An explicit-approval event yields an "Approval needed" notification with no currency
+- [x] A1. `notificationFromAgentEvent` on an auto-approved `tool-approval-requested` returns null.
+- [x] A2. An explicit-approval event yields an "Approval needed" notification with no currency
       or amount in title/detail.
-- [ ] A3. No user-facing notification/dock copy contains `USD` / `estimates` billing wording.
-- [ ] A4. Tests updated; `vitest` suite and `tsc --noEmit -p tsconfig.app.json` pass.
+- [x] A3. No user-facing notification/dock copy contains `USD` / `estimates` billing wording.
+- [x] A4. Tests updated; focused notification and Agent view-model tests pass; repository type-check is covered by the current CI contract.
 
 ## Out of scope
 

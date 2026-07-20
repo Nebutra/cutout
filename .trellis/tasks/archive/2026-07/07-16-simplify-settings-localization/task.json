@@ -3,7 +3,7 @@
   "name": "simplify-settings-localization",
   "title": "Simplify settings and localize general",
   "description": "",
-  "status": "in_progress",
+  "status": "completed",
   "dev_type": null,
   "scope": null,
   "package": null,
@@ -11,7 +11,7 @@
   "creator": "tseka",
   "assignee": "tseka",
   "createdAt": "2026-07-16",
-  "completedAt": null,
+  "completedAt": "2026-07-20",
   "branch": null,
   "base_branch": "main",
   "worktree_path": null,
@@ -21,6 +21,6 @@
   "children": [],
   "parent": null,
   "relatedFiles": [],
-  "notes": "",
+  "notes": "Completed in de77cfe; focused settings grouping, recovery, and update tests passed during the 2026-07-20 audit.",
   "meta": {}
 }
