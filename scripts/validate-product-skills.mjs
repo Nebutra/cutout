@@ -2,6 +2,7 @@
 import { readFile, stat } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import process from 'node:process'
+import { parseSkillFrontmatter } from './lib/skill-frontmatter.mjs'
 
 const root = resolve(import.meta.dirname, '..')
 const read = (path) => readFile(resolve(root, path), 'utf8')
@@ -32,12 +33,12 @@ for (const skill of catalog.skills) {
   const lines = source.split(/\r?\n/).length
   assert(lines >= 80 && lines <= 150, `${skill.id}: SKILL.md must be 80-150 lines; received ${lines}.`)
   assert(!source.includes('TODO'), `${skill.id}: SKILL.md contains TODO content.`)
-  const frontmatter = source.match(/^---\n([\s\S]*?)\n---/)
+  const frontmatter = parseSkillFrontmatter(source)
   assert(frontmatter, `${skill.id}: invalid YAML frontmatter.`)
   if (frontmatter) {
-    const keys = [...frontmatter[1].matchAll(/^([a-zA-Z0-9_-]+):/gm)].map((match) => match[1])
+    const keys = [...frontmatter.matchAll(/^([a-zA-Z0-9_-]+):/gm)].map((match) => match[1])
     assert(keys.join(',') === 'name,description', `${skill.id}: frontmatter may contain only name and description.`)
-    assert(frontmatter[1].includes(`name: ${skill.id}`), `${skill.id}: frontmatter name drift.`)
+    assert(frontmatter.includes(`name: ${skill.id}`), `${skill.id}: frontmatter name drift.`)
   }
   assert(agent.includes('interface:'), `${skill.id}: agents/openai.yaml lacks interface metadata.`)
   assert(agent.includes('display_name: "'), `${skill.id}: display_name must be quoted.`)

@@ -23,6 +23,12 @@ jobs:
           node-version: ${{ matrix.node }}
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Install Chromium and Linux dependencies
+        if: runner.os == 'Linux'
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Install Chromium
+        if: runner.os != 'Linux'
+        run: pnpm exec playwright install chromium
       - run: pnpm agent:validate
       - run: pnpm lint
       - run: pnpm test

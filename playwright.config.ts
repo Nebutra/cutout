@@ -1,8 +1,19 @@
 import { defineConfig, devices } from '@playwright/test'
 
-const chromeExecutable =
-  process.env.PLAYWRIGHT_CHROME_EXECUTABLE
-  ?? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
+const macChromeExecutable = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
+
+export function resolveChromeExecutable(
+  override: string | undefined,
+  platform: NodeJS.Platform,
+) {
+  return override || (platform === 'darwin' ? macChromeExecutable : undefined)
+}
+
+const chromeExecutable = resolveChromeExecutable(
+  process.env.PLAYWRIGHT_CHROME_EXECUTABLE,
+  process.platform,
+)
+const launchOptions = chromeExecutable ? { executablePath: chromeExecutable } : undefined
 
 export default defineConfig({
   testDir: './tests/visual',
@@ -28,9 +39,7 @@ export default defineConfig({
     timezoneId: 'Asia/Shanghai',
     colorScheme: 'dark',
     reducedMotion: 'reduce',
-    launchOptions: {
-      executablePath: chromeExecutable,
-    },
+    launchOptions,
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
   },
@@ -53,7 +62,7 @@ export default defineConfig({
       use: {
         ...devices['Pixel 7'],
         viewport: { width: 412, height: 915 },
-        launchOptions: { executablePath: chromeExecutable },
+        launchOptions,
       },
     },
   ],

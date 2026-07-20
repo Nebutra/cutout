@@ -41,6 +41,10 @@ installer version differs from their release version.
   `CUTOUT_UPDATER_BETA_ENDPOINTS` are optional approved-host overrides.
 - Private keys remain CI secrets. Public endpoint/key configuration remains CI
   variables and is compiled into release builds.
+- Every CI contract runner installs Playwright Chromium before `pnpm test`;
+  Linux also installs its browser system dependencies. Browser configuration
+  uses the bundled executable outside macOS unless an explicit executable path
+  is provided. Text validators accept both LF and CRLF repository checkouts.
 - AppShell initializes once, delays automatic checking for 8 seconds, and uses
   the persisted 24-hour preference gate. The Home action subscribes to this
   state; it does not call GitHub or the native updater directly.
@@ -93,6 +97,8 @@ installer version differs from their release version.
 - `scripts/release-workflow.test.ts`: four-entry matrix, validate/build/publish
   dependency graph, least-privilege permissions, isolated Tauri action, and
   draft promotion.
+- `scripts/ci-platform-contracts.test.ts`: browser installation ordering,
+  platform-specific executable selection, and LF/CRLF frontmatter parsing.
 - `scripts/update-artifacts.test.ts`: signature, HTTPS/allowlist, rollback,
   rollout, SBOM, provenance, and generated-manifest validation.
 - `src/components/home/SidebarAccount.test.tsx`: hidden idle/checking/error
