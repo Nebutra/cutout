@@ -230,6 +230,18 @@ describe('buildAgentViewModel', () => {
     })])
   })
 
+  it('shows the same pending turn before the provider emits its first delta', () => {
+    const model = buildAgentViewModel({
+      brief: 'Hello', workflowPhase: 'idle', stages: [], outcome: null,
+      working: true, elapsedSeconds: 0, runError: null,
+      liveAgentMessage: { id: 'runtime:stream:run-1', label: 'Agent is responding', text: '' },
+    })
+
+    expect(model.feed).toEqual([expect.objectContaining({
+      id: 'runtime:stream:run-1', role: 'agent', status: 'pending', detail: '',
+    })])
+  })
+
   it('keeps internal design synthesis represented as activity instead of conversation text', () => {
     const model = buildAgentViewModel({
       brief: 'Create a checkout',

@@ -47,17 +47,31 @@ pending or ready, and use rich output safely.
 
 ## Acceptance Criteria
 
-- [ ] During a streamed conversational response, the dock updates one Agent
+- [x] During a streamed conversational response, the dock updates one Agent
   bubble in place and keeps it scrolled into view.
-- [ ] On completion, the same bubble becomes one durable `agent-message`; a
+- [x] On completion, the same bubble becomes one durable `agent-message`; a
   retry or reload does not duplicate it.
-- [ ] Markdown is rendered from an allowlisted AST with no raw HTML execution
+- [x] Markdown is rendered from an allowlisted AST with no raw HTML execution
   and no unsafe URL schemes.
-- [ ] Generation stages visibly move from queued to generating to ready/failed
+- [x] Generation stages visibly move from queued to generating to ready/failed
   for pages and region slices; completed results replace the correct card.
-- [ ] Canvas panning/zoom state is preserved as material placeholders resolve.
-- [ ] Unit and visual coverage cover normal completion, cancellation, buffered
+- [x] Canvas panning/zoom state is preserved as material placeholders resolve.
+- [x] Unit and visual coverage cover normal completion, cancellation, buffered
   fallback, retry, and workspace restore.
+
+## Verification Evidence
+
+- `live-agent-output.test.ts` proves exact delta batching, buffered fallback,
+  cancellation propagation, and rejection of unfinished legacy snapshot text.
+- `agent-view-model.test.ts` proves a single pending turn before the first delta,
+  one projected stream, durable reply replay, and retry intent de-duplication.
+- `AgentRichText.test.tsx` proves the allowlisted Markdown and URL policy.
+- `OutputCanvas.overlay.test.tsx` proves queued/generating/failed labels and
+  stable-ID replacement with a ready artifact; `output-canvas-viewport.test.ts`
+  proves later replacements do not request another fit.
+- Focused Vitest: 75 tests passed. `tsc --noEmit`, `pnpm lint`, and
+  `git diff --check` passed. Desktop Playwright directly relevant cases for
+  conversation/canvas separation and retry de-duplication passed.
 
 ## Out Of Scope
 

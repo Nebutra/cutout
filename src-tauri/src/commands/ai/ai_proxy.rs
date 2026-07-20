@@ -106,6 +106,9 @@ impl From<KeyError> for ProxyError {
 /// host guard for the `/images/edits` endpoint.
 pub(crate) fn enforce_host(kind: &str, url: &str) -> Result<(), ProxyError> {
     let parsed = reqwest::Url::parse(url).map_err(|_| ProxyError::BadUrl)?;
+    if !parsed.username().is_empty() || parsed.password().is_some() {
+        return Err(ProxyError::BadUrl);
+    }
     let host = parsed
         .host_str()
         .ok_or(ProxyError::BadUrl)?
@@ -365,19 +368,32 @@ pub async fn ai_proxy_request(
     headers: HashMap<String, String>,
     body: Option<String>,
 ) -> Result<ProxyResponse, ProxyError> {
-    enforce_host(&kind, &url)?;
-    enforce_resolved_host(&kind, &url).await?;
     let secret = if requires_secret(&kind) {
         read_secret(&provider_id).map_err(ProxyError::from)?
     } else {
         String::new()
     };
-    let (method, header_map) = build_method_and_headers(&kind, &method, headers, &secret)?;
+    request_with_secret(&kind, &url, &method, headers, body, &secret).await
+}
+
+/// Internal one-shot request for pre-persistence provider checks. The caller owns
+/// secret resolution; the value never crosses back through IPC or enters Keychain.
+pub(crate) async fn request_with_secret(
+    kind: &str,
+    url: &str,
+    method: &str,
+    headers: HashMap<String, String>,
+    body: Option<String>,
+    secret: &str,
+) -> Result<ProxyResponse, ProxyError> {
+    enforce_host(kind, url)?;
+    enforce_resolved_host(kind, url).await?;
+    let (method, header_map) = build_method_and_headers(kind, method, headers, secret)?;
 
     // Bound the whole call. Image endpoints use a longer cap; text/model probes
     // keep the shorter default so a bad relay does not hang the app.
     let client = build_client(Some(buffered_timeout_for_url(&url)));
-    let mut req = client.request(method, &url).headers(header_map);
+    let mut req = client.request(method, url).headers(header_map);
     if let Some(body) = body {
         req = req.body(body);
     }
@@ -500,6 +516,18 @@ mod tests {
         assert!(matches!(
             enforce_host("anthropic", "https://api.anthropic.com.evil.com/v1"),
             Err(ProxyError::DisallowedHost)
+        ));
+    }
+
+    #[test]
+    fn host_allowlist_rejects_url_userinfo() {
+        assert!(matches!(
+            enforce_host("openai-compatible", "https://secret@relay.example/v1"),
+            Err(ProxyError::BadUrl)
+        ));
+        assert!(matches!(
+            enforce_host("openai", "https://user:secret@api.openai.com/v1"),
+            Err(ProxyError::BadUrl)
         ));
     }
 

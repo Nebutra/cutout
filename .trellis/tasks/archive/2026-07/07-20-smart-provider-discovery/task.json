@@ -1,0 +1,49 @@
+{
+  "id": "smart-provider-discovery",
+  "name": "smart-provider-discovery",
+  "title": "Smart provider discovery and model catalog",
+  "description": "Securely discover supported Codex and Claude provider configuration, test credentials server-side, populate model selection from provider catalogs, and use explicit OpenAI wire protocols.",
+  "status": "completed",
+  "dev_type": "fullstack",
+  "scope": "desktop-provider-discovery",
+  "package": "cutout",
+  "priority": "P2",
+  "creator": "tseka",
+  "assignee": "tseka",
+  "createdAt": "2026-07-20",
+  "completedAt": "2026-07-20",
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [
+    "07-20-provider-distribution-validation"
+  ],
+  "parent": null,
+  "relatedFiles": [
+    "src-tauri/src/commands/ai/provider_discovery.rs",
+    "src-tauri/src/commands/ai/ai_proxy.rs",
+    "src/components/settings/ProviderForm.tsx",
+    "src/services/ai/provider-discovery.ts",
+    "src/services/ai/provider-types.ts"
+  ],
+  "notes": "Provider discovery implementation scope completed with focused automated evidence. Real current/legacy OS Keychain integration, packaged desktop discover-check-select-save-generate validation, and final plugin validation are explicitly deferred to child task 07-20-provider-distribution-validation and are not claimed as passed here.",
+  "meta": {
+    "closureAudit": {
+      "date": "2026-07-20",
+      "result": "implementation-complete-followup-planned",
+      "verified": [
+        "sanitized Codex and Claude fixtures",
+        "bounded single-use Rust drafts",
+        "pre-persistence catalog check",
+        "explicit Responses and Chat Completions routing",
+        "mounted ProviderForm save gate and atomic import",
+        "strict secret-free IPC candidate parsing",
+        "AI Rust tests, focused frontend tests, typecheck and lint"
+      ],
+      "deferredTo": "07-20-provider-distribution-validation"
+    }
+  }
+}

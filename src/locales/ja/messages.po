@@ -2897,3 +2897,58 @@ msgstr "開いているタブと最近閉じたタブがここに表示されま
 #: src/components/home/ProjectHome.tsx
 msgid "home.your_projects"
 msgstr "あなたのプロジェクト"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderForm.tsx
+msgid "settings.provider_api_protocol"
+msgstr "API protocol"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderForm.tsx
+msgid "settings.provider_protocol_responses"
+msgstr "Responses API"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderForm.tsx
+msgid "settings.provider_protocol_chat_completions"
+msgstr "Chat Completions"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderForm.tsx
+msgid "settings.check_connection_load_models"
+msgstr "Check connection and load models"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderForm.tsx
+msgid "settings.select_model"
+msgstr "Select a model"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderForm.tsx
+msgid "settings.enter_model_manually"
+msgstr "Enter model ID manually"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.provider_source_environment"
+msgstr "Process environment"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.provider_source_keychain"
+msgstr "Cutout Keychain"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.discovered_providers"
+msgstr "Discovered providers"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.discovered_on_mac"
+msgstr "Discovered on this Mac"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.no_reusable_credential"
+msgstr "No reusable credential"

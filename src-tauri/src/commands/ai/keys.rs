@@ -194,6 +194,19 @@ fn key_status_inner(provider_id: &str) -> Result<bool, KeyError> {
     }
 }
 
+/// Internal presence-only lookup for exact Cutout provider accounts.
+pub(crate) fn has_key_exact(provider_id: &str) -> bool {
+    key_status_inner(provider_id).unwrap_or(false)
+}
+
+pub(crate) fn store_imported_key(provider_id: &str, secret: &str) -> Result<(), KeyError> {
+    set_key_inner(provider_id, secret)
+}
+
+pub(crate) fn delete_imported_key(provider_id: &str) -> Result<(), KeyError> {
+    delete_key_inner(provider_id)
+}
+
 fn delete_key_inner(provider_id: &str) -> Result<(), KeyError> {
     cache_remove(provider_id);
     match entry(provider_id)?.delete_credential() {

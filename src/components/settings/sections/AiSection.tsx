@@ -16,6 +16,7 @@ import {
   ShieldCheck,
   SlidersHorizontal,
   TriangleAlert,
+  WandSparkles,
 } from "lucide-react";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { plural } from "@lingui/core/macro";
@@ -32,10 +33,12 @@ import { ProviderDirectory } from "../ProviderDirectory";
 import type { ProviderDefinition } from "@/services/ai/provider-registry";
 import { modelRoutingCoverage } from "../model-routing-summary";
 import { PaidActionsSection } from "./PaidActionsSection";
+import { useQuery } from "@tanstack/react-query";
+import { discoverProviderCandidates, type ProviderDiscoveryCandidate } from "@/services/ai/provider-discovery";
 
 type View =
   | { readonly mode: "list" }
-  | { readonly mode: "add"; readonly definition?: ProviderDefinition }
+  | { readonly mode: "add"; readonly definition?: ProviderDefinition; readonly discovered?: ProviderDiscoveryCandidate }
   | { readonly mode: "edit"; readonly provider: ProviderConfig };
 
 export function AiSection() {
@@ -44,7 +47,7 @@ export function AiSection() {
   const list = providers.data ?? [];
 
   if (view.mode !== "list") {
-    if (view.mode === "add" && !view.definition) {
+    if (view.mode === "add" && !view.definition && !view.discovered) {
       return (
         <div data-provider-connect-layout className="flex min-h-full min-w-0 flex-col">
           <div className="shrink-0 pb-3">
@@ -93,6 +96,7 @@ export function AiSection() {
         <ProviderForm
           initial={view.mode === "edit" ? view.provider : undefined}
           initialKind={view.mode === "add" ? view.definition?.id : undefined}
+          discovered={view.mode === "add" ? view.discovered : undefined}
           onDone={() => setView({ mode: "list" })}
         />
       </div>
@@ -144,6 +148,8 @@ export function AiSection() {
         )}
       </div>
 
+      <DiscoveredProviders onSelect={(discovered) => setView({ mode: "add", discovered })} />
+
       <Button
         variant="outline"
         className="w-full"
@@ -157,6 +163,25 @@ export function AiSection() {
       <PaidActionsSection />
     </div>
   );
+}
+
+function DiscoveredProviders({ onSelect }: { readonly onSelect: (candidate: ProviderDiscoveryCandidate) => void }) {
+  const { t } = useLingui()
+  const query = useQuery({ queryKey: ['provider-discovery'], queryFn: discoverProviderCandidates, retry: false })
+  if (!query.data?.length) return null
+  const sourceLabel = (source: string) => source === 'codex' ? 'Codex' : source === 'claude' ? 'Claude Code' : source === 'environment'
+    ? t({ id: 'settings.provider_source_environment', message: 'Process environment' })
+    : t({ id: 'settings.provider_source_keychain', message: 'Cutout Keychain' })
+  return <section className="flex flex-col gap-2" aria-label={t({ id: 'settings.discovered_providers', message: 'Discovered providers' })}>
+    <div className="flex items-center gap-2 text-xs font-medium"><WandSparkles className="size-3.5" /><Trans id="settings.discovered_on_mac">Discovered on this Mac</Trans></div>
+    {query.data.map((candidate) => <button key={candidate.id} type="button" disabled={!candidate.credential.importable}
+      onClick={() => onSelect(candidate)}
+      className="flex items-center justify-between gap-3 rounded-md border border-border px-3 py-2 text-left hover:bg-muted/50 disabled:opacity-50">
+      <span className="min-w-0"><span className="block truncate text-sm font-medium">{candidate.label}</span>
+        <span className="block truncate text-[11px] text-muted-foreground">{sourceLabel(candidate.source)} · {candidate.credential.reference ?? t({ id: 'settings.no_reusable_credential', message: 'No reusable credential' })}</span></span>
+      <span className="shrink-0 text-[11px] text-muted-foreground">{candidate.wireProtocol ?? candidate.kind}</span>
+    </button>)}
+  </section>
 }
 
 const ModelAssignments = memo(function ModelAssignments({

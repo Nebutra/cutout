@@ -27,6 +27,8 @@ import {
   PackageOpen,
   Palette,
   Grid3x3,
+  GitBranch,
+  History,
   Map as MapIcon,
   PanelLeft,
   PanelLeftClose,
@@ -196,6 +198,7 @@ import {
   type GlobalLibraryItem,
 } from "@/global-library";
 import { AgentWorkspaceDock } from "@/components/agent-workspace";
+import { GitWorkspaceDock, type GitWorkspaceReview } from "@/components/git-workspace";
 import {
   FilesPanel,
   type FilesPanelNode,
@@ -244,7 +247,11 @@ import {
 } from "@/agent-runtime/run-coordinator";
 import { useAgentRunEvents } from "@/agent-runtime/use-agent-run-events";
 import { consumeComposerDraft } from "./composer-draft";
-import { createLiveTextBatcher } from "./live-agent-output";
+import {
+  collectLiveText,
+  createLiveTextBatcher,
+  restoreLiveAgentOutput,
+} from "./live-agent-output";
 import { useDesktopToolLoop } from "@/agent-runtime/use-desktop-tool-loop";
 import {
   decideVariant,
@@ -439,6 +446,8 @@ export function IntentWorkspace({
   const [agentDockVisible, setAgentDockVisible] = useState(true);
   const [filesDockVisible, setFilesDockVisible] = useState(false);
   const [designDockVisible, setDesignDockVisible] = useState(false);
+  const [gitDockVisible, setGitDockVisible] = useState(false);
+  const [gitReview, setGitReview] = useState<GitWorkspaceReview>();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [canvasBackground, setCanvasBackground] = useState<string | null>(
     readCanvasBackground,
@@ -486,8 +495,10 @@ export function IntentWorkspace({
     () => initialWorkspace?.humanLoopCustomAnswer ?? "",
   );
   const [composerDraft, setComposerDraft] = useState("");
-  const [liveAgentOutput, setLiveAgentOutput] = useState(
-    () => initialWorkspace?.liveAgentOutput ?? "",
+  // Live provider deltas are deliberately not restored from workspace.v1.
+  // Durable agent-message events are the transcript source of truth.
+  const [liveAgentOutput, setLiveAgentOutput] = useState(() =>
+    restoreLiveAgentOutput(initialWorkspace?.liveAgentOutput),
   );
   const [liveAgentLabel, setLiveAgentLabel] = useState<string | null>(null);
   const [runError, setRunError] = useState<string | null>(
@@ -872,7 +883,7 @@ export function IntentWorkspace({
       (genError ? userFacingGenerationError(genError.message) : null),
     notices: executionNotices,
     runEvents: agentRunEvents,
-    liveAgentMessage: liveAgentOutput
+    liveAgentMessage: liveAgentLabel
       ? {
           id: `runtime:stream:${agentRunEvents.activeRunId ?? "design-markdown"}`,
           text: liveAgentOutput,
@@ -927,7 +938,7 @@ export function IntentWorkspace({
       selectedPrototypePageId,
       runError,
       namingStatus,
-      liveAgentOutput,
+      liveAgentOutput: "",
       attachments: attachments.map(persistReferenceAttachment),
       webSearchEnabled,
       composerModelPolicy:
@@ -957,7 +968,6 @@ export function IntentWorkspace({
     designDocument,
     humanLoopChoiceId,
     humanLoopCustomAnswer,
-    liveAgentOutput,
     namingStatus,
     outcome,
     prototypeDesignSystem,
@@ -1051,6 +1061,8 @@ export function IntentWorkspace({
     getStoreState().endGen();
     setRunCancelled(true);
     setRunError(null);
+    setLiveAgentOutput("");
+    setLiveAgentLabel(null);
     setNamingStatus((status) =>
       status === "running" || status === "pending" ? "idle" : status,
     );
@@ -2842,12 +2854,11 @@ export function IntentWorkspace({
     lease: AgentRunLease,
     capabilityContext: string,
   ): Promise<string> {
-    let streamed = "";
     const liveOutput = createLiveTextBatcher(setLiveAgentOutput);
     setLiveAgentLabel("Agent is responding");
     setLiveAgentOutput("");
     try {
-      for await (const delta of personalizedGenerationRef.current.streamText({
+      const result = await collectLiveText(personalizedGenerationRef.current.streamText({
         providerId: chat.providerId,
         model: chat.model,
         system: [
@@ -2862,21 +2873,13 @@ export function IntentWorkspace({
         reasoningEffort: chat.effort,
         reasoningProtocol: chat.reasoningProtocol,
         signal: lease.controller.signal,
-      })) {
+      }), fallbackReply, liveOutput, () => {
         agentRunCoordinatorRef.current.checkpoint(lease);
-        streamed += delta;
-        liveOutput.append(delta);
+      }, () => lease.controller.signal.aborted);
+      if (result.usedBufferedFallback) {
+        console.info("[Cutout] conversational stream used its buffered reply.");
       }
-      liveOutput.flush();
-      return streamed.trim() || fallbackReply;
-    } catch (error) {
-      liveOutput.flush();
-      if (lease.controller.signal.aborted) throw error;
-      console.info(
-        "[Cutout] conversational stream fell back:",
-        error instanceof Error ? error.message : String(error),
-      );
-      return fallbackReply;
+      return result.text;
     } finally {
       setLiveAgentOutput("");
       setLiveAgentLabel(null);
@@ -3284,11 +3287,20 @@ export function IntentWorkspace({
             setAgentDockVisible((visible) => !visible);
             setFilesDockVisible(false);
             setDesignDockVisible(false);
+            setGitDockVisible(false);
           }}
           filesActive={filesDockVisible}
           onToggleFiles={() => {
             setFilesDockVisible((visible) => !visible);
             setAgentDockVisible(false);
+            setDesignDockVisible(false);
+            setGitDockVisible(false);
+          }}
+          gitActive={gitDockVisible}
+          onToggleGit={() => {
+            setGitDockVisible((visible) => !visible);
+            setAgentDockVisible(false);
+            setFilesDockVisible(false);
             setDesignDockVisible(false);
           }}
           onOpenAssets={library.open}
@@ -3296,6 +3308,7 @@ export function IntentWorkspace({
             setAgentDockVisible(false);
             setFilesDockVisible(false);
             setDesignDockVisible(false);
+            setGitDockVisible(false);
             onOpenDesignOs("specimen");
           }}
           inspectorActive={designDockVisible}
@@ -3325,10 +3338,12 @@ export function IntentWorkspace({
             ? "design-drawer"
             : filesDockVisible
               ? "files-drawer"
-              : "agent-drawer"
+              : gitDockVisible
+                ? "git-drawer"
+                : "agent-drawer"
         }
         className={cn(
-          !agentDockVisible && !filesDockVisible && !designDockVisible && "hidden",
+          !agentDockVisible && !filesDockVisible && !designDockVisible && !gitDockVisible && "hidden",
           "absolute inset-x-0 bottom-0 z-30 h-[min(70dvh,42rem)] min-h-[19rem] w-full overflow-hidden border-t border-border bg-background shadow-2xl lg:inset-y-0 lg:bottom-auto lg:right-auto lg:h-full lg:w-[24rem] lg:border-r lg:border-t-0 lg:transition-[left] lg:duration-300 lg:ease-in-out 2xl:w-[27rem]",
           sidebarCollapsed ? "lg:left-0" : "lg:left-14",
         )}
@@ -3344,6 +3359,8 @@ export function IntentWorkspace({
             onClose={() => setDesignDockVisible(false)}
             onOpenSpecimen={() => onOpenDesignOs("specimen")}
           />
+        ) : gitDockVisible ? (
+          <GitWorkspaceDock onClose={() => setGitDockVisible(false)} onReview={setGitReview} />
         ) : filesDockVisible ? (
           <>
             <button
@@ -3648,7 +3665,23 @@ export function IntentWorkspace({
             canvasBackground ? { background: canvasBackground } : undefined
           }
         >
-          <OutputSurface
+          {gitDockVisible && gitReview?.type === "diff" ? (
+            <section className="flex h-full min-h-0 flex-col bg-background" aria-label="Git diff review">
+              <header className="flex h-12 shrink-0 items-center gap-3 border-b border-border px-4">
+                <GitBranch className="size-4 text-muted-foreground" />
+                <div className="min-w-0 flex-1"><div className="truncate text-sm font-medium">{gitReview.diff.path}</div><div className="text-[11px] text-muted-foreground">{gitReview.diff.target === "staged" ? "Staged changes" : "Working tree changes"}</div></div>
+                <Button type="button" variant="ghost" size="icon" className="size-7" aria-label="Close Git diff" onClick={() => setGitReview(undefined)}><X className="size-3.5" /></Button>
+              </header>
+              <div className="min-h-0 flex-1 overflow-auto p-4"><pre className="min-h-full whitespace-pre-wrap font-mono text-xs leading-5 text-muted-foreground">{gitReview.diff.kind === "binary" ? "Binary file. A text diff is unavailable." : gitReview.diff.kind === "unsupported-encoding" ? "This file encoding cannot be displayed safely." : gitReview.diff.patch || "No textual diff."}{gitReview.diff.kind === "oversized" ? "\n\n[Diff truncated at the display limit]" : ""}</pre></div>
+            </section>
+          ) : gitDockVisible && gitReview?.type === "commit" ? (
+            <section className="flex h-full min-h-0 flex-col bg-background" aria-label="Git commit review">
+              <header className="flex h-12 shrink-0 items-center gap-3 border-b border-border px-4"><History className="size-4 text-muted-foreground" /><div className="min-w-0 flex-1"><div className="truncate text-sm font-medium">{gitReview.commit.subject}</div><div className="text-[11px] text-muted-foreground">{gitReview.commit.shortOid}</div></div><Button type="button" variant="ghost" size="icon" className="size-7" aria-label="Close Git commit" onClick={() => setGitReview(undefined)}><X className="size-3.5" /></Button></header>
+              <div className="min-h-0 flex-1 overflow-auto p-5"><dl className="grid max-w-3xl grid-cols-[8rem_minmax(0,1fr)] gap-x-4 gap-y-3 text-sm"><dt className="text-muted-foreground">Author</dt><dd>{gitReview.commit.author}</dd><dt className="text-muted-foreground">Committed</dt><dd>{new Date(gitReview.commit.authoredAt).toLocaleString()}</dd><dt className="text-muted-foreground">Commit</dt><dd className="break-all font-mono text-xs">{gitReview.commit.oid}</dd><dt className="text-muted-foreground">Parents</dt><dd className="break-all font-mono text-xs">{gitReview.commit.parents.join(" ") || "Initial commit"}</dd><dt className="text-muted-foreground">Decorations</dt><dd>{gitReview.commit.decorations.join(", ") || "None"}</dd></dl><div className="mt-6 max-w-3xl border-t border-border pt-4"><h3 className="mb-2 text-xs font-medium uppercase text-muted-foreground">Changed files · {gitReview.files.length}</h3>{gitReview.files.map((file) => <button type="button" key={`${file.status}:${file.path}`} className="flex w-full items-center gap-3 rounded px-2 py-2 text-left text-sm hover:bg-muted" onClick={() => gitReview.onSelectFile(file.path)}><span className="w-8 shrink-0 font-mono text-xs text-muted-foreground">{file.status}</span><span className="min-w-0 flex-1 truncate">{file.path}</span></button>)}</div></div>
+            </section>
+          ) : gitDockVisible && gitReview?.type === "branch" ? (
+            <section className="flex h-full min-h-0 flex-col bg-background" aria-label="Git branch comparison"><header className="flex h-12 shrink-0 items-center gap-3 border-b border-border px-4"><GitBranch className="size-4 text-muted-foreground" /><div className="min-w-0 flex-1"><div className="truncate text-sm font-medium">{gitReview.comparison.base} ↔ {gitReview.comparison.compare}</div><div className="text-[11px] text-muted-foreground">{gitReview.comparison.baseOnly} base-only · {gitReview.comparison.compareOnly} compare-only commits</div></div><Button type="button" variant="ghost" size="icon" className="size-7" aria-label="Close branch comparison" onClick={() => setGitReview(undefined)}><X className="size-3.5" /></Button></header><div className="min-h-0 flex-1 overflow-auto p-5"><h3 className="mb-2 text-xs font-medium uppercase text-muted-foreground">Changed files · {gitReview.comparison.files.length}</h3>{gitReview.comparison.files.map((file) => <div key={`${file.status}:${file.path}`} className="flex max-w-3xl items-center gap-3 border-b border-border/60 px-2 py-2 text-sm"><span className="w-8 shrink-0 font-mono text-xs text-muted-foreground">{file.status}</span><span className="min-w-0 flex-1 truncate">{file.path}</span></div>)}</div></section>
+          ) : <OutputSurface
             canvasBackground={canvasBackground}
             showMinimap={minimapVisible}
             showGrid={gridVisible}
@@ -3803,7 +3836,7 @@ export function IntentWorkspace({
                   )
                 : []
             }
-          />
+          />}
         </section>
       </main>
 
@@ -6405,7 +6438,7 @@ function useCenteredSafeArea() {
     const measure = () => {
       const bounds = element.parentElement?.getBoundingClientRect();
       if (!bounds) return;
-      const panels = [...(workspace?.querySelectorAll<HTMLElement>('[data-workspace-panel="agent-drawer"], [data-workspace-panel="files-drawer"], [data-workspace-panel="design-drawer"], [aria-label="Inspector"]') ?? [])];
+      const panels = [...(workspace?.querySelectorAll<HTMLElement>('[data-workspace-panel="agent-drawer"], [data-workspace-panel="files-drawer"], [data-workspace-panel="design-drawer"], [data-workspace-panel="git-drawer"], [aria-label="Inspector"]') ?? [])];
       const { left, right, bottom } = projectVisiblePanelInsets(bounds, panels.map((panel) => ({ bounds: panel.getBoundingClientRect(), visible: visiblyOccupiesSpace(panel) })));
       const area = projectCanvasSafeArea({ viewport: { width: bounds.width, height: bounds.height }, agentDrawer: { open: left > 0, size: left }, inspector: { open: right > 0, size: right }, bottomOverlay: { open: bottom > 0, size: bottom }, centeredOverlay: { maxWidth: 448, margin: 24 } });
       const anchor = projectCanvasOverlayAnchor(area, "center");
@@ -6806,6 +6839,8 @@ function WorkspaceRail({
   onToggleAgent,
   filesActive,
   onToggleFiles,
+  gitActive,
+  onToggleGit,
   onOpenAssets,
   onOpenDesign,
   inspectorActive,
@@ -6818,6 +6853,8 @@ function WorkspaceRail({
   readonly onToggleAgent: () => void;
   readonly filesActive: boolean;
   readonly onToggleFiles: () => void;
+  readonly gitActive: boolean;
+  readonly onToggleGit: () => void;
   readonly onOpenAssets: () => void;
   readonly onOpenDesign: () => void;
   readonly inspectorActive: boolean;
@@ -6851,6 +6888,12 @@ function WorkspaceRail({
         label="Files"
         active={filesActive}
         onClick={onToggleFiles}
+      />
+      <RailItem
+        icon={<GitBranch className="size-4" />}
+        label="Git"
+        active={gitActive}
+        onClick={onToggleGit}
       />
       <RailItem
         icon={<ImageIcon className="size-4" />}

@@ -41,6 +41,13 @@ pub enum ProviderKind {
     LmStudio,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum OpenAiWireProtocol {
+    Responses,
+    ChatCompletions,
+}
+
 /// A user-configured provider connection. Contains **no secret** — the key is
 /// referenced indirectly by `id` via the keychain.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -54,6 +61,8 @@ pub struct ProviderConfig {
     /// Required for `openai-compatible`; optional override otherwise.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub base_url: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub wire_protocol: Option<OpenAiWireProtocol>,
     /// Model slug (e.g. `claude-sonnet-4-6` or `anthropic/claude-sonnet-4-6`).
     pub default_model: String,
     pub enabled: bool,
@@ -89,6 +98,35 @@ fn config_path<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, ProvidersError
         .map_err(|e| ProvidersError::ConfigDir(e.to_string()))?;
     std::fs::create_dir_all(&dir).map_err(|e| ProvidersError::ConfigDir(e.to_string()))?;
     Ok(dir.join(CONFIG_FILE))
+}
+
+pub(crate) fn load_providers_sync<R: Runtime>(
+    app: &AppHandle<R>,
+) -> Result<Vec<ProviderConfig>, ProvidersError> {
+    let path = config_path(app)?;
+    match std::fs::read(&path) {
+        Ok(bytes) => {
+            serde_json::from_slice(&bytes).map_err(|e| ProvidersError::Parse(e.to_string()))
+        }
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(Vec::new()),
+        Err(e) => Err(ProvidersError::Read(e.to_string())),
+    }
+}
+
+pub(crate) fn save_providers_atomic<R: Runtime>(
+    app: &AppHandle<R>,
+    providers: &[ProviderConfig],
+) -> Result<(), ProvidersError> {
+    let path = config_path(app)?;
+    let temporary = path.with_extension(format!("json.{}.tmp", uuid::Uuid::new_v4()));
+    let json =
+        serde_json::to_vec_pretty(providers).map_err(|e| ProvidersError::Parse(e.to_string()))?;
+    std::fs::write(&temporary, json).map_err(|e| ProvidersError::Write(e.to_string()))?;
+    if let Err(error) = std::fs::rename(&temporary, &path) {
+        let _ = std::fs::remove_file(&temporary);
+        return Err(ProvidersError::Write(error.to_string()));
+    }
+    Ok(())
 }
 
 /// Load the persisted provider list. A missing file yields an empty list.
@@ -146,12 +184,14 @@ mod tests {
             kind: ProviderKind::Anthropic,
             label: "My Anthropic".to_string(),
             base_url: None,
+            wire_protocol: None,
             default_model: "claude-sonnet-4-6".to_string(),
             enabled: true,
         };
         let json = serde_json::to_string(&cfg).unwrap();
         assert!(json.contains("\"defaultModel\":\"claude-sonnet-4-6\""));
         assert!(!json.contains("baseUrl"), "absent base_url must be omitted");
+        assert!(!json.contains("wireProtocol"));
 
         let back: ProviderConfig = serde_json::from_str(&json).unwrap();
         assert_eq!(back.id, "abc");

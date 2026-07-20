@@ -2897,3 +2897,57 @@ msgstr "打开的标签页和最近关闭的标签页会显示在这里"
 #: src/components/home/ProjectHome.tsx
 msgid "home.your_projects"
 msgstr "你的项目"
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderForm.tsx
+msgid "settings.provider_api_protocol"
+msgstr "API 协议"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderForm.tsx
+msgid "settings.provider_protocol_responses"
+msgstr "Responses API"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderForm.tsx
+msgid "settings.provider_protocol_chat_completions"
+msgstr "Chat Completions"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderForm.tsx
+msgid "settings.check_connection_load_models"
+msgstr "检查连接并加载模型"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderForm.tsx
+msgid "settings.select_model"
+msgstr "选择模型"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderForm.tsx
+msgid "settings.enter_model_manually"
+msgstr "手动输入模型 ID"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.provider_source_environment"
+msgstr "进程环境变量"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.provider_source_keychain"
+msgstr "Cutout 钥匙串"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.discovered_providers"
+msgstr "发现的提供方"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.discovered_on_mac"
+msgstr "在这台 Mac 上发现"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.no_reusable_credential"
+msgstr "没有可复用的凭据"

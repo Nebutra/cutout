@@ -13,6 +13,7 @@ import type { Result } from '@/services/types'
 import type { ProviderService } from './types'
 import {
   providerConfigsSchema,
+  defaultOpenAIWireProtocol,
   type ProviderConfig,
   type ProviderDraft,
 } from './provider-types'
@@ -81,7 +82,12 @@ function validateModelsResponse(body: string): Result<void> {
 async function loadProviders(): Promise<ProviderConfig[]> {
   if (!isTauriHost()) return []
   const raw = await invoke<unknown>('load_providers')
-  return providerConfigsSchema.parse(raw)
+  return providerConfigsSchema.parse(raw).map((provider) => ({
+    ...provider,
+    ...(provider.wireProtocol
+      ? {}
+      : { wireProtocol: defaultOpenAIWireProtocol(provider.kind) }),
+  }))
 }
 
 /** Persist the full provider list (non-secret JSON). */
@@ -100,6 +106,7 @@ function materialize(draft: ProviderDraft): ProviderConfig {
     enabled: draft.enabled,
     // Omit `baseUrl` entirely when absent (matches Rust's serde skip).
     ...(draft.baseUrl ? { baseUrl: draft.baseUrl } : {}),
+    ...(draft.wireProtocol ? { wireProtocol: draft.wireProtocol } : {}),
   }
 }
 

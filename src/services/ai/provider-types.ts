@@ -15,6 +15,22 @@ import { z } from 'zod'
 
 /** Every provider kind Rust knows how to inject auth for (spec §4). */
 export type ProviderKind = string
+export const openAIWireProtocolSchema = z.enum(['responses', 'chat-completions'])
+export type OpenAIWireProtocol = z.infer<typeof openAIWireProtocolSchema>
+
+export function isOpenAIShapedProvider(kind: ProviderKind): boolean {
+  return kind === 'openai' || kind === 'openai-compatible' || [
+    'dashscope','deepseek','zhipu','moonshot','volcengine','siliconflow',
+    'openrouter','together','groq','fireworks','xai','mistral',
+    'ollama','vllm','lm-studio',
+  ].includes(kind)
+}
+
+/** Preserve existing compatible-provider behavior while moving OpenAI to Responses. */
+export function defaultOpenAIWireProtocol(kind: ProviderKind): OpenAIWireProtocol | undefined {
+  if (!isOpenAIShapedProvider(kind)) return undefined
+  return kind === 'openai' ? 'responses' : 'chat-completions'
+}
 
 /** The ordered, user-selectable kinds (drives the Settings `Select`). */
 export const PROVIDER_KINDS: readonly ProviderKind[] = [
@@ -37,6 +53,8 @@ export interface ProviderConfig {
   readonly label: string
   /** Required for `openai-compatible`; optional override for other kinds. */
   readonly baseUrl?: string
+  /** Explicit generation endpoint for OpenAI-shaped providers. */
+  readonly wireProtocol?: OpenAIWireProtocol
   /** Default model slug, e.g. `claude-sonnet-4.6` or `anthropic/claude-sonnet-4.6`. */
   readonly defaultModel: string
   readonly enabled: boolean
@@ -57,6 +75,7 @@ export const providerConfigSchema = z.object({
   kind: providerKindSchema,
   label: z.string().min(1),
   baseUrl: z.string().min(1).optional(),
+  wireProtocol: openAIWireProtocolSchema.optional(),
   defaultModel: z.string().min(1),
   enabled: z.boolean(),
 })

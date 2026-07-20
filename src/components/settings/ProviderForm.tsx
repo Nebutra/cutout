@@ -1,27 +1,28 @@
 /**
  * ProviderForm (spec §7) — add / edit a provider connection.
  *
- * Save is a two-step, secret-safe sequence:
- *   1. `upsert(draft)` persists the **non-secret** config and returns it with a
- *      stable id (generated on create).
- *   2. iff the user typed a key, `setKey(id, secret)` sends it straight to Rust;
- *      the secret is then wiped from local state (`setSecret('')`) before the
- *      form closes. The secret is never placed in Query/Zustand state, never
- *      echoed, never persisted in JS.
+ * New providers are checked in a short-lived Rust draft and imported atomically;
+ * edits retain the existing config/key mutation hooks. A manually entered secret
+ * remains transient React state and is wiped after any save attempt.
  *
  * `baseUrl` is surfaced only for `openai-compatible` (the one kind that requires
  * it); `defaultModel` is a Select seeded from `SUGGESTED_MODELS`, degrading to a
  * free-text input for kinds without a catalog (e.g. `openai-compatible`).
  */
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
+import { v4 as uuidv4 } from 'uuid'
 import { toast } from 'sonner'
-import { Loader2 } from 'lucide-react'
+import { Loader2, RefreshCw } from 'lucide-react'
 import { Trans, useLingui } from '@lingui/react/macro'
 import {
   PROVIDER_KINDS,
   type ProviderConfig,
   type ProviderDraft,
   type ProviderKind,
+  type OpenAIWireProtocol,
+  defaultOpenAIWireProtocol,
+  isOpenAIShapedProvider,
 } from '@/services/ai/provider-types'
 import {
   DEFAULT_MODEL,
@@ -47,6 +48,8 @@ import {
 import { KeyField } from './KeyField'
 import { createBuiltinProviderRegistry } from '@/services/ai/provider-registry'
 import { setProviderVerification } from '@/services/ai/provider-verification'
+import { cancelProviderDraft, checkProviderDraft, createProviderDraft, importProviderDraft, type ProviderDiscoveryCandidate } from '@/services/ai/provider-discovery'
+import { apiBaseUrl } from '@/services/ai/base-url'
 
 /**
  * Brand kind labels. These are product names and stay verbatim across locales;
@@ -65,26 +68,47 @@ function isKnownDefault(model: string): boolean {
   return Object.values(DEFAULT_MODEL).includes(model)
 }
 
+function discoveryError(error: unknown): { code?: string; message: string } {
+  if (typeof error === 'object' && error !== null) {
+    const value = error as { code?: unknown; message?: unknown }
+    if (typeof value.message === 'string') return { message: value.message, ...(typeof value.code === 'string' ? { code: value.code } : {}) }
+  }
+  return { message: error instanceof Error ? error.message : String(error) }
+}
+
 interface ProviderFormProps {
   /** Existing config → edit mode; absent → add mode. */
   readonly initial?: ProviderConfig
   readonly initialKind?: ProviderKind
+  readonly discovered?: ProviderDiscoveryCandidate
   /** Leave the form (back to the list). */
   readonly onDone: () => void
 }
 
-export function ProviderForm({ initial, initialKind, onDone }: ProviderFormProps) {
+export function ProviderForm({ initial, initialKind, discovered, onDone }: ProviderFormProps) {
   const { t } = useLingui()
   const isEdit = initial !== undefined
-  const [kind, setKind] = useState<ProviderKind>(initial?.kind ?? initialKind ?? 'anthropic')
-  const [label, setLabel] = useState(initial?.label ?? '')
-  const [baseUrl, setBaseUrl] = useState(initial?.baseUrl ?? '')
+  const [kind, setKind] = useState<ProviderKind>(initial?.kind ?? discovered?.kind ?? initialKind ?? 'anthropic')
+  const [label, setLabel] = useState(initial?.label ?? discovered?.label ?? '')
+  const [baseUrl, setBaseUrl] = useState(initial?.baseUrl ?? discovered?.baseUrl ?? '')
+  const [wireProtocol, setWireProtocol] = useState<OpenAIWireProtocol | undefined>(
+    initial?.wireProtocol ?? discovered?.wireProtocol ?? defaultOpenAIWireProtocol(initial?.kind ?? discovered?.kind ?? initialKind ?? 'anthropic'),
+  )
   const [defaultModel, setDefaultModel] = useState(
-    initial?.defaultModel ?? DEFAULT_MODEL[initialKind ?? 'anthropic'] ?? '',
+    initial?.defaultModel ?? discovered?.modelHint ?? DEFAULT_MODEL[discovered?.kind ?? initialKind ?? 'anthropic'] ?? '',
   )
   // Ephemeral: the replacement secret the user is typing. Never leaves this state
   // except straight into `setKey`, after which it is cleared.
   const [secret, setSecret] = useState('')
+  const [probedModels, setProbedModels] = useState<string[]>([])
+  const [probeError, setProbeError] = useState<string>()
+  const [probeErrorCode, setProbeErrorCode] = useState<string>()
+  const [probing, setProbing] = useState(false)
+  const [connectionDirty, setConnectionDirty] = useState(!isEdit)
+  const [manualModel, setManualModel] = useState(false)
+  const [nativeDraftId, setNativeDraftId] = useState<string>()
+  const [importing, setImporting] = useState(false)
+  const queryClient = useQueryClient()
 
   const upsert = useUpsertProvider()
   const setKey = useSetKey()
@@ -92,11 +116,22 @@ export function ProviderForm({ initial, initialKind, onDone }: ProviderFormProps
   const status = useProviderStatus(initial?.id ?? '')
   const hasKey = isEdit && status.data === true
 
-  const busy = upsert.isPending || setKey.isPending
+  const busy = upsert.isPending || setKey.isPending || importing
+
+  useEffect(() => () => {
+    if (nativeDraftId) void cancelProviderDraft(nativeDraftId)
+  }, [nativeDraftId])
+
+  function invalidateConnection() {
+    if (nativeDraftId) void cancelProviderDraft(nativeDraftId)
+    setNativeDraftId(undefined); setProbedModels([]); setProbeError(undefined); setProbeErrorCode(undefined); setConnectionDirty(true)
+  }
 
   function onKindChange(next: string) {
     const nextKind = next as ProviderKind
     setKind(nextKind)
+    setWireProtocol(defaultOpenAIWireProtocol(nextKind))
+    invalidateConnection()
     // Re-seed the model only when it is empty or a stock default, so a custom
     // slug the user typed survives a kind switch.
     setDefaultModel((cur) =>
@@ -117,12 +152,14 @@ export function ProviderForm({ initial, initialKind, onDone }: ProviderFormProps
   const needsBaseUrl = definition?.configurableBaseUrl ?? kind === 'openai-compatible'
   const needsKey = definition?.authMethods.includes('api-key') ?? true
   const needsOAuth = definition?.authMethods.includes('oauth2') ?? false
+  const wireProtocols = definition?.openAIWireProtocols ?? (isOpenAIShapedProvider(kind) ? ['responses', 'chat-completions'] as const : [])
   const modelOptions = Array.from(
     new Set(
       [
         ...(SUGGESTED_MODELS[kind] ?? []),
         // Relays proxy many upstreams → offer the curated mainstream shortlist.
         ...(kind === 'openai-compatible' ? POPULAR_MODELS : []),
+        ...probedModels,
         defaultModel,
       ].filter((m) => m.trim()),
     ),
@@ -132,17 +169,55 @@ export function ProviderForm({ initial, initialKind, onDone }: ProviderFormProps
     label.trim().length > 0 &&
     defaultModel.trim().length > 0 &&
     (!needsBaseUrl || baseUrl.trim().length > 0) &&
-    !busy
+    !busy && !connectionDirty
+
+  async function probeModels() {
+    const resolvedBaseUrl = apiBaseUrl(kind, baseUrl.trim() || undefined)
+    if (!resolvedBaseUrl) return
+    setProbing(true); setProbeError(undefined); setProbeErrorCode(undefined)
+    try {
+      if (nativeDraftId) await cancelProviderDraft(nativeDraftId)
+      const draftId = await createProviderDraft({
+        kind, baseUrl: resolvedBaseUrl, wireProtocol,
+        ...(discovered ? { candidateId: discovered.id } : {}),
+        ...(initial?.id ? { providerId: initial.id } : {}),
+        ...(secret ? { secret } : {}),
+      })
+      setNativeDraftId(draftId)
+      const models = await checkProviderDraft(draftId)
+      setProbedModels(models)
+      setConnectionDirty(false)
+      if (!models.includes(defaultModel)) setDefaultModel(models[0] ?? '')
+    } catch (error) {
+      setProbedModels([])
+      const detail = discoveryError(error)
+      setProbeError(detail.message); setProbeErrorCode(detail.code)
+    } finally { setProbing(false) }
+  }
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!canSave) return
     try {
+      if (!initial && nativeDraftId) {
+        setImporting(true)
+        const saved = await importProviderDraft({
+          draftId: nativeDraftId, providerId: uuidv4(), label: label.trim(),
+          defaultModel: defaultModel.trim(), enabled: true,
+        })
+        setSecret(''); setNativeDraftId(undefined)
+        setProviderVerification(saved.id,{status:'verified',model:defaultModel,checkedAt:new Date().toISOString()})
+        await queryClient.invalidateQueries({ queryKey: ['providers'] })
+        toast.success(t({ id: 'settings.provider_added_toast', message: 'Provider added' }), { description: saved.label })
+        onDone()
+        return
+      }
       const draft: ProviderDraft = {
         ...(initial?.id ? { id: initial.id } : {}),
         kind,
         label: label.trim(),
         baseUrl: baseUrl.trim() ? baseUrl.trim() : undefined,
+        wireProtocol,
         defaultModel: defaultModel.trim(),
         enabled: initial?.enabled ?? true,
       }
@@ -152,6 +227,9 @@ export function ProviderForm({ initial, initialKind, onDone }: ProviderFormProps
       if (providedKey) {
         await setKey.mutateAsync({ id: saved.id, secret })
         setSecret('') // wipe the secret from JS the moment Rust has it
+      }
+      if (probedModels.length > 0) {
+        setProviderVerification(saved.id,{status:'verified',model:defaultModel,checkedAt:new Date().toISOString()})
       }
       toast.success(
         isEdit
@@ -190,6 +268,8 @@ export function ProviderForm({ initial, initialKind, onDone }: ProviderFormProps
       toast.error(t({ id: 'settings.save_failed_toast', message: 'Save failed' }), {
         description: error instanceof Error ? error.message : String(error),
       })
+    } finally {
+      setImporting(false)
     }
   }
 
@@ -246,7 +326,7 @@ export function ProviderForm({ initial, initialKind, onDone }: ProviderFormProps
             id="provider-baseurl"
             value={baseUrl}
             disabled={busy}
-            onChange={(e) => setBaseUrl(e.target.value)}
+            onChange={(e) => { setBaseUrl(e.target.value); invalidateConnection() }}
             placeholder="https://api.example.com/v1"
             className="font-mono"
             autoCapitalize="off"
@@ -256,40 +336,45 @@ export function ProviderForm({ initial, initialKind, onDone }: ProviderFormProps
         </div>
       )}
 
+      {isOpenAIShapedProvider(kind) && (
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="provider-wire-protocol"><Trans id="settings.provider_api_protocol">API protocol</Trans></Label>
+          <Select value={wireProtocol} onValueChange={(value) => { setWireProtocol(value as OpenAIWireProtocol); invalidateConnection() }} disabled={busy}>
+            <SelectTrigger id="provider-wire-protocol"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {wireProtocols.includes('responses') ? <SelectItem value="responses"><Trans id="settings.provider_protocol_responses">Responses API</Trans></SelectItem> : null}
+              {wireProtocols.includes('chat-completions') ? <SelectItem value="chat-completions"><Trans id="settings.provider_protocol_chat_completions">Chat Completions</Trans></SelectItem> : null}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+
+      {needsKey ? <KeyField id="provider-key" value={secret} onChange={(value) => { setSecret(value); invalidateConnection() }} hasKey={hasKey} disabled={busy} /> : null}
+      {needsOAuth ? <p className="rounded-md border border-amber-500/30 bg-amber-500/10 px-2.5 py-2 text-xs text-amber-700 dark:text-amber-300">Authorization is required. An injected desktop OAuth host must complete the connection before this provider becomes available.</p> : null}
+
+      <div className="flex items-center gap-2">
+        <Button type="button" variant="outline" onClick={() => void probeModels()} disabled={busy || probing || (!secret && !hasKey && !discovered?.credential.available && needsKey)}>
+          {probing ? <Loader2 className="animate-spin" /> : <RefreshCw />}<Trans id="settings.check_connection_load_models">Check connection and load models</Trans>
+        </Button>
+        {probeError ? <span className="text-xs text-destructive">{probeError}</span> : null}
+      </div>
+
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="provider-model">
           <Trans id="settings.provider_model_label">Default model</Trans>
         </Label>
-        {/* Free-text so relays / openai-compatible can enter ANY model slug;
-            the suggestions (per-kind + discovered) are offered via datalist, not
-            a locked Select. */}
-        <Input
-          id="provider-model"
-          list="provider-model-suggestions"
-          value={defaultModel}
-          disabled={busy}
-          onChange={(e) => setDefaultModel(e.target.value)}
-          placeholder={DEFAULT_MODEL[kind] ?? 'Model ID from provider catalog'}
-          className="font-mono"
-          autoComplete="off"
-          autoCapitalize="off"
-          autoCorrect="off"
-          spellCheck={false}
-        />
-        {modelOptions.length > 0 && (
-          <datalist id="provider-model-suggestions">
-            {modelOptions.map((m) => (
-              <option key={m} value={m} />
-            ))}
-          </datalist>
-        )}
+        {manualModel ? <Input id="provider-model" value={defaultModel} onChange={(event) => setDefaultModel(event.target.value)} className="font-mono" placeholder="Model ID" /> :
+          <Select value={defaultModel} onValueChange={setDefaultModel} disabled={busy || probing || connectionDirty}>
+            <SelectTrigger id="provider-model" className="font-mono"><SelectValue placeholder={t({ id: 'settings.select_model', message: 'Select a model' })} /></SelectTrigger>
+            <SelectContent>
+              {modelOptions.map((model) => <SelectItem key={model} value={model} className="font-mono">{model}</SelectItem>)}
+            </SelectContent>
+          </Select>}
+        {probeErrorCode === 'catalog-unsupported' ? <Button type="button" variant="ghost" size="sm" className="self-start" onClick={() => { setManualModel(true); setConnectionDirty(false) }}><Trans id="settings.enter_model_manually">Enter model ID manually</Trans></Button> : null}
       </div>
 
-      {needsKey ? <KeyField id="provider-key" value={secret} onChange={setSecret} hasKey={hasKey} disabled={busy} /> : null}
-      {needsOAuth ? <p className="rounded-md border border-amber-500/30 bg-amber-500/10 px-2.5 py-2 text-xs text-amber-700 dark:text-amber-300">Authorization is required. An injected desktop OAuth host must complete the connection before this provider becomes available.</p> : null}
-
       <div className="mt-1 flex justify-end gap-2">
-        <Button type="button" variant="outline" onClick={onDone} disabled={busy}>
+        <Button type="button" variant="outline" onClick={() => { if (nativeDraftId) void cancelProviderDraft(nativeDraftId); onDone() }} disabled={busy}>
           <Trans id="settings.cancel">Cancel</Trans>
         </Button>
         <Button type="submit" disabled={!canSave}>

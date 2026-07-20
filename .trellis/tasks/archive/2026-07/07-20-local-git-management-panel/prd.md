@@ -27,6 +27,12 @@ full GitKraken feature set.
 
 - Add one project-level Git surface with four focused views: `Changes`,
   `History`, `Branches`, and `Pull Requests`.
+- Add Git as a first-class item in the project rail. It opens a mutually
+  exclusive, resizable project dock alongside Agent and Files; it is not a
+  Settings section, Inspector subsection, modal, or separate dashboard.
+- Keep scanning and selection in the Git dock. Use the main workspace for the
+  selected diff, commit, branch comparison, or pull-request review so narrow
+  panels do not become dense miniature applications.
 - Keep the default view outcome-oriented: show the current branch, sync state,
   working-tree summary, and the next relevant action without a dense dashboard.
 - Use progressive disclosure for commit metadata, file diffs, branch topology,
@@ -41,6 +47,8 @@ full GitKraken feature set.
 - Show a text or binary-aware file diff with additions/deletions and safe empty,
   loading, large-file, and error states.
 - Never silently stage, discard, commit, push, or overwrite work.
+- The first release supports staging/unstaging selected paths, committing, and
+  pushing through typed operations. Discard and force-push are deferred.
 
 ### History
 
@@ -55,8 +63,8 @@ full GitKraken feature set.
 
 - Show local and remote branches, current/upstream state, ahead/behind counts,
   and last commit.
-- Support creating and switching local branches. Additional mutating branch
-  actions follow the explicit product decision recorded during planning.
+- Support creating and switching local branches. Branch deletion and history
+  rewriting are deferred.
 - Dirty-worktree and conflict preconditions must fail visibly without losing
   user changes.
 
@@ -69,6 +77,8 @@ full GitKraken feature set.
   implemented.
 - Any remote mutation must be previewed and explicitly confirmed, and its
   success/failure must be read back from the host rather than inferred.
+- The first release may merge an eligible pull request through a verified
+  GitHub host. Closing a pull request is deferred.
 
 ### Safety and Agent boundary
 
@@ -89,31 +99,63 @@ full GitKraken feature set.
 - Bundling OAuth credentials, creating cloud accounts, or claiming live GitHub
   connectivity without an installed authenticated host.
 - Generic arbitrary command execution or exposing a terminal through the panel.
+- Discarding changes, force-pushing, deleting branches, closing pull requests,
+  or rewriting history in the first release.
 
 ## Acceptance Criteria
 
-- [ ] A repository opens one Git surface containing Changes, History, Branches,
+- [x] A repository opens one Git surface containing Changes, History, Branches,
       and Pull Requests, with responsive project-shell navigation.
-- [ ] A non-repository project gets a concise empty state and no Git commands are
-      attempted.
-- [ ] Working-tree status and commit history are read from the authorized local
+- [x] A non-repository project gets a concise empty state; after capability
+      detection, status, history, and branch reads are not attempted.
+- [x] Working-tree status and commit history are read from the authorized local
       repository and remain responsive on large histories.
-- [ ] Commit and working-tree file diffs distinguish text, binary, missing, and
-      oversized content without rendering unsafe HTML.
-- [ ] Local and remote branch state includes current/upstream and ahead/behind
+- [x] Commit and working-tree file diffs distinguish text, binary, unsupported
+      encoding, and oversized content without rendering unsafe HTML.
+- [x] Local and remote branch state includes current/upstream and ahead/behind
       information; dirty/conflicted preconditions are explicit.
-- [ ] Pull Requests never appear available without a verified authenticated
+- [x] Pull Requests never appear available without a verified authenticated
       GitHub host session.
-- [ ] Every enabled mutation has a typed preview, an explicit confirmation when
+- [x] Every enabled mutation has stale-state protection and a verified result or
+      error receipt. Commit, branch changes, and push use typed previews and
+      explicit confirmation; stage/unstage remain explicit path-level actions.
+- [x] The local Git slice adds no public Agent, CLI, or MCP operation and exposes
+      no credentials, native repository paths, or unrestricted command surface.
+- [x] Focused Rust command, TypeScript bridge, and component interaction tests
+      cover parsing, unsafe paths, bounded output, plan expiry, non-repository,
+      unavailable-host, pagination, and confirmation behavior.
+- [x] The local Git slice does not alter the external Cutout Agent contract.
+
+## Deferred Follow-ups
+
+- `07-20-authenticated-github-pr-host`: verified authenticated PR list/detail,
+  checks/reviews, and previewed merge. The current UI remains unavailable until
+  this real host exists.
+- `07-20-git-workspace-hardening`: explicit missing/ignored classification,
+  bounded Agent Git context contract review, conflict/stale/failure fixture
+  expansion, and executable desktop/narrow visual coverage.
+
+The broader criteria below belong to those named follow-ups and are not claimed
+as completed by this local-first slice:
+
+- [ ] A verified GitHub host provides PR list/detail/check/review and merge.
+- [ ] Missing and ignored-relevant paths have explicit normalized presentation.
+- [ ] Agent-facing Git context is designed, bounded, and synchronized across all
+      public contract surfaces if adopted.
+- [ ] Desktop visual checks run against a deterministic project-state fixture.
+
+<!-- Superseded broad criteria retained in named follow-ups:
+- Every enabled mutation has a typed preview, an explicit confirmation when
       required, stale-state protection, and a verified result/error receipt.
-- [ ] Agent-facing Git context contains normalized metadata and bounded diffs,
+- Agent-facing Git context contains normalized metadata and bounded diffs,
       never credentials or unrestricted filesystem access.
-- [ ] Rust command tests, TypeScript service tests, component interaction tests,
+- Rust command tests, TypeScript service tests, component interaction tests,
       and desktop visual/responsive checks cover success, empty, conflict,
       unavailable-host, stale-state, and failure cases.
-- [ ] Existing Cutout Agent contract validation remains green; any new external
+- Existing Cutout Agent contract validation remains green; any new external
       Agent operation is synchronized across manifest, protocol, CLI, MCP, docs,
       and product Skills in the same change.
+-->
 
 ## Notes
 

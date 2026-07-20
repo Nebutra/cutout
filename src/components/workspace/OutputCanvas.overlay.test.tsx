@@ -97,4 +97,38 @@ describe('OutputCanvas overlays', () => {
     expect(host.textContent).toContain('DESIGN.md needs repair')
     expect(host.textContent).not.toContain('Queued')
   })
+
+  it('shows task lifecycle states and replaces a matching placeholder with its ready artifact', () => {
+    const material = (id: string) => ({
+      id,
+      kind: 'prototype-page' as const,
+      label: id,
+      version: 'pending',
+      provenance: { source: 'prototype-generation' as const },
+    })
+    host = document.createElement('div')
+    document.body.append(host)
+    root = createRoot(host)
+
+    act(() => root?.render(
+      <OutputCanvas
+        designSystem={null}
+        pages={[{ id: 'replace-me', label: 'Ready page', material: { ...material('replace-me'), version: 'v1' } }]}
+        assets={[]}
+        pendingPages={[
+          { id: 'queued', label: 'Queued page', material: material('queued'), status: 'queued' },
+          { id: 'generating', label: 'Generating page', material: material('generating'), status: 'generating' },
+          { id: 'failed', label: 'Failed page', material: material('failed'), status: 'failed' },
+          { id: 'replace-me', label: 'Old placeholder', material: material('replace-me'), status: 'generating' },
+        ]}
+      />,
+    ))
+
+    expect(host.textContent).toContain('Queued')
+    expect(host.textContent).toContain('Generating')
+    expect(host.textContent).toContain('Failed')
+    expect(host.textContent).toContain('Ready')
+    expect(host.textContent).toContain('Ready page')
+    expect(host.textContent).not.toContain('Old placeholder')
+  })
 })

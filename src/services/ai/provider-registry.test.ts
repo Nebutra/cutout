@@ -130,6 +130,9 @@ describe("provider brand assets", () => {
     expect(registry.definition("openai-compatible")?.icon?.id).toBe(
       "cutout:compatible",
     );
+    expect(registry.definition('openai')?.openAIWireProtocols).toEqual(['responses', 'chat-completions'])
+    expect(registry.definition('deepseek')?.openAIWireProtocols).toEqual(['chat-completions'])
+    expect(registry.definition('openai-compatible')?.openAIWireProtocols).toEqual(['responses', 'chat-completions'])
     expect(registry.definition("ollama")?.icon?.id).toBe("simple-icons:ollama");
   });
 });

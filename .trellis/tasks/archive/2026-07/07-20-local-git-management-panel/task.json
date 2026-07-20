@@ -3,7 +3,7 @@
   "name": "local-git-management-panel",
   "title": "Local Git management panel",
   "description": "",
-  "status": "planning",
+  "status": "completed",
   "dev_type": null,
   "scope": null,
   "package": null,
@@ -11,16 +11,19 @@
   "creator": "tseka",
   "assignee": "tseka",
   "createdAt": "2026-07-20",
-  "completedAt": null,
+  "completedAt": "2026-07-20",
   "branch": null,
   "base_branch": "main",
   "worktree_path": null,
   "commit": null,
   "pr_url": null,
   "subtasks": [],
-  "children": [],
+  "children": [
+    "07-20-authenticated-github-pr-host",
+    "07-20-git-workspace-hardening"
+  ],
   "parent": null,
   "relatedFiles": [],
-  "notes": "",
+  "notes": "Local-first Git slice completed. Authenticated GitHub PR operations and advanced hardening/visual coverage are tracked as named child tasks.",
   "meta": {}
 }

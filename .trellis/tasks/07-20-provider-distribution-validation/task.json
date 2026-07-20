@@ -1,0 +1,30 @@
+{
+  "id": "provider-distribution-validation",
+  "name": "provider-distribution-validation",
+  "title": "Provider discovery distribution validation",
+  "description": "Validate provider discovery against real current and legacy OS Keychain records, exercise the packaged desktop import and generation flow, and close final generated plugin contract validation.",
+  "status": "planning",
+  "dev_type": "fullstack",
+  "scope": "desktop-provider-distribution-validation",
+  "package": "cutout",
+  "priority": "P2",
+  "creator": "tseka",
+  "assignee": "tseka",
+  "createdAt": "2026-07-20",
+  "completedAt": null,
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [
+    "src-tauri/src/commands/ai/provider_discovery.rs",
+    "src-tauri/src/commands/ai/keys.rs",
+    "src/components/settings/ProviderForm.tsx"
+  ],
+  "notes": "Planning child of 07-20-smart-provider-discovery. The parent implementation is complete; this task owns environment and distribution evidence only.",
+  "meta": {}
+}
