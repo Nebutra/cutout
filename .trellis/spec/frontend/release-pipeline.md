@@ -46,6 +46,8 @@ installer version differs from their release version.
   uses the bundled executable outside macOS unless an explicit executable path
   is provided. Text validators accept both LF and CRLF repository checkouts;
   plugin source fingerprints and mirrored text trees normalize both forms.
+  Cross-platform tests use native path parsing and Windows `.cmd` shims for
+  package executables; unsupported Windows process-tree control fails closed.
 - AppShell initializes once, delays automatic checking for 8 seconds, and uses
   the persisted 24-hour preference gate. The Home action subscribes to this
   state; it does not call GitHub or the native updater directly.

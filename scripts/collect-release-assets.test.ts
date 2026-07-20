@@ -1,6 +1,6 @@
 import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { basename, join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { collectReleaseAssets, releaseArtifactIds, writeReleaseChecksums } from './lib/collect-release-assets.mjs'
 
@@ -26,7 +26,7 @@ describe('release asset collection', () => {
   it('qualifies duplicate platform basenames and writes deterministic checksums', async () => {
     const { input, output } = await fixture()
     const assets = await collectReleaseAssets({ inputDir: input, outputDir: output })
-    expect(assets.map((path) => path.split('/').at(-1))).toEqual(expect.arrayContaining([
+    expect(assets.map((path) => basename(path))).toEqual(expect.arrayContaining([
       'macos-aarch64-Cutout.dmg',
       'macos-x86_64-Cutout.dmg',
       'windows-x86_64-Cutout.msi',

@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import YAML from 'yaml'
 import { resolveChromeExecutable } from '../playwright.config'
 import { normalizeText, sha256NormalizedText } from './lib/normalized-text.mjs'
+import { resolveNodeCommand } from './lib/node-command.mjs'
 import { parseSkillFrontmatter } from './lib/skill-frontmatter.mjs'
 
 describe('cross-platform CI contracts', () => {
@@ -43,5 +44,12 @@ describe('cross-platform CI contracts', () => {
 
     expect(normalizeText(crlf)).toBe(lf)
     expect(sha256NormalizedText(crlf)).toBe(sha256NormalizedText(lf))
+  })
+
+  it('selects Windows command shims for Node package executables', () => {
+    expect(resolveNodeCommand('npm', 'win32')).toBe('npm.cmd')
+    expect(resolveNodeCommand('C:\\repo\\node_modules\\.bin\\tsc', 'win32')).toBe('C:\\repo\\node_modules\\.bin\\tsc.cmd')
+    expect(resolveNodeCommand('node.exe', 'win32')).toBe('node.exe')
+    expect(resolveNodeCommand('pnpm', 'linux')).toBe('pnpm')
   })
 })

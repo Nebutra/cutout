@@ -14,10 +14,14 @@ describe("node sandbox host", () => {
     await expect(resolveSandboxPath(root, "../escape")).rejects.toThrow("path-traversal");
     await expect(resolveSandboxPath(root, "src/escape/file")).rejects.toThrow("symlink-escape");
   });
-  it("runs only a host-mapped command with a secret-free environment", async () => {
+  it.skipIf(process.platform === "win32")("runs only a host-mapped command with a secret-free environment", async () => {
     const root = await mkdtemp(join(tmpdir(), "cutout-sandbox-"));
     const result = await runControlledCommand({ root, command: "test", commands: { test: { file: process.execPath, args: ["-e", "process.stdout.write(String(Boolean(process.env.MOX_API_KEY)))"] } } as never, limits, env: { PATH: process.env.PATH, MOX_API_KEY: "secret" } });
     expect(result.stdout).toBe("false");
+  });
+  it.runIf(process.platform === "win32")("fails closed when reliable process-tree cancellation is unavailable", async () => {
+    const root = await mkdtemp(join(tmpdir(), "cutout-sandbox-"));
+    await expect(runControlledCommand({ root, command: "test", commands: { test: { file: process.execPath, args: [] } } as never, limits })).rejects.toThrow("Windows job-object host adapter");
   });
   it.skipIf(process.platform === "win32")("cancels the whole detached process group", async () => {
     const root = await mkdtemp(join(tmpdir(), "cutout-sandbox-"));
