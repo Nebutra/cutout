@@ -410,20 +410,11 @@ export async function createRestoreInputFromProject(
 ): Promise<ProjectRestoreInput> {
   // Non-repository callers still receive the canonical IR projection first.
   record = (await normalizeProjectRecord(record)).record
-  const source = record.source
-    ? {
-        name: record.source.name,
-        bitmap: await decodeImage(record.source.blob),
-      }
-    : undefined
-  const mockup = record.mockup
-    ? {
-        blob: record.mockup.blob,
-        bitmap: await decodeImage(record.mockup.blob),
-        width: record.mockup.width,
-        height: record.mockup.height,
-      }
-    : null
+  // A stale or partially-written image must not prevent the project shell from
+  // opening. The project state and every other persisted artifact remain
+  // useful, and the next autosave removes the missing visual reference.
+  const source = await restoreStoredSource(record.source)
+  const mockup = await restoreStoredMockup(record.mockup)
 
   return {
     brief: record.brief,
@@ -434,6 +425,33 @@ export async function createRestoreInputFromProject(
     workspace: record.workspace ?? null,
     assetProduction: record.assetProduction ?? emptyAssetProductionSnapshot(),
     slices: record.slices,
+  }
+}
+
+async function restoreStoredSource(
+  source: StoredImage | undefined,
+): Promise<ProjectRestoreInput['source']> {
+  if (!source) return undefined
+  try {
+    return { name: source.name, bitmap: await decodeImage(source.blob) }
+  } catch {
+    return undefined
+  }
+}
+
+async function restoreStoredMockup(
+  mockup: StoredImage | undefined,
+): Promise<ProjectRestoreInput['mockup']> {
+  if (!mockup) return null
+  try {
+    return {
+      blob: mockup.blob,
+      bitmap: await decodeImage(mockup.blob),
+      width: mockup.width,
+      height: mockup.height,
+    }
+  } catch {
+    return null
   }
 }
 

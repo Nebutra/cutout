@@ -153,6 +153,48 @@ describe('project-repository.local', () => {
     }
   }
 
+  it('restores the project when a persisted source or mockup image is no longer decodable', async () => {
+    const createImageBitmap = vi.fn(async (blob: Blob) => {
+      if (await blob.text() === 'corrupt') throw new Error('decode failed')
+      return { width: 16, height: 16, close() {} } as ImageBitmap
+    })
+    const previous = globalThis.createImageBitmap
+    Object.defineProperty(globalThis, 'createImageBitmap', {
+      configurable: true,
+      value: createImageBitmap,
+    })
+    try {
+      const record: LocalProjectRecord = {
+        ...createEmptyProjectRecord(1),
+        brief: 'Restore the surviving project state',
+        source: {
+          name: 'source.png',
+          blob: new Blob(['corrupt'], { type: 'image/png' }),
+          width: 16,
+          height: 16,
+        },
+        mockup: {
+          name: 'mockup.png',
+          blob: new Blob(['corrupt'], { type: 'image/png' }),
+          width: 16,
+          height: 16,
+        },
+      }
+
+      await expect(createRestoreInputFromProject(record)).resolves.toMatchObject({
+        brief: 'Restore the surviving project state',
+        source: undefined,
+        mockup: null,
+      })
+      expect(createImageBitmap).toHaveBeenCalledTimes(2)
+    } finally {
+      Object.defineProperty(globalThis, 'createImageBitmap', {
+        configurable: true,
+        value: previous,
+      })
+    }
+  })
+
   it('saves, lists newest-first, loads, and removes projects', async () => {
     const repo = makeRepo()
     const first = {
