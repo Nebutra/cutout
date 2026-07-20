@@ -6,6 +6,38 @@ on:
     branches: [main]
 
 jobs:
+  native:
+    name: Native ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, macos-latest, windows-2022]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+          key: pull-request-${{ matrix.os }}
+      - name: Install Linux native dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends build-essential libssl-dev libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev
+      - run: pnpm install --frozen-lockfile
+      - name: Validate Tauri bundle configuration
+        run: pnpm exec vitest run scripts/tauri-config.test.ts scripts/tauri-capabilities.test.ts
+      - name: Compile and test native application
+        run: cargo test --locked --manifest-path src-tauri/Cargo.toml
+
   contract:
     strategy:
       fail-fast: false
@@ -47,4 +79,9 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec playwright install chromium
-      - run: pnpm test:visual
+      - name: Run release-critical browser contracts
+        run: >-
+          pnpm exec playwright test
+          tests/visual/home-composer-surface.spec.ts
+          tests/visual/update-settings.spec.ts
+          --project=desktop-chrome
