@@ -202,3 +202,36 @@ Reworked the root README into equivalent Simplified Chinese and English product,
 ### Next Steps
 
 - None - task complete
+
+
+## Session 7: Signed cross-platform desktop updates
+
+**Date**: 2026-07-20
+**Task**: Signed cross-platform desktop updates
+**Branch**: `main`
+
+### Summary
+
+Added atomic macOS, Windows, and Linux GitHub releases; version and artifact validation; signed updater metadata; Home update discovery and safe download/install routing; configured protected GitHub updater keys and synchronized both remotes.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `eb31446` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
