@@ -19,6 +19,7 @@ import { uiSliceNaming } from './ui-slice-naming'
 import { uiGraphPlanner } from './ui-graph-planner'
 import { uiIntentRecognition } from './ui-intent-recognition'
 import { uiPrototypePlanner } from './ui-prototype-planner'
+import { uiGenerationQa } from './ui-generation-qa'
 
 /** Every built-in prompt version shipped in the app. */
 export const BUILTIN_PROMPTS: readonly PromptVersion[] = [
@@ -29,6 +30,7 @@ export const BUILTIN_PROMPTS: readonly PromptVersion[] = [
   uiGraphPlanner,
   uiIntentRecognition,
   uiPrototypePlanner,
+  uiGenerationQa,
 ]
 
 /** Register all built-ins into an existing registry. */

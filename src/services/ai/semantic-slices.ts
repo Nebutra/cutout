@@ -38,6 +38,18 @@ export const semanticSlicePlanSchema = z.object({
     tone: z.string().min(1),
   }),
   slices: z.array(semanticSliceSpecSchema).min(1),
+}).superRefine((plan, context) => {
+  const ids = new Set<string>()
+  for (const slice of plan.slices) {
+    if (ids.has(slice.id)) {
+      context.addIssue({
+        code: 'custom',
+        path: ['slices'],
+        message: `Semantic slice ids must be unique: ${slice.id}`,
+      })
+    }
+    ids.add(slice.id)
+  }
 })
 
 export const generatedSliceValidationSchema = z.object({

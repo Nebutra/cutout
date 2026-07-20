@@ -16,6 +16,7 @@ import {
   clearAiNativeDiagnostics,
   getAiNativeDiagnostics,
 } from './diagnostics'
+import { currentProductionRunId } from '@/asset-production'
 
 export const PARAM_KEYS = ['threshold', 'minArea', 'mergeGap', 'padding'] as const
 
@@ -181,6 +182,10 @@ export function createAiNativeSnapshot(store: Store) {
     blobSize: slice.blob.size,
     blobType: slice.blob.type || null,
   }))
+  const productionRunId = currentProductionRunId(store.assetProduction)
+  const productionRun = productionRunId
+    ? store.assetProduction.runs[productionRunId]
+    : undefined
 
   return {
     brief: store.brief,
@@ -218,6 +223,28 @@ export function createAiNativeSnapshot(store: Store) {
       sliceCount: slices.length,
       selectedSliceId: slices.find((slice) => slice.selected)?.id ?? null,
       slices,
+    },
+    assetProduction: {
+      revision: store.assetProduction.revision,
+      activePlanId: store.assetProduction.activePlanId ?? null,
+      activeRunId: productionRunId ?? null,
+      run: productionRun
+        ? {
+            runId: productionRun.runId,
+            planId: productionRun.planId,
+            status: productionRun.status,
+            tasks: Object.values(productionRun.tasks).map((task) => ({
+              taskId: task.taskId,
+              status: task.status,
+              outputArtifactId: (task.output ?? task.candidate)?.artifactId ?? null,
+              issues: task.issues.map((issue) => ({
+                code: issue.code,
+                kind: issue.kind,
+                message: issue.message,
+              })),
+            })),
+          }
+        : null,
     },
     pipeline: {
       graph: store.pipeline,

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { parseEditableDesignMarkdown } from '@/prototype/design-md'
 import {
   astryxColorChoices,
+  automaticAstryxMapping,
   compileAstryxThemeFromDesignMarkdown,
   suggestAstryxMapping,
 } from './astryx-design-md'
@@ -50,6 +51,29 @@ describe('suggestAstryxMapping', () => {
     expect(byLabel.get('Accent')).toBeNull()
     const assigned = [...suggestions.values()].filter((value): value is string => value !== null)
     expect(new Set(assigned).size).toBe(assigned.length)
+  })
+})
+
+describe('automaticAstryxMapping', () => {
+  it('assigns unlabelled palettes to common visual roles without user setup', () => {
+    const choices = astryxColorChoices(parseEditableDesignMarkdown([
+      '---',
+      'tokens:',
+      '  colors:',
+      '    warm_ivory: "#F8F1E7"',
+      '    feather_cream: "#F3D9B1"',
+      '    soft_ochre: "#D9A441"',
+      '    ink_brown: "#3A2416"',
+      '    muted_red: "#B85C38"',
+      '---',
+    ].join('\n')))
+    const mapping = automaticAstryxMapping(choices)
+    const byLabel = new Map(choices.map((choice) => [choice.label, mapping.get(choice.controlId)]))
+
+    expect(byLabel.get('tokens.colors.warm_ivory')).toBe('--color-background-body')
+    expect(byLabel.get('tokens.colors.feather_cream')).toBe('--color-background-surface')
+    expect(byLabel.get('tokens.colors.ink_brown')).toBe('--color-text-primary')
+    expect(byLabel.get('tokens.colors.soft_ochre')).toBe('--color-accent')
   })
 })
 

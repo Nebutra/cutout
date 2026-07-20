@@ -8,6 +8,17 @@ import {
   type LocalProjectRecord,
 } from './project-repository.local'
 import { getStoreState } from '@/store'
+import { ContentAddressedDesktopArtifactStore, parseArtifactId } from '@/services/content-addressed-desktop-artifacts'
+import {
+  beginPrototypeProduction,
+  compileAssetProductionPlan,
+  emptyAssetProductionSnapshot,
+  publishPrototypeTaskArtifact,
+  publishToolCutoutProduction,
+  qualityIssue,
+  sha256Bytes,
+} from '@/asset-production'
+import { selectExportPayload } from '@/store/selectors'
 
 const pngBlob = (byte = 1) =>
   new Blob([new Uint8Array([byte])], { type: 'image/png' })
@@ -511,8 +522,8 @@ describe('project-repository.local', () => {
     try {
       const state = getStoreState()
       state.resetProject()
-      const runId = state.beginRegionSlices()
-      state.appendRegionSlices(runId, {
+      const runId = state.beginSliceProjection()
+      state.appendSliceProjection(runId, {
         slices: [
           {
             id: 'slice-hero',
@@ -537,7 +548,7 @@ describe('project-repository.local', () => {
           },
         ],
       })
-      state.finishRegionSlices(runId)
+      state.finishSliceProjection(runId)
 
       const record = await createProjectRecordFromStore({
         id: crypto.randomUUID(),
@@ -551,6 +562,21 @@ describe('project-repository.local', () => {
         ['region-hero', 'page-1', 'page-1-region-hero-1'],
         ['region-grid', 'page-1', null],
       ])
+      const heroRevision = record.designDocument?.materials
+        .find((material) => material.id === 'material:cutout-slice:slice-hero')
+        ?.revisions[0]
+      expect(heroRevision?.production).toMatchObject({
+        manifestItemId: 'page-1-region-hero-1',
+        pageId: 'page-1',
+        regionId: 'region-hero',
+        readiness: 'legacy-ready',
+        bounds: { x: 0, y: 0, width: 8, height: 8 },
+        issues: [expect.objectContaining({ code: 'legacy-unverified' })],
+      })
+      expect(heroRevision?.production?.artifactSha256).toBe(
+        heroRevision?.content.sha256,
+      )
+      expect(heroRevision?.provenanceId).toMatch(/^provenance:asset-task:/)
 
       // Restore round-trip preserves it in the live store.
       const restoreInput = await createRestoreInputFromProject(record)
@@ -647,5 +673,126 @@ describe('project-repository.local', () => {
     expect(record.status).toBe('Draft')
 
     getStoreState().resetProject()
+  })
+
+  it('materializes a missing slice blob from its content-addressed production artifact', async () => {
+    const idb = new IDBFactory()
+    const artifacts = new ContentAddressedDesktopArtifactStore(idb)
+    const bytes = new Uint8Array([4, 5, 6])
+    const sourceArtifactId = await artifacts.write({
+      bytes: new Uint8Array([1]), mediaType: 'image/png', source: 'cutout', runId: 'source',
+    })
+    const outputArtifactId = await artifacts.write({
+      bytes, mediaType: 'image/png', source: 'cutout', runId: 'output',
+    })
+    const snapshot = await publishToolCutoutProduction({
+      snapshot: createEmptyProjectRecord(1).assetProduction!,
+      projectRevisionId: 'revision:1',
+      sourceArtifactId,
+      sourceSha256: parseArtifactId(sourceArtifactId)!,
+      toolCallId: 'restore',
+      runId: 'asset-production:restore',
+      cutoutParams: { threshold: 246, minArea: 900, mergeGap: 18, padding: 10 },
+      outputs: [{
+        sliceId: 'slice-restore',
+        box: { x: 0, y: 0, width: 8, height: 8 },
+        artifact: {
+          artifactId: outputArtifactId,
+          sha256: parseArtifactId(outputArtifactId)!,
+          mediaType: 'image/png', width: 8, height: 8,
+        },
+      }],
+      createdAt: 1,
+    })
+    const run = snapshot.runs['asset-production:restore']!
+    const task = snapshot.plans[run.planId]!.tasks[0]!
+    const record: LocalProjectRecord = {
+      ...createEmptyProjectRecord(1),
+      id: 'recover-artifact',
+      slices: [{
+        id: 'slice-restore', index: 0, name: 'restore.png',
+        box: { x: 0, y: 0, width: 8, height: 8 },
+        blob: undefined as never,
+        width: 8, height: 8,
+        assetManifestItemId: task.manifestItemId,
+        productionTaskId: task.taskId,
+        productionRunId: run.runId,
+        outputArtifactId,
+        readiness: 'ready',
+      }],
+      assetProduction: snapshot,
+    }
+    const repo = createLocalProjectRepository({ idb })
+    expect((await repo.save(record)).ok).toBe(true)
+    const loaded = await repo.load(record.id)
+    expect(loaded.ok).toBe(true)
+    if (!loaded.ok) return
+    expect(new Uint8Array(await loaded.data.slices[0]!.blob.arrayBuffer())).toEqual(bytes)
+  })
+
+  it('round-trips a revision-bound quality approval into Design IR and export', async () => {
+    const state = getStoreState()
+    state.resetProject()
+    const blob = pngBlob(9)
+    const bytes = new Uint8Array(await blob.arrayBuffer())
+    const sha256 = await sha256Bytes(bytes)
+    const plan = await compileAssetProductionPlan({
+      sourceRevision: { projectRevisionId: 'revision:approval', pageArtifacts: [] },
+      items: [{
+        manifestItemId: 'asset:approval', pageId: 'home', regionId: 'hero',
+        route: 'direct-generate', label: 'Approved hero',
+      }],
+      createdAt: 1,
+    })
+    const task = plan.tasks[0]!
+    let snapshot = beginPrototypeProduction({
+      snapshot: emptyAssetProductionSnapshot(), plan, runId: 'run:approval', at: 2,
+    })
+    snapshot = publishPrototypeTaskArtifact({
+      snapshot,
+      runId: 'run:approval',
+      taskId: task.taskId,
+      artifact: {
+        artifactId: `artifact:sha256:${sha256}`,
+        sha256, mediaType: 'image/png', width: 8, height: 8,
+      },
+      reviewIssues: [qualityIssue('qa-rejected', 'Review rejected.', 'model-review', 3)],
+      evidence: { bounds: { x: 0, y: 0, width: 8, height: 8 } },
+      at: 3,
+    })
+    state.setAssetProduction(snapshot)
+    const projectionRunId = state.beginSliceProjection()
+    state.appendSliceProjection(projectionRunId, { slices: [{
+      id: 'slice-approval', index: 0,
+      box: { x: 0, y: 0, width: 8, height: 8 }, blob, width: 8, height: 8,
+      included: false, reviewIssues: ['Review rejected.'],
+      regionId: 'hero', pageId: 'home', assetManifestItemId: 'asset:approval',
+      productionTaskId: task.taskId, productionRunId: 'run:approval',
+      outputArtifactId: `artifact:sha256:${sha256}`, readiness: 'needs-review',
+    }] })
+    state.finishSliceProjection(projectionRunId)
+    expect(state.approveSliceForUse('slice-approval')).toBe(true)
+
+    const record = await createProjectRecordFromStore({
+      id: 'project:approval', createdAt: 1, state: getStoreState(), now: 4,
+    })
+    const production = record.designDocument?.materials
+      .find((material) => material.id === 'material:cutout-slice:slice-approval')
+      ?.revisions[0]?.production
+    expect(production).toMatchObject({
+      readiness: 'waived',
+      artifactSha256: sha256,
+      decision: {
+        decision: 'approve',
+        issueCodes: ['qa-rejected'],
+        actor: { kind: 'human', id: 'local.user' },
+      },
+    })
+
+    state.resetProject()
+    state.restoreProject(await createRestoreInputFromProject(record))
+    expect(selectExportPayload(getStoreState())).toHaveLength(1)
+    expect(getStoreState().analysis.slices[0]?.readiness).toBe('waived')
+    state.resetProject()
   })
 })

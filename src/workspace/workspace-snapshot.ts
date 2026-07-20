@@ -68,7 +68,6 @@ export interface WorkspaceSnapshot {
   readonly runError: string | null
   readonly namingStatus: WorkspaceNamingStatus
   /** Regions whose extraction failed; drives durable targeted retry. */
-  readonly failedRegionIds?: readonly string[]
   readonly liveAgentOutput: string
   readonly attachments: readonly PersistedReferenceAttachment[]
   readonly webSearchEnabled: boolean
@@ -139,7 +138,6 @@ export function isWorkspaceSnapshotEmpty(
     !snapshot.humanLoopChoiceId &&
     snapshot.humanLoopCustomAnswer.trim().length === 0 &&
     snapshot.namingStatus === 'idle' &&
-    !(snapshot.failedRegionIds?.length) &&
     snapshot.liveAgentOutput.trim().length === 0 &&
     (snapshot.attachments?.length ?? 0) === 0 &&
     !snapshot.webSearchEnabled &&
@@ -207,7 +205,6 @@ export function workspaceSnapshotFingerprint(
     snapshot.selectedPrototypePageId ?? '',
     snapshot.runError ?? '',
     snapshot.namingStatus,
-    snapshot.failedRegionIds?.join(',') ?? '',
     snapshot.liveAgentOutput.length,
     attachments,
     snapshot.webSearchEnabled ? 'web' : '',
@@ -252,7 +249,6 @@ function hasWorkspaceProjectionInput(snapshot: WorkspaceSnapshot): boolean {
       snapshot.humanLoopChoiceId ||
       snapshot.humanLoopCustomAnswer.trim() ||
       snapshot.namingStatus !== 'idle' ||
-      (snapshot.failedRegionIds?.length ?? 0) > 0 ||
       snapshot.liveAgentOutput.trim() ||
       (snapshot.attachments?.length ?? 0) > 0 ||
       snapshot.webSearchEnabled ||

@@ -4,7 +4,7 @@ import {
   appendRunEvent,
   createRunEvent,
   createRunEventStore,
-  replayRunEvents,
+  recoverInterruptedRunEvents,
   type AgentRunEventPayload,
   type AgentRunEventStore,
 } from './run-events'
@@ -29,7 +29,7 @@ export function useAgentRunEvents(
   initial: AgentRunEventStore | null | undefined,
 ): AgentRunEventWriter {
   const [store, setStore] = useState<AgentRunEventStore>(() =>
-    initial ? replayRunEvents(initial.events) : createRunEventStore(),
+    initial ? recoverInterruptedRunEvents(initial) : createRunEventStore(),
   )
 
   const startRun = useCallback<AgentRunEventWriter['startRun']>((mode, options) => {

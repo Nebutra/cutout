@@ -34,6 +34,11 @@ import {
   runSemanticSliceExperiment,
   type SemanticSliceArtifact,
 } from '@/services/ai/semantic-slices'
+import { publishSemanticSliceProduction, sha256Json } from '@/asset-production'
+import {
+  ContentAddressedDesktopArtifactStore,
+  parseArtifactId,
+} from '@/services/content-addressed-desktop-artifacts'
 import { planPrototype } from '@/prototype/planner'
 import {
   createAiNativeDiagnosticsSnapshot,
@@ -104,6 +109,7 @@ interface SemanticReferenceRequest {
 
 interface SemanticReferenceResult {
   readonly bytes?: Uint8Array
+  readonly mediaType?: string
   readonly sourceKind: 'brief' | 'mockup' | 'board' | 'mixed'
   readonly source: 'none' | 'mockup' | 'board' | 'file'
 }
@@ -324,10 +330,74 @@ export function useAiNativeControl({ analyze }: AiNativeControlOptions): void {
             },
           )
           if (isErr(result)) throw new Error(result.error)
+          const productionRunId = `semantic-production:${crypto.randomUUID()}`
+          const artifactStore = new ContentAddressedDesktopArtifactStore(indexedDB)
+          const source = reference.bytes
+            ? await persistSemanticSource(
+                artifactStore,
+                reference.bytes,
+                reference.mediaType ?? 'image/png',
+                productionRunId,
+              )
+            : undefined
+          const beforePublication = getStoreState().assetProduction
+          const projectRevisionId = getStoreState().workspaceSnapshot?.designDocument?.revision.id
+            ?? (source
+              ? `semantic-source:${source.sha256}`
+              : `semantic-brief:${await sha256Json({ brief, plan: result.data.plan })}`)
+          const publication = await publishSemanticSliceProduction({
+            snapshot: beforePublication,
+            semanticPlan: result.data.plan,
+            artifacts: result.data.artifacts,
+            projectRevisionId,
+            source,
+            runId: productionRunId,
+            providerRoute: `${image.providerId}/${image.model ?? 'default'}`,
+            materialize: (artifact, runId) =>
+              materializeSemanticArtifact(artifactStore, artifact, runId),
+          })
+          if (!getStoreState().commitAssetProduction(
+            beforePublication.revision,
+            publication.snapshot,
+          )) {
+            throw new Error('Asset production changed while semantic slices were publishing.')
+          }
+          const projectionRunId = getStoreState().beginSliceProjection()
+          if (publication.projections.length > 0) {
+            getStoreState().appendSliceProjection(projectionRunId, {
+              slices: publication.projections.map((item, index) => ({
+                id: `semantic:${item.taskId}`,
+                index,
+                box: { x: 0, y: 0, width: item.width, height: item.height },
+                blob: item.blob,
+                width: item.width,
+                height: item.height,
+                included: item.readiness === 'ready',
+                reviewIssues: item.reviewIssues,
+                regionId: item.regionId,
+                pageId: item.pageId,
+                assetManifestItemId: item.manifestItemId,
+                productionTaskId: item.taskId,
+                productionRunId: item.runId,
+                outputArtifactId: item.outputArtifactId,
+                readiness: item.readiness,
+              })),
+            })
+            for (const item of publication.projections) {
+              getStoreState().renameSlice(`semantic:${item.taskId}`, item.name)
+            }
+          }
+          getStoreState().finishSliceProjection(projectionRunId)
           return {
             plan: result.data.plan,
             summary: result.data.summary,
             reference,
+            production: {
+              planId: publication.plan.planId,
+              runId: publication.run.runId,
+              status: publication.run.status,
+              taskIds: publication.plan.tasks.map((task) => task.taskId),
+            },
             artifacts: await serializeSemanticArtifacts(
               result.data.artifacts,
               action.writeArtifacts !== false,
@@ -522,6 +592,7 @@ async function resolveSemanticReference(
     const { blob } = await readImageFile(request.referencePath, undefined)
     return {
       bytes: await blobToBytes(blob),
+      mediaType: blob.type || 'image/png',
       sourceKind: request.sourceKind ?? 'mixed',
       source: 'file',
     }
@@ -536,6 +607,7 @@ async function resolveSemanticReference(
   if ((mode === 'mockup' || mode === 'auto') && store.mockup) {
     return {
       bytes: await blobToBytes(store.mockup.blob),
+      mediaType: store.mockup.blob.type || 'image/png',
       sourceKind: request.sourceKind ?? 'mockup',
       source: 'mockup',
     }
@@ -544,6 +616,7 @@ async function resolveSemanticReference(
   if ((mode === 'board' || mode === 'auto') && store.source.bitmap) {
     return {
       bytes: await bitmapToBytes(store.source.bitmap),
+      mediaType: 'image/png',
       sourceKind: request.sourceKind ?? 'board',
       source: 'board',
     }
@@ -579,6 +652,53 @@ async function serializeSemanticArtifacts(
     })
   }
   return serialized
+}
+
+async function persistSemanticSource(
+  store: ContentAddressedDesktopArtifactStore,
+  bytes: Uint8Array,
+  mediaType: string,
+  runId: string,
+) {
+  const artifactId = await store.write({
+    bytes,
+    mediaType,
+    source: 'edit-image',
+    runId,
+  })
+  const sha256 = parseArtifactId(artifactId)
+  if (!sha256) throw new Error('Semantic source has an invalid content address.')
+  return { artifactId, sha256 }
+}
+
+async function materializeSemanticArtifact(
+  store: ContentAddressedDesktopArtifactStore,
+  artifact: SemanticSliceArtifact & { readonly asset: NonNullable<SemanticSliceArtifact['asset']> },
+  runId: string,
+) {
+  const blob = bytesToBlob(artifact.asset.bytes, artifact.asset.mediaType)
+  const bitmap = await decodeImage(blob)
+  const width = bitmap.width
+  const height = bitmap.height
+  bitmap.close()
+  const artifactId = await store.write({
+    bytes: artifact.asset.bytes,
+    mediaType: artifact.asset.mediaType,
+    source: 'generate-image',
+    runId,
+  })
+  const sha256 = parseArtifactId(artifactId)
+  if (!sha256) throw new Error('Semantic output has an invalid content address.')
+  return {
+    artifact: {
+      artifactId,
+      sha256,
+      mediaType: artifact.asset.mediaType,
+      width,
+      height,
+    },
+    blob,
+  }
 }
 
 async function serializeGeneratedArtifact(

@@ -1,6 +1,10 @@
 import type { Box } from '@/algorithm/types'
-import { fingerprint } from './fingerprint'
-import type { ContentReference, DesignDocument, Material } from './schema'
+import type {
+  ContentReference,
+  DesignDocument,
+  Material,
+  MaterialProductionEvidence,
+} from './schema'
 import { validateDesignDocument } from './validate'
 import { err, isOk, ok, type Result } from '@/services/types'
 import type { WorkspaceSnapshot } from '@/workspace/workspace-snapshot'
@@ -27,6 +31,10 @@ export interface LegacySliceArtifact {
   readonly mediaType: string
   readonly width: number
   readonly height: number
+  readonly production?: {
+    readonly provenanceId: string
+    readonly evidence: MaterialProductionEvidence
+  }
 }
 
 export interface LegacySourceArtifact {
@@ -127,6 +135,7 @@ export async function projectRecordToDesignDocument(
       mediaType: slice.blob.type || 'application/octet-stream',
       width: slice.width,
       height: slice.height,
+      production: productionEvidenceForSlice(record, slice),
     }))),
     record.source
       ? record.source.blob.arrayBuffer().then((buffer): LegacySourceArtifact => ({
@@ -162,6 +171,73 @@ export async function projectRecordToDesignDocument(
     sources: [source, mockup].filter((item): item is LegacySourceArtifact => item !== null),
     designMarkdown: record.designMarkdown,
   })
+}
+
+function productionEvidenceForSlice(
+  record: LocalProjectRecord,
+  slice: LocalProjectRecord['slices'][number],
+): LegacySliceArtifact['production'] {
+  const snapshot = record.assetProduction
+  if (!snapshot) return undefined
+  const runs = Object.values(snapshot.runs).sort(
+    (left, right) => right.startedAt - left.startedAt || right.runId.localeCompare(left.runId),
+  )
+  for (const run of runs) {
+    if (slice.productionRunId && run.runId !== slice.productionRunId) continue
+    const plan = snapshot.plans[run.planId]
+    if (!plan) continue
+    const task = plan.tasks.find((candidate) => {
+      if (slice.productionTaskId) return candidate.taskId === slice.productionTaskId
+      const manifestItemId = slice.assetManifestItemId ?? `legacy:${slice.id}`
+      return candidate.manifestItemId === manifestItemId
+    })
+    if (!task) continue
+    const state = run.tasks[task.taskId]
+    const artifact = state?.output ?? state?.candidate
+    if (!state || !artifact) continue
+    if (slice.outputArtifactId && artifact.artifactId !== slice.outputArtifactId) continue
+    const pageArtifact = plan.sourceRevision.pageArtifacts.find(
+      (candidate) => candidate.pageId === task.pageId,
+    )
+    return {
+      provenanceId: `provenance:asset-task:${task.taskId}:${artifact.sha256.slice(0, 12)}`,
+      evidence: {
+        planId: plan.planId,
+        runId: run.runId,
+        taskId: task.taskId,
+        manifestItemId: task.manifestItemId,
+        pageId: task.pageId,
+        regionId: task.regionId,
+        artifactId: artifact.artifactId,
+        artifactSha256: artifact.sha256,
+        readiness: slice.readiness ?? state.status,
+        included: slice.included ?? true,
+        bounds: slice.box,
+        sourceRevision: {
+          projectRevisionId: plan.sourceRevision.projectRevisionId,
+          designSystemArtifactId: plan.sourceRevision.designSystemArtifactId,
+          pageArtifactId: pageArtifact?.artifactId,
+          pageArtifactSha256: pageArtifact?.sha256,
+        },
+        cutoutParams: state.evidence?.cutoutParams,
+        boardDiagnostics: state.evidence?.boardDiagnostics,
+        qaVerdict: state.evidence?.qaVerdict,
+        providerRoute: state.evidence?.providerRoute,
+        lineage: state.evidence?.lineage,
+        issues: state.issues,
+        decision: state.decision
+          ? {
+              receiptId: state.decision.receiptId,
+              decision: state.decision.decision,
+              issueCodes: state.decision.issueCodes,
+              actor: state.decision.actor,
+              decidedAt: state.decision.decidedAt,
+            }
+          : undefined,
+      },
+    }
+  }
+  return undefined
 }
 
 /**
@@ -246,6 +322,18 @@ export async function projectWorkspaceSnapshotToDesignDocument(
     provenanceId,
     createdAt: toIso(project.updatedAt),
   })
+  const productionProvenance = [...new Map(
+    (input.slices ?? [])
+      .filter((slice) => slice.production)
+      .map((slice) => [slice.production!.provenanceId, {
+        id: slice.production!.provenanceId,
+        operation: 'derive' as const,
+        sourceIds: [projectSourceId],
+        actor: { kind: 'system' as const, id: 'asset-production-runtime' },
+        recordedAt: toIso(project.updatedAt),
+        tool: `asset-production.v1:${slice.production!.evidence.runId}:${slice.production!.evidence.taskId}`,
+      }]),
+  ).values()]
   const document: DesignDocument = {
     version: 'design-ir.v1',
     meta: {
@@ -279,7 +367,7 @@ export async function projectWorkspaceSnapshotToDesignDocument(
         }
       : undefined,
     materials,
-    provenance: [provenance],
+    provenance: [provenance, ...productionProvenance],
     brands: [],
     tokens: [],
     components: [],
@@ -461,7 +549,8 @@ async function legacyMaterials(input: {
       mediaType: slice.mediaType,
       bytes: slice.bytes,
       pixelSize: intrinsicSize(slice.width, slice.height, slice.bytes),
-      provenanceId: input.provenanceId,
+      provenanceId: slice.production?.provenanceId ?? input.provenanceId,
+      production: slice.production?.evidence,
       createdAt: input.createdAt,
     }))
   }
@@ -478,6 +567,7 @@ async function material(input: {
   readonly bytes: Uint8Array
   readonly pixelSize?: { readonly width: number; readonly height: number }
   readonly provenanceId: string
+  readonly production?: MaterialProductionEvidence
   readonly createdAt: string
 }): Promise<Material> {
   const content = await contentReference(
@@ -498,6 +588,7 @@ async function material(input: {
       createdAt: input.createdAt,
       content,
       provenanceId: input.provenanceId,
+      production: input.production,
     }],
     currentRevisionId: revisionId,
   }
@@ -566,9 +657,13 @@ function textBytes(text: string): Uint8Array {
 }
 
 async function sha256(bytes: Uint8Array): Promise<string> {
-  // Hashing an array through the shared canonical hasher avoids platform-specific
-  // Buffer behavior while still producing a real SHA-256 digest.
-  return fingerprint([...bytes])
+  const digest = await globalThis.crypto.subtle.digest(
+    'SHA-256',
+    new Uint8Array(bytes).buffer,
+  )
+  return [...new Uint8Array(digest)]
+    .map((byte) => byte.toString(16).padStart(2, '0'))
+    .join('')
 }
 
 function toIso(timestamp: number): string {

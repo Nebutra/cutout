@@ -46,8 +46,10 @@ import {
   GATEWAY_IMAGE_MODEL,
   GATEWAY_PROVIDER_ID,
 } from '@/services/ai/gateway-generation.testkit'
+import { installE2eLocalStorage } from './intent-workspace.e2e.testkit'
 
 const RUN = process.env.CUTOUT_RUN_PIPELINE_BENCHMARK === '1'
+const verificationStorage = installE2eLocalStorage()
 
 vi.mock('@/services/ai/model-assignment.local', () => ({
   loadAssignments: async (): Promise<ModelAssignments> => ({
@@ -117,7 +119,7 @@ function fakeRegistry(key: string, base: string): ServiceRegistry {
       setKey: notUsed,
       status: async () => ({ hasKey: true }),
       statuses: async (ids) => Object.fromEntries(ids.map((id) => [id, true])),
-      test: notUsed,
+      test: async () => ok({ model: GATEWAY_CHAT_MODEL }),
     },
     generation: createGatewayGenerationService(key, base),
     prompts: {
@@ -158,6 +160,7 @@ describe.skipIf(!RUN)('brief → prototype delivery — rendered IntentWorkspace
 
   beforeEach(async () => {
     getStoreState().resetProject()
+    verificationStorage.clear()
     if (!i18n.locale) await activateLocale('en')
   })
 
@@ -250,7 +253,12 @@ describe.skipIf(!RUN)('brief → prototype delivery — rendered IntentWorkspace
           await new Promise((resolve) => setTimeout(resolve, 500))
         })
         const snapshot = getStoreState().workspaceSnapshot
-        if (snapshot?.prototypeDesignSystem && (snapshot.prototypePages?.length ?? 0) > 0) {
+        const plannedPageCount = snapshot?.prototypePlan?.pages.length ?? 0
+        if (
+          snapshot?.prototypeDesignSystem
+          && plannedPageCount > 0
+          && snapshot.prototypePages.length === plannedPageCount
+        ) {
           delivered = snapshot
           break
         }
@@ -283,8 +291,8 @@ describe.skipIf(!RUN)('brief → prototype delivery — rendered IntentWorkspace
       }
       expect(delivered).toBeTruthy()
       expect(delivered!.prototypeDesignSystem).toBeTruthy()
-      expect(delivered!.prototypePlan?.pages.length).toBeGreaterThan(0)
-      expect(delivered!.prototypePages.length).toBeGreaterThan(0)
+      expect(delivered!.prototypePlan?.pages).toHaveLength(2)
+      expect(delivered!.prototypePages).toHaveLength(2)
       // Each generated page carries a real image and its plan identity.
       for (const page of delivered!.prototypePages) {
         expect(page.page.id.length).toBeGreaterThan(0)

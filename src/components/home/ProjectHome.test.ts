@@ -31,7 +31,7 @@ const i18n = setupI18n()
 i18n.loadAndActivate({ locale: 'en', messages: {} })
 let root:Root|undefined,host:HTMLDivElement|undefined
 afterEach(()=>{act(()=>root?.unmount());host?.remove();root=undefined;host=undefined})
-function mountHome(onStartWithBrief=vi.fn()){host=document.createElement('div');document.body.append(host);act(()=>{root=createRoot(host!);root.render(createElement(SettingsUIProvider,{value:{open:vi.fn()}},createElement(TooltipProvider,null,createElement(I18nProvider,{i18n},createElement(ProjectHome,{activeProjectId:null,projects:[],loadState:'ready',loadError:null,onOpenProject:vi.fn(),onArchiveProject:vi.fn(),onRestoreProject:vi.fn(),onDeleteProject:vi.fn(),onRenameProject:vi.fn(),onPinProject:vi.fn(),onStartWithBrief,onImportBoard:vi.fn(),onRetryProjects:vi.fn()})))))});return{host,onStartWithBrief}}
+function mountHome(onStartWithBrief=vi.fn()){host=document.createElement('div');document.body.append(host);act(()=>{root=createRoot(host!);root.render(createElement(SettingsUIProvider,{value:{open:vi.fn()}},createElement(TooltipProvider,null,createElement(I18nProvider,{i18n},createElement(ProjectHome,{activeProjectId:null,projects:[],loadState:'ready',loadError:null,onOpenProject:vi.fn(),onArchiveProject:vi.fn(async()=>true),onRestoreProject:vi.fn(),onDeleteProject:vi.fn(),onRenameProject:vi.fn(),onPinProject:vi.fn(),onStartWithBrief,onImportBoard:vi.fn(),onRetryProjects:vi.fn()})))))});return{host,onStartWithBrief}}
 const settleFocus=()=>new Promise<void>((resolve)=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve())))
 
 describe('ProjectRow', () => {

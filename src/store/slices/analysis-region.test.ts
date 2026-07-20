@@ -27,11 +27,11 @@ describe('per-region streaming slice actions', () => {
   })
 
   it('appends region slices without replacing, tagging region/page and re-indexing', () => {
-    const runId = getStoreState().beginRegionSlices()
+    const runId = getStoreState().beginSliceProjection()
     expect(getStoreState().analysis.status).toBe('running')
 
-    getStoreState().appendRegionSlices(runId, result(sliceInput('s1', 'hero', 'p1')))
-    getStoreState().appendRegionSlices(
+    getStoreState().appendSliceProjection(runId, result(sliceInput('s1', 'hero', 'p1')))
+    getStoreState().appendSliceProjection(
       runId,
       result(sliceInput('s2', 'grid', 'p1'), sliceInput('s3', 'grid', 'p1')),
     )
@@ -44,22 +44,22 @@ describe('per-region streaming slice actions', () => {
     expect(slices.every((s) => s.pageId === 'p1')).toBe(true)
     expect(getStoreState().analysis.status).toBe('running')
 
-    getStoreState().finishRegionSlices(runId)
+    getStoreState().finishSliceProjection(runId)
     expect(getStoreState().analysis.status).toBe('done')
   })
 
   it('targeted retry preserves successful regions and replaces only the targets', () => {
-    const first = getStoreState().beginRegionSlices()
-    getStoreState().appendRegionSlices(
+    const first = getStoreState().beginSliceProjection()
+    getStoreState().appendSliceProjection(
       first,
       result(sliceInput('hero-old', 'hero', 'p1'), sliceInput('grid-old', 'grid', 'p1')),
     )
-    getStoreState().finishRegionSlices(first)
+    getStoreState().finishSliceProjection(first)
 
-    const retry = getStoreState().beginRegionSlices(['grid'])
+    const retry = getStoreState().beginSliceProjection(['grid'])
     expect(getStoreState().analysis.slices.map((slice) => slice.id)).toEqual(['hero-old'])
-    getStoreState().appendRegionSlices(retry, result(sliceInput('grid-new', 'grid', 'p1')))
-    getStoreState().finishRegionSlices(retry)
+    getStoreState().appendSliceProjection(retry, result(sliceInput('grid-new', 'grid', 'p1')))
+    getStoreState().finishSliceProjection(retry)
     expect(getStoreState().analysis.slices.map((slice) => slice.id)).toEqual([
       'hero-old',
       'grid-new',
@@ -67,17 +67,17 @@ describe('per-region streaming slice actions', () => {
   })
 
   it('drops appends for a superseded run', () => {
-    const stale = getStoreState().beginRegionSlices()
-    const fresh = getStoreState().beginRegionSlices()
+    const stale = getStoreState().beginSliceProjection()
+    const fresh = getStoreState().beginSliceProjection()
     expect(fresh).toBeGreaterThan(stale)
 
-    getStoreState().appendRegionSlices(stale, result(sliceInput('x', 'r', 'p')))
+    getStoreState().appendSliceProjection(stale, result(sliceInput('x', 'r', 'p')))
     expect(getStoreState().analysis.slices).toHaveLength(0)
 
-    getStoreState().appendRegionSlices(fresh, result(sliceInput('y', 'r', 'p')))
+    getStoreState().appendSliceProjection(fresh, result(sliceInput('y', 'r', 'p')))
     expect(getStoreState().analysis.slices.map((s) => s.id)).toEqual(['y'])
 
-    getStoreState().finishRegionSlices(stale)
+    getStoreState().finishSliceProjection(stale)
     expect(getStoreState().analysis.status).toBe('running')
   })
 })

@@ -299,6 +299,36 @@ Create detailed flow docs when:
 
 ---
 
+## UI Projection And E2E Completion Checklist
+
+Use this checklist when a persisted/runtime authority is projected through a
+client store into React and then exercised by an integration benchmark.
+
+- [ ] Does every `useSyncExternalStore` / Zustand selector return a cached
+      reference, use shallow equality, or project the primitive actually needed?
+- [ ] After changing a collection selector, mount the real consuming hook or
+      App shell; reducer-only tests cannot detect React snapshot loops.
+- [ ] Does the E2E environment provide every browser-owned dependency introduced
+      by production code (IndexedDB, Storage, canvas, worker, verification state)?
+- [ ] Does test provider preflight behave like production verification instead
+      of bypassing a newly added receipt or eligibility gate?
+- [ ] Is success defined by the complete declared plan/manifest rather than
+      `results.length > 0`, first callback, filename, or a single ready artifact?
+- [ ] Do tests assert explicit user scope such as requested page count before
+      starting paid downstream work?
+- [ ] On concurrent failure, does the orchestrator stop claiming new work and
+      settle already in-flight callbacks before returning an error?
+
+**Real-world example**: Asset production changed `selectSlices` from returning
+the store array to allocating a filtered projection. One legacy hook subscribed
+without shallow equality, so React 19 entered a maximum-depth loop even though
+all reducer tests passed. The real pipeline benchmark also stopped when the
+first page appeared, allowing a one-page plan to satisfy an explicit two-page
+brief. The prevention is a primitive count selector, a mounted-hook regression,
+explicit-scope planner validation, and full-plan E2E completion.
+
+---
+
 ## Event Log / Projection Boundary
 
 Append-only logs are cross-layer contracts. A single event travels through:

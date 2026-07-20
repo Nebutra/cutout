@@ -412,6 +412,10 @@ export function AppShell() {
   const activeRecordRef = useRef<LocalProjectRecord | null>(null);
   const restoringRef = useRef(false);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const saveInFlightRef = useRef<{
+    readonly projectId: string;
+    readonly promise: Promise<boolean>;
+  } | null>(null);
   const lastSavedFingerprintRef = useRef("");
   const saveActiveProjectNowRef = useRef<
     (projectId?: string | null) => Promise<boolean>
@@ -444,57 +448,68 @@ export function AppShell() {
 
   const saveActiveProjectNow = useCallback(
     async (projectId = activeProjectId): Promise<boolean> => {
-      if (!projectId || restoringRef.current) return false;
+      if (!projectId) return true;
       if (saveTimerRef.current) {
         clearTimeout(saveTimerRef.current);
         saveTimerRef.current = null;
       }
 
-      const state = getStoreState();
-      if (!shouldPersistWorkspace(state)) return false;
+      const pending = saveInFlightRef.current;
+      if (pending?.projectId === projectId) await pending.promise;
 
-      const current = projectsRef.current.find(
-        (project) => project.id === projectId,
-      );
-      const previous =
-        activeRecordRef.current?.id === projectId
-          ? activeRecordRef.current
-          : undefined;
-      const createdAt = previous?.createdAt ?? current?.createdAt ?? Date.now();
+      const promise = (async () => {
+        if (restoringRef.current) return false;
+        const state = getStoreState();
+        if (!shouldPersistWorkspace(state)) return true;
 
-      const record = await createProjectRecordFromStore({
-        id: projectId,
-        createdAt,
-        state,
-        previous,
-      });
-      const fingerprint = [
-        projectId,
-        workspaceAutosaveFingerprint(state),
-        record.designDocumentContentHash ?? "",
-      ].join(":");
-      if (fingerprint === lastSavedFingerprintRef.current) return true;
-      // The repository compiler is the authority for the portable Design IR.
-      // Write it back only when the captured store state is still current. The
-      // snapshot fingerprint intentionally treats this derived document as a
-      // stable terminal projection, so this cannot restart a projection loop.
-      if (
-        record.workspace &&
-        workspaceAutosaveFingerprint(getStoreState()) ===
-          workspaceAutosaveFingerprint(state)
-      ) {
-        getStoreState().setWorkspaceSnapshot(record.workspace);
+        const current = projectsRef.current.find(
+          (project) => project.id === projectId,
+        );
+        const previous =
+          activeRecordRef.current?.id === projectId
+            ? activeRecordRef.current
+            : undefined;
+        const createdAt = previous?.createdAt ?? current?.createdAt ?? Date.now();
+
+        const record = await createProjectRecordFromStore({
+          id: projectId,
+          createdAt,
+          state,
+          previous,
+        });
+        const fingerprint = [
+          projectId,
+          workspaceAutosaveFingerprint(state),
+          record.designDocumentContentHash ?? "",
+        ].join(":");
+        if (fingerprint === lastSavedFingerprintRef.current) return true;
+        // The repository compiler is the authority for the portable Design IR.
+        // Write it back only when the captured store state is still current.
+        if (
+          record.workspace &&
+          workspaceAutosaveFingerprint(getStoreState()) ===
+            workspaceAutosaveFingerprint(state)
+        ) {
+          getStoreState().setWorkspaceSnapshot(record.workspace);
+        }
+        const saved = await projectRepository.save(record);
+        if (isErr(saved)) {
+          console.warn("[Cutout] project autosave failed:", saved.error);
+          return false;
+        }
+
+        activeRecordRef.current = record;
+        lastSavedFingerprintRef.current = fingerprint;
+        dispatchProjectShell({ type: "autosaved", project: record });
+        return true;
+      })();
+      const entry = { projectId, promise };
+      saveInFlightRef.current = entry;
+      try {
+        return await promise;
+      } finally {
+        if (saveInFlightRef.current === entry) saveInFlightRef.current = null;
       }
-      const saved = await projectRepository.save(record);
-      if (isErr(saved)) {
-        console.warn("[Cutout] project autosave failed:", saved.error);
-        return false;
-      }
-
-      activeRecordRef.current = record;
-      lastSavedFingerprintRef.current = fingerprint;
-      dispatchProjectShell({ type: "autosaved", project: record });
-      return true;
     },
     [activeProjectId, projectRepository],
   );
@@ -1810,18 +1825,23 @@ export function AppShell() {
     [activeProjectId, projectRepository, resetProject],
   );
   const archiveProject = useCallback(
-    async (id: string) => {
+    async (id: string): Promise<boolean> => {
       if (saveTimerRef.current) {
         clearTimeout(saveTimerRef.current);
         saveTimerRef.current = null;
       }
-      if (activeProjectId === id) await saveActiveProjectNow(id);
+      if (activeProjectId === id && !(await saveActiveProjectNow(id))) {
+        toast.error("Could not archive project", {
+          description: "The latest project state could not be saved.",
+        });
+        return false;
+      }
       const archived = await projectRepository.archive(id, Date.now());
       if (isErr(archived)) {
         toast.error("Could not archive project", {
           description: archived.error,
         });
-        return;
+        return false;
       }
 
       if (activeProjectId === id) {
@@ -1842,6 +1862,7 @@ export function AppShell() {
         });
       }
       toast.success("Project archived");
+      return true;
     },
     [activeProjectId, projectRepository, resetProject, saveActiveProjectNow],
   );
@@ -2088,7 +2109,7 @@ export function AppShell() {
                 loadState={projectLoadState}
                 loadError={projectLoadError}
                 onOpenProject={(id) => void openProjectById(id)}
-                onArchiveProject={(id) => void archiveProject(id)}
+                onArchiveProject={archiveProject}
                 onRestoreProject={(id) => void restoreArchivedProject(id)}
                 onDeleteProject={(id) => void deleteProject(id)}
                 onRenameProject={(project, name) =>
@@ -2180,7 +2201,12 @@ export function AppShell() {
             </Suspense>
           ) : null}
           <Dialog open={designOsOpen} onOpenChange={setDesignOsOpen}>
-            <DialogContent className="h-[min(48rem,88vh)] w-[calc(100vw-1rem)] min-w-0 max-w-5xl gap-0 overflow-hidden p-0">
+            <DialogContent className={cn(
+              "min-w-0 gap-0 overflow-hidden p-0",
+              designOsDefaultTab === "specimen"
+                ? "h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-[calc(100vw-1rem)]"
+                : "h-[min(48rem,88vh)] w-[calc(100vw-1rem)] max-w-5xl",
+            )}>
               <DialogHeader className="sr-only">
                 <DialogTitle>System inspector</DialogTitle>
                 <DialogDescription>
@@ -2469,6 +2495,7 @@ function shouldPersistWorkspace(
     state.mockup ||
     state.designMarkdown ||
     state.analysis.slices.length > 0 ||
+    Object.keys(state.assetProduction.runs).length > 0 ||
     !isWorkspaceSnapshotEmpty(state.workspaceSnapshot),
   );
 }
@@ -2477,7 +2504,23 @@ function workspaceAutosaveFingerprint(
   state: ReturnType<typeof getStoreState>,
 ): string {
   const slices = state.analysis.slices
-    .map((slice) => `${slice.id}:${slice.name}:${slice.width}x${slice.height}`)
+    .map((slice) => [
+      slice.id,
+      slice.name,
+      `${slice.width}x${slice.height}`,
+      `${slice.box.x},${slice.box.y},${slice.box.width},${slice.box.height}`,
+      slice.blob.size,
+      slice.included ? "included" : "excluded",
+      slice.confidence ?? "unknown",
+      slice.reviewIssues.join("\u001f"),
+      slice.pageId ?? "",
+      slice.regionId ?? "",
+      slice.assetManifestItemId ?? "",
+      slice.productionTaskId ?? "",
+      slice.productionRunId ?? "",
+      slice.outputArtifactId ?? "",
+      slice.readiness ?? "legacy-unverified",
+    ].join(":"))
     .join(",");
   const mockup = state.mockup
     ? `${state.mockup.width}x${state.mockup.height}:${state.mockup.blob.size}`
@@ -2499,6 +2542,7 @@ function workspaceAutosaveFingerprint(
     design,
     workspaceSnapshotFingerprint(state.workspaceSnapshot),
     state.analysis.status,
+    state.assetProduction.revision,
     state.genPhase,
     params,
     slices,

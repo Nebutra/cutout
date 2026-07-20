@@ -13,13 +13,13 @@
  */
 import { useEffect, useRef } from 'react'
 import { useStore } from '@/store'
-import { selectParams, selectSlices, selectSource } from '@/store/selectors'
+import { selectParams, selectSliceCount, selectSource } from '@/store/selectors'
 import { AUTO_RUN_DEBOUNCE_MS } from './useParamAutoRun'
 
 export function useAutoRun(analyze: (wantSlices: boolean) => void): void {
   const params = useStore(selectParams)
   const source = useStore(selectSource)
-  const slices = useStore(selectSlices)
+  const sliceCount = useStore(selectSliceCount)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const lastImageIdRef = useRef('')
   const lastParamsKeyRef = useRef('')
@@ -47,7 +47,7 @@ export function useAutoRun(analyze: (wantSlices: boolean) => void): void {
     if (lastImageIdRef.current !== source.imageId) {
       lastImageIdRef.current = source.imageId
       lastParamsKeyRef.current = paramsKey
-      if (slices.length > 0) return
+      if (sliceCount > 0) return
       analyze(true)
       return
     }
@@ -72,6 +72,6 @@ export function useAutoRun(analyze: (wantSlices: boolean) => void): void {
     source.imageId,
     source.autoAnalyze,
     paramsKey,
-    slices.length,
+    sliceCount,
   ])
 }

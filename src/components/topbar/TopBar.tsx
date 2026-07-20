@@ -6,7 +6,7 @@
  * Global destinations stay pinned on the right so they remain reachable from
  * both Home and project views.
  */
-import { Home, Plus, Scissors, X } from 'lucide-react'
+import { Home, PanelsTopLeft, Plus, X } from 'lucide-react'
 import { TopBarActions } from './TopBarActions'
 import { ProjectMenu } from './ProjectMenu'
 import { shouldShowProjectMenu } from './project-menu-visibility'
@@ -56,7 +56,7 @@ export function TopBar({
               <TopTab
                 active={view === 'project'}
                 label={projectName}
-                icon={<Scissors className="size-3.5" />}
+                icon={<PanelsTopLeft className="size-3.5" />}
                 onClick={onOpenProject}
                 onClose={onCloseProject}
               />

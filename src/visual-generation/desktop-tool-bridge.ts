@@ -1,3 +1,4 @@
+import type { DesktopToolExecutionResult } from "@/services/desktop-tool-executor";
 import type { DesktopToolLoop } from "@/agent-runtime/desktop-tool-loop";
 import {
   paidToolRequestSchema,
@@ -37,6 +38,8 @@ export function createDesktopVisualToolInvoker(input: {
   return {
     async invoke(invocation: VisualToolInvocation): Promise<VisualToolResult> {
       const toolCallId = `visual-tool:${invocation.taskId}:${invocation.nodeId}`;
+      if (invocation.signal?.aborted)
+        throw new DOMException("Visual generation cancelled.", "AbortError");
       const request = paidToolRequestSchema.parse({
         capability: invocation.capability,
         model: invocation.allowCompatibleFallback ? undefined : invocation.preferredModel,
@@ -47,20 +50,29 @@ export function createDesktopVisualToolInvoker(input: {
         approvalPolicy: invocation.approvalPolicy,
       });
       const authorization = input.authorize ? await input.authorize({ runId: invocation.runId, requestId: invocation.requestId, request }) : {};
-      await input.loop.request({
-        runId: invocation.runId,
-        toolCallId,
-        requestId: invocation.requestId,
-        stepId: invocation.nodeId,
-        label:
-          invocation.capability === "generate-image"
-            ? "Generate visual variant"
-            : "Refine selected visual",
-        expectedRevision: input.expectedRevision(),
-        request,
-        ...authorization,
-      });
-      const result = await input.loop.settled(toolCallId, invocation.requestId);
+      if (invocation.signal?.aborted)
+        throw new DOMException("Visual generation cancelled.", "AbortError");
+      const cancel = () => input.loop.cancel(toolCallId, invocation.requestId);
+      invocation.signal?.addEventListener("abort", cancel, { once: true });
+      let result: DesktopToolExecutionResult;
+      try {
+        await input.loop.request({
+          runId: invocation.runId,
+          toolCallId,
+          requestId: invocation.requestId,
+          stepId: invocation.nodeId,
+          label:
+            invocation.capability === "generate-image"
+              ? "Generate visual variant"
+              : "Refine selected visual",
+          expectedRevision: input.expectedRevision(),
+          request,
+          ...authorization,
+        });
+        result = await input.loop.settled(toolCallId, invocation.requestId);
+      } finally {
+        invocation.signal?.removeEventListener("abort", cancel);
+      }
       if (!result.ok) throw new Error(result.error);
       const artifactId = result.receipt.outputArtifactIds[0];
       if (!artifactId)

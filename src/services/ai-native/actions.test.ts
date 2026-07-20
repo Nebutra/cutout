@@ -1,7 +1,11 @@
-import { describe, expect, it } from 'vitest'
-import { parseAiNativeAction } from './actions'
+import { beforeEach, describe, expect, it } from 'vitest'
+import { compileAssetProductionPlan, beginAssetProduction } from '@/asset-production'
+import { getStoreState } from '@/store'
+import { createAiNativeSnapshot, parseAiNativeAction } from './actions'
 
 describe('AI Native semantic slice actions', () => {
+  beforeEach(() => getStoreState().resetProject())
+
   it('parses a prototype plan action', () => {
     const action = parseAiNativeAction({
       type: 'plan-prototype',
@@ -84,5 +88,34 @@ describe('AI Native semantic slice actions', () => {
         routes: ['board-collage'],
       }),
     ).toThrow()
+  })
+
+  it('exposes authoritative production state to external Agent snapshots', async () => {
+    const plan = await compileAssetProductionPlan({
+      sourceRevision: { projectRevisionId: 'revision:1', pageArtifacts: [] },
+      items: [{
+        manifestItemId: 'semantic:hero', pageId: 'semantic-brief', regionId: 'hero',
+        route: 'semantic-repair',
+      }],
+      createdAt: 1,
+    })
+    getStoreState().setAssetProduction(beginAssetProduction({
+      snapshot: getStoreState().assetProduction,
+      plan,
+      runId: 'semantic:run:1',
+      at: 2,
+    }))
+
+    expect(createAiNativeSnapshot(getStoreState()).assetProduction).toEqual({
+      revision: 2,
+      activePlanId: plan.planId,
+      activeRunId: 'semantic:run:1',
+      run: expect.objectContaining({
+        runId: 'semantic:run:1',
+        planId: plan.planId,
+        status: 'running',
+        tasks: [expect.objectContaining({ status: 'queued' })],
+      }),
+    })
   })
 })

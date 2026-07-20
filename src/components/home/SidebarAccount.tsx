@@ -5,11 +5,12 @@
  * workspace rather than a signed-in account; theme and settings moved here
  * from the TopBar.
  */
-import { Bell, Check, CheckCircle2, ChevronDown, CircleAlert, Monitor, Moon, Scissors, Settings2, Sun, SwatchBook, TriangleAlert } from 'lucide-react'
+import { Bell, Check, CheckCircle2, ChevronDown, CircleAlert, Monitor, Moon, Settings2, Sun, SwatchBook, TriangleAlert } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useTheme } from 'next-themes'
 import { useLingui } from '@lingui/react/macro'
 import { Button } from '@/components/ui/button'
+import { CutoutBrandMark } from '@/components/brand/CutoutBrandMark'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -49,18 +50,14 @@ function AccountMenu() {
           aria-label={t({ id: 'home.account_menu', message: 'Workspace menu' })}
           className="flex min-w-0 items-center gap-2 rounded-md px-2 py-1.5 text-sm font-semibold transition-colors hover:bg-muted"
         >
-          <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-foreground text-background">
-            <Scissors className="size-3.5" />
-          </span>
+          <CutoutBrandMark className="size-6 text-foreground" />
           <span className="truncate">Cutout</span>
           <ChevronDown className="size-3.5 shrink-0 text-muted-foreground" />
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-64">
         <DropdownMenuLabel className="flex flex-col items-center gap-1 py-4">
-          <span className="flex size-10 items-center justify-center rounded-full bg-foreground text-background">
-            <Scissors className="size-5" />
-          </span>
+          <CutoutBrandMark label="Cutout" className="size-10 text-foreground" />
           <span className="mt-1 text-sm font-semibold">
             {t({ id: 'home.local_workspace', message: 'Local workspace' })}
           </span>

@@ -1,6 +1,6 @@
 /**
- * The single Zustand store (spec §5), composed from five slices:
- *   source · params · analysis · selection · pipeline
+ * The single Zustand store (spec §5), composed from six slices:
+ *   source · params · analysis · selection · pipeline · asset production
  *
  * A single store keeps cross-slice actions (e.g. `loadImage` resetting analysis)
  * trivially consistent while selectors keep components subscribed to the minimum
@@ -15,6 +15,10 @@ import { createParamsSlice, DEFAULT_PARAMS } from './slices/params'
 import { createAnalysisSlice, INITIAL_ANALYSIS, disposeAnalysis } from './slices/analysis'
 import { createSelectionSlice } from './slices/selection'
 import { createPipelineSlice, INITIAL_PIPELINE } from './slices/pipeline'
+import {
+  createAssetProductionStoreSlice,
+  INITIAL_ASSET_PRODUCTION,
+} from './slices/asset-production'
 
 export const useStore = create<Store>()((set, get, api) => ({
   ...createSourceSlice(set, get, api),
@@ -22,6 +26,7 @@ export const useStore = create<Store>()((set, get, api) => ({
   ...createAnalysisSlice(set, get, api),
   ...createSelectionSlice(set, get, api),
   ...createPipelineSlice(set, get, api),
+  ...createAssetProductionStoreSlice(set, get, api),
   resetProject: () => {
     const state = get()
     state.source.bitmap?.close()
@@ -42,6 +47,7 @@ export const useStore = create<Store>()((set, get, api) => ({
       genError: null,
       graph: null,
       dagNodes: {},
+      assetProduction: INITIAL_ASSET_PRODUCTION,
     })
   },
   restoreProject: (input) => {
@@ -66,6 +72,10 @@ export const useStore = create<Store>()((set, get, api) => ({
       regionId: slice.regionId ?? null,
       pageId: slice.pageId ?? null,
       assetManifestItemId: slice.assetManifestItemId ?? null,
+      productionTaskId: slice.productionTaskId ?? null,
+      productionRunId: slice.productionRunId ?? null,
+      outputArtifactId: slice.outputArtifactId ?? null,
+      readiness: slice.readiness ?? null,
     }))
 
     set({
@@ -97,6 +107,7 @@ export const useStore = create<Store>()((set, get, api) => ({
       genError: null,
       graph: null,
       dagNodes: {},
+      assetProduction: input.assetProduction ?? INITIAL_ASSET_PRODUCTION,
     })
   },
   setWorkspaceSnapshot: (snapshot) => set({ workspaceSnapshot: snapshot }),

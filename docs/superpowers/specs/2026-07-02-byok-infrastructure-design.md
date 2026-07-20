@@ -96,7 +96,7 @@ interface ProviderConfig {
 ```
 
 - **Provider list** (the non-secret config) is stored as JSON in the app config dir (Tauri path API), *not* in the keychain — only the secret is in the keychain.
-- **Keychain entry:** service = `com.leishi.cutout`, account = `provider:{id}`. One secret per provider.
+- **Keychain entry:** service = `com.nebutra.cutout`, account = `provider:{id}`. One secret per provider.
 - Auth-header shaping per `kind` lives in Rust (`anthropic` → `x-api-key` + `anthropic-version`; `openai`/`gateway`/`openai-compatible` → `Authorization: Bearer`; `google` → `x-goog-api-key`). This is the *only* provider-specific logic in Rust — a small header map, not request logic.
 
 ---
@@ -132,7 +132,7 @@ interface GenerationService {                                 // what future fea
 ## 6. Rust surface (src-tauri)
 
 New module `commands/ai/`:
-- `keys.rs` — `set_key`, `key_status`, `delete_key`, `list_provider_status` via `keyring::Entry::new("com.leishi.cutout", &format!("provider:{id}"))`. `set_password` / `get_password` / `delete_password`. **`get` is used only internally by the proxy — never exposed to JS.**
+- `keys.rs` — `set_key`, `key_status`, `delete_key`, `list_provider_status` via `keyring::Entry::new("com.nebutra.cutout", &format!("provider:{id}"))`. `set_password` / `get_password` / `delete_password`. **`get` is used only internally by the proxy — never exposed to JS.**
 - `ai_proxy.rs` — `ai_proxy_stream(provider_id, kind, url, method, headers, body, on_chunk: Channel<Vec<u8>>)`: read secret from keychain, inject the per-kind auth header, `reqwest` with `.bytes_stream()`, forward chunks to the `Channel`, send a terminal marker. Non-stream `ai_proxy_request` for `generateText`.
 - `providers.rs` (optional) — persist/load the non-secret `ProviderConfig[]` JSON via `tauri::path` app-config dir (or keep in JS + Tauri fs; decision at review).
 - Register in `lib.rs` `generate_handler!`. Add `keyring = "3"`, `reqwest = { version = "0.12", features = ["json","stream"] }`, `futures-util` to `Cargo.toml`.

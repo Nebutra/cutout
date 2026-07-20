@@ -1,6 +1,6 @@
 import { pagesForScope, type PrototypeSuiteScope } from '@/prototype/generate-suite'
 import type { PrototypePlan } from '@/prototype/prototype-plan'
-import { createPrototypeAssetManifest, slugify } from '@/prototype/asset-manifest'
+import { createPrototypeAssetManifest } from '@/prototype/asset-manifest'
 import {
   applyOutcomeEvent,
   createOutcomeRuntime,
@@ -19,9 +19,13 @@ export interface PrototypeOutcomeInput {
     readonly page: { readonly id: string; readonly name: string }
     readonly revision?: string
   }[]
-  readonly slices: readonly { readonly id: string; readonly name: string; readonly revision?: string }[]
-  /** True only after this run's cutout/naming pass has settled. */
-  readonly slicesReady: boolean
+  /** Consumable production materials, already filtered by the production policy. */
+  readonly assets: readonly {
+    readonly id: string
+    readonly manifestItemId: string
+    readonly label?: string
+    readonly revision?: string
+  }[]
 }
 
 /** Projects durable workspace artifacts into the user's definition of done. */
@@ -33,12 +37,8 @@ export function projectPrototypeOutcome(
   const contract = prototypeOutcomeContract(input.plan, input.scope)
   const scopedPages = pagesForScope(input.plan, input.scope)
   const scopedPageIds = new Set(scopedPages.map((page) => page.id))
-  const expectedAssets = createPrototypeAssetManifest(input.plan, scopedPages).assets.filter(
-    (asset) => asset.assetRoute === 'board-cutout',
-  )
-  const assetByName = new Map(
-    expectedAssets.map((asset) => [slugify(asset.recommendedName), asset] as const),
-  )
+  const expectedAssets = createPrototypeAssetManifest(input.plan, scopedPages).assets
+  const expectedAssetIds = new Set(expectedAssets.map((asset) => asset.id))
   const runId = `workspace:${contract.id}`
   let state = createOutcomeRuntime(contract, runId)
 
@@ -72,15 +72,16 @@ export function projectPrototypeOutcome(
       revision: artifact.revision,
     })
   }
-  for (const slice of input.slicesReady ? input.slices : []) {
-    const asset = assetByName.get(slugify(slice.name.replace(/\.png$/i, '')))
+  for (const asset of input.assets) {
     materials.push({
-      id: `slice:${slice.id}`,
+      id: `asset:${asset.id}`,
       kind: 'cutout-slice',
-      label: slice.name,
+      label: asset.label ?? asset.manifestItemId,
       source: 'algorithm',
-      evidenceKey: asset ? `asset:${asset.id}` : undefined,
-      revision: slice.revision,
+      evidenceKey: expectedAssetIds.has(asset.manifestItemId)
+        ? `asset:${asset.manifestItemId}`
+        : undefined,
+      revision: asset.revision,
     })
   }
 
@@ -101,9 +102,7 @@ export function prototypeOutcomeContract(
   scope: PrototypeSuiteScope,
 ): OutcomeContract {
   const pages = pagesForScope(plan, scope)
-  const expectedAssets = createPrototypeAssetManifest(plan, pages).assets.filter(
-    (asset) => asset.assetRoute === 'board-cutout',
-  )
+  const expectedAssets = createPrototypeAssetManifest(plan, pages).assets
   const pageIds = pages.map((page) => page.id).join(',')
 
   return {

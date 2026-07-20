@@ -14,6 +14,8 @@ import { getAuthorizedWorkspace } from '@/platform/authorized-workspace'
 import { createTauriAgentHostService } from '@/agent-host/tauri-service'
 import { runDurableHostEffect } from '@/agent-host/durable-effect'
 
+const DESKTOP_TOOL_TIMEOUT_MS = 300_000
+
 export interface DesktopToolInvocation {
   readonly runId: string
   readonly toolCallId: string
@@ -66,6 +68,7 @@ export function useDesktopToolLoop(input: {
       currentRevision: () => state.current.revision,
       policy: () => paidToolPolicy(loadPaidToolPreferences()),
       append: (events) => state.current.append(events),
+      timeoutMs: DESKTOP_TOOL_TIMEOUT_MS,
       authorize: (request, approvalId) => authorize(
         request.runId,
         request.requestId,
@@ -114,7 +117,26 @@ export function useDesktopToolLoop(input: {
       .filter((item): item is DesktopToolArtifact => Boolean(item))
   }
 
-  return { loop, invoke, visualRuntime, resolveArtifact: (id: string) => artifacts.current!.read(id), persistReference: (bytes: Uint8Array, mediaType: string, runId: string) => artifacts.current!.write({ bytes, mediaType, source: 'edit-image', runId }), visualPreferences: () => loadPaidToolPreferences() }
+  return {
+    loop,
+    invoke,
+    visualRuntime,
+    resolveArtifact: (id: string) => artifacts.current!.read(id),
+    persistReference: (bytes: Uint8Array, mediaType: string, runId: string) =>
+      artifacts.current!.write({ bytes, mediaType, source: 'edit-image', runId }),
+    persistCutout: async (bytes: Uint8Array, mediaType: string, runId: string) => {
+      const artifactId = await artifacts.current!.write({
+        bytes,
+        mediaType,
+        source: 'cutout',
+        runId,
+      })
+      const sha256 = parseArtifactId(artifactId)
+      if (!sha256) throw new Error('Persisted cutout artifact has an invalid content address.')
+      return { artifactId, sha256 }
+    },
+    visualPreferences: () => loadPaidToolPreferences(),
+  }
 }
 
 async function digestRequest(value: unknown): Promise<string> {

@@ -75,6 +75,23 @@ describe('runPipeline', () => {
     expect(mine).toEqual(ref)
   })
 
+  it('keeps pre-matting box geometry for a broad neutral shadow', () => {
+    const build = (): PixelFrame => {
+      const paint: Record<string, readonly [number, number, number, number]> = {}
+      for (let y = 8; y <= 12; y += 1) {
+        for (let x = 4; x <= 15; x += 1) {
+          paint[`${x},${y}`] = [230, 230, 230, 255]
+        }
+      }
+      for (let y = 3; y <= 10; y += 1) {
+        for (let x = 8; x <= 11; x += 1) paint[`${x},${y}`] = BLACK
+      }
+      return paintedFrame(20, 16, WHITE, paint)
+    }
+    const params = { ...PARAMS, minArea: 4, padding: 2 }
+    expect(runPipeline(build(), params).boxes).toEqual(referencePipeline(build(), params))
+  })
+
   it('merges nearby squares via mergeGap', () => {
     // two 4x4 squares 2px apart -> merged with mergeGap 3
     const frame = frameWithSquares(20, 10, [

@@ -365,6 +365,7 @@ export function isImageEditCompatibilityError(error: unknown): boolean {
 export function isRetryableVisualToolError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
   if (isImageEditCompatibilityError(error)) return false;
+  if (/deadline|timed?\s*out|cancel|abort/i.test(message)) return false;
   if (/HTTP\s*(?:400|401|403|404|405|409|415|422)\b/i.test(message)) return false;
   return true;
 }

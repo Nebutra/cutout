@@ -389,38 +389,47 @@ function renderDesignSystemHtml(
   :root { color-scheme: light dark; }
   * { box-sizing: border-box; }
   body { margin: 0; font-family: ui-sans-serif, system-ui, sans-serif; background: #f7f6f2; color: #1b1d22; }
-  .app { display: grid; grid-template-columns: minmax(0,58fr) minmax(360px,42fr); min-height: 100vh; }
-  .specimen, .source { padding: 28px; overflow: auto; }
-  .source { background: #fff; border-left: 1px solid #dfdcd3; }
-  h1 { font-size: 20px; margin: 0 0 4px; }
-  .subtitle { color: #5b5f6b; font-size: 13px; margin: 0 0 24px; }
-  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: #5b5f6b; margin: 28px 0 12px; }
-  .swatch-grid { display: grid; grid-template-columns: repeat(auto-fill,minmax(120px,1fr)); gap: 10px; }
-  .swatch { border: 1px solid #dfdcd3; border-radius: 8px; overflow: hidden; background: #fff; }
-  .swatch-fill { height: 56px; }
-  .swatch-meta { padding: 8px; font-size: 11px; display: flex; flex-direction: column; gap: 2px; }
+  .topbar { position: sticky; top: 0; z-index: 2; display: flex; min-height: 60px; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 24px; border-bottom: 1px solid #dfdcd3; background: #fff; }
+  .topbar p { margin: 0; color: #5b5f6b; font: 11px/1.4 ui-monospace, monospace; letter-spacing: .06em; text-transform: uppercase; }
+  .topbar strong { display: block; margin-top: 2px; font-size: 14px; }
+  .app { display: grid; grid-template-columns: minmax(0,58fr) minmax(380px,42fr); min-height: calc(100vh - 60px); }
+  .specimen, .source { overflow: auto; }
+  .specimen { padding: 44px 48px 96px; }
+  .source { border-left: 1px solid #dfdcd3; background: #fff; }
+  .intro { display: flex; align-items: end; justify-content: space-between; gap: 24px; margin-bottom: 44px; }
+  h1 { max-width: 14ch; font: 500 clamp(36px,5vw,68px)/.96 ui-serif, Georgia, serif; letter-spacing: 0; margin: 0; }
+  .subtitle { max-width: 52ch; color: #5b5f6b; font-size: 15px; line-height: 1.55; margin: 14px 0 0; }
+  h2 { font: 600 11px/1.4 ui-monospace, monospace; text-transform: uppercase; letter-spacing: .08em; color: #5b5f6b; margin: 42px 0 14px; }
+  .swatch-grid { display: grid; grid-template-columns: repeat(auto-fill,minmax(150px,1fr)); gap: 14px; }
+  .swatch { border: 1px solid #dfdcd3; border-radius: 12px; overflow: hidden; background: #fff; transition: transform .15s ease, border-color .15s ease; }
+  .swatch:hover { transform: translateY(-2px); border-color: #1b1d22; }
+  .swatch-fill { height: 88px; }
+  .swatch-meta { padding: 10px; font-size: 11px; display: flex; flex-direction: column; gap: 3px; }
   .swatch-alias { color: #8b8e98; }
   .tier-label { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: #8b8e98; margin: 16px 0 8px; }
   .tier-label:first-of-type { margin-top: 0; }
-  .type-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid #dfdcd3; }
+  .type-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 14px 0; border-bottom: 1px solid #dfdcd3; }
   .type-sample { font-size: 20px; }
   .ramp-row { display: flex; align-items: center; gap: 12px; padding: 6px 0; }
   .ramp-bar { height: 10px; background: #3a4ea6; border-radius: 3px; }
   .radius-chip { display: inline-flex; align-items: center; justify-content: center; width: 64px; height: 64px; background: #e7e9f6; margin: 0 8px 8px 0; }
   code { font-family: ui-monospace, monospace; font-size: 11px; color: #5b5f6b; }
-  .tabs { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 12px; }
-  .tab { font-size: 12px; padding: 6px 10px; border: 1px solid #dfdcd3; background: #f7f6f2; border-radius: 6px; cursor: pointer; }
-  .tab.active { background: #1b1d22; color: #fff; border-color: #1b1d22; }
-  .panel { display: none; white-space: pre-wrap; word-break: break-word; font-size: 11px; line-height: 1.6; background: #f7f6f2; border-radius: 8px; padding: 12px; max-height: 70vh; overflow: auto; }
+  .source-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 20px 24px 12px; border-bottom: 1px solid #dfdcd3; }
+  .source-head strong { font-size: 14px; }
+  .tabs { display: flex; gap: 16px; overflow-x: auto; padding: 0 24px; border-bottom: 1px solid #dfdcd3; }
+  .tab { height: 44px; flex: none; font-size: 12px; padding: 0; border: 0; border-bottom: 2px solid transparent; background: transparent; color: #5b5f6b; cursor: pointer; }
+  .tab.active { color: #1b1d22; border-color: #1b1d22; font-weight: 700; }
+  .panel { display: none; margin: 0; white-space: pre-wrap; word-break: break-word; font: 12px/1.7 ui-monospace, monospace; color: #31343c; background: #fff; padding: 24px; height: calc(100vh - 176px); overflow: auto; }
   .panel.active { display: block; }
-  .copy { margin-bottom: 12px; font-size: 12px; padding: 6px 10px; border: 1px solid #dfdcd3; border-radius: 6px; background: #fff; cursor: pointer; }
+  .copy { font-size: 12px; padding: 7px 10px; border: 1px solid #dfdcd3; border-radius: 7px; background: #fff; cursor: pointer; }
+  @media (max-width: 900px) { .app { display: block; } .source { border-left: 0; border-top: 1px solid #dfdcd3; min-height: 620px; } .specimen { padding: 28px 20px 64px; } }
 </style>
 </head>
 <body>
+  <header class="topbar"><div><p>Design system explorer</p><strong>${escapeHtml(document.meta.title)}</strong></div><button type="button" class="copy" data-copy>Copy current file</button></header>
   <div class="app">
     <section class="specimen">
-      <h1>${escapeHtml(document.meta.title)}</h1>
-      <p class="subtitle">Revision ${escapeHtml(document.revision.id)} · generated by cutout.design-kit.v1</p>
+      <div class="intro"><div><h1>${escapeHtml(document.meta.title)}</h1><p class="subtitle">Revision ${escapeHtml(document.revision.id)} · generated from the current Design IR.</p></div></div>
       <h2>Color</h2>
       ${hasTiers ? tieredSwatchesHtml : `<div class="swatch-grid">${flatSwatchesHtml || '<p>No color tokens in this kit.</p>'}</div>`}
       <h2>Typography</h2>
@@ -434,7 +443,7 @@ function renderDesignSystemHtml(
       <p><a href="demo.html" target="_blank" rel="noopener">Open full-page demo →</a></p>
     </section>
     <section class="source">
-      <button type="button" class="copy" data-copy>Copy current file</button>
+      <div class="source-head"><strong>Implementation source</strong><span>Generated</span></div>
       <div class="tabs">${tabsHtml}</div>
       ${panelsHtml}
     </section>

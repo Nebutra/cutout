@@ -61,10 +61,12 @@ import { err, ok, type Result } from '@/services/types'
 import type { ServiceRegistry } from '@/services/types'
 import type { GenerateWithToolsInput, GenerateWithToolsOutput } from '@/services/ai/types'
 import type { ModelAssignments } from '@/services/ai/model-assignment-types'
+import { installE2eLocalStorage } from './intent-workspace.e2e.testkit'
 
 const RUN = process.env.CUTOUT_RUN_TOOL_GATE_BENCHMARK === '1'
 const MODEL = 'gpt-5.5'
 const PROVIDER_ID = 'test-provider'
+const verificationStorage = installE2eLocalStorage()
 
 vi.mock('@/services/ai/model-assignment.local', () => ({
   loadAssignments: async (): Promise<ModelAssignments> => ({
@@ -184,7 +186,7 @@ function fakeRegistry(key: string, base: string): ServiceRegistry {
       setKey: notUsed,
       status: async () => ({ hasKey: true }),
       statuses: async (ids) => Object.fromEntries(ids.map((id) => [id, true])),
-      test: notUsed,
+      test: async () => ok({ model: MODEL }),
     },
     generation: {
       generateText: async () => err('not used in this test'),
@@ -236,6 +238,7 @@ describe.skipIf(!RUN)('human-loop ask/await — rendered IntentWorkspace vs. a r
 
   beforeEach(async () => {
     getStoreState().resetProject()
+    verificationStorage.clear()
     // `I18nProvider` renders nothing until the shared `i18n` singleton has an
     // active locale — normally activated in main.tsx before first paint,
     // which this test harness bypasses entirely.

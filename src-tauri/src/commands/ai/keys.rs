@@ -16,7 +16,10 @@ use keyring::{Entry, Error as KeyringError};
 use serde::Serialize;
 
 /// Keychain service name (app id). Account is `provider:{id}`.
-const SERVICE: &str = "com.leishi.cutout";
+const SERVICE: &str = "com.nebutra.cutout";
+/// Read-only migration source. Existing keys move lazily when first used;
+/// retaining the source avoids deleting a user's prior Keychain record.
+const LEGACY_SERVICE: &str = "com.leishi.cutout";
 
 /// Per-provider key status returned by `list_key_status`.
 #[derive(Debug, Serialize)]
@@ -57,9 +60,38 @@ impl From<KeyringError> for KeyError {
 }
 
 /// Build the keychain entry handle for a provider id.
-fn entry(provider_id: &str) -> Result<Entry, KeyError> {
+fn entry_for(service: &str, provider_id: &str) -> Result<Entry, KeyError> {
     let account = format!("provider:{provider_id}");
-    Entry::new(SERVICE, &account).map_err(KeyError::from)
+    Entry::new(service, &account).map_err(KeyError::from)
+}
+
+fn entry(provider_id: &str) -> Result<Entry, KeyError> {
+    entry_for(SERVICE, provider_id)
+}
+
+/// Check for the existence of a generic-password item without asking Keychain
+/// to disclose its secret. Provider status is queried while the app loads, so
+/// reading the password here would turn an innocent settings render into a
+/// password prompt on every fresh launch.
+#[cfg(target_os = "macos")]
+fn keychain_item_exists(service: &str, provider_id: &str) -> Result<bool, KeyError> {
+    use security_framework::item::{ItemClass, ItemSearchOptions};
+    use security_framework_sys::base::errSecItemNotFound;
+
+    let account = format!("provider:{provider_id}");
+    let mut query = ItemSearchOptions::new();
+    query
+        .class(ItemClass::generic_password())
+        .service(service)
+        .account(&account)
+        // Attributes identify an item but never include kSecValueData.
+        .load_attributes(true);
+
+    match query.search() {
+        Ok(items) => Ok(!items.is_empty()),
+        Err(error) if error.code() == errSecItemNotFound => Ok(false),
+        Err(error) => Err(KeyError::Keychain(error.to_string())),
+    }
 }
 
 /// Process-lifetime cache of already-read secrets, keyed by provider id.
@@ -94,7 +126,9 @@ fn cache_remove(provider_id: &str) {
 /// unlocks the item (one OS prompt) and caches it; everyone else — including
 /// reads that raced in before the cache was warm — then hits the cache. Without
 /// this, N concurrent first-reads (status check + /v1/models + proxy) each
-/// prompted. Returns `None` for a missing item (`NoEntry` — no prompt).
+/// prompted. If this is a renamed installation, a missing current-service
+/// entry is read from the legacy service once, copied to the new service, and
+/// then served from cache. Returns `None` only when neither entry exists.
 fn cached_or_fetch(provider_id: &str) -> Result<Option<String>, KeyError> {
     let mut guard = secret_cache().lock().unwrap_or_else(|p| p.into_inner());
     if let Some(cached) = guard.get(provider_id) {
@@ -105,7 +139,19 @@ fn cached_or_fetch(provider_id: &str) -> Result<Option<String>, KeyError> {
             guard.insert(provider_id.to_string(), secret.clone());
             Ok(Some(secret))
         }
-        Err(KeyringError::NoEntry) => Ok(None),
+        Err(KeyringError::NoEntry) => {
+            match entry_for(LEGACY_SERVICE, provider_id)?.get_password() {
+                Ok(secret) => {
+                    entry(provider_id)?
+                        .set_password(&secret)
+                        .map_err(KeyError::from)?;
+                    guard.insert(provider_id.to_string(), secret.clone());
+                    Ok(Some(secret))
+                }
+                Err(KeyringError::NoEntry) => Ok(None),
+                Err(e) => Err(KeyError::from(e)),
+            }
+        }
         Err(e) => Err(KeyError::from(e)),
     }
 }
@@ -133,9 +179,19 @@ fn set_key_inner(provider_id: &str, secret: &str) -> Result<(), KeyError> {
 }
 
 fn key_status_inner(provider_id: &str) -> Result<bool, KeyError> {
-    // Same single-flight path as read_secret: checking existence unlocks + caches
-    // the item, so a later proxy read doesn't prompt again.
-    Ok(cached_or_fetch(provider_id)?.is_some())
+    // On macOS, settings and startup only need presence, not the secret. Query
+    // item metadata so status checks do not trigger the Keychain authorization
+    // dialog. The proxy remains the only path that reads the password.
+    #[cfg(target_os = "macos")]
+    {
+        Ok(keychain_item_exists(SERVICE, provider_id)?
+            || keychain_item_exists(LEGACY_SERVICE, provider_id)?)
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    {
+        Ok(cached_or_fetch(provider_id)?.is_some())
+    }
 }
 
 fn delete_key_inner(provider_id: &str) -> Result<(), KeyError> {

@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "canonicalWordmark": "wordmark-master.svg",
+  "sourceRaster": "../../approved/wordmark-cut-out-contrast-v1.png",
+  "construction": {
+    "spelling": "Cutout",
+    "rule": "Cut is solid; out is outline; both share one skeleton and continuous baseline",
+    "case": "mixed case",
+    "tracking": "locked to the approved master",
+    "minimumDigitalWidth": "96px",
+    "minimumPrintWidth": "28mm"
+  },
+  "productTypography": {
+    "family": "Geist Variable",
+    "fallback": "-apple-system, BlinkMacSystemFont, Segoe UI, PingFang SC, Microsoft YaHei, sans-serif",
+    "restriction": "the custom wordmark is for identity surfaces only and is not a UI text font"
+  },
+  "prohibited": [
+    "retyping the wordmark with a stock font",
+    "changing solid-to-outline order",
+    "adding a space or slash",
+    "independent letter scaling",
+    "using the wordmark as body copy"
+  ]
+}

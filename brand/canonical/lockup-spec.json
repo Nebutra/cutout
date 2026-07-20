@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "primary": "lockup-horizontal.svg",
+  "compact": "lockup-stacked.svg",
+  "sourceSymbol": "../a1/symbol-master.svg",
+  "sourceWordmark": "../a2/wordmark-master.svg",
+  "clearSpace": "one quarter of the symbol height around the full lockup",
+  "minimum": {
+    "horizontalWidthPx": 160,
+    "stackedWidthPx": 96
+  },
+  "usage": {
+    "horizontal": ["web header", "documents", "email", "wide product surfaces"],
+    "stacked": ["square panels", "compact vertical placements", "splash and social surfaces"]
+  },
+  "prohibited": [
+    "changing symbol-to-wordmark order",
+    "changing the approved gap",
+    "placing either element on a busy region",
+    "using unapproved candidate wordmarks"
+  ]
+}

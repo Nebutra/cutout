@@ -226,7 +226,7 @@ async function imageProviderKind(
  * Mutation: recognize the intent behind the brief (chat slot), then either
  * surface clarifying questions and STOP, or plan a graph from the enriched
  * intent and run it (image slot) — spec §6/§7. The recognized `IntentProfile`
- * is recorded on the store either way so the BriefNode can show the derived
+ * is recorded on the store either way so the Agent workspace can show the derived
  * understanding. The component gates on both slots being assigned (intent AND
  * planning both ride the chat slot; without it we fall back to the raw brief via
  * `planFromBrief` → `planGraph`, which the recognition step covers); the throws
@@ -273,7 +273,7 @@ export function useRunPlan() {
         // Surface the derived understanding regardless of which branch we took.
         getStoreState().setIntent(outcome.data.intent);
 
-        // Low confidence / open questions → stop; the BriefNode shows the prompts.
+        // Low confidence / open questions: stop so the Agent workspace can ask.
         if (outcome.data.kind === "clarify") return;
 
         const graph = outcome.data.graph;

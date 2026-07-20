@@ -267,12 +267,14 @@ import {
   integrityIssue,
   isConsumableTask,
   projectProductionMaterials,
+  projectProductionReviewQueue,
   prototypeDirectAssetChecklist,
   prototypeDirectAssetPrompt,
   publishPrototypeTaskArtifact,
   qualityIssue,
   type ProductionArtifactRef,
   type ProductionIssue,
+  type ProductionReviewProjection,
   type ProductionRunStatus,
 } from "@/asset-production";
 
@@ -494,9 +496,6 @@ export function IntentWorkspace({
   const [namingStatus, setNamingStatus] = useState<NamingStatus>(
     () => initialWorkspace?.namingStatus ?? "idle",
   );
-  const [failedRegionIds, setFailedRegionIds] = useState<readonly string[]>(
-    () => initialWorkspace?.failedRegionIds ?? [],
-  );
   const autoNamePendingRef = useRef(false);
   const brief = useStore((s) => s.brief);
   const setBrief = useStore((s) => s.setBrief);
@@ -516,6 +515,15 @@ export function IntentWorkspace({
   const productionStatus = productionStatusRunId
     ? assetProduction.runs[productionStatusRunId]?.status ?? null
     : null;
+  const productionReviewQueue = useMemo(
+    () => projectProductionReviewQueue(assetProduction),
+    [assetProduction],
+  );
+  const productionRepairRegionIds = useMemo(
+    () => [...new Set(productionReviewQueue.map((item) => item.regionId))],
+    [productionReviewQueue],
+  );
+  const productionReviewCount = productionReviewQueue.length;
   const assignments = useModelAssignments();
   const providers = useProviders();
   const desktopTools = useDesktopToolLoop({
@@ -844,7 +852,7 @@ export function IntentWorkspace({
   const repairPlan = planPrototypeRepair(
     outcome,
     Boolean(prototypeArtifacts.designSystem),
-    failedRegionIds,
+    productionRepairRegionIds,
   );
   const agentViewModel = buildAgentViewModel({
     brief,
@@ -914,7 +922,6 @@ export function IntentWorkspace({
       selectedPrototypePageId,
       runError,
       namingStatus,
-      failedRegionIds,
       liveAgentOutput,
       attachments: attachments.map(persistReferenceAttachment),
       webSearchEnabled,
@@ -947,7 +954,6 @@ export function IntentWorkspace({
     humanLoopCustomAnswer,
     liveAgentOutput,
     namingStatus,
-    failedRegionIds,
     outcome,
     prototypeDesignSystem,
     prototypePages,
@@ -1241,7 +1247,7 @@ export function IntentWorkspace({
         ? planPrototypeRepair(
             outcome,
             Boolean(prototypeArtifacts.designSystem),
-            failedRegionIds,
+            productionRepairRegionIds,
           )
         : null);
     if ((mode === "repair" || requestedMaterial) && (!prototypePlan || !repair))
@@ -2169,6 +2175,15 @@ export function IntentWorkspace({
       pages: pageSources,
     });
     let productionSnapshot = getStoreState().assetProduction;
+    const requestedRepairRegions = new Set(options.repair?.targetRegionIds ?? []);
+    const previousRun = Object.values(productionSnapshot.runs)
+      .filter(
+        (run) =>
+          run.runId !== productionRunId &&
+          run.planHash === productionPlan.planHash &&
+          run.status !== "cancelled",
+      )
+      .sort((left, right) => right.startedAt - left.startedAt)[0];
     const startedProduction = beginPrototypeProduction({
       snapshot: productionSnapshot,
       plan: productionPlan,
@@ -2184,15 +2199,6 @@ export function IntentWorkspace({
     };
     commitProduction(startedProduction);
 
-    const requestedRepairRegions = new Set(options.repair?.targetRegionIds ?? []);
-    const previousRun = Object.values(productionSnapshot.runs)
-      .filter(
-        (run) =>
-          run.runId !== productionRunId &&
-          run.planHash === productionPlan.planHash &&
-          run.status !== "cancelled",
-      )
-      .sort((left, right) => right.startedAt - left.startedAt)[0];
     const targetsKnownTask = productionPlan.tasks.some((task) =>
       requestedRepairRegions.has(task.regionId),
     );
@@ -2250,7 +2256,6 @@ export function IntentWorkspace({
       );
     }
     autoNamePendingRef.current = false;
-    const failedRegions = new Set<string>();
     const failOpenTasks = (message: string) => {
       const run = productionSnapshot.runs[productionRunId];
       if (!run) return;
@@ -2299,7 +2304,6 @@ export function IntentWorkspace({
               at: Date.now(),
             }),
           );
-          failedRegions.add(task.regionId);
           return;
         }
         try {
@@ -2450,7 +2454,6 @@ export function IntentWorkspace({
               at: Date.now(),
             }),
           );
-          failedRegions.add(task.regionId);
         }
         },
       );
@@ -2468,7 +2471,7 @@ export function IntentWorkspace({
         const referenceBytes = generated
           .filter((candidate) => candidate.page.id !== artifact.page.id)
           .map((candidate) => candidate.bytes);
-        const breakdown = await runRegionBreakdown(
+        await runRegionBreakdown(
           {
             generation: personalizedGenerationRef.current,
             providers: { list: async () => providers.data ?? [] },
@@ -2667,7 +2670,6 @@ export function IntentWorkspace({
                 getStoreState().appendSliceProjection(regionRunId, { slices: projected });
               }
               if (assignment.issues.length > 0) {
-                failedRegions.add(regionId);
                 throw new Error(
                   assignment.issues.map((issue) => issue.message).join(" "),
                 );
@@ -2692,7 +2694,6 @@ export function IntentWorkspace({
               }
             },
             onRegionError: (regionId, message) => {
-              failedRegions.add(regionId);
               const tasks = productionPlan.tasks.filter(
                 (task) =>
                   task.pageId === artifact.page.id &&
@@ -2716,16 +2717,18 @@ export function IntentWorkspace({
           },
         );
         agentRunCoordinatorRef.current.checkpoint(lease);
-        for (const regionId of breakdown.failedRegionIds) failedRegions.add(regionId);
       }
 
-      if (failedRegions.size > 0) {
-        setFailedRegionIds([...failedRegions]);
+      const failedProductionRegions = [...new Set(
+        projectProductionReviewQueue(productionSnapshot, productionRunId)
+          .filter((item) => item.status === "failed")
+          .map((item) => item.regionId),
+      )];
+      if (failedProductionRegions.length > 0) {
         throw new Error(
-          `Reusable material production failed for regions: ${[...failedRegions].join(", ")}.`,
+          `Reusable material production failed for regions: ${failedProductionRegions.join(", ")}.`,
         );
       }
-      setFailedRegionIds([]);
     } catch (error) {
       if (lease.controller.signal.aborted || !agentRunCoordinatorRef.current.isActive(lease)) {
         const status = productionSnapshot.runs[productionRunId]?.status;
@@ -3725,10 +3728,11 @@ export function IntentWorkspace({
             }}
             hasSource={hasSource}
             hasSlices={hasSlices}
+            productionReviewCount={productionReviewCount}
+            productionReviewQueue={productionReviewQueue}
             working={working}
             analysisStatus={analysisStatus}
             runError={runError}
-            failedRegionIds={failedRegionIds}
             focusedArtifactId={focusedArtifactId}
             focusRequestId={focusRequestId}
             selectedMaterial={selectedMaterial}
@@ -5270,10 +5274,11 @@ function OutputSurface({
   onPrimaryAction,
   hasSource,
   hasSlices,
+  productionReviewCount,
+  productionReviewQueue,
   working,
   analysisStatus,
   runError,
-  failedRegionIds,
   focusedArtifactId,
   focusRequestId,
   selectedMaterial,
@@ -5310,10 +5315,11 @@ function OutputSurface({
   readonly onPrimaryAction: () => void;
   readonly hasSource: boolean;
   readonly hasSlices: boolean;
+  readonly productionReviewCount: number;
+  readonly productionReviewQueue: readonly ProductionReviewProjection[];
   readonly working: boolean;
   readonly analysisStatus: ReturnType<typeof useStatus>;
   readonly runError: string | null;
-  readonly failedRegionIds: readonly string[];
   readonly focusedArtifactId: string | null;
   readonly focusRequestId: number;
   readonly selectedMaterial: MaterialRef | null;
@@ -5488,19 +5494,26 @@ function OutputSurface({
       ? prototypePlan?.pages.flatMap((page) => page.regions)
           .filter((region) => region.assetRoute === "board-cutout")
           .filter((region) => !canvasSlices.some((slice) => slice.regionId === region.id))
-          .map((region) => ({
-            id: `task:region:${region.id}`,
-            label: region.name,
-            material: {
+          .map((region) => {
+            const blocker = productionReviewQueue.find(
+              (item) => item.regionId === region.id,
+            );
+            return {
               id: `task:region:${region.id}`,
-              kind: "cutout-slice",
               label: region.name,
-              version: "pending",
-              provenance: { source: "page-deconstruction" },
-            },
-            status: failedRegionIds.includes(region.id) ? "failed" as const : taskStatus,
-            statusDetail: failedRegionIds.includes(region.id) ? "Needs retry" : taskStatus === "generating" ? "Extracting" : "Queued",
-          })) ?? []
+              material: {
+                id: `task:region:${region.id}`,
+                kind: "cutout-slice" as const,
+                label: region.name,
+                version: "pending",
+                provenance: { source: "page-deconstruction" as const },
+              },
+              status: blocker ? "failed" as const : taskStatus,
+              statusDetail: blocker
+                ? blocker.status === "failed" ? "Needs retry" : "Needs review"
+                : taskStatus === "generating" ? "Extracting" : "Queued",
+            };
+          }) ?? []
       : [];
     return (
       <div className="relative h-full min-h-0">
@@ -5552,7 +5565,7 @@ function OutputSurface({
     );
   }
 
-  if (hasSlices) {
+  if (hasSlices || productionReviewCount > 0) {
     const showPrototypeContext =
       Boolean(prototypePlan) || Boolean(prototypeDesignSystem) || prototypePages.length > 0
     return (
@@ -5588,7 +5601,7 @@ function OutputSurface({
           </div>
         ) : null}
         <div className="min-h-0 flex-1">
-          <SliceOutcomeTabs />
+          <SliceOutcomeTabs onRetry={onPrimaryAction} />
         </div>
       </div>
     );

@@ -6,6 +6,7 @@ const REQUIRED_DEFERRED_CHUNKS = [
   'PipelineCanvas-',
   'SettingsDialog-',
   'LibraryDrawer-',
+  'GlobalLibraryView-',
   'DesignOsWorkbench-',
   'live-model-',
   'generation-service.local-',

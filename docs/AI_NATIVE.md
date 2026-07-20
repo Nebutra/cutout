@@ -21,7 +21,7 @@ pnpm ai paths
 On macOS the queue root is:
 
 ```text
-~/Library/Application Support/com.leishi.cutout/ai-native
+~/Library/Application Support/com.nebutra.cutout/ai-native
 ```
 
 Agents may write `*.json` commands to `inbox/`. The app moves them to
@@ -124,10 +124,17 @@ reference image (`mockup` first, then `board`, then none).
 }
 ```
 
-`run-semantic-slices` plans, generates each slice, validates the result, and
-writes accepted or retryable images into `ai-native/artifacts/`. It defaults to
-the configured `chat` model for planning/QA and the configured `image` model for
-generation.
+`run-semantic-slices` plans, generates, and validates each semantic asset. It
+publishes one stable Asset Production task per semantic spec, stores selected
+bytes content-addressably, and projects ready or review images into the current
+workspace. Missing output becomes a visible failed task; rejected, skipped, or
+unavailable QA remains non-consumable in Needs Review.
+
+The response includes `production.planId`, `production.runId`, run `status`, and
+stable `taskIds`. `writeArtifacts` controls only the additional files under
+`ai-native/artifacts/`; authoritative production persistence always occurs.
+Planning/QA defaults to the configured `chat` model and generation defaults to
+the configured `image` model.
 
 ```json
 {

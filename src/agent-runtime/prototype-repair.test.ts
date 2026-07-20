@@ -62,7 +62,7 @@ describe('planPrototypeRepair', () => {
     })).toBe('Continue missing prototype pages, reusable materials')
   })
 
-  it('carries failed region ids into the smallest retry plan', () => {
+  it('carries authoritative blocked region ids into the smallest retry plan', () => {
     const outcome = createOutcomeRuntime(contract, 'run-1')
     expect(planPrototypeRepair(outcome, true, ['hero', 'gallery'])?.targetRegionIds)
       .toEqual(['hero', 'gallery'])

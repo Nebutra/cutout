@@ -4,9 +4,9 @@ import { getStoreState } from '@/store'
 beforeEach(() => {
   vi.stubGlobal('URL', { createObjectURL: () => 'blob:slice', revokeObjectURL: () => {} })
   getStoreState().resetProject()
-  const runId = getStoreState().beginRegionSlices()
-  getStoreState().appendRegionSlices(runId, { slices: [{ id: 'slice-1', index: 0, box: { x: 1, y: 2, width: 10, height: 12 }, blob: new Blob(['png']), width: 10, height: 12 }] })
-  getStoreState().finishRegionSlices(runId)
+  const runId = getStoreState().beginSliceProjection()
+  getStoreState().appendSliceProjection(runId, { slices: [{ id: 'slice-1', index: 0, box: { x: 1, y: 2, width: 10, height: 12 }, blob: new Blob(['png']), width: 10, height: 12 }] })
+  getStoreState().finishSliceProjection(runId)
 })
 
 describe('result review corrections', () => {

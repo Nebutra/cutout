@@ -29,6 +29,18 @@ export const MATTE_FULL_OPAQUE_DIST = 96
  */
 export const MATTE_ALPHA_FLOOR = 1
 
+/**
+ * Exterior haze: the darkest channel must remain this bright before a
+ * background-connected region can be treated as white-matted shadow/haze.
+ */
+export const MATTE_HAZE_MIN_CHANNEL = 176
+
+/**
+ * Exterior haze: maximum RGB channel spread for neutral shadow/haze. Keeping
+ * this narrow protects pale chromatic artwork such as cream paper and glass.
+ */
+export const MATTE_HAZE_MAX_CHROMA = 24
+
 /** Default white-background RGB threshold (user default). */
 export const DEFAULT_THRESHOLD = 246
 

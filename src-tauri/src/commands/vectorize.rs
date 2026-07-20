@@ -10,7 +10,7 @@ use keyring::{Entry, Error as KeyringError};
 use reqwest::multipart::{Form, Part};
 use serde::{Deserialize, Serialize};
 
-const SERVICE: &str = "com.leishi.cutout";
+const SERVICE: &str = "com.nebutra.cutout";
 const VECTORIZER_ENDPOINT: &str = "https://api.vectorizer.ai/api/v1/vectorize";
 const HTTP_TIMEOUT_SECS: u64 = 240;
 

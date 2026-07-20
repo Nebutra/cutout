@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   createMemoryVisualExecutionStore,
   executeVisualGeneration,
+  isRetryableVisualToolError,
   planVisualGeneration,
   visualGenerationTaskSchema,
   type ReviewGate,
@@ -108,6 +109,10 @@ function approve(
 }
 
 describe("visual generation contracts and planning", () => {
+  it("does not retry timeouts or cancelled provider calls", () => {
+    expect(isRetryableVisualToolError(new Error("Provider deadline exceeded."))).toBe(false);
+    expect(isRetryableVisualToolError(new DOMException("Stopped", "AbortError"))).toBe(false);
+  });
   it("builds parallel variants followed by selection, edit, review and promotion", () => {
     const plan = planVisualGeneration(task(), {
       generate: { currency: "USD", amount: 0.05 },

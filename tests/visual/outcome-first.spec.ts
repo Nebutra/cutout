@@ -369,7 +369,7 @@ test('completed result keeps the canvas free of review controls, while ordinary 
   await expect(page.getByText(/\$\d|USD|credits?/i)).toHaveCount(0)
 })
 
-test('selecting a deliverable reveals lineage and targets an Agent change request', async ({ page }) => {
+test('selecting a deliverable previews it and targets an Agent change request', async ({ page }) => {
   await createProjectWithWorkspace(page, completedWorkspace(), 'Deliverable lineage fixture')
   const closeInspector = page.getByRole('button', { name: 'Close design inspector' })
   if (await closeInspector.isVisible()) await closeInspector.click()
@@ -378,24 +378,16 @@ test('selecting a deliverable reveals lineage and targets an Agent change reques
   const card = page.getByText('Launch home', { exact: true }).last()
   await expect(card).toBeVisible()
   await card.click()
-  const selected = page.getByRole('region', { name: 'Selected deliverable' })
-  await expect(selected).toBeVisible()
-  await expect(selected).toContainText('Ready')
-  await expect(selected).toContainText('Generated from approved outcome')
-  const favorite = selected.getByRole('button', { name: 'Favorite Launch home' })
-  await favorite.click()
-  await expect(favorite).toHaveAttribute('aria-pressed', 'true')
-  const lock = selected.getByRole('button', { name: 'Lock Launch home as reference' })
-  await lock.click()
-  await expect(lock).toHaveAttribute('aria-pressed', 'true')
-  await expect(selected).toContainText('Locked prototype-page')
-  await selected.getByRole('button', { name: 'More like Launch home' }).click()
-  await expect(selected).toContainText('1 branch requested')
-  await expect(selected.getByRole('status')).toContainText('Queued for Agent execution')
+  const preview = page.getByRole('dialog')
+  await expect(preview).toBeVisible()
+  await expect(preview).toContainText('Launch home')
+  await page.keyboard.press('Escape')
+  await expect(preview).toBeHidden()
+
+  await expect(page.getByText('Continue generation', { exact: true })).toHaveCount(0)
+  await page.getByRole('button', { name: 'Request changes to Launch home' }).click()
   await expect(page.getByLabel('Message the Agent')).toBeFocused()
-  await page.getByRole('button', { name: 'Hide Agent' }).click()
-  await selected.getByRole('button', { name: 'Request changes to Launch home' }).click()
-  await expect(page.getByLabel('Message the Agent')).toBeFocused()
+  await expect(page.locator('[data-slot="agent-material-context"]')).toContainText('Launch home')
 })
 
 test('Canvas keeps a responsive safe area while workspace panels change', async ({ page }, testInfo) => {

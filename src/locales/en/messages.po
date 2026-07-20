@@ -13,243 +13,6 @@ msgstr ""
 "Language-Team: \n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
-#. placeholder {0}: slices.length
-#. js-lingui-explicit-id
-#: src/components/status/StatusBar.tsx
-#~ msgid "status.slice_count"
-#~ msgstr "{0, plural, one {# slice} other {# slices}}"
-
-#. js-lingui-explicit-id
-#: src/components/status/StatusBar.tsx
-#~ msgid "status.state_running"
-#~ msgstr "analyzing…"
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/IntegrationsSection.tsx
-#~ msgid "settings.integrations_title"
-#~ msgstr "Connect Cutout to your tools"
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/IntegrationsSection.tsx
-#~ msgid "settings.integrations_cta_wip"
-#~ msgstr "Connecting accounts is coming soon"
-
-#. js-lingui-explicit-id
-#: src/components/topbar/ThemeToggle.tsx
-#~ msgid "topbar.theme_dark_mode"
-#~ msgstr "Dark mode"
-
-#. js-lingui-explicit-id
-#: src/components/status/StatusBar.tsx
-#~ msgid "status.state_done"
-#~ msgstr "done"
-
-#. js-lingui-explicit-id
-#: src/components/status/StatusBar.tsx
-#~ msgid "status.state_error"
-#~ msgstr "error"
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/IntegrationsSection.tsx
-#~ msgid "settings.integrations_description"
-#~ msgstr "Figma, GitHub, Notion, Obsidian and more will connect through the Connector system so the Agent can read sources and deliver results. Accounts and connector hosts are still in progress."
-
-#. js-lingui-explicit-id
-#: src/components/status/StatusBar.tsx
-#~ msgid "status.state_idle"
-#~ msgstr "idle"
-
-#. js-lingui-explicit-id
-#: src/components/topbar/TopBarActions.tsx
-#~ msgid "topbar.import"
-#~ msgstr "Import"
-
-#. js-lingui-explicit-id
-#: src/components/topbar/ThemeToggle.tsx
-#~ msgid "topbar.theme_light_mode"
-#~ msgstr "Light mode"
-
-#. js-lingui-explicit-id
-#: src/components/topbar/ThemeToggle.tsx
-#~ msgid "topbar.theme_to_dark"
-#~ msgstr "Switch to dark mode"
-
-#. js-lingui-explicit-id
-#: src/components/topbar/ThemeToggle.tsx
-#~ msgid "topbar.theme_to_light"
-#~ msgstr "Switch to light mode"
-
-#. js-lingui-explicit-id
-#: src/components/status/StatusBar.tsx
-#~ msgid "status.param_summary"
-#~ msgstr "thr {threshold} · area {minArea} · gap {mergeGap} · pad {padding}"
-
-#. js-lingui-explicit-id
-#: src/components/settings/ModelSlot.tsx
-#~ msgid "settings.model_no_provider"
-#~ msgstr "Add an endpoint above to assign a model."
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-#~ msgid "settings.model_chat_label"
-#~ msgstr "Chat / Understanding"
-
-#. js-lingui-explicit-id
-#: src/components/settings/ModelSlot.tsx
-#~ msgid "settings.effort_default"
-#~ msgstr "Default"
-
-#. js-lingui-explicit-id
-#: src/components/settings/ModelSlot.tsx
-#~ msgid "settings.model_pick_endpoint"
-#~ msgstr "Endpoint"
-
-#. js-lingui-explicit-id
-#: src/components/settings/ModelSlot.tsx
-#~ msgid "settings.effort_high"
-#~ msgstr "High"
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-#~ msgid "settings.model_image_label"
-#~ msgstr "Image generation"
-
-#. js-lingui-explicit-id
-#: src/components/settings/ModelSlot.tsx
-#~ msgid "settings.effort_low"
-#~ msgstr "Low"
-
-#. js-lingui-explicit-id
-#: src/components/settings/ModelSlot.tsx
-#~ msgid "settings.effort_medium"
-#~ msgstr "Medium"
-
-#. js-lingui-explicit-id
-#: src/components/settings/ModelSlot.tsx
-#~ msgid "settings.model_slug_placeholder"
-#~ msgstr "model"
-
-#. js-lingui-explicit-id
-#: src/components/settings/ModelSlot.tsx
-#~ msgid "settings.model_endpoint_aria"
-#~ msgstr "Model endpoint"
-
-#. js-lingui-explicit-id
-#: src/components/settings/ModelSlot.tsx
-#~ msgid "settings.model_name_aria"
-#~ msgstr "Model name"
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-#~ msgid "settings.models_heading"
-#~ msgstr "Models"
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-#~ msgid "settings.models_hint"
-#~ msgstr "One endpoint, a different model per capability — no need to re-add the provider. Pick each from the endpoint's model list or type it."
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-#~ msgid "settings.model_image_hint"
-#~ msgstr "Produces images (e.g. regenerated asset sheets)."
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-#~ msgid "settings.model_chat_hint"
-#~ msgstr "Text, reasoning and vision — one multimodal model."
-
-#. js-lingui-explicit-id
-#: src/components/settings/ModelSlot.tsx
-#~ msgid "settings.effort_label"
-#~ msgstr "Thinking strength"
-
-#. js-lingui-explicit-id
-#: src/components/settings/ModelSlot.tsx
-#~ msgid "settings.effort_aria"
-#~ msgstr "Thinking strength"
-
-#. js-lingui-explicit-id
-#: src/components/settings/ModelSlot.tsx
-#~ msgid "settings.model_assignment_save"
-#~ msgstr "Save assignment"
-
-#. js-lingui-explicit-id
-#: src/components/library/TeamGovernancePanel.tsx
-#~ msgid "team.role_admin"
-#~ msgstr "Admin"
-
-#. js-lingui-explicit-id
-#: src/components/library/TeamGovernancePanel.tsx
-#~ msgid "team.collaboration_host_required"
-#~ msgstr "Collaboration host required"
-
-#. js-lingui-explicit-id
-#: src/components/library/TeamGovernancePanel.tsx
-#~ msgid "team.create_readonly_share"
-#~ msgstr "Create read-only share"
-
-#. js-lingui-explicit-id
-#: src/components/library/TeamGovernancePanel.tsx
-#~ msgid "team.role_select_aria"
-#~ msgstr "Current team role"
-
-#. js-lingui-explicit-id
-#: src/components/library/TeamGovernancePanel.tsx
-#~ msgid "team.role_editor"
-#~ msgstr "Editor"
-
-#. js-lingui-explicit-id
-#: src/components/library/TeamGovernancePanel.tsx
-#~ msgid "team.local_review_host"
-#~ msgstr "Local review host"
-
-#. js-lingui-explicit-id
-#: src/components/library/TeamGovernancePanel.tsx
-#~ msgid "team.remote_sync_disabled"
-#~ msgstr "Remote sync disabled"
-
-#. js-lingui-explicit-id
-#: src/components/library/TeamGovernancePanel.tsx
-#~ msgid "team.role_reviewer"
-#~ msgstr "Reviewer"
-
-#. js-lingui-explicit-id
-#: src/components/library/TeamGovernancePanel.tsx
-#~ msgid "team.label"
-#~ msgstr "Team"
-
-#. js-lingui-explicit-id
-#: src/components/library/TeamGovernancePanel.tsx
-#~ msgid "team.governance_section_aria"
-#~ msgstr "Team governance"
-
-#. js-lingui-explicit-id
-#: src/components/library/TeamGovernancePanel.tsx
-#~ msgid "team.role_viewer"
-#~ msgstr "Viewer"
-
-#. js-lingui-explicit-id
-#: src/components/home/ProjectHome.tsx
-#~ msgid "home.published_empty_description"
-#~ msgstr "Projects you publish will be listed here with their live links. This needs accounts and a community service, which are not built yet."
-
-#. js-lingui-explicit-id
-#: src/components/home/ProjectHome.tsx
-#~ msgid "home.published_projects"
-#~ msgstr "Published Projects"
-
-#. js-lingui-explicit-id
-#: src/components/home/ProjectHome.tsx
-#~ msgid "home.published_empty_title"
-#~ msgstr "Publishing is on the way"
-
-#. js-lingui-explicit-id
-#: src/components/home/ProjectHome.tsx
-#: src/components/settings/SettingsSidebar.tsx
-#~ msgid "home.wip_badge"
-#~ msgstr "WIP"
-
 #. js-lingui-explicit-id
 #. placeholder {0}: project.name
 #: src/components/home/ProjectHome.tsx
@@ -345,18 +108,6 @@ msgid "settings.task_dimensions_covered"
 msgstr "{0} of {1} task dimensions covered"
 
 #. js-lingui-explicit-id
-#. placeholder {0}: state.output.slices.length
-#: src/components/canvas/nodes/dag-node-common.tsx
-msgid "dag.slices_count"
-msgstr "{0} slices cut"
-
-#. js-lingui-explicit-id
-#. placeholder {0}: state.output.names.length
-#: src/components/canvas/nodes/dag-node-common.tsx
-msgid "dag.names_count"
-msgstr "{0} slices named"
-
-#. js-lingui-explicit-id
 #: src/components/preview/PreviewMeta.tsx
 msgid "preview.region_count"
 msgstr "{count, plural, one {# region} other {# regions}}"
@@ -432,11 +183,6 @@ msgid "team.host_required_description"
 msgstr "A desktop collaboration host is required to review or create a read-only share."
 
 #. js-lingui-explicit-id
-#: src/components/canvas/nodes/IntentPanel.tsx
-msgid "intent.questions_title"
-msgstr "A quick clarification first"
-
-#. js-lingui-explicit-id
 #: src/components/settings/sections/SpeechSection.tsx
 msgid "settings.speech.activation"
 msgstr "Activation"
@@ -463,6 +209,11 @@ msgid "settings.add"
 msgstr "Add"
 
 #. js-lingui-explicit-id
+#: src/components/workspace/IntentWorkspace.tsx
+msgid "workspace.human_loop_optional_context_placeholder"
+msgstr "Add a constraint or describe another direction…"
+
+#. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
 msgid "settings.empty_desc"
 msgstr "Add a provider and enter an API key to start using AI features."
@@ -481,26 +232,6 @@ msgstr "Add revision-bound comment"
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.add_tag_placeholder"
 msgstr "Add tag"
-
-#. js-lingui-explicit-id
-#: src/components/canvas/nodes/MockupNode.tsx
-msgid "mockup.add_to_library"
-msgstr "Add to library"
-
-#. js-lingui-explicit-id
-#: src/components/canvas/nodes/SlicesNode.tsx
-msgid "slices.add_to_library"
-msgstr "Add to library"
-
-#. js-lingui-explicit-id
-#: src/components/canvas/nodes/SlicesNode.tsx
-msgid "slices.toast_added_to_library"
-msgstr "Added {added} to library"
-
-#. js-lingui-explicit-id
-#: src/components/canvas/nodes/MockupNode.tsx
-msgid "mockup.toast_added_to_library"
-msgstr "Added to library"
 
 #. js-lingui-explicit-id
 #: src/components/settings/SettingsSidebar.tsx
@@ -685,21 +416,6 @@ msgid "home.asset_singular"
 msgstr "asset"
 
 #. js-lingui-explicit-id
-#: src/components/canvas/nodes/BoardNode.tsx
-msgid "pipeline.stage_board"
-msgstr "Asset board"
-
-#. js-lingui-explicit-id
-#: src/components/canvas/nodes/dag-node-common.tsx
-msgid "dag.op_board"
-msgstr "Asset board"
-
-#. js-lingui-explicit-id
-#: src/components/canvas/nodes/BoardNode.tsx
-msgid "pipeline.node_board_aria"
-msgstr "Asset board stage"
-
-#. js-lingui-explicit-id
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.capabilities_aria"
 msgstr "Asset capabilities"
@@ -718,11 +434,6 @@ msgstr "Asset library"
 #: src/components/home/ProjectHome.tsx
 msgid "home.asset_plural"
 msgstr "assets"
-
-#. js-lingui-explicit-id
-#: src/components/canvas/nodes/IntentPanel.tsx
-msgid "intent.assumptions"
-msgstr "Assumptions"
 
 #. js-lingui-explicit-id
 #: src/components/home/ProjectHome.tsx
@@ -795,11 +506,6 @@ msgid "home.nav_back"
 msgstr "Back"
 
 #. js-lingui-explicit-id
-#: src/components/canvas/PlannedCanvas.tsx
-msgid "dag.back_to_linear"
-msgstr "Back to the linear chain"
-
-#. js-lingui-explicit-id
 #: src/components/settings/ProviderForm.tsx
 msgid "settings.provider_baseurl_label"
 msgstr "Base URL"
@@ -808,11 +514,6 @@ msgstr "Base URL"
 #: src/components/settings/sections/UpdatesSection.tsx
 msgid "settings.updates.beta"
 msgstr "Beta"
-
-#. js-lingui-explicit-id
-#: src/components/canvas/nodes/dag-node-common.tsx
-msgid "dag.blocked"
-msgstr "Blocked — an upstream step failed."
 
 #. js-lingui-explicit-id
 #: src/components/library/KitLibraryInspector.tsx
@@ -833,16 +534,6 @@ msgstr "Brand kit"
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.tab_brand_kits"
 msgstr "Brand Kits"
-
-#. js-lingui-explicit-id
-#: src/components/canvas/nodes/BriefNode.tsx
-msgid "pipeline.stage_brief"
-msgstr "Brief"
-
-#. js-lingui-explicit-id
-#: src/components/canvas/nodes/BriefNode.tsx
-msgid "pipeline.node_brief_aria"
-msgstr "Brief stage"
 
 #. js-lingui-explicit-id
 #: src/components/library/GlobalLibraryView.tsx
@@ -868,11 +559,6 @@ msgstr "Cancel"
 #: src/components/settings/sections/ArchivedSection.tsx
 msgid "home.cancel"
 msgstr "Cancel"
-
-#. js-lingui-explicit-id
-#: src/components/canvas/nodes/dag-node-common.tsx
-msgid "dag.cancelled"
-msgstr "Cancelled."
 
 #. js-lingui-explicit-id
 #: src/components/settings/ModelSlot.tsx
@@ -960,6 +646,16 @@ msgid "home.rename_project_description"
 msgstr "Choose a clear name for this local project."
 
 #. js-lingui-explicit-id
+#: src/components/workspace/IntentWorkspace.tsx
+msgid "workspace.human_loop_choose_direction"
+msgstr "Choose a direction"
+
+#. js-lingui-explicit-id
+#: src/components/workspace/IntentWorkspace.tsx
+msgid "workspace.human_loop_instruction"
+msgstr "Choose one direction. Add optional context below, then press the arrow."
+
+#. js-lingui-explicit-id
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.clear_selection"
 msgstr "Clear"
@@ -1016,34 +712,14 @@ msgid "global_library.tab_components"
 msgstr "Components"
 
 #. js-lingui-explicit-id
-#: src/components/canvas/nodes/BoardNode.tsx
-msgid "board.composing"
-msgstr "Composing mockup…"
-
-#. js-lingui-explicit-id
 #: src/components/library/LibraryDrawer.tsx
 msgid "library.toast_compose_failed"
-msgstr "Composition failed"
-
-#. js-lingui-explicit-id
-#: src/components/canvas/nodes/BoardNode.tsx
-msgid "board.toast_compose_failed"
 msgstr "Composition failed"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/PersonalizationSection.tsx
 msgid "settings.personalization.personality_concise"
 msgstr "Concise"
-
-#. js-lingui-explicit-id
-#: src/components/canvas/nodes/IntentPanel.tsx
-msgid "intent.confidence"
-msgstr "Confidence"
-
-#. js-lingui-explicit-id
-#: src/components/canvas/nodes/SlicesNode.tsx
-msgid "slices.name_no_model_cta"
-msgstr "Configure a chat model to name slices"
 
 #. js-lingui-explicit-id
 #: src/components/library/GlobalLibraryView.tsx
@@ -1054,13 +730,6 @@ msgstr "Configure an authorized reference-discovery provider host to enable this
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.analyze_video_title"
 msgstr "Configure an authorized video executor host to enable frame and shot analysis."
-
-#. js-lingui-explicit-id
-#: src/components/canvas/nodes/BoardNode.tsx
-#: src/components/canvas/nodes/BriefNode.tsx
-#: src/components/canvas/nodes/MockupNode.tsx
-msgid "generate.no_model_cta"
-msgstr "Configure an image model in Settings"
 
 #. js-lingui-explicit-id
 #: src/components/library/LibraryDrawer.tsx
@@ -1146,6 +815,11 @@ msgid "global_library.meta_content_hash"
 msgstr "Content hash"
 
 #. js-lingui-explicit-id
+#: src/components/workspace/IntentWorkspace.tsx
+msgid "workspace.human_loop_use_judgment_hint"
+msgstr "Continue with the Agent's recommended direction."
+
+#. js-lingui-explicit-id
 #: src/components/home/ProjectHome.tsx
 msgid "home.continue_heading"
 msgstr "Continue working"
@@ -1176,8 +850,6 @@ msgid "global_library.toast_add_failed"
 msgstr "Could not add library item"
 
 #. js-lingui-explicit-id
-#: src/components/canvas/nodes/MockupNode.tsx
-#: src/components/canvas/nodes/SlicesNode.tsx
 #: src/components/library/LibraryDrawer.tsx
 msgid "library.toast_add_failed"
 msgstr "Could not add to library"
@@ -1276,11 +948,6 @@ msgid "settings.personalization.custom_requires_instructions"
 msgstr "Custom personality requires instructions before it can be saved."
 
 #. js-lingui-explicit-id
-#: src/components/canvas/edges/TransitionEdge.tsx
-msgid "pipeline.transition_cutout"
-msgstr "Cutout"
-
-#. js-lingui-explicit-id
 #. placeholder {0}: state.preferences.channel
 #: src/components/settings/sections/UpdatesSection.tsx
 msgid "settings.updates.up_to_date"
@@ -1300,26 +967,6 @@ msgstr "Cutout parameters"
 #: src/components/home/SidebarAccount.tsx
 msgid "home.theme_dark"
 msgstr "Dark"
-
-#. js-lingui-explicit-id
-#: src/components/canvas/edges/TransitionEdge.tsx
-msgid "pipeline.transition_deconstruct"
-msgstr "Deconstruct"
-
-#. js-lingui-explicit-id
-#: src/components/canvas/nodes/MockupNode.tsx
-msgid "mockup.deconstruct"
-msgstr "Deconstruct to board"
-
-#. js-lingui-explicit-id
-#: src/components/canvas/nodes/MockupNode.tsx
-msgid "mockup.deconstructing"
-msgstr "Deconstructing…"
-
-#. js-lingui-explicit-id
-#: src/components/canvas/nodes/MockupNode.tsx
-msgid "mockup.toast_deconstruct_failed"
-msgstr "Deconstruction failed"
 
 #. js-lingui-explicit-id
 #: src/components/settings/ProviderForm.tsx
@@ -1350,14 +997,14 @@ msgid "home.delete_permanently_title"
 msgstr "Delete permanently?"
 
 #. js-lingui-explicit-id
+#: src/components/workspace/IntentWorkspace.tsx
+msgid "workspace.agent_composer_placeholder"
+msgstr "Describe a result, correction, or next step…"
+
+#. js-lingui-explicit-id
 #: src/components/settings/sections/PersonalizationSection.tsx
 msgid "settings.personalization.custom_instructions_placeholder"
 msgstr "Describe stable preferences, constraints, or how you want results presented."
-
-#. js-lingui-explicit-id
-#: src/components/canvas/nodes/BriefNode.tsx
-msgid "brief.placeholder"
-msgstr "Describe the product and its main screen — who it is for, what it shows…"
 
 #. js-lingui-explicit-id
 #: src/components/home/ProjectHome.tsx
@@ -1385,11 +1032,6 @@ msgid "home.preset_miniapp_brief"
 msgstr "Design a WeChat mini-program flow for "
 
 #. js-lingui-explicit-id
-#: src/components/canvas/nodes/dag-node-common.tsx
-msgid "dag.op_design_system"
-msgstr "Design system"
-
-#. js-lingui-explicit-id
 #: src/components/library/KitLibraryInspector.tsx
 msgid "kit_library.design_system_files_aria"
 msgstr "Design system kit files"
@@ -1398,11 +1040,6 @@ msgstr "Design system kit files"
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.tab_design_systems"
 msgstr "Design Systems"
-
-#. js-lingui-explicit-id
-#: src/components/canvas/nodes/DesignSystemNode.tsx
-msgid "dag.node_design_system_aria"
-msgstr "Design-system node"
 
 #. js-lingui-explicit-id
 #: src/components/home/ProjectHome.tsx
@@ -1435,11 +1072,6 @@ msgid "settings.speech.dictionary_entry"
 msgstr "Dictionary entry"
 
 #. js-lingui-explicit-id
-#: src/components/canvas/nodes/IntentPanel.tsx
-msgid "intent.dimensions"
-msgstr "Dimensions"
-
-#. js-lingui-explicit-id
 #: src/components/settings/sections/PersonalizationSection.tsx
 msgid "settings.personalization.personality_direct"
 msgstr "Direct"
@@ -1463,11 +1095,6 @@ msgstr "Do not include API keys or private credentials. Project-specific require
 #: src/components/help/HelpMenu.tsx
 msgid "help.documentation"
 msgstr "Documentation"
-
-#. js-lingui-explicit-id
-#: src/components/canvas/edges/TransitionEdge.tsx
-msgid "pipeline.status_done"
-msgstr "Done"
 
 #. js-lingui-explicit-id
 #: src/components/library/KitLibraryInspector.tsx
@@ -1534,16 +1161,6 @@ msgstr "Empty"
 #: src/components/library/LibraryDrawer.tsx
 msgid "library.empty"
 msgstr "Empty for now — add slices or generated images to the library, or import your own."
-
-#. js-lingui-explicit-id
-#: src/components/canvas/nodes/MockupNode.tsx
-msgid "mockup.preview_zoom"
-msgstr "Enlarge mockup preview"
-
-#. js-lingui-explicit-id
-#: src/components/canvas/nodes/dag-node-common.tsx
-msgid "dag.preview_zoom"
-msgstr "Enlarge preview"
 
 #. js-lingui-explicit-id
 #: src/components/settings/KeyField.tsx
@@ -1681,21 +1298,6 @@ msgid "settings.section_general"
 msgstr "General"
 
 #. js-lingui-explicit-id
-#: src/components/canvas/edges/TransitionEdge.tsx
-msgid "pipeline.transition_generate"
-msgstr "Generate"
-
-#. js-lingui-explicit-id
-#: src/components/canvas/nodes/MockupNode.tsx
-msgid "mockup.empty"
-msgstr "Generate from the brief, or import a screenshot."
-
-#. js-lingui-explicit-id
-#: src/components/canvas/nodes/BriefNode.tsx
-msgid "brief.generate"
-msgstr "Generate mockup"
-
-#. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
 msgid "settings.dimension_image_generation_description"
 msgstr "Generate new visual material."
@@ -1706,25 +1308,9 @@ msgid "library.compose"
 msgstr "Generate prototype"
 
 #. js-lingui-explicit-id
-#: src/components/canvas/nodes/MockupNode.tsx
-msgid "mockup.generating"
-msgstr "Generating mockup…"
-
-#. js-lingui-explicit-id
 #: src/components/library/LibraryDrawer.tsx
 msgid "library.composing"
 msgstr "Generating…"
-
-#. js-lingui-explicit-id
-#: src/components/canvas/nodes/BriefNode.tsx
-msgid "brief.generating"
-msgstr "Generating…"
-
-#. js-lingui-explicit-id
-#: src/components/canvas/nodes/BriefNode.tsx
-#: src/components/canvas/nodes/MockupNode.tsx
-msgid "generate.toast_failed"
-msgstr "Generation failed"
 
 #. js-lingui-explicit-id
 #: src/components/settings/ProviderDirectory.tsx
@@ -1735,11 +1321,6 @@ msgstr "Global"
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.section_aria"
 msgstr "Global library"
-
-#. js-lingui-explicit-id
-#: src/components/canvas/nodes/IntentPanel.tsx
-msgid "intent.goal"
-msgstr "Goal"
 
 #. js-lingui-explicit-id
 #: src/components/home/ProjectHome.tsx
@@ -1818,11 +1399,6 @@ msgid "library.import"
 msgstr "Import"
 
 #. js-lingui-explicit-id
-#: src/components/canvas/nodes/MockupNode.tsx
-msgid "mockup.import_replace"
-msgstr "Import"
-
-#. js-lingui-explicit-id
 #: src/components/library/KitLibraryInspector.tsx
 msgid "kit_library.brand_book_confirmation_hint"
 msgstr "Import an authorized parser result. Nothing enters the kit until you confirm it."
@@ -1841,11 +1417,6 @@ msgstr "Import candidates"
 #: src/components/source/DropZone.tsx
 msgid "source.dropzone_aria"
 msgstr "Import image — drop a file or click to browse"
-
-#. js-lingui-explicit-id
-#: src/components/canvas/nodes/BriefNode.tsx
-msgid "brief.import_mockup"
-msgstr "Import mockup"
 
 #. js-lingui-explicit-id
 #: src/components/inspector/SliceDimensions.tsx
@@ -2059,21 +1630,6 @@ msgid "home.preset_mobile"
 msgstr "Mobile app"
 
 #. js-lingui-explicit-id
-#: src/components/canvas/nodes/MockupNode.tsx
-msgid "pipeline.stage_mockup"
-msgstr "Mockup"
-
-#. js-lingui-explicit-id
-#: src/components/canvas/nodes/dag-node-common.tsx
-msgid "dag.op_mockup"
-msgstr "Mockup"
-
-#. js-lingui-explicit-id
-#: src/components/canvas/nodes/MockupNode.tsx
-msgid "pipeline.node_mockup_aria"
-msgstr "Mockup stage"
-
-#. js-lingui-explicit-id
 #: src/components/settings/ModelSlot.tsx
 msgid "settings.model_or_blank_placeholder"
 msgstr "Model or leave blank for Auto"
@@ -2118,26 +1674,6 @@ msgstr "Name"
 #: src/components/inspector/SliceNameField.tsx
 msgid "inspector.name_label"
 msgstr "Name"
-
-#. js-lingui-explicit-id
-#: src/components/canvas/nodes/SlicesNode.tsx
-msgid "slices.toast_named"
-msgstr "Named {count} slices"
-
-#. js-lingui-explicit-id
-#: src/components/canvas/nodes/dag-node-common.tsx
-msgid "dag.op_name"
-msgstr "Naming"
-
-#. js-lingui-explicit-id
-#: src/components/canvas/nodes/SlicesNode.tsx
-msgid "slices.toast_name_failed"
-msgstr "Naming failed"
-
-#. js-lingui-explicit-id
-#: src/components/canvas/nodes/SlicesNode.tsx
-msgid "slices.naming"
-msgstr "Naming slices…"
 
 #. js-lingui-explicit-id
 #: src/components/library/GlobalLibraryView.tsx
@@ -2320,30 +1856,9 @@ msgid "home.pin_project"
 msgstr "Pin project"
 
 #. js-lingui-explicit-id
-#: src/components/canvas/LinearCanvas.tsx
-msgid "pipeline.canvas_aria"
-msgstr "Pipeline canvas"
-
-#. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
 msgid "settings.dimension_webdev_description"
 msgstr "Plan and implement web interfaces."
-
-#. js-lingui-explicit-id
-#. placeholder {0}: node.label
-#: src/components/canvas/nodes/DagNode.tsx
-msgid "dag.node_aria"
-msgstr "Planned node: {0}"
-
-#. js-lingui-explicit-id
-#: src/components/canvas/PlannedCanvas.tsx
-msgid "dag.canvas_aria"
-msgstr "Planned pipeline canvas"
-
-#. js-lingui-explicit-id
-#: src/components/canvas/nodes/BriefNode.tsx
-msgid "dag.toast_plan_failed"
-msgstr "Planning failed"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/IntegrationsSection.tsx
@@ -2519,16 +2034,6 @@ msgid "topbar.recently_closed"
 msgstr "Recently closed"
 
 #. js-lingui-explicit-id
-#: src/components/canvas/nodes/BriefNode.tsx
-msgid "dag.plan_and_generate"
-msgstr "Plan & generate graph"
-
-#. js-lingui-explicit-id
-#: src/components/canvas/nodes/BriefNode.tsx
-msgid "dag.planning"
-msgstr "Planning & generating…"
-
-#. js-lingui-explicit-id
 #: src/components/settings/ProviderDirectory.tsx
 msgid "settings.provider_category_recommended"
 msgstr "Recommended"
@@ -2549,11 +2054,6 @@ msgid "global_library.media_filter_references"
 msgstr "References"
 
 #. js-lingui-explicit-id
-#: src/components/canvas/nodes/IntentPanel.tsx
-msgid "intent.questions_hint"
-msgstr "Refine the brief above to answer these, then plan again."
-
-#. js-lingui-explicit-id
 #: src/components/settings/sections/IntegrationsSection.tsx
 msgid "settings.integrations.refresh_session"
 msgstr "Refresh session"
@@ -2562,11 +2062,6 @@ msgstr "Refresh session"
 #: src/components/settings/sections/IntegrationsSection.tsx
 msgid "settings.integrations.refreshing"
 msgstr "Refreshing session..."
-
-#. js-lingui-explicit-id
-#: src/components/canvas/nodes/MockupNode.tsx
-msgid "mockup.regenerate"
-msgstr "Regenerate"
 
 #. js-lingui-explicit-id
 #: src/components/library/RegistryInstallPanel.tsx
@@ -2753,11 +2248,6 @@ msgid "settings.remember_dir_hint"
 msgstr "Reuse the last folder instead of asking on every export."
 
 #. js-lingui-explicit-id
-#: src/components/canvas/nodes/BoardNode.tsx
-msgid "board.compose"
-msgstr "Reverse-compose mockup"
-
-#. js-lingui-explicit-id
 #: src/components/library/ReviewBranchEditor.tsx
 msgid "review_branch.section_aria"
 msgstr "Review branch"
@@ -2781,16 +2271,6 @@ msgstr "Revoking session..."
 #: src/components/home/ProjectHome.tsx
 msgid "home.status_running"
 msgstr "Running"
-
-#. js-lingui-explicit-id
-#: src/components/canvas/edges/TransitionEdge.tsx
-msgid "pipeline.status_running"
-msgstr "Running"
-
-#. js-lingui-explicit-id
-#: src/components/canvas/nodes/dag-node-common.tsx
-msgid "dag.running"
-msgstr "Running…"
 
 #. js-lingui-explicit-id
 #: src/components/settings/ProviderForm.tsx
@@ -2854,11 +2334,6 @@ msgstr "Select {0}"
 #: src/components/inspector/InspectorPanel.tsx
 msgid "inspector.empty_has_slices"
 msgstr "Select a slice to rename, inspect, and export it."
-
-#. js-lingui-explicit-id
-#: src/components/canvas/nodes/SlicesNode.tsx
-msgid "slices.name"
-msgstr "Semantic naming"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/IntegrationsSection.tsx
@@ -2925,21 +2400,6 @@ msgid "global_library.media_filter_slices"
 msgstr "Slices"
 
 #. js-lingui-explicit-id
-#: src/components/canvas/nodes/SlicesNode.tsx
-msgid "pipeline.stage_slices"
-msgstr "Slices"
-
-#. js-lingui-explicit-id
-#: src/components/canvas/nodes/dag-node-common.tsx
-msgid "dag.op_cutout"
-msgstr "Slices"
-
-#. js-lingui-explicit-id
-#: src/components/canvas/nodes/SlicesNode.tsx
-msgid "pipeline.node_slices_aria"
-msgstr "Slices stage"
-
-#. js-lingui-explicit-id
 #: src/components/library/KitLibraryInspector.tsx
 msgid "kit_library.source_heading"
 msgstr "Source"
@@ -3000,11 +2460,6 @@ msgstr "Start with an idea or bring in a visual board."
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.tab_starters"
 msgstr "Starter Kits"
-
-#. js-lingui-explicit-id
-#: src/components/canvas/nodes/IntentPanel.tsx
-msgid "intent.strategy"
-msgstr "Strategy"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/PersonalizationSection.tsx
@@ -3204,11 +2659,6 @@ msgid "settings.dimension_vision_description"
 msgstr "Understand screenshots, photos and visual references."
 
 #. js-lingui-explicit-id
-#: src/components/canvas/nodes/IntentPanel.tsx
-msgid "intent.title"
-msgstr "Understood intent"
-
-#. js-lingui-explicit-id
 #: src/hooks/useExport.ts
 msgid "export.error_unknown"
 msgstr "unknown error"
@@ -3290,6 +2740,11 @@ msgstr "Use masonry preview"
 #: src/components/settings/sections/PersonalizationSection.tsx
 msgid "settings.personalization.use_memory"
 msgstr "Use memory"
+
+#. js-lingui-explicit-id
+#: src/components/workspace/IntentWorkspace.tsx
+msgid "workspace.human_loop_use_judgment"
+msgstr "Use your judgment"
 
 #. js-lingui-explicit-id
 #. placeholder {0}: previous.version
@@ -3392,11 +2847,6 @@ msgstr "Visual Assets"
 #: src/components/settings/sections/IntegrationsSection.tsx
 msgid "settings.integrations.waiting_callback"
 msgstr "Waiting for callback"
-
-#. js-lingui-explicit-id
-#: src/components/canvas/nodes/dag-node-common.tsx
-msgid "dag.idle"
-msgstr "Waiting to run…"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/PersonalizationSection.tsx

@@ -79,6 +79,66 @@ export function suggestAstryxMapping(
   return suggestions
 }
 
+/**
+ * Produces a complete no-setup mapping for the common theme roles. Explicit
+ * token labels win; unlabelled palettes are assigned by visual role so a user
+ * can export a usable theme without becoming an Astryx token expert. Any
+ * remaining colors are still exported as namespaced custom properties.
+ */
+export function automaticAstryxMapping(
+  choices: readonly AstryxColorChoice[],
+): ReadonlyMap<string, string | null> {
+  const mapping = new Map(suggestAstryxMapping(choices))
+  const assigned = new Set([...mapping.values()].filter((value): value is string => value !== null))
+  const available = (variable: string) => !assigned.has(variable)
+  const unassigned = () => choices.filter((choice) => mapping.get(choice.controlId) === null)
+  const assign = (variable: string, pick: (items: readonly AstryxColorChoice[]) => AstryxColorChoice | undefined) => {
+    if (!available(variable)) return
+    const choice = pick(unassigned())
+    if (!choice) return
+    mapping.set(choice.controlId, variable)
+    assigned.add(variable)
+  }
+
+  assign('--color-background-body', (items) => brightest(items))
+  assign('--color-background-surface', (items) => brightest(items))
+  assign('--color-text-primary', (items) => darkest(items))
+  assign('--color-accent', (items) => mostSaturated(items))
+  assign('--color-border', (items) => brightest(items))
+
+  return mapping
+}
+
+function rgb(value: string): readonly [number, number, number] | null {
+  const match = /^#([0-9a-f]{6})$/i.exec(value.trim())
+  if (!match) return null
+  const number = Number.parseInt(match[1], 16)
+  return [(number >> 16) & 0xff, (number >> 8) & 0xff, number & 0xff]
+}
+
+function brightness(items: readonly AstryxColorChoice[], direction: 1 | -1): AstryxColorChoice | undefined {
+  return [...items].sort((left, right) => {
+    const a = rgb(left.value)
+    const b = rgb(right.value)
+    const aValue = a ? a[0] * 0.2126 + a[1] * 0.7152 + a[2] * 0.0722 : 0
+    const bValue = b ? b[0] * 0.2126 + b[1] * 0.7152 + b[2] * 0.0722 : 0
+    return direction * (bValue - aValue)
+  })[0]
+}
+
+function brightest(items: readonly AstryxColorChoice[]) { return brightness(items, 1) }
+function darkest(items: readonly AstryxColorChoice[]) { return brightness(items, -1) }
+
+function mostSaturated(items: readonly AstryxColorChoice[]): AstryxColorChoice | undefined {
+  return [...items].sort((left, right) => {
+    const a = rgb(left.value)
+    const b = rgb(right.value)
+    const aValue = a ? Math.max(...a) - Math.min(...a) : 0
+    const bValue = b ? Math.max(...b) - Math.min(...b) : 0
+    return bValue - aValue
+  })[0]
+}
+
 export async function compileAstryxThemeFromDesignMarkdown(
   model: EditableDesignMarkdown,
   themeName: string,

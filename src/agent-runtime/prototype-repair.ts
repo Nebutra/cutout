@@ -20,7 +20,7 @@ const EMPTY_REPAIR_PLAN: PrototypeRepairPlan = {
 export function planPrototypeRepair(
   outcome: OutcomeRuntimeState | null | undefined,
   hasDesignSystem: boolean,
-  failedRegionIds: readonly string[] = [],
+  blockedRegionIds: readonly string[] = [],
 ): PrototypeRepairPlan | null {
   if (!outcome || outcome.evaluation.status === 'satisfied') return null
 
@@ -37,7 +37,7 @@ export function planPrototypeRepair(
     generateDesignSystem,
     generatePages,
     deconstructPages,
-    targetRegionIds: deconstructPages ? [...failedRegionIds] : [],
+    targetRegionIds: deconstructPages ? [...blockedRegionIds] : [],
   }
   return Object.entries(plan).some(([key, value]) =>
     key === 'targetRegionIds' ? false : Boolean(value),

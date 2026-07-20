@@ -145,6 +145,12 @@ function validateMaterial(material: Material, provenanceIds: ReadonlySet<string>
     if (revision.provenanceId && !provenanceIds.has(revision.provenanceId)) {
       return err(`Material revision "${revision.id}" references unknown provenance "${revision.provenanceId}".`)
     }
+    if (
+      revision.production
+      && revision.content.sha256 !== revision.production.artifactSha256
+    ) {
+      return err(`Material revision "${revision.id}" production hash does not match its content.`)
+    }
   }
   if (!revisionIds.has(material.currentRevisionId)) {
     return err(`Material "${material.id}" points to unknown current revision "${material.currentRevisionId}".`)

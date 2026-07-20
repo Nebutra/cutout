@@ -9,6 +9,7 @@ import { z } from 'zod'
 import type { StateCreator } from 'zustand'
 import { ensurePngName } from '@/lib/filename'
 import type { Slice, Store } from '@/store/types'
+import { approveProductionQualityIssues } from '@/asset-production'
 
 /** A rename must be a non-empty (post-trim) string. */
 const renameSchema = z.string().trim().min(1)
@@ -18,6 +19,7 @@ export interface SelectionSlice {
   renameSlice(id: string, name: string): void
   updateSliceBounds(id: string, box: Slice['box']): void
   setSliceIncluded(id: string, included: boolean): void
+  approveSliceForUse(id: string): boolean
   clearSelection(): void
 }
 
@@ -88,4 +90,40 @@ export const createSelectionSlice: StateCreator<
         ),
       },
     })),
+  approveSliceForUse: (id) => {
+    let approved = false
+    set((state) => {
+      const slice = state.analysis.slices.find((candidate) => candidate.id === id)
+      if (
+        !slice?.productionRunId
+        || !slice.productionTaskId
+        || slice.readiness !== 'needs-review'
+      ) return state
+      try {
+        const assetProduction = approveProductionQualityIssues({
+          snapshot: state.assetProduction,
+          runId: slice.productionRunId,
+          taskId: slice.productionTaskId,
+          actorId: 'local.user',
+          receiptId: `asset-decision:${crypto.randomUUID()}`,
+          at: Date.now(),
+        })
+        approved = true
+        return {
+          assetProduction,
+          analysis: {
+            ...state.analysis,
+            slices: state.analysis.slices.map((candidate) =>
+              candidate.id === id
+                ? { ...candidate, readiness: 'waived' as const, included: true }
+                : candidate,
+            ),
+          },
+        }
+      } catch {
+        return state
+      }
+    })
+    return approved
+  },
 })

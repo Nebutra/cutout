@@ -4,7 +4,7 @@
  * (closable inline), and recently closed project tabs one click from reopening.
  */
 import { useEffect, useMemo, useState } from 'react'
-import { AppWindow, History, Home, Scissors, Search, X } from 'lucide-react'
+import { AppWindow, History, Home, PanelsTopLeft, Search, X } from 'lucide-react'
 import { useLingui } from '@lingui/react/macro'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -133,7 +133,7 @@ export function TabsMenu({
                 ) : null}
                 {showProject ? (
                   <TabRow
-                    icon={<Scissors className="size-3.5" />}
+                    icon={<PanelsTopLeft className="size-3.5" />}
                     name={projectName}
                     active={view === 'project'}
                     onSelect={() => openAndClose(onOpenProject)}

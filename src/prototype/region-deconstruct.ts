@@ -18,6 +18,7 @@
  * OffscreenCanvas, so it is exercised by the gated pipeline E2E and the
  * `src/algorithm` suite, not jsdom unit tests.
  */
+import { computeBoardDiagnostics, type BoardDiagnostics } from '@/algorithm/boardDiagnostics'
 import { runPipeline } from '@/algorithm/runPipeline'
 import type { CutoutParams } from '@/algorithm/types'
 import {
@@ -31,14 +32,25 @@ import type { ModelAssignment } from '@/services/ai/model-assignment-types'
 import type { ReasoningEffort } from '@/services/ai/reasoning'
 import { nameSlices } from '@/services/ai/naming'
 import { isErr } from '@/services/types'
+import { buildBoardChecklist, generateWithQa, type QaVerdict } from './generation-qa'
 import type { PrototypePage, PrototypeRegion } from './prototype-plan'
 import type { SliceInput } from '@/store/types'
+import { forEachConcurrent } from '@/lib/async-pool'
+
+const DEFAULT_REGION_CONCURRENCY = 2
 
 /** A region eligible for board-cutout slicing, in the order it should stream. */
 export function selectBoardCutoutRegions(
   page: PrototypePage,
 ): readonly PrototypeRegion[] {
   return page.regions.filter((region) => region.assetRoute === 'board-cutout')
+}
+
+/** Every page that owns at least one reusable board-cutout region. */
+export function selectPagesWithBoardCutouts(
+  pages: readonly PrototypePage[],
+): readonly PrototypePage[] {
+  return pages.filter((page) => selectBoardCutoutRegions(page).length > 0)
 }
 
 /** A file-safe slug from a region name, for namespacing slice names by region. */
@@ -64,6 +76,25 @@ export function regionNameContext(region: PrototypeRegion): string {
   )
 }
 
+/**
+ * The instruction that derives a TEXT-FREE extraction variant from a finished
+ * page. The displayed page keeps its real copy (full perceived fidelity); this
+ * variant replaces it only as the SOURCE for region asset boards, so no text
+ * ever bleeds into cutout assets — the image-prototype equivalent of "text is
+ * a runtime overlay, never baked into production art".
+ */
+export function pageTextFreeVariantPrompt(page: PrototypePage): string {
+  return [
+    `Reproduce the attached "${page.name}" page EXACTLY — same layout, same regions, same ` +
+      `colors, materials, illustrations, icons, and components, pixel-faithful in style.`,
+    `Change ONE thing only: remove ALL text. Replace every heading, label, number, and body ` +
+      `line with a flat placeholder bar in the text color (rounded, matching the original ` +
+      `text block's position and width). Buttons and badges keep their shape and fill but ` +
+      `their captions become blank or a placeholder bar.`,
+    `Do NOT restyle, recompose, add, or drop any visual element. No annotations, no frames.`,
+  ].join('\n')
+}
+
 /** The scoped board-generation instruction for a single region. */
 export function regionBoardPrompt(page: PrototypePage, region: PrototypeRegion): string {
   const assets =
@@ -77,14 +108,39 @@ export function regionBoardPrompt(page: PrototypePage, region: PrototypeRegion):
       `background. Pure white must fully surround every asset and flow continuously between ` +
       `all of them, with at least 64px of clear margin. Assets must NEVER touch, overlap, ` +
       `connect, or share a bounding box — an automatic white-background cutout separates them.`,
-    `Do NOT include assets from any other region. Do NOT draw page chrome, containers, or backgrounds.`,
+    `Do NOT include assets from any other region. Do NOT draw page chrome, containers, or backgrounds. ` +
+      `Do NOT add any text labels, captions, numbering, or watermarks of your own.`,
+    `Do NOT bake any text into assets: no labels, headings, numerals, UI copy, or isolated ` +
+      `glyphs — text is rendered at runtime, never as a cutout asset. Any white or very light ` +
+      `asset must have a visible closed non-white contour, stroke, or internal contrast so the ` +
+      `white-background cutout cannot fuse it with the canvas.`,
+    regionBoardLayoutInstruction(region),
   ].join('\n')
+}
+
+/** Stable board layout contract shared with spatial task binding. */
+export function regionBoardLayoutInstruction(region: PrototypeRegion): string {
+  const assets = region.assetOpportunities.length > 0
+    ? region.assetOpportunities
+    : [region.name || region.role || 'region asset']
+  const columns = Math.max(1, Math.ceil(Math.sqrt(assets.length)))
+  const rows = Math.ceil(assets.length / columns)
+  return [
+    `Use an exact ${columns}-column by ${rows}-row grid. Fill cells in reading order, ` +
+      `one complete asset per cell, and leave unused cells empty.`,
+    `Cell ownership in reading order: ${assets.map((asset, index) => `${index + 1}=${asset}`).join('; ')}.`,
+    `Keep every asset fully inside its own cell with white clearance from the cell boundaries. ` +
+      `Do not add visible cell borders, labels, numbers, or guides.`,
+  ].join(' ')
 }
 
 /**
  * Segment one generated region board into region/page-tagged slice inputs,
- * reusing the exact CV pipeline the worker runs. Main-thread OffscreenCanvas
- * (as in `@/lib/image`); not covered by jsdom unit tests.
+ * reusing the exact CV pipeline the worker runs. Also measures background
+ * compliance from the PRISTINE frame (before `runPipeline` mutates its alpha)
+ * so "did the model obey the pure-white instruction" is observable per board.
+ * Main-thread OffscreenCanvas (as in `@/lib/image`); not covered by jsdom
+ * unit tests.
  */
 export async function sliceRegionBoardBitmap(
   bitmap: ImageBitmap,
@@ -92,8 +148,10 @@ export async function sliceRegionBoardBitmap(
   regionId: string,
   pageId: string,
   signal?: AbortSignal,
-): Promise<SliceInput[]> {
+): Promise<{ slices: SliceInput[]; diagnostics: BoardDiagnostics }> {
   const frame = bitmapToFrame(bitmap)
+  // Measure before runPipeline: it mutates the frame's alpha in place.
+  const diagnostics = computeBoardDiagnostics(frame, params.threshold)
   const { boxes } = runPipeline(frame, params, signal)
   const cropSource = renderFrameCanvas(frame)
   const slices: SliceInput[] = []
@@ -111,7 +169,7 @@ export async function sliceRegionBoardBitmap(
       pageId,
     })
   }
-  return slices
+  return { slices, diagnostics }
 }
 
 /**
@@ -153,13 +211,16 @@ export interface RegionBreakdownDeps {
   readonly providers: Pick<ProviderService, 'list'>
   /** Decode board bytes → bitmap (real: `decodeImage`; test: a stub). */
   readonly decode: (bytes: Uint8Array) => Promise<ImageBitmap>
-  /** Segment a region board bitmap → slices (real: `sliceRegionBoardBitmap`). */
+  /**
+   * Segment a region board bitmap → slices + background-compliance
+   * diagnostics (real: `sliceRegionBoardBitmap`).
+   */
   readonly slice: (
     bitmap: ImageBitmap,
     regionId: string,
     pageId: string,
     signal?: AbortSignal,
-  ) => Promise<SliceInput[]>
+  ) => Promise<{ slices: SliceInput[]; diagnostics: BoardDiagnostics }>
   /**
    * Optional: name one region's slices in a single region-primed vision call
    * (real: wraps `nameSlices` with `regionNameContext`). Returns `{id,name}`
@@ -171,6 +232,17 @@ export interface RegionBreakdownDeps {
     context: string,
     signal?: AbortSignal,
   ) => Promise<readonly { readonly id: string; readonly name: string }[]>
+  /**
+   * Optional vision QA gate over each generated region board (real: wraps
+   * `reviewGeneratedImage` with the chat/vision slot). When present, a
+   * rejected board is regenerated with the failures appended as corrections
+   * (bounded by `qaMaxRetries`); the final board ships either way.
+   */
+  readonly reviewBoard?: (
+    boardBytes: Uint8Array,
+    checklist: readonly string[],
+    signal?: AbortSignal,
+  ) => Promise<QaVerdict>
 }
 
 export interface RegionBreakdownParams {
@@ -182,7 +254,17 @@ export interface RegionBreakdownParams {
   readonly image: ModelAssignment
   readonly signal?: AbortSignal
   /** Streamed once per region as its slices are cut, so the UI fills in live. */
-  readonly onRegionSliced: (regionId: string, slices: readonly SliceInput[]) => void
+  readonly onRegionSliced: (
+    regionId: string,
+    slices: readonly SliceInput[],
+    evidence: RegionSliceEvidence,
+  ) => unknown
+  /**
+   * Streamed once per region as soon as its board's background-compliance
+   * diagnostics exist (before `onRegionSliced`). Measurement only — a
+   * non-compliant board still slices normally.
+   */
+  readonly onRegionDiagnostics?: (regionId: string, diagnostics: BoardDiagnostics) => void
   /**
    * Streamed when a region's names come back (after the slices are already
    * shown) — region-slug-namespaced so names reflect the page⊃region tree.
@@ -192,12 +274,35 @@ export interface RegionBreakdownParams {
   readonly onRegionError?: (regionId: string, message: string) => void
   /** Retry only these failed regions. Omit for a complete page breakdown. */
   readonly targetRegionIds?: readonly string[]
+  /** Paid QA re-rolls per region board (only with `deps.reviewBoard`). Default 2. */
+  readonly qaMaxRetries?: number
+  /** Maximum region boards generated at once. Defaults to 2. */
+  readonly regionConcurrency?: number
+  /**
+   * Derive a text-free variant of the page first and use it as the source for
+   * every region board (one extra image call per page; the DISPLAYED page
+   * keeps its real copy). Falls back to the original page bytes on failure.
+   */
+  readonly textFreeSource?: boolean
+  /** Non-fatal notice that the text-free variant failed and the original page was used. */
+  readonly onTextFreeSourceError?: (message: string) => void
+  /** Streamed once per QA attempt: regionId, attempt number, and its verdict. */
+  readonly onRegionQa?: (regionId: string, attempt: number, verdict: QaVerdict) => void
+}
+
+export interface RegionSliceEvidence {
+  readonly boardWidth: number
+  readonly boardHeight: number
+  readonly diagnostics: BoardDiagnostics
+  readonly qaVerdict: QaVerdict | null
 }
 
 export interface RegionBreakdownResult {
   readonly regionCount: number
   readonly sliceCount: number
   readonly failedRegionIds: readonly string[]
+  /** Background-compliance diagnostics per region board that sliced. */
+  readonly diagnosticsByRegion: Readonly<Record<string, BoardDiagnostics>>
 }
 
 /**
@@ -219,56 +324,133 @@ export async function runRegionBreakdown(
   const useEdit = kind === 'openai' || kind === 'openai-compatible'
   const references = params.referenceImages ?? []
 
-  const failedRegionIds: string[] = []
-  // Naming runs concurrently with the NEXT region's board generation (a region-
-  // primed vision call), then applied once resolved — so slices show instantly
-  // and names fill in without serializing behind every region's generation.
-  const namingJobs: Promise<void>[] = []
-  let sliceCount = 0
-
-  for (const region of regions) {
+  // Optionally swap the board source for a text-free variant of the page so
+  // no text bleeds into cutout assets. Best-effort: the original page bytes
+  // remain the fallback, and the displayed page artifact is never touched.
+  let sourceBytes = params.pageBytes
+  if (params.textFreeSource && regions.length > 0) {
     params.signal?.throwIfAborted()
-    const prompt = regionBoardPrompt(params.page, region)
+    const variantPrompt = pageTextFreeVariantPrompt(params.page)
     try {
-      const board = useEdit
+      const variant = useEdit
         ? await deps.generation.editImage({
             providerId: params.image.providerId,
             model: params.image.model,
-            prompt,
-            images: [params.pageBytes, ...references],
+            prompt: variantPrompt,
+            images: [params.pageBytes],
             inputFidelity: 'high',
             signal: params.signal,
           })
         : await deps.generation.generateImages({
             providerId: params.image.providerId,
             model: params.image.model,
-            // Chat-image (Gemini) path can't take a reference via `images`;
-            // carry the page + references as multimodal input parts instead.
-            system: prompt,
+            system: variantPrompt,
             input: [
-              { type: 'text', text: prompt },
+              { type: 'text', text: variantPrompt },
               { type: 'image', image: params.pageBytes },
-              ...references.map((image) => ({ type: 'image' as const, image })),
             ],
             signal: params.signal,
           })
-      if (isErr(board)) throw new Error(board.error)
-      const asset = board.data[0]
-      if (!asset) throw new Error('The model returned no board image for this region.')
-      const bitmap = await deps.decode(asset.bytes)
+      if (isErr(variant)) throw new Error(variant.error)
+      const asset = variant.data[0]
+      if (!asset) throw new Error('The model returned no text-free page variant.')
+      sourceBytes = asset.bytes
+    } catch (error) {
+      if (params.signal?.aborted) throw error
+      params.onTextFreeSourceError?.(
+        error instanceof Error ? error.message : String(error),
+      )
+    }
+  }
+
+  const failedRegionIds: string[] = []
+  // Naming runs concurrently with the NEXT region's board generation (a region-
+  // primed vision call), then applied once resolved — so slices show instantly
+  // and names fill in without serializing behind every region's generation.
+  const namingJobs: Promise<void>[] = []
+  const diagnosticsByRegion: Record<string, BoardDiagnostics> = {}
+  let sliceCount = 0
+
+  await forEachConcurrent(
+    regions,
+    params.regionConcurrency ?? DEFAULT_REGION_CONCURRENCY,
+    async (region) => {
+    params.signal?.throwIfAborted()
+    const prompt = regionBoardPrompt(params.page, region)
+    try {
+      const generateBoard = async (
+        boardPrompt: string,
+        signal?: AbortSignal,
+      ): Promise<Uint8Array> => {
+        const board = useEdit
+          ? await deps.generation.editImage({
+              providerId: params.image.providerId,
+              model: params.image.model,
+              prompt: boardPrompt,
+              images: [sourceBytes, ...references],
+              inputFidelity: 'high',
+              signal,
+            })
+          : await deps.generation.generateImages({
+              providerId: params.image.providerId,
+              model: params.image.model,
+              // Chat-image (Gemini) path can't take a reference via `images`;
+              // carry the page + references as multimodal input parts instead.
+              system: boardPrompt,
+              input: [
+                { type: 'text', text: boardPrompt },
+                { type: 'image', image: sourceBytes },
+                ...references.map((image) => ({ type: 'image' as const, image })),
+              ],
+              signal,
+            })
+        if (isErr(board)) throw new Error(board.error)
+        const asset = board.data[0]
+        if (!asset) throw new Error('The model returned no board image for this region.')
+        return asset.bytes
+      }
+
+      let boardBytes: Uint8Array
+      let qaVerdict: QaVerdict | null = null
+      if (deps.reviewBoard) {
+        const checklist = buildBoardChecklist(params.page, region)
+        const reviewBoard = deps.reviewBoard
+        const outcome = await generateWithQa({
+          basePrompt: prompt,
+          generate: generateBoard,
+          review: (bytes, signal) => reviewBoard(bytes, checklist, signal),
+          maxRetries: params.qaMaxRetries,
+          onVerdict: (attempt, verdict) => params.onRegionQa?.(region.id, attempt, verdict),
+          signal: params.signal,
+        })
+        boardBytes = outcome.bytes
+        qaVerdict = outcome.verdict
+      } else {
+        boardBytes = await generateBoard(prompt, params.signal)
+      }
+      const bitmap = await deps.decode(boardBytes)
+      const boardWidth = bitmap.width
+      const boardHeight = bitmap.height
       let slices: SliceInput[]
       try {
-        slices = await deps.slice(bitmap, region.id, params.page.id, params.signal)
+        const sliced = await deps.slice(bitmap, region.id, params.page.id, params.signal)
+        slices = sliced.slices
+        diagnosticsByRegion[region.id] = sliced.diagnostics
+        params.onRegionDiagnostics?.(region.id, sliced.diagnostics)
       } finally {
         // Release the decoded board surface promptly (the worker path closes
-        // its bitmaps too); naming uses asset.bytes, not the bitmap.
+        // its bitmaps too); naming uses the board bytes, not the bitmap.
         bitmap.close()
       }
       sliceCount += slices.length
-      params.onRegionSliced(region.id, slices)
+      await params.onRegionSliced(region.id, slices, {
+        boardWidth,
+        boardHeight,
+        diagnostics: diagnosticsByRegion[region.id]!,
+        qaVerdict,
+      })
 
       if (deps.nameRegion && params.onRegionNamed && slices.length > 0) {
-        const boardBytes = asset.bytes
         const prefix = regionSlug(region.name)
         namingJobs.push(
           deps
@@ -299,8 +481,9 @@ export async function runRegionBreakdown(
       failedRegionIds.push(region.id)
       params.onRegionError?.(region.id, message)
     }
-  }
+    },
+  )
 
   await Promise.all(namingJobs)
-  return { regionCount: regions.length, sliceCount, failedRegionIds }
+  return { regionCount: regions.length, sliceCount, failedRegionIds, diagnosticsByRegion }
 }

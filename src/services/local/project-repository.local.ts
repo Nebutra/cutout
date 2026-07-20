@@ -3,6 +3,7 @@ import type {
   DesignMarkdownAsset,
   Params,
   ProjectRestoreInput,
+  SliceInput,
   Store,
 } from '@/store/types'
 import {
@@ -10,8 +11,14 @@ import {
   type WorkspaceSnapshot,
 } from '@/workspace/workspace-snapshot'
 import { DEFAULT_PARAMS } from '@/store/slices/params'
+import {
+  emptyAssetProductionSnapshot,
+  migrateLegacySlicesToAssetProduction,
+  type AssetProductionSnapshot,
+} from '@/asset-production'
 import { bitmapToBytes, bytesToBlob, decodeImage } from '@/lib/image'
 import { err, ok, type Result } from '@/services/types'
+import { ContentAddressedDesktopArtifactStore } from '@/services/content-addressed-desktop-artifacts'
 import {
   designDocumentToWorkspaceSnapshot,
   fingerprint,
@@ -68,6 +75,10 @@ interface StoredSlice {
   readonly regionId?: string | null
   readonly pageId?: string | null
   readonly assetManifestItemId?: string | null
+  readonly productionTaskId?: string | null
+  readonly productionRunId?: string | null
+  readonly outputArtifactId?: string | null
+  readonly readiness?: SliceInput['readiness']
 }
 
 export interface LocalProjectRecord extends LocalProjectSummary {
@@ -78,6 +89,8 @@ export interface LocalProjectRecord extends LocalProjectSummary {
   readonly designMarkdown: DesignMarkdownAsset | null
   readonly workspace: WorkspaceSnapshot | null
   readonly slices: readonly StoredSlice[]
+  /** Versioned slicing authority. Older records omit it and migrate additively. */
+  readonly assetProduction?: AssetProductionSnapshot
   /** Optional canonical IR. Old IndexedDB records omit it safely. */
   readonly designDocument?: DesignDocument
   /** Stable IR content hash, excluding projection timestamps. */
@@ -152,7 +165,7 @@ export function createLocalProjectRepository(
           >,
         )
         if (!record) return err(`Project "${id}" was not found.`)
-        const normalized = await normalizeProjectRecord(record)
+        const normalized = await normalizeProjectRecord(record, idb)
         if (normalized.didChange) await writeRecord(idb, normalized.record)
         return ok(normalized.record)
       } finally {
@@ -166,7 +179,7 @@ export function createLocalProjectRepository(
   async function save(record: LocalProjectRecord): Promise<Result<void>> {
     if (!idb) return err(`Project storage is unavailable.`)
     try {
-      const normalized = await normalizeProjectRecord(record)
+      const normalized = await normalizeProjectRecord(record, idb)
       await writeRecord(idb, normalized.record)
       return ok(undefined)
     } catch (error) {
@@ -282,6 +295,7 @@ export function createEmptyProjectRecord(now = Date.now()): LocalProjectRecord {
     designMarkdown: null,
     workspace: null,
     slices: [],
+    assetProduction: emptyAssetProductionSnapshot(),
   }
 }
 
@@ -329,8 +343,23 @@ export async function createProjectRecordFromStore(input: {
     regionId: slice.regionId,
     pageId: slice.pageId,
     assetManifestItemId: slice.assetManifestItemId,
+    productionTaskId: slice.productionTaskId,
+    productionRunId: slice.productionRunId,
+    outputArtifactId: slice.outputArtifactId,
+    readiness: slice.readiness,
   }))
   const brief = state.brief.trim()
+  const assetProduction = Object.keys(state.assetProduction.runs).length > 0
+    ? state.assetProduction
+    : await migrateLegacySlicesToAssetProduction({
+        projectId: input.id,
+        projectRevisionId:
+          state.workspaceSnapshot?.designDocument?.revision.id
+          ?? input.previous?.designDocument?.revision.id
+          ?? `project-revision:${input.id}`,
+        slices,
+        createdAt: input.createdAt,
+      })
   const thumbnail =
     slices[0]?.blob ??
     mockup?.blob ??
@@ -362,6 +391,7 @@ export async function createProjectRecordFromStore(input: {
     designMarkdown: state.designMarkdown,
     workspace,
     slices,
+    assetProduction,
   }
   const designDocument = await projectRecordToDesignDocument(record)
   const workspaceWithDesignDocument = workspace
@@ -402,6 +432,7 @@ export async function createRestoreInputFromProject(
     mockup,
     designMarkdown: record.designMarkdown,
     workspace: record.workspace ?? null,
+    assetProduction: record.assetProduction ?? emptyAssetProductionSnapshot(),
     slices: record.slices,
   }
 }
@@ -445,14 +476,28 @@ interface NormalizedProjectRecord {
  */
 async function normalizeProjectRecord(
   input: LocalProjectRecord,
+  idb: IDBFactory | undefined = globalThis.indexedDB,
 ): Promise<NormalizedProjectRecord> {
-  const migratedWorkspace = input.workspace
-    ? migrateWorkspaceV1(input.workspace)
+  const materialized = await materializeProjectSliceBlobs(input, idb)
+  const migratedWorkspace = materialized.workspace
+    ? migrateWorkspaceV1(materialized.workspace)
     : null
   let record: LocalProjectRecord = migratedWorkspace
-    ? { ...input, workspace: migratedWorkspace }
-    : input
-  let didChange = workspaceWasMigrated(input.workspace)
+    ? { ...materialized, workspace: migratedWorkspace }
+    : materialized
+  let didChange = materialized !== input || workspaceWasMigrated(input.workspace)
+  if (!record.assetProduction) {
+    record = {
+      ...record,
+      assetProduction: await migrateLegacySlicesToAssetProduction({
+        projectId: record.id,
+        projectRevisionId: record.designDocument?.revision.id ?? `project-revision:${record.id}`,
+        slices: record.slices,
+        createdAt: record.createdAt,
+      }),
+    }
+    didChange = true
+  }
   const validated = input.designDocument
     ? validateDesignDocument(input.designDocument)
     : null
@@ -526,6 +571,54 @@ async function normalizeProjectRecord(
     },
     didChange: true,
   }
+}
+
+async function materializeProjectSliceBlobs(
+  record: LocalProjectRecord,
+  idb: IDBFactory | undefined,
+): Promise<LocalProjectRecord> {
+  const missing = record.slices.filter((slice) => !(slice.blob instanceof Blob))
+  if (missing.length === 0) return record
+  if (!idb) throw new Error('Artifact storage is unavailable for slice recovery.')
+  const artifacts = new ContentAddressedDesktopArtifactStore(idb)
+  const slices = await Promise.all(record.slices.map(async (slice) => {
+    if (slice.blob instanceof Blob) return slice
+    const artifactId = slice.outputArtifactId ?? productionArtifactIdForSlice(record, slice)
+    if (!artifactId) {
+      throw new Error(`Slice "${slice.id}" has no recoverable production artifact.`)
+    }
+    const artifact = await artifacts.read(artifactId)
+    if (!artifact || artifact.bytes.byteLength === 0) {
+      throw new Error(`Slice artifact is unavailable: ${artifactId}`)
+    }
+    return {
+      ...slice,
+      blob: bytesToBlob(artifact.bytes, artifact.mediaType),
+    }
+  }))
+  return { ...record, slices }
+}
+
+function productionArtifactIdForSlice(
+  record: LocalProjectRecord,
+  slice: LocalProjectRecord['slices'][number],
+): string | undefined {
+  const snapshot = record.assetProduction
+  if (!snapshot) return undefined
+  for (const run of Object.values(snapshot.runs)) {
+    if (slice.productionRunId && run.runId !== slice.productionRunId) continue
+    const plan = snapshot.plans[run.planId]
+    const task = plan?.tasks.find((candidate) =>
+      slice.productionTaskId
+        ? candidate.taskId === slice.productionTaskId
+        : candidate.manifestItemId === (slice.assetManifestItemId ?? `legacy:${slice.id}`),
+    )
+    if (!task) continue
+    const state = run.tasks[task.taskId]
+    const artifact = state?.output ?? state?.candidate
+    if (artifact) return artifact.artifactId
+  }
+  return undefined
 }
 
 function workspaceWasMigrated(workspace: WorkspaceSnapshot | null): boolean {

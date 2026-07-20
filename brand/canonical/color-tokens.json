@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "surface": {
+    "paper": "#F7F7F2",
+    "graphite": "#242424",
+    "ink": "#111111"
+  },
+  "semantic": {
+    "approved": "#0A6B4F",
+    "review": "#8A5A00",
+    "destructive": "#B42318",
+    "focus": "#2457C5"
+  },
+  "contrastOnPaper": {
+    "ink": 17.57,
+    "graphite": 14.44,
+    "approved": 6.05,
+    "review": 5.52,
+    "destructive": 6.12,
+    "focus": 6.02
+  },
+  "rule": "Semantic meaning must be repeated by text and/or icon; color alone is never authoritative."
+}

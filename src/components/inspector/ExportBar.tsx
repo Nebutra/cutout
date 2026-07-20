@@ -16,7 +16,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { useExport } from '@/hooks/useExport'
-import { useSlices } from '@/store/selectors'
+import { isSliceConsumable, useSlices } from '@/store/selectors'
 import type { Slice } from '@/store/types'
 
 export interface ExportBarProps {
@@ -34,8 +34,11 @@ export function ExportBar({ slice }: ExportBarProps) {
     exportOneSvgApi,
     exportSvgPending,
   } = useExport()
-  const total = useSlices().filter((item) => item.included).length
-  const exportSliceDisabled = exportOnePending || exportSvgPending || !slice.included
+  const total = useSlices().filter(
+    (item) => item.included && isSliceConsumable(item),
+  ).length
+  const exportSliceDisabled =
+    exportOnePending || exportSvgPending || !slice.included || !isSliceConsumable(slice)
 
   return (
     <div className="flex items-center gap-2">

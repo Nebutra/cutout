@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "brand": "Cutout",
+  "canonicalSymbol": "symbol-master.svg",
+  "sourceRaster": "../../approved/symbol-offset-aperture-v1.png",
+  "construction": {
+    "form": "offset aperture",
+    "orientation": "aperture opens toward the lower-right quadrant",
+    "clearSpace": "one quarter of the symbol bounding-box width on every side",
+    "minimumDigitalSize": "16px",
+    "minimumPrintSize": "6mm"
+  },
+  "approvedVariants": [
+    "ink on paper",
+    "paper on graphite",
+    "single-color currentColor derivative"
+  ],
+  "prohibited": [
+    "rotation",
+    "non-uniform scaling",
+    "aperture closure",
+    "outline conversion of the canonical symbol",
+    "gradient or shadow",
+    "placement below the minimum clear-space rule"
+  ],
+  "verificationSizesPx": [16, 24, 32, 48]
+}

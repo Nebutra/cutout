@@ -17,6 +17,7 @@ export function InspectorPanel() {
   const selected = useSelectedSlice()
   const hasSlices = useSlices().length > 0
   const setIncluded = useStore((state) => state.setSliceIncluded)
+  const approveForUse = useStore((state) => state.approveSliceForUse)
 
   if (!selected) {
     return (
@@ -43,7 +44,11 @@ export function InspectorPanel() {
         <SliceThumb slice={selected} />
       </div>
       <SliceNameField slice={selected} />
-      <Button size="sm" variant={selected.included ? 'outline' : 'default'} aria-pressed={selected.included} onClick={() => setIncluded(selected.id, !selected.included)}>{selected.included ? 'Exclude from results' : 'Include in results'}</Button>
+      {selected.readiness === 'needs-review' ? (
+        <Button size="sm" onClick={() => approveForUse(selected.id)}>Approve for use</Button>
+      ) : (
+        <Button size="sm" variant={selected.included ? 'outline' : 'default'} aria-pressed={selected.included} onClick={() => setIncluded(selected.id, !selected.included)}>{selected.included ? 'Exclude from results' : 'Include in results'}</Button>
+      )}
       {selected.reviewIssues.length > 0 || (selected.confidence !== null && selected.confidence < 0.75) ? <div role="status" className="flex gap-2 border-y border-border py-2 text-xs text-amber-700 dark:text-amber-300"><AlertTriangle className="mt-0.5 size-3.5 shrink-0"/><div><p className="font-medium">Needs review</p><p>{selected.reviewIssues[0] ?? `Low confidence (${Math.round(selected.confidence! * 100)}%)`}</p></div></div> : null}
       <Separator />
       <SliceDimensions slice={selected} />

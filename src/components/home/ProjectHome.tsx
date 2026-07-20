@@ -1,4 +1,13 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from "react";
+import {
+  lazy,
+  Suspense,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type RefObject,
+} from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { withViewTransition } from "@/lib/view-transition";
 import {
@@ -27,7 +36,6 @@ import {
   Pin,
   PinOff,
   X,
-  Scissors,
   Search,
   SearchX,
   Smartphone,
@@ -74,7 +82,12 @@ import { sortProjects } from "./project-order";
 import { filterProjects } from "./project-search";
 import { ConnectorMenu } from "@/components/integrations/ConnectorMenu";
 import { SidebarAccount } from "./SidebarAccount";
-import { GlobalLibraryView } from "@/components/library/GlobalLibraryView";
+
+const GlobalLibraryView = lazy(() =>
+  import("@/components/library/GlobalLibraryView").then((module) => ({
+    default: module.GlobalLibraryView,
+  })),
+);
 
 type HomeSection =
   "start" | "library" | "drafts" | "projects" | "archived";
@@ -106,7 +119,7 @@ interface ProjectHomeProps {
   readonly loadState: ProjectLoadState;
   readonly loadError: string | null;
   readonly onOpenProject: (id: string) => void;
-  readonly onArchiveProject: (id: string) => void;
+  readonly onArchiveProject: (id: string) => Promise<boolean>;
   readonly onRestoreProject: (id: string) => void;
   readonly onDeleteProject: (id: string) => void;
   readonly onRenameProject: (
@@ -281,7 +294,9 @@ export function ProjectHome({
           />
           {section === "library" ? (
             <div className="min-h-full">
-              <GlobalLibraryView projectId={activeProjectId} />
+              <Suspense fallback={<LibraryLoadingState />}>
+                <GlobalLibraryView projectId={activeProjectId} />
+              </Suspense>
             </div>
           ) : section === "start" ? (
             <StartWorkspace
@@ -322,6 +337,20 @@ export function ProjectHome({
         </div>
       </section>
     </main>
+  );
+}
+
+function LibraryLoadingState() {
+  return (
+    <div className="mx-auto flex w-full max-w-6xl flex-col gap-4 px-5 py-6" aria-label="Loading Library">
+      <Skeleton className="h-8 w-48" />
+      <Skeleton className="h-10 w-full" />
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {Array.from({ length: 6 }, (_, index) => (
+          <Skeleton key={index} className="aspect-[4/3] w-full" />
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -485,7 +514,7 @@ function WorkspaceSidebar({
   readonly recentProjects: readonly LocalProjectSummary[];
   readonly onOpenProject: (id: string) => void;
   readonly activeProjectId: string | null;
-  readonly onArchiveProject: (id: string) => void;
+  readonly onArchiveProject: (id: string) => Promise<boolean>;
   readonly onRenameProject: (
     project: LocalProjectSummary,
     name: string,
@@ -609,7 +638,7 @@ function StartWorkspace({
   readonly onOpenEverythingInbox?: () => void;
   readonly onOpenProject: (id: string) => void;
   readonly activeProjectId: string | null;
-  readonly onArchiveProject: (id: string) => void;
+  readonly onArchiveProject: (id: string) => Promise<boolean>;
   readonly onRenameProject: (
     project: LocalProjectSummary,
     name: string,
@@ -890,7 +919,7 @@ function ProjectDirectory({
   readonly loadState: ProjectLoadState;
   readonly loadError: string | null;
   readonly onOpenProject: (id: string) => void;
-  readonly onArchiveProject: (id: string) => void;
+  readonly onArchiveProject: (id: string) => Promise<boolean>;
   readonly onRestoreProject: (id: string) => void;
   readonly onDeleteProject: (id: string) => void;
   readonly onRenameProject: (
@@ -1058,7 +1087,7 @@ export function ProjectRow({
   readonly locale: string;
   readonly active: boolean;
   readonly onOpen: () => void;
-  readonly onArchive: () => void;
+  readonly onArchive: () => Promise<boolean>;
   readonly onRestore: () => void;
   readonly onDelete: () => void;
   readonly onRename: (name: string) => void;
@@ -1122,7 +1151,7 @@ export function ProjectCard({
   readonly locale: string;
   readonly active: boolean;
   readonly onOpen: () => void;
-  readonly onArchive: () => void;
+  readonly onArchive: () => Promise<boolean>;
   readonly onRestore: () => void;
   readonly onDelete: () => void;
   readonly onRename: (name: string) => void;
@@ -1149,7 +1178,7 @@ export function ProjectCard({
           <CardThumbnail thumbnail={project.thumbnail} />
         ) : (
           <span className="flex h-full items-center justify-center">
-            <Scissors className="size-6 text-muted-foreground/50" />
+            <Images className="size-6 text-muted-foreground/50" />
           </span>
         )}
       </button>
@@ -1231,7 +1260,7 @@ function ProjectListItem({
   readonly compact?: boolean;
   readonly card?: boolean;
   readonly onOpen: () => void;
-  readonly onArchive: () => void;
+  readonly onArchive: () => Promise<boolean>;
   readonly onRename: (name: string) => void;
   readonly onPin: (pinned: boolean) => void;
 }) {
@@ -1306,7 +1335,7 @@ function ProjectActions({
   readonly menuOnly?: boolean;
   readonly onRename: (name: string) => void;
   readonly onPin: (pinned: boolean) => void;
-  readonly onArchive: () => void;
+  readonly onArchive: () => Promise<boolean>;
   readonly onRestore?: () => void;
   readonly onDelete?: () => void;
 }) {
@@ -1315,6 +1344,7 @@ function ProjectActions({
   const pinned = Boolean(project.pinnedAt);
   const [renameOpen, setRenameOpen] = useState(false);
   const [archiveOpen, setArchiveOpen] = useState(false);
+  const [archivePending, setArchivePending] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [name, setName] = useState(project.name);
   const actionSize = compact ? "size-7" : undefined;
@@ -1489,9 +1519,22 @@ function ProjectActions({
             <AlertDialogCancel>
               <Trans id="home.cancel">Cancel</Trans>
             </AlertDialogCancel>
-            <AlertDialogAction onClick={onArchive}>
+            <Button
+              type="button"
+              aria-busy={archivePending}
+              disabled={archivePending}
+              onClick={() => {
+                if (archivePending) return;
+                setArchivePending(true);
+                void onArchive()
+                  .then((archived) => {
+                    if (archived) setArchiveOpen(false);
+                  })
+                  .finally(() => setArchivePending(false));
+              }}
+            >
               <Trans id="home.archive">Archive</Trans>
-            </AlertDialogAction>
+            </Button>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -1541,7 +1584,7 @@ function ProjectMark({
         className,
       )}
     >
-      <Scissors className="size-4 text-muted-foreground" />
+      <Images className="size-4 text-muted-foreground" />
     </span>
   );
 }

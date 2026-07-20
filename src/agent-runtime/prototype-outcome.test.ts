@@ -61,8 +61,7 @@ describe('prototype outcome projection', () => {
       hasDesignSystem: true,
       hasDesignMarkdown: true,
       pages: [{ page: { id: 'cart', name: 'Cart' } }],
-      slices: [{ id: 'product', name: 'cart-product.png' }],
-      slicesReady: true,
+      assets: [{ id: 'product', manifestItemId: 'cart-cart-main-1' }],
     })
     expect(incomplete?.status).toBe('running')
     expect(incomplete?.evaluation.missing).toEqual([
@@ -79,11 +78,10 @@ describe('prototype outcome projection', () => {
         { page: { id: 'cart', name: 'Cart' } },
         { page: { id: 'payment', name: 'Payment' } },
       ],
-      slices: [
-        { id: 'product', name: 'cart-product.png' },
-        { id: 'coupon', name: 'cart-coupon.png' },
+      assets: [
+        { id: 'product', manifestItemId: 'cart-cart-main-1' },
+        { id: 'coupon', manifestItemId: 'cart-cart-main-2' },
       ],
-      slicesReady: true,
     })
     expect(complete?.status).toBe('ready-to-deliver')
   })
@@ -98,11 +96,10 @@ describe('prototype outcome projection', () => {
         { page: { id: 'cart', name: 'Cart' } },
         { page: { id: 'cart', name: 'Cart duplicate' } },
       ],
-      slices: [
-        { id: 'product', name: 'cart-product.png' },
-        { id: 'product', name: 'cart-product.png' },
+      assets: [
+        { id: 'product', manifestItemId: 'cart-cart-main-1' },
+        { id: 'product', manifestItemId: 'cart-cart-main-1' },
       ],
-      slicesReady: true,
     })
 
     expect(outcome?.materials).toHaveLength(4)
@@ -123,11 +120,7 @@ describe('prototype outcome projection', () => {
         { page: { id: 'cart', name: 'Cart' } },
         { page: { id: 'payment', name: 'Payment' } },
       ],
-      slices: [
-        { id: 'old-product', name: 'Old product' },
-        { id: 'old-coupon', name: 'Old coupon' },
-      ],
-      slicesReady: false,
+      assets: [],
     })
 
     expect(outcome?.status).toBe('running')
@@ -144,11 +137,10 @@ describe('prototype outcome projection', () => {
         { page: { id: 'settings', name: 'Settings' } },
         { page: { id: 'profile', name: 'Profile' } },
       ],
-      slices: [
-        { id: 'one', name: 'unrelated-one.png' },
-        { id: 'two', name: 'unrelated-two.png' },
+      assets: [
+        { id: 'one', manifestItemId: 'unrelated-one' },
+        { id: 'two', manifestItemId: 'unrelated-two' },
       ],
-      slicesReady: true,
     })
 
     expect(outcome?.evaluation.missing).toEqual([

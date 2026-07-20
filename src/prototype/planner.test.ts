@@ -6,6 +6,7 @@ import type { IntentProfile } from '@/dag/intent-types'
 import {
   composePrototypeRequirement,
   createLocalPrototypePlan,
+  explicitPrototypePageCount,
   planPrototype,
   shouldUseLocalSemanticFallback,
 } from './planner'
@@ -31,6 +32,17 @@ function mockGenerateObject<TData>(result: Result<TData>) {
     _input: GenerateInput,
     _schema: z.ZodType<T>,
   ): Promise<Result<T>> => Promise.resolve(result as unknown as Result<T>))
+}
+
+function mockGenerateSequence(...results: Result<PrototypePlan>[]) {
+  return vi.fn(<T,>(
+    _input: GenerateInput,
+    _schema: z.ZodType<T>,
+  ): Promise<Result<T>> => {
+    const result = results.shift()
+    if (!result) throw new Error('Unexpected planner call.')
+    return Promise.resolve(result as unknown as Result<T>)
+  })
 }
 
 const samplePlan: PrototypePlan = {
@@ -144,6 +156,47 @@ const samplePlan: PrototypePlan = {
 }
 
 describe('planPrototype', () => {
+  it('extracts explicit page counts across supported brief forms', () => {
+    expect(explicitPrototypePageCount('只需要两个页面')).toBe(2)
+    expect(explicitPrototypePageCount('Build 3 screens')).toBe(3)
+    expect(explicitPrototypePageCount('Create two pages')).toBe(2)
+    expect(explicitPrototypePageCount('做一个清晰的工作台')).toBeNull()
+  })
+
+  it('repairs a plan that merged explicitly requested pages', async () => {
+    const onePage = createLocalPrototypePlan('咖啡店点单')
+    const generateObject = mockGenerateSequence(ok(onePage), ok(samplePlan))
+    const result = await planPrototype(fakeGeneration(generateObject), {
+      providerId: 'p',
+      model: 'm',
+      brief: '做两个页面：菜单下单页和结账收款页。',
+    })
+
+    expect(result).toEqual(ok(samplePlan))
+    expect(generateObject).toHaveBeenCalledTimes(2)
+    const repairInput = generateObject.mock.calls[1]![0]
+    const repairPart = repairInput.input?.[0]
+    if (!repairPart || repairPart.type !== 'text') {
+      throw new Error('Expected a text-only planner repair instruction.')
+    }
+    expect(repairPart.text).toContain(
+      'explicitly requires 2 pages/screens',
+    )
+  })
+
+  it('fails before image generation when one repair still violates explicit scope', async () => {
+    const onePage = createLocalPrototypePlan('咖啡店点单')
+    const generateObject = mockGenerateSequence(ok(onePage), ok(onePage))
+    const result = await planPrototype(fakeGeneration(generateObject), {
+      providerId: 'p',
+      model: 'm',
+      brief: '做两个页面：菜单下单页和结账收款页。',
+    })
+
+    expect(result.ok).toBe(false)
+    expect(!result.ok && result.error).toContain('did not satisfy the explicit scope')
+  })
+
   it('rejects an empty brief without calling the model', async () => {
     const generateObject = mockGenerateObject(ok(samplePlan))
     const result = await planPrototype(fakeGeneration(generateObject), {

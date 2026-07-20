@@ -26,7 +26,7 @@ import {
   type ReactFlowInstance,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import { Ban, Boxes, CheckCircle2, ChevronUp, Circle, DownloadCloud, GitBranch, Heart, ImageOff, ImagePlus, LoaderCircle, Lock, Maximize, MessageSquare, Minus, MousePointer2, MoveUpRight, Pencil, Plus, Scan, Slash, Sparkles, Square, StickyNote, Type, WandSparkles, X } from 'lucide-react'
+import { Ban, Boxes, CheckCircle2, ChevronUp, Circle, DownloadCloud, GitBranch, Heart, ImageOff, ImagePlus, LoaderCircle, Lock, Maximize, MessageSquare, Minus, MousePointer2, MoveUpRight, Pencil, Plus, Slash, Sparkles, Square, StickyNote, Type, WandSparkles, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import type { CreativeBranchRequest, CreativeVariantDecision } from '@/agent-runtime/creative-board-decisions'
 import type { MaterialRef } from '@/agent-runtime/material-impact'
@@ -60,9 +60,6 @@ import {
   transitionCanvasPanels,
   type CanvasSafeArea,
 } from './output-canvas-viewport'
-import { PromotionPanel } from '@/components/structured-authoring/PromotionPanel'
-import type { StructuredPromotion } from '@/structured-authoring'
-import { fullImageBounds, normalizeRegionBounds, regionOverlayStyle, type Point, type RegionBounds } from './output-region-selection'
 import { buildOutputCanvasNodes, type CanvasImageItem, type CanvasLane } from './output-canvas-layout'
 
 export type { CanvasImageItem } from './output-canvas-layout'
@@ -88,7 +85,6 @@ export interface OutputCanvasProps {
   readonly onMoreLikeThis?: (material: MaterialRef) => void
   readonly branchRequestCount?: number
   readonly creativeBranches?: readonly CreativeBranchRequest[]
-  readonly onPromoteRegion?: (request: RegionPromotionRequest) => void
   readonly onSaveToLibrary?: (item: CanvasImageItem) => void
   readonly showMinimap?: boolean
   readonly showGrid?: boolean
@@ -104,11 +100,6 @@ export interface OutputCanvasProps {
   readonly annotations?: readonly CanvasAnnotation[]
   readonly onAnnotationsChange?: (annotations: readonly CanvasAnnotation[]) => void
   readonly librarySavedMaterialIds?: ReadonlySet<string>
-}
-
-export interface RegionPromotionRequest {
-  readonly kind: StructuredPromotion['kind']
-  readonly selection: StructuredPromotion['selection']
 }
 
 /* --- Layout constants (the "constraint": fixed zones + grid, not free drag) --- */
@@ -162,8 +153,8 @@ function CardNode({ data }: NodeProps) {
   const { item, selected } = data as CardData
   const url = useItemUrl(item)
   const taskStatus = item.status
-  // A click selects the material for the Agent; double-click keeps the larger
-  // visual preview available without conflating inspection with selection.
+  // A card is visual content first: a click opens its preview. Selection stays
+  // in sync so the user can request a follow-up change after closing it.
   return (
     <div
       title={item.label}
@@ -202,19 +193,11 @@ function CardNode({ data }: NodeProps) {
 function CardPreviewDialog({
   item,
   onOpenChange,
-  onPromoteRegion,
 }: {
   readonly item: CanvasImageItem | null
   readonly onOpenChange: (open: boolean) => void
-  readonly onPromoteRegion?: (request: RegionPromotionRequest) => void
 }) {
   const [url, setUrl] = useState<string | null>(null)
-  const [selecting, setSelecting] = useState(false)
-  const [selection, setSelection] = useState<StructuredPromotion['selection'] | undefined>()
-  const [draftBounds, setDraftBounds] = useState<RegionBounds | null>(null)
-  const [imageReady, setImageReady] = useState(false)
-  const imageRef = useRef<HTMLImageElement | null>(null)
-  const dragRef = useRef<{ x: number; y: number } | null>(null)
   useEffect(() => {
     if (!item) {
       setUrl(null)
@@ -232,41 +215,6 @@ function CardPreviewDialog({
     setUrl(next)
     return () => URL.revokeObjectURL(next)
   }, [item])
-  useEffect(() => { setSelecting(false); setSelection(undefined); setDraftBounds(null); setImageReady(false); dragRef.current = null }, [item])
-  useEffect(() => {
-    if (!item) return
-    const cancel = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return
-      if (selection || selecting) event.preventDefault()
-      setSelecting(false)
-      setSelection(undefined)
-      setDraftBounds(null)
-      dragRef.current = null
-    }
-    window.addEventListener('keydown', cancel)
-    return () => window.removeEventListener('keydown', cancel)
-  }, [item, selecting, selection])
-
-  const boundsFor = (start: Point, end: Point) => {
-    const image = imageRef.current
-    if (!image) return null
-    const rect = image.getBoundingClientRect()
-    return normalizeRegionBounds(start, end, { left: rect.left, top: rect.top, width: rect.width, height: rect.height, naturalWidth: image.naturalWidth, naturalHeight: image.naturalHeight })
-  }
-  const commitBounds = (start: Point, end: Point) => {
-    if (!item) return
-    const bounds = boundsFor(start, end)
-    setDraftBounds(null)
-    if (bounds) setSelection(selectionFor(item, bounds))
-  }
-  const selectFullImage = () => {
-    const image = imageRef.current
-    if (!image || !item) return
-    const bounds = fullImageBounds(image.naturalWidth, image.naturalHeight)
-    if (bounds) setSelection(selectionFor(item, bounds))
-  }
-  const hasEvidence = Boolean(item?.pageId && item.evidenceMaterialId && item.revisionId)
-  const visibleBounds = selection?.bounds ?? draftBounds
 
   return (
     <Dialog open={item !== null} onOpenChange={onOpenChange}>
@@ -274,13 +222,8 @@ function CardPreviewDialog({
         <DialogTitle className="sr-only">{item?.label ?? 'Preview'}</DialogTitle>
         {url ? (
           <div className="grid max-h-[92vh] gap-2 overflow-y-auto">
-            <div className="flex flex-wrap items-center justify-between gap-2 px-1 pt-1"><p className="min-w-0 flex-1 truncate text-sm font-semibold">{item?.label}</p><div className="flex flex-wrap gap-1"><Button type="button" size="sm" variant={selecting ? 'secondary' : 'outline'} aria-pressed={selecting} disabled={!imageReady || !hasEvidence} onClick={() => { setSelecting((value) => !value); setSelection(undefined); setDraftBounds(null) }}><Scan /> Select region</Button><Button type="button" size="sm" variant="outline" disabled={!imageReady || !hasEvidence} onClick={selectFullImage}>Use full image</Button></div></div>
-            {!hasEvidence ? <p className="px-1 text-xs text-muted-foreground">Structured promotion requires an authoritative page and revision.</p> : null}
-            <div className={cn('relative touch-none', selecting && 'cursor-crosshair')} onPointerDown={(event) => { if (!selecting) return; event.currentTarget.setPointerCapture(event.pointerId); dragRef.current = { x: event.clientX, y: event.clientY }; setSelection(undefined); setDraftBounds(null) }} onPointerMove={(event) => { if (!selecting || !dragRef.current) return; setDraftBounds(boundsFor(dragRef.current, { x: event.clientX, y: event.clientY })) }} onPointerCancel={() => { dragRef.current = null; setDraftBounds(null) }} onPointerUp={(event) => { if (!selecting || !dragRef.current) return; commitBounds(dragRef.current, { x: event.clientX, y: event.clientY }); dragRef.current = null }}>
-              <img ref={imageRef} src={url} alt="" draggable={false} onLoad={() => setImageReady(true)} className="max-h-[72vh] max-w-[90vw] rounded-md object-contain" />
-              {visibleBounds && imageRef.current ? <div aria-label={selection ? 'Selected image region' : 'Selecting image region'} className="pointer-events-none absolute border-2 border-ring bg-ring/10" style={regionOverlayStyle(visibleBounds, imageRef.current.naturalWidth, imageRef.current.naturalHeight)} /> : null}
-            </div>
-            <PromotionPanel selection={selection} onPromote={(kind) => { if (selection) onPromoteRegion?.({ kind, selection }) }} />
+            <p className="min-w-0 truncate px-1 pt-1 text-sm font-semibold">{item?.label}</p>
+            <img src={url} alt="" className="max-h-[82vh] max-w-[90vw] rounded-md object-contain" />
           </div>
         ) : null}
       </DialogContent>
@@ -328,7 +271,6 @@ export function OutputCanvas({
   onMoreLikeThis,
   branchRequestCount = 0,
   creativeBranches = [],
-  onPromoteRegion,
   onSaveToLibrary,
   librarySavedMaterialIds,
   showMinimap = false,
@@ -594,11 +536,10 @@ export function OutputCanvas({
         onInit={setInstance}
         onNodeClick={(_, node) => {
           if (node.type === 'outputCard') {
-            onSelectMaterial?.((node.data as CardData).item.material)
+            const item = (node.data as CardData).item
+            onSelectMaterial?.(item.material)
+            setPreviewItem(item)
           }
-        }}
-        onNodeDoubleClick={(_, node) => {
-          if (node.type === 'outputCard') setPreviewItem((node.data as CardData).item)
         }}
         minZoom={0.2}
         maxZoom={1.6}
@@ -814,19 +755,12 @@ export function OutputCanvas({
       ) : null}
       <CardPreviewDialog
         item={previewItem}
-        onPromoteRegion={onPromoteRegion}
         onOpenChange={(open) => {
           if (!open) setPreviewItem(null)
         }}
       />
     </div>
   )
-}
-
-function selectionFor(item: CanvasImageItem, bounds: StructuredPromotion['selection']['bounds']): StructuredPromotion['selection'] {
-  if (!item.revisionId || !item.pageId) throw new Error('Region promotion requires authoritative page and revision evidence.')
-  if (!item.evidenceMaterialId) throw new Error('Region promotion requires authoritative material evidence.')
-  return { materialId: item.evidenceMaterialId, revisionId: item.revisionId, pageId: item.pageId, bounds, selectedBy: 'user', selectedAt: new Date().toISOString() }
 }
 
 function CanvasToolButton({

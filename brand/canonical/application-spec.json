@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "social": {
+    "avatar": "social/avatar-1024.png",
+    "card": "social/social-card-1200x1200.png",
+    "safeArea": "Keep the symbol inside the central 70 percent; verify circular and rounded-square crops."
+  },
+  "webHeader": {
+    "asset": "web/header-1600x400.png",
+    "rule": "Use the primary horizontal lockup and preserve a quiet descriptor zone."
+  },
+  "email": {
+    "asset": "email/signature-1200x360.png",
+    "rule": "Raster signature is a reference template; production email uses accessible HTML text and linked identity image."
+  },
+  "appIcon": {
+    "canonicalSource": "app-icon-layout.json",
+    "source": "app-icon/app-icon-1024.png",
+    "macOS": "app-icon/Cutout.icns",
+    "windows": "app-icon/Cutout.ico",
+    "linux": ["app-icon/linux/icon-128.png", "app-icon/linux/icon-256.png", "app-icon/linux/icon-512.png"],
+    "favicon": ["app-icon/favicon/favicon-16.png", "app-icon/favicon/favicon-32.png", "app-icon/favicon/favicon-48.png", "app-icon/favicon/favicon-64.png", "app-icon/favicon/favicon.ico"],
+    "masking": "The source remains square and opaque; platform masks are applied by the host.",
+    "opticalAlignment": {
+      "symbolBoundsPx": [226, 235, 620, 602],
+      "offsetFromPreviousReviewPx": [24, 24],
+      "rule": "Preserve the canonical symbol geometry and outer paper tile; apply only this platform-specific optical translation."
+    }
+  },
+  "webAd": {
+    "asset": "ads/web-ad-1200x628.png",
+    "rule": "Keep canonical wordmark separate from headline text and retain the lower verification rule."
+  },
+  "notApplicable": ["QR code application", "mouse pad"]
+}

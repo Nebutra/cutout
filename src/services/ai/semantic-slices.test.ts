@@ -99,6 +99,13 @@ function fakeGeneration(config: {
 }
 
 describe('semantic slice experiment', () => {
+  it('rejects duplicate semantic ids before generation can bind production tasks', () => {
+    expect(semanticSlicePlanSchema.safeParse({
+      ...plan,
+      slices: [plan.slices[0], { ...plan.slices[1], id: plan.slices[0].id }],
+    }).success).toBe(false)
+  })
+
   it('plans atomic slice specs from brief plus optional reference image', async () => {
     const { generation, objectCalls } = fakeGeneration({
       objectResults: [ok(plan)],

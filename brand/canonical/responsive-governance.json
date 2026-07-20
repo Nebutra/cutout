@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "breakpoints": [
+    {"minWidthPx": 160, "asset": "../a4/lockup-horizontal.svg"},
+    {"minWidthPx": 96, "asset": "../a4/lockup-stacked.svg"},
+    {"minWidthPx": 16, "asset": "../a1/symbol-master.svg"}
+  ],
+  "family": [
+    {"id": "canonical-light", "surface": "#F7F7F2", "foreground": "#111111"},
+    {"id": "canonical-dark", "surface": "#242424", "foreground": "#F7F7F2"},
+    {"id": "forced-colors", "surface": "Canvas", "foreground": "CanvasText"}
+  ],
+  "motionFallback": "The canonical static symbol is always shown when motion is reduced, unavailable, interrupted or unverified.",
+  "versioning": {
+    "canonicalChange": "major",
+    "spacingOrExportChange": "minor",
+    "metadataOnlyChange": "patch",
+    "invalidation": "A changed canonical checksum invalidates every declared descendant."
+  },
+  "generationRule": "Model-generated skins may affect material or scene only; canonical geometry is overlaid deterministically and never generated."
+}

@@ -36,6 +36,14 @@ export default defineConfig({
     rolldownOptions: {
       output: {
         manualChunks(id) {
+          // Production contracts are shared by startup recovery/store state and
+          // the deferred workspace executors. Keep that cross-layer authority
+          // in one cacheable chunk instead of folding it into first-paint code.
+          if (id.includes('/src/asset-production/')) return 'asset-production'
+          if (
+            id.endsWith('/src/global-library/blob-store.ts')
+            || id.endsWith('/src/services/content-addressed-desktop-artifacts.ts')
+          ) return 'content-artifacts'
           if (!id.includes('/node_modules/')) return
           if (/\/node_modules\/(react|react-dom|scheduler)\//.test(id)) return 'vendor-react'
           if (/\/node_modules\/(radix-ui|@radix-ui)\//.test(id)) return 'vendor-radix'

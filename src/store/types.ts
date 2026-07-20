@@ -17,6 +17,7 @@ import type { NodeRunState } from '@/dag/executor'
 import type { CutoutSlice } from '@/services/types'
 import type { SliceName } from '@/services/ai/naming'
 import type { WorkspaceSnapshot } from '@/workspace/workspace-snapshot'
+import type { AssetProductionSnapshot, ProductionTaskStatus } from '@/asset-production'
 
 /** The four tunable parameters (defaults live in `slices/params.ts`). */
 export type Params = CutoutParams
@@ -68,6 +69,11 @@ export interface Slice {
   readonly pageId: string | null
   /** Exact originating manifest item; null for legacy/manual slices. */
   readonly assetManifestItemId: string | null
+  /** Stable production identity. Null only for legacy/unmigrated UI projections. */
+  readonly productionTaskId: string | null
+  readonly productionRunId: string | null
+  readonly outputArtifactId: string | null
+  readonly readiness: ProductionTaskStatus | null
 }
 
 /**
@@ -106,6 +112,10 @@ export interface SliceInput {
   readonly regionId?: string | null
   readonly pageId?: string | null
   readonly assetManifestItemId?: string | null
+  readonly productionTaskId?: string | null
+  readonly productionRunId?: string | null
+  readonly outputArtifactId?: string | null
+  readonly readiness?: ProductionTaskStatus | null
 }
 
 /** A persisted project restore payload decoded back into live browser objects. */
@@ -120,6 +130,7 @@ export interface ProjectRestoreInput {
   readonly mockup?: MockupArtifact | null
   readonly designMarkdown?: DesignMarkdownAsset | null
   readonly workspace?: WorkspaceSnapshot | null
+  readonly assetProduction?: AssetProductionSnapshot
   readonly slices?: ReadonlyArray<{
     readonly id: string
     readonly index: number
@@ -134,6 +145,10 @@ export interface ProjectRestoreInput {
     readonly regionId?: string | null
     readonly pageId?: string | null
     readonly assetManifestItemId?: string | null
+    readonly productionTaskId?: string | null
+    readonly productionRunId?: string | null
+    readonly outputArtifactId?: string | null
+    readonly readiness?: ProductionTaskStatus | null
   }>
 }
 
@@ -256,7 +271,7 @@ export interface StoreState {
   readonly brief: string
   /**
    * The recognized, open-world understanding of the current brief (spec §6/§7),
-   * or null before recognition. Surfaced on the BriefNode; cleared when the
+   * or null before recognition. Surfaced in the Agent workspace; cleared when the
    * brief is edited (it becomes stale).
    */
   readonly intent: IntentProfile | null
@@ -266,6 +281,8 @@ export interface StoreState {
   readonly designMarkdown: DesignMarkdownAsset | null
   /** Project-level planning/prototype UI state that must survive refresh/crash. */
   readonly workspaceSnapshot: WorkspaceSnapshot | null
+  /** Versioned production authority; `analysis.slices` is its transitional UI projection. */
+  readonly assetProduction: AssetProductionSnapshot
   /** Ephemeral, single-consumer launch request from a product entry point. */
   readonly pendingAgentRun: PendingAgentRun | null
   /** Which forward generation is in flight (drives mockup/edge running state). */
@@ -297,16 +314,25 @@ export interface StoreActions {
   applyPreview(runId: number, previewBitmap: ImageBitmap): void
   /** Commit slice results for `runId`; drops (and closes objectUrls) if stale. */
   applyAnalysisResult(runId: number, result: AnalysisResult): void
-  /** Atomically publish a completed external/tool-loop cutout result. */
-  commitCutoutResult(result: AnalysisResult): void
+  /** Replace the UI projection after a production snapshot was committed. */
+  replaceProductionSliceProjection(result: AnalysisResult): void
+  /** Rebind preserved UI slices to a carry-forward task publication. */
+  rebindProductionSliceProjection(
+    runId: string,
+    tasks: readonly {
+      readonly taskId: string
+      readonly outputArtifactId: string
+      readonly readiness: ProductionTaskStatus
+    }[],
+  ): void
   /** Mark the current run as failed with a message (drops if stale). */
   failAnalysis(runId: number, message: string): void
   /** Start a per-region breakdown run: clear prior slices, bump `runId`, mark running. */
-  beginRegionSlices(targetRegionIds?: readonly string[]): number
+  beginSliceProjection(targetRegionIds?: readonly string[]): number
   /** Append one region's freshly-cut slices to the running list (streams to UI). */
-  appendRegionSlices(runId: number, result: AnalysisResult): void
+  appendSliceProjection(runId: number, result: AnalysisResult): void
   /** Mark a per-region breakdown run done (drops if superseded). */
-  finishRegionSlices(runId: number): void
+  finishSliceProjection(runId: number): void
   /** Select exactly one slice by id (clears others). */
   selectSlice(id: string): void
   /** Rename a slice (validated + sanitized + `.png`-suffixed). */
@@ -315,6 +341,8 @@ export interface StoreActions {
   updateSliceBounds(id: string, box: Box): void
   /** Include or exclude a result from bulk delivery. */
   setSliceIncluded(id: string, included: boolean): void
+  /** Approve only revision-bound, reviewable production quality issues. */
+  approveSliceForUse(id: string): boolean
   /** Clear the current selection. */
   clearSelection(): void
   /** Set the `brief` node's requirement text (clears any prior generate error + stale intent). */
@@ -331,6 +359,10 @@ export interface StoreActions {
   clearDesignMarkdown(): void
   /** Replace the project-level planning/prototype snapshot. */
   setWorkspaceSnapshot(snapshot: WorkspaceSnapshot | null): void
+  /** Replace the versioned asset-production snapshot after a validated transition. */
+  setAssetProduction(snapshot: AssetProductionSnapshot): void
+  /** Atomically publish a snapshot only when no concurrent producer advanced it. */
+  commitAssetProduction(expectedRevision: number, snapshot: AssetProductionSnapshot): boolean
   /** Queue a one-shot agent run after navigation mounts the workspace. */
   requestAgentRun(intent: PendingAgentRun['intent']): PendingAgentRun
   /** Atomically take and clear the pending run, preventing duplicate paid work. */

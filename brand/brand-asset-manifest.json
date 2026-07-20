@@ -1,0 +1,290 @@
+{
+  "schemaVersion": 1,
+  "brand": "Cutout",
+  "identity": {
+    "symbol": "candidate-13-offset-aperture",
+    "wordmark": "candidate-15-cut-out-contrast",
+    "status": "approved-for-product-consumption",
+    "sourceWorkspace": "Cutout Brand VI v1.0 handoff, 2026-07-17",
+    "legalClearance": "not-performed"
+  },
+  "appIcon": {
+    "source": "brand/canonical/app-icon-layout.json",
+    "destination": "brand/derivatives/app-icon-1024.png",
+    "symbolBoundsPx": [
+      226,
+      235,
+      620,
+      602
+    ],
+    "opticalOffsetPx": [
+      24,
+      24
+    ],
+    "platformDerivatives": [
+      {
+        "generatedName": "icon.icns",
+        "destination": "brand/derivatives/app-icon.icns"
+      },
+      {
+        "generatedName": "icon.ico",
+        "destination": "brand/derivatives/app-icon.ico"
+      }
+    ]
+  },
+  "assets": [
+    {
+      "path": "brand/canonical/app-icon-layout.json",
+      "sha256": "9d5a8806543efe836b6e2339da47679278b941c68ae1528c95c95349a007fc1c",
+      "role": "canonical-application-master",
+      "dependsOn": "brand/canonical/symbol.svg"
+    },
+    {
+      "path": "brand/canonical/symbol.svg",
+      "sha256": "ab2a80c566b89bc1ee689f050d995ef66f208710aea20e19227178c15e7519c1",
+      "role": "canonical-symbol"
+    },
+    {
+      "path": "brand/canonical/wordmark.svg",
+      "sha256": "2f42959df21f38ee170f6bdbec6b45518ed847bad55475b09d3f2c6a4d9194df",
+      "role": "canonical-wordmark"
+    },
+    {
+      "path": "brand/canonical/lockup-horizontal.svg",
+      "sha256": "c3fa4cdd1a421eefb965379f012cfa78a2d0279cb5abd080c80336b0e5c59172",
+      "role": "canonical-lockup"
+    },
+    {
+      "path": "brand/canonical/lockup-stacked.svg",
+      "sha256": "8276513aa62348f7bb7441083b412c193a15487609d9d08391b944b6caca97b2",
+      "role": "canonical-lockup"
+    },
+    {
+      "path": "brand/canonical/color-tokens.json",
+      "sha256": "7f4b7592003c0588a6147efc15058a61d0281d5e32402c0681452c8bf34fe39d",
+      "role": "normative-spec"
+    },
+    {
+      "path": "brand/canonical/identity-spec.json",
+      "sha256": "ab9493cf4647de6b2a8ebe408ceebb8f15a348785439ee50544ae903d03c911b",
+      "role": "normative-spec"
+    },
+    {
+      "path": "brand/canonical/typography-spec.json",
+      "sha256": "abaecf81001f27e194ff13dfb9cf8338a352b133ed7806028f6ec848d83702c5",
+      "role": "normative-spec"
+    },
+    {
+      "path": "brand/canonical/lockup-spec.json",
+      "sha256": "3d58057decd5b69697ec82e97a0e9ff65eafb05b70a822b2414fa3c77e696e0d",
+      "role": "normative-spec"
+    },
+    {
+      "path": "brand/canonical/responsive-governance.json",
+      "sha256": "0ddf506e7e6aad72a3edef30d9afa477fd84fa73280cb6c331866d1989314831",
+      "role": "normative-spec"
+    },
+    {
+      "path": "brand/canonical/application-spec.json",
+      "sha256": "abaaff5ee5e5cd2ea1de5903462634278508c6b600fd37ce3899ce92b55fbf12",
+      "role": "normative-spec"
+    },
+    {
+      "path": "brand/derivatives/symbol-current-color.svg",
+      "sha256": "d1f2e0438ce4ca56cbe0bd45ff08449553a4903ed6fe706297a6e6550652eab8",
+      "role": "runtime-derivative",
+      "dependsOn": "brand/canonical/symbol.svg"
+    },
+    {
+      "path": "brand/derivatives/wordmark-current-color.svg",
+      "sha256": "51ccaff35330abfc89f32805400bed6ead597f4fa6c3b8c792550c3ebf9f8dd8",
+      "role": "runtime-derivative",
+      "dependsOn": "brand/canonical/wordmark.svg"
+    },
+    {
+      "path": "brand/derivatives/lockup-horizontal-current-color.svg",
+      "sha256": "f663d5b8a11daf3bff669e89f6e518a3c08b25e5c5aee8957e072f01e23da7e3",
+      "role": "runtime-derivative",
+      "dependsOn": "brand/canonical/lockup-horizontal.svg"
+    },
+    {
+      "path": "brand/derivatives/lockup-stacked-current-color.svg",
+      "sha256": "1eb400c587bde540d5229f238c9ff48138b945648b8b4fd34ed58f5f7d419eac",
+      "role": "runtime-derivative",
+      "dependsOn": "brand/canonical/lockup-stacked.svg"
+    },
+    {
+      "path": "brand/derivatives/app-icon-1024.png",
+      "sha256": "fe8d73737132393f2322cd503b85e2556908af0b53a6646e96a62dcad406fa46",
+      "role": "platform-master",
+      "dependsOn": "brand/canonical/symbol.svg",
+      "derivation": {
+        "method": "render the canonical app-icon-layout.json composition at 1024px",
+        "sourceSha256": "9d5a8806543efe836b6e2339da47679278b941c68ae1528c95c95349a007fc1c",
+        "acceptance": [
+          "no exterior black frame",
+          "opaque paper surface",
+          "legible at 128px"
+        ]
+      }
+    },
+    {
+      "path": "brand/derivatives/app-icon.icns",
+      "sha256": "e4a052c724a713b55fc83c66982d978f79d3b84bd1d94a35c142e020d6a2bc86",
+      "role": "platform-derivative",
+      "dependsOn": "brand/derivatives/app-icon-1024.png"
+    },
+    {
+      "path": "brand/derivatives/app-icon.ico",
+      "sha256": "83e9d9ef19d166c6e01ca58de022e65587efffeda6905b579831ac0cd80281a8",
+      "role": "platform-derivative",
+      "dependsOn": "brand/derivatives/app-icon-1024.png"
+    },
+    {
+      "path": "brand/evidence/delivery-overview.png",
+      "sha256": "187e326706781f20743256005af1535136a00ad9cc61a2f7f20e0978b612f70d",
+      "role": "review-evidence"
+    }
+  ],
+  "consumers": [
+    {
+      "source": "brand/derivatives/symbol-current-color.svg",
+      "destination": "public/brand/symbol-current-color.svg",
+      "sha256": "d1f2e0438ce4ca56cbe0bd45ff08449553a4903ed6fe706297a6e6550652eab8",
+      "mode": "copy"
+    },
+    {
+      "source": "brand/derivatives/wordmark-current-color.svg",
+      "destination": "public/brand/wordmark-current-color.svg",
+      "sha256": "51ccaff35330abfc89f32805400bed6ead597f4fa6c3b8c792550c3ebf9f8dd8",
+      "mode": "copy"
+    },
+    {
+      "source": "brand/derivatives/lockup-horizontal-current-color.svg",
+      "destination": "public/brand/lockup-horizontal-current-color.svg",
+      "sha256": "f663d5b8a11daf3bff669e89f6e518a3c08b25e5c5aee8957e072f01e23da7e3",
+      "mode": "copy"
+    },
+    {
+      "source": "brand/derivatives/lockup-stacked-current-color.svg",
+      "destination": "public/brand/lockup-stacked-current-color.svg",
+      "sha256": "1eb400c587bde540d5229f238c9ff48138b945648b8b4fd34ed58f5f7d419eac",
+      "mode": "copy"
+    },
+    {
+      "source": "brand/canonical/symbol.svg",
+      "destination": "public/favicon.svg",
+      "sha256": "ab2a80c566b89bc1ee689f050d995ef66f208710aea20e19227178c15e7519c1",
+      "mode": "copy"
+    },
+    {
+      "source": "brand/derivatives/app-icon-1024.png",
+      "destination": "src-tauri/icons/icon.png",
+      "sha256": "29206620ec38082e70fa98ffc64c3f3d438798530e84cb61a7264b63ab53504e",
+      "mode": "tauri-icon"
+    },
+    {
+      "source": "brand/derivatives/app-icon.icns",
+      "destination": "src-tauri/icons/icon.icns",
+      "sha256": "e4a052c724a713b55fc83c66982d978f79d3b84bd1d94a35c142e020d6a2bc86",
+      "mode": "copy"
+    },
+    {
+      "source": "brand/derivatives/app-icon.ico",
+      "destination": "src-tauri/icons/icon.ico",
+      "sha256": "83e9d9ef19d166c6e01ca58de022e65587efffeda6905b579831ac0cd80281a8",
+      "mode": "copy"
+    },
+    {
+      "source": "brand/derivatives/app-icon-1024.png",
+      "destination": "src-tauri/icons/32x32.png",
+      "sha256": "7a49c8d6eb1b1f2c391afb64fd696648503d550296fcceef9129de3e247acb6f",
+      "mode": "resize",
+      "size": 32
+    },
+    {
+      "source": "brand/derivatives/app-icon-1024.png",
+      "destination": "src-tauri/icons/128x128.png",
+      "sha256": "5bf1b9d17ae33e7a75f7a4f81068651813c1fc9a3328f45fc10cb0d031b14fe9",
+      "mode": "resize",
+      "size": 128
+    },
+    {
+      "source": "brand/derivatives/app-icon-1024.png",
+      "destination": "src-tauri/icons/128x128@2x.png",
+      "sha256": "6c8ed8d0cae79b884ca294a4095f381e4fd3c751d238930a3fc7889e9a197b10",
+      "mode": "resize",
+      "size": 256
+    },
+    {
+      "source": "brand/derivatives/app-icon-1024.png",
+      "destination": "src-tauri/icons/Square30x30Logo.png",
+      "sha256": "5056e750628eb953bc4e3a253481ab7771d688ea9768fb35966072d6d7aa2e55",
+      "mode": "resize",
+      "size": 30
+    },
+    {
+      "source": "brand/derivatives/app-icon-1024.png",
+      "destination": "src-tauri/icons/Square44x44Logo.png",
+      "sha256": "dafe3eac1f993c34a9892f24bc82f93a12526611ccfa04b6f21e901e541f81ce",
+      "mode": "resize",
+      "size": 44
+    },
+    {
+      "source": "brand/derivatives/app-icon-1024.png",
+      "destination": "src-tauri/icons/StoreLogo.png",
+      "sha256": "f3a6ed7a453b2396d2fb214dea5aa0fce04cc2a38934db7bdf6228d5fede4989",
+      "mode": "resize",
+      "size": 50
+    },
+    {
+      "source": "brand/derivatives/app-icon-1024.png",
+      "destination": "src-tauri/icons/Square71x71Logo.png",
+      "sha256": "7bcd96640137e959996dacf51397238d9c771d79538d75753adc8aa73c0c98ce",
+      "mode": "resize",
+      "size": 71
+    },
+    {
+      "source": "brand/derivatives/app-icon-1024.png",
+      "destination": "src-tauri/icons/Square89x89Logo.png",
+      "sha256": "b4c4032a8f3c2e05e9c38a60a80454996f73fd2186cde9cab812a878fc694fa1",
+      "mode": "resize",
+      "size": 89
+    },
+    {
+      "source": "brand/derivatives/app-icon-1024.png",
+      "destination": "src-tauri/icons/Square107x107Logo.png",
+      "sha256": "2e0fbd85e2e4d4362de542ca9c4b599e8c25f90e851ab078e6b97702c7a26d51",
+      "mode": "resize",
+      "size": 107
+    },
+    {
+      "source": "brand/derivatives/app-icon-1024.png",
+      "destination": "src-tauri/icons/Square142x142Logo.png",
+      "sha256": "5f355909c613424e63da6f454294313005d03d07ca6cd0cfbebc3691a83cb4c3",
+      "mode": "resize",
+      "size": 142
+    },
+    {
+      "source": "brand/derivatives/app-icon-1024.png",
+      "destination": "src-tauri/icons/Square150x150Logo.png",
+      "sha256": "a804d7c1a71d98b93d63eabe031fa2ead97d6ea674dfa35a2716cc6cb6ee4faa",
+      "mode": "resize",
+      "size": 150
+    },
+    {
+      "source": "brand/derivatives/app-icon-1024.png",
+      "destination": "src-tauri/icons/Square284x284Logo.png",
+      "sha256": "171d01114bc9cd6b6b062f1c5e1b44a37c4bb583d2ae1517951ff82d281b773f",
+      "mode": "resize",
+      "size": 284
+    },
+    {
+      "source": "brand/derivatives/app-icon-1024.png",
+      "destination": "src-tauri/icons/Square310x310Logo.png",
+      "sha256": "62360032a20a7315cbff7791738822a13626fd69d21aa029676ff9313e1da356",
+      "mode": "resize",
+      "size": 310
+    }
+  ]
+}

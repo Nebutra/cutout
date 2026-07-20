@@ -272,7 +272,7 @@ export const tauriBridge: NativeBridge = {
 ```
 No component/store/hook imports `@tauri-apps/*` directly — `AssetRepository` (service) → `NativeBridge` (platform) → Tauri. Tests inject a fake bridge; no Tauri runtime needed.
 
-**`tauri.conf.json` essentials:** window `1280×860` (min `1040×720`), `identifier com.leishi.asset-cutout-studio`, `bundle.targets:["dmg"]`, `macOS.minimumSystemVersion:"11.0"`, `hardenedRuntime:false` (unsigned, matches current story). **CSP must include** `img-src 'self' data: blob:; worker-src 'self' blob:` for the OffscreenCanvas worker.
+**`tauri.conf.json` essentials:** window `1280×860` (min `1040×720`), `identifier com.nebutra.asset-cutout-studio`, `bundle.targets:["dmg"]`, `macOS.minimumSystemVersion:"11.0"`, `hardenedRuntime:false` (unsigned, matches current story). **CSP must include** `img-src 'self' data: blob:; worker-src 'self' blob:` for the OffscreenCanvas worker.
 
 **DMG per-arch:** no universal DMG from one target — build `--target aarch64-apple-darwin` and `--target x86_64-apple-darwin` separately (`rustup target add` both).
 

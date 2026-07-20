@@ -1,6 +1,7 @@
 import type { Box, CutoutParams, PixelFrame } from './types'
 import { floodBackground } from './floodBackground'
 import { applyAlphaCut } from './applyAlphaCut'
+import { matteExteriorHaze } from './matteExteriorHaze'
 import { softenMaskEdges } from './softenMaskEdges'
 import { findComponents } from './findComponents'
 import { mergeBoxes } from './mergeBoxes'
@@ -35,18 +36,19 @@ export class PipelineAbortError extends Error {
 }
 
 /**
- * Run the 6-stage cutout pipeline, mutating `frame.data` in place (worker-owned).
+ * Run the 8-stage cutout pipeline, mutating `frame.data` in place (worker-owned).
  *
- * Stage order is ported verbatim from the original Electron renderer:
+ * Stage order extends the original Electron renderer with deterministic matte passes:
  *   1. floodBackground  → background mask
  *   2. applyAlphaCut    → zero background alpha
- *   3. softenMaskEdges  → soft white-matting alpha ramp + de-fringe on the
+ *   3. matteExteriorHaze → recover broad, background-connected neutral shadow
+ *   4. softenMaskEdges  → soft white-matting alpha ramp + de-fringe on the
  *      1px boundary band (deliberate replacement of the original feather hack;
  *      detection stages are unaffected — band alpha never drops to 0)
- *   4. findComponents   → foreground bounding boxes (>= NOISE_FLOOR only)
- *   5. mergeBoxes       → merge boxes within mergeGap, THEN cull those < minArea
- *   6. splitCompositeBoxes / filterUiContainers → refine, drop UI chrome
- *   7. padBox + sort    → pad each merged box, then order top-to-bottom / left-to-right
+ *   5. findComponents   → foreground bounding boxes (>= NOISE_FLOOR only)
+ *   6. mergeBoxes       → merge boxes within mergeGap, THEN cull those < minArea
+ *   7. splitCompositeBoxes / filterUiContainers → refine, drop UI chrome
+ *   8. padBox + sort    → pad each merged box, then order top-to-bottom / left-to-right
  *
  * `signal` (if provided) is checked between stages; an aborted signal throws
  * {@link PipelineAbortError} so a superseded run stops promptly (spec §6).
@@ -67,6 +69,9 @@ export function runPipeline(
   checkAbort()
 
   applyAlphaCut(frame, background)
+  checkAbort()
+
+  matteExteriorHaze(frame, background)
   checkAbort()
 
   softenMaskEdges(frame, background)

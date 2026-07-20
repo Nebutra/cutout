@@ -10,6 +10,7 @@
 import type { StateCreator } from 'zustand'
 import type { SourceState, Store } from '@/store/types'
 import { INITIAL_ANALYSIS, disposeAnalysis } from './analysis'
+import { supersedeActiveProduction } from '@/asset-production'
 
 /** The empty source (nothing dropped yet). */
 export const INITIAL_SOURCE: SourceState = {
@@ -33,7 +34,7 @@ export const createSourceSlice: StateCreator<Store, [], [], SourceSlice> = (
   source: INITIAL_SOURCE,
 
   loadImage: ({ bitmap, name, autoAnalyze = true }) => {
-    const { source, analysis } = get()
+    const { source, analysis, assetProduction } = get()
     // Release the outgoing source + all analysis resources before replacing.
     source.bitmap?.close()
     disposeAnalysis(analysis)
@@ -48,6 +49,7 @@ export const createSourceSlice: StateCreator<Store, [], [], SourceSlice> = (
         autoAnalyze,
       },
       analysis: INITIAL_ANALYSIS,
+      assetProduction: supersedeActiveProduction(assetProduction),
     })
   },
 })

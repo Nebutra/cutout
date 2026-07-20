@@ -4,7 +4,7 @@ import os from 'node:os'
 import path from 'node:path'
 import process from 'node:process'
 
-const APP_ID = 'com.leishi.cutout'
+const APP_ID = 'com.nebutra.cutout'
 const DEFAULT_TIMEOUT_MS = Number(process.env.CUTOUT_AI_TIMEOUT_MS ?? 300_000)
 const POLL_MS = 100
 

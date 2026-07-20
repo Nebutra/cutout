@@ -231,17 +231,84 @@ export async function planPrototype(
     if (shouldUseLocalSemanticFallback(result.error)) {
       const fallback = createLocalPrototypePlan(brief, params.intent)
       const fallbackValidation = validatePrototypePlan(fallback)
-      if (!isErr(fallbackValidation)) return ok(fallback)
+      const coverageError = prototypeBriefCoverageError(brief, fallback)
+      if (!isErr(fallbackValidation) && !coverageError) return ok(fallback)
     }
     return result
   }
 
-  const validation = validatePrototypePlan(result.data)
+  let plan = result.data
+  let coverageError = prototypeBriefCoverageError(brief, plan)
+  if (coverageError) {
+    const repaired = await generation.generateObject(
+      {
+        providerId: params.providerId,
+        model: params.model,
+        promptRef: { id: 'ui-prototype-planner' },
+        input: [{
+          type: 'text',
+          text: [
+            composePrototypeRequirement(brief, params.intent),
+            '',
+            'CORRECTION REQUIRED:',
+            coverageError,
+            'Regenerate the complete plan. Do not merge explicitly requested pages or screens.',
+          ].join('\n'),
+        }],
+        reasoningEffort: params.effort,
+        signal: params.signal,
+      },
+      generatedPrototypePlanSchema,
+    )
+    if (isErr(repaired)) return repaired
+    plan = repaired.data
+    coverageError = prototypeBriefCoverageError(brief, plan)
+    if (coverageError) return err(`The planner did not satisfy the explicit scope: ${coverageError}`)
+  }
+
+  const validation = validatePrototypePlan(plan)
   if (isErr(validation)) {
     return err(`The planner produced an invalid prototype plan: ${validation.error}`)
   }
 
-  return ok(result.data)
+  return ok(plan)
+}
+
+export function explicitPrototypePageCount(brief: string): number | null {
+  const numeric = brief.match(/\b(\d{1,2})\s*(?:个|张)?\s*(?:页面|页|屏幕|pages?|screens?)\b/i)
+    ?? brief.match(/(\d{1,2})\s*(?:个|张)?\s*(?:页面|页|屏幕)/i)
+  if (numeric) return boundedPageCount(Number(numeric[1]))
+
+  const chinese = brief.match(/([一二两三四五六七八九十]+)\s*(?:个|张)?\s*(?:页面|页|屏幕)/)
+  if (chinese) return boundedPageCount(parseChineseCount(chinese[1]!))
+
+  const english = brief.match(/\b(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\s+(?:pages?|screens?)\b/i)
+  if (!english) return null
+  const words = ['one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve']
+  return words.indexOf(english[1]!.toLowerCase()) + 1
+}
+
+function prototypeBriefCoverageError(brief: string, plan: PrototypePlan): string | null {
+  const expected = explicitPrototypePageCount(brief)
+  if (expected === null || plan.humanLoop.mode === 'ask') return null
+  return plan.pages.length === expected
+    ? null
+    : `The brief explicitly requires ${expected} pages/screens, but the plan contains ${plan.pages.length}.`
+}
+
+function boundedPageCount(value: number): number | null {
+  return Number.isInteger(value) && value >= 1 && value <= 12 ? value : null
+}
+
+function parseChineseCount(value: string): number {
+  const digits: Record<string, number> = {
+    一: 1, 二: 2, 两: 2, 三: 3, 四: 4, 五: 5, 六: 6,
+    七: 7, 八: 8, 九: 9,
+  }
+  if (value === '十') return 10
+  if (value.startsWith('十')) return 10 + (digits[value[1]!] ?? 0)
+  if (value.endsWith('十')) return (digits[value[0]!] ?? 0) * 10
+  return digits[value] ?? Number.NaN
 }
 
 function fallbackProductName(brief: string, intent?: IntentProfile): string {

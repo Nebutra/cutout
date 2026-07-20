@@ -53,6 +53,10 @@ function toSlice(input: SliceInput, base: string, index: number): Slice {
     regionId: input.regionId ?? null,
     pageId: input.pageId ?? null,
     assetManifestItemId: input.assetManifestItemId ?? null,
+    productionTaskId: input.productionTaskId ?? null,
+    productionRunId: input.productionRunId ?? null,
+    outputArtifactId: input.outputArtifactId ?? null,
+    readiness: input.readiness ?? null,
   }
 }
 
@@ -61,21 +65,29 @@ export interface AnalysisSlice {
   beginAnalysis(): number
   applyPreview(runId: number, previewBitmap: ImageBitmap): void
   applyAnalysisResult(runId: number, result: AnalysisResult): void
-  commitCutoutResult(result: AnalysisResult): void
+  replaceProductionSliceProjection(result: AnalysisResult): void
+  rebindProductionSliceProjection(
+    runId: string,
+    tasks: readonly {
+      readonly taskId: string
+      readonly outputArtifactId: string
+      readonly readiness: NonNullable<Slice['readiness']>
+    }[],
+  ): void
   failAnalysis(runId: number, message: string): void
   /**
    * Start a per-region breakdown run: clear prior slices, bump `runId`, mark
    * running. Returns the run id so appends for a superseded run can be dropped.
    */
-  beginRegionSlices(targetRegionIds?: readonly string[]): number
+  beginSliceProjection(targetRegionIds?: readonly string[]): number
   /**
    * Append one region's freshly-cut slices to the running list (does NOT
    * replace) so the UI streams them in as each region finishes. Global
    * `index` is reassigned so it stays unique/monotonic across regions.
    */
-  appendRegionSlices(runId: number, result: AnalysisResult): void
+  appendSliceProjection(runId: number, result: AnalysisResult): void
   /** Mark a per-region run done (no-op if superseded). */
-  finishRegionSlices(runId: number): void
+  finishSliceProjection(runId: number): void
 }
 
 export const createAnalysisSlice: StateCreator<Store, [], [], AnalysisSlice> = (
@@ -122,7 +134,7 @@ export const createAnalysisSlice: StateCreator<Store, [], [], AnalysisSlice> = (
     set((state) => ({ analysis: { ...state.analysis, status: 'done', slices } }))
   },
 
-  commitCutoutResult: (result) => {
+  replaceProductionSliceProjection: (result) => {
     const { analysis, source } = get()
     if (!source.bitmap || !source.imageId) {
       throw new Error('The cutout source changed before its result could be published.')
@@ -141,6 +153,28 @@ export const createAnalysisSlice: StateCreator<Store, [], [], AnalysisSlice> = (
     })
   },
 
+  rebindProductionSliceProjection: (runId, tasks) => {
+    const byTaskId = new Map(tasks.map((task) => [task.taskId, task]))
+    set((state) => ({
+      analysis: {
+        ...state.analysis,
+        slices: state.analysis.slices.map((slice) => {
+          const binding = slice.productionTaskId
+            ? byTaskId.get(slice.productionTaskId)
+            : undefined
+          return binding
+            ? {
+                ...slice,
+                productionRunId: runId,
+                outputArtifactId: binding.outputArtifactId,
+                readiness: binding.readiness,
+              }
+            : slice
+        }),
+      },
+    }))
+  },
+
   failAnalysis: (runId, message) => {
     if (runId !== get().analysis.runId) return
     set((state) => ({
@@ -148,7 +182,7 @@ export const createAnalysisSlice: StateCreator<Store, [], [], AnalysisSlice> = (
     }))
   },
 
-  beginRegionSlices: (targetRegionIds) => {
+  beginSliceProjection: (targetRegionIds) => {
     const { analysis } = get()
     const targets = targetRegionIds?.length ? new Set(targetRegionIds) : null
     const preserved = targets
@@ -170,7 +204,7 @@ export const createAnalysisSlice: StateCreator<Store, [], [], AnalysisSlice> = (
     return runId
   },
 
-  appendRegionSlices: (runId, result) => {
+  appendSliceProjection: (runId, result) => {
     const { analysis, source } = get()
     // Stale: a newer run superseded this one. The blobs never got objectUrls,
     // so dropping them is enough (no leak).
@@ -187,7 +221,7 @@ export const createAnalysisSlice: StateCreator<Store, [], [], AnalysisSlice> = (
     }))
   },
 
-  finishRegionSlices: (runId) => {
+  finishSliceProjection: (runId) => {
     if (runId !== get().analysis.runId) return
     set((state) => ({ analysis: { ...state.analysis, status: 'done' } }))
   },

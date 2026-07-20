@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "canvasPx": 1024,
+  "surface": "#ffffff",
+  "tileInsetPx": 64,
+  "tileCornerRadiusPx": 220,
+  "symbol": "symbol.svg",
+  "symbolBoundsPx": [226, 235, 620, 602],
+  "opticalOffsetFromPreviousReviewPx": [24, 24],
+  "background": {
+    "base": "#ffffff",
+    "dominantGlows": ["cyan", "green"],
+    "accentGlows": ["pink", "blue-violet"],
+    "rule": "Low-saturation diffuse color over white; preserve black-symbol contrast at 16px."
+  }
+}

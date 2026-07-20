@@ -4,11 +4,38 @@ import {
   createRunEvent,
   createToolRetryEvent,
   createRunEventStore,
+  recoverInterruptedRunEvents,
   replayRunEvents,
   type AgentRunEvent,
 } from './run-events'
 
 describe('agent run events', () => {
+  it('records an append-only message revision without changing the run intent', () => {
+    const store = replayRunEvents([
+      createRunEvent('run', { type: 'run-started', mode: 'create' }, { eventId: 'start', at: 1 }),
+      createRunEvent('run', { type: 'intent-recorded', intent: 'Make it blue' }, { eventId: 'intent', at: 2 }),
+      createRunEvent('run', { type: 'message-revised', targetEventId: 'intent', message: 'Make it green' }, { eventId: 'revision', at: 3 }),
+    ])
+    expect(store.activeRun?.intent).toBe('Make it blue')
+    expect(store.events.at(-1)).toMatchObject({ type: 'message-revised', targetEventId: 'intent', message: 'Make it green' })
+  })
+  it('projects the latest evidence when a material is regenerated in one run', () => {
+    const store = replayRunEvents([
+      createRunEvent('run', { type: 'run-started', mode: 'create' }, { eventId: 'start', at: 1 }),
+      createRunEvent('run', {
+        type: 'material-recorded',
+        material: { id: 'page:home', kind: 'prototype-page', label: 'Home', source: 'agent', evidenceKey: 'page:home', revision: 'v1' },
+      }, { eventId: 'material-v1', at: 2 }),
+      createRunEvent('run', {
+        type: 'material-recorded',
+        material: { id: 'page:home', kind: 'prototype-page', label: 'Home', source: 'agent', evidenceKey: 'page:home', revision: 'v2' },
+      }, { eventId: 'material-v2', at: 3 }),
+    ])
+
+    expect(store.activeRun?.materials).toEqual([
+      expect.objectContaining({ id: 'page:home', evidenceKey: 'page:home', revision: 'v2' }),
+    ])
+  })
   it('records steer history without replacing the run intent', () => {
     const store = replayRunEvents([
       createRunEvent('run', { type: 'run-started', mode: 'create' }, { eventId: 'start', at: 1 }),
@@ -146,6 +173,33 @@ describe('agent run events', () => {
     expect(store.activeRun?.status).toBe('cancelled')
     expect(store.activeRun?.materials).toHaveLength(0)
     expect(store.events.map((event) => event.eventId)).toEqual(['start', 'cancel'])
+  })
+
+  it('closes a persisted running lifecycle after an app restart', () => {
+    const recovered = recoverInterruptedRunEvents(
+      replayRunEvents([
+        started('run-1', 'start', 1),
+        {
+          eventId: 'tool',
+          runId: 'run-1',
+          at: 2,
+          type: 'tool-started',
+          toolCallId: 'tool-1',
+          tool: 'edit-image',
+          label: 'Refine selected visual',
+        },
+      ]),
+      10,
+    )
+
+    expect(recovered.activeRun).toMatchObject({
+      status: 'cancelled',
+      cancelledReason: 'Interrupted when the app closed.',
+    })
+    expect(recovered.events.at(-1)).toMatchObject({
+      type: 'run-cancelled',
+      at: 10,
+    })
   })
 
   it('rejects tool completion without a matching started event', () => {

@@ -10,6 +10,12 @@ describe('content-addressed Global Library blobs', () => {
     expect(second.sha256).toBe(first.sha256)
     expect(await store.quota()).toMatchObject({usedBytes:3,availableBytes:97})
   })
+  it('deduplicates concurrent writes of the same content hash', async () => {
+    const store=new IndexedDbLibraryBlobStore(new IDBFactory(),100)
+    const records=await Promise.all(Array.from({length:3},()=>store.put(new Uint8Array([1,2,3]),'image/png')))
+    expect(new Set(records.map((record)=>record.sha256)).size).toBe(1)
+    expect(await store.quota()).toMatchObject({usedBytes:3,availableBytes:97})
+  })
   it('rejects unsafe media and quota overflow without partial writes', async () => {
     const store=new IndexedDbLibraryBlobStore(new IDBFactory(),2)
     await expect(store.put(new Uint8Array([1]),'text/html')).rejects.toThrow('Unsupported')

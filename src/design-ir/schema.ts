@@ -195,6 +195,72 @@ export const materialKindSchema = z.enum([
   'design-demo',
 ])
 
+export const materialProductionEvidenceSchema = z.object({
+  planId: idSchema,
+  runId: idSchema,
+  taskId: idSchema,
+  manifestItemId: idSchema,
+  pageId: idSchema,
+  regionId: idSchema,
+  artifactId: idSchema,
+  artifactSha256: sha256Schema,
+  readiness: z.enum([
+    'queued', 'generating', 'candidate-ready', 'reviewing', 'accepted',
+    'cutting', 'verifying', 'ready', 'needs-review', 'waived', 'failed',
+    'cancelled', 'legacy-ready',
+  ]),
+  included: z.boolean(),
+  bounds: z.object({
+    x: z.number().nonnegative(),
+    y: z.number().nonnegative(),
+    width: z.number().positive(),
+    height: z.number().positive(),
+  }).strict(),
+  sourceRevision: z.object({
+    projectRevisionId: idSchema,
+    designSystemArtifactId: idSchema.optional(),
+    pageArtifactId: idSchema.optional(),
+    pageArtifactSha256: sha256Schema.optional(),
+  }).strict(),
+  cutoutParams: z.object({
+    threshold: z.number(),
+    minArea: z.number(),
+    mergeGap: z.number(),
+    padding: z.number(),
+  }).strict().optional(),
+  boardDiagnostics: z.object({
+    borderWhiteRatio: z.number().min(0).max(1),
+    whiteRatio: z.number().min(0).max(1),
+    compliant: z.boolean(),
+  }).strict().optional(),
+  qaVerdict: z.object({
+    pass: z.boolean(),
+    failures: z.array(z.string().min(1).max(2_000)),
+    unavailable: z.boolean().optional(),
+  }).strict().optional(),
+  providerRoute: z.string().min(1).max(240).optional(),
+  lineage: z.object({
+    previousRunId: idSchema,
+    previousTaskId: idSchema,
+    previousArtifactSha256: sha256Schema,
+  }).strict().optional(),
+  issues: z.array(z.object({
+    code: z.string().min(1).max(120),
+    kind: z.enum(['integrity', 'quality', 'warning']),
+    message: z.string().min(1).max(2_000),
+    waivable: z.boolean(),
+    source: z.enum(['runtime', 'deterministic-check', 'model-review', 'user']),
+    recordedAt: z.number().int().nonnegative(),
+  }).strict()),
+  decision: z.object({
+    receiptId: idSchema,
+    decision: z.enum(['approve', 'waive']),
+    issueCodes: z.array(z.string().min(1)),
+    actor: z.object({ kind: z.enum(['human', 'agent']), id: idSchema }).strict(),
+    decidedAt: z.number().int().nonnegative(),
+  }).strict().optional(),
+}).strict()
+
 /**
  * Material revisions are append-only values. There is no mutable content field
  * on a material; a changed artifact is always a newly identified revision.
@@ -205,6 +271,7 @@ export const materialRevisionSchema = z.object({
   createdAt: isoDateTimeSchema,
   content: contentReferenceSchema,
   provenanceId: idSchema.optional(),
+  production: materialProductionEvidenceSchema.optional(),
 }).strict()
 
 export const materialSchema = z.object({
@@ -341,6 +408,7 @@ export type DesignToken = z.infer<typeof designTokenSchema>
 export type DesignComponent = z.infer<typeof componentSchema>
 export type Material = z.infer<typeof materialSchema>
 export type MaterialRevision = z.infer<typeof materialRevisionSchema>
+export type MaterialProductionEvidence = z.infer<typeof materialProductionEvidenceSchema>
 export type Provenance = z.infer<typeof provenanceSchema>
 export type DesignRelation = z.infer<typeof relationSchema>
 export type PrototypeSubtree = z.infer<typeof prototypeSubtreeSchema>
