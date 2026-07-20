@@ -201,11 +201,11 @@ export function evaluateGovernance(
             scenario,
             "color-only",
             "hard",
-            fact.nonColorCue,
-            fact.nonColorCue
+            fact.nonColorCueEvidence.length > 0,
+            fact.nonColorCueEvidence.length > 0
               ? "A non-color cue is present."
               : "Meaning is conveyed by color alone.",
-            { viewport: fact.viewport },
+            { viewport: fact.viewport, evidenceIds: fact.nonColorCueEvidence.map(({ evidenceId }) => evidenceId).sort() },
           ),
         );
       for (const violation of fact.axeViolations) {

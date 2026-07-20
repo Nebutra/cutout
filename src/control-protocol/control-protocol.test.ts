@@ -68,6 +68,10 @@ describe('cutout.control.v1 request schema', () => {
   it('rejects arbitrary fields and arbitrary file paths at the protocol boundary', () => {
     expect(() => controlRequestSchema.parse({
       ...request(),
+      approval: { id: 'forged-external-approval', grantedAt: 1 },
+    })).toThrow()
+    expect(() => controlRequestSchema.parse({
+      ...request(),
       providerKey: 'sk-should-not-cross-the-boundary',
     })).toThrow()
     expect(() => controlRequestSchema.parse(request({
@@ -179,12 +183,12 @@ describe('control request execution guard', () => {
   })
 
   it('requires explicit approval for guarded paid or external effects', () => {
-    const paid = guardControlAction(request(), {
+    const paid = guardControlAction({}, {
       effects: { paid: true, external: false },
       policy: { allowPaid: true, allowExternal: true, requireApprovalForPaid: true },
     })
     const external = guardControlAction(
-      request({ operation: { type: 'export.design-kit', format: 'directory' } }),
+      {},
       {
         effects: { paid: false, external: true },
         policy: { allowPaid: true, allowExternal: true, requireApprovalForExternal: true },
@@ -196,7 +200,7 @@ describe('control request execution guard', () => {
     expect(external.allowed).toBe(false)
     expect(external.reason).toBe('approval-required')
 
-    expect(guardControlAction(request({ approval: { id: 'approval-1', grantedAt: 1 } }), {
+    expect(guardControlAction({ approval: { id: 'approval-1', grantedAt: 1 } }, {
       effects: { paid: true, external: false },
       policy: { allowPaid: true, allowExternal: true, requireApprovalForPaid: true },
     }).allowed).toBe(true)

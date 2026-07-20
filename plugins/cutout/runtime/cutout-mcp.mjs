@@ -2,7 +2,8 @@ import { createRequire } from "node:module";
 import process$1 from "node:process";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import { createHash, randomUUID } from "node:crypto";
-import { lstat, mkdir, readFile, readdir, realpath, rename, rm, rmdir, stat, unlink, writeFile } from "node:fs/promises";
+import { lstat, mkdir, open, readFile, readdir, realpath, rename, rm, rmdir, stat, unlink, writeFile } from "node:fs/promises";
+import { constants } from "node:fs";
 //#region \0rolldown/runtime.js
 var __defProp = Object.defineProperty;
 var __commonJSMin = (cb, mod) => () => (mod || (cb((mod = { exports: {} }).exports, mod), cb = null), mod.exports);
@@ -6845,7 +6846,7 @@ var materialKindSchema = _enum([
 	"cutout-slice",
 	"design-markdown"
 ]);
-var approvalSchema = object({
+object({
 	id: opaqueControlIdSchema,
 	grantedAt: number().int().nonnegative()
 }).strict();
@@ -6984,7 +6985,6 @@ var controlRequestSchema = object({
 	requestId: opaqueControlIdSchema,
 	expectedRevision: number().int().nonnegative(),
 	mode: _enum(["dry-run", "apply"]),
-	approval: approvalSchema.optional(),
 	operation: controlOperationSchema
 }).strict();
 var controlResponseErrorSchema = object({
@@ -7020,7 +7020,7 @@ var controlResponseSchema = object({
 * Guard a host-declared side effect. The agent cannot make an action paid or
 * external merely by adding fields to JSON: the host owns this declaration.
 */
-function guardControlAction(request, options) {
+function guardControlAction(authorization, options) {
 	const { effects, policy } = options;
 	if (effects.paid && !policy.allowPaid) return {
 		allowed: false,
@@ -7031,7 +7031,7 @@ function guardControlAction(request, options) {
 		reason: "external-actions-disabled"
 	};
 	if (effects.paid && policy.requireApprovalForPaid || effects.external && policy.requireApprovalForExternal) {
-		if (!request.approval) return {
+		if (!authorization.approval) return {
 			allowed: false,
 			reason: "approval-required"
 		};
@@ -7062,7 +7062,7 @@ function applyControlRequest(ledger, request, options = {}) {
 			effects
 		}
 	});
-	const guard = guardControlAction(request, {
+	const guard = guardControlAction(options.authorization ?? {}, {
 		effects,
 		policy: options.policy ?? defaultControlPolicy()
 	});
@@ -9614,6 +9614,8 @@ var SOURCE_FILE = /\.(?:[cm]?[jt]sx?|vue|svelte|css|scss|sass|less|html|mdx?|jso
 * defend against symlink pivots and time-of-check surprises at the host edge.
 */
 async function scanSourceInput(projectRoot, operation) {
+	const rootMetadata = await lstat(projectRoot);
+	if (rootMetadata.isSymbolicLink() || !rootMetadata.isDirectory()) throw new Error("Source scan root must be a regular, non-symbolic-link directory.");
 	const root = await realpath(projectRoot);
 	const input = operation.input;
 	switch (input.type) {
@@ -9632,12 +9634,7 @@ async function scanSourceInput(projectRoot, operation) {
 			artifacts: []
 		};
 		case "local-file-scan": {
-			const target = await controlledPath(root, input.path);
-			const stat = await lstat(target);
-			if (stat.isSymbolicLink() || !stat.isFile()) throw new Error("Only regular, non-symbolic-link files can be ingested.");
-			if (stat.size > MAX_FILE_BYTES) throw new Error(`Local files over ${MAX_FILE_BYTES} bytes are not accepted.`);
-			const bytes = new Uint8Array(await readFile(target));
-			if (bytes.byteLength !== stat.size) throw new Error("Source file changed while it was being read.");
+			const bytes = await readStableRegularFile(await controlledPath(root, input.path), MAX_FILE_BYTES, "Source file");
 			return {
 				input: {
 					type: "local-file",
@@ -9678,6 +9675,7 @@ async function scanSourceInput(projectRoot, operation) {
 async function inventory(directory, root) {
 	const entries = [];
 	const visit = async (current) => {
+		await assertStableDirectory$1(root, current);
 		const names = await readdir(current);
 		for (const name of names.sort((left, right) => left.localeCompare(right))) {
 			if (entries.length >= MAX_REPOSITORY_ENTRIES) throw new Error(`Repository inventories over ${MAX_REPOSITORY_ENTRIES} entries are not accepted.`);
@@ -9691,10 +9689,11 @@ async function inventory(directory, root) {
 			if (!stat.isFile()) continue;
 			const path = relative(root, target).split(sep).join("/");
 			if (!allowedRepositoryEntry(path)) continue;
+			const digest = await digestFile(target);
 			entries.push({
 				path,
-				bytes: stat.size,
-				sha256: await digestFile(target, stat.size)
+				bytes: digest.bytes,
+				sha256: digest.sha256
 			});
 		}
 	};
@@ -9704,10 +9703,44 @@ async function inventory(directory, root) {
 function allowedRepositoryEntry(path) {
 	return !SECRET_PATH.test(path) && (ALLOWLISTED_CONFIG.test(path) || SOURCE_FILE.test(path));
 }
-async function digestFile(path, expectedBytes) {
-	const bytes = new Uint8Array(await readFile(path));
-	if (bytes.byteLength !== expectedBytes) throw new Error("Repository file changed while it was being scanned.");
-	return createHash("sha256").update(bytes).digest("hex");
+async function digestFile(path) {
+	const bytes = await readStableRegularFile(path, MAX_FILE_BYTES, "Repository file");
+	return {
+		bytes: bytes.byteLength,
+		sha256: createHash("sha256").update(bytes).digest("hex")
+	};
+}
+async function readStableRegularFile(path, maxBytes, label) {
+	let handle;
+	try {
+		handle = await open(path, constants.O_RDONLY | noFollowFlag());
+		const before = await handle.stat();
+		if (!before.isFile()) throw new Error(`${label} must be a regular file.`);
+		if (before.size > maxBytes) throw new Error(`${label}s over ${maxBytes} bytes are not accepted.`);
+		const bytes = new Uint8Array(await handle.readFile());
+		const after = await handle.stat();
+		const pathMetadata = await lstat(path);
+		if (pathMetadata.isSymbolicLink() || !sameIdentity(before, after) || !sameIdentity(after, pathMetadata) || bytes.byteLength !== after.size) throw new Error(`${label} changed while it was being read.`);
+		return bytes;
+	} catch (error) {
+		if (error.code === "ELOOP") throw new Error(`${label} must not be a symbolic link.`);
+		throw error;
+	} finally {
+		await handle?.close();
+	}
+}
+async function assertStableDirectory$1(root, directory) {
+	const metadata = await lstat(directory);
+	if (metadata.isSymbolicLink() || !metadata.isDirectory()) throw new Error("Repository scan encountered a non-directory or symbolic-link component.");
+	const canonical = await realpath(directory);
+	assertInside(root, canonical);
+	if (canonical !== directory) throw new Error("Repository scan encountered a non-canonical directory.");
+}
+function sameIdentity(left, right) {
+	return left.dev === right.dev && left.ino === right.ino;
+}
+function noFollowFlag() {
+	return typeof constants.O_NOFOLLOW === "number" ? constants.O_NOFOLLOW : 0;
 }
 async function controlledPath(root, relativePath) {
 	const requested = relativePath === "." ? root : resolve(root, relativePath);
@@ -10611,7 +10644,7 @@ function cancelled(task, backend, startedAt, now = Date.now, patchSha256 = "0".r
 * available is an approval-gated, directory-sandboxed Design Kit export.
 */
 function createHeadlessRuntime(store, coding = {}) {
-	return { async execute(input) {
+	return { async execute(input, authorization = {}) {
 		const parsedRequest = controlRequestSchema.safeParse(input);
 		if (!parsedRequest.success) return invalidResponse(input, parsedRequest.error.issues[0]?.message ?? "Invalid control request.");
 		const state = await store.load();
@@ -10622,11 +10655,14 @@ function createHeadlessRuntime(store, coding = {}) {
 		});
 		const request = parsedRequest.data;
 		const ledger = ledgerFromState(state);
-		const preparation = applyControlRequest(ledger, request, { policy: {
-			allowPaid: request.operation.type === "tool.invoke",
-			allowExternal: state.policy.allowApply,
-			requireApprovalForExternal: state.policy.requireApprovalForExternal
-		} });
+		const preparation = applyControlRequest(ledger, request, {
+			policy: {
+				allowPaid: request.operation.type === "tool.invoke",
+				allowExternal: state.policy.allowApply,
+				requireApprovalForExternal: state.policy.requireApprovalForExternal
+			},
+			authorization
+		});
 		if (preparation.decision === "duplicate" || preparation.decision === "conflict" || preparation.decision === "denied") return preparation.response;
 		if (request.mode === "apply" && !state.policy.allowedOperations.some((operation) => operation === request.operation.type)) return response(request, ledger.revision, "denied", false, false, void 0, {
 			code: "policy-denied",
@@ -10636,7 +10672,7 @@ function createHeadlessRuntime(store, coding = {}) {
 			code: "policy-denied",
 			message: "This headless runtime supports patches only in dry-run mode."
 		});
-		const dispatched = await dispatch(store, state, request, coding);
+		const dispatched = await dispatch(store, state, request, coding, authorization);
 		if (!dispatched.ok) return response(request, ledger.revision, dispatched.code ? "denied" : "invalid", request.mode === "dry-run", false, void 0, {
 			code: dispatched.code ?? "invalid-request",
 			message: dispatched.message
@@ -10651,7 +10687,7 @@ function createHeadlessRuntime(store, coding = {}) {
 		return completed.response;
 	} };
 }
-async function dispatch(store, state, request, coding) {
+async function dispatch(store, state, request, coding, authorization) {
 	switch (request.operation.type) {
 		case "project.context": return ok(projectContext(state, request.operation.include));
 		case "material.list": return ok(materialList(state, request.operation.filter));
@@ -10698,7 +10734,7 @@ async function dispatch(store, state, request, coding) {
 			return fail(message);
 		}
 		case "tool.invoke": {
-			const plan = planPaidTool(request.operation.tool, void 0, { allowPaid: true }, Boolean(request.approval));
+			const plan = planPaidTool(request.operation.tool, void 0, { allowPaid: true }, Boolean(authorization.approval));
 			if (request.mode === "dry-run") return ok({
 				operation: "tool.invoke",
 				plan
@@ -11519,6 +11555,22 @@ object({
 	mode: governanceModeSchema,
 	state: governanceStateSchema
 }).strict();
+var nonColorCueEvidenceSchema = object({
+	evidenceId: string().min(1),
+	state: governanceStateSchema,
+	kind: _enum([
+		"text",
+		"icon",
+		"shape",
+		"pattern",
+		"position"
+	]),
+	source: _enum([
+		"design-ir",
+		"human-review",
+		"dom-contract"
+	])
+}).strict();
 object({
 	scenarioId: string().min(1),
 	viewport: string().min(1),
@@ -11529,7 +11581,7 @@ object({
 	borderColor: string().optional(),
 	outlineColor: string().optional(),
 	outlineWidthPx: number().nonnegative().default(0),
-	nonColorCue: boolean().default(false),
+	nonColorCueEvidence: array(nonColorCueEvidenceSchema).default([]),
 	axeViolations: array(object({
 		id: string(),
 		impact: _enum([
@@ -13226,6 +13278,115 @@ function clean(value, fallback) {
 	return value;
 }
 //#endregion
+//#region scripts/cutout-approval-leases.mjs
+var PROTOCOL$1 = "cutout.approval-lease.v1";
+var FILE = "approval-leases.json";
+async function reserveApprovalLease(projectRoot, leaseId, operation, expectedRevision, now = Date.now()) {
+	if (typeof leaseId !== "string" || !leaseId.trim()) throw new Error("A host-issued approval lease id is required.");
+	const catalog = await load(projectRoot);
+	const index = catalog.leases.findIndex((entry) => entry.leaseId === leaseId);
+	if (index < 0) throw new Error("Approval lease was not issued by this Cutout host.");
+	const lease = catalog.leases[index];
+	validateLease(lease);
+	if (lease.state !== "issued") throw new Error("Approval lease has already been consumed or reserved.");
+	if (now >= lease.expiresAt) throw new Error("Approval lease has expired.");
+	if (lease.expectedRevision !== expectedRevision) throw new Error("Approval lease is bound to a different project revision.");
+	if (lease.requestDigest !== requestDigest(operation, expectedRevision)) throw new Error("Approval lease is bound to a different request.");
+	const reservationId = randomUUID();
+	const reserved = {
+		...lease,
+		state: "reserved",
+		reservationId,
+		reservedAt: now
+	};
+	const leases = catalog.leases.slice();
+	leases[index] = reserved;
+	await save(projectRoot, {
+		protocol: PROTOCOL$1,
+		leases
+	});
+	return {
+		reservationId,
+		approval: {
+			id: lease.approvalId,
+			grantedAt: lease.issuedAt
+		}
+	};
+}
+async function completeApprovalLease(projectRoot, leaseId, reservationId, response, now = Date.now()) {
+	const catalog = await load(projectRoot);
+	const index = catalog.leases.findIndex((entry) => entry.leaseId === leaseId);
+	if (index < 0) throw new Error("Approval lease reservation was not found.");
+	const lease = catalog.leases[index];
+	if (lease.state !== "reserved" || lease.reservationId !== reservationId) throw new Error("Approval lease reservation does not match.");
+	const leases = catalog.leases.slice();
+	leases[index] = {
+		...lease,
+		state: "consumed",
+		consumedAt: now,
+		response: {
+			requestId: response.requestId,
+			status: response.status,
+			revision: response.revision
+		}
+	};
+	await save(projectRoot, {
+		protocol: PROTOCOL$1,
+		leases
+	});
+}
+function requestDigest(operation, expectedRevision) {
+	return createHash("sha256").update(canonical({
+		expectedRevision,
+		operation
+	})).digest("hex");
+}
+async function load(projectRoot) {
+	try {
+		const parsed = JSON.parse(await readFile(resolve(projectRoot, ".cutout", FILE), "utf8"));
+		if (parsed?.protocol !== PROTOCOL$1 || !Array.isArray(parsed.leases)) throw new Error("Invalid approval lease catalog.");
+		parsed.leases.forEach(validateLease);
+		return parsed;
+	} catch (error) {
+		if (error?.code === "ENOENT") return {
+			protocol: PROTOCOL$1,
+			leases: []
+		};
+		throw error;
+	}
+}
+async function save(projectRoot, catalog) {
+	const path = resolve(projectRoot, ".cutout", FILE);
+	const temporary = `${path}.tmp-${randomUUID()}`;
+	await writeFile(temporary, `${JSON.stringify(catalog, null, 2)}\n`, {
+		encoding: "utf8",
+		mode: 384,
+		flag: "wx"
+	});
+	await rename(temporary, path);
+}
+function validateLease(lease) {
+	if (!lease || lease.protocol !== PROTOCOL$1) throw new Error("Invalid approval lease protocol.");
+	for (const field of [
+		"leaseId",
+		"approvalId",
+		"subject",
+		"requestDigest"
+	]) if (typeof lease[field] !== "string" || !lease[field].trim()) throw new Error(`Invalid approval lease ${field}.`);
+	if (!Number.isInteger(lease.expectedRevision) || lease.expectedRevision < 0) throw new Error("Invalid approval lease revision.");
+	if (!Number.isInteger(lease.issuedAt) || !Number.isInteger(lease.expiresAt) || lease.expiresAt <= lease.issuedAt) throw new Error("Invalid approval lease lifetime.");
+	if (![
+		"issued",
+		"reserved",
+		"consumed"
+	].includes(lease.state)) throw new Error("Invalid approval lease state.");
+}
+function canonical(value) {
+	if (Array.isArray(value)) return `[${value.map(canonical).join(",")}]`;
+	if (value && typeof value === "object") return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${canonical(value[key])}`).join(",")}}`;
+	return JSON.stringify(value);
+}
+//#endregion
 //#region scripts/cutout-headless-adapter.mjs
 var PROTOCOL = "cutout.control.v1";
 var SAFE_OPERATIONS = /* @__PURE__ */ new Set([
@@ -13241,25 +13402,38 @@ var SAFE_OPERATIONS = /* @__PURE__ */ new Set([
 	"run.cancel",
 	"export.design-kit",
 	"export.brand-kit",
-	"export.starter"
+	"export.starter",
+	"coding.execute",
+	"coding.review",
+	"coding.repair"
+]);
+var APPROVAL_LEASE_OPERATIONS = /* @__PURE__ */ new Set([
+	"source.ingest",
+	"export.design-kit",
+	"export.brand-kit",
+	"export.starter",
+	"coding.execute",
+	"coding.review",
+	"coding.repair"
 ]);
 function createHeadlessAdapter(loadRuntime) {
 	return {
-		async executeControl(projectRoot, operation, { mode = "apply", requestId = randomUUID(), approval } = {}) {
+		async executeControl(projectRoot, operation, { mode = "apply", requestId = randomUUID(), approvalLeaseId } = {}) {
 			if (!SAFE_OPERATIONS.has(operation?.type)) return unsupported(`Operation "${String(operation?.type ?? "unknown")}"`);
 			try {
 				return await withProjectControlLock(projectRoot, async () => {
 					const runtime = await loadRuntime();
 					const store = runtime.createNodeFsRuntimeStore(resolve(projectRoot));
-					const state = await store.load();
+					const expectedRevision = (await store.load()).ledger?.revision ?? 0;
+					const reservation = mode === "apply" && APPROVAL_LEASE_OPERATIONS.has(operation.type) ? await reserveApprovalLease(projectRoot, approvalLeaseId, operation, expectedRevision) : void 0;
 					const response = await runtime.createHeadlessRuntime(store).execute({
 						protocol: PROTOCOL,
 						requestId,
-						expectedRevision: state.ledger?.revision ?? 0,
+						expectedRevision,
 						mode,
-						...approval ? { approval } : {},
 						operation
-					});
+					}, reservation ? { approval: reservation.approval } : void 0);
+					if (reservation) await completeApprovalLease(projectRoot, approvalLeaseId, reservation.reservationId, response);
 					return {
 						ok: response.status === "ok",
 						response
@@ -13683,17 +13857,17 @@ var MCP_TOOLS = [
 	},
 	{
 		name: "cutout_apply_source_ingest",
-		description: "Apply a previously reviewed controlled source import after explicit approval. The host resolves scans below its project root, records source/provenance, and never receives arbitrary file bytes or absolute paths.",
+		description: "Apply a previously reviewed controlled source import after host-issued approval lease. The host resolves scans below its project root, records source/provenance, and never receives arbitrary file bytes or absolute paths.",
 		inputSchema: {
 			type: "object",
 			additionalProperties: false,
-			required: ["input", "approvalId"],
+			required: ["input", "approvalLeaseId"],
 			properties: {
 				input: {
 					type: "object",
 					additionalProperties: true
 				},
-				approvalId: {
+				approvalLeaseId: {
 					type: "string",
 					minLength: 1,
 					maxLength: 160
@@ -13712,12 +13886,12 @@ var MCP_TOOLS = [
 	},
 	{
 		name: "cutout_export_design_kit",
-		description: "Write the planned Design Kit only to .cutout/exports/design-kit after explicit approval. No destination path is accepted.",
+		description: "Write the planned Design Kit only to .cutout/exports/design-kit after host-issued approval lease. No destination path is accepted.",
 		inputSchema: {
 			type: "object",
 			additionalProperties: false,
-			required: ["approvalId"],
-			properties: { approvalId: {
+			required: ["approvalLeaseId"],
+			properties: { approvalLeaseId: {
 				type: "string",
 				minLength: 1,
 				maxLength: 160
@@ -13739,17 +13913,17 @@ var MCP_TOOLS = [
 	},
 	{
 		name: "cutout_export_brand_kit",
-		description: "Write the planned Brand/VI Kit only to .cutout/exports/brand-kit after explicit approval. It accepts no destination and rejects inferred or mismatched evidence.",
+		description: "Write the planned Brand/VI Kit only to .cutout/exports/brand-kit after host-issued approval lease. It accepts no destination and rejects inferred or mismatched evidence.",
 		inputSchema: {
 			type: "object",
 			additionalProperties: false,
-			required: ["input", "approvalId"],
+			required: ["input", "approvalLeaseId"],
 			properties: {
 				input: {
 					type: "object",
 					description: "Complete BrandKitInput: { document, brand }."
 				},
-				approvalId: {
+				approvalLeaseId: {
 					type: "string",
 					minLength: 1,
 					maxLength: 160
@@ -13777,11 +13951,11 @@ var MCP_TOOLS = [
 	},
 	{
 		name: "cutout_export_starter",
-		description: "Write a hash-verified StarterPlan only to .cutout/exports/starter after explicit approval. No destination or command is accepted.",
+		description: "Write a hash-verified StarterPlan only to .cutout/exports/starter after host-issued approval lease. No destination or command is accepted.",
 		inputSchema: {
 			type: "object",
 			additionalProperties: false,
-			required: ["framework", "approvalId"],
+			required: ["framework", "approvalLeaseId"],
 			properties: {
 				framework: {
 					type: "string",
@@ -13792,7 +13966,7 @@ var MCP_TOOLS = [
 						"tanstack-start"
 					]
 				},
-				approvalId: {
+				approvalLeaseId: {
 					type: "string",
 					minLength: 1,
 					maxLength: 160
@@ -13822,14 +13996,14 @@ var MCP_TOOLS = [
 	},
 	{
 		name: "cutout_apply_coding_task",
-		description: "Apply a reviewed CodingTask after explicit approval. Only an injected controlled workspace/backend may write allowlisted paths or run named checks.",
+		description: "Apply a reviewed CodingTask after host-issued approval lease. Only an injected controlled workspace/backend may write allowlisted paths or run named checks.",
 		inputSchema: {
 			type: "object",
 			additionalProperties: false,
 			required: [
 				"operation",
 				"task",
-				"approvalId"
+				"approvalLeaseId"
 			],
 			properties: {
 				operation: {
@@ -13841,7 +14015,7 @@ var MCP_TOOLS = [
 					]
 				},
 				task: { type: "object" },
-				approvalId: {
+				approvalLeaseId: {
 					type: "string",
 					minLength: 1,
 					maxLength: 160
@@ -13959,7 +14133,7 @@ var MCP_TOOLS = [
 			required: [
 				"itemId",
 				"framework",
-				"approvalId"
+				"approvalLeaseId"
 			],
 			properties: {
 				itemId: {
@@ -13976,7 +14150,7 @@ var MCP_TOOLS = [
 					minLength: 1,
 					maxLength: 80
 				},
-				approvalId: {
+				approvalLeaseId: {
 					type: "string",
 					minLength: 1,
 					maxLength: 160
@@ -14198,16 +14372,13 @@ async function callTool(params) {
 			break;
 		case "cutout_apply_source_ingest":
 			assertSourceDescriptor(input.input);
-			if (typeof input.approvalId !== "string" || input.approvalId.length === 0 || input.approvalId.length > 160) throw rpcError(-32602, "approvalId is required.");
+			if (typeof input.approvalLeaseId !== "string" || input.approvalLeaseId.length === 0 || input.approvalLeaseId.length > 160) throw rpcError(-32602, "approvalLeaseId is required.");
 			result = await executeControl(PROJECT_ROOT, {
 				type: "source.ingest",
 				input: input.input
 			}, {
 				mode: "apply",
-				approval: {
-					id: input.approvalId,
-					grantedAt: Date.now()
-				}
+				approvalLeaseId: input.approvalLeaseId
 			});
 			break;
 		case "cutout_plan_design_kit_export":
@@ -14217,16 +14388,13 @@ async function callTool(params) {
 			}, { mode: "dry-run" });
 			break;
 		case "cutout_export_design_kit":
-			if (typeof input.approvalId !== "string" || input.approvalId.length === 0 || input.approvalId.length > 160) throw rpcError(-32602, "approvalId is required.");
+			if (typeof input.approvalLeaseId !== "string" || input.approvalLeaseId.length === 0 || input.approvalLeaseId.length > 160) throw rpcError(-32602, "approvalLeaseId is required.");
 			result = await executeControl(PROJECT_ROOT, {
 				type: "export.design-kit",
 				format: "directory"
 			}, {
 				mode: "apply",
-				approval: {
-					id: input.approvalId,
-					grantedAt: Date.now()
-				}
+				approvalLeaseId: input.approvalLeaseId
 			});
 			break;
 		case "cutout_plan_brand_kit_export":
@@ -14238,16 +14406,13 @@ async function callTool(params) {
 			break;
 		case "cutout_export_brand_kit":
 			if (!input.input || typeof input.input !== "object" || Array.isArray(input.input)) throw rpcError(-32602, "input must be a BrandKitInput object.");
-			if (typeof input.approvalId !== "string" || input.approvalId.length === 0 || input.approvalId.length > 160) throw rpcError(-32602, "approvalId is required.");
+			if (typeof input.approvalLeaseId !== "string" || input.approvalLeaseId.length === 0 || input.approvalLeaseId.length > 160) throw rpcError(-32602, "approvalLeaseId is required.");
 			result = await executeControl(PROJECT_ROOT, {
 				type: "export.brand-kit",
 				input: input.input
 			}, {
 				mode: "apply",
-				approval: {
-					id: input.approvalId,
-					grantedAt: Date.now()
-				}
+				approvalLeaseId: input.approvalLeaseId
 			});
 			break;
 		case "cutout_plan_starter_export":
@@ -14259,16 +14424,13 @@ async function callTool(params) {
 			break;
 		case "cutout_export_starter":
 			if (!validStarterFramework(input.framework)) throw rpcError(-32602, "framework must be next-app-router, vite-react, nuxt, or tanstack-start.");
-			if (typeof input.approvalId !== "string" || input.approvalId.length === 0 || input.approvalId.length > 160) throw rpcError(-32602, "approvalId is required.");
+			if (typeof input.approvalLeaseId !== "string" || input.approvalLeaseId.length === 0 || input.approvalLeaseId.length > 160) throw rpcError(-32602, "approvalLeaseId is required.");
 			result = await executeControl(PROJECT_ROOT, {
 				type: "export.starter",
 				framework: input.framework
 			}, {
 				mode: "apply",
-				approval: {
-					id: input.approvalId,
-					grantedAt: Date.now()
-				}
+				approvalLeaseId: input.approvalLeaseId
 			});
 			break;
 		case "cutout_plan_coding_task":
@@ -14280,16 +14442,13 @@ async function callTool(params) {
 			break;
 		case "cutout_apply_coding_task":
 			assertCodingInput(input);
-			if (typeof input.approvalId !== "string" || input.approvalId.length === 0 || input.approvalId.length > 160) throw rpcError(-32602, "approvalId is required.");
+			if (typeof input.approvalLeaseId !== "string" || input.approvalLeaseId.length === 0 || input.approvalLeaseId.length > 160) throw rpcError(-32602, "approvalLeaseId is required.");
 			result = await executeControl(PROJECT_ROOT, {
 				type: input.operation,
 				task: input.task
 			}, {
 				mode: "apply",
-				approval: {
-					id: input.approvalId,
-					grantedAt: Date.now()
-				}
+				approvalLeaseId: input.approvalLeaseId
 			});
 			break;
 		case "cutout_registry_list":
@@ -14326,7 +14485,7 @@ async function callTool(params) {
 		case "cutout_registry_apply_install":
 			result = {
 				ok: true,
-				response: await registryApplyInstall(PROJECT_ROOT, input.itemId, input.framework, input.approvalId, input.version)
+				response: await registryApplyInstall(PROJECT_ROOT, input.itemId, input.framework, input.approvalLeaseId, input.version)
 			};
 			break;
 		case "cutout_registry_install_receipt": {

@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { mkdir, rmdir, stat } from 'node:fs/promises'
 import { resolve } from 'node:path'
+import { completeApprovalLease, reserveApprovalLease } from './cutout-approval-leases.mjs'
 
 export const PROTOCOL = 'cutout.control.v1'
 
@@ -18,11 +19,24 @@ const SAFE_OPERATIONS = new Set([
   'export.design-kit',
   'export.brand-kit',
   'export.starter',
+  'coding.execute',
+  'coding.review',
+  'coding.repair',
+])
+
+const APPROVAL_LEASE_OPERATIONS = new Set([
+  'source.ingest',
+  'export.design-kit',
+  'export.brand-kit',
+  'export.starter',
+  'coding.execute',
+  'coding.review',
+  'coding.repair',
 ])
 
 export function createHeadlessAdapter(loadRuntime) {
   return {
-    async executeControl(projectRoot, operation, { mode = 'apply', requestId = randomUUID(), approval } = {}) {
+    async executeControl(projectRoot, operation, { mode = 'apply', requestId = randomUUID(), approvalLeaseId } = {}) {
       if (!SAFE_OPERATIONS.has(operation?.type)) {
         return unsupported(`Operation "${String(operation?.type ?? 'unknown')}"`)
       }
@@ -32,14 +46,18 @@ export function createHeadlessAdapter(loadRuntime) {
           const runtime = await loadRuntime()
           const store = runtime.createNodeFsRuntimeStore(resolve(projectRoot))
           const state = await store.load()
+          const expectedRevision = state.ledger?.revision ?? 0
+          const reservation = mode === 'apply' && APPROVAL_LEASE_OPERATIONS.has(operation.type)
+            ? await reserveApprovalLease(projectRoot, approvalLeaseId, operation, expectedRevision)
+            : undefined
           const response = await runtime.createHeadlessRuntime(store).execute({
             protocol: PROTOCOL,
             requestId,
-            expectedRevision: state.ledger?.revision ?? 0,
+            expectedRevision,
             mode,
-            ...(approval ? { approval } : {}),
             operation,
-          })
+          }, reservation ? { approval: reservation.approval } : undefined)
+          if (reservation) await completeApprovalLease(projectRoot, approvalLeaseId, reservation.reservationId, response)
           return { ok: response.status === 'ok', response }
         })
       } catch (error) {

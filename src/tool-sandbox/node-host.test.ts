@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, symlink } from "node:fs/promises";
+import { mkdtemp, mkdir, rm, symlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -8,11 +8,15 @@ const limits = { maxDurationMs: 2_000, maxBytes: 10_000, maxProcesses: 2 };
 describe("node sandbox host", () => {
   it("rejects absolute, traversal, and symlink escape paths", async () => {
     const root = await mkdtemp(join(tmpdir(), "cutout-sandbox-"));
+    const alias = `${root}-alias`;
     await mkdir(join(root, "src"));
     await symlink(tmpdir(), join(root, "src", "escape"));
+    await symlink(root, alias);
     await expect(resolveSandboxPath(root, "/tmp")).rejects.toThrow("absolute-path");
     await expect(resolveSandboxPath(root, "../escape")).rejects.toThrow("path-traversal");
     await expect(resolveSandboxPath(root, "src/escape/file")).rejects.toThrow("symlink-escape");
+    await expect(resolveSandboxPath(alias, ".")).rejects.toThrow("workspace-root");
+    await rm(alias, { force: true });
   });
   it.skipIf(process.platform === "win32")("runs only a host-mapped command with a secret-free environment", async () => {
     const root = await mkdtemp(join(tmpdir(), "cutout-sandbox-"));

@@ -94,7 +94,7 @@ export function buildTokenContrastGovernance(
       fontSizePx: 16,
       fontWeight: 400,
       outlineWidthPx: 0,
-      nonColorCue: false,
+      nonColorCueEvidence: [],
       axeViolations: [],
     })
   }

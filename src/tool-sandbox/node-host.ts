@@ -1,10 +1,13 @@
 import { spawn } from "node:child_process";
-import { lstat, realpath } from "node:fs/promises";
+import { constants } from "node:fs";
+import { lstat, open, realpath, type FileHandle } from "node:fs/promises";
 import { isAbsolute, relative, resolve, sep } from "node:path";
 import type { SandboxCommand, ToolLimits } from "./contracts";
 import { controlledEnvironment } from "./environment";
 
 export async function canonicalWorkspaceRoot(root: string): Promise<string> {
+  const metadata = await lstat(root);
+  if (metadata.isSymbolicLink() || !metadata.isDirectory()) throw new Error("workspace-root: Workspace root must be a regular, non-symbolic-link directory.");
   return realpath(root);
 }
 
@@ -43,8 +46,10 @@ export async function runControlledCommand(input: {
   if (!spec) throw new Error("command-denied: Command is not configured by the host.");
   if (process.platform === "win32") throw new Error("capability-required: Reliable process-tree cancellation requires a Windows job-object host adapter.");
   const cwd = await resolveSandboxPath(input.root, input.cwd);
+  const cwdHandle = await openSandboxDirectory(cwd);
   const started = Date.now();
-  return new Promise((resolvePromise, reject) => {
+  try {
+    return await new Promise((resolvePromise, reject) => {
     const sourceEnv = input.env ?? process.env;
     const child = spawn(spec.file, [...spec.args], { cwd, env: controlledEnvironment(sourceEnv, ["PATH", "HOME", "TMPDIR", "TEMP", "TMP", "LANG", "LC_ALL"]), shell: false, detached: true, stdio: ["ignore", "pipe", "pipe"] });
     let stdout = "", stderr = "", bytes = 0, settled = false;
@@ -59,10 +64,41 @@ export async function runControlledCommand(input: {
     child.stderr.on("data", (chunk: Buffer) => collect("stderr", chunk));
     child.once("error", finishError);
     child.once("close", (exitCode) => { if (settled) return; settled = true; cleanup(); resolvePromise({ command: input.command, exitCode, stdout, stderr, durationMs: Date.now() - started }); });
+    void verifySandboxDirectory(cwdHandle, cwd).catch((error: Error) => finishError(error));
     const timeout = setTimeout(() => finishError(new Error("time-limit: Command exceeded its approved wall-clock duration.")), input.limits.maxDurationMs);
     const abort = () => finishError(new DOMException("Command cancelled.", "AbortError"));
     input.signal?.addEventListener("abort", abort, { once: true });
     if (input.signal?.aborted) abort();
     function cleanup() { clearTimeout(timeout); input.signal?.removeEventListener("abort", abort); }
-  });
+    });
+  } finally {
+    await cwdHandle.close();
+  }
 }
+
+async function openSandboxDirectory(path: string): Promise<FileHandle> {
+  try {
+    const handle = await open(path, constants.O_RDONLY | directoryFlag() | noFollowFlag());
+    const opened = await handle.stat();
+    const current = await lstat(path);
+    if (!opened.isDirectory() || current.isSymbolicLink() || opened.dev !== current.dev || opened.ino !== current.ino) {
+      await handle.close();
+      throw new Error("cwd-changed: Sandbox working directory changed before command execution.");
+    }
+    return handle;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ELOOP") throw new Error("symlink-escape: Symbolic links are not allowed in sandbox paths.");
+    throw error;
+  }
+}
+
+async function verifySandboxDirectory(handle: FileHandle, path: string): Promise<void> {
+  const opened = await handle.stat();
+  const current = await lstat(path);
+  if (!opened.isDirectory() || current.isSymbolicLink() || opened.dev !== current.dev || opened.ino !== current.ino) {
+    throw new Error("cwd-changed: Sandbox working directory changed during command launch.");
+  }
+}
+
+function directoryFlag(): number { return typeof constants.O_DIRECTORY === "number" ? constants.O_DIRECTORY : 0; }
+function noFollowFlag(): number { return typeof constants.O_NOFOLLOW === "number" ? constants.O_NOFOLLOW : 0; }

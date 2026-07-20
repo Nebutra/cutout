@@ -1,0 +1,29 @@
+{
+  "id": "packaged-release-smoke-evidence",
+  "name": "packaged-release-smoke-evidence",
+  "title": "Capture packaged release smoke evidence",
+  "description": "Build a signed release candidate and retain platform launch, updater, signing, and notarization evidence.",
+  "status": "planning",
+  "dev_type": "release",
+  "scope": null,
+  "package": null,
+  "priority": "P1",
+  "creator": "tseka",
+  "assignee": "tseka",
+  "createdAt": "2026-07-20",
+  "completedAt": null,
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [
+    ".github/workflows/release-update.yml",
+    "scripts/smoke-packaged-macos.sh"
+  ],
+  "notes": "Planning only; do not claim signing or notarization without release artifacts and CI evidence.",
+  "meta": {}
+}

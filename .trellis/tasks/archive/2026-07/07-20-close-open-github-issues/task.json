@@ -1,0 +1,28 @@
+{
+  "id": "close-open-github-issues",
+  "name": "close-open-github-issues",
+  "title": "Close all open GitHub issues",
+  "description": "Resolve and verify all open issues in Nebutra/cutout, ordered by security and runtime dependency.",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P0",
+  "creator": "tseka",
+  "assignee": "tseka",
+  "createdAt": "2026-07-20",
+  "completedAt": "2026-07-20",
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [
+    "07-20-packaged-release-smoke-evidence"
+  ],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "Issues #1-#11 are implemented and locally verified. Release-bundle signing and packaged launch evidence is tracked separately and is not claimed here.",
+  "meta": {}
+}

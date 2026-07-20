@@ -219,12 +219,14 @@ export const controlRequestSchema = z.object({
   requestId: opaqueControlIdSchema,
   expectedRevision: z.number().int().nonnegative(),
   mode: z.enum(['dry-run', 'apply']),
-  approval: approvalSchema.optional(),
   operation: controlOperationSchema,
 }).strict()
 
 export type ControlOperation = z.infer<typeof controlOperationSchema>
 export type ControlRequest = z.infer<typeof controlRequestSchema>
+export type TrustedControlAuthorization = Readonly<{
+  approval?: z.infer<typeof approvalSchema>
+}>
 export type SourceIngestOperation = Extract<ControlOperation, { readonly type: 'source.ingest' }>
 
 export type ControlResponseStatus = 'ok' | 'conflict' | 'denied' | 'invalid'
@@ -316,7 +318,7 @@ export interface ControlActionGuardResult {
  * external merely by adding fields to JSON: the host owns this declaration.
  */
 export function guardControlAction(
-  request: Pick<ControlRequest, 'approval'>,
+  authorization: TrustedControlAuthorization,
   options: ControlActionGuardOptions,
 ): ControlActionGuardResult {
   const { effects, policy } = options
@@ -330,7 +332,7 @@ export function guardControlAction(
     (effects.paid && policy.requireApprovalForPaid)
     || (effects.external && policy.requireApprovalForExternal)
   ) {
-    if (!request.approval) return { allowed: false, reason: 'approval-required' }
+    if (!authorization.approval) return { allowed: false, reason: 'approval-required' }
   }
   return { allowed: true }
 }
@@ -339,6 +341,8 @@ export interface ApplyControlRequestOptions {
   /** Hosts may raise the effect classification, never lower it. */
   readonly effects?: ControlEffects
   readonly policy?: ControlPolicy
+  /** Trusted host context. This is deliberately absent from ControlRequest. */
+  readonly authorization?: TrustedControlAuthorization
 }
 
 export type ControlRequestDecision = 'dispatch' | 'dry-run' | 'duplicate' | 'conflict' | 'denied'
@@ -391,7 +395,7 @@ export function applyControlRequest(
     })
   }
 
-  const guard = guardControlAction(request, {
+  const guard = guardControlAction(options.authorization ?? {}, {
     effects,
     policy: options.policy ?? defaultControlPolicy(),
   })

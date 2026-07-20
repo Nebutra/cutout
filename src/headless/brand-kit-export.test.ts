@@ -65,13 +65,13 @@ describe('Brand Kit headless export', () => {
     const missingApproval = await runtime.execute(request({ type: 'export.brand-kit', input: input() }, { requestId: 'missing-approval' }))
     expect(missingApproval).toMatchObject({ status: 'denied', error: { code: 'approval-required' } })
 
-    const applied = await runtime.execute(request({ type: 'export.brand-kit', input: input() }, { requestId: 'approved', approval: { id: 'human-approved', grantedAt: 1 } }))
+    const applied = await runtime.execute(request({ type: 'export.brand-kit', input: input() }, { requestId: 'approved' }), { approval: { id: 'human-approved', grantedAt: 1 } })
     expect(applied).toMatchObject({ status: 'ok', revision: 1, result: { directory: '.cutout/exports/brand-kit/receipt' } })
     expect(writeBrandKit).toHaveBeenCalledTimes(1)
 
     const mismatched = input()
     mismatched.document = { ...mismatched.document, meta: { ...mismatched.document.meta, title: 'Untrusted copy' } }
-    const rejected = await runtime.execute(request({ type: 'export.brand-kit', input: mismatched }, { requestId: 'mismatch', expectedRevision: 1, approval: { id: 'human-approved-2', grantedAt: 2 } }))
+    const rejected = await runtime.execute(request({ type: 'export.brand-kit', input: mismatched }, { requestId: 'mismatch', expectedRevision: 1 }), { approval: { id: 'human-approved-2', grantedAt: 2 } })
     expect(rejected).toMatchObject({ status: 'invalid', error: { code: 'invalid-request', message: expect.stringContaining('does not match') } })
     expect(writeBrandKit).toHaveBeenCalledTimes(1)
   })

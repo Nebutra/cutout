@@ -12,6 +12,7 @@ import { createHeadlessRuntime } from '@/headless'
 import { redactControlValue } from '@/control-protocol'
 import { githubIntegrationManifest } from '@/integration-sdk/github'
 import { notionIntegrationManifest } from '@/integration-sdk/notion'
+import { issueApprovalLease } from './cutout-approval-leases.mjs'
 
 function state(): HeadlessProjectState {
   return {
@@ -74,6 +75,27 @@ async function fixture() {
   const root = await mkdtemp(join(tmpdir(), 'cutout-adapter-'))
   await createNodeFsRuntimeStore(root).save(state())
   return root
+}
+
+async function approvalLease(root: string, operation: object, approvalId: string) {
+  const current = await createNodeFsRuntimeStore(root).load()
+  return issueApprovalLease(root, {
+    approvalId,
+    subject: 'test:desktop-host',
+    operation,
+    expectedRevision: current.ledger?.revision ?? 0,
+    expiresAt: Date.now() + 60_000,
+  })
+}
+
+function cliIdeaOperation(text: string) {
+  return {
+    type: 'source.ingest',
+    input: {
+      type: 'inline-text', sourceKind: 'idea', title: 'Idea', text, role: 'requirement',
+      license: { kind: 'unknown', rationale: 'User supplied through the Cutout CLI.' },
+    },
+  }
 }
 
 async function declaredMcpTools(): Promise<string[]> {
@@ -226,12 +248,14 @@ describe('headless CLI and MCP adapters', () => {
       expect(dryRun).toMatchObject({ code: 0, value: { ok: true, response: { dryRun: true, result: { files: expect.any(Array) } } } })
       expect(await readdir(join(root, '.cutout', 'exports', 'design-kit'))).toEqual([])
 
-      const applied = await runCli(root, 'export-kit', '--apply', '--approval', 'human-approved-export')
+      const firstLease = await approvalLease(root, { type: 'export.design-kit', format: 'directory' }, 'human-approved-export')
+      const applied = await runCli(root, 'export-kit', '--apply', '--approval-lease', firstLease.leaseId)
       expect(applied).toMatchObject({ code: 0, value: { ok: true, response: { revision: 1, result: { directory: plan.directory, idempotent: false } } } })
       const manifest = await readFile(join(root, plan.directory, 'manifest.json'), 'utf8')
       expect(JSON.parse(manifest)).toMatchObject({ version: 'design-kit.v1' })
 
-      const second = await runCli(root, 'export-kit', '--apply', '--approval', 'human-approved-export-2')
+      const secondLease = await approvalLease(root, { type: 'export.design-kit', format: 'directory' }, 'human-approved-export-2')
+      const second = await runCli(root, 'export-kit', '--apply', '--approval-lease', secondLease.leaseId)
       expect(second).toMatchObject({ code: 0, value: { ok: true, response: { revision: 2, result: { idempotent: true } } } })
     } finally {
       await rm(root, { recursive: true, force: true })
@@ -247,7 +271,8 @@ describe('headless CLI and MCP adapters', () => {
     }
     try {
       const preview = await runCli(root, 'ingest', '--idea', 'A calm B2B dashboard.')
-      const applied = await runCli(root, 'ingest', '--idea', 'A calm B2B dashboard.', '--apply', '--approval', 'human-reviewed-import')
+      const ingestLease = await approvalLease(root, cliIdeaOperation('A calm B2B dashboard.'), 'human-reviewed-import')
+      const applied = await runCli(root, 'ingest', '--idea', 'A calm B2B dashboard.', '--apply', '--approval-lease', ingestLease.leaseId)
       const blockedPath = await runCli(root, 'ingest', '--file', '/tmp/secret.png')
       const planned = await mcp.call(30, 'tools/call', { name: 'cutout_plan_source_ingest', arguments: { input } })
       const rejectedPayload = await mcp.call(31, 'tools/call', {
@@ -282,17 +307,20 @@ describe('headless CLI and MCP adapters', () => {
       } } } })
       expect(await readdir(join(root, '.cutout', 'exports', 'brand-kit'))).toEqual([])
 
-      const applied = await runCli(root, 'export-brand-kit', '--input', JSON.stringify(input), '--apply', '--approval', 'human-approved-brand')
+      const brandLease = await approvalLease(root, { type: 'export.brand-kit', input }, 'human-approved-brand')
+      const applied = await runCli(root, 'export-brand-kit', '--input', JSON.stringify(input), '--apply', '--approval-lease', brandLease.leaseId)
       expect(applied).toMatchObject({ code: 0, value: { ok: true, response: { revision: 1, result: { directory: plan.directory, idempotent: false } } } })
       expect(await readFile(join(root, plan.directory, 'brand.manifest.json'), 'utf8')).toContain('cutout.brand-kit.v1')
 
       const mismatched = structuredClone(input)
       mismatched.document.meta.title = 'Untrusted copy'
-      const rejected = await runCli(root, 'export-brand-kit', '--input', JSON.stringify(mismatched), '--apply', '--approval', 'second-human')
+      const mismatchLease = await approvalLease(root, { type: 'export.brand-kit', input: mismatched }, 'second-human')
+      const rejected = await runCli(root, 'export-brand-kit', '--input', JSON.stringify(mismatched), '--apply', '--approval-lease', mismatchLease.leaseId)
       expect(rejected).toMatchObject({ code: 1, value: { ok: false, response: { error: { code: 'invalid-request', message: expect.stringContaining('does not match') } } } })
 
       const planned = await mcp.call(21, 'tools/call', { name: 'cutout_plan_brand_kit_export', arguments: { input } })
-      const mcpApplied = await mcp.call(22, 'tools/call', { name: 'cutout_export_brand_kit', arguments: { input, approvalId: 'mcp-approved-brand' } })
+      const mcpBrandLease = await approvalLease(root, { type: 'export.brand-kit', input }, 'mcp-approved-brand')
+      const mcpApplied = await mcp.call(22, 'tools/call', { name: 'cutout_export_brand_kit', arguments: { input, approvalLeaseId: mcpBrandLease.leaseId } })
       expect(planned).toMatchObject({ result: { isError: false, structuredContent: { ok: true, response: { dryRun: true, result: { brandId: 'brand:adapter' } } } } })
       expect(mcpApplied).toMatchObject({ result: { isError: false, structuredContent: { ok: true, response: { result: { idempotent: true } } } } })
     } finally {
@@ -315,7 +343,8 @@ describe('headless CLI and MCP adapters', () => {
       const missingApproval = await runCli(root, 'export-starter', '--framework', 'vite-react', '--apply')
       expect(missingApproval).toMatchObject({ code: 1, value: { ok: false, error: { code: 'invalid-command' } } })
 
-      const applied = await runCli(root, 'export-starter', '--framework', 'vite-react', '--apply', '--approval', 'human-approved-starter')
+      const starterLease = await approvalLease(root, { type: 'export.starter', framework: 'vite-react' }, 'human-approved-starter')
+      const applied = await runCli(root, 'export-starter', '--framework', 'vite-react', '--apply', '--approval-lease', starterLease.leaseId)
       expect(applied).toMatchObject({ code: 0, value: { ok: true, response: { revision: 1, result: {
         directory: plan.directory, idempotent: false, framework: 'vite-react',
       } } } })
@@ -326,7 +355,8 @@ describe('headless CLI and MCP adapters', () => {
         'cutout_plan_starter_export', 'cutout_export_starter',
       ]))
       const planned = await mcp.call(11, 'tools/call', { name: 'cutout_plan_starter_export', arguments: { framework: 'next-app-router' } })
-      const mcpApplied = await mcp.call(12, 'tools/call', { name: 'cutout_export_starter', arguments: { framework: 'next-app-router', approvalId: 'mcp-approved-starter' } })
+      const mcpStarterLease = await approvalLease(root, { type: 'export.starter', framework: 'next-app-router' }, 'mcp-approved-starter')
+      const mcpApplied = await mcp.call(12, 'tools/call', { name: 'cutout_export_starter', arguments: { framework: 'next-app-router', approvalLeaseId: mcpStarterLease.leaseId } })
       expect(planned).toMatchObject({ result: { isError: false, structuredContent: { ok: true, response: { dryRun: true, result: { framework: 'next-app-router' } } } } })
       expect(mcpApplied).toMatchObject({ result: { isError: false, structuredContent: { ok: true, response: { result: { framework: 'next-app-router', idempotent: false } } } } })
     } finally {
@@ -343,7 +373,8 @@ describe('headless CLI and MCP adapters', () => {
       const listed = await mcp.call(2, 'tools/list')
       const called = await mcp.call(3, 'tools/call', { name: 'cutout_dry_run_patch', arguments: { operation: { type: 'tokens.patch', changes: [{ token: 'color.primary', value: '#22c55e' }] } } })
       const planned = await mcp.call(4, 'tools/call', { name: 'cutout_plan_design_kit_export', arguments: {} })
-      const applied = await mcp.call(5, 'tools/call', { name: 'cutout_export_design_kit', arguments: { approvalId: 'mcp-approved-export' } })
+      const exportLease = await approvalLease(root, { type: 'export.design-kit', format: 'directory' }, 'mcp-approved-export')
+      const applied = await mcp.call(5, 'tools/call', { name: 'cutout_export_design_kit', arguments: { approvalLeaseId: exportLease.leaseId } })
       const missingApproval = await mcp.call(6, 'tools/call', { name: 'cutout_export_design_kit', arguments: {} })
 
       expect(initialize).toMatchObject({ result: { serverInfo: { name: 'cutout-headless' } } })
@@ -497,9 +528,11 @@ describe('headless CLI and MCP adapters', () => {
 
       const missingApproval = await runCli(root, 'ingest', '--idea', 'A calm workspace.', '--apply')
       expect(missingApproval).toMatchObject({ code: 1, value: { ok: false, error: { code: 'invalid-command' } } })
+      const ideaText = 'A calm workspace for turning references into production UI.'
+      const ideaLease = await approvalLease(root, cliIdeaOperation(ideaText), 'reviewed-idea')
       const ideaApplied = await runCli(
         root, 'ingest', '--idea', 'A calm workspace for turning references into production UI.',
-        '--apply', '--approval', 'reviewed-idea',
+        '--apply', '--approval-lease', ideaLease.leaseId,
       )
       expect(ideaApplied).toMatchObject({ code: 0, value: { ok: true, response: { revision: 1 } } })
 
@@ -508,8 +541,9 @@ describe('headless CLI and MCP adapters', () => {
         license: { kind: 'unknown', rationale: 'Descriptor only; review required.' },
       }
       const urlPreview = await mcp.call(40, 'tools/call', { name: 'cutout_plan_source_ingest', arguments: { input: urlInput } })
+      const urlLease = await approvalLease(root, { type: 'source.ingest', input: urlInput }, 'reviewed-url')
       const urlApplied = await mcp.call(41, 'tools/call', {
-        name: 'cutout_apply_source_ingest', arguments: { input: urlInput, approvalId: 'reviewed-url' },
+        name: 'cutout_apply_source_ingest', arguments: { input: urlInput, approvalLeaseId: urlLease.leaseId },
       })
       expect(urlPreview).toMatchObject({ result: { isError: false, structuredContent: { response: { revision: 1, dryRun: true } } } })
       expect(urlApplied).toMatchObject({ result: { isError: false, structuredContent: { response: { revision: 2 } } } })
@@ -551,12 +585,14 @@ describe('headless CLI and MCP adapters', () => {
       }
 
       const designPreview = await runCli(root, 'export-kit')
-      const designApplied = await runCli(root, 'export-kit', '--apply', '--approval', 'reviewed-design-kit')
+      const designLease = await approvalLease(root, { type: 'export.design-kit', format: 'directory' }, 'reviewed-design-kit')
+      const designApplied = await runCli(root, 'export-kit', '--apply', '--approval-lease', designLease.leaseId)
       expect(designPreview).toMatchObject({ code: 0, value: { response: { revision: 2, dryRun: true, result: { files: expect.any(Array) } } } })
       expect(designApplied).toMatchObject({ code: 0, value: { response: { revision: 3, result: { idempotent: false } } } })
 
       const brandPreview = await runCli(root, 'export-brand-kit', '--input', JSON.stringify(brand))
-      const brandApplied = await runCli(root, 'export-brand-kit', '--input', JSON.stringify(brand), '--apply', '--approval', 'reviewed-brand-kit')
+      const journeyBrandLease = await approvalLease(root, { type: 'export.brand-kit', input: brand }, 'reviewed-brand-kit')
+      const brandApplied = await runCli(root, 'export-brand-kit', '--input', JSON.stringify(brand), '--apply', '--approval-lease', journeyBrandLease.leaseId)
       expect(brandPreview).toMatchObject({ code: 0, value: { response: { revision: 3, dryRun: true, result: { files: expect.any(Array) } } } })
       expect(brandApplied).toMatchObject({ code: 0, value: { response: { revision: 4, result: { idempotent: false } } } })
 
@@ -581,8 +617,9 @@ describe('headless CLI and MCP adapters', () => {
       expect(components.files.every((file) => /^[a-f0-9]{64}$/.test(file.sha256))).toBe(true)
 
       const starterPreview = await mcp.call(42, 'tools/call', { name: 'cutout_plan_starter_export', arguments: { framework: 'vite-react' } })
+      const journeyStarterLease = await approvalLease(root, { type: 'export.starter', framework: 'vite-react' }, 'reviewed-starter')
       const starterApplied = await mcp.call(43, 'tools/call', {
-        name: 'cutout_export_starter', arguments: { framework: 'vite-react', approvalId: 'reviewed-starter' },
+        name: 'cutout_export_starter', arguments: { framework: 'vite-react', approvalLeaseId: journeyStarterLease.leaseId },
       })
       expect(starterPreview).toMatchObject({ result: { isError: false, structuredContent: { response: { revision: 4, dryRun: true } } } })
       expect(starterApplied).toMatchObject({ result: { isError: false, structuredContent: { response: { revision: 5 } } } })

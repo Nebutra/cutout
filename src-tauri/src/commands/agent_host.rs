@@ -56,8 +56,25 @@ pub struct Attempt {
 #[serde(rename_all = "camelCase")]
 pub struct Lease {
     owner: String,
+    #[serde(default)]
+    lease_id: String,
     heartbeat_at: u64,
     expires_at: u64,
+}
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LeaseGrant {
+    owner: String,
+    lease_id: String,
+    attempt: u32,
+    expires_at: u64,
+}
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ClaimOutcome {
+    claimed: bool,
+    grant: Option<LeaseGrant>,
+    state: HostFile,
 }
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -280,8 +297,9 @@ pub async fn agent_host_node_claim(
     node_id: String,
     lease_ms: u64,
     max_attempts: u32,
-) -> Result<HostFile, String> {
-    mutate(&registry, &host, &workspace_handle, move |state| {
+) -> Result<ClaimOutcome, String> {
+    let mut granted = None;
+    let state = mutate(&registry, &host, &workspace_handle, |state| {
         let at = now();
         let run = state.runs.get_mut(&run_id).ok_or("Unknown run.")?;
         let node = run.nodes.get_mut(&node_id).ok_or("Unknown node.")?;
@@ -295,25 +313,55 @@ pub async fn agent_host_node_claim(
             node.status = "failed".into();
             return Ok(());
         }
+        let attempt = node.attempts.len() as u32 + 1;
         node.attempts.push(Attempt {
-            number: node.attempts.len() as u32 + 1,
+            number: attempt,
             started_at: at,
             completed_at: None,
             error: None,
         });
         node.status = "running".into();
         node.next_attempt_at = None;
+        let owner = state.instance_id.clone().ok_or("Host is not started.")?;
+        let lease_id = format!("{owner}:{run_id}:{node_id}:{attempt}:{at}");
+        let expires_at = at.saturating_add(lease_ms);
         node.lease = Some(Lease {
-            owner: state.instance_id.clone().ok_or("Host is not started.")?,
+            owner: owner.clone(),
+            lease_id: lease_id.clone(),
             heartbeat_at: at,
-            expires_at: at + lease_ms,
+            expires_at,
+        });
+        granted = Some(LeaseGrant {
+            owner,
+            lease_id,
+            attempt,
+            expires_at,
         });
         run.status = "running".into();
         run.updated_at = at;
         event(state, Some(&run_id), Some(&node_id), "node-started", None);
         Ok(())
     })
-    .await
+    .await?;
+    Ok(ClaimOutcome {
+        claimed: granted.is_some(),
+        grant: granted,
+        state,
+    })
+}
+fn validate_grant(node: &Node, grant: &LeaseGrant, at: u64) -> Result<(), String> {
+    let lease = node.lease.as_ref().ok_or("Node has no active lease.")?;
+    let attempt = node.attempts.last().map(|value| value.number);
+    if node.status != "running"
+        || lease.owner != grant.owner
+        || lease.lease_id.is_empty()
+        || lease.lease_id != grant.lease_id
+        || attempt != Some(grant.attempt)
+        || at >= lease.expires_at
+    {
+        return Err("Node lease grant is stale.".into());
+    }
+    Ok(())
 }
 #[tauri::command]
 pub async fn agent_host_node_heartbeat(
@@ -323,10 +371,10 @@ pub async fn agent_host_node_heartbeat(
     run_id: String,
     node_id: String,
     lease_ms: u64,
+    grant: LeaseGrant,
 ) -> Result<HostFile, String> {
     mutate(&registry, &host, &workspace_handle, move |state| {
         let at = now();
-        let owner = state.instance_id.clone().ok_or("Host is not started.")?;
         let node = state
             .runs
             .get_mut(&run_id)
@@ -334,12 +382,10 @@ pub async fn agent_host_node_heartbeat(
             .nodes
             .get_mut(&node_id)
             .ok_or("Unknown node.")?;
+        validate_grant(node, &grant, at)?;
         let lease = node.lease.as_mut().ok_or("Node has no active lease.")?;
-        if node.status != "running" || lease.owner != owner || lease.expires_at < at {
-            return Err("Node lease is stale.".into());
-        }
         lease.heartbeat_at = at;
-        lease.expires_at = at + lease_ms;
+        lease.expires_at = at.saturating_add(lease_ms);
         Ok(())
     })
     .await
@@ -392,6 +438,7 @@ pub async fn agent_host_node_fail(
     base_delay_ms: u64,
     max_delay_ms: u64,
     jitter_milli: u16,
+    grant: LeaseGrant,
 ) -> Result<HostFile, String> {
     mutate(&registry, &host, &workspace_handle, move |state| {
         if jitter_milli > 1000 {
@@ -403,9 +450,7 @@ pub async fn agent_host_node_fail(
             return Ok(());
         }
         let node = run.nodes.get_mut(&node_id).ok_or("Unknown node.")?;
-        if node.status != "running" {
-            return Err("Node failure requires an active attempt.".into());
-        }
+        validate_grant(node, &grant, at)?;
         if let Some(attempt) = node.attempts.last_mut() {
             attempt.completed_at = Some(at);
             attempt.error = Some(error.clone())
@@ -454,6 +499,7 @@ pub async fn agent_host_node_complete(
     run_id: String,
     node_id: String,
     receipt_id: Option<String>,
+    grant: LeaseGrant,
 ) -> Result<HostFile, String> {
     mutate(&registry, &host, &workspace_handle, move |state| {
         let at = now();
@@ -471,6 +517,7 @@ pub async fn agent_host_node_complete(
         if node.status != "running" {
             return Err("Node completion requires an active attempt.".into());
         }
+        validate_grant(node, &grant, at)?;
         if let Some(key) = &node.effect_key {
             let receipt_id = receipt_id
                 .clone()
@@ -588,6 +635,7 @@ mod tests {
                             attempts: vec![],
                             lease: Some(Lease {
                                 owner: "old".into(),
+                                lease_id: "old:r:active:1:1".into(),
                                 heartbeat_at: 1,
                                 expires_at: 2,
                             }),
@@ -605,5 +653,45 @@ mod tests {
         assert_eq!(next.runs["r"].nodes["done"].status, "succeeded");
         assert_eq!(next.runs["r"].nodes["active"].status, "queued");
         assert!(next.runs["r"].nodes["active"].lease.is_none())
+    }
+
+    #[test]
+    fn lease_grant_is_bound_to_owner_attempt_and_live_lease() {
+        let node = Node {
+            id: "node".into(),
+            effect_key: None,
+            status: "running".into(),
+            attempts: vec![Attempt {
+                number: 2,
+                started_at: 10,
+                completed_at: None,
+                error: None,
+            }],
+            lease: Some(Lease {
+                owner: "host".into(),
+                lease_id: "lease-2".into(),
+                heartbeat_at: 10,
+                expires_at: 20,
+            }),
+            receipt_id: None,
+            next_attempt_at: None,
+        };
+        let grant = LeaseGrant {
+            owner: "host".into(),
+            lease_id: "lease-2".into(),
+            attempt: 2,
+            expires_at: 20,
+        };
+        assert!(validate_grant(&node, &grant, 19).is_ok());
+        assert!(validate_grant(&node, &grant, 20).is_err());
+        assert!(validate_grant(
+            &node,
+            &LeaseGrant {
+                lease_id: "other".into(),
+                ..grant
+            },
+            19
+        )
+        .is_err());
     }
 }

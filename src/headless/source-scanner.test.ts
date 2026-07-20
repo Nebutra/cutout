@@ -52,4 +52,17 @@ describe('controlled source scanner', () => {
       await rm(outside, { recursive: true, force: true })
     }
   })
+
+  it('rejects a symlink selected as the source scan root', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'cutout-source-scan-'))
+    const alias = `${root}-alias`
+    try {
+      await writeFile(join(root, 'source.ts'), 'export const safe = true')
+      await symlink(root, alias)
+      await expect(scanSourceInput(alias, fileOperation('source.ts'))).rejects.toThrow(/scan root.*symbolic-link/)
+    } finally {
+      await rm(alias, { force: true })
+      await rm(root, { recursive: true, force: true })
+    }
+  })
 })

@@ -200,10 +200,37 @@ pub async fn workspace_revision_apply_export(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tempfile::tempdir;
+
     #[test]
     fn rejects_unsafe_manifest_paths() {
         let value = Value::Null;
         assert!(revision(&value).is_err());
         assert_eq!(hash(b"a").len(), 64);
+    }
+
+    #[test]
+    fn reads_authoritative_design_ir_from_cutout_manifest() {
+        tauri::async_runtime::block_on(async {
+            let workspace = tempdir().unwrap();
+            let cutout = workspace.path().join(".cutout");
+            std::fs::create_dir(&cutout).unwrap();
+            std::fs::write(
+                cutout.join("manifest.json"),
+                r#"{"files":{"designIr":"design-ir.json"}}"#,
+            )
+            .unwrap();
+            std::fs::write(
+                cutout.join("design-ir.json"),
+                r#"{"revision":{"id":"revision-smoke","number":1}}"#,
+            )
+            .unwrap();
+
+            let path = design_ir_path(workspace.path()).await.unwrap();
+            assert_eq!(path, cutout.join("design-ir.json").canonicalize().unwrap());
+            let bytes = fs::read(path).await.unwrap();
+            let document: Value = serde_json::from_slice(&bytes).unwrap();
+            assert_eq!(revision(&document).unwrap(), ("revision-smoke".into(), 1));
+        });
     }
 }

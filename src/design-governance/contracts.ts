@@ -16,12 +16,19 @@ export const governanceScenarioSchema = tokenUsageBindingSchema.omit({ modes: tr
   scenarioId: z.string().min(1), mode: governanceModeSchema, state: governanceStateSchema,
 }).strict()
 
+export const nonColorCueEvidenceSchema = z.object({
+  evidenceId: z.string().min(1),
+  state: governanceStateSchema,
+  kind: z.enum(['text', 'icon', 'shape', 'pattern', 'position']),
+  source: z.enum(['design-ir', 'human-review', 'dom-contract']),
+}).strict()
+
 export const computedStyleFactSchema = z.object({
   scenarioId: z.string().min(1), viewport: z.string().min(1),
   foreground: z.string().min(1), backgroundLayers: z.array(z.string().min(1)).min(1),
   fontSizePx: z.number().nonnegative(), fontWeight: z.number().int().nonnegative(),
   borderColor: z.string().optional(), outlineColor: z.string().optional(), outlineWidthPx: z.number().nonnegative().default(0),
-  nonColorCue: z.boolean().default(false), axeViolations: z.array(z.object({ id: z.string(), impact: z.enum(['minor','moderate','serious','critical']).nullable() }).strict()).default([]),
+  nonColorCueEvidence: z.array(nonColorCueEvidenceSchema).default([]), axeViolations: z.array(z.object({ id: z.string(), impact: z.enum(['minor','moderate','serious','critical']).nullable() }).strict()).default([]),
 }).strict()
 
 export const governanceFindingSchema = z.object({
@@ -43,6 +50,7 @@ export const governanceRepairTaskSchema = z.object({
 export type TokenUsageBinding = z.infer<typeof tokenUsageBindingSchema>
 export type GovernanceScenario = z.infer<typeof governanceScenarioSchema>
 export type ComputedStyleFact = z.infer<typeof computedStyleFactSchema>
+export type NonColorCueEvidence = z.infer<typeof nonColorCueEvidenceSchema>
 export type GovernanceReceipt = z.infer<typeof governanceReceiptSchema>
 export type PromotionTarget = z.infer<typeof promotionTargetSchema>
 export type GovernanceRepairTask = z.infer<typeof governanceRepairTaskSchema>

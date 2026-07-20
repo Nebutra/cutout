@@ -199,13 +199,35 @@ fn walk(root: &Path, directory: &Path, state: &mut ScanState) -> Result<(), Scan
         }
         let mut file = open_without_following(&target)?;
         let opened = file.metadata().map_err(io_error)?;
-        if !opened.is_file() {
+        if !opened.is_file() || !same_file_identity(&metadata, &opened) {
             return Err(ScanError::Invalid(
                 "repository entry changed during scan".into(),
             ));
         }
+        if opened.len() > MAX_FILE_BYTES {
+            state.excluded.oversized += 1;
+            continue;
+        }
         let mut bytes = Vec::with_capacity(opened.len() as usize);
-        file.read_to_end(&mut bytes).map_err(io_error)?;
+        file.by_ref()
+            .take(MAX_FILE_BYTES + 1)
+            .read_to_end(&mut bytes)
+            .map_err(io_error)?;
+        if bytes.len() as u64 > MAX_FILE_BYTES {
+            state.excluded.oversized += 1;
+            continue;
+        }
+        let after = file.metadata().map_err(io_error)?;
+        let current = fs::symlink_metadata(&target).map_err(io_error)?;
+        if current.file_type().is_symlink()
+            || !same_file_identity(&opened, &after)
+            || !same_file_identity(&after, &current)
+            || bytes.len() as u64 != after.len()
+        {
+            return Err(ScanError::Invalid(
+                "repository entry changed during scan".into(),
+            ));
+        }
         if bytes.contains(&0) {
             state.excluded.binary += 1;
             continue;
@@ -275,6 +297,17 @@ fn open_without_following(path: &Path) -> Result<File, ScanError> {
         .custom_flags(FILE_FLAG_OPEN_REPARSE_POINT)
         .open(path)
         .map_err(io_error)
+}
+#[cfg(unix)]
+fn same_file_identity(left: &fs::Metadata, right: &fs::Metadata) -> bool {
+    use std::os::unix::fs::MetadataExt;
+    left.dev() == right.dev() && left.ino() == right.ino()
+}
+#[cfg(windows)]
+fn same_file_identity(left: &fs::Metadata, right: &fs::Metadata) -> bool {
+    use std::os::windows::fs::MetadataExt;
+    left.volume_serial_number() == right.volume_serial_number()
+        && left.file_index() == right.file_index()
 }
 fn safe_label(value: &str) -> bool {
     !value.is_empty()
@@ -455,5 +488,20 @@ mod tests {
         assert_eq!(result.framework_hints[0].framework, "vite");
         assert!(!json.contains(root.path().to_str().unwrap()));
         assert!(!json.contains("sk-this-is-a-secret-value"));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn scan_rejects_a_symlink_selected_as_root() {
+        use std::os::unix::fs::symlink;
+
+        let parent = tempdir().unwrap();
+        let repository = parent.path().join("repository");
+        let alias = parent.path().join("repository-alias");
+        fs::create_dir(&repository).unwrap();
+        symlink(&repository, &alias).unwrap();
+
+        let error = scan_selected_root(&alias).unwrap_err();
+        assert!(error.to_string().contains("real directory"));
     }
 }

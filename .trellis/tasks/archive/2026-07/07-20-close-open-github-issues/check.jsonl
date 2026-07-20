@@ -1,0 +1,3 @@
+{"file":".trellis/spec/frontend/agent-control-safety.md","reason":"Verify the security error matrix and required regressions against changed boundaries."}
+{"file":".trellis/spec/frontend/codex-plugin.md","reason":"Verify bundled runtime fingerprints and discovery contract."}
+{"file":".trellis/spec/frontend/release-pipeline.md","reason":"Verify native/package gates without overstating signing or notarization."}

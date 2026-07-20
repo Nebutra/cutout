@@ -100,12 +100,12 @@ function flag(args, name) { const at = args.indexOf(name); return at >= 0 ? args
 
 async function coding(projectRoot, args) {
   const [action, taskJson, ...rest] = args
-  if (!['execute', 'review', 'repair'].includes(action) || !taskJson) throw new Error('Use: coding <execute|review|repair> <CodingTask JSON> [--apply --approval <approval-id>].')
+  if (!['execute', 'review', 'repair'].includes(action) || !taskJson) throw new Error('Use: coding <execute|review|repair> <CodingTask JSON> [--apply --approval-lease <lease-id>].')
   let task
   try { task = JSON.parse(taskJson) } catch { throw new Error('CodingTask must be valid JSON.') }
   if (rest.length === 0) return executeControl(projectRoot, { type: `coding.${action}`, task }, { mode: 'dry-run' })
-  if (rest.length === 3 && rest[0] === '--apply' && rest[1] === '--approval' && rest[2]) return executeControl(projectRoot, { type: `coding.${action}`, task }, { mode: 'apply', approval: { id: rest[2], grantedAt: Date.now() } })
-  throw new Error('Use: coding <execute|review|repair> <CodingTask JSON> [--apply --approval <approval-id>].')
+  if (rest.length === 3 && rest[0] === '--apply' && rest[1] === '--approval-lease' && rest[2]) return executeControl(projectRoot, { type: `coding.${action}`, task }, { mode: 'apply', approvalLeaseId: rest[2] })
+  throw new Error('Use: coding <execute|review|repair> <CodingTask JSON> [--apply --approval-lease <lease-id>].')
 }
 
 async function run(projectRoot, args) {
@@ -140,7 +140,7 @@ async function run(projectRoot, args) {
 }
 
 async function ingest(projectRoot, args) {
-  const { sourceArgs, apply, approvalId } = parseApply(args, 'ingest')
+  const { sourceArgs, apply, approvalLeaseId } = parseApply(args, 'ingest')
   const [kind, value, ...extra] = sourceArgs
   if (!kind || !value || extra.length > 0) {
     throw new Error('Use: ingest --repo <relative-root> | --url <url> | --idea <text> | --story <text> | --file <relative-path> [--apply --approval <approval-id>].')
@@ -157,17 +157,17 @@ async function ingest(projectRoot, args) {
   }
   return executeControl(projectRoot, { type: 'source.ingest', input }, {
     mode: apply ? 'apply' : 'dry-run',
-    ...(apply ? { approval: { id: approvalId, grantedAt: Date.now() } } : {}),
+    ...(apply ? { approvalLeaseId } : {}),
   })
 }
 
 function parseApply(args, command) {
   const applyAt = args.indexOf('--apply')
-  if (applyAt < 0) return { sourceArgs: args, apply: false, approvalId: undefined }
-  if (args.length !== applyAt + 3 || args[applyAt + 1] !== '--approval' || !args[applyAt + 2]) {
-    throw new Error(`Use: ${command} <descriptor> [--apply --approval <approval-id>].`)
+  if (applyAt < 0) return { sourceArgs: args, apply: false, approvalLeaseId: undefined }
+  if (args.length !== applyAt + 3 || args[applyAt + 1] !== '--approval-lease' || !args[applyAt + 2]) {
+    throw new Error(`Use: ${command} <descriptor> [--apply --approval-lease <lease-id>].`)
   }
-  return { sourceArgs: args.slice(0, applyAt), apply: true, approvalId: args[applyAt + 2] }
+  return { sourceArgs: args.slice(0, applyAt), apply: true, approvalLeaseId: args[applyAt + 2] }
 }
 
 function inferFileKind(path) {
@@ -182,20 +182,20 @@ async function exportKit(projectRoot, args) {
   if (args.length === 0 || (args.length === 1 && args[0] === '--dry-run')) {
     return executeControl(projectRoot, { type: 'export.design-kit', format: 'directory' }, { mode: 'dry-run' })
   }
-  if (args.length === 3 && args[0] === '--apply' && args[1] === '--approval') {
-    const approvalId = args[2]
-    if (!approvalId) throw new Error('--approval requires an opaque approval id.')
+  if (args.length === 3 && args[0] === '--apply' && args[1] === '--approval-lease') {
+    const approvalLeaseId = args[2]
+    if (!approvalLeaseId) throw new Error('--approval-lease requires a host-issued lease id.')
     return executeControl(projectRoot, { type: 'export.design-kit', format: 'directory' }, {
-      mode: 'apply', approval: { id: approvalId, grantedAt: Date.now() },
+      mode: 'apply', approvalLeaseId,
     })
   }
-  throw new Error('Use: export-kit [--dry-run] or export-kit --apply --approval <approval-id>.')
+  throw new Error('Use: export-kit [--dry-run] or export-kit --apply --approval-lease <lease-id>.')
 }
 
 async function exportBrandKit(projectRoot, args) {
-  const { input, apply, approvalId } = parseBrandKitExportArgs(args)
+  const { input, apply, approvalLeaseId } = parseBrandKitExportArgs(args)
   return executeControl(projectRoot, { type: 'export.brand-kit', input }, apply
-    ? { mode: 'apply', approval: { id: approvalId, grantedAt: Date.now() } }
+    ? { mode: 'apply', approvalLeaseId }
     : { mode: 'dry-run' })
 }
 
@@ -209,9 +209,9 @@ function parseBrandKitExportArgs(args) {
   } catch {
     throw new Error('--input must be valid BrandKitInput JSON.')
   }
-  if (args.length === 2) return { input, apply: false, approvalId: undefined }
-  if (args.length === 5 && args[2] === '--apply' && args[3] === '--approval' && args[4]) {
-    return { input, apply: true, approvalId: args[4] }
+  if (args.length === 2) return { input, apply: false, approvalLeaseId: undefined }
+  if (args.length === 5 && args[2] === '--apply' && args[3] === '--approval-lease' && args[4]) {
+    return { input, apply: true, approvalLeaseId: args[4] }
   }
   throw new Error('Use: export-brand-kit --input <BrandKitInput JSON> [--apply --approval <approval-id>].')
 }
@@ -222,12 +222,12 @@ async function exportStarter(projectRoot, args) {
     return executeControl(projectRoot, { type: 'export.starter', framework }, { mode: 'dry-run' })
   }
   return executeControl(projectRoot, { type: 'export.starter', framework }, {
-    mode: 'apply', approval: { id: args[4], grantedAt: Date.now() },
+    mode: 'apply', approvalLeaseId: args[4],
   })
 }
 
 function starterFramework(args) {
-  const validApply = args.length === 5 && args[2] === '--apply' && args[3] === '--approval' && Boolean(args[4])
+  const validApply = args.length === 5 && args[2] === '--apply' && args[3] === '--approval-lease' && Boolean(args[4])
   if ((args.length !== 2 && !validApply) || args[0] !== '--framework') {
     throw new Error('Use: export-starter --framework <next-app-router|vite-react|nuxt|tanstack-start> [--apply --approval <approval-id>].')
   }

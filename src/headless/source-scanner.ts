@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto'
-import { lstat, readdir, readFile, realpath } from 'node:fs/promises'
+import { constants } from 'node:fs'
+import { lstat, open, readdir, realpath, type FileHandle } from 'node:fs/promises'
 import { basename, relative, resolve, sep } from 'node:path'
 import type { SourceIngestOperation } from '@/control-protocol'
 import type { EverythingInput, RepositoryInventoryEntry } from '@/ingestion/everything-inbox'
@@ -25,6 +26,8 @@ export async function scanSourceInput(
   projectRoot: string,
   operation: Extract<SourceIngestOperation, { readonly type: 'source.ingest' }>,
 ): Promise<ScannedSourceInput> {
+  const rootMetadata = await lstat(projectRoot)
+  if (rootMetadata.isSymbolicLink() || !rootMetadata.isDirectory()) throw new Error('Source scan root must be a regular, non-symbolic-link directory.')
   const root = await realpath(projectRoot)
   const input = operation.input
   switch (input.type) {
@@ -36,11 +39,7 @@ export async function scanSourceInput(
       return { input: { ...input }, artifacts: [] }
     case 'local-file-scan': {
       const target = await controlledPath(root, input.path)
-      const stat = await lstat(target)
-      if (stat.isSymbolicLink() || !stat.isFile()) throw new Error('Only regular, non-symbolic-link files can be ingested.')
-      if (stat.size > MAX_FILE_BYTES) throw new Error(`Local files over ${MAX_FILE_BYTES} bytes are not accepted.`)
-      const bytes = new Uint8Array(await readFile(target))
-      if (bytes.byteLength !== stat.size) throw new Error('Source file changed while it was being read.')
+      const bytes = await readStableRegularFile(target, MAX_FILE_BYTES, 'Source file')
       return {
         input: {
           type: 'local-file', path: input.path, bytes, sourceKind: input.sourceKind,
@@ -72,6 +71,7 @@ export async function scanSourceInput(
 async function inventory(directory: string, root: string): Promise<readonly RepositoryInventoryEntry[]> {
   const entries: RepositoryInventoryEntry[] = []
   const visit = async (current: string): Promise<void> => {
+    await assertStableDirectory(root, current)
     const names = await readdir(current)
     for (const name of names.sort((left, right) => left.localeCompare(right))) {
       if (entries.length >= MAX_REPOSITORY_ENTRIES) throw new Error(`Repository inventories over ${MAX_REPOSITORY_ENTRIES} entries are not accepted.`)
@@ -85,7 +85,8 @@ async function inventory(directory: string, root: string): Promise<readonly Repo
       if (!stat.isFile()) continue
       const path = relative(root, target).split(sep).join('/')
       if (!allowedRepositoryEntry(path)) continue
-      entries.push({ path, bytes: stat.size, sha256: await digestFile(target, stat.size) })
+      const digest = await digestFile(target)
+      entries.push({ path, bytes: digest.bytes, sha256: digest.sha256 })
     }
   }
   await visit(directory)
@@ -96,12 +97,49 @@ function allowedRepositoryEntry(path: string): boolean {
   return !SECRET_PATH.test(path) && (ALLOWLISTED_CONFIG.test(path) || SOURCE_FILE.test(path))
 }
 
-async function digestFile(path: string, expectedBytes: number): Promise<string> {
+async function digestFile(path: string): Promise<{ readonly bytes: number; readonly sha256: string }> {
   // Hashes make a repository snapshot auditable while never placing its source
   // contents in Design IR or a control response.
-  const bytes = new Uint8Array(await readFile(path))
-  if (bytes.byteLength !== expectedBytes) throw new Error('Repository file changed while it was being scanned.')
-  return createHash('sha256').update(bytes).digest('hex')
+  const bytes = await readStableRegularFile(path, MAX_FILE_BYTES, 'Repository file')
+  return { bytes: bytes.byteLength, sha256: createHash('sha256').update(bytes).digest('hex') }
+}
+
+async function readStableRegularFile(path: string, maxBytes: number, label: string): Promise<Uint8Array> {
+  let handle: FileHandle | undefined
+  try {
+    handle = await open(path, constants.O_RDONLY | noFollowFlag())
+    const before = await handle.stat()
+    if (!before.isFile()) throw new Error(`${label} must be a regular file.`)
+    if (before.size > maxBytes) throw new Error(`${label}s over ${maxBytes} bytes are not accepted.`)
+    const bytes = new Uint8Array(await handle.readFile())
+    const after = await handle.stat()
+    const pathMetadata = await lstat(path)
+    if (pathMetadata.isSymbolicLink() || !sameIdentity(before, after) || !sameIdentity(after, pathMetadata) || bytes.byteLength !== after.size) {
+      throw new Error(`${label} changed while it was being read.`)
+    }
+    return bytes
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ELOOP') throw new Error(`${label} must not be a symbolic link.`)
+    throw error
+  } finally {
+    await handle?.close()
+  }
+}
+
+async function assertStableDirectory(root: string, directory: string): Promise<void> {
+  const metadata = await lstat(directory)
+  if (metadata.isSymbolicLink() || !metadata.isDirectory()) throw new Error('Repository scan encountered a non-directory or symbolic-link component.')
+  const canonical = await realpath(directory)
+  assertInside(root, canonical)
+  if (canonical !== directory) throw new Error('Repository scan encountered a non-canonical directory.')
+}
+
+function sameIdentity(left: { readonly dev: number | bigint; readonly ino: number | bigint }, right: { readonly dev: number | bigint; readonly ino: number | bigint }): boolean {
+  return left.dev === right.dev && left.ino === right.ino
+}
+
+function noFollowFlag(): number {
+  return typeof constants.O_NOFOLLOW === 'number' ? constants.O_NOFOLLOW : 0
 }
 
 async function controlledPath(root: string, relativePath: string): Promise<string> {

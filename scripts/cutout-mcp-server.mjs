@@ -121,12 +121,12 @@ export const MCP_TOOLS = [
   },
   {
     name: 'cutout_apply_source_ingest',
-    description: 'Apply a previously reviewed controlled source import after explicit approval. The host resolves scans below its project root, records source/provenance, and never receives arbitrary file bytes or absolute paths.',
+    description: 'Apply a previously reviewed controlled source import after host-issued approval lease. The host resolves scans below its project root, records source/provenance, and never receives arbitrary file bytes or absolute paths.',
     inputSchema: {
-      type: 'object', additionalProperties: false, required: ['input', 'approvalId'],
+      type: 'object', additionalProperties: false, required: ['input', 'approvalLeaseId'],
       properties: {
         input: { type: 'object', additionalProperties: true },
-        approvalId: { type: 'string', minLength: 1, maxLength: 160 },
+        approvalLeaseId: { type: 'string', minLength: 1, maxLength: 160 },
       },
     },
   },
@@ -137,10 +137,10 @@ export const MCP_TOOLS = [
   },
   {
     name: 'cutout_export_design_kit',
-    description: 'Write the planned Design Kit only to .cutout/exports/design-kit after explicit approval. No destination path is accepted.',
+    description: 'Write the planned Design Kit only to .cutout/exports/design-kit after host-issued approval lease. No destination path is accepted.',
     inputSchema: {
-      type: 'object', additionalProperties: false, required: ['approvalId'],
-      properties: { approvalId: { type: 'string', minLength: 1, maxLength: 160 } },
+      type: 'object', additionalProperties: false, required: ['approvalLeaseId'],
+      properties: { approvalLeaseId: { type: 'string', minLength: 1, maxLength: 160 } },
     },
   },
   {
@@ -153,12 +153,12 @@ export const MCP_TOOLS = [
   },
   {
     name: 'cutout_export_brand_kit',
-    description: 'Write the planned Brand/VI Kit only to .cutout/exports/brand-kit after explicit approval. It accepts no destination and rejects inferred or mismatched evidence.',
+    description: 'Write the planned Brand/VI Kit only to .cutout/exports/brand-kit after host-issued approval lease. It accepts no destination and rejects inferred or mismatched evidence.',
     inputSchema: {
-      type: 'object', additionalProperties: false, required: ['input', 'approvalId'],
+      type: 'object', additionalProperties: false, required: ['input', 'approvalLeaseId'],
       properties: {
         input: { type: 'object', description: 'Complete BrandKitInput: { document, brand }.' },
-        approvalId: { type: 'string', minLength: 1, maxLength: 160 },
+        approvalLeaseId: { type: 'string', minLength: 1, maxLength: 160 },
       },
     },
   },
@@ -172,12 +172,12 @@ export const MCP_TOOLS = [
   },
   {
     name: 'cutout_export_starter',
-    description: 'Write a hash-verified StarterPlan only to .cutout/exports/starter after explicit approval. No destination or command is accepted.',
+    description: 'Write a hash-verified StarterPlan only to .cutout/exports/starter after host-issued approval lease. No destination or command is accepted.',
     inputSchema: {
-      type: 'object', additionalProperties: false, required: ['framework', 'approvalId'],
+      type: 'object', additionalProperties: false, required: ['framework', 'approvalLeaseId'],
       properties: {
         framework: { type: 'string', enum: ['next-app-router', 'vite-react', 'nuxt', 'tanstack-start'] },
-        approvalId: { type: 'string', minLength: 1, maxLength: 160 },
+        approvalLeaseId: { type: 'string', minLength: 1, maxLength: 160 },
       },
     },
   },
@@ -188,14 +188,14 @@ export const MCP_TOOLS = [
   },
   {
     name: 'cutout_apply_coding_task',
-    description: 'Apply a reviewed CodingTask after explicit approval. Only an injected controlled workspace/backend may write allowlisted paths or run named checks.',
-    inputSchema: { type: 'object', additionalProperties: false, required: ['operation', 'task', 'approvalId'], properties: { operation: { type: 'string', enum: ['coding.execute', 'coding.review', 'coding.repair'] }, task: { type: 'object' }, approvalId: { type: 'string', minLength: 1, maxLength: 160 } } },
+    description: 'Apply a reviewed CodingTask after host-issued approval lease. Only an injected controlled workspace/backend may write allowlisted paths or run named checks.',
+    inputSchema: { type: 'object', additionalProperties: false, required: ['operation', 'task', 'approvalLeaseId'], properties: { operation: { type: 'string', enum: ['coding.execute', 'coding.review', 'coding.repair'] }, task: { type: 'object' }, approvalLeaseId: { type: 'string', minLength: 1, maxLength: 160 } } },
   },
   { name: 'cutout_registry_list', description: 'List verified project registry items without reading arbitrary paths or contacting the network.', inputSchema: { type: 'object', additionalProperties: false, properties: { kind: { type: 'string', enum: ['component','pattern','template','starter','skill','integration-adapter'] }, framework: { type: 'string', maxLength: 80 } } } },
   { name: 'cutout_registry_search', description: 'Search verified project registry metadata by text and exact filters.', inputSchema: { type: 'object', additionalProperties: false, required: ['query'], properties: { query: { type: 'string', minLength: 1, maxLength: 200 }, kind: { type: 'string', enum: ['component','pattern','template','starter','skill','integration-adapter'] }, framework: { type: 'string', maxLength: 80 } } } },
   { name: 'cutout_registry_get', description: 'Read one verified registry item manifest; file bytes and credentials are not returned.', inputSchema: { type: 'object', additionalProperties: false, required: ['itemId'], properties: { itemId: { type: 'string', minLength: 1, maxLength: 160 }, version: { type: 'string', maxLength: 80 } } } },
   { name: 'cutout_registry_plan_install', description: 'Resolve and preview an open-code install diff, including three-way conflicts. This does not write.', inputSchema: { type: 'object', additionalProperties: false, required: ['itemId','framework'], properties: { itemId: { type: 'string', minLength: 1, maxLength: 160 }, version: { type: 'string', maxLength: 80 }, framework: { type: 'string', minLength: 1, maxLength: 80 } } } },
-  { name: 'cutout_registry_apply_install', description: 'Re-resolve and apply an approved conflict-free install to controlled project paths, then record installed origins.', inputSchema: { type: 'object', additionalProperties: false, required: ['itemId','framework','approvalId'], properties: { itemId: { type: 'string', minLength: 1, maxLength: 160 }, version: { type: 'string', maxLength: 80 }, framework: { type: 'string', minLength: 1, maxLength: 80 }, approvalId: { type: 'string', minLength: 1, maxLength: 160 } } } },
+  { name: 'cutout_registry_apply_install', description: 'Re-resolve and apply an approved conflict-free install to controlled project paths, then record installed origins.', inputSchema: { type: 'object', additionalProperties: false, required: ['itemId','framework','approvalLeaseId'], properties: { itemId: { type: 'string', minLength: 1, maxLength: 160 }, version: { type: 'string', maxLength: 80 }, framework: { type: 'string', minLength: 1, maxLength: 80 }, approvalLeaseId: { type: 'string', minLength: 1, maxLength: 160 } } } },
   { name: 'cutout_registry_install_receipt', description: 'Read a durable install receipt by its opaque plan id.', inputSchema: { type: 'object', additionalProperties: false, required: ['planId'], properties: { planId: { type: 'string', minLength: 1, maxLength: 160 } } } },
   { name: 'cutout_workflow_pack_list', description: 'List repo-native workflow packs without network access.', inputSchema: { type: 'object', additionalProperties: false, properties: {} } },
   { name: 'cutout_workflow_pack_get', description: 'Read one versioned repo-native workflow pack.', inputSchema: { type: 'object', additionalProperties: false, required: ['id'], properties: { id: { type: 'string', minLength: 1, maxLength: 160 }, version: { type: 'string', maxLength: 80 } } } },
@@ -291,22 +291,22 @@ async function callTool(params) {
       break
     case 'cutout_apply_source_ingest':
       assertSourceDescriptor(input.input)
-      if (typeof input.approvalId !== 'string' || input.approvalId.length === 0 || input.approvalId.length > 160) {
-        throw rpcError(-32602, 'approvalId is required.')
+      if (typeof input.approvalLeaseId !== 'string' || input.approvalLeaseId.length === 0 || input.approvalLeaseId.length > 160) {
+        throw rpcError(-32602, 'approvalLeaseId is required.')
       }
       result = await executeControl(PROJECT_ROOT, { type: 'source.ingest', input: input.input }, {
-        mode: 'apply', approval: { id: input.approvalId, grantedAt: Date.now() },
+        mode: 'apply', approvalLeaseId: input.approvalLeaseId,
       })
       break
     case 'cutout_plan_design_kit_export':
       result = await executeControl(PROJECT_ROOT, { type: 'export.design-kit', format: 'directory' }, { mode: 'dry-run' })
       break
     case 'cutout_export_design_kit':
-      if (typeof input.approvalId !== 'string' || input.approvalId.length === 0 || input.approvalId.length > 160) {
-        throw rpcError(-32602, 'approvalId is required.')
+      if (typeof input.approvalLeaseId !== 'string' || input.approvalLeaseId.length === 0 || input.approvalLeaseId.length > 160) {
+        throw rpcError(-32602, 'approvalLeaseId is required.')
       }
       result = await executeControl(PROJECT_ROOT, { type: 'export.design-kit', format: 'directory' }, {
-        mode: 'apply', approval: { id: input.approvalId, grantedAt: Date.now() },
+        mode: 'apply', approvalLeaseId: input.approvalLeaseId,
       })
       break
     case 'cutout_plan_brand_kit_export':
@@ -319,11 +319,11 @@ async function callTool(params) {
       if (!input.input || typeof input.input !== 'object' || Array.isArray(input.input)) {
         throw rpcError(-32602, 'input must be a BrandKitInput object.')
       }
-      if (typeof input.approvalId !== 'string' || input.approvalId.length === 0 || input.approvalId.length > 160) {
-        throw rpcError(-32602, 'approvalId is required.')
+      if (typeof input.approvalLeaseId !== 'string' || input.approvalLeaseId.length === 0 || input.approvalLeaseId.length > 160) {
+        throw rpcError(-32602, 'approvalLeaseId is required.')
       }
       result = await executeControl(PROJECT_ROOT, { type: 'export.brand-kit', input: input.input }, {
-        mode: 'apply', approval: { id: input.approvalId, grantedAt: Date.now() },
+        mode: 'apply', approvalLeaseId: input.approvalLeaseId,
       })
       break
     case 'cutout_plan_starter_export':
@@ -332,11 +332,11 @@ async function callTool(params) {
       break
     case 'cutout_export_starter':
       if (!validStarterFramework(input.framework)) throw rpcError(-32602, 'framework must be next-app-router, vite-react, nuxt, or tanstack-start.')
-      if (typeof input.approvalId !== 'string' || input.approvalId.length === 0 || input.approvalId.length > 160) {
-        throw rpcError(-32602, 'approvalId is required.')
+      if (typeof input.approvalLeaseId !== 'string' || input.approvalLeaseId.length === 0 || input.approvalLeaseId.length > 160) {
+        throw rpcError(-32602, 'approvalLeaseId is required.')
       }
       result = await executeControl(PROJECT_ROOT, { type: 'export.starter', framework: input.framework }, {
-        mode: 'apply', approval: { id: input.approvalId, grantedAt: Date.now() },
+        mode: 'apply', approvalLeaseId: input.approvalLeaseId,
       })
       break
     case 'cutout_plan_coding_task':
@@ -345,14 +345,14 @@ async function callTool(params) {
       break
     case 'cutout_apply_coding_task':
       assertCodingInput(input)
-      if (typeof input.approvalId !== 'string' || input.approvalId.length === 0 || input.approvalId.length > 160) throw rpcError(-32602, 'approvalId is required.')
-      result = await executeControl(PROJECT_ROOT, { type: input.operation, task: input.task }, { mode: 'apply', approval: { id: input.approvalId, grantedAt: Date.now() } })
+      if (typeof input.approvalLeaseId !== 'string' || input.approvalLeaseId.length === 0 || input.approvalLeaseId.length > 160) throw rpcError(-32602, 'approvalLeaseId is required.')
+      result = await executeControl(PROJECT_ROOT, { type: input.operation, task: input.task }, { mode: 'apply', approvalLeaseId: input.approvalLeaseId })
       break
     case 'cutout_registry_list': result = { ok: true, response: { items: await registryList(PROJECT_ROOT, { kind: input.kind, framework: input.framework }) } }; break
     case 'cutout_registry_search': result = { ok: true, response: { items: await registryList(PROJECT_ROOT, { query: input.query, kind: input.kind, framework: input.framework }) } }; break
     case 'cutout_registry_get': result = { ok: true, response: await registryGet(PROJECT_ROOT, input.itemId, input.version) }; break
     case 'cutout_registry_plan_install': result = { ok: true, response: await registryPlanInstall(PROJECT_ROOT, input.itemId, input.framework, input.version) }; break
-    case 'cutout_registry_apply_install': result = { ok: true, response: await registryApplyInstall(PROJECT_ROOT, input.itemId, input.framework, input.approvalId, input.version) }; break
+    case 'cutout_registry_apply_install': result = { ok: true, response: await registryApplyInstall(PROJECT_ROOT, input.itemId, input.framework, input.approvalLeaseId, input.version) }; break
     case 'cutout_registry_install_receipt': { const receipt = await registryReceipt(PROJECT_ROOT, input.planId); result = receipt ? { ok: true, response: receipt } : { ok: false, error: { code: 'not-found', message: 'Registry install receipt was not found.' } }; break }
     case 'cutout_workflow_pack_list': result={ok:true,response:{packs:await workflowList(PROJECT_ROOT)}};break
     case 'cutout_workflow_pack_get': result={ok:true,response:await workflowGet(PROJECT_ROOT,input.id,input.version)};break

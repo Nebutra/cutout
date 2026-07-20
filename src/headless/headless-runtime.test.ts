@@ -299,11 +299,11 @@ describe('repo-native headless runtime', () => {
     }
     const denied = await runtime.execute(request(operation, { requestId: 'source-apply' }))
     const applied = await runtime.execute(request(operation, {
-      requestId: 'source-apply', approval: { id: 'reviewed-import', grantedAt: 1 },
-    }))
+      requestId: 'source-apply',
+    }), { approval: { id: 'reviewed-import', grantedAt: 1 } })
     const duplicate = await runtime.execute(request(operation, {
-      requestId: 'source-apply', approval: { id: 'reviewed-import', grantedAt: 1 },
-    }))
+      requestId: 'source-apply',
+    }), { approval: { id: 'reviewed-import', grantedAt: 1 } })
 
     expect(denied).toMatchObject({ status: 'denied', error: { code: 'approval-required' } })
     expect(applied).toMatchObject({ status: 'ok', revision: 1, result: { operation: 'source.ingest' } })

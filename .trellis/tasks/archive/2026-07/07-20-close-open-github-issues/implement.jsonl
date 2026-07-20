@@ -1,0 +1,4 @@
+{"file":".trellis/spec/frontend/agent-control-safety.md","reason":"Executable contracts for durable claims, approval leases, controlled paths, governance evidence, adapters, and receipts."}
+{"file":".trellis/spec/frontend/codex-plugin.md","reason":"Generated plugin runtime and Agent surface synchronization requirements."}
+{"file":".trellis/spec/frontend/release-pipeline.md","reason":"Native build, capability drift, and packaged macOS smoke requirements."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Cross-layer request, ledger, evidence, and generated-runtime consistency checks."}

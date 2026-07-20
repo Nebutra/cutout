@@ -5,6 +5,7 @@ import {
   type ControlOperation,
   type ControlRequest,
   type ControlResponse,
+  type TrustedControlAuthorization,
 } from '@/control-protocol'
 import { planPaidTool } from '@/control-protocol'
 import { compileHeadlessDesignKit } from '@/design-kit'
@@ -26,7 +27,7 @@ import { ledgerFromState, type RuntimeStore, type SourceIngestionStore } from '.
 import { executeCodingTask, type CodingBackend, type CodingWorkspace } from '@/coding-runtime'
 
 export interface HeadlessRuntime {
-  execute(input: unknown): Promise<ControlResponse>
+  execute(input: unknown, authorization?: TrustedControlAuthorization): Promise<ControlResponse>
 }
 
 /**
@@ -36,7 +37,7 @@ export interface HeadlessRuntime {
  */
 export function createHeadlessRuntime(store: RuntimeStore, coding: { backend?: CodingBackend; workspace?: CodingWorkspace } = {}): HeadlessRuntime {
   return {
-    async execute(input) {
+    async execute(input, authorization = {}) {
       const parsedRequest = controlRequestSchema.safeParse(input)
       if (!parsedRequest.success) return invalidResponse(input, parsedRequest.error.issues[0]?.message ?? 'Invalid control request.')
 
@@ -60,6 +61,7 @@ export function createHeadlessRuntime(store: RuntimeStore, coding: { backend?: C
           allowExternal: state.policy.allowApply,
           requireApprovalForExternal: state.policy.requireApprovalForExternal,
         },
+        authorization,
       })
       if (preparation.decision === 'duplicate' || preparation.decision === 'conflict' || preparation.decision === 'denied') {
         return preparation.response
@@ -76,7 +78,7 @@ export function createHeadlessRuntime(store: RuntimeStore, coding: { backend?: C
         })
       }
 
-      const dispatched = await dispatch(store, state, request, coding)
+      const dispatched = await dispatch(store, state, request, coding, authorization)
       if (!dispatched.ok) {
         return response(request, ledger.revision, dispatched.code ? 'denied' : 'invalid', request.mode === 'dry-run', false, undefined, {
           code: dispatched.code ?? 'invalid-request', message: dispatched.message,
@@ -116,7 +118,7 @@ type DispatchResult = {
   readonly code?: 'authorization-required' | 'capability-required' | 'budget-exceeded'
 }
 
-async function dispatch(store: RuntimeStore, state: HeadlessProjectState, request: ControlRequest, coding: { backend?: CodingBackend; workspace?: CodingWorkspace }): Promise<DispatchResult> {
+async function dispatch(store: RuntimeStore, state: HeadlessProjectState, request: ControlRequest, coding: { backend?: CodingBackend; workspace?: CodingWorkspace }, authorization: TrustedControlAuthorization): Promise<DispatchResult> {
   switch (request.operation.type) {
     case 'project.context': return ok(projectContext(state, request.operation.include))
     case 'material.list': return ok(materialList(state, request.operation.filter))
@@ -162,7 +164,7 @@ async function dispatch(store: RuntimeStore, state: HeadlessProjectState, reques
       }
     }
     case 'tool.invoke': {
-      const plan = planPaidTool(request.operation.tool, undefined, { allowPaid: true }, Boolean(request.approval))
+      const plan = planPaidTool(request.operation.tool, undefined, { allowPaid: true }, Boolean(authorization.approval))
       if (request.mode === 'dry-run') return ok({ operation: 'tool.invoke', plan })
       return { ok: false, code: 'capability-required', message: plan.reason ?? 'No paid tool executor is available.' }
     }

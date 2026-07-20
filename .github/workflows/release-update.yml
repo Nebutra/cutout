@@ -139,6 +139,8 @@ jobs:
           test -n "$CUTOUT_UPDATER_PUBKEY" || { echo 'CUTOUT_UPDATER_PUBKEY is required' >&2; exit 1; }
           test -n "$CUTOUT_UPDATER_ALLOWED_HOSTS" || { echo 'CUTOUT_UPDATER_ALLOWED_HOSTS is required' >&2; exit 1; }
           test -n "$CUTOUT_UPDATER_STABLE_ENDPOINTS" || { echo 'CUTOUT_UPDATER_STABLE_ENDPOINTS is required' >&2; exit 1; }
+      - name: Exercise safe local workspace bridge
+        run: cargo test --locked --manifest-path src-tauri/Cargo.toml reads_authoritative_design_ir_from_cutout_manifest
       - uses: tauri-apps/tauri-action@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -149,6 +151,10 @@ jobs:
           uploadWorkflowArtifacts: true
           workflowArtifactNamePattern: ${{ matrix.artifact }}
           uploadUpdaterSignatures: true
+      - name: Launch host-native packaged application
+        if: runner.os == 'macOS'
+        shell: bash
+        run: bash scripts/smoke-packaged-macos.sh "src-tauri/target/${{ matrix.target }}/release/bundle/macos"
 
   publish:
     name: Create GitHub Release

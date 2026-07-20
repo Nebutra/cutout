@@ -106,5 +106,11 @@ channel:
 # (main agent spawns trellis-implement / trellis-check / trellis-research
 # sub-agents).
 #
-# codex:
-#   dispatch_mode: inline  # or "sub-agent" to dispatch trellis-* sub-agents
+codex:
+  dispatch_mode: sub-agent
+
+# Preserve local customizations (default task-creation consent) across `trellis update`
+update:
+  skip:
+    - .trellis/workflow.md
+    - .trellis/config.yaml

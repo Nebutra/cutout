@@ -11,7 +11,8 @@ const policy: StandardGovernancePolicy = { version:'design-governance-policy.v1'
 const location = { entityId:'component.button', path:'components/button' }
 const binding = (kind:'text'|'ui-boundary'|'focus-indicator'|'color-only', lockedTokenIds:string[] = []) => ({ id:`binding.${kind}`, selector:'#subject', foregroundTokenId:'fg', backgroundTokenId:'bg', kind, modes, states, lockedTokenIds })
 const scenario = (kind:Parameters<typeof binding>[0], locked=false) => enumerateGovernanceScenarios([binding(kind, locked?['fg']:[])],new Set(['fg','bg']))[0]!
-const fact = (scenarioId:string, overrides:Partial<ComputedStyleFact>={}):ComputedStyleFact => ({ scenarioId,viewport:'desktop',foreground:'rgb(0,0,0)',backgroundLayers:['rgb(255,255,255)'],fontSizePx:16,fontWeight:400,outlineWidthPx:2,nonColorCue:true,axeViolations:[],...overrides })
+const cue = [{ evidenceId:'cue:explicit', state:'default' as const, kind:'icon' as const, source:'human-review' as const }]
+const fact = (scenarioId:string, overrides:Partial<ComputedStyleFact>={}):ComputedStyleFact => ({ scenarioId,viewport:'desktop',foreground:'rgb(0,0,0)',backgroundLayers:['rgb(255,255,255)'],fontSizePx:16,fontWeight:400,outlineWidthPx:2,nonColorCueEvidence:cue,axeViolations:[],...overrides })
 
 describe('Design Governance strict conformance corpus', () => {
   it('enumerates every light/dark/high-contrast and interaction-state cell exactly once', () => {
@@ -27,7 +28,7 @@ describe('Design Governance strict conformance corpus', () => {
     expect(evaluateGovernance([large],[fact(large.scenarioId,{foreground:'rgb(119,119,119)',fontSizePx:24})],1).status).toBe('passed')
     expect(evaluateGovernance([boundary],[fact(boundary.scenarioId,{borderColor:'rgb(160,160,160)'})],1).status).toBe('blocked')
     expect(evaluateGovernance([focus],[fact(focus.scenarioId,{outlineColor:'rgb(0,0,0)',outlineWidthPx:1.99})],1).status).toBe('blocked')
-    expect(evaluateGovernance([color],[fact(color.scenarioId,{nonColorCue:false})],1).findings[0]).toMatchObject({rule:'color-only',severity:'hard',status:'failed'})
+    expect(evaluateGovernance([color],[fact(color.scenarioId,{nonColorCueEvidence:[]})],1).findings[0]).toMatchObject({rule:'color-only',severity:'hard',status:'failed'})
   })
 
   it('composites alpha correctly and keeps CSS Color 4 gamut mapping finite', () => {

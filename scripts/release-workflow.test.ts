@@ -39,4 +39,16 @@ describe('cross-platform release workflow', () => {
     expect(publishScript).toContain('--draft')
     expect(publishScript).toContain('gh release edit')
   })
+
+  it('tests a safe workspace read and launches the host-native packaged app before publishing', async () => {
+    const source = await readFile('.github/workflows/release-update.yml', 'utf8')
+    const workflow = YAML.parse(source)
+    const buildSteps = workflow.jobs.build.steps
+    const workspaceSmoke = buildSteps.find((step: { name?: string }) => step.name === 'Exercise safe local workspace bridge')
+    const packageSmoke = buildSteps.find((step: { name?: string }) => step.name === 'Launch host-native packaged application')
+
+    expect(workspaceSmoke.run).toContain('reads_authoritative_design_ir_from_cutout_manifest')
+    expect(packageSmoke.if).toBe("runner.os == 'macOS'")
+    expect(packageSmoke.run).toContain('scripts/smoke-packaged-macos.sh')
+  })
 })
