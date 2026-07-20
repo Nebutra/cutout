@@ -1,8 +1,8 @@
 #!/usr/bin/env node
-import { createHash } from 'node:crypto'
 import { readFile, readdir, stat } from 'node:fs/promises'
 import { dirname, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { normalizeText, sha256NormalizedText } from './lib/normalized-text.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const pluginRoot = resolve(root, 'plugins/cutout')
@@ -52,7 +52,7 @@ assert(buildManifest.packageVersion === packageJson.version, 'Bundled runtime ve
 for (const [path, expectedHash] of Object.entries(buildManifest.sourceHashes ?? {})) {
   const sourcePath = resolve(root, path)
   assert(await exists(sourcePath), `Bundled runtime source is missing: ${path}.`)
-  if (await exists(sourcePath)) assert(sha256(await readFile(sourcePath)) === expectedHash, `Bundled runtime source changed; run pnpm plugin:build: ${path}.`)
+  if (await exists(sourcePath)) assert(sha256NormalizedText(await readFile(sourcePath, 'utf8')) === expectedHash, `Bundled runtime source changed; run pnpm plugin:build: ${path}.`)
 }
 
 const bundle = await readFile(resolve(pluginRoot, 'runtime/cutout-mcp.mjs'), 'utf8')
@@ -83,7 +83,7 @@ async function hasPngSignature(path) {
 async function equalNormalizedTextFiles(left, right) {
   if (!(await exists(left)) || !(await exists(right))) return false
   const [leftText, rightText] = await Promise.all([readFile(left, 'utf8'), readFile(right, 'utf8')])
-  return normalizeText(leftText) === rightText
+  return normalizeText(leftText) === normalizeText(rightText)
 }
 
 async function equalNormalizedTextTrees(left, right) {
@@ -103,12 +103,4 @@ async function listFiles(rootPath, current = rootPath) {
     else if (entry.isFile()) files.push(relative(rootPath, path))
   }
   return files
-}
-
-function sha256(value) {
-  return createHash('sha256').update(value).digest('hex')
-}
-
-function normalizeText(source) {
-  return `${source.replace(/[ \t]+$/gm, '').trimEnd()}\n`
 }

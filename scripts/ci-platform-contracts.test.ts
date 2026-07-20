@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises'
 import { describe, expect, it } from 'vitest'
 import YAML from 'yaml'
 import { resolveChromeExecutable } from '../playwright.config'
+import { normalizeText, sha256NormalizedText } from './lib/normalized-text.mjs'
 import { parseSkillFrontmatter } from './lib/skill-frontmatter.mjs'
 
 describe('cross-platform CI contracts', () => {
@@ -34,5 +35,13 @@ describe('cross-platform CI contracts', () => {
       'name: example',
       'description: Example skill',
     ].join(eol))
+  })
+
+  it('keeps plugin text and fingerprints stable across checkout line endings', () => {
+    const lf = 'const value = true\n// done\n'
+    const crlf = 'const value = true\r\n// done\r\n'
+
+    expect(normalizeText(crlf)).toBe(lf)
+    expect(sha256NormalizedText(crlf)).toBe(sha256NormalizedText(lf))
   })
 })

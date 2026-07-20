@@ -1,9 +1,9 @@
 #!/usr/bin/env node
-import { createHash } from 'node:crypto'
 import { cp, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { dirname, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { build } from 'vite'
+import { normalizeText, sha256NormalizedText } from './lib/normalized-text.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const pluginRoot = resolve(root, 'plugins/cutout')
@@ -48,7 +48,7 @@ const modulePaths = [...new Set(outputs.flatMap((output) => output.type === 'chu
   .filter((path) => path.startsWith(`${root}/`))
   .sort()
 const sourceHashes = {}
-for (const path of modulePaths) sourceHashes[relative(root, path)] = sha256(await readFile(path))
+for (const path of modulePaths) sourceHashes[relative(root, path)] = sha256NormalizedText(await readFile(path, 'utf8'))
 
 const packageJson = JSON.parse(await readFile(resolve(root, 'package.json'), 'utf8'))
 await writeFile(resolve(runtimeDir, 'runtime-build.json'), `${JSON.stringify({
@@ -58,10 +58,6 @@ await writeFile(resolve(runtimeDir, 'runtime-build.json'), `${JSON.stringify({
 }, null, 2)}\n`)
 
 process.stdout.write(`Built Cutout Codex plugin runtime from ${modulePaths.length} source modules.\n`)
-
-function sha256(value) {
-  return createHash('sha256').update(value).digest('hex')
-}
 
 async function normalizeTextTree(path) {
   const entries = await readdir(path, { withFileTypes: true })
@@ -74,8 +70,4 @@ async function normalizeTextTree(path) {
 async function normalizeTextFile(path) {
   const source = await readFile(path, 'utf8')
   await writeFile(path, normalizeText(source))
-}
-
-function normalizeText(source) {
-  return `${source.replace(/[ \t]+$/gm, '').trimEnd()}\n`
 }

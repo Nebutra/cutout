@@ -44,7 +44,8 @@ installer version differs from their release version.
 - Every CI contract runner installs Playwright Chromium before `pnpm test`;
   Linux also installs its browser system dependencies. Browser configuration
   uses the bundled executable outside macOS unless an explicit executable path
-  is provided. Text validators accept both LF and CRLF repository checkouts.
+  is provided. Text validators accept both LF and CRLF repository checkouts;
+  plugin source fingerprints and mirrored text trees normalize both forms.
 - AppShell initializes once, delays automatic checking for 8 seconds, and uses
   the persisted 24-hour preference gate. The Home action subscribes to this
   state; it does not call GitHub or the native updater directly.
