@@ -829,6 +829,10 @@ export function IntentWorkspace({
         },
       );
     }
+    // Partial evidence is expected while the pipeline is producing the suite.
+    // Publishing a terminal evaluation for every intermediate projection turns
+    // normal progress into a burst of false "needs repair" notifications.
+    if (working) return;
     const missingSignature = outcome.evaluation.missing
       .map((item) => `${item.kind}:${item.count}`)
       .join(",");
@@ -848,6 +852,7 @@ export function IntentWorkspace({
     agentRunEvents.activeRunId,
     emitRunEvent,
     outcome,
+    working,
   ]);
   const repairPlan = planPrototypeRepair(
     outcome,

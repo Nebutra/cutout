@@ -30,9 +30,33 @@ function safe(value: string, limit: number): string {
   return normalized.slice(0, limit) || 'No additional detail.'
 }
 
+function outcomeNotificationRunId(id: string): string | null {
+  if (!id.startsWith('agent:')) return null
+  const marker = id.lastIndexOf(':outcome')
+  if (marker < 'agent:'.length) return null
+  const suffix = id.slice(marker + ':outcome'.length)
+  if (suffix !== '' && !suffix.startsWith(':')) return null
+  return id.slice('agent:'.length, marker)
+}
+
+function collapseOutcomeHistory(items: readonly LocalNotification[]): readonly LocalNotification[] {
+  const seenRuns = new Set<string>()
+  return [...items]
+    .sort((a, b) => b.createdAt - a.createdAt)
+    .filter((item) => {
+      const runId = outcomeNotificationRunId(item.id)
+      if (!runId) return true
+      if (seenRuns.has(runId)) return false
+      seenRuns.add(runId)
+      return true
+    })
+}
+
 export function loadLocalNotifications(storage?: Pick<Storage, 'getItem'>): readonly LocalNotification[] {
   try {
-    return notificationListSchema.parse(JSON.parse((storage ?? host())?.getItem(STORAGE_KEY) ?? '[]'))
+    return collapseOutcomeHistory(
+      notificationListSchema.parse(JSON.parse((storage ?? host())?.getItem(STORAGE_KEY) ?? '[]')),
+    )
   } catch {
     return []
   }
@@ -89,9 +113,11 @@ export function notificationFromAgentEvent(event: AgentRunEvent): LocalNotificat
     case 'step-failed':
       return { ...base, kind: 'failure', title: event.type === 'tool-failed' ? `${safe(event.label, 120)} failed` : `${safe(event.label, 120)} needs attention`, detail: safe(event.detail, 500) }
     case 'outcome-evaluated':
+      // Outcome evaluation is current state, not an append-only activity item.
+      // Keep one notification per run so repair -> ready replaces stale status.
       return event.status === 'satisfied'
-        ? { ...base, kind: 'success', title: 'Result ready', detail: 'The requested outcome is complete.' }
-        : { ...base, kind: 'attention', title: 'Result needs repair', detail: safe(event.missing.map((item) => `${item.label} (${item.count})`).join(', '), 500) }
+        ? { ...base, id: `agent:${event.runId}:outcome`, kind: 'success', title: 'Result ready', detail: 'The requested outcome is complete.' }
+        : { ...base, id: `agent:${event.runId}:outcome`, kind: 'attention', title: 'Result needs repair', detail: safe(event.missing.map((item) => `${item.label} (${item.count})`).join(', '), 500) }
     default:
       return null
   }

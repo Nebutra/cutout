@@ -30,6 +30,39 @@ describe('local notification projection', () => {
     expect(notificationFromAgentEvent(event({ type: 'tool-failed', toolCallId: 't', tool: 'image', label: 'Generate image', detail: 'Provider unavailable' }))).toMatchObject({ kind: 'failure', detail: 'Provider unavailable' })
   })
 
+  it('replaces outcome status within one run instead of accumulating stale repair alerts', () => {
+    const storage = memory()
+    const repair = event({ type: 'outcome-evaluated', status: 'needs-repair', missing: [{ kind: 'prototype-page', count: 1, label: 'Planned prototype pages' }] })
+    const ready = { ...event({ type: 'outcome-evaluated', status: 'satisfied', missing: [] }), eventId: 'event:outcome-ready', at: 43 }
+
+    const repairNotification = notificationFromAgentEvent(repair)!
+    const readyNotification = notificationFromAgentEvent(ready)!
+    expect(repairNotification.id).toBe('agent:run.one:outcome')
+    expect(readyNotification.id).toBe(repairNotification.id)
+
+    appendLocalNotification(repairNotification, storage)
+    appendLocalNotification(readyNotification, storage)
+    expect(loadLocalNotifications(storage)).toEqual([
+      expect.objectContaining({ id: 'agent:run.one:outcome', kind: 'success', title: 'Result ready' }),
+    ])
+  })
+
+  it('collapses legacy per-event outcome notifications already stored for the same run', () => {
+    const storage = memory()
+    storage.setItem('cutout.notifications.v1', JSON.stringify([
+      { id: 'agent:run.one:outcome:needs-repair:design-system:1', source: 'agent', kind: 'attention', title: 'Result needs repair', detail: 'Shared design system (1)', createdAt: 41, read: false },
+      { id: 'agent:run.one:outcome:needs-repair:prototype-page:1', source: 'agent', kind: 'attention', title: 'Result needs repair', detail: 'Planned prototype pages (1)', createdAt: 42, read: false },
+      { id: 'agent:run.two:outcome:satisfied:', source: 'agent', kind: 'success', title: 'Result ready', detail: 'Complete', createdAt: 40, read: false },
+      { id: 'agent:event:tool-failed', source: 'agent', kind: 'failure', title: 'Generate failed', detail: 'Provider unavailable', createdAt: 39, read: false },
+    ]))
+
+    expect(loadLocalNotifications(storage).map((item) => item.id)).toEqual([
+      'agent:run.one:outcome:needs-repair:prototype-page:1',
+      'agent:run.two:outcome:satisfied:',
+      'agent:event:tool-failed',
+    ])
+  })
+
   it('stays silent for auto-approved tool calls and never surfaces billing amounts', () => {
     const approval = {
       type: 'tool-approval-requested' as const,

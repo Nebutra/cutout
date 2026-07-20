@@ -327,6 +327,30 @@ first page appeared, allowing a one-page plan to satisfy an explicit two-page
 brief. The prevention is a primitive count selector, a mounted-hook regression,
 explicit-scope planner validation, and full-plan E2E completion.
 
+### Intermediate Evidence Is Not A Terminal Evaluation
+
+When a long-running workflow projects partial evidence into a completion
+contract, keep progress facts separate from terminal status:
+
+- [ ] Record material/evidence events while work is active, but do not publish
+      `satisfied` / `needs-repair` until the lifecycle has settled.
+- [ ] Treat a partial contract during production as `running`, not as a failed
+      final result.
+- [ ] Make state-like notifications use a stable identity per run and concern,
+      so `needs-repair` -> `ready` replaces stale status instead of appending.
+- [ ] Add regressions for both transition directions: partial -> complete and
+      partial -> terminal failure.
+- [ ] Verify notification history contains one current outcome per run, while
+      the append-only event ledger may retain all evidence facts.
+
+**Real-world example**: Cutout recomputed its prototype outcome after every
+design-system, DESIGN.md, page, and reusable-material update. The projection was
+correct, but each intermediate `needs-repair` evaluation was published as a
+user notification with a unique event ID. Normal progress appeared as repeated
+failure, and eventual success could not replace the stale alerts. The fix was
+to emit terminal evaluation only after work settled and key outcome
+notifications by run rather than event.
+
 ---
 
 ## Event Log / Projection Boundary
