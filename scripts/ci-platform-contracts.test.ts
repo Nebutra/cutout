@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import YAML from 'yaml'
 import { resolveChromeExecutable } from '../playwright.config'
 import { normalizeText, sha256NormalizedText } from './lib/normalized-text.mjs'
-import { resolveNodeCommand } from './lib/node-command.mjs'
+import { nodeCommandNeedsShell, resolveNodeCommand } from './lib/node-command.mjs'
 import { parseSkillFrontmatter } from './lib/skill-frontmatter.mjs'
 
 describe('cross-platform CI contracts', () => {
@@ -51,5 +51,10 @@ describe('cross-platform CI contracts', () => {
     expect(resolveNodeCommand('C:\\repo\\node_modules\\.bin\\tsc', 'win32')).toBe('C:\\repo\\node_modules\\.bin\\tsc.cmd')
     expect(resolveNodeCommand('node.exe', 'win32')).toBe('node.exe')
     expect(resolveNodeCommand('pnpm', 'linux')).toBe('pnpm')
+    expect(nodeCommandNeedsShell('npm.cmd', 'win32')).toBe(true)
+    expect(nodeCommandNeedsShell('C:\\tools\\pnpm.cmd', 'win32')).toBe(true)
+    expect(nodeCommandNeedsShell('custom.cmd', 'win32')).toBe(false)
+    expect(nodeCommandNeedsShell('node.exe', 'win32')).toBe(false)
+    expect(nodeCommandNeedsShell('npm.cmd', 'linux')).toBe(false)
   })
 })

@@ -4,7 +4,6 @@ import { mkdtemp, mkdir, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { promisify } from 'node:util'
-import { resolveNodeCommand } from '../../scripts/lib/node-command.mjs'
 import { compileComponentCandidates, type ComponentManifest } from '@/components-compiler'
 import { compileDesignKit, type DesignKit, type DesignKitInput } from '@/design-kit'
 import { fingerprint, type DesignDocument } from '@/design-ir'
@@ -160,7 +159,7 @@ describe('Starter Compiler v1', () => {
         await writeFile(destination, entry.content, 'utf8')
       }
       await symlink(resolve('node_modules'), join(directory, 'node_modules'), 'dir')
-      await promisify(execFile)(resolveNodeCommand(resolve('node_modules/.bin/tsc')), ['--project', join(directory, 'tsconfig.json'), '--noEmit'], { cwd: directory })
+      await promisify(execFile)(process.execPath, [resolve('node_modules/typescript/lib/tsc.js'), '--project', join(directory, 'tsconfig.json'), '--noEmit'], { cwd: directory })
     } finally {
       await rm(directory, { recursive: true, force: true })
     }
