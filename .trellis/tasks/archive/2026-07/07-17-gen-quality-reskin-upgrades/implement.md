@@ -21,5 +21,17 @@
 
 ## Deferred (follow-up child tasks)
 
-- G4 chroma-key boards: generalize `src/algorithm` background model (`isBackgroundPixel`, flood fill, alpha cut, UI params) to a configurable key color; then switch board prompts to #00FF00.
-- G5 hard DESIGN.md gate: surface `designSystemMarkdownValidationError` fallback as an outcome gap in `prototype-outcome.ts` + run-event verdict.
+- G4 chroma-key boards: tracked independently in
+  `07-20-configurable-chroma-key-boards`. This is not part of the delivered
+  white-board pipeline and must not be represented as available.
+- G5 hard DESIGN.md gate: tracked independently in
+  `07-20-design-markdown-hard-gate`. The later recovery contract deliberately
+  preserves valid visual media, marks generated documentation
+  `repair-required`, and permits valid imported DESIGN.md evidence. Changing
+  that policy requires an explicit product decision rather than silently
+  overriding the recovery contract while closing this prompt/QA task.
+
+## Closure scope (2026-07-20)
+
+This task is complete for its designed and shipped scope: G1, G2, and G3.
+G4/G5 remain explicit follow-ups and are not claimed as implemented here.

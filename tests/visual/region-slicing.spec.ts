@@ -65,6 +65,74 @@ test.describe('per-region board slicing (real browser CV)', () => {
     expect(result.diagnostics.compliant).toBe(true)
   })
 
+  test('removes the white fringe from an anti-aliased circle on a dark canvas', async ({ page }) => {
+    await page.goto('/tests/visual/region-slicing-harness.html')
+
+    const result = await page.evaluate(async () => {
+      const { sliceRegionBoardBitmap } = await import(
+        '/src/prototype/region-deconstruct.ts'
+      )
+
+      const size = 160
+      const canvas = new OffscreenCanvas(size, size)
+      const context = canvas.getContext('2d', { willReadFrequently: true })!
+      const image = context.createImageData(size, size)
+      const center = size / 2
+      const radius = 42
+      for (let y = 0; y < size; y += 1) {
+        for (let x = 0; x < size; x += 1) {
+          const distance = Math.hypot(x + 0.5 - center, y + 0.5 - center)
+          const coverage = Math.min(1, Math.max(0, radius + 0.75 - distance))
+          const whiteBlend = Math.round(255 * (1 - coverage))
+          const offset = (y * size + x) * 4
+          image.data[offset] = whiteBlend
+          image.data[offset + 1] = whiteBlend
+          image.data[offset + 2] = whiteBlend
+          image.data[offset + 3] = 255
+        }
+      }
+      context.putImageData(image, 0, 0)
+
+      const bitmap = await createImageBitmap(canvas)
+      const cut = await sliceRegionBoardBitmap(
+        bitmap,
+        { threshold: 246, minArea: 900, mergeGap: 18, padding: 8 },
+        'circle',
+        'dark-composite',
+      )
+      bitmap.close()
+      const slice = cut.slices[0]
+      if (!slice) return { count: 0, partialPixels: 0, maxFringeChannel: 255 }
+
+      const sliceBitmap = await createImageBitmap(slice.blob)
+      const output = new OffscreenCanvas(sliceBitmap.width, sliceBitmap.height)
+      const outputContext = output.getContext('2d', { willReadFrequently: true })!
+      outputContext.drawImage(sliceBitmap, 0, 0)
+      sliceBitmap.close()
+      const pixels = outputContext.getImageData(0, 0, output.width, output.height).data
+      let partialPixels = 0
+      let maxFringeChannel = 0
+      for (let offset = 0; offset < pixels.length; offset += 4) {
+        const alpha = pixels[offset + 3]!
+        if (alpha <= 0 || alpha >= 255) continue
+        partialPixels += 1
+        maxFringeChannel = Math.max(
+          maxFringeChannel,
+          pixels[offset]!,
+          pixels[offset + 1]!,
+          pixels[offset + 2]!,
+        )
+      }
+      return { count: cut.slices.length, partialPixels, maxFringeChannel }
+    })
+
+    expect(result.count).toBe(1)
+    expect(result.partialPixels).toBeGreaterThan(0)
+    // The source transition was blended toward white. After de-fringing, its
+    // partial-alpha RGB is black, so compositing on a dark surface adds no halo.
+    expect(result.maxFringeChannel).toBeLessThanOrEqual(2)
+  })
+
   test('round-trips task-bound slices through persistence into Outcome', async ({ page }) => {
     await page.goto('/tests/visual/region-slicing-harness.html')
 

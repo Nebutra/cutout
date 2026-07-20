@@ -3,7 +3,7 @@
   "name": "gen-quality-reskin-upgrades",
   "title": "Generation quality: reskin-pipeline upgrades",
   "description": "",
-  "status": "in_progress",
+  "status": "completed",
   "dev_type": null,
   "scope": null,
   "package": null,
@@ -11,16 +11,19 @@
   "creator": "tseka",
   "assignee": "tseka",
   "createdAt": "2026-07-17",
-  "completedAt": null,
+  "completedAt": "2026-07-20",
   "branch": null,
   "base_branch": "main",
   "worktree_path": null,
   "commit": null,
   "pr_url": null,
   "subtasks": [],
-  "children": [],
+  "children": [
+    "configurable-chroma-key-boards",
+    "design-markdown-hard-gate"
+  ],
   "parent": null,
   "relatedFiles": [],
-  "notes": "",
+  "notes": "Delivered G1/G2/G3. G4 and G5 are explicit follow-up tasks because they change the background model and later DESIGN.md recovery policy respectively.",
   "meta": {}
 }

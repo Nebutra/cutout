@@ -1,0 +1,30 @@
+{
+  "id": "design-markdown-hard-gate",
+  "name": "design-markdown-hard-gate",
+  "title": "Decide and implement the DESIGN.md hard-gate policy",
+  "description": "Resolve whether invalid generated DESIGN.md must block Outcome when valid imported documentation exists, then implement the chosen policy consistently.",
+  "status": "planning",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P2",
+  "creator": "tseka",
+  "assignee": "tseka",
+  "createdAt": "2026-07-20",
+  "completedAt": null,
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [
+    "src/prototype/prototype-artifact-recovery.ts",
+    "src/agent-runtime/prototype-outcome.ts",
+    "src/components/workspace/IntentWorkspace.tsx"
+  ],
+  "notes": "Current shipped policy preserves valid visual media, exposes generated docs as repair-required, and accepts valid imported DESIGN.md as outcome evidence. A hard gate would intentionally change that recovery contract.",
+  "meta": {}
+}

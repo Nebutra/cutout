@@ -1,0 +1,29 @@
+{
+  "id": "configurable-chroma-key-boards",
+  "name": "configurable-chroma-key-boards",
+  "title": "Configurable chroma-key production boards",
+  "description": "Generalize board generation and the cutout background model to an explicitly configured solid key color before enabling #00FF00 boards.",
+  "status": "planning",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P2",
+  "creator": "tseka",
+  "assignee": "tseka",
+  "createdAt": "2026-07-20",
+  "completedAt": null,
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [
+    "src/algorithm",
+    "src/prototype/region-deconstruct.ts"
+  ],
+  "notes": "Do not claim chroma-key support until prompt, detection, alpha-cut, diagnostics, UI parameters, legacy white boards, and regression fixtures share one key-color contract.",
+  "meta": {}
+}
