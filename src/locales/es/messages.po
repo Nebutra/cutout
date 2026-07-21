@@ -332,7 +332,7 @@ msgstr "Clave de API"
 #. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
 msgid "settings.keychain_trust"
-msgstr "Las claves de API se almacenan solo en el llavero del sistema operativo y se inyectan en la capa nativa; nunca entran en la página web."
+msgstr "Las claves API se almacenan localmente en este dispositivo y se inyectan en la capa nativa: nunca entran en la página web."
 
 #. js-lingui-explicit-id
 #: src/components/settings/VectorizerPanel.tsx
@@ -1457,7 +1457,7 @@ msgstr "Mantener el dictado visible"
 #. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
 msgid "settings.dialog_form_desc"
-msgstr "Las claves se almacenan solo en el llavero del sistema, nunca se escriben en la página web ni en el disco en texto sin cifrar."
+msgstr "Las claves se almacenan localmente en este dispositivo y se inyectan de forma nativa, nunca se envían a la página web."
 
 #. js-lingui-explicit-id
 #: src/components/library/KitLibraryInspector.tsx
@@ -2542,7 +2542,7 @@ msgstr "No se pudo decodificar ese archivo como imagen."
 #. js-lingui-explicit-id
 #: src/components/settings/KeyField.tsx
 msgid "settings.key_hint"
-msgstr "La clave se escribe solo en el llavero del sistema; nunca se reenvía ni se muestra."
+msgstr "La clave se almacena localmente en este dispositivo, nunca se devuelve ni se muestra."
 
 #. js-lingui-explicit-id
 #: src/components/slices/SliceGridEmpty.tsx
@@ -2575,7 +2575,7 @@ msgstr "Esto eliminará «{0}» del almacenamiento local. Esta acción no se pue
 #. js-lingui-explicit-id
 #: src/components/settings/ProviderRow.tsx
 msgid "settings.remove_confirm_desc"
-msgstr "Esto elimina la configuración de “{label}” y su clave almacenada en el llavero del sistema. Esta acción no se puede deshacer."
+msgstr "Esto elimina la configuración de «{label}» y su clave almacenada localmente. Esta acción no se puede deshacer."
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/SpeechSection.tsx

@@ -1,16 +1,17 @@
 //! PNG → SVG vectorization commands.
 //!
 //! `vectorize_local_vtracer` is fully offline. `vectorize_vectorizer_ai` uses
-//! the Vectorizer.AI direct API; the API Secret stays in the OS keychain and is
-//! injected inside Rust, never returned to JS.
+//! the Vectorizer.AI direct API; the API Secret is stored via the local file
+//! secret store (`commands::secret_store`) and injected inside Rust, never
+//! returned to JS.
 
 use std::time::Duration;
 
-use keyring::{Entry, Error as KeyringError};
 use reqwest::multipart::{Form, Part};
 use serde::{Deserialize, Serialize};
 
-const SERVICE: &str = "com.nebutra.cutout";
+use crate::commands::secret_store;
+
 const VECTORIZER_ENDPOINT: &str = "https://api.vectorizer.ai/api/v1/vectorize";
 const HTTP_TIMEOUT_SECS: u64 = 240;
 
@@ -36,8 +37,8 @@ pub enum VectorizeError {
     InvalidImage(String),
     #[error("local vectorization failed: {0}")]
     Local(String),
-    #[error("keychain error: {0}")]
-    Keychain(String),
+    #[error("secret store error: {0}")]
+    Store(String),
     #[error("HTTP client error: {0}")]
     Http(String),
     #[error("Vectorizer.AI API error: {0}")]
@@ -55,12 +56,9 @@ impl Serialize for VectorizeError {
     }
 }
 
-impl From<KeyringError> for VectorizeError {
-    fn from(e: KeyringError) -> Self {
-        match e {
-            KeyringError::NoEntry => VectorizeError::MissingSecret,
-            other => VectorizeError::Keychain(other.to_string()),
-        }
+impl From<std::io::Error> for VectorizeError {
+    fn from(e: std::io::Error) -> Self {
+        VectorizeError::Store(e.to_string())
     }
 }
 
@@ -74,8 +72,8 @@ struct ApiErrorBody {
     message: Option<String>,
 }
 
-fn vectorizer_entry(api_id: &str) -> Result<Entry, VectorizeError> {
-    Entry::new(SERVICE, &format!("vectorizer:{api_id}")).map_err(VectorizeError::from)
+fn vectorizer_account(api_id: &str) -> String {
+    format!("vectorizer:{api_id}")
 }
 
 fn normalize_api_id(api_id: &str) -> Result<String, VectorizeError> {
@@ -87,18 +85,12 @@ fn normalize_api_id(api_id: &str) -> Result<String, VectorizeError> {
 }
 
 fn read_vectorizer_secret(api_id: &str) -> Result<String, VectorizeError> {
-    vectorizer_entry(api_id)?
-        .get_password()
-        .map_err(VectorizeError::from)
+    secret_store::get(&vectorizer_account(api_id))?.ok_or(VectorizeError::MissingSecret)
 }
 
 fn key_status_inner(api_id: &str) -> Result<bool, VectorizeError> {
     let api_id = normalize_api_id(api_id)?;
-    match vectorizer_entry(&api_id)?.get_password() {
-        Ok(_) => Ok(true),
-        Err(KeyringError::NoEntry) => Ok(false),
-        Err(e) => Err(VectorizeError::from(e)),
-    }
+    Ok(secret_store::exists(&vectorizer_account(&api_id))?)
 }
 
 fn validate_mode(mode: Option<String>) -> Result<String, VectorizeError> {
@@ -150,9 +142,8 @@ pub async fn set_vectorizer_api_key(
     if api_secret.is_empty() {
         return Err(VectorizeError::EmptySecret);
     }
-    vectorizer_entry(&api_id)?
-        .set_password(&api_secret)
-        .map_err(VectorizeError::from)
+    secret_store::set(&vectorizer_account(&api_id), &api_secret)?;
+    Ok(())
 }
 
 #[tauri::command]
@@ -163,10 +154,8 @@ pub async fn vectorizer_key_status(api_id: String) -> Result<bool, VectorizeErro
 #[tauri::command]
 pub async fn delete_vectorizer_api_key(api_id: String) -> Result<(), VectorizeError> {
     let api_id = normalize_api_id(&api_id)?;
-    match vectorizer_entry(&api_id)?.delete_credential() {
-        Ok(()) | Err(KeyringError::NoEntry) => Ok(()),
-        Err(e) => Err(VectorizeError::from(e)),
-    }
+    secret_store::delete(&vectorizer_account(&api_id))?;
+    Ok(())
 }
 
 #[tauri::command]

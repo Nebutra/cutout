@@ -332,7 +332,7 @@ msgstr "APIキー"
 #. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
 msgid "settings.keychain_trust"
-msgstr "APIキーはOSのキーチェーンにのみ保存され、ネイティブ層で注入されます — Webページには一切含まれません。"
+msgstr "APIキーはこのデバイス上にローカル保存され、ネイティブ層で注入されます。ウェブページに渡ることはありません。"
 
 #. js-lingui-explicit-id
 #: src/components/settings/VectorizerPanel.tsx
@@ -1457,7 +1457,7 @@ msgstr "ディクテーションを表示したままにする"
 #. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
 msgid "settings.dialog_form_desc"
-msgstr "キーはシステムキーチェーンにのみ保存され、Webページやディスクに平文で書き込まれることはありません。"
+msgstr "キーはこのデバイスにローカル保存され、ネイティブに注入されます。ウェブページに送られることはありません。"
 
 #. js-lingui-explicit-id
 #: src/components/library/KitLibraryInspector.tsx
@@ -2542,7 +2542,7 @@ msgstr "このファイルは画像としてデコードできませんでした
 #. js-lingui-explicit-id
 #: src/components/settings/KeyField.tsx
 msgid "settings.key_hint"
-msgstr "キーはシステムキーチェーンにのみ書き込まれ、送り返されたり表示されたりすることはありません。"
+msgstr "キーはこのデバイスにローカル保存され、返送も表示もされません。"
 
 #. js-lingui-explicit-id
 #: src/components/slices/SliceGridEmpty.tsx
@@ -2575,7 +2575,7 @@ msgstr "これにより「{0}」がローカルストレージから削除され
 #. js-lingui-explicit-id
 #: src/components/settings/ProviderRow.tsx
 msgid "settings.remove_confirm_desc"
-msgstr "これにより「{label}」の設定と、システムキーチェーンに保存されたキーが削除されます。この操作は元に戻せません。"
+msgstr "「{label}」の設定とローカルに保存されたキーを削除します。この操作は取り消せません。"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/SpeechSection.tsx

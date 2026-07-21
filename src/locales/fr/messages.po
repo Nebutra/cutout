@@ -332,7 +332,7 @@ msgstr "Clé API"
 #. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
 msgid "settings.keychain_trust"
-msgstr "Les clés API sont stockées uniquement dans le trousseau de votre système et injectées au niveau natif — elles n'atteignent jamais la page web."
+msgstr "Les clés API sont stockées localement sur cet appareil et injectées dans la couche native — elles n'entrent jamais dans la page web."
 
 #. js-lingui-explicit-id
 #: src/components/settings/VectorizerPanel.tsx
@@ -1457,7 +1457,7 @@ msgstr "Garder la dictée visible"
 #. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
 msgid "settings.dialog_form_desc"
-msgstr "Les clés sont stockées uniquement dans le trousseau système, jamais écrites en clair sur la page web ou sur le disque."
+msgstr "Les clés sont stockées localement sur cet appareil et injectées nativement, jamais envoyées à la page web."
 
 #. js-lingui-explicit-id
 #: src/components/library/KitLibraryInspector.tsx
@@ -2542,7 +2542,7 @@ msgstr "Ce fichier n'a pas pu être décodé comme une image."
 #. js-lingui-explicit-id
 #: src/components/settings/KeyField.tsx
 msgid "settings.key_hint"
-msgstr "La clé est écrite uniquement dans le trousseau système, jamais renvoyée ni affichée."
+msgstr "La clé est stockée localement sur cet appareil, jamais renvoyée ni affichée."
 
 #. js-lingui-explicit-id
 #: src/components/slices/SliceGridEmpty.tsx
@@ -2575,7 +2575,7 @@ msgstr "Cela supprimera « {0} » du stockage local. Cette action est irréversi
 #. js-lingui-explicit-id
 #: src/components/settings/ProviderRow.tsx
 msgid "settings.remove_confirm_desc"
-msgstr "Ceci supprime la configuration de « {label} » ainsi que sa clé stockée dans le trousseau système. Cette action est irréversible."
+msgstr "Cela supprime la configuration de « {label} » et sa clé stockée localement. Cette action est irréversible."
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/SpeechSection.tsx

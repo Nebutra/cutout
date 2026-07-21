@@ -77,7 +77,7 @@ export function KeyField({ id, value, onChange, hasKey, disabled }: KeyFieldProp
       </div>
       <p className={cn('text-xs text-muted-foreground')}>
         <Trans id="settings.key_hint">
-          The key is written only to the system keychain, never sent back or
+          The key is stored locally on this device, never sent back or
           displayed.
         </Trans>
       </p>

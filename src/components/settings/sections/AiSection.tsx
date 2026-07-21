@@ -89,8 +89,8 @@ export function AiSection() {
           </h2>
           <p className="mt-0.5 text-xs text-muted-foreground">
             <Trans id="settings.dialog_form_desc">
-              Keys are stored only in the system keychain, never written to the
-              web page or disk in plaintext.
+              Keys are stored locally on this device and injected natively, never
+              sent to the web page.
             </Trans>
           </p>
         </div>
@@ -109,8 +109,8 @@ export function AiSection() {
       <div className="flex items-start gap-2 rounded-lg border border-border bg-card/40 px-3 py-2 text-xs text-muted-foreground">
         <ShieldCheck className="mt-0.5 size-3.5 shrink-0 text-emerald-500" />
         <Trans id="settings.keychain_trust">
-          API keys are stored only in your OS keychain and injected in the
-          native layer — they never enter the web page.
+          API keys are stored locally on this device and injected in the native
+          layer — they never enter the web page.
         </Trans>
       </div>
 
