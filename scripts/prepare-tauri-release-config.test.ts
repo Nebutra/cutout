@@ -5,6 +5,7 @@ import { spawnSync } from 'node:child_process'
 import { describe, expect, it } from 'vitest'
 
 const validKey = 'untrusted comment: minisign public key: 0123456789ABCDEF\nRWT0123456789ABCDEFabcdefghijklmnopqrstuvwxyz0123456789AB='
+const tauriPublicKey = validKey.split('\n')[1]
 
 describe('Tauri release config preparation', () => {
   it('writes a merge-only updater config from the protected public key', async () => {
@@ -18,7 +19,7 @@ describe('Tauri release config preparation', () => {
 
     expect(result.status, result.stderr).toBe(0)
     expect(JSON.parse(await readFile(output, 'utf8'))).toEqual({
-      plugins: { updater: { pubkey: validKey } },
+      plugins: { updater: { pubkey: tauriPublicKey } },
     })
   })
 
@@ -33,7 +34,7 @@ describe('Tauri release config preparation', () => {
 
     expect(result.status, result.stderr).toBe(0)
     expect(JSON.parse(await readFile(output, 'utf8'))).toEqual({
-      plugins: { updater: { pubkey: validKey } },
+      plugins: { updater: { pubkey: tauriPublicKey } },
     })
   })
 

@@ -22,7 +22,7 @@ export function normalizePublicKey(value) {
   if (lines.length !== 2 || !lines[0].startsWith('untrusted comment: ') || !/^RW[A-Za-z0-9+/=]+$/.test(lines[1])) {
     throw new Error('CUTOUT_UPDATER_PUBKEY must be a complete two-line minisign public key')
   }
-  return normalized
+  return lines[1]
 }
 
 function decodeBase64PublicKey(value) {
