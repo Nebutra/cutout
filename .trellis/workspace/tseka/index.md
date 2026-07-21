@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 9
+- **Total Sessions**: 10
 - **Last Active**: 2026-07-21
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~307 | Active |
+| `journal-1.md` | ~340 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 10 | 2026-07-21 | Merge Advanced settings into General | `4d6213e` | `main` |
 | 9 | 2026-07-21 | Remove manual cutout controls | `90a45fd` | `main` |
 | 8 | 2026-07-21 | Fix integration logo readability | `0e5a45f` | `main` |
 | 7 | 2026-07-20 | Signed cross-platform desktop updates | `eb31446` | `main` |

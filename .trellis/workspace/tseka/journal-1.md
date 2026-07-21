@@ -305,3 +305,36 @@ Removed all manual cutout parameter surfaces, preserved legacy project compatibi
 ### Next Steps
 
 - None - task complete
+
+
+## Session 10: Merge Advanced settings into General
+
+**Date**: 2026-07-21
+**Task**: Merge Advanced settings into General
+**Branch**: `main`
+
+### Summary
+
+Removed the single-control Advanced tab, moved Developer mode to General with interaction coverage, rebuilt and installed the updated macOS app.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `4d6213e` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
