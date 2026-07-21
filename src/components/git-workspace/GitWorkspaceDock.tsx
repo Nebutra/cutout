@@ -138,14 +138,32 @@ export function GitWorkspaceDock({ onClose, onReview }: { readonly onClose: () =
   return (
     <section className="flex h-full min-h-0 flex-col bg-background" aria-label="Git">
       <header className="flex h-12 shrink-0 items-center gap-2 border-b border-border px-3">
-        <GitBranch className="size-4" />
+        <button
+          type="button"
+          className="group relative flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+          aria-label="Hide Git"
+          title="Hide Git"
+          onClick={onClose}
+        >
+          <GitBranch
+            aria-hidden="true"
+            focusable="false"
+            data-git-dock-icon="git"
+            className="absolute size-4 opacity-100 transition-opacity duration-150 group-hover:opacity-0 group-focus-visible:opacity-0 motion-reduce:transition-none"
+          />
+          <PanelLeftClose
+            aria-hidden="true"
+            focusable="false"
+            data-git-dock-icon="collapse"
+            className="absolute size-4 opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-visible:opacity-100 motion-reduce:transition-none"
+          />
+        </button>
         <div className="min-w-0 flex-1">
           <div className="truncate text-sm font-medium">Git</div>
           {status ? <div className="truncate text-[11px] text-muted-foreground">{status.detached ? 'Detached HEAD' : status.branch ?? 'No branch'}{status.ahead ? ` · ↑${status.ahead}` : ''}{status.behind ? ` · ↓${status.behind}` : ''}</div> : null}
         </div>
         {status && !status.detached ? <button type="button" className="flex h-7 items-center gap-1 rounded-md px-2 text-[11px] text-muted-foreground hover:bg-muted hover:text-foreground" onClick={() => void previewPush()} disabled={Boolean(busyAction)}><Upload className="size-3.5" />Push</button> : null}
         <button type="button" className="flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground" aria-label="Refresh Git" onClick={() => void refresh()} disabled={loading}><RefreshCw className={cn('size-4', loading && 'animate-spin')} /></button>
-        <button type="button" className="flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground" aria-label="Hide Git" onClick={onClose}><PanelLeftClose className="size-4" /></button>
       </header>
 
       <div className="grid shrink-0 grid-cols-4 border-b border-border p-1">

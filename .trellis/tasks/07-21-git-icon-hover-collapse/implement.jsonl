@@ -1,0 +1,2 @@
+{"file":".trellis/spec/frontend/component-guidelines.md","reason":"Follow existing button, focus, and component composition patterns."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Keep the UI change narrow and testable."}

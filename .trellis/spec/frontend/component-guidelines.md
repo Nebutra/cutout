@@ -46,9 +46,27 @@ Questions to answer:
 
 ## Accessibility
 
-<!-- A11y requirements and patterns -->
+### Identity icons that reveal a panel action
 
-(To be filled by the team)
+When a dock header icon doubles as the affordance for collapsing that dock:
+
+- Render exactly one fixed-size `button`; do not place a static identity icon
+  beside a second collapse button.
+- Give the button the action name (for example `aria-label="Hide Git"`) and a
+  visible hover title or tooltip.
+- The default glyph may identify the current dock, while hover and
+  `focus-visible` reveal the collapse glyph in the same stable icon box.
+- Mark both inner SVG glyphs `aria-hidden="true"` and `focusable="false"`; the
+  button owns the accessible semantics.
+- Keep the action understandable without animation and disable decorative
+  transitions under `prefers-reduced-motion`.
+- Test one control, keyboard focus, stable dimensions, glyph state classes, and
+  exactly one callback invocation.
+
+Wrong: a Git glyph on the left plus a second `Hide Git` icon on the right.
+
+Correct: one 28x28 `Hide Git` button whose Git glyph swaps to the panel-close
+glyph on hover or keyboard focus.
 
 ---
 
