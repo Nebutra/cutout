@@ -8,7 +8,7 @@ import { toast } from 'sonner'
 import { useLingui } from '@lingui/react/macro'
 
 /** Build version. Bump alongside `package.json` / `Cargo.toml`. */
-const APP_VERSION = '0.1.0'
+const APP_VERSION = '0.1.1'
 
 export function AboutFooter() {
   const { t } = useLingui()

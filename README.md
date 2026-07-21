@@ -20,7 +20,7 @@ They consume the same `.cutout` state. They do not control each other through GU
 
 ## Install the macOS app
 
-Download the Apple Silicon DMG from [Cutout v0.1.0](https://github.com/Nebutra/cutout/releases/tag/v0.1.0), then drag Cutout into Applications.
+Download the Apple Silicon DMG from [Cutout v0.1.1](https://github.com/Nebutra/cutout/releases/tag/v0.1.1), then drag Cutout into Applications.
 
 The current public build has a complete ad-hoc bundle signature, but it is not Developer ID signed or Apple notarized. On first launch, another Mac may require the standard Finder **Open** flow or explicit approval in **Privacy & Security**.
 
@@ -29,7 +29,7 @@ The current public build has a complete ad-hoc bundle signature, but it is not D
 Use Codex CLI `0.144.5` or a compatible plugin-enabled version.
 
 ```bash
-codex plugin marketplace add Nebutra/cutout --ref v0.1.0
+codex plugin marketplace add Nebutra/cutout --ref v0.1.1
 codex plugin add cutout@cutout-local
 codex plugin list
 ```
@@ -37,7 +37,7 @@ codex plugin list
 `codex plugin list` should show:
 
 ```text
-cutout@cutout-local  installed, enabled  0.1.0
+cutout@cutout-local  installed, enabled  0.1.1
 ```
 
 Codex captures plugin Skills and MCP tools when a conversation starts. Open a new conversation after installing or updating the plugin.
