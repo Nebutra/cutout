@@ -14,11 +14,11 @@ Audit every currently open issue in `Nebutra/cutout`, complete any bounded missi
 
 ## Acceptance Criteria
 
-- [ ] Every open issue has an evidence-backed disposition: closed, completed in this task, or left open with concrete blockers.
-- [ ] Bounded missing work required by closable issues is implemented with regression tests.
-- [ ] The full relevant TypeScript, Rust/Tauri, Agent contract, build, and packaging gates pass or any environmental limitation is reported precisely.
-- [ ] GitHub receives concise verification comments before each issue is closed.
-- [ ] Remaining open issues contain no false implementation claims.
+- [x] Every open issue has an evidence-backed disposition: issues #1-#11 were verified, commented, and closed.
+- [x] Bounded missing work required by closable issues is implemented with regression tests.
+- [x] The relevant TypeScript, Rust/Tauri, Agent contract, build, and release smoke gates passed; signing/notarization was kept separate from local smoke claims.
+- [x] GitHub received concise verification comments before each issue was closed.
+- [x] The repository has no remaining open GitHub issues and contains no false implementation claims.
 
 ## Notes
 
