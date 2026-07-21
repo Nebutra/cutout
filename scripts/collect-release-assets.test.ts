@@ -11,8 +11,8 @@ async function fixture() {
   const files: Record<string, string[]> = {
     'release-macos-aarch64': ['Cutout.app.tar.gz', 'Cutout.app.tar.gz.sig', 'Cutout.dmg'],
     'release-macos-x86_64': ['Cutout.app.tar.gz', 'Cutout.app.tar.gz.sig', 'Cutout.dmg'],
-    'release-windows-x86_64': ['Cutout.msi', 'Cutout-setup.exe'],
-    'release-linux-x86_64': ['Cutout.AppImage', 'Cutout.deb'],
+    'release-windows-x86_64': ['Cutout.msi', 'Cutout-setup.exe', 'Cutout-setup.nsis.zip', 'Cutout-setup.nsis.zip.sig'],
+    'release-linux-x86_64': ['Cutout.AppImage', 'Cutout.deb', 'Cutout.AppImage.tar.gz', 'Cutout.AppImage.tar.gz.sig'],
   }
   for (const artifactId of releaseArtifactIds) {
     const directory = join(input, artifactId, 'nested')
@@ -46,6 +46,15 @@ describe('release asset collection', () => {
     const second = await fixture()
     await rm(join(second.input, 'release-windows-x86_64', 'nested', 'Cutout.msi'))
     await expect(collectReleaseAssets({ inputDir: second.input, outputDir: second.output })).rejects.toThrow('missing required .msi')
+  })
+
+  it('hard-fails when a platform updater artifact or signature is missing', async () => {
+    const windows = await fixture()
+    await rm(join(windows.input, 'release-windows-x86_64', 'nested', 'Cutout-setup.nsis.zip.sig'))
+    await expect(collectReleaseAssets({ inputDir: windows.input, outputDir: windows.output })).rejects.toThrow('missing required .nsis.zip.sig')
+    const linux = await fixture()
+    await rm(join(linux.input, 'release-linux-x86_64', 'nested', 'Cutout.AppImage.tar.gz'))
+    await expect(collectReleaseAssets({ inputDir: linux.input, outputDir: linux.output })).rejects.toThrow('missing required .AppImage.tar.gz')
   })
 
   it('rejects symbolic links and nested input/output boundaries', async () => {

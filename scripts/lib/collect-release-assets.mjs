@@ -18,8 +18,8 @@ const allowedSuffixes = Object.freeze([
 const requiredBundles = Object.freeze({
   'release-macos-aarch64': ['.dmg', '.app.tar.gz', '.app.tar.gz.sig'],
   'release-macos-x86_64': ['.dmg', '.app.tar.gz', '.app.tar.gz.sig'],
-  'release-windows-x86_64': ['.msi', '.exe'],
-  'release-linux-x86_64': ['.AppImage', '.deb'],
+  'release-windows-x86_64': ['.msi', '.exe', '.nsis.zip', '.nsis.zip.sig'],
+  'release-linux-x86_64': ['.AppImage', '.deb', '.AppImage.tar.gz', '.AppImage.tar.gz.sig'],
 })
 
 function isWithin(parent, child) {

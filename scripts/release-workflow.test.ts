@@ -49,6 +49,21 @@ describe('cross-platform release workflow', () => {
     expect(publishScript).toContain('gh release edit')
   })
 
+  it('feeds every platform updater artifact into the manifest generator', async () => {
+    const source = await readFile('.github/workflows/release-update.yml', 'utf8')
+    const workflow = YAML.parse(source)
+    const generateStep = workflow.jobs.publish.steps.find((step: { name?: string }) => step.name === 'Generate and validate updater metadata')
+
+    for (const key of ['darwin-aarch64', 'darwin-x86_64', 'windows-x86_64', 'linux-x86_64']) {
+      expect(generateStep.run).toContain(key)
+    }
+    expect(generateStep.run).toContain('windows-x86_64-*.nsis.zip')
+    expect(generateStep.run).toContain('linux-x86_64-*.AppImage.tar.gz')
+    expect(generateStep.run).toContain('--platform')
+    expect(generateStep.run).toContain('--artifact-base-url')
+    expect(generateStep.run).toContain('Missing updater artifact for')
+  })
+
   it('tests a safe workspace read and launches the host-native packaged app before publishing', async () => {
     const source = await readFile('.github/workflows/release-update.yml', 'utf8')
     const workflow = YAML.parse(source)

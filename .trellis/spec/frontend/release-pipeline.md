@@ -30,6 +30,18 @@ installer version differs from their release version.
 - Required workflow artifact ids:
   `release-macos-aarch64`, `release-macos-x86_64`,
   `release-windows-x86_64`, and `release-linux-x86_64`.
+- The generated `latest.json` advertises every built platform. Its `platforms`
+  map carries `darwin-aarch64`, `darwin-x86_64`, `windows-x86_64`, and
+  `linux-x86_64`, each with its own HTTPS updater URL and signature. The Windows
+  auto-update target is the NSIS bundle (`.nsis.zip`); the MSI ships only as a
+  downloadable installer. The Linux target is the AppImage updater archive
+  (`.AppImage.tar.gz`). `darwin-aarch64` is the mandatory primary anchor —
+  validation still fails closed if it is absent, and every other present
+  platform is validated with the same HTTPS/allowlist/signature checks.
+- The collector treats each platform's updater artifact and `.sig` as required
+  (`.app.tar.gz(.sig)` on macOS, `.nsis.zip(.sig)` on Windows,
+  `.AppImage.tar.gz(.sig)` on Linux). A missing updater bundle for any platform
+  fails the release rather than publishing a partial manifest.
 - Matrix jobs receive `contents: read`; only the final publish job receives
   `contents: write`.
 - Required protected environment values:
@@ -75,7 +87,7 @@ installer version differs from their release version.
 | Any matrix job fails | Do not start `publish` |
 | Required platform/bundle is absent | Collector fails before Release creation |
 | Symlink or duplicate output is found | Collector fails closed |
-| Updater archive/signature is absent | Metadata generation fails |
+| Any platform's updater archive/signature is absent | Collector and metadata generation fail closed |
 | Public key is empty or malformed | Stop before invoking the Tauri bundler |
 | Release tag already has a Release | Refuse immutable asset replacement |
 | Upload is incomplete | Release remains a draft, not a public success |
@@ -87,7 +99,8 @@ installer version differs from their release version.
 ### 5. Good/Base/Bad Cases
 
 - Good: all four matrix entries finish, collected names include their platform
-  and architecture, updater evidence validates, and one draft is promoted.
+  and architecture, `latest.json` carries all four platform entries, updater
+  evidence validates for each, and one draft is promoted.
 - Good: the delayed desktop check discovers a newer signed GitHub release; one
   compact Home action appears and opens the existing update controls.
 - Base: a manual build selects an existing version tag and uses the exact same
@@ -103,15 +116,16 @@ installer version differs from their release version.
 - `scripts/validate-release-version.test.ts`: synchronized, drift, tag mismatch,
   and malformed semantic versions.
 - `scripts/collect-release-assets.test.ts`: architecture-qualified duplicate
-  basenames, required outputs, symlink rejection, directory boundaries, and
-  deterministic SHA-256 output.
+  basenames, required outputs (including per-platform updater bundles + `.sig`),
+  symlink rejection, directory boundaries, and deterministic SHA-256 output.
 - `scripts/release-workflow.test.ts`: four-entry matrix, validate/build/publish
-  dependency graph, least-privilege permissions, isolated Tauri action, and
-  draft promotion.
+  dependency graph, least-privilege permissions, isolated Tauri action, draft
+  promotion, and the multi-platform manifest generation step.
 - `scripts/ci-platform-contracts.test.ts`: browser installation ordering,
   platform-specific executable selection, and LF/CRLF frontmatter parsing.
 - `scripts/update-artifacts.test.ts`: signature, HTTPS/allowlist, rollback,
-  rollout, SBOM, provenance, and generated-manifest validation.
+  rollout, SBOM, provenance, multi-platform manifest generation (all four
+  platform keys, non-primary fail-closed), and generated-manifest validation.
 - `src/components/home/SidebarAccount.test.tsx`: hidden idle/checking/error
   states, visible actionable phases, version label, and Settings target.
 - `src/updater/{runtime,service,orchestrator}.test.ts`: narrow Tauri commands,
