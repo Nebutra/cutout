@@ -272,3 +272,36 @@ Theme-adapted integration marks, bundled official Pencil and Paper assets with r
 ### Next Steps
 
 - None - task complete
+
+
+## Session 9: Remove manual cutout controls
+
+**Date**: 2026-07-21
+**Task**: Remove manual cutout controls
+**Branch**: `main`
+
+### Summary
+
+Removed all manual cutout parameter surfaces, preserved legacy project compatibility through internal defaults, updated Agent/CLI contracts, verified and installed the new macOS app.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `90a45fd` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
