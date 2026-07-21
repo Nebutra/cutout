@@ -224,11 +224,6 @@ msgid "global_library.add_tag_placeholder"
 msgstr "Ajouter une étiquette"
 
 #. js-lingui-explicit-id
-#: src/components/settings/SettingsSidebar.tsx
-msgid "settings.section_advanced"
-msgstr "Avancé"
-
-#. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
 #: src/components/settings/sections/SpeechSection.tsx
 msgid "settings.advanced"
@@ -1052,7 +1047,7 @@ msgid "settings.integrations.desktop_not_installed"
 msgstr "Le fournisseur de bureau n’est pas installé."
 
 #. js-lingui-explicit-id
-#: src/components/settings/sections/AdvancedSection.tsx
+#: src/components/settings/sections/GeneralSection.tsx
 msgid "settings.developer_mode.title"
 msgstr "Mode développeur"
 
@@ -2383,7 +2378,7 @@ msgid "settings.key_show"
 msgstr "Afficher"
 
 #. js-lingui-explicit-id
-#: src/components/settings/sections/AdvancedSection.tsx
+#: src/components/settings/sections/GeneralSection.tsx
 msgid "settings.developer_mode.hint"
 msgstr "Affiche des outils de lecture seule pour le DAG, le Design IR et l'audit des reçus dans les projets."
 

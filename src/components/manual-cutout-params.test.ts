@@ -7,9 +7,13 @@ const componentSource = (path: string) =>
 
 describe('manual cutout parameter UI', () => {
   it('removes parameter controls from settings and source UI', () => {
-    const advanced = componentSource('settings/sections/AdvancedSection.tsx')
+    const general = componentSource('settings/sections/GeneralSection.tsx')
 
-    expect(advanced).not.toMatch(/Cutout parameters|resetParams|reset_params/)
+    expect(general).not.toMatch(/Cutout parameters|resetParams|reset_params/)
+    expect(existsSync(join(
+      process.cwd(),
+      'src/components/settings/sections/AdvancedSection.tsx',
+    ))).toBe(false)
     expect(existsSync(join(
       process.cwd(),
       'src/components/source/ParameterControls.tsx',

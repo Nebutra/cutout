@@ -224,11 +224,6 @@ msgid "global_library.add_tag_placeholder"
 msgstr "添加标签"
 
 #. js-lingui-explicit-id
-#: src/components/settings/SettingsSidebar.tsx
-msgid "settings.section_advanced"
-msgstr "高级"
-
-#. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
 #: src/components/settings/sections/SpeechSection.tsx
 msgid "settings.advanced"
@@ -1052,7 +1047,7 @@ msgid "settings.integrations.desktop_not_installed"
 msgstr "未安装桌面提供方。"
 
 #. js-lingui-explicit-id
-#: src/components/settings/sections/AdvancedSection.tsx
+#: src/components/settings/sections/GeneralSection.tsx
 msgid "settings.developer_mode.title"
 msgstr "开发者模式"
 
@@ -2383,7 +2378,7 @@ msgid "settings.key_show"
 msgstr "显示"
 
 #. js-lingui-explicit-id
-#: src/components/settings/sections/AdvancedSection.tsx
+#: src/components/settings/sections/GeneralSection.tsx
 msgid "settings.developer_mode.hint"
 msgstr "在项目内显示只读的 DAG、Design IR 和回执审计工具。"
 

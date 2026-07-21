@@ -224,11 +224,6 @@ msgid "global_library.add_tag_placeholder"
 msgstr "タグを追加"
 
 #. js-lingui-explicit-id
-#: src/components/settings/SettingsSidebar.tsx
-msgid "settings.section_advanced"
-msgstr "詳細"
-
-#. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
 #: src/components/settings/sections/SpeechSection.tsx
 msgid "settings.advanced"
@@ -1052,7 +1047,7 @@ msgid "settings.integrations.desktop_not_installed"
 msgstr "デスクトッププロバイダーがインストールされていません。"
 
 #. js-lingui-explicit-id
-#: src/components/settings/sections/AdvancedSection.tsx
+#: src/components/settings/sections/GeneralSection.tsx
 msgid "settings.developer_mode.title"
 msgstr "開発者モード"
 
@@ -2383,7 +2378,7 @@ msgid "settings.key_show"
 msgstr "表示"
 
 #. js-lingui-explicit-id
-#: src/components/settings/sections/AdvancedSection.tsx
+#: src/components/settings/sections/GeneralSection.tsx
 msgid "settings.developer_mode.hint"
 msgstr "プロジェクト内に読み取り専用の DAG、Design IR、レシート監査ツールを表示します。"
 

@@ -3,8 +3,10 @@
  *
  *   Theme     light / dark / system   (next-themes)
  *   Language  en / zh-CN / ja / fr / es, live switch (Lingui `activateLocale`, persisted)
+ *   Export     remember the last export folder
+ *   Developer expose read-only project audit tools
  */
-import { type ReactNode } from "react";
+import { type ReactNode, useState } from "react";
 import { Moon, Sun, Monitor } from "lucide-react";
 import { useTheme } from "next-themes";
 import { Trans, useLingui } from "@lingui/react/macro";
@@ -16,6 +18,10 @@ import {
 } from "@/hooks/queries/export-prefs";
 import { switchLocale } from "@/i18n/switch";
 import { SUPPORTED, LOCALE_LABEL, type Locale } from "@/i18n/config";
+import {
+  loadWorkspaceNavigation,
+  setDeveloperMode,
+} from "@/workspace/navigation";
 
 /** One labelled preference row: title (+ hint) on the left, control on the right. */
 function Row({
@@ -52,6 +58,9 @@ export function GeneralSection() {
   const currentLocale = i18n.locale as Locale;
   const exportPrefs = useExportPrefs();
   const setRememberDir = useSetRememberDir();
+  const [developerMode, setDeveloperModeState] = useState(
+    () => loadWorkspaceNavigation().advanced,
+  );
 
   return (
     <div className="flex flex-col divide-y divide-border">
@@ -104,6 +113,29 @@ export function GeneralSection() {
           aria-label={t({
             id: "settings.remember_dir_label",
             message: "Remember export folder",
+          })}
+        />
+      </Row>
+
+      <Row
+        label={
+          <Trans id="settings.developer_mode.title">Developer mode</Trans>
+        }
+        hint={
+          <Trans id="settings.developer_mode.hint">
+            Show read-only DAG, Design IR and receipt audit tools inside projects.
+          </Trans>
+        }
+      >
+        <Switch
+          checked={developerMode}
+          onCheckedChange={(enabled) => {
+            setDeveloperMode(enabled);
+            setDeveloperModeState(enabled);
+          }}
+          aria-label={t({
+            id: "settings.developer_mode.title",
+            message: "Developer mode",
           })}
         />
       </Row>

@@ -15,7 +15,7 @@ import type { ReactNode } from 'react'
 export interface SettingsUI {
   readonly open: (target?: SettingsTarget) => void
 }
-export type SettingsTargetSection='general'|'ai'|'advanced'|'updates-support'|'speech'|'personalization'|'integrations'|'archived'
+export type SettingsTargetSection='general'|'ai'|'updates-support'|'speech'|'personalization'|'integrations'|'archived'
 export interface SettingsTarget{readonly section:SettingsTargetSection;readonly anchor?:'model-routing'|'connections'|'paid-actions'|'updates'}
 
 export function focusSettingsTarget(

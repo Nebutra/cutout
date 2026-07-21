@@ -224,11 +224,6 @@ msgid "global_library.add_tag_placeholder"
 msgstr "Add tag"
 
 #. js-lingui-explicit-id
-#: src/components/settings/SettingsSidebar.tsx
-msgid "settings.section_advanced"
-msgstr "Advanced"
-
-#. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
 #: src/components/settings/sections/SpeechSection.tsx
 msgid "settings.advanced"
@@ -1052,7 +1047,7 @@ msgid "settings.integrations.desktop_not_installed"
 msgstr "Desktop provider is not installed."
 
 #. js-lingui-explicit-id
-#: src/components/settings/sections/AdvancedSection.tsx
+#: src/components/settings/sections/GeneralSection.tsx
 msgid "settings.developer_mode.title"
 msgstr "Developer mode"
 
@@ -2383,7 +2378,7 @@ msgid "settings.key_show"
 msgstr "Show"
 
 #. js-lingui-explicit-id
-#: src/components/settings/sections/AdvancedSection.tsx
+#: src/components/settings/sections/GeneralSection.tsx
 msgid "settings.developer_mode.hint"
 msgstr "Show read-only DAG, Design IR and receipt audit tools inside projects."
 
