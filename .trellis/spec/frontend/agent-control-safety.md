@@ -12,6 +12,9 @@ receipts. `.cutout` state and provenance remain authoritative.
 
 - External apply surfaces accept `approvalLeaseId`, never a caller-authored
   approval object.
+- Registry install apply accepts the reviewed `planId` together with
+  `approvalLeaseId`; it must not infer authority from a legacy `--approval`
+  value or silently fall back to preview.
 - `createHeadlessRuntime(store).execute(request, authorization)` receives the
   trusted authorization separately from the untrusted request.
 - `runDurableHostEffect(...)` executes only after `nodeClaim(...)` returns a
@@ -25,9 +28,15 @@ receipts. `.cutout` state and provenance remain authoritative.
 - Lease reservation and the complete control request run under the same
   project-scoped external-control lock. Reserved leases are single-use even
   when the operation returns a denied or invalid response.
+- Registry install re-plans under that lock, rejects a changed `planId`, binds
+  the lease to `registry.install` and the current project revision, and checks
+  the plan again at the write boundary.
 - Durable completion, failure, and heartbeat require the current owner,
   attempt, and an unexpired lease. A missing claim prevents the effect and its
   heartbeat from starting.
+- Every durable-host mutation reloads state and commits under the store's
+  cross-instance exclusive transaction. Starting a second host preserves live
+  leases; recovery requeues only leases expired at the shared clock boundary.
 - Controlled reads reject absolute paths, traversal, symlink roots/components,
   non-regular files, identity changes, and size/count limit violations.
 - The Node command host exposes a fixed command enum, `shell: false`, an
@@ -44,7 +53,10 @@ receipts. `.cutout` state and provenance remain authoritative.
 | Condition | Required behavior |
 | --- | --- |
 | Forged, expired, replayed, stale, or mismatched lease | Reject before dispatching the effect |
+| Registry apply omits either `planId` or `approvalLeaseId` | Reject; never downgrade to a dry-run response |
+| Registry content or workspace state changes after preview | Reject the stale `planId` before writing |
 | Claim missing, terminal, delayed, cancelled, or held by another owner | Do not start heartbeat or effect |
+| Two host instances claim the same live node | Exactly one claim is persisted and may execute |
 | Owner lease expires or is taken over | Reject late completion/failure |
 | Concurrent request at the same revision | Exactly one reservation succeeds; the other conflicts or deduplicates |
 | Transaction journal remains after interruption | Recover deterministically before accepting another mutation |
@@ -67,10 +79,12 @@ receipts. `.cutout` state and provenance remain authoritative.
 
 ### 6. Tests Required
 
-- Durable host/effect: competing owners, terminal/cancelled nodes, expiry
-  boundary, takeover, and idempotent re-entry.
+- Durable host/effect: competing live store instances, terminal/cancelled
+  nodes, expiry boundary, live-host startup, takeover, and idempotent re-entry.
 - CLI/MCP adapters: forged, expired, replayed, revision-mismatched, and
   operation-mismatched leases plus real concurrent processes.
+- Registry adapters: required plan/lease pair, legacy approval rejection,
+  changed-plan rejection before reservation, and single-use lease replay.
 - Node filesystem store: run events and ledger in one transaction, recovery
   from an interrupted journal, and stale revision conflict.
 - Source scanner/tool host/Tauri: traversal, symlink root/component,

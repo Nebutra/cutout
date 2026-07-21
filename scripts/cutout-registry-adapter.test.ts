@@ -31,4 +31,49 @@ describe('registry approval lease adapter', () => {
       expect(applyInstall).not.toHaveBeenCalled()
     } finally { await rm(root, { recursive: true, force: true }) }
   })
+
+  it('rejects a forged lease before writing', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'cutout-registry-forged-')); await mkdir(join(root, '.cutout'))
+    const applyInstall = vi.fn()
+    const adapter = createRegistryAdapter(async () => ({ planInstall: async () => plan, currentRevision: async () => 3, applyInstall }))
+    try {
+      await expect(adapter.registryApplyInstall(root, plan.itemId, plan.targetFramework, plan.id, 'forged')).rejects.toThrow('not issued by this Cutout host')
+      expect(applyInstall).not.toHaveBeenCalled()
+    } finally { await rm(root, { recursive: true, force: true }) }
+  })
+
+  it('rejects an expired lease before writing', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'cutout-registry-expired-')); await mkdir(join(root, '.cutout'))
+    const applyInstall = vi.fn()
+    const adapter = createRegistryAdapter(async () => ({ planInstall: async () => plan, currentRevision: async () => 3, applyInstall }))
+    try {
+      const lease = await issueApprovalLease(root, {
+        approvalId: 'expired-install', subject: 'desktop-host', operation, expectedRevision: 3, expiresAt: 2_000,
+      }, 1_000)
+      await expect(adapter.registryApplyInstall(root, plan.itemId, plan.targetFramework, plan.id, lease.leaseId)).rejects.toThrow('expired')
+      expect(applyInstall).not.toHaveBeenCalled()
+    } finally { await rm(root, { recursive: true, force: true }) }
+  })
+
+  it('rejects leases issued for another project revision or registry operation', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'cutout-registry-mismatch-')); await mkdir(join(root, '.cutout'))
+    const applyInstall = vi.fn()
+    const adapter = createRegistryAdapter(async () => ({ planInstall: async () => plan, currentRevision: async () => 3, applyInstall }))
+    try {
+      const staleRevision = await issueApprovalLease(root, {
+        approvalId: 'stale-install', subject: 'desktop-host', operation, expectedRevision: 2, expiresAt: Date.now() + 60_000,
+      })
+      await expect(adapter.registryApplyInstall(root, plan.itemId, plan.targetFramework, plan.id, staleRevision.leaseId)).rejects.toThrow('different project revision')
+
+      const differentOperation = await issueApprovalLease(root, {
+        approvalId: 'other-install',
+        subject: 'desktop-host',
+        operation: { ...operation, targetFramework: 'next-app-router' },
+        expectedRevision: 3,
+        expiresAt: Date.now() + 60_000,
+      })
+      await expect(adapter.registryApplyInstall(root, plan.itemId, plan.targetFramework, plan.id, differentOperation.leaseId)).rejects.toThrow('different request')
+      expect(applyInstall).not.toHaveBeenCalled()
+    } finally { await rm(root, { recursive: true, force: true }) }
+  })
 })
