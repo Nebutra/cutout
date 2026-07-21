@@ -22,6 +22,7 @@ import { Trans, useLingui } from "@lingui/react/macro";
 import { plural } from "@lingui/core/macro";
 import type { ProviderConfig } from "@/services/ai/provider-types";
 import { useProviders } from "@/hooks/queries/providers";
+import { useCapabilityBindings } from "@/hooks/queries/ai-settings";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ProviderRow } from "../ProviderRow";
@@ -193,7 +194,8 @@ const ModelAssignments = memo(function ModelAssignments({
   const [advanced, setAdvanced] = useState(false);
   const providers = useProviders();
   const list = providers.data ?? [];
-  const coverage = modelRoutingCoverage(list);
+  const bindings = useCapabilityBindings();
+  const coverage = modelRoutingCoverage(list, bindings.data);
   const localizedDimensions: Record<
     (typeof MODEL_DIMENSIONS)[number]["task"],
     { label: string; description: string }
