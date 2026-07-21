@@ -168,16 +168,6 @@ msgid "export.toast_success"
 msgstr "{savedCount, plural, one {Se exportó # fragmento} other {Se exportaron # fragmentos}}"
 
 #. js-lingui-explicit-id
-#: src/components/slices/SliceGridEmpty.tsx
-msgid "slices.empty_lower_threshold"
-msgstr "Umbral −10"
-
-#. js-lingui-explicit-id
-#: src/components/slices/SliceGridEmpty.tsx
-msgid "slices.empty_halve_min_area"
-msgstr "Área mín. −50%"
-
-#. js-lingui-explicit-id
 #: src/components/library/TeamGovernancePanel.tsx
 msgid "team.host_required_description"
 msgstr "Se requiere un host de colaboración de escritorio para revisar o crear un enlace de solo lectura."
@@ -338,6 +328,11 @@ msgstr "Las claves API se almacenan localmente en este dispositivo y se inyectan
 #: src/components/settings/VectorizerPanel.tsx
 msgid "vectorizer.mode_label"
 msgstr "Modo de API"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderForm.tsx
+msgid "settings.provider_api_protocol"
+msgstr "API protocol"
 
 #. js-lingui-explicit-id
 #: src/components/settings/VectorizerPanel.tsx
@@ -596,9 +591,19 @@ msgid "settings.speech.host_unavailable_suffix"
 msgstr "Los cambios aquí no se pueden guardar hasta entonces."
 
 #. js-lingui-explicit-id
+#: src/components/settings/ProviderForm.tsx
+msgid "settings.provider_protocol_chat_completions"
+msgstr "Chat Completions"
+
+#. js-lingui-explicit-id
 #: src/components/settings/sections/UpdatesSection.tsx
 msgid "settings.updates.check_automatically"
 msgstr "Comprobar automáticamente"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderForm.tsx
+msgid "settings.check_connection_load_models"
+msgstr "Check connection and load models"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/UpdatesSection.tsx
@@ -954,14 +959,9 @@ msgid "settings.updates.up_to_date"
 msgstr "Cutout está actualizado en el canal {0}."
 
 #. js-lingui-explicit-id
-#: src/components/source/ParameterControls.tsx
-msgid "source.params_aria"
-msgstr "Parámetros de recorte"
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/AdvancedSection.tsx
-msgid "settings.reset_params_label"
-msgstr "Parámetros de recorte"
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.provider_source_keychain"
+msgstr "Cutout Keychain"
 
 #. js-lingui-explicit-id
 #: src/components/home/SidebarAccount.tsx
@@ -1087,6 +1087,16 @@ msgid "global_library.discover_references"
 msgstr "Descubrir referencias"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.discovered_on_mac"
+msgstr "Discovered on this Mac"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.discovered_providers"
+msgstr "Discovered providers"
+
+#. js-lingui-explicit-id
 #: src/components/settings/sections/PersonalizationSection.tsx
 msgid "settings.personalization.custom_instructions_help"
 msgstr "No incluyas claves API ni credenciales privadas. Los requisitos específicos del proyecto pertenecen al brief del proyecto."
@@ -1171,6 +1181,11 @@ msgstr "Introduce la clave de API"
 #: src/components/settings/VectorizerPanel.tsx
 msgid "vectorizer.secret_placeholder"
 msgstr "Introduce el secreto de API"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderForm.tsx
+msgid "settings.enter_model_manually"
+msgstr "Enter model ID manually"
 
 #. js-lingui-explicit-id
 #: src/components/library/KitLibraryInspector.tsx
@@ -1731,6 +1746,16 @@ msgid "slices.empty_no_regions_title"
 msgstr "No se encontraron regiones"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.no_reusable_credential"
+msgstr "No reusable credential"
+
+#. js-lingui-explicit-id
+#: src/components/slices/SliceGridEmpty.tsx
+msgid "slices.empty_no_regions_automatic_hint"
+msgstr "No se encontraron regiones reutilizables. Prueba con otra hoja de recursos."
+
+#. js-lingui-explicit-id
 #: src/components/settings/ProviderRow.tsx
 #: src/components/settings/VectorizerPanel.tsx
 msgid "settings.status_unconfigured"
@@ -1797,16 +1822,6 @@ msgstr "o haz clic para explorar · PNG, JPEG, WebP"
 #: src/components/settings/sections/PaidActionsSection.tsx
 msgid "settings.paid_actions.title"
 msgstr "Acciones de pago"
-
-#. js-lingui-explicit-id
-#: src/components/source/ParameterControls.tsx
-msgid "source.params_heading"
-msgstr "Parámetros"
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/AdvancedSection.tsx
-msgid "settings.reset_done_toast"
-msgstr "Parámetros restablecidos"
 
 #. js-lingui-explicit-id
 #: src/components/library/KitLibraryInspector.tsx
@@ -1915,6 +1930,11 @@ msgstr "Vista previa de diagnósticos"
 #: src/components/library/RegistryInstallPanel.tsx
 msgid "registry_install.preview_install"
 msgstr "Vista previa de instalación"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.provider_source_environment"
+msgstr "Process environment"
 
 #. js-lingui-explicit-id
 #: src/components/settings/VectorizerPanel.tsx
@@ -2131,11 +2151,6 @@ msgid "topbar.rerun_label"
 msgstr "Reejecutar análisis"
 
 #. js-lingui-explicit-id
-#: src/components/source/ParameterControls.tsx
-msgid "source.params_reset"
-msgstr "Restablecer"
-
-#. js-lingui-explicit-id
 #: src/components/settings/sections/PersonalizationSection.tsx
 msgid "settings.personalization.reset"
 msgstr "Restablecer"
@@ -2154,16 +2169,6 @@ msgstr "Error al restablecer"
 #: src/components/settings/sections/RecoverySection.tsx
 msgid "settings.recovery.hint"
 msgstr "Restablece las preferencias de interfaz o exporta un paquete local de diagnóstico depurado. Los datos del proyecto no se eliminan."
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/AdvancedSection.tsx
-msgid "settings.reset_params"
-msgstr "Restablecer parámetros"
-
-#. js-lingui-explicit-id
-#: src/components/source/ParameterControls.tsx
-msgid "source.params_reset_title"
-msgstr "Restablecer parámetros a los valores predeterminados"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/PersonalizationSection.tsx
@@ -2202,6 +2207,11 @@ msgid "review_branch.resolved"
 msgstr "resuelto"
 
 #. js-lingui-explicit-id
+#: src/components/settings/ProviderForm.tsx
+msgid "settings.provider_protocol_responses"
+msgstr "Responses API"
+
+#. js-lingui-explicit-id
 #: src/components/settings/sections/UpdatesSection.tsx
 msgid "settings.updates.install_note"
 msgstr "El reinicio solo ocurre después de elegir Instalar y reiniciar. El trabajo activo del Agent bloquea la instalación."
@@ -2211,11 +2221,6 @@ msgstr "El reinicio solo ocurre después de elegir Instalar y reiniciar. El trab
 #: src/components/settings/sections/ArchivedSection.tsx
 msgid "home.restore"
 msgstr "Restaurar"
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/AdvancedSection.tsx
-msgid "settings.reset_params_hint"
-msgstr "Restaura el umbral, el área mínima, el espacio y el relleno a sus valores predeterminados."
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/PersonalizationSection.tsx
@@ -2329,6 +2334,11 @@ msgstr "Buscar pestañas"
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.select_item_aria"
 msgstr "Seleccionar {0}"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderForm.tsx
+msgid "settings.select_model"
+msgstr "Select a model"
 
 #. js-lingui-explicit-id
 #: src/components/inspector/InspectorPanel.tsx
@@ -2545,11 +2555,6 @@ msgid "settings.key_hint"
 msgstr "La clave se almacena localmente en este dispositivo, nunca se devuelve ni se muestra."
 
 #. js-lingui-explicit-id
-#: src/components/slices/SliceGridEmpty.tsx
-msgid "slices.empty_no_regions_hint"
-msgstr "Los parámetros pueden ser demasiado estrictos para esta hoja. Prueba a relajarlos:"
-
-#. js-lingui-explicit-id
 #: src/components/preview/PreviewCanvas.tsx
 msgid "preview.empty_hint"
 msgstr "La vista previa transparente aparece aquí una vez analizada una hoja."
@@ -2701,6 +2706,7 @@ msgid "settings.updates.download_progress_aria"
 msgstr "Progreso de descarga de la actualización"
 
 #. js-lingui-explicit-id
+#: src/components/home/SidebarAccount.tsx
 #: src/components/settings/sections/UpdatesSection.tsx
 msgid "settings.updates.title"
 msgstr "Actualizaciones"
@@ -2798,7 +2804,7 @@ msgid "global_library.meta_version"
 msgstr "Versión"
 
 #. js-lingui-explicit-id
-#. placeholder {0}: state.release.version
+#: src/components/home/SidebarAccount.tsx
 #: src/components/settings/sections/UpdatesSection.tsx
 msgid "settings.updates.version_available"
 msgstr "La versión {0} está disponible."
@@ -2897,58 +2903,3 @@ msgstr "Aquí aparecerán tus pestañas abiertas y las cerradas recientemente"
 #: src/components/home/ProjectHome.tsx
 msgid "home.your_projects"
 msgstr "Tus proyectos"
-
-#. js-lingui-explicit-id
-#: src/components/settings/ProviderForm.tsx
-msgid "settings.provider_api_protocol"
-msgstr "API protocol"
-
-#. js-lingui-explicit-id
-#: src/components/settings/ProviderForm.tsx
-msgid "settings.provider_protocol_responses"
-msgstr "Responses API"
-
-#. js-lingui-explicit-id
-#: src/components/settings/ProviderForm.tsx
-msgid "settings.provider_protocol_chat_completions"
-msgstr "Chat Completions"
-
-#. js-lingui-explicit-id
-#: src/components/settings/ProviderForm.tsx
-msgid "settings.check_connection_load_models"
-msgstr "Check connection and load models"
-
-#. js-lingui-explicit-id
-#: src/components/settings/ProviderForm.tsx
-msgid "settings.select_model"
-msgstr "Select a model"
-
-#. js-lingui-explicit-id
-#: src/components/settings/ProviderForm.tsx
-msgid "settings.enter_model_manually"
-msgstr "Enter model ID manually"
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.provider_source_environment"
-msgstr "Process environment"
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.provider_source_keychain"
-msgstr "Cutout Keychain"
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.discovered_providers"
-msgstr "Discovered providers"
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.discovered_on_mac"
-msgstr "Discovered on this Mac"
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.no_reusable_credential"
-msgstr "No reusable credential"

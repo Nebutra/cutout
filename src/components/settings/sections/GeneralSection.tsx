@@ -3,7 +3,6 @@
  *
  *   Theme     light / dark / system   (next-themes)
  *   Language  en / zh-CN / ja / fr / es, live switch (Lingui `activateLocale`, persisted)
- *   Reset     restore the four cutout params to defaults (Zustand)
  */
 import { type ReactNode } from "react";
 import { Moon, Sun, Monitor } from "lucide-react";

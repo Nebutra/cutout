@@ -1,6 +1,6 @@
 # Cutout — Settings Surface Design Spec
 
-**Status:** decided (design for review) · **Depends on:** the shipped BYOK layer (`services/ai`, `hooks/queries/providers`, Rust `commands/ai/*`), i18n (`src/i18n`, Lingui), and `@tauri-apps/plugin-store` (already installed for i18n). · **Scope:** consolidate every settings-related affordance into one coherent Settings surface, and add the AI **model-assignment** layer (which model serves each output modality). **Not** in scope: building generative features, a prompt-management UI (prompts are built-in system assets — see §1), or any `models.dev` integration (see §9).
+**Status:** historical design, updated by the product-owned automatic cutout contract on 2026-07-21. Cutout algorithm configuration is internal and must not appear in Settings. · **Depends on:** the shipped BYOK layer (`services/ai`, `hooks/queries/providers`, Rust `commands/ai/*`), i18n (`src/i18n`, Lingui), and `@tauri-apps/plugin-store` (already installed for i18n). · **Scope:** consolidate every settings-related affordance into one coherent Settings surface, and add the AI **model-assignment** layer (which model serves each output modality). **Not** in scope: building generative features, a prompt-management UI (prompts are built-in system assets — see §1), or any `models.dev` integration (see §9).
 
 ---
 
@@ -48,7 +48,6 @@ All thin preferences on one screen — each is instant-apply:
 |---|---|---|
 | Theme | `next-themes` (existing) | Light / Dark / System segmented control |
 | Language | Lingui `activate` + plugin-store (existing) | 简体中文 / English, live switch, no reload |
-| Reset parameter defaults | `store.resetParams` (existing) | mirrors the inline `ParameterControls` action |
 | Remember export directory | new pref (plugin-store) | toggle; when on, `useExportAll` reuses the last dir |
 
 No new backend. "Remember export directory" is the only new preference; it is persisted via plugin-store alongside the AI model assignments (§5).
@@ -140,7 +139,7 @@ async function listEndpointModels(cfg: ProviderConfig): Promise<string[]>
 |---|---|
 | Provider CRUD · keychain · `test()` · 6 hooks · `ProviderService` · Rust `commands/ai/*` | ✅ reuse |
 | `ProviderForm` (endpoint + key) | 🔧 small change: auto-test on save; `/v1/models` autofill for the model field |
-| `ThemeToggle` · `LanguageSwitcher` · `resetParams` | ✅ reuse, relocated into General |
+| `ThemeToggle` · `LanguageSwitcher` | ✅ reuse, relocated into General |
 | `models.ts` (`DEFAULT_MODEL` / `SUGGESTED_MODELS`) | ✅ reuse as suggestion source |
 | Settings shell (Dialog + sidebar, `⌘,`) | 🆕 replaces `SettingsMenu` dropdown |
 | Model-assignment layer (`chat` / `image`) + plugin-store persistence | 🆕 |

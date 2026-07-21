@@ -24,9 +24,9 @@ import {
 } from '@/services/content-addressed-desktop-artifacts'
 import { publishToolCutoutProduction } from '@/asset-production'
 
-/** The trigger returned to callers (e.g. `useParamAutoRun`). */
+/** The trigger returned to callers such as `useAutoRun`. */
 export interface AnalysisBridge {
-  /** Begin a run for the current params; `wantSlices` gates the heavy path. */
+  /** Begin a run with internal params; `wantSlices` gates the heavy path. */
   analyze(wantSlices: boolean): void
 }
 

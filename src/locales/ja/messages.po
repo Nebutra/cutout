@@ -168,16 +168,6 @@ msgid "export.toast_success"
 msgstr "{savedCount, plural, other {# 枚のスライスをエクスポートしました}}"
 
 #. js-lingui-explicit-id
-#: src/components/slices/SliceGridEmpty.tsx
-msgid "slices.empty_lower_threshold"
-msgstr "しきい値を −10"
-
-#. js-lingui-explicit-id
-#: src/components/slices/SliceGridEmpty.tsx
-msgid "slices.empty_halve_min_area"
-msgstr "最小面積を −50%"
-
-#. js-lingui-explicit-id
 #: src/components/library/TeamGovernancePanel.tsx
 msgid "team.host_required_description"
 msgstr "レビューまたは読み取り専用共有の作成にはデスクトップコラボレーションホストが必要です。"
@@ -338,6 +328,11 @@ msgstr "APIキーはこのデバイス上にローカル保存され、ネイテ
 #: src/components/settings/VectorizerPanel.tsx
 msgid "vectorizer.mode_label"
 msgstr "APIモード"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderForm.tsx
+msgid "settings.provider_api_protocol"
+msgstr "API protocol"
 
 #. js-lingui-explicit-id
 #: src/components/settings/VectorizerPanel.tsx
@@ -596,9 +591,19 @@ msgid "settings.speech.host_unavailable_suffix"
 msgstr "それまでは、ここでの変更は保存できません。"
 
 #. js-lingui-explicit-id
+#: src/components/settings/ProviderForm.tsx
+msgid "settings.provider_protocol_chat_completions"
+msgstr "Chat Completions"
+
+#. js-lingui-explicit-id
 #: src/components/settings/sections/UpdatesSection.tsx
 msgid "settings.updates.check_automatically"
 msgstr "自動で確認"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderForm.tsx
+msgid "settings.check_connection_load_models"
+msgstr "Check connection and load models"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/UpdatesSection.tsx
@@ -954,14 +959,9 @@ msgid "settings.updates.up_to_date"
 msgstr "Cutout は {0} チャネルで最新です。"
 
 #. js-lingui-explicit-id
-#: src/components/source/ParameterControls.tsx
-msgid "source.params_aria"
-msgstr "切り抜きパラメーター"
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/AdvancedSection.tsx
-msgid "settings.reset_params_label"
-msgstr "切り抜きパラメーター"
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.provider_source_keychain"
+msgstr "Cutout Keychain"
 
 #. js-lingui-explicit-id
 #: src/components/home/SidebarAccount.tsx
@@ -1087,6 +1087,16 @@ msgid "global_library.discover_references"
 msgstr "参照を検出"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.discovered_on_mac"
+msgstr "Discovered on this Mac"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.discovered_providers"
+msgstr "Discovered providers"
+
+#. js-lingui-explicit-id
 #: src/components/settings/sections/PersonalizationSection.tsx
 msgid "settings.personalization.custom_instructions_help"
 msgstr "API キーや非公開の資格情報を含めないでください。プロジェクト固有の要件はプロジェクトブリーフに書いてください。"
@@ -1171,6 +1181,11 @@ msgstr "APIキーを入力"
 #: src/components/settings/VectorizerPanel.tsx
 msgid "vectorizer.secret_placeholder"
 msgstr "APIシークレットを入力"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderForm.tsx
+msgid "settings.enter_model_manually"
+msgstr "Enter model ID manually"
 
 #. js-lingui-explicit-id
 #: src/components/library/KitLibraryInspector.tsx
@@ -1731,6 +1746,16 @@ msgid "slices.empty_no_regions_title"
 msgstr "領域が見つかりません"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.no_reusable_credential"
+msgstr "No reusable credential"
+
+#. js-lingui-explicit-id
+#: src/components/slices/SliceGridEmpty.tsx
+msgid "slices.empty_no_regions_automatic_hint"
+msgstr "再利用可能な領域が見つかりませんでした。別の素材シートをお試しください。"
+
+#. js-lingui-explicit-id
 #: src/components/settings/ProviderRow.tsx
 #: src/components/settings/VectorizerPanel.tsx
 msgid "settings.status_unconfigured"
@@ -1797,16 +1822,6 @@ msgstr "またはクリックして参照 · PNG、JPEG、WebP"
 #: src/components/settings/sections/PaidActionsSection.tsx
 msgid "settings.paid_actions.title"
 msgstr "有料アクション"
-
-#. js-lingui-explicit-id
-#: src/components/source/ParameterControls.tsx
-msgid "source.params_heading"
-msgstr "パラメーター"
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/AdvancedSection.tsx
-msgid "settings.reset_done_toast"
-msgstr "パラメーターをリセットしました"
 
 #. js-lingui-explicit-id
 #: src/components/library/KitLibraryInspector.tsx
@@ -1915,6 +1930,11 @@ msgstr "診断情報をプレビュー"
 #: src/components/library/RegistryInstallPanel.tsx
 msgid "registry_install.preview_install"
 msgstr "インストール内容をプレビュー"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.provider_source_environment"
+msgstr "Process environment"
 
 #. js-lingui-explicit-id
 #: src/components/settings/VectorizerPanel.tsx
@@ -2131,11 +2151,6 @@ msgid "topbar.rerun_label"
 msgstr "解析を再実行"
 
 #. js-lingui-explicit-id
-#: src/components/source/ParameterControls.tsx
-msgid "source.params_reset"
-msgstr "リセット"
-
-#. js-lingui-explicit-id
 #: src/components/settings/sections/PersonalizationSection.tsx
 msgid "settings.personalization.reset"
 msgstr "リセット"
@@ -2154,16 +2169,6 @@ msgstr "リセットに失敗しました"
 #: src/components/settings/sections/RecoverySection.tsx
 msgid "settings.recovery.hint"
 msgstr "インターフェース設定をリセットするか、匿名化されたローカル診断バンドルをエクスポートします。プロジェクトデータは削除されません。"
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/AdvancedSection.tsx
-msgid "settings.reset_params"
-msgstr "パラメーターをリセット"
-
-#. js-lingui-explicit-id
-#: src/components/source/ParameterControls.tsx
-msgid "source.params_reset_title"
-msgstr "パラメーターを既定値にリセット"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/PersonalizationSection.tsx
@@ -2202,6 +2207,11 @@ msgid "review_branch.resolved"
 msgstr "解決済み"
 
 #. js-lingui-explicit-id
+#: src/components/settings/ProviderForm.tsx
+msgid "settings.provider_protocol_responses"
+msgstr "Responses API"
+
+#. js-lingui-explicit-id
 #: src/components/settings/sections/UpdatesSection.tsx
 msgid "settings.updates.install_note"
 msgstr "「インストールして再起動」を選んだ後にのみ再起動します。進行中の Agent 作業はインストールをブロックします。"
@@ -2211,11 +2221,6 @@ msgstr "「インストールして再起動」を選んだ後にのみ再起動
 #: src/components/settings/sections/ArchivedSection.tsx
 msgid "home.restore"
 msgstr "復元"
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/AdvancedSection.tsx
-msgid "settings.reset_params_hint"
-msgstr "しきい値・最小面積・ギャップ・パディングを既定値に戻します。"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/PersonalizationSection.tsx
@@ -2329,6 +2334,11 @@ msgstr "タブを検索"
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.select_item_aria"
 msgstr "{0} を選択"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderForm.tsx
+msgid "settings.select_model"
+msgstr "Select a model"
 
 #. js-lingui-explicit-id
 #: src/components/inspector/InspectorPanel.tsx
@@ -2545,11 +2555,6 @@ msgid "settings.key_hint"
 msgstr "キーはこのデバイスにローカル保存され、返送も表示もされません。"
 
 #. js-lingui-explicit-id
-#: src/components/slices/SliceGridEmpty.tsx
-msgid "slices.empty_no_regions_hint"
-msgstr "このシートに対してパラメーターが厳しすぎる可能性があります。次を緩めてみてください:"
-
-#. js-lingui-explicit-id
 #: src/components/preview/PreviewCanvas.tsx
 msgid "preview.empty_hint"
 msgstr "シートが解析されると、ここに透過プレビューが表示されます。"
@@ -2701,6 +2706,7 @@ msgid "settings.updates.download_progress_aria"
 msgstr "更新のダウンロード進捗"
 
 #. js-lingui-explicit-id
+#: src/components/home/SidebarAccount.tsx
 #: src/components/settings/sections/UpdatesSection.tsx
 msgid "settings.updates.title"
 msgstr "更新"
@@ -2798,7 +2804,7 @@ msgid "global_library.meta_version"
 msgstr "バージョン"
 
 #. js-lingui-explicit-id
-#. placeholder {0}: state.release.version
+#: src/components/home/SidebarAccount.tsx
 #: src/components/settings/sections/UpdatesSection.tsx
 msgid "settings.updates.version_available"
 msgstr "バージョン {0} が利用可能です。"
@@ -2897,58 +2903,3 @@ msgstr "開いているタブと最近閉じたタブがここに表示されま
 #: src/components/home/ProjectHome.tsx
 msgid "home.your_projects"
 msgstr "あなたのプロジェクト"
-
-#. js-lingui-explicit-id
-#: src/components/settings/ProviderForm.tsx
-msgid "settings.provider_api_protocol"
-msgstr "API protocol"
-
-#. js-lingui-explicit-id
-#: src/components/settings/ProviderForm.tsx
-msgid "settings.provider_protocol_responses"
-msgstr "Responses API"
-
-#. js-lingui-explicit-id
-#: src/components/settings/ProviderForm.tsx
-msgid "settings.provider_protocol_chat_completions"
-msgstr "Chat Completions"
-
-#. js-lingui-explicit-id
-#: src/components/settings/ProviderForm.tsx
-msgid "settings.check_connection_load_models"
-msgstr "Check connection and load models"
-
-#. js-lingui-explicit-id
-#: src/components/settings/ProviderForm.tsx
-msgid "settings.select_model"
-msgstr "Select a model"
-
-#. js-lingui-explicit-id
-#: src/components/settings/ProviderForm.tsx
-msgid "settings.enter_model_manually"
-msgstr "Enter model ID manually"
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.provider_source_environment"
-msgstr "Process environment"
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.provider_source_keychain"
-msgstr "Cutout Keychain"
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.discovered_providers"
-msgstr "Discovered providers"
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.discovered_on_mac"
-msgstr "Discovered on this Mac"
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.no_reusable_credential"
-msgstr "No reusable credential"

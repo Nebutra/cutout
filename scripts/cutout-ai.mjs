@@ -95,14 +95,6 @@ async function buildAction(command, args) {
     case 'set-brief':
     case 'brief':
       return { type: 'set-brief', text: args.join(' ') }
-    case 'set-param':
-      requireArgs(command, args, 2)
-      return { type: 'set-param', key: args[0], value: parseNumber(args[1], 'value') }
-    case 'set-params':
-      requireArgs(command, args, 1)
-      return { type: 'set-params', params: parseJson(args.join(' ')) }
-    case 'reset-params':
-      return { type: 'reset-params' }
     case 'import-board':
     case 'load-board':
       requireArgs(command, args, 1)
@@ -305,8 +297,6 @@ Usage:
   echo "$OPENAI_API_KEY" | pnpm ai set-provider-key <providerId> -
   pnpm ai set-model-assignment image <providerId> gpt-image-1
   pnpm ai set-brief "政府官网"
-  pnpm ai set-param threshold 246
-  pnpm ai set-params '{"threshold":246,"minArea":900,"mergeGap":18,"padding":10}'
   pnpm ai import-board /absolute/path/sheet.png
   pnpm ai import-mockup /absolute/path/mockup.png
   pnpm ai run-cutout [waitMs]
@@ -317,7 +307,7 @@ Usage:
   pnpm ai semantic-plan "政府官网"
   pnpm ai semantic-slices '{"brief":"政府官网","maxSlices":6,"routes":["text-to-image","image-to-image"]}'
   pnpm ai name-slices
-  pnpm ai send '{"type":"set-param","key":"threshold","value":246}'
+  pnpm ai send '{"type":"get-state"}'
   echo '{"type":"get-state"}' | pnpm ai send -
 
 Flags:

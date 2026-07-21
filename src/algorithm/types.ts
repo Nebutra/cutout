@@ -5,7 +5,7 @@
  * MUST NOT import any DOM / OffscreenCanvas API. Rendering lives in the worker.
  */
 
-/** The four tunable parameters that fully determine pipeline output. */
+/** Product-owned internal parameters that fully determine pipeline output. */
 export interface CutoutParams {
   /** White-background RGB threshold; a pixel is background if r,g,b all >= threshold. */
   readonly threshold: number

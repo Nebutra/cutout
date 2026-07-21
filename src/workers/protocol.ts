@@ -4,9 +4,9 @@ import type { Box, CutoutParams } from '@/algorithm/types'
  * Worker message protocol (spec §4b).
  *
  * The source image is uploaded to the worker exactly once (`loadImage`,
- * transferring the `ImageBitmap`); thereafter each slider change sends only a
- * tiny `analyze` message and transfers zero image bytes. Responses come in two
- * phases: a fast `preview` (live drag) and a heavy `slices` (commit).
+ * transferring the `ImageBitmap`); thereafter analysis and explicit reruns send
+ * only a tiny `analyze` message and transfer zero image bytes. Responses come in
+ * two phases: a preview and the heavier encoded `slices` result.
  */
 
 /** Named pipeline stages, used for progress reporting. */

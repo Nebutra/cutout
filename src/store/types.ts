@@ -19,11 +19,8 @@ import type { SliceName } from '@/services/ai/naming'
 import type { WorkspaceSnapshot } from '@/workspace/workspace-snapshot'
 import type { AssetProductionSnapshot, ProductionTaskStatus } from '@/asset-production'
 
-/** The four tunable parameters (defaults live in `slices/params.ts`). */
+/** Internal cutout configuration (defaults live in `slices/params.ts`). */
 export type Params = CutoutParams
-
-/** A parameter key — used by `setParam` for a type-safe partial update. */
-export type ParamKey = keyof Params
 
 /** The loaded source sheet. `bitmap` is null until an image is dropped. */
 export interface SourceState {
@@ -304,10 +301,6 @@ export interface StoreActions {
     /** Defaults to true. Agent-managed cutout flows set false to avoid a duplicate run. */
     autoAnalyze?: boolean
   }): void
-  /** Update one param immutably (label update is instant; re-run is debounced). */
-  setParam(key: ParamKey, value: number): void
-  /** Reset all params to their defaults. */
-  resetParams(): void
   /** Bump `runId`, mark `running`, and return the new id for the worker request. */
   beginAnalysis(): number
   /** Replace the preview bitmap for `runId`; drops (and closes) if stale. */

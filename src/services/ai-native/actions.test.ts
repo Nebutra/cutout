@@ -90,6 +90,18 @@ describe('AI Native semantic slice actions', () => {
     ).toThrow()
   })
 
+  it.each([
+    { type: 'set-param', key: 'threshold', value: 240 },
+    { type: 'set-params', params: { minArea: 400 } },
+    { type: 'reset-params' },
+  ])('rejects removed manual parameter action $type', (action) => {
+    expect(() => parseAiNativeAction(action)).toThrow()
+  })
+
+  it('does not expose internal cutout parameters in snapshots', () => {
+    expect(createAiNativeSnapshot(getStoreState())).not.toHaveProperty('params')
+  })
+
   it('exposes authoritative production state to external Agent snapshots', async () => {
     const plan = await compileAssetProductionPlan({
       sourceRevision: { projectRevisionId: 'revision:1', pageArtifacts: [] },
