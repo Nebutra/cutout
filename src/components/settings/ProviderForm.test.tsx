@@ -89,7 +89,7 @@ describe('ProviderForm draft verification flow', () => {
       .find((item) => item.textContent?.includes(label)) as HTMLButtonElement | undefined
     expect(button('Add')?.disabled).toBe(true)
 
-    await act(async () => button('Check connection and load models')?.click())
+    await act(async () => button('Check credentials and load models')?.click())
     expect(mocks.createDraft).toHaveBeenCalledWith(expect.objectContaining({
       kind: 'openai', wireProtocol: 'responses', candidateId: 'candidate:opaque',
     }))
@@ -105,7 +105,7 @@ describe('ProviderForm draft verification flow', () => {
     expect(button('Add')?.disabled).toBe(true)
     expect(mocks.cancelDraft).toHaveBeenCalledWith('provider-draft:opaque')
 
-    await act(async () => button('Check connection and load models')?.click())
+    await act(async () => button('Check credentials and load models')?.click())
     expect(button('Add')?.disabled).toBe(false)
 
     await act(async () => button('Add')?.click())

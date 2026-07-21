@@ -12,7 +12,7 @@ use tauri::{AppHandle, Manager, Runtime};
 
 use super::ai_proxy;
 use super::keys;
-use super::providers::{self, OpenAiWireProtocol, ProviderConfig, ProviderKind};
+use super::providers::{self, ProviderConfig, ProviderKind, ProviderWireProtocol};
 
 const MAX_CONFIG_BYTES: u64 = 1024 * 1024;
 const MAX_DRAFTS: usize = 32;
@@ -22,7 +22,7 @@ struct ProviderDraftSession {
     created_at: Instant,
     kind: String,
     base_url: String,
-    wire_protocol: Option<OpenAiWireProtocol>,
+    wire_protocol: Option<ProviderWireProtocol>,
     candidate_id: Option<String>,
     provider_id: Option<String>,
     secret: Option<String>,
@@ -51,7 +51,7 @@ fn take_draft(draft_id: &str) -> Result<ProviderDraftSession, DiscoveryError> {
 pub struct CreateDraftInput {
     kind: String,
     base_url: String,
-    wire_protocol: Option<OpenAiWireProtocol>,
+    wire_protocol: Option<ProviderWireProtocol>,
     candidate_id: Option<String>,
     provider_id: Option<String>,
     secret: Option<String>,
@@ -224,36 +224,10 @@ fn normalize_wire(value: Option<&str>) -> Result<Option<String>, DiscoveryError>
 
 fn normalized_draft_wire_protocol(
     kind: ProviderKind,
-    wire_protocol: Option<OpenAiWireProtocol>,
-) -> Result<Option<OpenAiWireProtocol>, DiscoveryError> {
-    use OpenAiWireProtocol::{ChatCompletions, Responses};
-    use ProviderKind::*;
-
-    match (kind, wire_protocol) {
-        (Openai, None) => Ok(Some(Responses)),
-        (Openai, Some(protocol)) => Ok(Some(protocol)),
-        (OpenaiCompatible, Some(protocol)) => Ok(Some(protocol)),
-        (OpenaiCompatible, None) => Err(DiscoveryError::UnsupportedWireProtocol(
-            "an explicit protocol is required for custom OpenAI-compatible providers".into(),
-        )),
-        (
-            Dashscope | Deepseek | Zhipu | Moonshot | Volcengine | Siliconflow | Openrouter
-            | Together | Groq | Fireworks | Xai | Mistral | Ollama | Vllm | LmStudio,
-            None | Some(ChatCompletions),
-        ) => Ok(Some(ChatCompletions)),
-        (
-            Dashscope | Deepseek | Zhipu | Moonshot | Volcengine | Siliconflow | Openrouter
-            | Together | Groq | Fireworks | Xai | Mistral | Ollama | Vllm | LmStudio,
-            Some(Responses),
-        ) => Err(DiscoveryError::UnsupportedWireProtocol("responses".into())),
-        (Anthropic | Google | Gateway, None) => Ok(None),
-        (Anthropic | Google | Gateway, Some(protocol)) => {
-            Err(DiscoveryError::UnsupportedWireProtocol(match protocol {
-                Responses => "responses".into(),
-                ChatCompletions => "chat-completions".into(),
-            }))
-        }
-    }
+    wire_protocol: Option<ProviderWireProtocol>,
+) -> Result<Option<ProviderWireProtocol>, DiscoveryError> {
+    kind.effective_wire_protocol(wire_protocol)
+        .map_err(DiscoveryError::UnsupportedWireProtocol)
 }
 
 fn discover_codex(home: &Path) -> Result<Vec<ProviderCandidate>, DiscoveryError> {
@@ -392,7 +366,7 @@ fn discover_claude(home: &Path) -> Result<Vec<ProviderCandidate>, DiscoveryError
         kind: "anthropic".into(),
         label: "Claude Code Anthropic".into(),
         base_url,
-        wire_protocol: None,
+        wire_protocol: Some("anthropic-messages".into()),
         model_hint: value
             .get("model")
             .and_then(serde_json::Value::as_str)
@@ -421,14 +395,14 @@ fn discover_environment() -> Vec<ProviderCandidate> {
             "anthropic",
             "Anthropic",
             Some("https://api.anthropic.com/v1"),
-            None,
+            Some("anthropic-messages"),
         ),
         (
             "GOOGLE_GENERATIVE_AI_API_KEY",
             "google",
             "Google AI",
-            None,
-            None,
+            Some("https://generativelanguage.googleapis.com/v1beta"),
+            Some("google-generate-content"),
         ),
     ];
     definitions
@@ -665,12 +639,24 @@ async fn check_draft<R: Runtime>(
     app: &AppHandle<R>,
     draft: &ProviderDraftSession,
 ) -> Result<Vec<String>, DiscoveryError> {
+    // This intentionally remains an authenticated catalog request. The four
+    // supported generation protocols do not share a standardized no-cost
+    // OPTIONS/HEAD probe, and Check connection must never trigger generation.
+    // Runtime viability is enforced locally by the closed kind/protocol matrix,
+    // protocol-specific auth, URL normalization, and exhaustive SDK adapters.
     let secret = resolve_draft_secret(app, draft).await?;
     let url = format!("{}/models", draft.base_url.trim_end_matches('/'));
-    let response =
-        ai_proxy::request_with_secret(&draft.kind, &url, "GET", Default::default(), None, &secret)
-            .await
-            .map_err(|error| DiscoveryError::Request(error.to_string()))?;
+    let response = ai_proxy::request_with_secret(
+        &draft.kind,
+        draft.wire_protocol,
+        &url,
+        "GET",
+        Default::default(),
+        None,
+        &secret,
+    )
+    .await
+    .map_err(|error| DiscoveryError::Request(error.to_string()))?;
     match response.status {
         200..=299 => model_ids(&response.body),
         401 | 403 => Err(DiscoveryError::Http(response.status)),
@@ -894,26 +880,38 @@ wire_api = "legacy-completions"
     fn draft_protocol_defaults_and_validation_fail_closed() {
         assert_eq!(
             normalized_draft_wire_protocol(ProviderKind::Openai, None).unwrap(),
-            Some(OpenAiWireProtocol::Responses)
+            Some(ProviderWireProtocol::Responses)
         );
         assert!(matches!(
-            normalized_draft_wire_protocol(ProviderKind::OpenaiCompatible, None),
-            Err(DiscoveryError::UnsupportedWireProtocol(_))
+            normalized_draft_wire_protocol(ProviderKind::OpenaiCompatible, None).unwrap(),
+            Some(ProviderWireProtocol::ChatCompletions)
         ));
         assert!(matches!(
             normalized_draft_wire_protocol(
                 ProviderKind::Deepseek,
-                Some(OpenAiWireProtocol::Responses)
+                Some(ProviderWireProtocol::Responses)
             ),
             Err(DiscoveryError::UnsupportedWireProtocol(_))
         ));
         assert!(matches!(
             normalized_draft_wire_protocol(
                 ProviderKind::Anthropic,
-                Some(OpenAiWireProtocol::ChatCompletions)
+                Some(ProviderWireProtocol::ChatCompletions)
             ),
             Err(DiscoveryError::UnsupportedWireProtocol(_))
         ));
+        assert_eq!(
+            normalized_draft_wire_protocol(ProviderKind::Anthropic, None).unwrap(),
+            Some(ProviderWireProtocol::AnthropicMessages)
+        );
+        assert_eq!(
+            normalized_draft_wire_protocol(
+                ProviderKind::OpenaiCompatible,
+                Some(ProviderWireProtocol::GoogleGenerateContent)
+            )
+            .unwrap(),
+            Some(ProviderWireProtocol::GoogleGenerateContent)
+        );
     }
 
     #[test]
@@ -923,7 +921,7 @@ wire_api = "legacy-completions"
             created_at,
             kind: "openai".into(),
             base_url: "https://api.openai.com/v1".into(),
-            wire_protocol: Some(OpenAiWireProtocol::Responses),
+            wire_protocol: Some(ProviderWireProtocol::Responses),
             candidate_id: None,
             provider_id: None,
             secret: None,
@@ -944,6 +942,13 @@ wire_api = "legacy-completions"
         assert_eq!(
             model_ids(r#"{"data":[{"id":"z"},{"id":"a"},{"id":"a"}]}"#).unwrap(),
             vec!["a", "z"]
+        );
+        assert_eq!(
+            model_ids(
+                r#"{"models":[{"name":"models/gemini-2.5-pro"},{"name":"models/gemini-2.5-flash"}]}"#
+            )
+            .unwrap(),
+            vec!["gemini-2.5-flash", "gemini-2.5-pro"]
         );
         assert!(matches!(
             model_ids(r#"{"data":[]}"#),
@@ -978,7 +983,7 @@ wire_api = "legacy-completions"
                     created_at: Instant::now(),
                     kind: "openai".into(),
                     base_url: "https://api.openai.com/v1".into(),
-                    wire_protocol: Some(OpenAiWireProtocol::Responses),
+                    wire_protocol: Some(ProviderWireProtocol::Responses),
                     candidate_id: None,
                     provider_id: None,
                     secret: None,

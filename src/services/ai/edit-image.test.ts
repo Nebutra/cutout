@@ -43,6 +43,7 @@ describe('GenerationService.editImage', () => {
       expect.objectContaining({
         providerId: 'p1',
         kind: 'openai-compatible',
+        wireProtocol: 'chat-completions',
         baseUrl: 'https://relay.example/v1',
         model: 'gpt-image-1',
         prompt: 'redraw as assets',
@@ -124,6 +125,19 @@ describe('GenerationService.editImage', () => {
   it('errors (without invoking) for a non-OpenAI-shaped provider', async () => {
     const gen = createLocalGenerationService(
       providersWith([cfg({ kind: 'anthropic', baseUrl: undefined })]),
+    )
+    const result = await gen.editImage({
+      providerId: 'p1',
+      prompt: 'p',
+      images: [new Uint8Array([1])],
+    })
+    expect(result.ok).toBe(false)
+    expect(invokeMock).not.toHaveBeenCalled()
+  })
+
+  it('errors (without invoking) for a custom endpoint using a non-OpenAI protocol', async () => {
+    const gen = createLocalGenerationService(
+      providersWith([cfg({ wireProtocol: 'anthropic-messages' })]),
     )
     const result = await gen.editImage({
       providerId: 'p1',

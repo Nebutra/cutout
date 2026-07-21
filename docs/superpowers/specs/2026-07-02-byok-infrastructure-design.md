@@ -83,12 +83,18 @@ A provider is a user-configured connection. Modeled uniformly so Gateway is "jus
 ```ts
 // services/ai/provider-types.ts
 type ProviderKind = 'anthropic' | 'openai' | 'google' | 'gateway' | 'openai-compatible'
+type ProviderWireProtocol =
+  | 'responses'
+  | 'chat-completions'
+  | 'anthropic-messages'
+  | 'google-generate-content'
 
 interface ProviderConfig {
   id: string                 // stable uuid; also the keychain entry name
   kind: ProviderKind
   label: string              // user-facing ("My Anthropic", "Team Gateway")
   baseURL?: string           // required for 'openai-compatible'; optional override otherwise
+  wireProtocol?: ProviderWireProtocol // omitted only by legacy records; defaults by kind
   defaultModel: string       // e.g. 'anthropic/claude-sonnet-4.6' (gateway) or 'claude-sonnet-4.6'
   enabled: boolean
   // NO key field — the secret lives in the OS keychain, referenced by `id`
@@ -97,7 +103,8 @@ interface ProviderConfig {
 
 - **Provider list** (the non-secret config) is stored as JSON in the app config dir (Tauri path API), *not* in the keychain — only the secret is in the keychain.
 - **Keychain entry:** service = `com.nebutra.cutout`, account = `provider:{id}`. One secret per provider.
-- Auth-header shaping per `kind` lives in Rust (`anthropic` → `x-api-key` + `anthropic-version`; `openai`/`gateway`/`openai-compatible` → `Authorization: Bearer`; `google` → `x-goog-api-key`). This is the *only* provider-specific logic in Rust — a small header map, not request logic.
+- Host policy remains keyed by `kind`, while auth-header shaping follows the validated effective `wireProtocol`: OpenAI protocols use Bearer auth, Anthropic Messages uses `x-api-key` + `anthropic-version`, and Google GenerateContent uses `x-goog-api-key`. Gateway and local profiles retain their dedicated kind policies. The webview cannot supply raw auth headers.
+- Connection checks use authenticated model-catalog reads only. They do not issue generation requests or claim end-to-end generation success; protocol viability is enforced by the closed kind/protocol matrix and exhaustive local adapter, URL, and auth construction.
 
 ---
 
@@ -133,7 +140,7 @@ interface GenerationService {                                 // what future fea
 
 New module `commands/ai/`:
 - `keys.rs` — `set_key`, `key_status`, `delete_key`, `list_provider_status` via `keyring::Entry::new("com.nebutra.cutout", &format!("provider:{id}"))`. `set_password` / `get_password` / `delete_password`. **`get` is used only internally by the proxy — never exposed to JS.**
-- `ai_proxy.rs` — `ai_proxy_stream(provider_id, kind, url, method, headers, body, on_chunk: Channel<Vec<u8>>)`: read secret from keychain, inject the per-kind auth header, `reqwest` with `.bytes_stream()`, forward chunks to the `Channel`, send a terminal marker. Non-stream `ai_proxy_request` for `generateText`.
+- `ai_proxy.rs` — `ai_proxy_stream(provider_id, kind, wire_protocol, url, method, headers, body, on_chunk)`: validate the kind/protocol pair, read the secret from the keychain, inject protocol-specific auth, stream response bytes through the `Channel`, and send a terminal marker. `ai_proxy_request` carries the same validated protocol for buffered calls.
 - `providers.rs` (optional) — persist/load the non-secret `ProviderConfig[]` JSON via `tauri::path` app-config dir (or keep in JS + Tauri fs; decision at review).
 - Register in `lib.rs` `generate_handler!`. Add `keyring = "3"`, `reqwest = { version = "0.12", features = ["json","stream"] }`, `futures-util` to `Cargo.toml`.
 - **Capabilities:** these are custom commands (not the fs/dialog plugins), so they're allowed via the app's command ACL; no broad network permission is granted to the webview. The webview cannot make arbitrary authed calls — only through these typed commands.

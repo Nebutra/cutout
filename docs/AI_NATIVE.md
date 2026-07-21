@@ -34,7 +34,7 @@ Generated experimental assets are written to `artifacts/`.
 ```sh
 pnpm ai get-state
 pnpm ai get-ai-config
-pnpm ai upsert-provider '{"kind":"openai-compatible","label":"Mox","baseUrl":"https://aigw.mox.ktvsky.com","defaultModel":"gpt-image-1","enabled":true}'
+pnpm ai upsert-provider '{"kind":"openai-compatible","label":"Mox","baseUrl":"https://aigw.mox.ktvsky.com","wireProtocol":"chat-completions","defaultModel":"gpt-image-1","enabled":true}'
 echo "$OPENAI_API_KEY" | pnpm ai set-provider-key <providerId> -
 pnpm ai set-model-assignment image <providerId> gpt-image-1
 pnpm ai set-brief "政府官网"

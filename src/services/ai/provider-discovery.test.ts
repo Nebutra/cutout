@@ -58,6 +58,23 @@ describe('provider discovery native contract', () => {
     })
   })
 
+  it('accepts native Anthropic and Google protocol candidates', async () => {
+    const candidates = [
+      {
+        id: 'anthropic:opaque', source: 'claude', sourceLabel: 'Claude Code',
+        kind: 'anthropic', label: 'Anthropic', wireProtocol: 'anthropic-messages',
+        credential: { sourceType: 'environment', available: true, importable: true }, warnings: [],
+      },
+      {
+        id: 'google:opaque', source: 'environment', sourceLabel: 'Environment',
+        kind: 'google', label: 'Google', wireProtocol: 'google-generate-content',
+        credential: { sourceType: 'environment', available: true, importable: true }, warnings: [],
+      },
+    ]
+    invokeMock.mockResolvedValueOnce(candidates)
+    await expect(discoverProviderCandidates()).resolves.toEqual(candidates)
+  })
+
   it('imports only the consumed draft identity and selected model', async () => {
     const saved = {
       id: 'provider-id',

@@ -74,10 +74,11 @@ Two layers: **Credentials** (BYOK connections) and **Models** (assignment by out
 
 One form, endpoint declared explicitly (never guessed). This is a small evolution of the existing `ProviderForm`, which already has the kind `Select` + conditional `baseURL` + `KeyField`.
 
-- **Endpoint** (`Select`, = existing `ProviderKind`): `Anthropic` · `OpenAI` · `Google` · `AI Gateway` · `Custom (OpenAI-compatible)`.
-- **Base URL** (`Input`): shown **only** when endpoint is `Custom (OpenAI-compatible)`; **required** there. (Unchanged from today: `needsBaseUrl = kind === 'openai-compatible'`.)
+- **Endpoint** (`Select`, = existing `ProviderKind`): `Anthropic` · `OpenAI` · `Google` · `AI Gateway` · `Custom endpoint`.
+- **API protocol** (`Select`): OpenAI Responses · OpenAI Chat Completions · Anthropic Messages · Google GenerateContent. Vendor presets expose only supported values; `Custom endpoint` exposes all four executable protocols.
+- **Base URL** (`Input`): shown **only** when endpoint is `Custom endpoint`; **required** there. A pathless URL defaults to `/v1` for OpenAI/Anthropic protocols and `/v1beta` for Google GenerateContent; explicit paths are preserved.
 - **API Key** (`KeyField`, existing): write-only; on save the secret goes straight to `setKey()` → Rust and is wiped from JS. `🔒` affordance + tooltip states the keychain/Rust-proxy guarantee.
-- **Save auto-tests:** after `upsert` + `setKey`, the form calls `useTestKey().mutateAsync(saved.id)` automatically and shows the result (`✓ verified` / error) — the user no longer clicks a separate Test.
+- **Save auto-tests:** after `upsert` + `setKey`, the form calls `useTestKey().mutateAsync(saved.id)` automatically and shows the credential/catalog result (`✓ verified` / error) — the user no longer clicks a separate Test.
 
 Reused verbatim: `useUpsertProvider`, `useSetKey`, `useTestKey`, `useProviders`, `useProviderStatus`, `useRemoveProvider`, the local `ProviderService`, and all Rust `commands/ai/*`.
 
@@ -124,9 +125,18 @@ A small function that lists an endpoint's models through the existing buffered p
 // src/services/ai/list-models.ts
 async function listEndpointModels(cfg: ProviderConfig): Promise<string[]>
 // runs ONLY when cfg.baseUrl is set (openai-compatible/relays, or a baseUrl override):
-//   → ai_proxy_request(GET {cfg.baseUrl}/v1/models) → parse OpenAI-compatible { data:[{id}] } → string[]
+//   → ai_proxy_request(GET {protocolBase}/models, wireProtocol)
+//   → parse { data:[{id}] } or { models:[{name}] } → string[]
 // no baseUrl → returns [] (caller falls back to SUGGESTED_MODELS + free-text)
 ```
+
+The remote check is deliberately limited to authenticated `GET /models`. It
+verifies host policy, protocol-specific authentication, base URL normalization,
+and supported catalog parsing, but it does not claim that generation succeeded.
+There is no standardized no-cost `OPTIONS`/`HEAD` generation probe shared by all
+four protocol families, and Settings must never trigger a billable model call.
+Generation viability is enforced locally by the closed kind/protocol matrix,
+exhaustive adapter selection, protocol-aware paths/auth, and request-shape tests.
 
 - Reuses the Rust `ai_proxy_request` command as-is (buffered GET). **Discovery is gated on `cfg.baseUrl` being present.** The GET host must pass the existing `enforce_host` guard for the endpoint `kind` (`openai-compatible` already permits the user's host; a `baseUrl` override on a vendor kind must still resolve to that vendor's allowed host).
 - Exposed to the UI as `useEndpointModels(providerId)` (TanStack Query, `enabled` only when the provider has a key **and** a `baseUrl`). Empty/failed discovery degrades to the suggested list + free-text; it never blocks the form.
@@ -152,10 +162,10 @@ async function listEndpointModels(cfg: ProviderConfig): Promise<string[]>
 
 **Add a relay endpoint**
 ```
-Settings → AI → Add endpoint → Endpoint: Custom (OpenAI-compatible)
+Settings → AI → Add endpoint → Endpoint: Custom endpoint
   → Base URL https://relay/v1 + Key ····
   → Save: upsert(config) → setKey(id, secret) [secret → Rust → keychain, wiped from JS]
-         → auto test (useTestKey().mutateAsync(id)) → ✓ verified
+         → credential/catalog test (useTestKey().mutateAsync(id)) → ✓ verified
   → useEndpointModels(id): ai_proxy_request GET /v1/models → model list ready for the slots
 ```
 
@@ -206,7 +216,7 @@ src/hooks/queries/
 
 ## 10. i18n
 
-All user-facing strings go through Lingui (`Trans` / `t` macros), matching the just-shipped catalogs. Brand/product names (Anthropic, OpenAI, …) stay verbatim; only `Custom (OpenAI-compatible)` and generic labels are translated. Model slugs and base URLs are never translated.
+All user-facing strings go through Lingui (`Trans` / `t` macros), matching the just-shipped catalogs. Brand/product and protocol names (Anthropic, OpenAI, Google GenerateContent, …) stay verbatim; `Custom endpoint` and generic labels are translated. Model slugs and base URLs are never translated.
 
 ---
 
@@ -215,7 +225,7 @@ All user-facing strings go through Lingui (`Trans` / `t` macros), matching the j
 - **Settings shell:** `⌘,` opens; section switch; Esc closes; About footer renders version.
 - **General:** theme/language/reset are instant (no save); "remember export dir" persists and is read by `useExportAll`.
 - **Credentials form:** `Custom` reveals+requires Base URL; save runs auto-test; secret is wiped from JS after `setKey` (reuse existing assertions); no secret in Query/Zustand.
-- **`/v1/models` discovery:** parses OpenAI-compatible `{ data:[{id}] }`; failure degrades to suggestions + free-text (never blocks); request carries no key into JS.
+- **Protocol model discovery:** calls `<normalized-base>/models`, parses both `{ data:[{id}] }` and `{ models:[{name}] }` (stripping `models/`), and carries the selected protocol to Rust for auth. Failure degrades to suggestions + free-text; no key enters JS.
 - **Model assignment:** set persists via plugin-store; a slot with no keyed endpoint is disabled; modality→slot resolution (`text`/`vision`→chat, `image-generation`→image).
 
 ---

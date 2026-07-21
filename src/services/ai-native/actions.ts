@@ -9,7 +9,7 @@ import { z } from 'zod'
 import { graphSpecSchema } from '@/dag/graph-spec'
 import { intentProfileSchema } from '@/dag/intent-types'
 import { modelAssignmentSchema } from '@/services/ai/model-assignment-types'
-import { providerConfigSchema } from '@/services/ai/provider-types'
+import { providerDraftSchema } from '@/services/ai/provider-types'
 import type { DagNodeOutput, Store } from '@/store/types'
 import {
   clearAiNativeDiagnostics,
@@ -20,10 +20,6 @@ import { currentProductionRunId } from '@/asset-production'
 const slotIdSchema = z.enum(['chat', 'image'])
 const semanticSliceRouteSchema = z.enum(['text-to-image', 'image-to-image'])
 const semanticSliceReferenceSchema = z.enum(['auto', 'none', 'mockup', 'board'])
-const providerDraftSchema = providerConfigSchema.extend({
-  id: z.string().min(1).optional(),
-})
-
 export const aiNativeActionSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('ping') }),
   z.object({ type: z.literal('get-state') }),

@@ -305,6 +305,11 @@ msgid "preview.analyzing"
 msgstr "分析中…"
 
 #. js-lingui-explicit-id
+#: src/components/settings/ProviderForm.tsx
+msgid "settings.provider_protocol_anthropic_messages"
+msgstr "Anthropic Messages"
+
+#. js-lingui-explicit-id
 #: src/components/settings/VectorizerPanel.tsx
 msgid "vectorizer.api_id_saved"
 msgstr "API ID 已保存"
@@ -588,7 +593,7 @@ msgstr "在此之前，此处的更改无法保存。"
 #. js-lingui-explicit-id
 #: src/components/settings/ProviderForm.tsx
 msgid "settings.provider_protocol_chat_completions"
-msgstr "Chat Completions"
+msgstr "OpenAI Chat Completions"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/UpdatesSection.tsx
@@ -598,7 +603,7 @@ msgstr "自动检查"
 #. js-lingui-explicit-id
 #: src/components/settings/ProviderForm.tsx
 msgid "settings.check_connection_load_models"
-msgstr "检查连接并加载模型"
+msgstr "检查凭证并加载模型"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/UpdatesSection.tsx
@@ -936,6 +941,11 @@ msgstr "自定义"
 #: src/components/settings/sections/PersonalizationSection.tsx
 msgid "settings.personalization.personality_custom"
 msgstr "自定义"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderForm.tsx
+msgid "settings.provider_kind_openai_compatible"
+msgstr "自定义端点"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/PersonalizationSection.tsx
@@ -1331,6 +1341,11 @@ msgstr "全球"
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.section_aria"
 msgstr "全局库"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderForm.tsx
+msgid "settings.provider_protocol_google_generate_content"
+msgstr "Google GenerateContent"
 
 #. js-lingui-explicit-id
 #: src/components/home/ProjectHome.tsx
@@ -1799,11 +1814,6 @@ msgid "topbar.tabs_overview"
 msgstr "打开的标签页"
 
 #. js-lingui-explicit-id
-#: src/components/settings/ProviderForm.tsx
-msgid "settings.provider_kind_openai_compatible"
-msgstr "OpenAI 兼容"
-
-#. js-lingui-explicit-id
 #: src/components/settings/ModelSlot.tsx
 msgid "settings.optional_fallback_model_placeholder"
 msgstr "可选的备用模型"
@@ -2204,7 +2214,7 @@ msgstr "已解决"
 #. js-lingui-explicit-id
 #: src/components/settings/ProviderForm.tsx
 msgid "settings.provider_protocol_responses"
-msgstr "Responses API"
+msgstr "OpenAI Responses"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/UpdatesSection.tsx

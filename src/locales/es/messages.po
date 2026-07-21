@@ -305,6 +305,11 @@ msgid "preview.analyzing"
 msgstr "Analizando…"
 
 #. js-lingui-explicit-id
+#: src/components/settings/ProviderForm.tsx
+msgid "settings.provider_protocol_anthropic_messages"
+msgstr "Anthropic Messages"
+
+#. js-lingui-explicit-id
 #: src/components/settings/VectorizerPanel.tsx
 msgid "vectorizer.api_id_saved"
 msgstr "ID de API guardado"
@@ -588,7 +593,7 @@ msgstr "Los cambios aquí no se pueden guardar hasta entonces."
 #. js-lingui-explicit-id
 #: src/components/settings/ProviderForm.tsx
 msgid "settings.provider_protocol_chat_completions"
-msgstr "Chat Completions"
+msgstr "OpenAI Chat Completions"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/UpdatesSection.tsx
@@ -598,7 +603,7 @@ msgstr "Comprobar automáticamente"
 #. js-lingui-explicit-id
 #: src/components/settings/ProviderForm.tsx
 msgid "settings.check_connection_load_models"
-msgstr "Check connection and load models"
+msgstr "Comprobar credenciales y cargar modelos"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/UpdatesSection.tsx
@@ -936,6 +941,11 @@ msgstr "Personalizado"
 #: src/components/settings/sections/PersonalizationSection.tsx
 msgid "settings.personalization.personality_custom"
 msgstr "Personalizada"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderForm.tsx
+msgid "settings.provider_kind_openai_compatible"
+msgstr "Endpoint personalizado"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/PersonalizationSection.tsx
@@ -1331,6 +1341,11 @@ msgstr "Global"
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.section_aria"
 msgstr "Biblioteca global"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderForm.tsx
+msgid "settings.provider_protocol_google_generate_content"
+msgstr "Google GenerateContent"
 
 #. js-lingui-explicit-id
 #: src/components/home/ProjectHome.tsx
@@ -1799,11 +1814,6 @@ msgid "topbar.tabs_overview"
 msgstr "Pestañas abiertas"
 
 #. js-lingui-explicit-id
-#: src/components/settings/ProviderForm.tsx
-msgid "settings.provider_kind_openai_compatible"
-msgstr "Compatible con OpenAI"
-
-#. js-lingui-explicit-id
 #: src/components/settings/ModelSlot.tsx
 msgid "settings.optional_fallback_model_placeholder"
 msgstr "Modelo de respaldo opcional"
@@ -2204,7 +2214,7 @@ msgstr "resuelto"
 #. js-lingui-explicit-id
 #: src/components/settings/ProviderForm.tsx
 msgid "settings.provider_protocol_responses"
-msgstr "Responses API"
+msgstr "OpenAI Responses"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/UpdatesSection.tsx

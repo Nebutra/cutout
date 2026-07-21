@@ -1,0 +1,5 @@
+{"file":".trellis/spec/frontend/byok-user-copy.md","reason":"Verify protocol errors and credential guidance remain accurate."}
+{"file":".trellis/spec/frontend/agent-control-safety.md","reason":"Review network and secret boundaries for every new protocol family."}
+{"file":".trellis/spec/frontend/type-safety.md","reason":"Verify exhaustive discriminant handling and persistence compatibility."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Apply the frontend verification checklist."}
+{"file":".trellis/tasks/07-21-provider-protocol-families/research/protocol-family-mvp.md","reason":"Verify the implementation matches the researched executable MVP and exclusions."}

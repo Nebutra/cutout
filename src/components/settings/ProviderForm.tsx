@@ -20,9 +20,9 @@ import {
   type ProviderConfig,
   type ProviderDraft,
   type ProviderKind,
-  type OpenAIWireProtocol,
-  defaultOpenAIWireProtocol,
-  isOpenAIShapedProvider,
+  type ProviderWireProtocol,
+  defaultProviderWireProtocol,
+  supportedProviderWireProtocols,
 } from '@/services/ai/provider-types'
 import {
   DEFAULT_MODEL,
@@ -91,8 +91,8 @@ export function ProviderForm({ initial, initialKind, discovered, onDone }: Provi
   const [kind, setKind] = useState<ProviderKind>(initial?.kind ?? discovered?.kind ?? initialKind ?? 'anthropic')
   const [label, setLabel] = useState(initial?.label ?? discovered?.label ?? '')
   const [baseUrl, setBaseUrl] = useState(initial?.baseUrl ?? discovered?.baseUrl ?? '')
-  const [wireProtocol, setWireProtocol] = useState<OpenAIWireProtocol | undefined>(
-    initial?.wireProtocol ?? discovered?.wireProtocol ?? defaultOpenAIWireProtocol(initial?.kind ?? discovered?.kind ?? initialKind ?? 'anthropic'),
+  const [wireProtocol, setWireProtocol] = useState<ProviderWireProtocol | undefined>(
+    initial?.wireProtocol ?? discovered?.wireProtocol ?? defaultProviderWireProtocol(initial?.kind ?? discovered?.kind ?? initialKind ?? 'anthropic'),
   )
   const [defaultModel, setDefaultModel] = useState(
     initial?.defaultModel ?? discovered?.modelHint ?? DEFAULT_MODEL[discovered?.kind ?? initialKind ?? 'anthropic'] ?? '',
@@ -130,7 +130,7 @@ export function ProviderForm({ initial, initialKind, discovered, onDone }: Provi
   function onKindChange(next: string) {
     const nextKind = next as ProviderKind
     setKind(nextKind)
-    setWireProtocol(defaultOpenAIWireProtocol(nextKind))
+    setWireProtocol(defaultProviderWireProtocol(nextKind))
     invalidateConnection()
     // Re-seed the model only when it is empty or a stock default, so a custom
     // slug the user typed survives a kind switch.
@@ -143,7 +143,7 @@ export function ProviderForm({ initial, initialKind, discovered, onDone }: Provi
     return k === 'openai-compatible'
       ? t({
           id: 'settings.provider_kind_openai_compatible',
-          message: 'OpenAI Compatible',
+          message: 'Custom endpoint',
         })
       : createBuiltinProviderRegistry().definition(k)?.label ?? KIND_BRAND[k] ?? k
   }
@@ -152,7 +152,7 @@ export function ProviderForm({ initial, initialKind, discovered, onDone }: Provi
   const needsBaseUrl = definition?.configurableBaseUrl ?? kind === 'openai-compatible'
   const needsKey = definition?.authMethods.includes('api-key') ?? true
   const needsOAuth = definition?.authMethods.includes('oauth2') ?? false
-  const wireProtocols = definition?.openAIWireProtocols ?? (isOpenAIShapedProvider(kind) ? ['responses', 'chat-completions'] as const : [])
+  const wireProtocols = definition?.wireProtocols ?? supportedProviderWireProtocols(kind)
   const modelOptions = Array.from(
     new Set(
       [
@@ -172,7 +172,11 @@ export function ProviderForm({ initial, initialKind, discovered, onDone }: Provi
     !busy && !connectionDirty
 
   async function probeModels() {
-    const resolvedBaseUrl = apiBaseUrl(kind, baseUrl.trim() || undefined)
+    const resolvedBaseUrl = apiBaseUrl(
+      kind,
+      baseUrl.trim() || definition?.defaultBaseUrl,
+      wireProtocol,
+    )
     if (!resolvedBaseUrl) return
     setProbing(true); setProbeError(undefined); setProbeErrorCode(undefined)
     try {
@@ -336,14 +340,16 @@ export function ProviderForm({ initial, initialKind, discovered, onDone }: Provi
         </div>
       )}
 
-      {isOpenAIShapedProvider(kind) && (
+      {wireProtocols.length > 0 && (
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="provider-wire-protocol"><Trans id="settings.provider_api_protocol">API protocol</Trans></Label>
-          <Select value={wireProtocol} onValueChange={(value) => { setWireProtocol(value as OpenAIWireProtocol); invalidateConnection() }} disabled={busy}>
+          <Select value={wireProtocol} onValueChange={(value) => { setWireProtocol(value as ProviderWireProtocol); invalidateConnection() }} disabled={busy}>
             <SelectTrigger id="provider-wire-protocol"><SelectValue /></SelectTrigger>
             <SelectContent>
-              {wireProtocols.includes('responses') ? <SelectItem value="responses"><Trans id="settings.provider_protocol_responses">Responses API</Trans></SelectItem> : null}
-              {wireProtocols.includes('chat-completions') ? <SelectItem value="chat-completions"><Trans id="settings.provider_protocol_chat_completions">Chat Completions</Trans></SelectItem> : null}
+              {wireProtocols.includes('responses') ? <SelectItem value="responses"><Trans id="settings.provider_protocol_responses">OpenAI Responses</Trans></SelectItem> : null}
+              {wireProtocols.includes('chat-completions') ? <SelectItem value="chat-completions"><Trans id="settings.provider_protocol_chat_completions">OpenAI Chat Completions</Trans></SelectItem> : null}
+              {wireProtocols.includes('anthropic-messages') ? <SelectItem value="anthropic-messages"><Trans id="settings.provider_protocol_anthropic_messages">Anthropic Messages</Trans></SelectItem> : null}
+              {wireProtocols.includes('google-generate-content') ? <SelectItem value="google-generate-content"><Trans id="settings.provider_protocol_google_generate_content">Google GenerateContent</Trans></SelectItem> : null}
             </SelectContent>
           </Select>
         </div>
@@ -354,7 +360,7 @@ export function ProviderForm({ initial, initialKind, discovered, onDone }: Provi
 
       <div className="flex items-center gap-2">
         <Button type="button" variant="outline" onClick={() => void probeModels()} disabled={busy || probing || (!secret && !hasKey && !discovered?.credential.available && needsKey)}>
-          {probing ? <Loader2 className="animate-spin" /> : <RefreshCw />}<Trans id="settings.check_connection_load_models">Check connection and load models</Trans>
+          {probing ? <Loader2 className="animate-spin" /> : <RefreshCw />}<Trans id="settings.check_connection_load_models">Check credentials and load models</Trans>
         </Button>
         {probeError ? <span className="text-xs text-destructive">{probeError}</span> : null}
       </div>
