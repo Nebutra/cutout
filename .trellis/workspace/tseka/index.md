@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 7
-- **Last Active**: 2026-07-20
+- **Total Sessions**: 8
+- **Last Active**: 2026-07-21
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~237 | Active |
+| `journal-1.md` | ~270 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 8 | 2026-07-21 | Fix integration logo readability | `0e5a45f` | `main` |
 | 7 | 2026-07-20 | Signed cross-platform desktop updates | `eb31446` | `main` |
 | 6 | 2026-07-20 | Publish bilingual Cutout README | `b30dcc8` | `main` |
 | 5 | 2026-07-20 | Close Cutout production pipeline and fix project archiving | `e2ea8fc` | `main` |

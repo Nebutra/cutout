@@ -18,7 +18,9 @@ Replaced the hard-coded plan review dashboard with safe AI-authored Markdown art
 
 ### Main Changes
 
-- Detailed change bullets were not supplied; see the summary above.
+- Made monochrome integration SVGs theme-aware and standardized the shared icon box at 20x20px.
+- Bundled official Pencil and Paper app marks with exact upstream URLs and SHA-256 provenance.
+- Updated unit coverage and desktop/mobile light/dark Playwright baselines.
 
 ### Git Commits
 
@@ -227,6 +229,41 @@ Added atomic macOS, Windows, and Linux GitHub releases; version and artifact val
 ### Testing
 
 - Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 8: Fix integration logo readability
+
+**Date**: 2026-07-21
+**Task**: Fix integration logo readability
+**Branch**: `main`
+
+### Summary
+
+Theme-adapted integration marks, bundled official Pencil and Paper assets with reproducible provenance, standardized 20px rendering, and refreshed desktop/mobile visual coverage.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `0e5a45f` | fix: improve integration logo readability |
+
+### Testing
+
+- Focused Vitest: 9 tests passed.
+- Focused oxlint and `tsc -b`: passed.
+- Affected Playwright visual suite: 8 desktop/mobile tests passed.
 
 ### Status
 
