@@ -24,6 +24,7 @@ describe('cross-platform release workflow', () => {
     const source = await readFile('.github/workflows/release-update.yml', 'utf8')
     const workflow = YAML.parse(source)
     const buildAction = workflow.jobs.build.steps.find((step: { uses?: string }) => step.uses?.startsWith('tauri-apps/tauri-action@'))
+    const configInjection = workflow.jobs.build.steps.find((step: { name?: string }) => step.name === 'Inject updater public key into release-only Tauri config')
     const publishScript = workflow.jobs.publish.steps.at(-1).run
 
     expect(buildAction.with).toMatchObject({
@@ -33,6 +34,8 @@ describe('cross-platform release workflow', () => {
     })
     expect(buildAction.with).not.toHaveProperty('tagName')
     expect(buildAction.with).not.toHaveProperty('releaseId')
+    expect(configInjection.run).toBe('node scripts/prepare-tauri-release-config.mjs')
+    expect(buildAction.with.args).toContain('--config src-tauri/tauri.release.conf.json')
     expect(workflow.jobs.build.env.CUTOUT_UPDATER_STABLE_ENDPOINTS).toContain('releases/latest/download/latest.json')
     expect(workflow.jobs.build.env.CUTOUT_UPDATER_ALLOWED_HOSTS).toContain('github.com')
     expect(publishScript).toContain('gh release create')

@@ -199,11 +199,12 @@ fn walk(root: &Path, directory: &Path, state: &mut ScanState) -> Result<(), Scan
         }
         let mut file = open_without_following(&target)?;
         let opened = file.metadata().map_err(io_error)?;
-        if !opened.is_file() || !same_file_identity(&metadata, &opened) {
+        if !opened.is_file() {
             return Err(ScanError::Invalid(
                 "repository entry changed during scan".into(),
             ));
         }
+        let opened_identity = file_identity(&file)?;
         if opened.len() > MAX_FILE_BYTES {
             state.excluded.oversized += 1;
             continue;
@@ -218,10 +219,11 @@ fn walk(root: &Path, directory: &Path, state: &mut ScanState) -> Result<(), Scan
             continue;
         }
         let after = file.metadata().map_err(io_error)?;
-        let current = fs::symlink_metadata(&target).map_err(io_error)?;
-        if current.file_type().is_symlink()
-            || !same_file_identity(&opened, &after)
-            || !same_file_identity(&after, &current)
+        let current_file = open_without_following(&target)?;
+        let current = current_file.metadata().map_err(io_error)?;
+        if !current.is_file()
+            || file_identity(&file)? != opened_identity
+            || file_identity(&current_file)? != opened_identity
             || bytes.len() as u64 != after.len()
         {
             return Err(ScanError::Invalid(
@@ -298,16 +300,43 @@ fn open_without_following(path: &Path) -> Result<File, ScanError> {
         .open(path)
         .map_err(io_error)
 }
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct FileIdentity {
+    volume: u64,
+    index: u64,
+}
+
 #[cfg(unix)]
-fn same_file_identity(left: &fs::Metadata, right: &fs::Metadata) -> bool {
+fn file_identity(file: &File) -> Result<FileIdentity, ScanError> {
     use std::os::unix::fs::MetadataExt;
-    left.dev() == right.dev() && left.ino() == right.ino()
+    let metadata = file.metadata().map_err(io_error)?;
+    Ok(FileIdentity {
+        volume: metadata.dev(),
+        index: metadata.ino(),
+    })
 }
 #[cfg(windows)]
-fn same_file_identity(left: &fs::Metadata, right: &fs::Metadata) -> bool {
-    use std::os::windows::fs::MetadataExt;
-    left.volume_serial_number() == right.volume_serial_number()
-        && left.file_index() == right.file_index()
+fn file_identity(file: &File) -> Result<FileIdentity, ScanError> {
+    use std::mem::MaybeUninit;
+    use std::os::windows::io::AsRawHandle;
+    use windows_sys::Win32::Storage::FileSystem::{
+        GetFileInformationByHandle, BY_HANDLE_FILE_INFORMATION,
+    };
+
+    let mut information = MaybeUninit::<BY_HANDLE_FILE_INFORMATION>::uninit();
+    // SAFETY: `file` owns a valid handle for the duration of this call and the
+    // output pointer refers to writable storage for the documented structure.
+    let succeeded =
+        unsafe { GetFileInformationByHandle(file.as_raw_handle() as _, information.as_mut_ptr()) };
+    if succeeded == 0 {
+        return Err(io_error(std::io::Error::last_os_error()));
+    }
+    // SAFETY: GetFileInformationByHandle initialized the structure on success.
+    let information = unsafe { information.assume_init() };
+    Ok(FileIdentity {
+        volume: u64::from(information.dwVolumeSerialNumber),
+        index: (u64::from(information.nFileIndexHigh) << 32) | u64::from(information.nFileIndexLow),
+    })
 }
 fn safe_label(value: &str) -> bool {
     !value.is_empty()
@@ -460,6 +489,31 @@ mod tests {
     use super::*;
     use std::io::Write;
     use tempfile::tempdir;
+
+    #[test]
+    fn file_identity_tracks_opened_files_and_hard_links() {
+        let root = tempdir().unwrap();
+        let original_path = root.path().join("original.ts");
+        let hard_link_path = root.path().join("hard-link.ts");
+        let other_path = root.path().join("other.ts");
+        File::create(&original_path).unwrap();
+        fs::hard_link(&original_path, &hard_link_path).unwrap();
+        File::create(&other_path).unwrap();
+
+        let original = File::open(original_path).unwrap();
+        let hard_link = File::open(hard_link_path).unwrap();
+        let other = File::open(other_path).unwrap();
+
+        assert_eq!(
+            file_identity(&original).unwrap(),
+            file_identity(&hard_link).unwrap()
+        );
+        assert_ne!(
+            file_identity(&original).unwrap(),
+            file_identity(&other).unwrap()
+        );
+    }
+
     #[test]
     fn scan_never_emits_root_or_secrets_and_reports_frameworks() {
         let root = tempdir().unwrap();

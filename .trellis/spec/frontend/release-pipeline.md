@@ -41,6 +41,11 @@ installer version differs from their release version.
   `CUTOUT_UPDATER_BETA_ENDPOINTS` are optional approved-host overrides.
 - Private keys remain CI secrets. Public endpoint/key configuration remains CI
   variables and is compiled into release builds.
+- The committed Tauri updater config remains fail-closed. Before packaging,
+  release CI validates the complete two-line minisign public key, writes an
+  ignored merge-only config, and passes it to the Tauri CLI with `--config`.
+  Exporting `CUTOUT_UPDATER_PUBKEY` alone is insufficient because the Tauri
+  bundler reads `plugins.updater.pubkey` from CLI configuration.
 - Every CI contract runner installs Playwright Chromium before `pnpm test`;
   Linux also installs its browser system dependencies. Browser configuration
   uses the bundled executable outside macOS unless an explicit executable path
@@ -71,6 +76,7 @@ installer version differs from their release version.
 | Required platform/bundle is absent | Collector fails before Release creation |
 | Symlink or duplicate output is found | Collector fails closed |
 | Updater archive/signature is absent | Metadata generation fails |
+| Public key is empty or malformed | Stop before invoking the Tauri bundler |
 | Release tag already has a Release | Refuse immutable asset replacement |
 | Upload is incomplete | Release remains a draft, not a public success |
 | Browser/dev build has no updater config | Home action remains absent |

@@ -33,6 +33,7 @@ dist-ssr
 # tauri
 src-tauri/target/
 src-tauri/gen/
+src-tauri/tauri.release.conf.json
 
 # test
 coverage/
