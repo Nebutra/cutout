@@ -24,13 +24,19 @@ describe('cross-platform release workflow', () => {
     const source = await readFile('.github/workflows/release-update.yml', 'utf8')
     const workflow = YAML.parse(source)
     const buildAction = workflow.jobs.build.steps.find((step: { uses?: string }) => step.uses?.startsWith('tauri-apps/tauri-action@'))
+    const artifactUpload = workflow.jobs.build.steps.find((step: { uses?: string }) => step.uses?.startsWith('actions/upload-artifact@'))
     const configInjection = workflow.jobs.build.steps.find((step: { name?: string }) => step.name === 'Inject updater public key into release-only Tauri config')
     const publishScript = workflow.jobs.publish.steps.at(-1).run
 
     expect(buildAction.with).toMatchObject({
       uploadUpdaterJson: false,
-      uploadWorkflowArtifacts: true,
-      workflowArtifactNamePattern: '${{ matrix.artifact }}',
+      uploadWorkflowArtifacts: false,
+      uploadUpdaterSignatures: false,
+    })
+    expect(artifactUpload.with).toMatchObject({
+      name: '${{ matrix.artifact }}',
+      path: 'src-tauri/target/${{ matrix.target }}/release/bundle',
+      'if-no-files-found': 'error',
     })
     expect(buildAction.with).not.toHaveProperty('tagName')
     expect(buildAction.with).not.toHaveProperty('releaseId')
