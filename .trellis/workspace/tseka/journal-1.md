@@ -53,7 +53,14 @@ Fixed long generated prompts being rejected by the 20,000-character audit intent
 
 ### Main Changes
 
-- Detailed change bullets were not supplied; see the summary above.
+- Vertically centered compact connector logos and replaced the Canva mark.
+- Added Retry for transient interrupted Agent runs while excluding policy,
+  authentication, configuration, material, and cancellation failures.
+- Unified the Git dock identity and collapse control; hover/focus swaps the Git
+  branch icon to the drawer-close icon.
+- Added OpenAI Responses, OpenAI Chat Completions, Anthropic Messages, and
+  Google GenerateContent custom endpoint protocols across UI, TypeScript, Rust,
+  docs, locales, and visual coverage.
 
 ### Git Commits
 
@@ -63,7 +70,13 @@ Fixed long generated prompts being rejected by the 20,000-character audit intent
 
 ### Testing
 
-- Validation was not recorded for this session.
+- Connector unit, lint, type-check, brand, and desktop/mobile visual checks.
+- Agent retry focused tests, lint, and type-check.
+- Git dock unit and accessibility checks; its legacy visual fixture remains
+  skipped because the fixture times out before assertions.
+- Provider protocol Vitest 74/74, Rust AI tests 46/46, Provider Playwright
+  10/10, lint, TypeScript build, Agent contract validation, Rust formatting,
+  and diff checks.
 
 ### Status
 
@@ -326,6 +339,42 @@ Removed the single-control Advanced tab, moved Developer mode to General with in
 | Hash | Message |
 |------|---------|
 | `4d6213e` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 11: Polish connectors, agent retry, Git dock, and provider protocols
+
+**Date**: 2026-07-21
+**Task**: Polish connectors, agent retry, Git dock, and provider protocols
+**Branch**: `main`
+
+### Summary
+
+Centered connector logos and updated Canva branding; added safe retry for transient Agent failures; unified the Git dock identity and collapse control; added four executable provider protocol families with non-billable credential/catalog checks, exhaustive adapters, Rust auth routing, docs, specs, locales, and visual coverage.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `c1475ef` | (see git log) |
+| `fe77a65` | (see git log) |
+| `bf41e12` | (see git log) |
+| `ed6b6eb` | (see git log) |
 
 ### Testing
 
