@@ -18,10 +18,11 @@ by `IntegrationIcon` in settings or connector menus.
 ## Theme Contract
 
 - `monochrome-svg`: render geometry with the current theme foreground.
-- `color-svg` and `image`: preserve official artwork; do not apply a global
-  fill, grayscale, or theme-color rewrite inside `IntegrationIcon`.
-- Keep the icon box stable at 20x20px so geometry and image loading cannot
-  shift list layout.
+- `image`: preserve official artwork; do not apply a global fill, grayscale, or
+  theme-color rewrite inside `IntegrationIcon`.
+- Use the typed `IntegrationIcon` size contract: `default` is 20x20px for
+  settings and management surfaces, while `compact` is 16x16px for dense
+  dropdown rows. Do not duplicate raw sizing classes at call sites.
 
 ## Accessibility
 
@@ -34,10 +35,9 @@ by `IntegrationIcon` in settings or connector menus.
 
 - Unit: every connector resolves through the shared registry/component;
   official assets expose provenance; only intended fallbacks are generic.
-- Visual: light and dark themes verify 20x20 geometry or loaded image pixels,
-  non-transparent foreground, scrolling, and desktop/mobile screenshots.
-- Preserve product-specific behavior such as Canva's official gradient rather
-  than applying monochrome rules indiscriminately.
+- Visual: light and dark themes verify the surface-specific 16x16 or 20x20
+  geometry, loaded image pixels, non-transparent foreground, scrolling, and
+  desktop/mobile screenshots.
 
 ## Wrong Vs Correct
 

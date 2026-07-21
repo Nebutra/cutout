@@ -26,23 +26,54 @@ describe('IntegrationIcon', () => {
     }
   })
 
-  it('preserves the official Canva gradient wordmark', () => {
+  it('renders the locally bundled Iconify Boxicons Brands Canva mark', () => {
     const asset = integrationIconRegistry['cutout.canva']
     expect(asset).toMatchObject({
-      kind: 'color-svg',
-      source: 'Canva Developers',
-      sourceUrl: 'https://www.canva.dev/',
-      license: 'Canva trademark and brand terms',
+      kind: 'monochrome-svg',
+      source: 'Iconify (Boxicons Brands)',
+      sourceUrl: 'https://api.iconify.design/bxl:canva.svg',
+      license: 'MIT',
     })
-    expect(asset.svg).toContain('<title>Canva</title>')
-    expect(asset.svg).toMatch(/viewBox="0 0 80 30"/)
-    expect(asset.svg).toContain('url(#canva-a)')
+    expect(asset.svg).toMatch(/viewBox="0 0 24 24"/)
+    expect(asset.svg).toContain('fill="currentColor"')
     const html = renderToStaticMarkup(
       createElement(IntegrationIcon, { id: 'cutout.canva', name: 'Canva' }),
     )
     expect(html).toContain('aria-label="Canva logo"')
-    expect(html).toContain('data-icon-kind="color-svg"')
-    expect(html).not.toContain('fill-current')
+    expect(html).toContain('data-icon-kind="monochrome-svg"')
+    expect(html).toContain('fill-current')
+  })
+
+  it('uses typed default and compact icon boxes', () => {
+    const defaultHtml = renderToStaticMarkup(
+      createElement(IntegrationIcon, { id: 'cutout.figma', name: 'Figma' }),
+    )
+    const compactHtml = renderToStaticMarkup(
+      createElement(IntegrationIcon, {
+        id: 'cutout.figma',
+        name: 'Figma',
+        size: 'compact',
+      }),
+    )
+    expect(defaultHtml).toContain('data-icon-size="default"')
+    expect(defaultHtml).toContain('size-5')
+    expect(compactHtml).toContain('data-icon-size="compact"')
+    expect(compactHtml).toContain('size-4')
+  })
+
+  it('vertically centers SVG, image, and generic icon boxes consistently', () => {
+    for (const [id, name] of [
+      ['cutout.figma', 'Figma'],
+      ['cutout.pencil', 'Pencil'],
+      ['cutout.repository', 'Repository'],
+    ] as const) {
+      const html = renderToStaticMarkup(
+        createElement(IntegrationIcon, { id, name, size: 'compact' }),
+      )
+      expect(html).toContain(
+        'class="inline-flex shrink-0 self-center align-middle items-center justify-center size-4',
+      )
+    }
   })
 
   it('renders official locally bundled Pencil and Paper artwork', () => {
@@ -105,5 +136,8 @@ describe('IntegrationIcon', () => {
     )
     expect(html).toContain('aria-label="Future integration"')
     expect(html).toContain('data-icon-kind="generic"')
+    expect(html).toContain('<span role="img"')
+    expect(html).toContain('aria-hidden="true"')
+    expect(html).toContain('focusable="false"')
   })
 })

@@ -18,11 +18,6 @@ interface MonochromeSvgIcon extends IntegrationIconProvenance {
   readonly svg: string
 }
 
-interface ColorSvgIcon extends IntegrationIconProvenance {
-  readonly kind: 'color-svg'
-  readonly svg: string
-}
-
 interface ImageIcon extends IntegrationIconProvenance {
   readonly kind: 'image'
   readonly src: string
@@ -30,7 +25,6 @@ interface ImageIcon extends IntegrationIconProvenance {
 
 export type IntegrationIconAsset =
   | MonochromeSvgIcon
-  | ColorSvgIcon
   | ImageIcon
 
 const simpleIcon = (svg: string, slug: string): MonochromeSvgIcon => ({
@@ -48,11 +42,11 @@ export const integrationIconRegistry = {
   'cutout.obsidian': simpleIcon(obsidian, 'obsidian'),
   'cutout.framer': simpleIcon(framer, 'framer'),
   'cutout.canva': {
-    kind: 'color-svg',
+    kind: 'monochrome-svg',
     svg: canva,
-    source: 'Canva Developers',
-    sourceUrl: 'https://www.canva.dev/',
-    license: 'Canva trademark and brand terms',
+    source: 'Iconify (Boxicons Brands)',
+    sourceUrl: 'https://api.iconify.design/bxl:canva.svg',
+    license: 'MIT',
   },
   'cutout.pencil': {
     kind: 'image',

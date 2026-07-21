@@ -119,6 +119,7 @@ test("all integrations have nonempty non-Plug icons in light/dark after scrollin
           image = element.querySelector("img");
         return {
           id: element.getAttribute("data-integration-icon"),
+          size: element.getAttribute("data-icon-size"),
           source: element.getAttribute("data-icon-source"),
           kind: element.getAttribute("data-icon-kind"),
           width: box.width,
@@ -143,7 +144,12 @@ test("all integrations have nonempty non-Plug icons in light/dark after scrollin
           plug: element.classList.contains("lucide-plug"),
         };
       });
-      expect(facts).toMatchObject({ width: 20, height: 20, plug: false });
+      expect(facts).toMatchObject({
+        size: "default",
+        width: 20,
+        height: 20,
+        plug: false,
+      });
       expect(facts.color).not.toBe("rgba(0, 0, 0, 0)");
       if (facts.kind === "image") {
         expect(facts.imageWidth).toBe(20);
@@ -156,10 +162,12 @@ test("all integrations have nonempty non-Plug icons in light/dark after scrollin
         expect(facts.geometry).toBeGreaterThan(0);
       }
       if (facts.id === "cutout.canva") {
-        expect(facts.source).toBe("Canva Developers");
-        expect(facts.path.length).toBeGreaterThan(1000);
-        expect(facts.gradient).toBe("canva-a");
-        expect(facts.fill).toBe("url(#canva-a)");
+        expect(facts.source).toBe("Iconify (Boxicons Brands)");
+        expect(facts.kind).toBe("monochrome-svg");
+        expect(facts.path.length).toBeGreaterThan(300);
+        expect(facts.gradient).toBe("");
+        expect(facts.fill).toBe("currentColor");
+        expect(facts.pathFill).toBe(facts.color);
       } else if (facts.id === "cutout.pencil") {
         expect(facts.source).toBe("pen.dev");
       } else if (facts.id === "cutout.paper") {
