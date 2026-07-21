@@ -1,0 +1,3 @@
+{"file":".trellis/spec/frontend/index.md","reason":"Frontend package guidance and applicable checklist."}
+{"file":".trellis/spec/frontend/component-guidelines.md","reason":"IntegrationIcon is a shared accessible React component."}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"The shared icon registry must remain the single source for every integration surface."}

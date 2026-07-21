@@ -106,6 +106,7 @@ test("all integrations have nonempty non-Plug icons in light/dark after scrollin
   await expect(
     page.locator('[data-integration-icon="cutout.canva"].lucide-palette'),
   ).toHaveCount(0);
+  const lightSimpleIconColors = new Map<string, string>();
   for (const dark of [false, true]) {
     await page.evaluate(
       (enabled) => document.documentElement.classList.toggle("dark", enabled),
@@ -114,13 +115,20 @@ test("all integrations have nonempty non-Plug icons in light/dark after scrollin
     for (const icon of await icons.all()) {
       const facts = await icon.evaluate((element) => {
         const box = element.getBoundingClientRect(),
-          svg = element.matches("svg") ? element : element.querySelector("svg");
+          svg = element.matches("svg") ? element : element.querySelector("svg"),
+          image = element.querySelector("img");
         return {
           id: element.getAttribute("data-integration-icon"),
           source: element.getAttribute("data-icon-source"),
+          kind: element.getAttribute("data-icon-kind"),
           width: box.width,
           height: box.height,
           svgWidth: svg?.getBoundingClientRect().width ?? 0,
+          svgHeight: svg?.getBoundingClientRect().height ?? 0,
+          imageWidth: image?.getBoundingClientRect().width ?? 0,
+          imageHeight: image?.getBoundingClientRect().height ?? 0,
+          naturalWidth: image?.naturalWidth ?? 0,
+          naturalHeight: image?.naturalHeight ?? 0,
           geometry: [
             ...(svg?.querySelectorAll("path,circle,rect,polygon,polyline") ??
               []),
@@ -128,23 +136,41 @@ test("all integrations have nonempty non-Plug icons in light/dark after scrollin
           path: svg?.querySelector("path")?.getAttribute("d") ?? "",
           gradient: svg?.querySelector("linearGradient")?.id ?? "",
           fill: svg?.querySelector("path")?.getAttribute("fill") ?? "",
+          pathFill: svg?.querySelector("path")
+            ? getComputedStyle(svg.querySelector("path")!).fill
+            : "",
           color: getComputedStyle(element).color,
           plug: element.classList.contains("lucide-plug"),
         };
       });
-      expect(facts).toMatchObject({
-        width: 16,
-        height: 16,
-        svgWidth: 16,
-        plug: false,
-      });
-      expect(facts.geometry).toBeGreaterThan(0);
+      expect(facts).toMatchObject({ width: 20, height: 20, plug: false });
       expect(facts.color).not.toBe("rgba(0, 0, 0, 0)");
+      if (facts.kind === "image") {
+        expect(facts.imageWidth).toBe(20);
+        expect(facts.imageHeight).toBe(20);
+        expect(facts.naturalWidth).toBeGreaterThan(0);
+        expect(facts.naturalHeight).toBeGreaterThan(0);
+      } else {
+        expect(facts.svgWidth).toBe(20);
+        expect(facts.svgHeight).toBe(20);
+        expect(facts.geometry).toBeGreaterThan(0);
+      }
       if (facts.id === "cutout.canva") {
         expect(facts.source).toBe("Canva Developers");
         expect(facts.path.length).toBeGreaterThan(1000);
         expect(facts.gradient).toBe("canva-a");
         expect(facts.fill).toBe("url(#canva-a)");
+      } else if (facts.id === "cutout.pencil") {
+        expect(facts.source).toBe("pen.dev");
+      } else if (facts.id === "cutout.paper") {
+        expect(facts.source).toBe("paper.design");
+      } else if (facts.kind === "monochrome-svg") {
+        expect(facts.pathFill).toBe(facts.color);
+        if (dark) {
+          expect(facts.color).not.toBe(lightSimpleIconColors.get(facts.id!));
+        } else {
+          lightSimpleIconColors.set(facts.id!, facts.color);
+        }
       }
     }
     await icons.last().scrollIntoViewIfNeeded();

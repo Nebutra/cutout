@@ -28,6 +28,7 @@ This directory contains guidelines for frontend development. Fill in each file w
 | [Prototype Route-Suite Generation](./prototype-generation.md) | Agent-authored route graphs, complete page generation, and cross-page visual consistency | Filled |
 | [Desktop Release Pipeline](./release-pipeline.md) | Atomic cross-platform native builds, updater evidence, and GitHub Release publication | Filled |
 | [Agent Control Safety](./agent-control-safety.md) | Durable claims, host-issued approval leases, controlled paths, governance evidence, and composite receipts | Filled |
+| [Integration Brand Icons](./integration-brand-icons.md) | Local brand asset provenance, theme contrast, accessibility, and visual verification | Filled |
 
 ---
 
