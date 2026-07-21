@@ -39,6 +39,7 @@
     "copyright": "Copyright © 2026 Nebutra AI Native Team",
     "category": "public.app-category.graphics-design",
     "icon": [
+      "icons/icon.png",
       "icons/icon.icns",
       "icons/icon.ico"
     ],

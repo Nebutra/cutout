@@ -24,4 +24,12 @@ describe("Tauri package-manager portability", () => {
     });
     expect(config.capabilities).toBeUndefined();
   });
+
+  it("includes a square PNG icon for Linux bundles", async () => {
+    const config = JSON.parse(
+      await readFile(resolve(process.cwd(), "src-tauri/tauri.conf.json"), "utf8"),
+    );
+
+    expect(config.bundle.icon).toContain("icons/icon.png");
+  });
 });
