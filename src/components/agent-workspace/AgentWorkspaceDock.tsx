@@ -380,8 +380,11 @@ export function AgentRunFeed({
           <p className="max-w-[30ch] break-words py-2 text-xs leading-4 text-muted-foreground">{emptyLabel}</p>
         ) : (() => {
           const latestActionId = [...items].reverse().find((item) => item.type === 'message' && item.action)?.id
-          return items.map((item, index) => (
-            <FeedRow key={item.id} item={item} detailsLabel={detailsLabel} onApproveTool={onApproveTool} onDenyTool={onDenyTool} onCancelTool={onCancelTool} onRetryTool={onRetryTool} onAgentAction={onAgentAction} onEditMessage={onEditMessage} showMessageAction={item.id === latestActionId} onRetry={index === items.length - 1 ? onRetry : undefined} retryLabel={retryLabel} />
+          const latestErrorId = onRetry
+            ? [...items].reverse().find((item) => item.type === 'error')?.id
+            : undefined
+          return items.map((item) => (
+            <FeedRow key={item.id} item={item} detailsLabel={detailsLabel} onApproveTool={onApproveTool} onDenyTool={onDenyTool} onCancelTool={onCancelTool} onRetryTool={onRetryTool} onAgentAction={onAgentAction} onEditMessage={onEditMessage} showMessageAction={item.id === latestActionId} onRetry={item.id === latestErrorId ? onRetry : undefined} retryLabel={retryLabel} />
           ))
         })()}
         <div ref={endRef} />

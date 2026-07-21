@@ -73,6 +73,10 @@ import {
   type LockedComposerRoute,
 } from "@/agent-runtime/composer-execution";
 import { recordAiNativeDiagnostic } from "@/services/ai-native/diagnostics";
+import {
+  classifyGenerationError,
+  userFacingGenerationError,
+} from "@/services/ai/generation-error";
 import { useModelAssignments } from "@/hooks/queries/ai-settings";
 import { useProviders } from "@/hooks/queries/providers";
 import {
@@ -247,6 +251,7 @@ import {
 } from "@/agent-runtime/run-coordinator";
 import { useAgentRunEvents } from "@/agent-runtime/use-agent-run-events";
 import { consumeComposerDraft } from "./composer-draft";
+import { createAgentRunRetryControl } from "./agent-run-retry";
 import {
   collectLiveText,
   createLiveTextBatcher,
@@ -503,6 +508,9 @@ export function IntentWorkspace({
   const [liveAgentLabel, setLiveAgentLabel] = useState<string | null>(null);
   const [runError, setRunError] = useState<string | null>(
     () => initialWorkspace?.runError ?? null,
+  );
+  const [retryableRunBrief, setRetryableRunBrief] = useState<string | null>(
+    null,
   );
   const [namingStatus, setNamingStatus] = useState<NamingStatus>(
     () => initialWorkspace?.namingStatus ?? "idle",
@@ -870,6 +878,14 @@ export function IntentWorkspace({
     Boolean(prototypeArtifacts.designSystem),
     productionRepairRegionIds,
   );
+  const runRetryControl = createAgentRunRetryControl(
+    {
+      working,
+      hasRepairPlan: Boolean(repairPlan),
+      retryableBrief: retryableRunBrief,
+    },
+    createAssets,
+  );
   const agentViewModel = buildAgentViewModel({
     brief,
     workflowPhase,
@@ -1061,6 +1077,7 @@ export function IntentWorkspace({
     getStoreState().endGen();
     setRunCancelled(true);
     setRunError(null);
+    setRetryableRunBrief(null);
     setLiveAgentOutput("");
     setLiveAgentLabel(null);
     setNamingStatus((status) =>
@@ -1240,6 +1257,7 @@ export function IntentWorkspace({
   ): Promise<void> {
     const baseText = (options.briefOverride ?? brief).trim();
     if (!baseText) return;
+    setRetryableRunBrief(null);
     const text = withCanvasAnnotations(baseText, canvasAnnotations);
     const requestedMaterial = options.ignoreSelectedMaterial
       ? null
@@ -1488,7 +1506,8 @@ export function IntentWorkspace({
         return;
       }
       const message = errorMessage(error);
-      const displayMessage = userFacingGenerationError(message);
+      const classification = classifyGenerationError(message);
+      const displayMessage = classification.displayMessage;
       recordAiNativeDiagnostic({
         level: "error",
         scope: "workspace.create-assets",
@@ -1505,6 +1524,7 @@ export function IntentWorkspace({
         },
       });
       setRunError(displayMessage);
+      setRetryableRunBrief(classification.retryable ? baseText : null);
       toast.error("Generation failed", {
         description: displayMessage,
       });
@@ -3576,16 +3596,14 @@ export function IntentWorkspace({
                 ) : null
               }
               labels={
-                repairPlan ? { retry: "Continue" } : undefined
+                runRetryControl.label
+                  ? { retry: runRetryControl.label }
+                  : undefined
               }
               onCancel={
                 working && activeRunRef.current ? stopActiveRun : undefined
               }
-              onRetry={
-                !working && repairPlan
-                  ? () => void createAssets("repair")
-                  : undefined
-              }
+              onRetry={runRetryControl.onRetry}
               onApproveTool={(toolCallId, requestId) =>
                 void desktopTools.loop.approve(toolCallId, requestId)
               }
@@ -6693,42 +6711,6 @@ function isPrototypeSuiteComplete(
 function errorMessage(error: unknown): string {
   if (error instanceof Error) return error.message;
   return String(error);
-}
-
-function userFacingGenerationError(message: string): string {
-  const lower = message.toLowerCase();
-
-  if (
-    lower.includes("api_key") ||
-    lower.includes("api key") ||
-    lower.includes("unauthorized") ||
-    lower.includes("invalid key")
-  ) {
-    return "The selected AI provider needs a valid API key. Open Settings and update the provider.";
-  }
-
-  if (
-    lower.includes("timed out") ||
-    lower.includes("timeout") ||
-    lower.includes("request failed") ||
-    lower.includes("network") ||
-    lower.includes("fetch failed")
-  ) {
-    return "The connection to the AI provider was interrupted. Try again to continue.";
-  }
-
-  if (
-    lower.includes("schema") ||
-    lower.includes("json") ||
-    lower.includes("structured")
-  ) {
-    return "The AI response could not be processed. Try again to continue.";
-  }
-
-  if (message.trim().length === 0) return "Generation stopped.";
-  return message.length > 180
-    ? "Generation stopped. Try again to continue."
-    : message;
 }
 
 function recoverWorkflowPhase(

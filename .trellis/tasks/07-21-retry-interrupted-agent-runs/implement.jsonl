@@ -1,0 +1,3 @@
+{"file":".trellis/spec/frontend/component-guidelines.md","reason":"Follow existing React component and callback composition patterns."}
+{"file":".trellis/spec/frontend/agent-control-safety.md","reason":"Preserve run identity, retry semantics, and approval/receipt safety boundaries."}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"Reuse the existing error-row retry control and centralized error classification."}

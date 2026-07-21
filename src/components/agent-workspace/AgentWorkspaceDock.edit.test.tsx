@@ -71,3 +71,33 @@ describe('inline message editing', () => {
     expect(container!.querySelector('[role="alert"]')?.textContent).toBe('This request is no longer active.')
   })
 })
+
+describe('stopped-run retry', () => {
+  it('renders one Retry action below the latest error and invokes its callback', async () => {
+    const onRetry = vi.fn()
+    container = document.createElement('div')
+    document.body.append(container)
+    await act(async () => createRoot(container!).render(createElement(AgentWorkspaceDock, {
+      viewModel: {
+        summary: { status: 'stopped', title: 'Run stopped', detail: 'Service temporarily unavailable', intent: 'Create a checkout flow', elapsedLabel: '0:04' },
+        feed: [
+          { id: 'error-1', type: 'error', status: 'stopped', title: 'Run stopped', detail: 'Older failure', provenance: 'runtime' },
+          { id: 'error-2', type: 'error', status: 'stopped', title: 'Run stopped', detail: 'Latest transport interruption', provenance: 'runtime' },
+          { id: 'agent-1', type: 'message', role: 'agent', status: 'complete', title: 'Agent', detail: 'Completed work remains available.', provenance: 'runtime' },
+        ],
+        checklist: [],
+      },
+      composer: { value: '', onChange: vi.fn(), onSubmit: vi.fn() },
+      labels: { retry: 'Retry' },
+      onRetry,
+    })))
+
+    const retryButtons = [...container.querySelectorAll('button')]
+      .filter((button) => button.textContent?.trim() === 'Retry')
+    expect(retryButtons).toHaveLength(1)
+    expect(retryButtons[0].closest('article')?.textContent).toContain('Latest transport interruption')
+    expect(retryButtons[0].getAttribute('type')).toBe('button')
+    await act(async () => click(retryButtons[0]))
+    expect(onRetry).toHaveBeenCalledTimes(1)
+  })
+})
