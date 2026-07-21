@@ -73,7 +73,7 @@
   },
   "policy": {
     "defaultMode": "dry-run",
-    "applyRequires": ["operation enabled by .cutout policy", "explicit opaque approval id for source ingestion and external exports"],
+    "applyRequires": ["operation enabled by .cutout policy", "host-issued short-lived single-use approval lease bound to operation, preview digest, and expected revision"],
     "paidActions": "Budget and approval are declared by cutout.control.v1; the desktop executor can require a short-lived capability lease, while the current headless host has no paid-tool executor.",
     "secrets": "Control requests, manifests and receipts reject or redact credential-shaped values; provider credentials stay in the host keychain, auth headers are assembled in Rust, and credentials are never part of this manifest.",
     "filesystemBoundary": "Controlled paths resolve below the canonical selected project root and reject absolute paths, parent traversal and symlink components; generated writes stay below .cutout/exports and use no caller-selected destination.",

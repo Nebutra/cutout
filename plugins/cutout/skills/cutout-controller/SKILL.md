@@ -27,7 +27,8 @@ authoritative; generated exports are projections.
 - Always call the matching `cutout_plan_*` or other dry-run tool first.
 - Present the exact plan, effects, provenance, hashes, policy, and limitations.
 - Apply only when the user explicitly approves that reviewed plan and the host
-  supplies its opaque approval id. Never invent an approval id or weaken policy.
+  supplies a host-issued approval lease bound to the previewed operation. Never
+  invent a lease, mint one in the controller, or weaken policy.
 - Read the result back with `cutout_deliverables_read` and validate again.
 
 ## Boundaries

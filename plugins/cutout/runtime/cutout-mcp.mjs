@@ -13054,6 +13054,9 @@ function createNodeRegistryService(projectRoot) {
 	const catalog = resolve(root, ".cutout", "registry", "items");
 	const receipts = resolve(root, ".cutout", "registry", "receipts");
 	return {
+		async currentRevision() {
+			return (await createNodeFsRuntimeStore(root).load()).ledger?.revision ?? 0;
+		},
 		async publishBundled(input) {
 			const item = RegistryItemSchema.parse(input.item);
 			const bytes = new Map(input.files.map((file) => [file.path, file.bytes]));
@@ -13090,7 +13093,7 @@ function createNodeRegistryService(projectRoot) {
 				files
 			}, framework);
 		},
-		async applyInstall(id, framework, approvalId, version) {
+		async applyInstall(id, framework, planId, approvalId, version) {
 			const item = select(await readCatalog(catalog), id, version);
 			const files = await readItemFiles(catalog, item);
 			const installer = new RegistryOpenCodeInstaller(createNodeRegistryInstallHost(root));
@@ -13098,6 +13101,7 @@ function createNodeRegistryService(projectRoot) {
 				item,
 				files
 			}, framework);
+			if (plan.id !== planId) throw new Error("Registry install plan changed; preview and approve a new plan.");
 			const receipt = await installer.apply(plan.id, approvalId);
 			await mkdir(receipts, { recursive: true });
 			await writeFile(resolve(receipts, `${safeName(plan.id)}.json`), `${JSON.stringify(receipt, null, 2)}\n`, { flag: "wx" }).catch(async (error) => {
@@ -14126,13 +14130,14 @@ var MCP_TOOLS = [
 	},
 	{
 		name: "cutout_registry_apply_install",
-		description: "Re-resolve and apply an approved conflict-free install to controlled project paths, then record installed origins.",
+		description: "Re-resolve and apply a previewed conflict-free install after a host-issued approval lease bound to its plan and project revision.",
 		inputSchema: {
 			type: "object",
 			additionalProperties: false,
 			required: [
 				"itemId",
 				"framework",
+				"planId",
 				"approvalLeaseId"
 			],
 			properties: {
@@ -14149,6 +14154,11 @@ var MCP_TOOLS = [
 					type: "string",
 					minLength: 1,
 					maxLength: 80
+				},
+				planId: {
+					type: "string",
+					minLength: 1,
+					maxLength: 160
 				},
 				approvalLeaseId: {
 					type: "string",
@@ -14485,7 +14495,7 @@ async function callTool(params) {
 		case "cutout_registry_apply_install":
 			result = {
 				ok: true,
-				response: await registryApplyInstall(PROJECT_ROOT, input.itemId, input.framework, input.approvalLeaseId, input.version)
+				response: await registryApplyInstall(PROJECT_ROOT, input.itemId, input.framework, input.planId, input.approvalLeaseId, input.version)
 			};
 			break;
 		case "cutout_registry_install_receipt": {
@@ -14669,7 +14679,26 @@ function createRegistryAdapter(loadService) {
 		registryList: async (root, query) => (await loadService(root)).list(query),
 		registryGet: async (root, id, version) => (await loadService(root)).get(id, version),
 		registryPlanInstall: async (root, id, framework, version) => (await loadService(root)).planInstall(id, framework, version),
-		registryApplyInstall: async (root, id, framework, approval, version) => (await loadService(root)).applyInstall(id, framework, approval, version),
+		registryApplyInstall: async (root, id, framework, planId, approvalLeaseId, version) => withProjectControlLock(root, async () => {
+			const service = await loadService(root);
+			const plan = await service.planInstall(id, framework, version);
+			if (plan.id !== planId) throw new Error("Registry install plan changed; preview and approve a new plan.");
+			const expectedRevision = await service.currentRevision();
+			const reservation = await reserveApprovalLease(root, approvalLeaseId, {
+				type: "registry.install",
+				planId,
+				itemId: plan.itemId,
+				itemVersion: plan.itemVersion,
+				targetFramework: plan.targetFramework
+			}, expectedRevision);
+			const receipt = await service.applyInstall(id, framework, planId, reservation.approval.id, version);
+			await completeApprovalLease(root, approvalLeaseId, reservation.reservationId, {
+				requestId: planId,
+				status: "ok",
+				revision: expectedRevision
+			});
+			return receipt;
+		}),
 		registryReceipt: async (root, planId) => (await loadService(root)).receipt(planId)
 	};
 }

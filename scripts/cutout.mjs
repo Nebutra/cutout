@@ -90,8 +90,13 @@ async function registry(projectRoot, args) {
   if (action === 'get' && rest[0]) return { ok: true, response: await registryGet(projectRoot, rest[0], flag(rest, '--version')) }
   if (action === 'install' && rest[0]) {
     const framework = flag(rest, '--framework'); if (!framework) throw new Error('registry install requires --framework.')
-    const approval = flag(rest, '--approval'); const version = flag(rest, '--version')
-    return { ok: true, response: approval ? await registryApplyInstall(projectRoot, rest[0], framework, approval, version) : await registryPlanInstall(projectRoot, rest[0], framework, version) }
+    if (rest.includes('--approval')) throw new Error('registry install no longer accepts caller-authored --approval; use a reviewed --plan with --approval-lease.')
+    const approvalLeaseId = flag(rest, '--approval-lease'); const planId = flag(rest, '--plan'); const version = flag(rest, '--version')
+    if (approvalLeaseId || planId) {
+      if (!approvalLeaseId || !planId) throw new Error('registry install apply requires --plan and --approval-lease.')
+      return { ok: true, response: await registryApplyInstall(projectRoot, rest[0], framework, planId, approvalLeaseId, version) }
+    }
+    return { ok: true, response: await registryPlanInstall(projectRoot, rest[0], framework, version) }
   }
   if (action === 'receipt' && rest.length === 1) { const receipt = await registryReceipt(projectRoot, rest[0]); return receipt ? { ok: true, response: receipt } : adapterError('not-found', 'Registry install receipt was not found.') }
   throw new Error('Use: registry list|search|get|install|receipt.')
@@ -143,7 +148,7 @@ async function ingest(projectRoot, args) {
   const { sourceArgs, apply, approvalLeaseId } = parseApply(args, 'ingest')
   const [kind, value, ...extra] = sourceArgs
   if (!kind || !value || extra.length > 0) {
-    throw new Error('Use: ingest --repo <relative-root> | --url <url> | --idea <text> | --story <text> | --file <relative-path> [--apply --approval <approval-id>].')
+    throw new Error('Use: ingest --repo <relative-root> | --url <url> | --idea <text> | --story <text> | --file <relative-path> [--apply --approval-lease <lease-id>].')
   }
   const license = { kind: 'unknown', rationale: 'User supplied through the Cutout CLI.' }
   let input
@@ -201,7 +206,7 @@ async function exportBrandKit(projectRoot, args) {
 
 function parseBrandKitExportArgs(args) {
   if (args.length < 2 || args[0] !== '--input') {
-    throw new Error('Use: export-brand-kit --input <BrandKitInput JSON> [--apply --approval <approval-id>].')
+    throw new Error('Use: export-brand-kit --input <BrandKitInput JSON> [--apply --approval-lease <lease-id>].')
   }
   let input
   try {
@@ -213,7 +218,7 @@ function parseBrandKitExportArgs(args) {
   if (args.length === 5 && args[2] === '--apply' && args[3] === '--approval-lease' && args[4]) {
     return { input, apply: true, approvalLeaseId: args[4] }
   }
-  throw new Error('Use: export-brand-kit --input <BrandKitInput JSON> [--apply --approval <approval-id>].')
+  throw new Error('Use: export-brand-kit --input <BrandKitInput JSON> [--apply --approval-lease <lease-id>].')
 }
 
 async function exportStarter(projectRoot, args) {
@@ -229,7 +234,7 @@ async function exportStarter(projectRoot, args) {
 function starterFramework(args) {
   const validApply = args.length === 5 && args[2] === '--apply' && args[3] === '--approval-lease' && Boolean(args[4])
   if ((args.length !== 2 && !validApply) || args[0] !== '--framework') {
-    throw new Error('Use: export-starter --framework <next-app-router|vite-react|nuxt|tanstack-start> [--apply --approval <approval-id>].')
+    throw new Error('Use: export-starter --framework <next-app-router|vite-react|nuxt|tanstack-start> [--apply --approval-lease <lease-id>].')
   }
   const framework = args[1]
   if (!['next-app-router', 'vite-react', 'nuxt', 'tanstack-start'].includes(framework)) {
@@ -302,7 +307,7 @@ function parseScopes(args) {
 }
 
 function printUsage() {
-  process.stdout.write(`Cutout headless CLI (no GUI queue, no provider access)\n\nUsage:\n  cutout [--project <dir>] context [--include summary,outcome,run-events]\n  cutout [--project <dir>] materials [--kind <kind> | --page <id>]\n  cutout [--project <dir>] validate [--scope design,tokens,materials,outcome]\n  cutout [--project <dir>] governance preview|validate|report --input <JSON> --policy <JSON>\n  cutout [--project <dir>] patch design-markdown --replace <text>\n  cutout [--project <dir>] patch design-markdown --append <text>\n  cutout [--project <dir>] patch project-name <text>\n  cutout [--project <dir>] patch tokens color.primary=#22c55e\n  cutout [--project <dir>] run start --id <run-id> [--mode create|repair] <intent>\n  cutout [--project <dir>] run get <run-id>\n  cutout [--project <dir>] run events <run-id> [--after <event-id>] [--limit <count>]\n  cutout [--project <dir>] run cancel <run-id> [reason]\n  cutout [--project <dir>] export-kit [--dry-run]\n  cutout [--project <dir>] export-kit --apply --approval <approval-id>\n  cutout [--project <dir>] export-brand-kit --input <BrandKitInput JSON>\n  cutout [--project <dir>] export-brand-kit --input <BrandKitInput JSON> --apply --approval <approval-id>\n  cutout [--project <dir>] export-starter --framework <next-app-router|vite-react>\n  cutout [--project <dir>] export-starter --framework <next-app-router|vite-react> --apply --approval <approval-id>\n  cutout [--project <dir>] ingest --repo <relative-root> [--apply --approval <approval-id>]\n  cutout [--project <dir>] ingest --url <url> [--apply --approval <approval-id>]\n  cutout [--project <dir>] ingest --idea <text> [--apply --approval <approval-id>]\n  cutout [--project <dir>] ingest --story <text> [--apply --approval <approval-id>]\n  cutout [--project <dir>] ingest --file <relative-path> [--apply --approval <approval-id>]\n`)
+  process.stdout.write(`Cutout headless CLI (no GUI queue, no provider access)\n\nUsage:\n  cutout [--project <dir>] context [--include summary,outcome,run-events]\n  cutout [--project <dir>] materials [--kind <kind> | --page <id>]\n  cutout [--project <dir>] validate [--scope design,tokens,materials,outcome]\n  cutout [--project <dir>] governance preview|validate|report --input <JSON> --policy <JSON>\n  cutout [--project <dir>] patch design-markdown --replace <text>\n  cutout [--project <dir>] patch design-markdown --append <text>\n  cutout [--project <dir>] patch project-name <text>\n  cutout [--project <dir>] patch tokens color.primary=#22c55e\n  cutout [--project <dir>] run start --id <run-id> [--mode create|repair] <intent>\n  cutout [--project <dir>] run get <run-id>\n  cutout [--project <dir>] run events <run-id> [--after <event-id>] [--limit <count>]\n  cutout [--project <dir>] run cancel <run-id> [reason]\n  cutout [--project <dir>] export-kit [--dry-run]\n  cutout [--project <dir>] export-kit --apply --approval-lease <lease-id>\n  cutout [--project <dir>] export-brand-kit --input <BrandKitInput JSON>\n  cutout [--project <dir>] export-brand-kit --input <BrandKitInput JSON> --apply --approval-lease <lease-id>\n  cutout [--project <dir>] export-starter --framework <next-app-router|vite-react>\n  cutout [--project <dir>] export-starter --framework <next-app-router|vite-react> --apply --approval-lease <lease-id>\n  cutout [--project <dir>] ingest --repo <relative-root> [--apply --approval-lease <lease-id>]\n  cutout [--project <dir>] ingest --url <url> [--apply --approval-lease <lease-id>]\n  cutout [--project <dir>] ingest --idea <text> [--apply --approval-lease <lease-id>]\n  cutout [--project <dir>] ingest --story <text> [--apply --approval-lease <lease-id>]\n  cutout [--project <dir>] ingest --file <relative-path> [--apply --approval-lease <lease-id>]\n`)
 }
 
 try {

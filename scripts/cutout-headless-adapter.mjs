@@ -98,7 +98,7 @@ export function unsupported(operation) {
   )
 }
 
-async function withProjectControlLock(projectRoot, action) {
+export async function withProjectControlLock(projectRoot, action) {
   const lock = resolve(projectRoot, '.cutout', '.external-control.lock')
   const deadline = Date.now() + 10_000
   while (true) {

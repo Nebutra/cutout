@@ -66,7 +66,7 @@ Return revisions, hashes, receipts, and checks where available.
 ## Approval Rules
 
 Preview mutations, exports, coding, and paid work before apply.
-Use an explicit opaque approval id scoped to the prepared operation.
+Use a host-issued, short-lived, single-use approval lease bound to the prepared operation, preview digest, and expected revision.
 Invalidate approval after any revision, scope, budget, or output change.
 
 ## Completion Gate

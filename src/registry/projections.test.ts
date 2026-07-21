@@ -45,7 +45,7 @@ describe('compiler registry projections', () => {
       expect(await service.list({ query: 'deterministically compiled' })).toHaveLength(1)
       expect(await service.get(projection.item.id)).toMatchObject({ schemaVersion: 'cutout.registry-item.v1' })
       const installPlan = await service.planInstall(projection.item.id, 'vite-react'); expect(installPlan.files).toEqual([expect.objectContaining({ status: 'create' })])
-      const receipt = await service.applyInstall(projection.item.id, 'vite-react', 'approved-projection'); expect(receipt.status).toBe('succeeded')
+      const receipt = await service.applyInstall(projection.item.id, 'vite-react', installPlan.id, 'approved-projection'); expect(receipt.status).toBe('succeeded')
       expect(await readFile(join(root, 'src/App.tsx'), 'utf8')).toBe(content)
     } finally { await rm(root, { recursive: true, force: true }) }
   })

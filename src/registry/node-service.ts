@@ -4,6 +4,7 @@ import { RegistryItemSchema, type RegistryItem, type RegistryItemKind } from './
 import { RegistryOpenCodeInstaller, type RegistryInstallPlan, type RegistryInstallReceipt } from './installer'
 import type { RegistryInstallInput } from './installer'
 import { createNodeRegistryInstallHost } from './node-host'
+import { createNodeFsRuntimeStore } from '../headless'
 
 export interface RegistryQuery { readonly query?: string; readonly kind?: RegistryItemKind; readonly framework?: string }
 
@@ -12,6 +13,7 @@ export function createNodeRegistryService(projectRoot: string) {
   const catalog = resolve(root, '.cutout', 'registry', 'items')
   const receipts = resolve(root, '.cutout', 'registry', 'receipts')
   return {
+    async currentRevision() { return (await createNodeFsRuntimeStore(root).load()).ledger?.revision ?? 0 },
     async publishBundled(input: RegistryInstallInput) {
       const item = RegistryItemSchema.parse(input.item)
       const bytes = new Map(input.files.map((file) => [file.path, file.bytes]))
@@ -30,11 +32,12 @@ export function createNodeRegistryService(projectRoot: string) {
       const files = await readItemFiles(catalog, item)
       return new RegistryOpenCodeInstaller(createNodeRegistryInstallHost(root)).plan({ item, files }, framework)
     },
-    async applyInstall(id: string, framework: string, approvalId: string, version?: string): Promise<RegistryInstallReceipt> {
+    async applyInstall(id: string, framework: string, planId: string, approvalId: string, version?: string): Promise<RegistryInstallReceipt> {
       const item = select(await readCatalog(catalog), id, version)
       const files = await readItemFiles(catalog, item)
       const installer = new RegistryOpenCodeInstaller(createNodeRegistryInstallHost(root))
       const plan = await installer.plan({ item, files }, framework)
+      if (plan.id !== planId) throw new Error('Registry install plan changed; preview and approve a new plan.')
       const receipt = await installer.apply(plan.id, approvalId)
       await mkdir(receipts, { recursive: true }); await writeFile(resolve(receipts, `${safeName(plan.id)}.json`), `${JSON.stringify(receipt, null, 2)}\n`, { flag: 'wx' }).catch(async (error: NodeJS.ErrnoException) => { if (error.code !== 'EEXIST') throw error })
       return receipt

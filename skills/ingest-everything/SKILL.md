@@ -65,7 +65,7 @@ Return revisions, hashes, receipts, and evidence where available.
 ## Approval Rules
 
 Preview ingestion, patches, paid actions, and exports before apply.
-Use only an explicit opaque approval id scoped to the prepared operation.
+Use only a host-issued, short-lived, single-use approval lease bound to the prepared operation, preview digest, and expected revision.
 Invalidate approval when inputs, revision, scope, budget, or output changes.
 
 ## Completion Gate
@@ -92,4 +92,3 @@ Summarize completed and missing user-visible materials.
 Preserve the last valid revision and durable receipts.
 Report the exact missing capability, stale revision, denial, or evidence gap.
 Never weaken policy to make work appear complete.
-

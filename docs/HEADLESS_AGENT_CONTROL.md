@@ -50,9 +50,9 @@ pnpm cutout --project . materials --kind prototype-page
 pnpm cutout --project . validate --scope design,tokens,materials
 pnpm cutout --project . patch tokens color.primary=#22c55e
 pnpm cutout --project . ingest --repo .
-pnpm cutout --project . ingest --repo . --apply --approval human-approved-20260711
+pnpm cutout --project . ingest --repo . --apply --approval-lease <host-issued-lease-id>
 pnpm cutout --project . export-kit
-pnpm cutout --project . export-kit --apply --approval human-approved-20260711
+pnpm cutout --project . export-kit --apply --approval-lease <host-issued-lease-id>
 pnpm cutout --project . export-brand-kit --input "$(cat brand-kit-input.json)"
 pnpm cutout --project . export-starter --framework vite-react
 ```
@@ -61,11 +61,12 @@ Design and token patches are dry-run previews in v1. They are validated by the
 same control protocol as the app and never write Design IR state. Controlled
 source ingestion supports inline ideas/stories, credential-free URL descriptors
 and relative local file/repository scans. It previews by default; apply requires
-project policy and an explicit approval id. URL descriptors are not fetched.
+project policy and a host-issued approval lease. URL descriptors are not fetched.
 
 `export-kit` defaults to a dry-run that compiles the complete file plan with a
 SHA-256 for every output. Apply requires both a project policy that enables
-`export.design-kit` and an explicit approval id. The destination is never an
+`export.design-kit` and a short-lived, single-use lease bound to the operation,
+preview digest, and expected Design IR revision. The destination is never an
 argument: the runtime atomically writes only to
 `.cutout/exports/design-kit/<deterministic-kit-id>/`, reads every file back, and
 refuses to replace a revision whose hashes differ.
@@ -92,7 +93,7 @@ target stack, writable relative paths, named quality checks, expected revision,
 changed-file/byte budget, and time ceiling.
 
 The runtime always produces a `cutout.coding-patch.v1` preview before apply.
-Apply additionally requires project policy and an opaque approval id. The Node
+Apply additionally requires project policy and a host-issued approval lease. The Node
 workspace adapter rejects absolute/traversal/credential-shaped paths, symbolic
 links, stale file hashes, repository snapshot conflicts, and changes outside
 the declared path and byte budgets. Quality checks are host-injected named
@@ -135,15 +136,17 @@ The server exposes only stable tools:
 - `cutout_validate`
 - `cutout_dry_run_patch`
 - `cutout_plan_source_ingest`
-- `cutout_apply_source_ingest` (requires `approvalId`)
+- `cutout_apply_source_ingest` (requires `approvalLeaseId`)
 - `cutout_plan_design_kit_export`
-- `cutout_export_design_kit` (requires `approvalId`)
+- `cutout_export_design_kit` (requires `approvalLeaseId`)
 - `cutout_plan_brand_kit_export` (requires explicit `BrandKitInput`)
-- `cutout_export_brand_kit` (requires explicit `BrandKitInput` and `approvalId`)
+- `cutout_export_brand_kit` (requires explicit `BrandKitInput` and `approvalLeaseId`)
 - `cutout_plan_starter_export`
-- `cutout_export_starter` (requires `approvalId`)
+- `cutout_export_starter` (requires `approvalLeaseId`)
 - `cutout_plan_coding_task`
-- `cutout_apply_coding_task` (requires `approvalId` and an injected coding host)
+- `cutout_apply_coding_task` (requires `approvalLeaseId` and an injected coding host)
+- `cutout_registry_plan_install` (returns the reviewed `planId`; no writes)
+- `cutout_registry_apply_install` (requires that `planId` and a host-issued `approvalLeaseId` bound to the plan and current revision)
 
 Results are JSON-RPC/MCP `structuredContent` and are redacted by the runtime
 before returning. Material results include metadata and SHA-256 addresses, not

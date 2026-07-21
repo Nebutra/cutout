@@ -132,8 +132,13 @@ pnpm cutout --project . export-starter --framework vite-react
 Approval-gated apply:
 
 ```bash
-pnpm cutout --project . export-kit --apply --approval <opaque-approval-id>
+pnpm cutout --project . export-kit --apply --approval-lease <host-issued-lease-id>
 ```
+
+Apply never accepts a reusable approval string. The embedding desktop/agent
+host must issue a short-lived, single-use lease bound to the exact operation,
+preview digest, and expected Design IR revision. The CLI only consumes that
+opaque lease; it cannot mint or broaden one.
 
 ## Project and export contract
 
