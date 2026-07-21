@@ -16,10 +16,19 @@ await rename(temporary, output)
 export function normalizePublicKey(value) {
   if (!value) throw new Error('CUTOUT_UPDATER_PUBKEY is required')
 
-  const normalized = value.replace(/\r\n/g, '\n').trim()
+  const input = value.replace(/\r\n/g, '\n').trim()
+  const normalized = input.includes('\n') ? input : decodeBase64PublicKey(input)
   const lines = normalized.split('\n')
   if (lines.length !== 2 || !lines[0].startsWith('untrusted comment: ') || !/^RW[A-Za-z0-9+/=]+$/.test(lines[1])) {
     throw new Error('CUTOUT_UPDATER_PUBKEY must be a complete two-line minisign public key')
   }
   return normalized
+}
+
+function decodeBase64PublicKey(value) {
+  if (!/^[A-Za-z0-9+/]+={0,2}$/.test(value) || value.length % 4 !== 0) return value
+
+  const bytes = Buffer.from(value, 'base64')
+  if (bytes.toString('base64') !== value) return value
+  return bytes.toString('utf8').replace(/\r\n/g, '\n').trim()
 }
