@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.4 - 2026-07-22
+
+- Added a message-level Regenerate action for the latest completed Agent response without duplicating the source user turn.
+- Clear superseded run failures as soon as a retry or regeneration attempt is accepted, preventing stale `Run stopped` and `No result yet` states.
+- Kept message regeneration isolated from run-level recovery and paid-tool retry contracts.
+
 ## 0.1.3 - 2026-07-22
 
 - Superseded the unpublished `v0.1.2` release after its macOS DMGs correctly failed the notarization gate.

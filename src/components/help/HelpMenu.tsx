@@ -56,7 +56,7 @@ export function HelpMenu() {
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
-            Cutout v0.1.3
+            Cutout v0.1.4
           </DropdownMenuLabel>
         </DropdownMenuContent>
       </DropdownMenu>
