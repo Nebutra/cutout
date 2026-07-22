@@ -1,0 +1,2 @@
+{"file":".trellis/spec/frontend/byok-provider-protocols.md","reason":"Verify provider behavior and host boundaries remain unchanged."}
+{"file":".trellis/spec/frontend/release-pipeline.md","reason":"Verify the frontend bundle gate passes without being relaxed."}

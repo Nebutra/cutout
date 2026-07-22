@@ -122,6 +122,15 @@ Connection checks prove credential and catalog access only. They must never
 issue a generation POST because there is no standardized cross-family no-cost
 generation probe.
 
+The application entry must not statically load provider catalog definitions or
+provider SDK runtime solely to support connection testing. When a configured
+provider has no explicit `baseUrl`, `ProviderService.test()` dynamically loads
+the catalog to resolve the first-party default endpoint. Configured/custom
+endpoints use their supplied URL without loading that catalog. `pnpm build`
+enforces this boundary by rejecting first-party provider endpoint markers in
+the frontend entry chunk; do not weaken that gate to accommodate an eager
+import.
+
 ### 4. Validation & Error Matrix
 
 | Condition | Required behavior |
@@ -160,8 +169,8 @@ generation probe.
   action copy must say credential/catalog check rather than generation proof.
 - Visual: desktop/mobile provider directory and custom endpoint form coverage.
 - Gates: `pnpm lint`, `pnpm exec tsc -b --pretty false`, focused Vitest,
-  `cargo test commands::ai::`, `cargo fmt --check`, `pnpm agent:validate`, and
-  `git diff --check`.
+  `cargo test commands::ai::`, `cargo fmt --check`, `pnpm agent:validate`,
+  `pnpm build` including the frontend bundle gate, and `git diff --check`.
 
 ### 7. Wrong vs Correct
 

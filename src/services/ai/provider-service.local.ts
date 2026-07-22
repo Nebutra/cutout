@@ -20,7 +20,6 @@ import {
 } from './provider-types'
 import { apiBaseUrl } from './base-url'
 import { parseProviderModelIds } from './provider-model-catalog'
-import { createBuiltinProviderRegistry } from './provider-registry'
 
 /** Row shape returned by the Rust `list_key_status` command. */
 interface KeyStatusRow {
@@ -109,7 +108,6 @@ function materialize(draft: ProviderDraft): ProviderConfig {
 }
 
 export function createLocalProviderService(): ProviderService {
-  const registry = createBuiltinProviderRegistry()
   return {
     list: loadProviders,
 
@@ -162,7 +160,8 @@ export function createLocalProviderService(): ProviderService {
       // endpoint normalization, and catalog parsing without incurring a model
       // call. It does not claim that a selected model can generate; there is no
       // cross-family standardized no-cost OPTIONS/HEAD generation probe.
-      const configuredBaseUrl = cfg.baseUrl ?? registry.definition(cfg.kind)?.defaultBaseUrl
+      const configuredBaseUrl = cfg.baseUrl ?? (await import('./provider-registry'))
+        .createBuiltinProviderRegistry().definition(cfg.kind)?.defaultBaseUrl
       if (configuredBaseUrl) {
         try {
           const wireProtocol = effectiveProviderWireProtocol(cfg)

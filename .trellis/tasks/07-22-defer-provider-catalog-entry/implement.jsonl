@@ -1,0 +1,2 @@
+{"file":".trellis/spec/frontend/byok-provider-protocols.md","reason":"Preserve provider protocol, Rust proxy, default endpoint, and non-billable connection-check contracts."}
+{"file":".trellis/spec/frontend/release-pipeline.md","reason":"Keep the production bundle and native release gates fail-closed."}
