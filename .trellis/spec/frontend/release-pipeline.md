@@ -19,6 +19,9 @@ installer version differs from their release version.
   `node scripts/collect-release-assets.mjs checksums --directory <dir>`
 - Updater generation/validation remains owned by `pnpm update:generate` and
   `pnpm update:validate`.
+- macOS DMG notarization command:
+  `xcrun notarytool submit <dmg> --key "$APPLE_API_KEY_PATH" --key-id "$APPLE_API_KEY" --issuer "$APPLE_API_ISSUER" --wait`, followed by
+  `xcrun stapler staple <dmg>`.
 - Desktop UI state owner: `createDesktopUpdateOrchestrator(...)` in `AppShell`.
   Home and Settings receive that controller; they do not construct another one.
 
@@ -35,6 +38,10 @@ installer version differs from their release version.
 - Required protected environment values:
   `TAURI_SIGNING_PRIVATE_KEY`, `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`, and
   `CUTOUT_UPDATER_PUBKEY`. The updater private key must be password-protected.
+  The private key and password are scoped only to the fail-fast signing-input
+  check and the commit-pinned Tauri build actions; checkout, dependency install,
+  tests, artifact upload, metadata generation, and publication do not receive
+  them.
   GitHub distribution defaults the stable endpoint to the repository's
   `releases/latest/download/latest.json` and the allowlist to `github.com`.
   `CUTOUT_UPDATER_STABLE_ENDPOINTS`, `CUTOUT_UPDATER_ALLOWED_HOSTS`, and
@@ -48,10 +55,15 @@ installer version differs from their release version.
   `APPLE_API_PRIVATE_KEY` to `$RUNNER_TEMP/AuthKey_<key-id>.p8` with mode
   `0600`, and exports only `APPLE_API_KEY_PATH` for the Tauri process. The
   temporary key is removed after packaging, including failed builds.
-- macOS artifacts are uploadable only after the generated `.app` and `.dmg`
-  both pass Developer ID signature verification, Gatekeeper assessment, and
-  stapled-ticket validation. Tauri's macOS build must wait for notarization and
-  stapling before these checks run.
+- Tauri 2.11.4 notarizes and staples the `.app` before creating the DMG. Signing
+  the later DMG does not notarize that container. Release CI must therefore
+  submit the finished DMG separately with `notarytool --wait`, staple the
+  accepted ticket, and only then allow the generated `.app` and `.dmg` to pass
+  Developer ID signature verification, Gatekeeper assessment, and
+  stapled-ticket validation.
+- Both Tauri build actions are pinned to the reviewed commit SHA. A mutable tag
+  such as `tauri-apps/tauri-action@v1` is forbidden because those actions receive
+  updater signing material and the macOS action also receives Apple credentials.
 - Private keys remain CI secrets. Public endpoint/key configuration remains CI
   variables and is compiled into release builds.
 - The committed Tauri updater config remains fail-closed. Before packaging,
@@ -92,6 +104,7 @@ installer version differs from their release version.
 | Public key is empty or malformed | Stop before invoking the Tauri bundler |
 | Updater key password is absent | Stop before invoking the Tauri bundler |
 | Any Apple signing/notarization secret is absent on macOS | Stop before invoking the macOS Tauri build |
+| App notarization or explicit DMG notarization is not accepted | Do not run artifact upload or publication |
 | App or DMG signature, Gatekeeper, or stapler validation fails | Do not upload that macOS workflow artifact |
 | Release tag already has a Release | Refuse immutable asset replacement |
 | Upload is incomplete | Release remains a draft, not a public success |
@@ -104,6 +117,9 @@ installer version differs from their release version.
 
 - Good: all four matrix entries finish, collected names include their platform
   and architecture, updater evidence validates, and one draft is promoted.
+- Good: Tauri receives an Apple `Accepted` result for the app, the workflow
+  receives a separate `Accepted` result for the DMG, and both artifacts report
+  `source=Notarized Developer ID` before upload.
 - Good: the delayed desktop check discovers a newer signed GitHub release; one
   compact Home action appears and opens the existing update controls.
 - Base: a manual build selects an existing version tag and uses the exact same
@@ -112,6 +128,9 @@ installer version differs from their release version.
   header has no empty update placeholder.
 - Bad: each matrix entry runs `gh release create`, uploads its own
   `latest.json`, or has repository write permission.
+- Bad: the workflow treats Tauri's app notarization as proof that the
+  subsequently created DMG is notarized, or verifies the DMG before separately
+  submitting and stapling it.
 - Bad: CI edits version manifests after checkout to make a mismatched tag pass.
 
 ### 6. Tests Required
@@ -123,7 +142,8 @@ installer version differs from their release version.
   deterministic SHA-256 output.
 - `scripts/release-workflow.test.ts`: four-entry matrix, validate/build/publish
   dependency graph, least-privilege permissions, isolated macOS/non-macOS Tauri
-  actions, Apple secret scoping and temporary key handling, macOS
+  actions, immutable Tauri action pinning, updater and Apple secret scoping,
+  temporary key handling, app-before-DMG notarization ordering, macOS
   signature/notarization verification, and draft promotion.
 - `scripts/ci-platform-contracts.test.ts`: browser installation ordering,
   platform-specific executable selection, and LF/CRLF frontmatter parsing.

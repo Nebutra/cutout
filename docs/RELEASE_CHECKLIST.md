@@ -27,7 +27,7 @@
 - Configure the protected GitHub `release` environment with `APPLE_CERTIFICATE` (base64 PKCS#12), `APPLE_CERTIFICATE_PASSWORD`, `APPLE_SIGNING_IDENTITY`, `APPLE_API_KEY` (App Store Connect key ID), `APPLE_API_ISSUER`, and `APPLE_API_PRIVATE_KEY` (complete `.p8` content). Do not store `APPLE_API_KEY_PATH`; the workflow creates it under `$RUNNER_TEMP` with mode `0600` and removes it after the macOS build.
 - Confirm Apple secrets appear only on the macOS credential-preparation, Tauri app notarization build, and explicit DMG notarization steps. Windows and Linux jobs receive no Apple certificate, identity, issuer, key ID, private-key content, or private-key path.
 - Run `scripts/release-macos.sh --distribute`; missing signing or notarization prerequisites must hard fail.
-- Require the GitHub macOS build to wait for Tauri's notarization and stapling, then validate both the `.app` and `.dmg` with `codesign --verify --deep --strict --verbose=2`, Gatekeeper (`spctl`), and `xcrun stapler validate` before artifact upload.
+- Require the GitHub macOS build to wait for Tauri's app notarization and stapling, submit the subsequently created DMG separately with `xcrun notarytool submit --wait`, staple the accepted DMG ticket, then validate both the `.app` and `.dmg` with `codesign --verify --deep --strict --verbose=2`, Gatekeeper (`spctl`), and `xcrun stapler validate` before artifact upload.
 - Inspect release evidence with `codesign -dvvv --entitlements :-` and re-run Gatekeeper assessment on a clean machine.
 
 ## DMG and updater policy
