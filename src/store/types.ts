@@ -362,6 +362,8 @@ export interface StoreActions {
   consumeAgentRun(): PendingAgentRun | null
   /** Mark a forward generation as started (clears the prior error). */
   beginGen(phase: Exclude<GenPhase, 'idle'>): void
+  /** Clear a superseded forward-generation error without changing its phase. */
+  clearGenError(): void
   /** Mark the current forward generation as finished (back to idle). */
   endGen(): void
   /** Mark the current forward generation as failed, scoped to its op. */

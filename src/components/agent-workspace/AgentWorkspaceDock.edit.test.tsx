@@ -134,3 +134,45 @@ describe('stopped-run retry', () => {
     expect(onRetry).toHaveBeenCalledTimes(1)
   })
 })
+
+describe('message regeneration', () => {
+  it('renders one icon-only action for the latest eligible Agent reply and invokes its callback', async () => {
+    const onRegenerateMessage = vi.fn()
+    container = document.createElement('div')
+    document.body.append(container)
+    await act(async () => createRoot(container!).render(createElement(AgentRunFeed, {
+      items: [
+        { id: 'user', type: 'message', role: 'user', status: 'complete', title: 'You', detail: 'Hello', provenance: 'runtime' },
+        { id: 'agent-old', type: 'message', role: 'agent', status: 'complete', title: 'Agent', detail: 'Older reply', provenance: 'runtime' },
+        { id: 'agent-latest', type: 'message', role: 'agent', status: 'complete', title: 'Agent', detail: 'Latest reply', provenance: 'runtime', regeneratable: true },
+      ],
+      heading: 'Conversation',
+      emptyLabel: 'No activity',
+      detailsLabel: 'Execution details',
+      onRegenerateMessage,
+    })))
+
+    const buttons = container.querySelectorAll<HTMLButtonElement>('[aria-label="Regenerate response"]')
+    expect(buttons).toHaveLength(1)
+    expect(buttons[0].textContent).toBe('')
+    expect(buttons[0].closest('[data-slot="agent-message"]')?.textContent).toContain('Latest reply')
+    await act(async () => click(buttons[0]))
+    expect(onRegenerateMessage).toHaveBeenCalledWith('agent-latest')
+  })
+
+  it('hides regeneration while the dock reports an active run', async () => {
+    container = document.createElement('div')
+    document.body.append(container)
+    await act(async () => createRoot(container!).render(createElement(AgentWorkspaceDock, {
+      viewModel: {
+        summary: { status: 'running', title: 'Working', detail: '', intent: 'Hello', elapsedLabel: '0:01' },
+        feed: [{ id: 'agent', type: 'message', role: 'agent', status: 'complete', title: 'Agent', detail: 'Hello', provenance: 'runtime', regeneratable: true }],
+        checklist: [],
+      },
+      composer: { value: '', onChange: vi.fn(), onSubmit: vi.fn() },
+      onRegenerateMessage: vi.fn(),
+    })))
+
+    expect(container.querySelector('[aria-label="Regenerate response"]')).toBeNull()
+  })
+})
