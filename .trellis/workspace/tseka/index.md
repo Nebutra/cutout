@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 13
+- **Total Sessions**: 14
 - **Last Active**: 2026-07-22
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~455 | Active |
+| `journal-1.md` | ~489 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 14 | 2026-07-22 | Restore Git visual coverage and reopened Agent Retry | `c0f8a67`, `6d487e7` | `main` |
 | 13 | 2026-07-22 | Restore provider bundle boundary and install Cutout | `bd44c16` | `main` |
 | 12 | 2026-07-22 | Unify workspace rail navigation | `9ca9b6d` | `main` |
 | 11 | 2026-07-21 | Polish connectors, agent retry, Git dock, and provider protocols | `c1475ef`, `fe77a65`, `bf41e12`, `ed6b6eb` | `main` |

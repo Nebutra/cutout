@@ -453,3 +453,37 @@ Deferred provider catalog metadata out of the frontend entry, restored the produ
 ### Next Steps
 
 - None - task complete
+
+
+## Session 14: Restore Git visual coverage and reopened Agent Retry
+
+**Date**: 2026-07-22
+**Task**: Restore Git visual coverage and reopened Agent Retry
+**Branch**: `main`
+
+### Summary
+
+Restored deterministic Git workspace visual coverage and fixed Retry reconstruction for transient Agent failures after reopening a project.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `c0f8a67` | (see git log) |
+| `6d487e7` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
