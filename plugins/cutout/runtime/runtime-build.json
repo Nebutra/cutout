@@ -1,6 +1,6 @@
 {
   "protocol": "cutout.codex-plugin-runtime.v1",
-  "packageVersion": "0.1.4",
+  "packageVersion": "0.1.5",
   "sourceHashes": {
     "node_modules/.pnpm/js-sha256@0.10.1/node_modules/js-sha256/src/sha256.js": "10dbc92fbdb2ed3939c16ea9c726c7653f5ec7dfdb010c9904404268cb424a08",
     "node_modules/.pnpm/zod@4.4.3/node_modules/zod/v4/classic/errors.js": "b155316267f79068ddc2dddc7046e13785804b768ca36e6deff1691d154f7c20",
