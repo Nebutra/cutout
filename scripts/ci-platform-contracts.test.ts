@@ -60,6 +60,7 @@ describe('cross-platform CI contracts', () => {
     expect(resolveNodeCommand('npm', 'win32')).toBe('npm.cmd')
     expect(resolveNodeCommand('C:\\repo\\node_modules\\.bin\\tsc', 'win32')).toBe('C:\\repo\\node_modules\\.bin\\tsc.cmd')
     expect(resolveNodeCommand('node.exe', 'win32')).toBe('node.exe')
+    expect(resolveNodeCommand('taskkill.exe', 'win32')).toBe('taskkill.exe')
     expect(resolveNodeCommand('pnpm', 'linux')).toBe('pnpm')
     expect(nodeCommandNeedsShell('npm.cmd', 'win32')).toBe(true)
     expect(nodeCommandNeedsShell('C:\\tools\\pnpm.cmd', 'win32')).toBe(true)
