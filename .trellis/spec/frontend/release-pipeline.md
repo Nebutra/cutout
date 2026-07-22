@@ -38,10 +38,12 @@ installer version differs from their release version.
 - Required protected environment values:
   `TAURI_SIGNING_PRIVATE_KEY`, `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`, and
   `CUTOUT_UPDATER_PUBKEY`. The updater private key must be password-protected.
-  The private key and password are scoped only to the fail-fast signing-input
-  check and the commit-pinned Tauri build actions; checkout, dependency install,
-  tests, artifact upload, metadata generation, and publication do not receive
-  them.
+  The private key is scoped only to the fail-fast signing-input check, the two
+  commit-pinned Tauri build actions, and the publish step that generates and
+  validates updater metadata. The password is scoped only to the signing-input
+  check and Tauri actions. Neither secret is set at build-job or publish-job
+  scope, and checkout, dependency install, tests, artifact collection/upload,
+  and Release creation/publication receive neither.
   GitHub distribution defaults the stable endpoint to the repository's
   `releases/latest/download/latest.json` and the allowlist to `github.com`.
   `CUTOUT_UPDATER_STABLE_ENDPOINTS`, `CUTOUT_UPDATER_ALLOWED_HOSTS`, and

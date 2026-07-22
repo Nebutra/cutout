@@ -53,23 +53,35 @@ describe('cross-platform release workflow', () => {
     expect(publishScript).toContain('gh release edit')
   })
 
-  it('scopes updater signing secrets only to validation and pinned signing actions', async () => {
+  it('scopes the updater private key to required consumers and keeps its password out of publication', async () => {
     const source = await readFile('.github/workflows/release-update.yml', 'utf8')
     const workflow = YAML.parse(source)
     const buildSteps = workflow.jobs.build.steps
-    const signingSecretConsumers = buildSteps
-      .filter((step: { env?: Record<string, string> }) => JSON.stringify(step.env ?? {}).includes('secrets.TAURI_SIGNING_PRIVATE_KEY'))
+    const publishSteps = workflow.jobs.publish.steps
+    const allSteps = [...workflow.jobs.validate.steps, ...buildSteps, ...publishSteps]
+    const privateKeyConsumers = allSteps
+      .filter((step: { env?: Record<string, string> }) => step.env?.TAURI_SIGNING_PRIVATE_KEY === '${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}')
+      .map((step: { name?: string }) => step.name)
+    const passwordConsumers = allSteps
+      .filter((step: { env?: Record<string, string> }) => step.env?.TAURI_SIGNING_PRIVATE_KEY_PASSWORD === '${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}')
       .map((step: { name?: string }) => step.name)
     const publicGate = buildSteps.find((step: { name?: string }) => step.name === 'Require protected updater public configuration')
     const signingGateIndex = buildSteps.findIndex((step: { name?: string }) => step.name === 'Require protected updater signing configuration')
     const macBuildIndex = buildSteps.findIndex((step: { name?: string }) => step.name === 'Build signed bundles and notarize/staple macOS app')
     const signingGate = buildSteps[signingGateIndex]
+    const metadataGeneration = publishSteps.find((step: { name?: string }) => step.name === 'Generate and validate updater metadata')
 
     expect(workflow.jobs.build.env).not.toHaveProperty('TAURI_SIGNING_PRIVATE_KEY')
     expect(workflow.jobs.build.env).not.toHaveProperty('TAURI_SIGNING_PRIVATE_KEY_PASSWORD')
     expect(workflow.jobs.publish.env).not.toHaveProperty('TAURI_SIGNING_PRIVATE_KEY')
     expect(workflow.jobs.publish.env).not.toHaveProperty('TAURI_SIGNING_PRIVATE_KEY_PASSWORD')
-    expect(signingSecretConsumers).toEqual([
+    expect(privateKeyConsumers).toEqual([
+      'Require protected updater signing configuration',
+      'Build signed bundles and notarize/staple macOS app',
+      'Build non-macOS bundles',
+      'Generate and validate updater metadata',
+    ])
+    expect(passwordConsumers).toEqual([
       'Require protected updater signing configuration',
       'Build signed bundles and notarize/staple macOS app',
       'Build non-macOS bundles',
@@ -82,6 +94,8 @@ describe('cross-platform release workflow', () => {
     ])
     expect(signingGate.run).toContain('TAURI_SIGNING_PRIVATE_KEY is required')
     expect(signingGate.run).toContain('TAURI_SIGNING_PRIVATE_KEY_PASSWORD is required')
+    expect(Object.keys(metadataGeneration.env)).toContain('TAURI_SIGNING_PRIVATE_KEY')
+    expect(metadataGeneration.env).not.toHaveProperty('TAURI_SIGNING_PRIVATE_KEY_PASSWORD')
   })
 
   it('scopes Apple credentials to the macOS preparation, build, and DMG notarization steps', async () => {
