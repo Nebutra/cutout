@@ -3323,16 +3323,27 @@ export function IntentWorkspace({
             setFilesDockVisible(false);
             setDesignDockVisible(false);
           }}
-          onOpenAssets={library.open}
-          onOpenDesign={() => {
+          onOpenAssets={() => {
             setAgentDockVisible(false);
             setFilesDockVisible(false);
             setDesignDockVisible(false);
             setGitDockVisible(false);
-            onOpenDesignOs("specimen");
+            library.open();
+          }}
+          onOpenDesign={() => {
+            setDesignDockVisible((visible) => !visible);
+            setAgentDockVisible(false);
+            setFilesDockVisible(false);
+            setGitDockVisible(false);
           }}
           inspectorActive={designDockVisible}
-          onOpenDeliver={() => onOpenDesignOs("delivery")}
+          onOpenDeliver={() => {
+            setAgentDockVisible(false);
+            setFilesDockVisible(false);
+            setDesignDockVisible(false);
+            setGitDockVisible(false);
+            onOpenDesignOs("delivery");
+          }}
           advanced={advanced}
           onOpenAdvanced={onOpenAdvanced}
           onCollapseSidebar={() => setSidebarCollapsed(true)}
@@ -6921,7 +6932,7 @@ function RailItem({
       aria-label={label}
       aria-pressed={active}
       className={cn(
-        "flex w-12 flex-col items-center gap-1 rounded-md px-1 py-2 text-[10px] transition-colors",
+        "flex size-12 shrink-0 flex-col items-center justify-center gap-1 rounded-md px-1 text-[10px] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background",
         active
           ? "bg-muted text-foreground"
           : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",

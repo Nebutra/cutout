@@ -1,0 +1,2 @@
+{"file":".trellis/spec/frontend/index.md","reason":"Apply the repository's frontend development checklist and preserve established component conventions."}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"Keep the rail on one shared item component and avoid parallel interaction implementations."}
