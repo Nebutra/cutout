@@ -15,9 +15,14 @@ describe('cross-platform release workflow', () => {
       'release-linux-x86_64',
     ])
     expect(workflow.permissions).toEqual({ contents: 'read' })
-    expect(workflow.jobs.build.needs).toBe('validate')
-    expect(workflow.jobs.publish.needs).toEqual(['validate', 'build'])
-    expect(workflow.jobs.publish.permissions).toEqual({ contents: 'write' })
+    expect(workflow.jobs.quality).toMatchObject({
+      needs: 'validate',
+      uses: './.github/workflows/ci.yml',
+      with: { source_sha: '${{ needs.validate.outputs.sha }}' },
+    })
+    expect(workflow.jobs.build.needs).toEqual(['validate', 'quality'])
+    expect(workflow.jobs.publish.needs).toEqual(['validate', 'quality', 'build'])
+    expect(workflow.jobs.publish.permissions).toEqual({ contents: 'write', 'id-token': 'write', attestations: 'write' })
   })
 
   it('keeps matrix builders isolated from GitHub Release mutation', async () => {
@@ -51,6 +56,29 @@ describe('cross-platform release workflow', () => {
     expect(publishScript).toContain('gh release create')
     expect(publishScript).toContain('--draft')
     expect(publishScript).toContain('gh release edit')
+  })
+
+  it('pins every action and toolchain dependency to an immutable commit', async () => {
+    for (const path of ['.github/workflows/ci.yml', '.github/workflows/release-update.yml']) {
+      const source = await readFile(path, 'utf8')
+      const uses = [...source.matchAll(/^\s*- uses:\s*([^\s#]+)/gm)].map((match) => match[1])
+      expect(uses.length).toBeGreaterThan(0)
+      for (const action of uses) expect(action, path).toMatch(/@[a-f0-9]{40}$/)
+    }
+  })
+
+  it('makes manual releases main-line, immutable, and policy-free', async () => {
+    const source = await readFile('.github/workflows/release-update.yml', 'utf8')
+    const workflow = YAML.parse(source)
+    const inputs = workflow.on.workflow_dispatch.inputs
+    const authority = workflow.jobs.validate.steps.find((step: { id?: string }) => step.id === 'authority')
+    const generate = workflow.jobs.publish.steps.find((step: { name?: string }) => step.name === 'Generate and validate updater metadata')
+
+    expect(Object.keys(inputs)).toEqual(['tag'])
+    expect(authority.run).toContain('git merge-base --is-ancestor')
+    expect(authority.run).toContain('validate-release-authority.mjs')
+    expect(authority.run).toContain('Could not prove that release')
+    expect(generate.run).not.toMatch(/rollout|rollback|previous-version|previous-manifest/i)
   })
 
   it('feeds every platform updater artifact into the manifest generator', async () => {
@@ -231,6 +259,43 @@ describe('cross-platform release workflow', () => {
     expect(verification.run).toContain('--bin verify-updater-signature')
     expect(verification.run).toContain('"$updater_artifact.sig"')
     expect(verification.env).not.toHaveProperty('TAURI_SIGNING_PRIVATE_KEY')
+  })
+
+  it('fails closed unless Windows installers have the expected Authenticode signer and timestamp', async () => {
+    const source = await readFile('.github/workflows/release-update.yml', 'utf8')
+    const workflow = YAML.parse(source)
+    const steps = workflow.jobs.build.steps
+    const preparation = steps.find((step: { name?: string }) => step.name === 'Prepare Windows Authenticode certificate')
+    const verification = steps.find((step: { name?: string }) => step.name === 'Verify Windows Authenticode signatures')
+    const cleanup = steps.find((step: { name?: string }) => step.name === 'Remove temporary Windows signing material')
+
+    expect(preparation.if).toBe("runner.os == 'Windows'")
+    expect(Object.keys(preparation.env)).toEqual(['WINDOWS_CERTIFICATE', 'WINDOWS_CERTIFICATE_PASSWORD'])
+    expect(preparation.run).toContain('Import-PfxCertificate')
+    expect(preparation.run).toContain('1.3.6.1.5.5.7.3.3')
+    expect(preparation.run.indexOf('CUTOUT_WINDOWS_CERTIFICATE_PATH=')).toBeLessThan(preparation.run.indexOf('Import-PfxCertificate'))
+    expect(preparation.run).toContain('CUTOUT_WINDOWS_IMPORTED_THUMBPRINTS=')
+    expect(preparation.run).toContain('Remove-Item $pfxPath')
+    expect(verification.run).toContain('Get-AuthenticodeSignature')
+    expect(verification.run).toContain("Status -ne 'Valid'")
+    expect(verification.run).toContain('SignerCertificate.Thumbprint')
+    expect(verification.run).toContain('TimeStamperCertificate')
+    expect(cleanup.if).toBe("always() && runner.os == 'Windows'")
+    expect(cleanup.run).toContain("CUTOUT_WINDOWS_IMPORTED_THUMBPRINTS -split ';'")
+  })
+
+  it('attests the complete release asset set before the single publisher runs', async () => {
+    const source = await readFile('.github/workflows/release-update.yml', 'utf8')
+    const workflow = YAML.parse(source)
+    const steps = workflow.jobs.publish.steps
+    const checksumIndex = steps.findIndex((step: { name?: string }) => step.name === 'Generate and validate updater metadata')
+    const attestationIndex = steps.findIndex((step: { name?: string }) => step.name === 'Attest release assets')
+    const publishIndex = steps.findIndex((step: { name?: string }) => step.name === 'Create draft release, upload verified assets, and publish')
+
+    expect(steps[attestationIndex].uses).toMatch(/^actions\/attest-build-provenance@[a-f0-9]{40}$/)
+    expect(steps[attestationIndex].with['subject-path']).toBe('dist/release-assets/*')
+    expect(attestationIndex).toBeGreaterThan(checksumIndex)
+    expect(publishIndex).toBeGreaterThan(attestationIndex)
   })
 
   it('tests a safe workspace read and launches the host-native packaged app before publishing', async () => {

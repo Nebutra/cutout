@@ -89,12 +89,12 @@ export function createLocalAssetRepository(
 
   async function saveMany(
     assets: readonly AssetToSave[],
-    opts?: SaveOptions,
+    _opts?: SaveOptions,
   ): Promise<Result<SaveManyOutcome>> {
     if (assets.length === 0) return err<SaveManyOutcome>('Nothing to export')
     try {
       const inputs = await Promise.all(assets.map(toSaveInput))
-      const res = await bridge.saveAssets(inputs, opts?.destDir)
+      const res = await bridge.saveAssets(inputs)
 
       const failedNames = new Set(res.failed.map((f) => f.name))
       const saved: AssetRef[] = res.canceled

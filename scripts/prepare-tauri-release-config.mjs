@@ -5,9 +5,14 @@ import process from 'node:process'
 const output = resolve(process.cwd(), process.argv[2] ?? 'src-tauri/tauri.release.conf.json')
 const publicKey = normalizePublicKey(process.env.CUTOUT_UPDATER_PUBKEY)
 const temporary = `${output}.${process.pid}.tmp`
+const windows = windowsSigningConfig(process.env)
+const config = {
+  plugins: { updater: { pubkey: publicKey } },
+  ...(windows ? { bundle: { windows } } : {}),
+}
 
 await mkdir(dirname(output), { recursive: true })
-await writeFile(temporary, `${JSON.stringify({ plugins: { updater: { pubkey: publicKey } } }, null, 2)}\n`, {
+await writeFile(temporary, `${JSON.stringify(config, null, 2)}\n`, {
   encoding: 'utf8',
   mode: 0o600,
 })
@@ -31,4 +36,23 @@ function decodeBase64PublicKey(value) {
   const bytes = Buffer.from(value, 'base64')
   if (bytes.toString('base64') !== value) return value
   return bytes.toString('utf8').replace(/\r\n/g, '\n').trim()
+}
+
+export function windowsSigningConfig(env) {
+  const rawThumbprint = env.CUTOUT_WINDOWS_CERTIFICATE_THUMBPRINT?.trim()
+  if (!rawThumbprint) return undefined
+  const certificateThumbprint = rawThumbprint.replace(/\s/g, '').toUpperCase()
+  if (!/^[A-F0-9]{40}$/.test(certificateThumbprint)) {
+    throw new Error('CUTOUT_WINDOWS_CERTIFICATE_THUMBPRINT must be a 40-character SHA-1 certificate thumbprint')
+  }
+  const timestampUrl = env.CUTOUT_WINDOWS_TIMESTAMP_URL?.trim() || 'https://timestamp.digicert.com'
+  const parsed = new URL(timestampUrl)
+  if (parsed.protocol !== 'https:' || parsed.username || parsed.password) {
+    throw new Error('CUTOUT_WINDOWS_TIMESTAMP_URL must be an HTTPS URL without credentials')
+  }
+  return {
+    certificateThumbprint,
+    digestAlgorithm: 'sha256',
+    timestampUrl: parsed.href,
+  }
 }

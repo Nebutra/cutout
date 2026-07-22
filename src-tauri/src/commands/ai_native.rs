@@ -8,7 +8,8 @@ use serde::Serialize;
 use serde_json::{json, Value};
 use std::{
     fs,
-    path::{Path, PathBuf},
+    io::Read,
+    path::{Component, Path, PathBuf},
     time::{SystemTime, UNIX_EPOCH},
 };
 use tauri::{AppHandle, Manager};
@@ -16,6 +17,7 @@ use tauri::{AppHandle, Manager};
 const AI_NATIVE_DIR: &str = "ai-native";
 const DEFAULT_POLL_LIMIT: usize = 8;
 const MAX_POLL_LIMIT: usize = 32;
+const MAX_IMPORT_BYTES: u64 = 100 * 1024 * 1024;
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -25,6 +27,7 @@ pub struct AiNativePaths {
     processing: String,
     outbox: String,
     failed: String,
+    imports: String,
     artifacts: String,
 }
 
@@ -144,10 +147,12 @@ pub fn ai_native_complete(app: AppHandle, id: String, result: Value) -> Result<(
 }
 
 #[tauri::command]
-pub fn ai_native_read_file(path: String) -> Result<AiNativeFile, String> {
-    let path = PathBuf::from(path);
-    let bytes =
-        fs::read(&path).map_err(|error| format!("Could not read AI Native file: {error}"))?;
+pub fn ai_native_read_file(app: AppHandle, path: String) -> Result<AiNativeFile, String> {
+    let root = ai_native_root(&app)?.join("imports");
+    fs::create_dir_all(&root)
+        .map_err(|error| format!("Could not create AI Native imports directory: {error}"))?;
+    let path = controlled_import_path(&root, &path)?;
+    let bytes = read_import_without_following(&path)?;
     let name = path
         .file_name()
         .and_then(|name| name.to_str())
@@ -198,6 +203,7 @@ fn ensure_dirs(root: &Path) -> Result<AiNativePaths, String> {
     let processing = root.join("processing");
     let outbox = root.join("outbox");
     let failed = root.join("failed");
+    let imports = root.join("imports");
     let artifacts = root.join("artifacts");
 
     for dir in [
@@ -206,6 +212,7 @@ fn ensure_dirs(root: &Path) -> Result<AiNativePaths, String> {
         processing.as_path(),
         outbox.as_path(),
         failed.as_path(),
+        imports.as_path(),
         artifacts.as_path(),
     ] {
         fs::create_dir_all(dir)
@@ -218,8 +225,75 @@ fn ensure_dirs(root: &Path) -> Result<AiNativePaths, String> {
         processing: path_to_string(&processing),
         outbox: path_to_string(&outbox),
         failed: path_to_string(&failed),
+        imports: path_to_string(&imports),
         artifacts: path_to_string(&artifacts),
     })
+}
+
+fn controlled_import_path(root: &Path, value: &str) -> Result<PathBuf, String> {
+    let relative = Path::new(value);
+    if relative.is_absolute()
+        || relative
+            .components()
+            .any(|component| !matches!(component, Component::Normal(_)))
+    {
+        return Err(
+            "AI Native imports require a safe relative path under ai-native/imports.".into(),
+        );
+    }
+    let target = root.join(relative);
+    let parent = target
+        .parent()
+        .ok_or("AI Native import has no parent directory.")?;
+    let canonical_root = fs::canonicalize(root)
+        .map_err(|error| format!("Could not resolve AI Native imports directory: {error}"))?;
+    let canonical_parent = fs::canonicalize(parent)
+        .map_err(|error| format!("Could not resolve AI Native import parent: {error}"))?;
+    if !canonical_parent.starts_with(&canonical_root) {
+        return Err("AI Native import path escapes the controlled imports directory.".into());
+    }
+    Ok(canonical_parent.join(
+        relative
+            .file_name()
+            .ok_or("AI Native import name is missing.")?,
+    ))
+}
+
+fn read_import_without_following(path: &Path) -> Result<Vec<u8>, String> {
+    let mut options = fs::OpenOptions::new();
+    options.read(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.custom_flags(libc::O_NOFOLLOW);
+    }
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::OpenOptionsExt;
+        const FILE_FLAG_OPEN_REPARSE_POINT: u32 = 0x0020_0000;
+        options.custom_flags(FILE_FLAG_OPEN_REPARSE_POINT);
+    }
+    let mut file = options
+        .open(path)
+        .map_err(|error| format!("Could not read AI Native import: {error}"))?;
+    let metadata = file
+        .metadata()
+        .map_err(|error| format!("Could not inspect AI Native import: {error}"))?;
+    if !metadata.is_file() {
+        return Err("AI Native import must be a regular file.".into());
+    }
+    if metadata.len() > MAX_IMPORT_BYTES {
+        return Err(format!(
+            "AI Native imports over {MAX_IMPORT_BYTES} bytes are not accepted."
+        ));
+    }
+    let mut bytes = Vec::with_capacity(metadata.len() as usize);
+    file.read_to_end(&mut bytes)
+        .map_err(|error| format!("Could not read AI Native import: {error}"))?;
+    if bytes.len() as u64 != metadata.len() {
+        return Err("AI Native import changed while it was being read.".into());
+    }
+    Ok(bytes)
 }
 
 fn split_envelope(mut value: Value, fallback_id: &str) -> (String, Value) {
@@ -333,4 +407,28 @@ fn now_millis() -> u128 {
         .duration_since(UNIX_EPOCH)
         .map(|duration| duration.as_millis())
         .unwrap_or_default()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn import_paths_reject_absolute_and_traversal() {
+        let root = tempfile::tempdir().unwrap();
+        assert!(controlled_import_path(root.path(), "/etc/passwd").is_err());
+        assert!(controlled_import_path(root.path(), "../secret").is_err());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn import_reader_rejects_symbolic_links() {
+        use std::os::unix::fs::symlink;
+        let root = tempfile::tempdir().unwrap();
+        let outside = root.path().join("outside.png");
+        fs::write(&outside, b"secret").unwrap();
+        let link = root.path().join("link.png");
+        symlink(&outside, &link).unwrap();
+        assert!(read_import_without_following(&link).is_err());
+    }
 }

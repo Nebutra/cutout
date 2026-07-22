@@ -12,8 +12,8 @@ Every paid or remote provider execution is guarded before invocation by a versio
 ## Host security boundary
 
 - Desktop paid actions may require a short-lived `cutout.capability-lease.v1` bound to the exact run subject, request digest, approval id and approved scopes. Expired, revoked or replayed authority fails closed and produces no provider call.
-- Provider secrets remain in the host keychain. The WebView never receives the credential; Rust assembles the provider-specific authentication header immediately before transport.
-- Remote provider URLs are HTTPS and provider/vendor allowlisted. Literal and DNS-resolved loopback, private, link-local, multicast and IPv6 ULA destinations are rejected. Redirect following is disabled, preventing credential forwarding to a second origin.
+- Provider secrets remain in the host keychain. Before reading one, Rust reloads the persisted provider id and binds the secret to that record's enabled kind, effective protocol, exact origin and configured/default base-path prefix. The WebView never receives the credential; Rust assembles the provider-specific authentication header immediately before transport.
+- Remote provider URLs are HTTPS and provider/vendor allowlisted. Literal and DNS-resolved loopback, private, link-local, multicast, IPv6 ULA and reserved destinations are rejected. The validated DNS socket addresses are pinned into the HTTP client so connect cannot re-resolve to a different address. Redirect following is disabled, preventing credential forwarding to a second origin.
 - Explicit Ollama, vLLM and LM Studio profiles are the exception: they permit HTTP(S) only to loopback and do not broaden access to the LAN.
 - Credential-shaped response headers, cookies and authentication challenges are removed before the response crosses IPC.
 

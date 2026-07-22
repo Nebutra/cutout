@@ -1,5 +1,6 @@
 /// <reference types="vitest/config" />
 import { defineConfig } from 'vite'
+import { readFileSync } from 'node:fs'
 import { fileURLToPath, URL } from 'node:url'
 import react from '@vitejs/plugin-react'
 import babel from '@rolldown/plugin-babel'
@@ -7,9 +8,13 @@ import tailwindcss from '@tailwindcss/vite'
 import { lingui, linguiTransformerBabelPreset } from '@lingui/vite-plugin'
 
 const host = process.env.TAURI_DEV_HOST
+const productVersion = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')).version
 
 // https://vite.dev/config/
 export default defineConfig({
+  define: {
+    __CUTOUT_VERSION__: JSON.stringify(productVersion),
+  },
   plugins: [
     // @vitejs/plugin-react v6 (Vite 8 / Rolldown) is Oxc-based and no longer
     // accepts a `babel` option. The Lingui macro transform therefore runs as a

@@ -1,9 +1,10 @@
 import { createRequire } from "node:module";
 import process$1 from "node:process";
+import { constants, readFileSync } from "node:fs";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
-import { createHash, randomUUID } from "node:crypto";
+import { createHash, createHmac, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import { lstat, mkdir, open, readFile, readdir, realpath, rename, rm, rmdir, stat, unlink, writeFile } from "node:fs/promises";
-import { constants } from "node:fs";
+import { homedir } from "node:os";
 //#region \0rolldown/runtime.js
 var __defProp = Object.defineProperty;
 var __commonJSMin = (cb, mod) => () => (mod || (cb((mod = { exports: {} }).exports, mod), cb = null), mod.exports);
@@ -8814,6 +8815,7 @@ async function compileStarter(input) {
 	const documentValidation = validateDesignDocument(parsed.document);
 	if (!documentValidation.ok) throw new Error(`Invalid DesignDocument: ${documentValidation.error}`);
 	const document = documentValidation.data.document;
+	assertSafeCssTokens(document);
 	const documentFingerprint = await fingerprint(document);
 	await validateDesignKit$1(document, parsed.kit, documentFingerprint);
 	const manifest = await validateComponentManifest(document, parsed.candidates);
@@ -9230,11 +9232,11 @@ function renderTanStackFiles(document, candidates) {
 }
 function renderVueComponent(candidate, assets) {
 	const asset = assets.find((item) => item.candidateId === candidate.id);
-	return `<script setup lang="ts">\ninterface Props { eyebrow?: string }\nwithDefaults(defineProps<Props>(), { eyebrow: '' })\n<\/script>\n\n<template>\n  <section class="cutout-component cutout-${slug(candidate.name)}" data-cutout-component="${candidate.componentId}">\n    <div class="cutout-component__content"><h2>${escapeJsxText(candidate.name)}</h2><p>${escapeJsxText(candidate.description ?? candidate.name)}</p><p v-if="eyebrow">{{ eyebrow }}</p><slot name="actions" /></div>\n${asset ? `    <img class="cutout-component__asset" src="/${asset.outputPath.replace(/^public\//, "")}" alt="" data-material-id="${asset.materialId}" />\n` : ""}  </section>\n</template>\n`;
+	return `<script setup lang="ts">\ninterface Props { eyebrow?: string }\nwithDefaults(defineProps<Props>(), { eyebrow: '' })\n<\/script>\n\n<template>\n  <section class="cutout-component cutout-${slug(candidate.name)}" data-cutout-component="${escapeHtmlAttribute(candidate.componentId)}">\n    <div class="cutout-component__content"><h2>${escapeJsxText(candidate.name)}</h2><p>${escapeJsxText(candidate.description ?? candidate.name)}</p><p v-if="eyebrow">{{ eyebrow }}</p><slot name="actions" /></div>\n${asset ? `    <img class="cutout-component__asset" src="/${escapeHtmlAttribute(asset.outputPath.replace(/^public\//, ""))}" alt="" data-material-id="${escapeHtmlAttribute(asset.materialId)}" />\n` : ""}  </section>\n</template>\n`;
 }
 function renderNuxtPage(document, page, candidates) {
 	const names = candidates.filter((candidate) => candidate.sourcePageIds.includes(page.id)).map((candidate) => candidate.exportName);
-	return `<template>\n  <main class="cutout-page" data-cutout-page="${page.id}">\n    <header class="cutout-page__header"><p class="cutout-page__purpose">${escapeJsxText(page.purpose)}</p><h1>${escapeJsxText(page.name)}</h1><p>${escapeJsxText(document.needs[0]?.statement ?? document.prototype?.plan.product.summary ?? "")}</p></header>\n${names.map((name) => `    <Generated${name} />`).join("\n")}\n  </main>\n</template>\n`;
+	return `<template>\n  <main class="cutout-page" data-cutout-page="${escapeHtmlAttribute(page.id)}">\n    <header class="cutout-page__header"><p class="cutout-page__purpose">${escapeJsxText(page.purpose)}</p><h1>${escapeJsxText(page.name)}</h1><p>${escapeJsxText(document.needs[0]?.statement ?? document.prototype?.plan.product.summary ?? "")}</p></header>\n${names.map((name) => `    <Generated${name} />`).join("\n")}\n  </main>\n</template>\n`;
 }
 function renderTanStackRouter(pages, candidates) {
 	const imports = candidates.map((candidate) => `import { ${candidate.exportName} } from './components/${candidate.exportName}'`);
@@ -9363,7 +9365,7 @@ function renderViteRouter(document, candidates) {
 function renderComponentCss(document, candidates) {
 	const color = document.tokens.find((token) => token.kind === "color" && candidates.some((candidate) => candidate.tokenIds.includes(token.id)));
 	const radius = document.tokens.find((token) => token.kind === "radius" && candidates.some((candidate) => candidate.tokenIds.includes(token.id)));
-	return `.cutout-page { min-height: 100vh; padding: clamp(1.5rem, 4vw, 4rem); background: #fff; color: #111827; }\n.cutout-page__header { max-width: 72rem; margin: 0 auto 2rem; }\n.cutout-page__purpose { color: ${color ? `var(--cutout-token-${slug(color.name)}, ${color.value})` : "#4b5563"}; font-weight: 600; }\n.cutout-component { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2rem; align-items: center; max-width: 72rem; margin: 0 auto 1rem; padding: clamp(1.5rem, 4vw, 3rem); border: 1px solid color-mix(in srgb, currentColor 14%, transparent); border-radius: ${radius ? `var(--cutout-token-${slug(radius.name)}, ${radius.value})` : "0.5rem"}; }\n.cutout-component__content { max-width: 44rem; }\n.cutout-component__asset { display: block; max-width: min(20rem, 35vw); height: auto; }\n@media (max-width: 640px) { .cutout-component { grid-template-columns: 1fr; } .cutout-component__asset { max-width: 100%; } }\n`;
+	return `.cutout-page { min-height: 100vh; padding: clamp(1.5rem, 4vw, 4rem); background: #fff; color: #111827; }\n.cutout-page__header { max-width: 72rem; margin: 0 auto 2rem; }\n.cutout-page__purpose { color: ${color ? `var(--cutout-token-${slug(color.name)})` : "#4b5563"}; font-weight: 600; }\n.cutout-component { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2rem; align-items: center; max-width: 72rem; margin: 0 auto 1rem; padding: clamp(1.5rem, 4vw, 3rem); border: 1px solid color-mix(in srgb, currentColor 14%, transparent); border-radius: ${radius ? `var(--cutout-token-${slug(radius.name)})` : "0.5rem"}; }\n.cutout-component__content { max-width: 44rem; }\n.cutout-component__asset { display: block; max-width: min(20rem, 35vw); height: auto; }\n@media (max-width: 640px) { .cutout-component { grid-template-columns: 1fr; } .cutout-component__asset { max-width: 100%; } }\n`;
 }
 function renderPackageJson(framework, title) {
 	const packageJson = framework === "next-app-router" ? {
@@ -9486,6 +9488,12 @@ function nextImportPrefix(route) {
 function escapeJsxText(value) {
 	return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/{/g, "&#123;").replace(/}/g, "&#125;");
 }
+function escapeHtmlAttribute(value) {
+	return value.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/'/g, "&#39;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+function assertSafeCssTokens(document) {
+	for (const token of document.tokens) if (/[{};@<>\r\n]/.test(token.value) || /(?:url|expression)\s*\(/i.test(token.value)) throw new Error(`Design token "${token.id}" contains an unsafe CSS value.`);
+}
 function slug(value) {
 	return value.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "item";
 }
@@ -9596,6 +9604,7 @@ object({
 //#region src/headless/source-scanner.ts
 var MAX_FILE_BYTES = 100 * 1024 * 1024;
 var MAX_REPOSITORY_ENTRIES = 1e4;
+var MAX_REPOSITORY_DEPTH = 64;
 var IGNORED_DIRECTORY = /* @__PURE__ */ new Set([
 	".git",
 	"node_modules",
@@ -9674,7 +9683,8 @@ async function scanSourceInput(projectRoot, operation) {
 }
 async function inventory(directory, root) {
 	const entries = [];
-	const visit = async (current) => {
+	const visit = async (current, depth) => {
+		if (depth > MAX_REPOSITORY_DEPTH) throw new Error(`Repository scan depth exceeds ${MAX_REPOSITORY_DEPTH}.`);
 		await assertStableDirectory$1(root, current);
 		const names = await readdir(current);
 		for (const name of names.sort((left, right) => left.localeCompare(right))) {
@@ -9683,7 +9693,7 @@ async function inventory(directory, root) {
 			const stat = await lstat(target);
 			if (stat.isSymbolicLink()) continue;
 			if (stat.isDirectory()) {
-				if (!IGNORED_DIRECTORY.has(name)) await visit(target);
+				if (!IGNORED_DIRECTORY.has(name)) await visit(target, depth + 1);
 				continue;
 			}
 			if (!stat.isFile()) continue;
@@ -9697,7 +9707,7 @@ async function inventory(directory, root) {
 			});
 		}
 	};
-	await visit(directory);
+	await visit(directory, 0);
 	return entries;
 }
 function allowedRepositoryEntry(path) {
@@ -13285,9 +13295,11 @@ function clean(value, fallback) {
 //#region scripts/cutout-approval-leases.mjs
 var PROTOCOL$1 = "cutout.approval-lease.v1";
 var FILE = "approval-leases.json";
-async function reserveApprovalLease(projectRoot, leaseId, operation, expectedRevision, now = Date.now()) {
+var KEY_FILE = join(homedir(), ".cutout", "approval-lease.key");
+async function reserveApprovalLease(projectRoot, leaseId, operation, expectedRevision, now = Date.now(), key) {
 	if (typeof leaseId !== "string" || !leaseId.trim()) throw new Error("A host-issued approval lease id is required.");
-	const catalog = await load(projectRoot);
+	const hostKey = await approvalKey(key);
+	const catalog = await load(projectRoot, hostKey);
 	const index = catalog.leases.findIndex((entry) => entry.leaseId === leaseId);
 	if (index < 0) throw new Error("Approval lease was not issued by this Cutout host.");
 	const lease = catalog.leases[index];
@@ -13297,12 +13309,12 @@ async function reserveApprovalLease(projectRoot, leaseId, operation, expectedRev
 	if (lease.expectedRevision !== expectedRevision) throw new Error("Approval lease is bound to a different project revision.");
 	if (lease.requestDigest !== requestDigest(operation, expectedRevision)) throw new Error("Approval lease is bound to a different request.");
 	const reservationId = randomUUID();
-	const reserved = {
+	const reserved = signLeaseRecord({
 		...lease,
 		state: "reserved",
 		reservationId,
 		reservedAt: now
-	};
+	}, hostKey);
 	const leases = catalog.leases.slice();
 	leases[index] = reserved;
 	await save(projectRoot, {
@@ -13317,14 +13329,15 @@ async function reserveApprovalLease(projectRoot, leaseId, operation, expectedRev
 		}
 	};
 }
-async function completeApprovalLease(projectRoot, leaseId, reservationId, response, now = Date.now()) {
-	const catalog = await load(projectRoot);
+async function completeApprovalLease(projectRoot, leaseId, reservationId, response, now = Date.now(), key) {
+	const hostKey = await approvalKey(key);
+	const catalog = await load(projectRoot, hostKey);
 	const index = catalog.leases.findIndex((entry) => entry.leaseId === leaseId);
 	if (index < 0) throw new Error("Approval lease reservation was not found.");
 	const lease = catalog.leases[index];
 	if (lease.state !== "reserved" || lease.reservationId !== reservationId) throw new Error("Approval lease reservation does not match.");
 	const leases = catalog.leases.slice();
-	leases[index] = {
+	leases[index] = signLeaseRecord({
 		...lease,
 		state: "consumed",
 		consumedAt: now,
@@ -13333,7 +13346,7 @@ async function completeApprovalLease(projectRoot, leaseId, reservationId, respon
 			status: response.status,
 			revision: response.revision
 		}
-	};
+	}, hostKey);
 	await save(projectRoot, {
 		protocol: PROTOCOL$1,
 		leases
@@ -13345,11 +13358,15 @@ function requestDigest(operation, expectedRevision) {
 		operation
 	})).digest("hex");
 }
-async function load(projectRoot) {
+async function load(projectRoot, suppliedKey) {
 	try {
 		const parsed = JSON.parse(await readFile(resolve(projectRoot, ".cutout", FILE), "utf8"));
 		if (parsed?.protocol !== PROTOCOL$1 || !Array.isArray(parsed.leases)) throw new Error("Invalid approval lease catalog.");
-		parsed.leases.forEach(validateLease);
+		const key = await approvalKey(suppliedKey);
+		parsed.leases.forEach((lease) => {
+			validateLease(lease);
+			verifyLease(lease, key);
+		});
 		return parsed;
 	} catch (error) {
 		if (error?.code === "ENOENT") return {
@@ -13384,6 +13401,76 @@ function validateLease(lease) {
 		"reserved",
 		"consumed"
 	].includes(lease.state)) throw new Error("Invalid approval lease state.");
+	if (typeof lease.signature !== "string" || !/^[a-f0-9]{64}$/.test(lease.signature)) throw new Error("Invalid approval lease signature.");
+}
+function signedLeaseFields(lease) {
+	return {
+		protocol: lease.protocol,
+		leaseId: lease.leaseId,
+		approvalId: lease.approvalId,
+		subject: lease.subject,
+		requestDigest: lease.requestDigest,
+		expectedRevision: lease.expectedRevision,
+		issuedAt: lease.issuedAt,
+		expiresAt: lease.expiresAt,
+		state: lease.state,
+		reservationId: lease.reservationId ?? null,
+		reservedAt: lease.reservedAt ?? null,
+		consumedAt: lease.consumedAt ?? null,
+		response: lease.response ?? null
+	};
+}
+function signLease(lease, key) {
+	return createHmac("sha256", key).update(canonical(signedLeaseFields(lease))).digest("hex");
+}
+function signLeaseRecord(lease, key) {
+	const { signature: _discarded, ...record } = lease;
+	return {
+		...record,
+		signature: signLease(record, key)
+	};
+}
+function verifyLease(lease, key) {
+	const actual = Buffer.from(lease.signature, "hex");
+	const expected = Buffer.from(signLease(lease, key), "hex");
+	if (actual.length !== expected.length || !timingSafeEqual(actual, expected)) throw new Error("Approval lease signature is invalid.");
+}
+async function approvalKey(supplied) {
+	if (supplied) {
+		const key = Buffer.from(supplied);
+		if (key.length < 32) throw new Error("Approval lease host key must contain at least 32 bytes.");
+		return key;
+	}
+	const encoded = process.env.CUTOUT_APPROVAL_LEASE_KEY;
+	if (encoded) {
+		const key = Buffer.from(encoded, "base64");
+		if (key.length < 32) throw new Error("CUTOUT_APPROVAL_LEASE_KEY must decode to at least 32 bytes.");
+		return key;
+	}
+	await mkdir(resolve(KEY_FILE, ".."), {
+		recursive: true,
+		mode: 448
+	});
+	try {
+		await writeFile(KEY_FILE, randomBytes(32), {
+			mode: 384,
+			flag: "wx"
+		});
+	} catch (error) {
+		if (error?.code !== "EEXIST") throw error;
+	}
+	const noFollow = constants.O_NOFOLLOW ?? 0;
+	const handle = await open(KEY_FILE, constants.O_RDONLY | noFollow);
+	try {
+		const stat = await handle.stat();
+		if (!stat.isFile()) throw new Error("Approval lease host key must be a regular file.");
+		if (process.platform !== "win32" && (stat.mode & 63) !== 0) throw new Error("Approval lease host key permissions must be owner-only.");
+		const key = await handle.readFile();
+		if (key.length < 32) throw new Error("Approval lease host key is invalid.");
+		return key;
+	} finally {
+		await handle.close();
+	}
 }
 function canonical(value) {
 	if (Array.isArray(value)) return `[${value.map(canonical).join(",")}]`;
@@ -13504,10 +13591,7 @@ function sanitizeMessage(message) {
 }
 //#endregion
 //#region scripts/cutout-mcp-server.mjs
-var SERVER_INFO = {
-	name: "cutout-headless",
-	version: "0.1.4"
-};
+var SERVER_INFO;
 var PROJECT_ROOT;
 var closeHeadlessRuntime;
 var executeControl;
@@ -14596,6 +14680,11 @@ function send(message) {
 }
 var buffer = "";
 function runMcpServer(options) {
+	if (typeof options.serverVersion !== "string" || !options.serverVersion.trim()) throw new Error("runMcpServer requires the authoritative product version");
+	SERVER_INFO = {
+		name: "cutout-headless",
+		version: options.serverVersion
+	};
 	PROJECT_ROOT = options.projectRoot;
 	closeHeadlessRuntime = options.closeHeadlessRuntime ?? (async () => void 0);
 	executeControl = options.executeControl;
@@ -14739,10 +14828,13 @@ async function all(root) {
 }
 //#endregion
 //#region scripts/cutout-mcp-bundle-entry.mjs
-var externalControl = createExternalControl(resolve(import.meta.dirname, "..", "runtime-data"));
+var dataRoot = resolve(import.meta.dirname, "..", "runtime-data");
+var serverVersion = JSON.parse(readFileSync(resolve(dataRoot, "cutout.agent-capabilities.json"), "utf8")).product.packageVersion;
+var externalControl = createExternalControl(dataRoot);
 var headless = createHeadlessAdapter(async () => headless_exports);
 var registry = createRegistryAdapter(async (projectRoot) => createNodeRegistryService(projectRoot));
 runMcpServer({
+	serverVersion,
 	projectRoot: process$1.env.CUTOUT_PROJECT_ROOT,
 	closeHeadlessRuntime: async () => void 0,
 	executeControl: headless.executeControl,

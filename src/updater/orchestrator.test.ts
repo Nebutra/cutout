@@ -1,11 +1,32 @@
 import { describe, expect, it, vi } from "vitest";
-import type { UpdateBackend, UpdateInstallSafety } from "./contracts";
+import { UpdateOperationError } from "./contracts";
+import type {
+  UpdateBackend,
+  UpdateCapability,
+  UpdateInstallSafety,
+  UpdatePreferences,
+} from "./contracts";
 import { createMemoryUpdatePreferences, createUpdateOrchestrator, shouldAutoCheck } from "./orchestrator";
 
 const release = { version: "1.2.0", notes: "Safer local updates." };
-function fixture(overrides: Partial<UpdateBackend> = {}, safetyOverrides: Partial<UpdateInstallSafety> = {}) {
+const availableCapability: UpdateCapability = {
+  available: true,
+  currentVersion: "1.1.0",
+  endpointConfigured: true,
+  pubkeyConfigured: true,
+  channels: {
+    stable: { available: true },
+    beta: { available: false, reason: "Beta updates are not configured." },
+  },
+};
+
+function fixture(
+  overrides: Partial<UpdateBackend> = {},
+  safetyOverrides: Partial<UpdateInstallSafety> = {},
+  preferenceOverrides: Partial<UpdatePreferences> = {},
+) {
   const backend: UpdateBackend = {
-    capability: vi.fn(async () => ({ available: true, currentVersion: "1.1.0", endpointConfigured: true, pubkeyConfigured: true })),
+    capability: vi.fn(async () => availableCapability),
     check: vi.fn(async () => release),
     download: vi.fn(async (_release, progress) => { progress(25, 100); progress(100, 100) }),
     cancel: vi.fn(async () => {}),
@@ -18,7 +39,12 @@ function fixture(overrides: Partial<UpdateBackend> = {}, safetyOverrides: Partia
     shutdownDurableHost: vi.fn(async () => {}),
     ...safetyOverrides,
   };
-  const orchestrator = createUpdateOrchestrator({ backend, safety, preferences: createMemoryUpdatePreferences(), now: () => new Date("2026-07-15T00:00:00.000Z") });
+  const orchestrator = createUpdateOrchestrator({
+    backend,
+    safety,
+    preferences: createMemoryUpdatePreferences(preferenceOverrides),
+    now: () => new Date("2026-07-15T00:00:00.000Z"),
+  });
   return { backend, safety, orchestrator };
 }
 
@@ -45,9 +71,59 @@ describe("update orchestration", () => {
   it("keeps the current version usable when preparation fails", async () => {
     const { orchestrator, backend, safety } = fixture({}, { createRecoverySnapshot: vi.fn(async () => { throw new Error("snapshot failed") }) });
     await orchestrator.initialize(); await orchestrator.check(); await orchestrator.download(); await orchestrator.install();
-    expect(orchestrator.getState()).toMatchObject({ phase: "error", error: "snapshot failed" });
+    expect(orchestrator.getState()).toMatchObject({ phase: "error", error: "snapshot failed", retryAction: "install" });
     expect(safety.shutdownDurableHost).not.toHaveBeenCalled();
     expect(backend.installAndRestart).not.toHaveBeenCalled();
+  });
+
+  it("retries preparation and installation without downloading again", async () => {
+    const createRecoverySnapshot = vi.fn()
+      .mockRejectedValueOnce(new Error("snapshot failed"))
+      .mockResolvedValue(undefined);
+    const { orchestrator, backend } = fixture({}, { createRecoverySnapshot });
+    await orchestrator.initialize(); await orchestrator.check(); await orchestrator.download();
+    await orchestrator.install();
+    await orchestrator.retry();
+    expect(createRecoverySnapshot).toHaveBeenCalledTimes(2);
+    expect(backend.download).toHaveBeenCalledOnce();
+    expect(backend.installAndRestart).toHaveBeenCalledOnce();
+    expect(orchestrator.getState().phase).toBe("installing");
+  });
+
+  it("retries a failed download from the native retry action", async () => {
+    const download = vi.fn()
+      .mockRejectedValueOnce(new UpdateOperationError("download failed", "download"))
+      .mockImplementation(async (_release, progress) => progress(100, 100));
+    const { orchestrator } = fixture({ download });
+    await orchestrator.initialize(); await orchestrator.check(); await orchestrator.download();
+    expect(orchestrator.getState()).toMatchObject({
+      phase: "error",
+      error: "download failed",
+      retryAction: "download",
+      downloaded: 0,
+    });
+    await orchestrator.retry();
+    expect(download).toHaveBeenCalledTimes(2);
+    expect(orchestrator.getState()).toMatchObject({ phase: "ready", downloaded: 100, total: 100 });
+  });
+
+  it("returns to download when native installation consumes the verified bytes", async () => {
+    const installAndRestart = vi.fn(async () => {
+      throw new UpdateOperationError("install failed", "download");
+    });
+    const { orchestrator, backend } = fixture({ installAndRestart });
+    await orchestrator.initialize(); await orchestrator.check(); await orchestrator.download();
+    await orchestrator.install();
+    expect(orchestrator.getState()).toMatchObject({
+      phase: "error",
+      error: "install failed",
+      retryAction: "download",
+      downloaded: 0,
+    });
+    await orchestrator.retry();
+    expect(backend.download).toHaveBeenCalledTimes(2);
+    expect(installAndRestart).toHaveBeenCalledOnce();
+    expect(orchestrator.getState().phase).toBe("ready");
   });
 
   it("cancels a native download and returns to the available release", async () => {
@@ -65,10 +141,34 @@ describe("update orchestration", () => {
   });
 
   it("truthfully reports an unavailable backend", async () => {
-    const { orchestrator, backend } = fixture({ capability: vi.fn(async () => ({ available: false, currentVersion: "0.1.0", endpointConfigured: false, pubkeyConfigured: false, reason: "Desktop update endpoint and public key are not configured." })) });
+    const reason = "Desktop update endpoint and public key are not configured.";
+    const { orchestrator, backend } = fixture({ capability: vi.fn(async () => ({
+      available: false,
+      currentVersion: "0.1.0",
+      endpointConfigured: false,
+      pubkeyConfigured: false,
+      reason,
+      channels: {
+        stable: { available: false, reason },
+        beta: { available: false, reason },
+      },
+    })) });
     await orchestrator.initialize(); await orchestrator.check();
     expect(orchestrator.getState()).toMatchObject({ phase: "unavailable", capability: { available: false } });
     expect(backend.check).not.toHaveBeenCalled();
+  });
+
+  it("falls back from a persisted unavailable beta channel", async () => {
+    const { orchestrator } = fixture({}, {}, { channel: "beta" });
+    await orchestrator.initialize();
+    expect(orchestrator.getState().preferences.channel).toBe("stable");
+  });
+
+  it("does not select an unavailable beta channel", async () => {
+    const { orchestrator } = fixture();
+    await orchestrator.initialize();
+    orchestrator.setChannel("beta");
+    expect(orchestrator.getState().preferences.channel).toBe("stable");
   });
 });
 

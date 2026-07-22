@@ -16,6 +16,7 @@ import {
   type AuthorizedWorkspace,
 } from "@/platform/authorized-workspace";
 import { WORKSPACE_NAVIGATION_KEY } from "@/workspace/navigation";
+import { PRODUCT_VERSION } from "@/product-version";
 
 type HostStatus = "unavailable" | "checking" | "ready" | "error";
 
@@ -57,7 +58,7 @@ export function RecoverySection() {
     const generatedAt = new Date().toISOString();
     return createDiagnosticBundle({
       generatedAt,
-      version: "0.1.4",
+      version: PRODUCT_VERSION,
       safeMode: false,
       events: [
         ...getAiNativeDiagnostics().map((item) => ({

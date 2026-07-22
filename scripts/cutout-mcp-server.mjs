@@ -1,6 +1,6 @@
 import process from 'node:process'
 
-const SERVER_INFO = { name: 'cutout-headless', version: '0.1.4' }
+let SERVER_INFO
 let PROJECT_ROOT
 let closeHeadlessRuntime
 let executeControl
@@ -412,6 +412,10 @@ function send(message) {
 let buffer = ''
 
 export function runMcpServer(options) {
+  if (typeof options.serverVersion !== 'string' || !options.serverVersion.trim()) {
+    throw new Error('runMcpServer requires the authoritative product version')
+  }
+  SERVER_INFO = { name: 'cutout-headless', version: options.serverVersion }
   PROJECT_ROOT = options.projectRoot
   closeHeadlessRuntime = options.closeHeadlessRuntime ?? (async () => undefined)
   executeControl = options.executeControl

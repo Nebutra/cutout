@@ -30,11 +30,11 @@ function projectState(): HeadlessProjectState {
   }
 }
 
-function startBundledMcp(projectRoot?: string) {
+function startMcp(projectRoot?: string, entry = 'plugins/cutout/runtime/cutout-mcp.mjs') {
   const env = { ...process.env }
   if (projectRoot) env.CUTOUT_PROJECT_ROOT = projectRoot
   else delete env.CUTOUT_PROJECT_ROOT
-  const child = spawn(process.execPath, ['plugins/cutout/runtime/cutout-mcp.mjs'], { cwd: process.cwd(), env })
+  const child = spawn(process.execPath, [entry], { cwd: process.cwd(), env })
   const pending = new Map<number, (message: Record<string, unknown>) => void>()
   let stdout = ''
   let stderr = ''
@@ -72,7 +72,7 @@ function startBundledMcp(projectRoot?: string) {
 
 describe('Cutout Codex plugin runtime', () => {
   it('keeps discovery available and fails project tools closed without a host binding', async () => {
-    const mcp = startBundledMcp()
+    const mcp = startMcp()
     try {
       const initialized = await mcp.call(1, 'initialize', {})
       const tools = await mcp.call(2, 'tools/list', {})
@@ -93,7 +93,7 @@ describe('Cutout Codex plugin runtime', () => {
   it('loads and validates a bound project without the source checkout runtime', async () => {
     const root = await mkdtemp(join(tmpdir(), 'cutout-plugin-'))
     await createNodeFsRuntimeStore(root).save(projectState())
-    const mcp = startBundledMcp(root)
+    const mcp = startMcp(root)
     try {
       const handshake = await mcp.call(1, 'tools/call', { name: 'cutout_controller_handshake', arguments: { clientName: 'Codex' } })
       const validation = await mcp.call(2, 'tools/call', { name: 'cutout_validate', arguments: { scope: ['design', 'tokens', 'materials'] } })
@@ -102,6 +102,16 @@ describe('Cutout Codex plugin runtime', () => {
     } finally {
       await mcp.close()
       await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('keeps the source stdio entry fail-closed when cwd is a valid project', async () => {
+    const mcp = startMcp(undefined, 'scripts/cutout-mcp.mjs')
+    try {
+      const handshake = await mcp.call(1, 'tools/call', { name: 'cutout_controller_handshake', arguments: { clientName: 'Codex' } })
+      expect(handshake).toMatchObject({ result: { isError: true, structuredContent: { error: { code: 'project-binding-required' } } } })
+    } finally {
+      await mcp.close()
     }
   })
 })

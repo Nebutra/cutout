@@ -19,7 +19,7 @@ installer version differs from their release version.
   `node scripts/collect-release-assets.mjs checksums --directory <dir>`
 - Updater generation/validation remains owned by `pnpm update:generate` and
   `pnpm update:validate`.
-- macOS DMG notarization command:
+- macOS DMG notarization uses
   `xcrun notarytool submit <dmg> --key "$APPLE_API_KEY_PATH" --key-id "$APPLE_API_KEY" --issuer "$APPLE_API_ISSUER" --wait`, followed by
   `xcrun stapler staple <dmg>`.
 - Desktop UI state owner: `createDesktopUpdateOrchestrator(...)` in `AppShell`.
@@ -28,8 +28,9 @@ installer version differs from their release version.
 ### 3. Contracts
 
 - Release tags are `v<semver>`; prerelease identifiers select the beta channel.
-- `package.json`, `src-tauri/tauri.conf.json`, and the root package in
-  `src-tauri/Cargo.toml` must contain the same version and match the tag.
+- `package.json` is the display/handshake version source. Its value,
+  `src-tauri/tauri.conf.json`, the root package in `src-tauri/Cargo.toml`, the
+  Agent capability manifest, and the Codex plugin manifest must match the tag.
 - Required workflow artifact ids:
   `release-macos-aarch64`, `release-macos-x86_64`,
   `release-windows-x86_64`, and `release-linux-x86_64`.
@@ -46,7 +47,21 @@ installer version differs from their release version.
   `.AppImage(.sig)` on Linux). A missing updater bundle for any platform
   fails the release rather than publishing a partial manifest.
 - Matrix jobs receive `contents: read`; only the final publish job receives
-  `contents: write`.
+  `contents: write`. `scripts/validate-release-authority.mjs` rejects any other
+  workflow writer or GitHub Release mutator.
+- `.github/workflows/ci.yml` is callable and is the exact release quality gate.
+  Native release builds require that full native, contract, build, lint, unit,
+  and release-critical browser workflow to pass first.
+- Release callers pass the validated tag commit as `source_sha`; every checkout
+  in the reusable workflow uses that exact revision. A manual dispatch must not
+  test `main` while packaging a different input tag.
+- The workflow ends in one stable `Quality gate` job that depends on native,
+  contract, and browser boundaries and fails unless all three results are
+  `success`. Branch rules require this aggregate context instead of enumerating
+  matrix-generated check names.
+- Every Action and toolchain action is pinned to a reviewed 40-character commit
+  SHA. Repository settings must also require SHA pinning and restrict allowed
+  actions to the reviewed set.
 - Required protected environment values:
   `TAURI_SIGNING_PRIVATE_KEY`, `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`, and
   `CUTOUT_UPDATER_PUBKEY`. The updater private key must be password-protected.
@@ -62,6 +77,12 @@ installer version differs from their release version.
   `APPLE_API_KEY`, `APPLE_API_ISSUER`, and `APPLE_API_PRIVATE_KEY`. These Apple
   secrets are scoped only to macOS preparation, Tauri build, and explicit DMG
   notarization steps; Windows and Linux Tauri steps receive none of them.
+- The protected environment also owns `WINDOWS_CERTIFICATE` (base64 PKCS#12)
+  and `WINDOWS_CERTIFICATE_PASSWORD`. The Windows job imports that certificate
+  into the ephemeral current-user store, injects only its SHA-1 thumbprint into
+  the ignored merge config, requires SHA-256 signing and an HTTPS timestamp,
+  verifies the NSIS and MSI signer plus timestamp, and always removes the
+  temporary certificate material.
 - The macOS preparation step hard-fails when any Apple input is absent, writes
   `APPLE_API_PRIVATE_KEY` to `$RUNNER_TEMP/AuthKey_<key-id>.p8` with mode
   `0600`, and exports only `APPLE_API_KEY_PATH` for the Tauri process. The
@@ -80,6 +101,12 @@ installer version differs from their release version.
   verify that archive against `CUTOUT_UPDATER_PUBKEY` before workflow-artifact
   upload. The publish job consumes only these verified sidecars; metadata
   generation never receives or simulates presence of the updater private key.
+- The publish job creates a GitHub build-provenance attestation for every final
+  release asset after `SHA256SUMS` is generated and before the draft Release is
+  created. It alone receives `id-token: write` and `attestations: write`.
+- Release metadata contains updater manifest, checksums, SPDX SBOM, and
+  provenance. It does not claim rollout or rollback policy because the desktop
+  updater has no consumer for those metadata files.
 - The committed Tauri updater config remains fail-closed. Before packaging,
   release CI validates the complete two-line minisign public key, writes an
   ignored merge-only config, and passes it to the Tauri CLI with `--config`.
@@ -111,6 +138,8 @@ installer version differs from their release version.
 | Tag is not `v<semver>` | Stop in `validate`; run no native build |
 | Source versions differ | Stop in `validate` with all three observed versions |
 | Tag and source differ | Stop in `validate`; never rewrite source in CI |
+| Tag commit is not reachable from `main` | Stop before the reusable quality gate |
+| Another workflow can write contents or mutate a Release | Stop in `validate` |
 | Any matrix job fails | Do not start `publish` |
 | Required platform/bundle is absent | Collector fails before Release creation |
 | Symlink or duplicate output is found | Collector fails closed |
@@ -122,6 +151,9 @@ installer version differs from their release version.
 | Any Apple signing/notarization secret is absent on macOS | Stop before invoking the macOS Tauri build |
 | App notarization or explicit DMG notarization is not accepted | Do not run artifact upload or publication |
 | App or DMG signature, Gatekeeper, or stapler validation fails | Do not upload that macOS workflow artifact |
+| Windows certificate is absent, invalid, expired, lacks code-signing EKU, or has no private key | Stop before the Windows Tauri build |
+| NSIS or MSI Authenticode signer/status/timestamp is invalid | Do not upload the Windows workflow artifact |
+| GitHub provenance attestation fails | Keep the Release unpublished |
 | Release tag already has a Release | Refuse immutable asset replacement |
 | Upload is incomplete | Release remains a draft, not a public success |
 | Browser/dev build has no updater config | Home action remains absent |
@@ -139,14 +171,15 @@ installer version differs from their release version.
   `source=Notarized Developer ID` before upload.
 - Good: the delayed desktop check discovers a newer signed GitHub release; one
   compact Home action appears and opens the existing update controls.
-- Base: a manual build selects an existing version tag and uses the exact same
-  gates as a tag push.
+- Base: a manual build selects an existing version tag reachable from `main`
+  and uses the exact same gates as a tag push; it cannot set rollout or rollback
+  policy.
 - Base: current version is latest or runtime configuration is absent; the Home
   header has no empty update placeholder.
 - Bad: each matrix entry runs `gh release create`, uploads its own
   `latest.json`, or has repository write permission.
 - Bad: the workflow treats Tauri's app notarization as proof that the
-  subsequently created DMG is notarized, or verifies the DMG before separately
+  subsequently created DMG is notarized, or validates the DMG before separately
   submitting and stapling it.
 - Bad: CI edits version manifests after checkout to make a mismatched tag pass.
 
@@ -159,15 +192,17 @@ installer version differs from their release version.
   symlink rejection, directory boundaries, and deterministic SHA-256 output.
 - `scripts/release-workflow.test.ts`: four-entry matrix, validate/build/publish
   dependency graph, least-privilege permissions, isolated macOS/non-macOS Tauri
-  actions pinned to a reviewed commit, Apple and updater secret scoping,
-  temporary key handling, updater sidecar verification, app-before-DMG
-  notarization ordering, macOS signature/notarization verification, draft
-  promotion, and the multi-platform manifest generation step.
+  actions pinned to a reviewed commit, all Action SHA pins, Apple/Windows/updater
+  secret scoping, temporary key handling, updater sidecar verification,
+  app-before-DMG notarization ordering, macOS signature/notarization
+  verification, Windows Authenticode, attestation, single-authority
+  publication, draft promotion, and multi-platform manifest generation.
 - `scripts/ci-platform-contracts.test.ts`: browser installation ordering,
   platform-specific executable selection, and LF/CRLF frontmatter parsing.
-- `scripts/update-artifacts.test.ts`: signature, HTTPS/allowlist, rollback,
-  rollout, SBOM, provenance, multi-platform manifest generation (all four
-  platform keys, non-primary fail-closed), and generated-manifest validation.
+- `scripts/update-artifacts.test.ts`: signature, HTTPS/allowlist, downgrade
+  rejection, unsupported rollout/rollback flags, SBOM, provenance,
+  multi-platform manifest generation (all four platform keys, non-primary
+  fail-closed), and generated-manifest validation.
 - `src/components/home/SidebarAccount.test.tsx`: hidden idle/checking/error
   states, visible actionable phases, version label, and Settings target.
 - `src/updater/{runtime,service,orchestrator}.test.ts`: narrow Tauri commands,
@@ -195,12 +230,12 @@ metadata.
 
 ```yaml
 build:
-  needs: validate
+  needs: [validate, quality]
   permissions:
     contents: read
 
 publish:
-  needs: [validate, build]
+  needs: [validate, quality, build]
   permissions:
     contents: write
 ```

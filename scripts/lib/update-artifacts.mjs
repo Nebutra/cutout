@@ -33,15 +33,6 @@ export function compareVersions(left, right) {
 }
 
 export function sha256(bytes) { return createHash('sha256').update(bytes).digest('hex') }
-export function deterministicCohort(installationId, channel, version) {
-  if (!installationId) throw new Error('An opaque installation id is required for staged rollout.')
-  const value = Number.parseInt(sha256(`${installationId}\0${channel}\0${version}`).slice(0, 8), 16)
-  return value % 100
-}
-export function eligibleForRollout(input) {
-  if (!Number.isInteger(input.percentage) || input.percentage < 0 || input.percentage > 100) throw new Error('Rollout percentage must be an integer from 0 to 100.')
-  return deterministicCohort(input.installationId, input.channel, input.version) < input.percentage
-}
 
 function validatePlatformEntry(key, platform, options) {
   if (!platform || typeof platform.url !== 'string' || typeof platform.signature !== 'string') throw new Error(`${key} url and signature are required.`)
@@ -68,17 +59,12 @@ export function validateUpdateManifest(manifest, options = {}) {
   return manifest
 }
 
-export function checkUpdate({ manifest, currentVersion, expectedSignature, allowedHosts, rollback, rollout, installationId }) {
+export function checkUpdate({ manifest, currentVersion, expectedSignature, allowedHosts }) {
   validateUpdateManifest(manifest, { expectedSignature, allowedHosts })
-  if (rollout && !eligibleForRollout({ ...rollout, installationId, version: manifest.version })) return { status: 'no-update', reason: 'outside-staged-cohort' }
   const comparison = compareVersions(manifest.version, currentVersion)
   if (comparison === 0) return { status: 'no-update', reason: 'current' }
-  if (comparison < 0) {
-    const allowed = rollback?.enabled === true && rollback?.targetVersion === manifest.version && rollback?.fromVersions?.includes(currentVersion)
-    if (!allowed) throw new Error('Rollback is not authorized for this current version.')
-    return { status: 'update', version: manifest.version, rollback: true }
-  }
-  return { status: 'update', version: manifest.version, rollback: false }
+  if (comparison < 0) throw new Error('Updater manifests cannot downgrade an installed release.')
+  return { status: 'update', version: manifest.version }
 }
 
 export async function readSignedArtifact(artifactPath, signaturePath) {
@@ -106,6 +92,9 @@ function normalizeReleasePlatforms(input) {
 
 export function buildReleaseDocuments(input) {
   if (!channels.has(input.channel)) throw new Error('Update channel must be stable or beta.')
+  if (input.rolloutPercentage !== undefined || input.previousVersion !== undefined || input.previousManifestUrl !== undefined) {
+    throw new Error('Rollout and rollback metadata are not supported by the desktop updater contract.')
+  }
   parseVersion(input.version)
   const platforms = normalizeReleasePlatforms(input).map((entry) => {
     const url = new URL(entry.artifactUrl)
@@ -116,11 +105,8 @@ export function buildReleaseDocuments(input) {
   const publishedAt = new Date(input.publishedAt).toISOString()
   const manifest = { version: input.version, notes: input.notes ?? '', pub_date: publishedAt, platforms: Object.fromEntries(platforms.map((p) => [p.key, { url: p.href, signature: p.signature }])) }
   validateUpdateManifest(manifest, { expectedSignature: primary.signature, allowedHosts: input.allowedHosts })
-  const rollout = { version: 'cutout.rollout.v1', channel: input.channel, percentage: input.rolloutPercentage, salt: 'sha256-installation-channel-version', manifest: `${input.channel}/latest.json` }
-  const rollback = { version: 'cutout.rollback.v1', enabled: Boolean(input.previousVersion), targetVersion: input.previousVersion ?? null, fromVersions: input.previousVersion ? [input.version] : [], previousManifestUrl: input.previousManifestUrl ?? null }
-  if (input.previousVersion && compareVersions(input.previousVersion, input.version) >= 0) throw new Error('Previous version must be older than the release version.')
   const sbom = { spdxVersion: 'SPDX-2.3', dataLicense: 'CC0-1.0', SPDXID: 'SPDXRef-DOCUMENT', name: `Cutout-${input.version}`, documentNamespace: `https://cutout.local/sbom/${input.version}/${primary.artifactDigest}`, creationInfo: { created: publishedAt, creators: ['Tool: cutout-update-artifacts'] }, packages: platforms.map((p) => ({ SPDXID: p.key === primaryPlatform ? 'SPDXRef-Package-Cutout' : `SPDXRef-Package-Cutout-${p.key}`, name: 'Cutout', versionInfo: input.version, downloadLocation: p.href, checksums: [{ algorithm: 'SHA256', checksumValue: p.artifactDigest }] })) }
   const provenance = { version: 'cutout.provenance.v1', subject: platforms.map((p) => ({ name: p.filename, digest: { sha256: p.artifactDigest } })), build: { builder: 'github-actions', source: input.sourceRevision, channel: input.channel, generatedAt: publishedAt }, signing: { scheme: 'Tauri updater signature', privateKeySource: 'CI secret only' } }
-  const metadata = { version: 'cutout.release-metadata.v1', releaseVersion: input.version, channel: input.channel, artifact: { url: primary.href, sha256: primary.artifactDigest, signatureFile: primary.signatureFile }, platforms: platforms.map((p) => ({ key: p.key, url: p.href, sha256: p.artifactDigest, signatureFile: p.signatureFile })), sbom: { file: 'sbom.spdx.json', sha256: sha256(JSON.stringify(sbom)) }, provenance: { file: 'provenance.json', sha256: sha256(JSON.stringify(provenance)) }, rollout, rollback }
-  return { manifest, rollout, rollback, sbom, provenance, metadata }
+  const metadata = { version: 'cutout.release-metadata.v2', releaseVersion: input.version, channel: input.channel, artifact: { url: primary.href, sha256: primary.artifactDigest, signatureFile: primary.signatureFile }, platforms: platforms.map((p) => ({ key: p.key, url: p.href, sha256: p.artifactDigest, signatureFile: p.signatureFile })), sbom: { file: 'sbom.spdx.json', sha256: sha256(JSON.stringify(sbom)) }, provenance: { file: 'provenance.json', sha256: sha256(JSON.stringify(provenance)) } }
+  return { manifest, sbom, provenance, metadata }
 }

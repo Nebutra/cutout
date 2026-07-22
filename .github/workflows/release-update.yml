@@ -8,16 +8,6 @@ on:
       tag:
         description: Existing v-prefixed release tag to build
         required: true
-      rollout:
-        description: Deterministic rollout percentage
-        required: true
-        default: '10'
-      previous_version:
-        description: Optional older version authorized for rollback metadata
-        required: false
-      previous_manifest_url:
-        description: Optional HTTPS manifest URL for the previous version
-        required: false
 
 permissions:
   contents: read
@@ -35,6 +25,7 @@ jobs:
       version: ${{ steps.release.outputs.version }}
       channel: ${{ steps.release.outputs.channel }}
       prerelease: ${{ steps.release.outputs.prerelease }}
+      sha: ${{ steps.authority.outputs.sha }}
     steps:
       - name: Resolve release identity
         id: release
@@ -59,25 +50,63 @@ jobs:
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "channel=$channel" >> "$GITHUB_OUTPUT"
           echo "prerelease=$prerelease" >> "$GITHUB_OUTPUT"
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           ref: ${{ steps.release.outputs.tag }}
-      - uses: pnpm/action-setup@v4
+          fetch-depth: 0
+      - uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
         with:
           version: 10
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Require a main-line tag and the single release authority
+        id: authority
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
+          release_sha="$(git rev-list -n 1 "$RELEASE_TAG")"
+          test -n "$release_sha" || { echo "Release tag does not resolve to a commit: $RELEASE_TAG" >&2; exit 1; }
+          git merge-base --is-ancestor "$release_sha" refs/remotes/origin/main || {
+            echo "Release tag $RELEASE_TAG is not reachable from main." >&2
+            exit 1
+          }
+          node scripts/validate-release-authority.mjs
+          set +e
+          existing="$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${RELEASE_TAG}" 2>&1)"
+          status=$?
+          set -e
+          if [ "$status" -eq 0 ]; then
+            echo "Release $RELEASE_TAG already exists; immutable assets cannot be replaced." >&2
+            exit 1
+          fi
+          grep -Eq 'HTTP 404|"status"[[:space:]]*:[[:space:]]*"?404' <<<"$existing" || {
+            echo "$existing" >&2
+            echo "Could not prove that release $RELEASE_TAG is absent." >&2
+            exit 1
+          }
+          echo "sha=$release_sha" >> "$GITHUB_OUTPUT"
       - name: Require tag and source versions to match
         run: node scripts/validate-release-version.mjs --expected "${{ steps.release.outputs.version }}"
-      - run: pnpm test:update-artifacts
-      - run: pnpm exec vitest run scripts/validate-release-version.test.ts scripts/collect-release-assets.test.ts scripts/release-workflow.test.ts
+
+  quality:
+    name: Complete release quality gate
+    needs: validate
+    permissions:
+      contents: read
+    uses: ./.github/workflows/ci.yml
+    with:
+      source_sha: ${{ needs.validate.outputs.sha }}
 
   build:
     name: Build ${{ matrix.artifact }}
-    needs: validate
+    needs: [validate, quality]
     environment: release
     strategy:
       fail-fast: false
@@ -106,20 +135,20 @@ jobs:
       CUTOUT_UPDATER_STABLE_ENDPOINTS: ${{ vars.CUTOUT_UPDATER_STABLE_ENDPOINTS || format('https://github.com/{0}/releases/latest/download/latest.json', github.repository) }}
       CUTOUT_UPDATER_BETA_ENDPOINTS: ${{ vars.CUTOUT_UPDATER_BETA_ENDPOINTS }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           ref: ${{ needs.validate.outputs.tag }}
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
         with:
           version: 10
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
           cache: pnpm
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4
         with:
           targets: ${{ matrix.target }}
-      - uses: swatinem/rust-cache@v2
+      - uses: swatinem/rust-cache@42dc69e1aa15d09112580998cf2ef0119e2e91ae # v2
         with:
           workspaces: src-tauri -> target
           key: release-${{ matrix.target }}
@@ -136,6 +165,41 @@ jobs:
           test -n "$CUTOUT_UPDATER_PUBKEY" || { echo 'CUTOUT_UPDATER_PUBKEY is required' >&2; exit 1; }
           test -n "$CUTOUT_UPDATER_ALLOWED_HOSTS" || { echo 'CUTOUT_UPDATER_ALLOWED_HOSTS is required' >&2; exit 1; }
           test -n "$CUTOUT_UPDATER_STABLE_ENDPOINTS" || { echo 'CUTOUT_UPDATER_STABLE_ENDPOINTS is required' >&2; exit 1; }
+      - name: Prepare Windows Authenticode certificate
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
+          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ([string]::IsNullOrWhiteSpace($env:WINDOWS_CERTIFICATE)) { throw 'WINDOWS_CERTIFICATE is required' }
+          if ([string]::IsNullOrWhiteSpace($env:WINDOWS_CERTIFICATE_PASSWORD)) { throw 'WINDOWS_CERTIFICATE_PASSWORD is required' }
+          $pfxPath = Join-Path $env:RUNNER_TEMP 'cutout-authenticode.pfx'
+          "CUTOUT_WINDOWS_CERTIFICATE_PATH=$pfxPath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          $imported = @()
+          try {
+            try { [IO.File]::WriteAllBytes($pfxPath, [Convert]::FromBase64String($env:WINDOWS_CERTIFICATE)) }
+            catch { throw 'WINDOWS_CERTIFICATE must be a base64-encoded PKCS#12 payload' }
+            $password = ConvertTo-SecureString $env:WINDOWS_CERTIFICATE_PASSWORD -AsPlainText -Force
+            $imported = @(Import-PfxCertificate -FilePath $pfxPath -CertStoreLocation Cert:\CurrentUser\My -Password $password -Exportable:$false)
+            $importedThumbprints = @($imported | ForEach-Object { $_.Thumbprint } | Where-Object { $_ })
+            "CUTOUT_WINDOWS_IMPORTED_THUMBPRINTS=$($importedThumbprints -join ';')" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+            $signingCertificates = @($imported | Where-Object { $_.HasPrivateKey })
+            if ($signingCertificates.Count -ne 1) { throw "Expected exactly one Windows signing certificate with a private key, found $($signingCertificates.Count)" }
+            $certificate = $signingCertificates[0]
+            if (-not $certificate.HasPrivateKey) { throw 'Windows signing certificate has no private key' }
+            if ($certificate.NotBefore.ToUniversalTime() -gt [DateTime]::UtcNow -or $certificate.NotAfter.ToUniversalTime() -le [DateTime]::UtcNow) { throw 'Windows signing certificate is not currently valid' }
+            $codeSigningEku = $certificate.EnhancedKeyUsageList | Where-Object { $_.ObjectId.Value -eq '1.3.6.1.5.5.7.3.3' }
+            if (-not $codeSigningEku) { throw 'Windows signing certificate is not authorized for code signing' }
+            "CUTOUT_WINDOWS_CERTIFICATE_THUMBPRINT=$($certificate.Thumbprint)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          } catch {
+            foreach ($entry in $imported) {
+              Remove-Item "Cert:\CurrentUser\My\$($entry.Thumbprint)" -Force -ErrorAction SilentlyContinue
+            }
+            Remove-Item $pfxPath -Force -ErrorAction SilentlyContinue
+            throw
+          }
       - name: Inject updater public key into release-only Tauri config
         run: node scripts/prepare-tauri-release-config.mjs
       - name: Exercise safe local workspace bridge
@@ -251,6 +315,23 @@ jobs:
           codesign --verify --deep --strict --verbose=2 "${dmgs[0]}"
           spctl --assess --type open --context context:primary-signature --verbose=4 "${dmgs[0]}"
           xcrun stapler validate "${dmgs[0]}"
+      - name: Verify Windows Authenticode signatures
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          BUNDLE_ROOT: src-tauri/target/${{ matrix.target }}/release/bundle
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $nsis = @(Get-ChildItem (Join-Path $env:BUNDLE_ROOT 'nsis') -Filter *.exe -File)
+          $msi = @(Get-ChildItem (Join-Path $env:BUNDLE_ROOT 'msi') -Filter *.msi -File)
+          if ($nsis.Count -ne 1) { throw "Expected exactly one NSIS installer, found $($nsis.Count)" }
+          if ($msi.Count -ne 1) { throw "Expected exactly one MSI installer, found $($msi.Count)" }
+          foreach ($file in @($nsis[0], $msi[0])) {
+            $signature = Get-AuthenticodeSignature -FilePath $file.FullName
+            if ($signature.Status -ne 'Valid') { throw "Invalid Authenticode signature for $($file.Name): $($signature.Status)" }
+            if ($signature.SignerCertificate.Thumbprint -ne $env:CUTOUT_WINDOWS_CERTIFICATE_THUMBPRINT) { throw "Unexpected Authenticode signer for $($file.Name)" }
+            if (-not $signature.TimeStamperCertificate) { throw "Missing trusted timestamp for $($file.Name)" }
+          }
       - name: Remove temporary Apple notarization key
         if: always() && runner.os == 'macOS'
         shell: bash
@@ -259,12 +340,25 @@ jobs:
           if test -n "${APPLE_API_KEY_PATH:-}"; then
             rm -f -- "$APPLE_API_KEY_PATH"
           fi
+      - name: Remove temporary Windows signing material
+        if: always() && runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          foreach ($thumbprint in ($env:CUTOUT_WINDOWS_IMPORTED_THUMBPRINTS -split ';')) {
+            if ($thumbprint) {
+              Remove-Item "Cert:\CurrentUser\My\$thumbprint" -Force -ErrorAction SilentlyContinue
+            }
+          }
+          if ($env:CUTOUT_WINDOWS_CERTIFICATE_PATH) {
+            Remove-Item $env:CUTOUT_WINDOWS_CERTIFICATE_PATH -Force -ErrorAction SilentlyContinue
+          }
       - name: Launch host-native packaged application
         if: runner.os == 'macOS'
         shell: bash
         run: bash scripts/smoke-packaged-macos.sh "src-tauri/target/${{ matrix.target }}/release/bundle/macos"
       - name: Upload platform release artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: ${{ matrix.artifact }}
           path: src-tauri/target/${{ matrix.target }}/release/bundle
@@ -273,27 +367,29 @@ jobs:
 
   publish:
     name: Create GitHub Release
-    needs: [validate, build]
+    needs: [validate, quality, build]
     runs-on: ubuntu-22.04
     environment: release
     permissions:
       contents: write
+      id-token: write
+      attestations: write
     env:
       GH_TOKEN: ${{ github.token }}
       CUTOUT_UPDATER_ALLOWED_HOSTS: ${{ vars.CUTOUT_UPDATER_ALLOWED_HOSTS || 'github.com' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           ref: ${{ needs.validate.outputs.tag }}
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
         with:
           version: 10
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           pattern: release-*
           path: dist/release-artifacts
@@ -305,9 +401,7 @@ jobs:
           RELEASE_TAG: ${{ needs.validate.outputs.tag }}
           RELEASE_VERSION: ${{ needs.validate.outputs.version }}
           CHANNEL: ${{ needs.validate.outputs.channel }}
-          ROLLOUT: ${{ github.event_name == 'workflow_dispatch' && inputs.rollout || '100' }}
-          PREVIOUS_VERSION: ${{ github.event_name == 'workflow_dispatch' && inputs.previous_version || '' }}
-          PREVIOUS_MANIFEST_URL: ${{ github.event_name == 'workflow_dispatch' && inputs.previous_manifest_url || '' }}
+          RELEASE_SHA: ${{ needs.validate.outputs.sha }}
         run: |
           set -euo pipefail
           base="https://github.com/${GITHUB_REPOSITORY}/releases/download/${RELEASE_TAG}"
@@ -327,13 +421,14 @@ jobs:
             platform_args+=(--platform "$key=$artifact")
             if [ "$key" = darwin-aarch64 ]; then primary_sig="$artifact.sig"; fi
           done
-          rollback_args=()
-          if test -n "$PREVIOUS_VERSION"; then rollback_args+=(--previous-version "$PREVIOUS_VERSION"); fi
-          if test -n "$PREVIOUS_MANIFEST_URL"; then rollback_args+=(--previous-manifest-url "$PREVIOUS_MANIFEST_URL"); fi
-          pnpm update:generate -- "${platform_args[@]}" --artifact-base-url "$base" --version "$RELEASE_VERSION" --channel "$CHANNEL" --rollout "$ROLLOUT" --allowed-hosts "$CUTOUT_UPDATER_ALLOWED_HOSTS" --revision "$GITHUB_SHA" --output dist/update "${rollback_args[@]}"
+          pnpm update:generate -- "${platform_args[@]}" --artifact-base-url "$base" --version "$RELEASE_VERSION" --channel "$CHANNEL" --allowed-hosts "$CUTOUT_UPDATER_ALLOWED_HOSTS" --revision "$RELEASE_SHA" --output dist/update
           pnpm update:validate -- --manifest "dist/update/$CHANNEL/latest.json" --signature "$primary_sig" --allowed-hosts "$CUTOUT_UPDATER_ALLOWED_HOSTS"
           cp "dist/update/$CHANNEL/"* dist/release-assets/
           node scripts/collect-release-assets.mjs checksums --directory dist/release-assets
+      - name: Attest release assets
+        uses: actions/attest-build-provenance@96b4a1ef7235a096b17240c259729fdd70c83d45 # v2
+        with:
+          subject-path: dist/release-assets/*
       - name: Create draft release, upload verified assets, and publish
         shell: bash
         env:
@@ -341,10 +436,19 @@ jobs:
           PRERELEASE: ${{ needs.validate.outputs.prerelease }}
         run: |
           set -euo pipefail
-          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+          set +e
+          existing="$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${RELEASE_TAG}" 2>&1)"
+          status=$?
+          set -e
+          if [ "$status" -eq 0 ]; then
             echo "Release $RELEASE_TAG already exists; refusing to replace immutable assets." >&2
             exit 1
           fi
+          grep -Eq 'HTTP 404|"status"[[:space:]]*:[[:space:]]*"?404' <<<"$existing" || {
+            echo "$existing" >&2
+            echo "Could not prove that release $RELEASE_TAG is still absent." >&2
+            exit 1
+          }
           gh release create "$RELEASE_TAG" dist/release-assets/* --verify-tag --draft --generate-notes --title "Cutout $RELEASE_TAG"
           edit_args=(--draft=false)
           if [[ "$PRERELEASE" == true ]]; then edit_args+=(--prerelease); else edit_args+=(--latest); fi

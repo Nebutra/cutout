@@ -56,6 +56,7 @@ Both Rust proxy commands receive the same protocol discriminator:
 
 ```rust
 ai_proxy_request(
+    app: AppHandle,
     provider_id: String,
     kind: String,
     wire_protocol: Option<ProviderWireProtocol>,
@@ -66,6 +67,7 @@ ai_proxy_request(
 ) -> Result<ProxyResponse, ProxyError>
 
 ai_proxy_stream(
+    app: AppHandle,
     provider_id: String,
     kind: String,
     wire_protocol: Option<ProviderWireProtocol>,
@@ -114,6 +116,19 @@ headers, then derives credentials from the validated effective protocol:
 | Anthropic Messages | `x-api-key` plus `anthropic-version: 2023-06-01` |
 | Google GenerateContent | `x-goog-api-key` |
 
+Before reading a credential, Rust reloads the persisted provider by
+`provider_id` and verifies that it is enabled and that the supplied kind,
+effective wire protocol, request origin, and request path prefix match that
+record's configured or first-party default endpoint. A webview cannot combine
+one provider's secret selector with another provider's destination.
+
+Remote hostnames are resolved once immediately before client construction. All
+resolved addresses must be public, IPv4-mapped IPv6 and reserved ranges are
+normalized/rejected, and the validated socket addresses are installed into the
+HTTP client resolver so connect cannot perform a second unvalidated DNS lookup.
+Local model providers use the same pinning but require every resolved address
+to be loopback.
+
 Model catalog checks call authenticated `GET <protocol-base>/models`. Parsers
 accept OpenAI/Anthropic `data[].id` and Google `models[].name`, removing a
 leading `models/` prefix and deduplicating IDs.
@@ -143,6 +158,8 @@ import.
 | `/models` returns 401/403 | Report credential failure |
 | `/models` returns 404/405 | Report catalog unsupported; do not fall back to generation |
 | Adapter switch receives a new unhandled protocol | Compile-time `never` branch and runtime capability error |
+| Provider id, kind, protocol, origin, or base-path prefix does not match persisted configuration | Reject before reading the secret |
+| DNS resolves a remote endpoint to any non-public address, or a local endpoint to any non-loopback address | Reject before connecting |
 
 ### 5. Good / Base / Bad Cases
 
@@ -163,8 +180,10 @@ import.
   model-catalog parsing, and refined-schema consumers using `safeExtend` or a
   shared refined draft schema.
 - Rust: serde round trips, effective defaults, unsupported combinations,
-  protocol auth headers, stripped inbound auth headers, draft catalog checks,
-  and buffered/stream proxy parity.
+  provider id/kind/protocol/origin/path binding, protocol auth headers,
+  stripped inbound auth headers, mapped/reserved address rejection,
+  resolve-to-connect pinning, draft catalog checks, and buffered/stream proxy
+  parity.
 - UI: protocol options and explicit labels for each supported kind; visible
   action copy must say credential/catalog check rather than generation proof.
 - Visual: desktop/mobile provider directory and custom endpoint form coverage.

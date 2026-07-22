@@ -65,4 +65,22 @@ describe('controlled source scanner', () => {
       await rm(root, { recursive: true, force: true })
     }
   })
+
+  it('rejects repository trees beyond the explicit depth budget', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'cutout-source-depth-'))
+    try {
+      let current = root
+      for (let depth = 0; depth < 66; depth += 1) {
+        current = join(current, `d${depth}`)
+        await mkdir(current)
+      }
+      await writeFile(join(current, 'source.ts'), 'export const deep = true')
+      await expect(scanSourceInput(root, {
+        type: 'source.ingest',
+        input: { type: 'repository-scan', root: '.', role: 'implementation', license },
+      })).rejects.toThrow('depth exceeds 64')
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
 })
