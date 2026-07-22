@@ -554,3 +554,37 @@ Attempted immutable v0.1.2 release, diagnosed post-build DMG notarization and Ta
 ### Next Steps
 
 - None - task complete
+
+
+## Session 17: Ship Agent response regeneration in v0.1.4
+
+**Date**: 2026-07-22
+**Task**: Ship Agent response regeneration in v0.1.4
+**Branch**: `release/v0.1.4`
+
+### Summary
+
+Added latest-response Regenerate with durable revision semantics, fixed stale retry error cleanup and fail-closed tool-gate behavior, published signed/notarized v0.1.4 for all platforms, and reinstalled/verified the arm64 macOS release.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `4297089` | (see git log) |
+| `cd8fcd1` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
