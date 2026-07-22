@@ -619,3 +619,40 @@ Redownloaded and checksum-verified the stable Apple Silicon DMG, preserved the p
 ### Next Steps
 
 - None - task complete
+
+
+## Session 19: Harden release updater and close security issues
+
+**Date**: 2026-07-22
+**Task**: Harden release updater and close security issues
+**Branch**: `chore/archive-harden-release-task`
+
+### Summary
+
+Hardened Cutout security boundaries and updater trust, protected release governance, stabilized Windows CI, upgraded Actions to Node 24, remediated fast-uri, and closed all GitHub issues with verified main CI.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `957be1c` | (see git log) |
+| `039c07a` | (see git log) |
+| `8617887` | (see git log) |
+| `0bc05f9` | (see git log) |
+| `827581e` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
