@@ -196,6 +196,25 @@ jobs:
           uploadUpdaterJson: false
           uploadWorkflowArtifacts: false
           uploadUpdaterSignatures: false
+      - name: Notarize and staple macOS DMG
+        if: runner.os == 'macOS'
+        shell: bash
+        env:
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+        run: |
+          set -euo pipefail
+          bundle_root="src-tauri/target/${{ matrix.target }}/release/bundle"
+          shopt -s nullglob
+          dmgs=("$bundle_root/dmg/"*.dmg)
+          test "${#dmgs[@]}" -eq 1 || { echo "Expected exactly one macOS DMG, found ${#dmgs[@]}" >&2; exit 1; }
+
+          xcrun notarytool submit "${dmgs[0]}" \
+            --key "$APPLE_API_KEY_PATH" \
+            --key-id "$APPLE_API_KEY" \
+            --issuer "$APPLE_API_ISSUER" \
+            --wait
+          xcrun stapler staple "${dmgs[0]}"
       - name: Verify signed and notarized macOS bundles
         if: runner.os == 'macOS'
         shell: bash

@@ -52,13 +52,14 @@ describe('cross-platform release workflow', () => {
     expect(publishScript).toContain('gh release edit')
   })
 
-  it('scopes Apple credentials to the macOS preparation and build steps', async () => {
+  it('scopes Apple credentials to the macOS preparation, build, and DMG notarization steps', async () => {
     const source = await readFile('.github/workflows/release-update.yml', 'utf8')
     const workflow = YAML.parse(source)
     const buildSteps = workflow.jobs.build.steps
     const preparation = buildSteps.find((step: { name?: string }) => step.name === 'Prepare Apple signing and notarization credentials')
     const macBuild = buildSteps.find((step: { name?: string }) => step.name === 'Build signed and notarized macOS bundles')
     const nonMacBuild = buildSteps.find((step: { name?: string }) => step.name === 'Build non-macOS bundles')
+    const dmgNotarization = buildSteps.find((step: { name?: string }) => step.name === 'Notarize and staple macOS DMG')
     const appleNames = [
       'APPLE_CERTIFICATE',
       'APPLE_CERTIFICATE_PASSWORD',
@@ -74,9 +75,11 @@ describe('cross-platform release workflow', () => {
     expect(preparation.if).toBe("runner.os == 'macOS'")
     expect(macBuild.if).toBe("runner.os == 'macOS'")
     expect(nonMacBuild.if).toBe("runner.os != 'macOS'")
+    expect(dmgNotarization.if).toBe("runner.os == 'macOS'")
     expect(appleSecretConsumers).toEqual([
       'Prepare Apple signing and notarization credentials',
       'Build signed and notarized macOS bundles',
+      'Notarize and staple macOS DMG',
     ])
     expect(JSON.stringify(workflow.jobs.validate)).not.toContain('secrets.APPLE_')
     expect(JSON.stringify(workflow.jobs.publish)).not.toContain('secrets.APPLE_')
@@ -93,6 +96,7 @@ describe('cross-platform release workflow', () => {
       'APPLE_API_KEY',
       'APPLE_API_ISSUER',
     ])
+    expect(Object.keys(dmgNotarization.env)).toEqual(['APPLE_API_KEY', 'APPLE_API_ISSUER'])
     expect(Object.keys(nonMacBuild.env)).toEqual(['GITHUB_TOKEN'])
     expect(JSON.stringify(nonMacBuild)).not.toContain('APPLE_')
   })
@@ -127,19 +131,31 @@ describe('cross-platform release workflow', () => {
     const workflow = YAML.parse(source)
     const buildSteps = workflow.jobs.build.steps
     const macBuildIndex = buildSteps.findIndex((step: { name?: string }) => step.name === 'Build signed and notarized macOS bundles')
+    const dmgNotarizationIndex = buildSteps.findIndex((step: { name?: string }) => step.name === 'Notarize and staple macOS DMG')
     const verificationIndex = buildSteps.findIndex((step: { name?: string }) => step.name === 'Verify signed and notarized macOS bundles')
     const cleanupIndex = buildSteps.findIndex((step: { name?: string }) => step.name === 'Remove temporary Apple notarization key')
     const uploadIndex = buildSteps.findIndex((step: { uses?: string }) => step.uses?.startsWith('actions/upload-artifact@'))
     const macBuild = buildSteps[macBuildIndex]
+    const dmgNotarization = buildSteps[dmgNotarizationIndex]
     const verification = buildSteps[verificationIndex]
 
+    expect(dmgNotarization.if).toBe("runner.os == 'macOS'")
+    expect(dmgNotarizationIndex).toBeGreaterThan(macBuildIndex)
     expect(verification.if).toBe("runner.os == 'macOS'")
-    expect(verificationIndex).toBeGreaterThan(macBuildIndex)
+    expect(verificationIndex).toBeGreaterThan(dmgNotarizationIndex)
     expect(cleanupIndex).toBeGreaterThan(verificationIndex)
     expect(uploadIndex).toBeGreaterThan(verificationIndex)
     expect(uploadIndex).toBeGreaterThan(cleanupIndex)
     expect(macBuild.with.args).not.toContain('--skip-stapling')
     expect(macBuild.with.args).not.toContain('--no-sign')
+    expect(dmgNotarization.run).toContain('$bundle_root/dmg/')
+    expect(dmgNotarization.run).toContain('xcrun notarytool submit "${dmgs[0]}"')
+    expect(dmgNotarization.run).toContain('--key "$APPLE_API_KEY_PATH"')
+    expect(dmgNotarization.run).toContain('--key-id "$APPLE_API_KEY"')
+    expect(dmgNotarization.run).toContain('--issuer "$APPLE_API_ISSUER"')
+    expect(dmgNotarization.run).toContain('--wait')
+    expect(dmgNotarization.run).toContain('xcrun stapler staple "${dmgs[0]}"')
+    expect(dmgNotarization.run.indexOf('xcrun stapler staple')).toBeGreaterThan(dmgNotarization.run.indexOf('xcrun notarytool submit'))
     expect(verification.run).toContain('$bundle_root/macos/')
     expect(verification.run).toContain('$bundle_root/dmg/')
     expect(verification.run.match(/codesign --verify/g)).toHaveLength(2)
