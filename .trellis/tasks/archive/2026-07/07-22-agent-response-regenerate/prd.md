@@ -43,20 +43,20 @@ the behavior in the next signed stable desktop release.
 
 ## Acceptance Criteria
 
-- [ ] The latest completed Agent response shows one Regenerate icon with
+- [x] The latest completed Agent response shows one Regenerate icon with
       keyboard-accessible `Regenerate response` labeling and tooltip.
-- [ ] Clicking Regenerate reruns the effective preceding user turn and updates
+- [x] Clicking Regenerate reruns the effective preceding user turn and updates
       the same Agent response without duplicating the user message.
-- [ ] Edited user turns regenerate from their latest revision.
-- [ ] Older Agent messages and all non-message feed rows have no message-level
+- [x] Edited user turns regenerate from their latest revision.
+- [x] Older Agent messages and all non-message feed rows have no message-level
       Regenerate control.
-- [ ] Starting Retry or Regenerate removes the stale stopped summary/error row
+- [x] Starting Retry or Regenerate removes the stale stopped summary/error row
       before tool-gate streaming; an early conversational return does not bring
       the old red card or right-pane `No result yet` state back.
-- [ ] Run Retry/Continue and paid-tool Retry behavior remains unchanged.
-- [ ] Focused component, projection, retry lifecycle, lint, TypeScript, full
+- [x] Run Retry/Continue and paid-tool Retry behavior remains unchanged.
+- [x] Focused component, projection, retry lifecycle, lint, TypeScript, full
       test, build, Rust, Agent-contract, i18n, and release validation pass.
-- [ ] `v0.1.4` is published with all required platform assets and updater
+- [x] `v0.1.4` is published with all required platform assets and updater
       metadata, and the installed macOS app verifies as signed/notarized
       version `0.1.4`.
 
