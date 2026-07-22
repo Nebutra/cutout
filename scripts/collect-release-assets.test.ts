@@ -57,6 +57,18 @@ describe('release asset collection', () => {
     await expect(collectReleaseAssets({ inputDir: linux.input, outputDir: linux.output })).rejects.toThrow('missing required .AppImage.tar.gz')
   })
 
+  it('rejects ambiguous updater archives or signatures for one platform', async () => {
+    const archives = await fixture()
+    const windowsDir = join(archives.input, 'release-windows-x86_64', 'nested')
+    await writeFile(join(windowsDir, 'Cutout-alternate.nsis.zip'), 'duplicate archive')
+    await expect(collectReleaseAssets({ inputDir: archives.input, outputDir: archives.output })).rejects.toThrow('exactly one .nsis.zip output; found 2')
+
+    const signatures = await fixture()
+    const linuxDir = join(signatures.input, 'release-linux-x86_64', 'nested')
+    await writeFile(join(linuxDir, 'Cutout-alternate.AppImage.tar.gz.sig'), 'duplicate signature')
+    await expect(collectReleaseAssets({ inputDir: signatures.input, outputDir: signatures.output })).rejects.toThrow('exactly one .AppImage.tar.gz.sig output; found 2')
+  })
+
   it('rejects symbolic links and nested input/output boundaries', async () => {
     const { root, input, output } = await fixture()
     await symlink(join(input, 'release-macos-aarch64', 'nested', 'Cutout.dmg'), join(input, 'release-macos-aarch64', 'linked.dmg'))

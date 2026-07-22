@@ -20,16 +20,16 @@ Cutout 的权威数据不是聊天记录或截图，而是项目中的 `.cutout`
 
 ## 安装 macOS App
 
-从 [Cutout v0.1.1 Release](https://github.com/Nebutra/cutout/releases/tag/v0.1.1) 下载 Apple Silicon DMG，然后将 Cutout 拖入 Applications。
+从 [Cutout v0.1.2 Release](https://github.com/Nebutra/cutout/releases/tag/v0.1.2) 下载 Apple Silicon DMG，然后将 Cutout 拖入 Applications。
 
-当前公开构建使用完整的 ad-hoc bundle 签名，但尚未使用 Developer ID 签名或 Apple 公证。其他 Mac 首次打开时可能需要在 Finder 中右键选择 **打开**，或在 **隐私与安全性** 中明确允许。
+公开的 macOS 构建会在发布前完成 Developer ID 签名、Apple 公证和票据装订。
 
 ## 安装 Codex 插件
 
 需要 Codex CLI `0.144.5` 或兼容的插件版本。
 
 ```bash
-codex plugin marketplace add Nebutra/cutout --ref v0.1.1
+codex plugin marketplace add Nebutra/cutout --ref v0.1.2
 codex plugin add cutout@cutout-local
 codex plugin list
 ```
@@ -37,7 +37,7 @@ codex plugin list
 `codex plugin list` 应显示：
 
 ```text
-cutout@cutout-local  installed, enabled  0.1.1
+cutout@cutout-local  installed, enabled  0.1.2
 ```
 
 Codex 在会话开始时捕获插件的 Skill 和 MCP 工具。安装或更新插件后，请新建会话。
@@ -111,7 +111,6 @@ Cutout 目前不宣称实现以下能力：
 - 视频处理；
 - 云端多人协作；
 - 内置 headless 模型 provider；
-- Apple Developer ID 签名或公证。
 
 Figma 适配器只消费调用方明确提供的授权快照；URL 摄取只记录不含凭证的描述符，不会抓取网页。公网 OAuth HTTP MCP 是 roadmap 项目，不是当前能力。
 

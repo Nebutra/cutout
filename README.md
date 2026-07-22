@@ -20,16 +20,16 @@ They consume the same `.cutout` state. They do not control each other through GU
 
 ## Install the macOS app
 
-Download the Apple Silicon DMG from [Cutout v0.1.1](https://github.com/Nebutra/cutout/releases/tag/v0.1.1), then drag Cutout into Applications.
+Download the Apple Silicon DMG from [Cutout v0.1.2](https://github.com/Nebutra/cutout/releases/tag/v0.1.2), then drag Cutout into Applications.
 
-The current public build has a complete ad-hoc bundle signature, but it is not Developer ID signed or Apple notarized. On first launch, another Mac may require the standard Finder **Open** flow or explicit approval in **Privacy & Security**.
+The public macOS build is Developer ID signed, Apple notarized, and stapled before publication.
 
 ## Install the Codex plugin
 
 Use Codex CLI `0.144.5` or a compatible plugin-enabled version.
 
 ```bash
-codex plugin marketplace add Nebutra/cutout --ref v0.1.1
+codex plugin marketplace add Nebutra/cutout --ref v0.1.2
 codex plugin add cutout@cutout-local
 codex plugin list
 ```
@@ -37,7 +37,7 @@ codex plugin list
 `codex plugin list` should show:
 
 ```text
-cutout@cutout-local  installed, enabled  0.1.1
+cutout@cutout-local  installed, enabled  0.1.2
 ```
 
 Codex captures plugin Skills and MCP tools when a conversation starts. Open a new conversation after installing or updating the plugin.
@@ -111,7 +111,6 @@ Cutout does not currently claim:
 - video processing;
 - cloud collaboration;
 - a bundled headless model provider;
-- Apple Developer ID signing or notarization.
 
 The Figma adapter only consumes an authorized snapshot supplied by its caller. URL ingestion records a credential-free descriptor and does not fetch the page. Hosted OAuth HTTP MCP remains a roadmap item, not a shipped capability.
 

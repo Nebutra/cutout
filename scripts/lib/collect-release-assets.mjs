@@ -22,6 +22,13 @@ const requiredBundles = Object.freeze({
   'release-linux-x86_64': ['.AppImage', '.deb', '.AppImage.tar.gz', '.AppImage.tar.gz.sig'],
 })
 
+const uniqueUpdaterBundles = Object.freeze({
+  'release-macos-aarch64': ['.app.tar.gz', '.app.tar.gz.sig'],
+  'release-macos-x86_64': ['.app.tar.gz', '.app.tar.gz.sig'],
+  'release-windows-x86_64': ['.nsis.zip', '.nsis.zip.sig'],
+  'release-linux-x86_64': ['.AppImage.tar.gz', '.AppImage.tar.gz.sig'],
+})
+
 function isWithin(parent, child) {
   const prefix = `${resolve(parent)}${sep}`
   return resolve(child).startsWith(prefix)
@@ -64,6 +71,10 @@ export async function collectReleaseAssets({ inputDir, outputDir, artifactIds = 
     const names = files.map((file) => basename(file))
     for (const suffix of requiredBundles[artifactId]) {
       if (!names.some((name) => name.endsWith(suffix))) throw new Error(`${artifactId} is missing required ${suffix} output.`)
+    }
+    for (const suffix of uniqueUpdaterBundles[artifactId]) {
+      const matches = names.filter((name) => name.endsWith(suffix))
+      if (matches.length !== 1) throw new Error(`${artifactId} must contain exactly one ${suffix} output; found ${matches.length}.`)
     }
     for (const source of files) {
       const destination = join(output, `${artifactId.replace(/^release-/, '')}-${basename(source)}`)

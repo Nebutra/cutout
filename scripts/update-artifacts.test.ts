@@ -67,17 +67,16 @@ describe('signed update artifact policy', () => {
     expect(value.manifest.platforms['darwin-aarch64'].signature).toBe(before)
   })
 
-  it('generates hash, SBOM, provenance and rollback metadata and hard-fails without a release key', () => {
+  it('generates hash, SBOM, provenance and rollback metadata from verified sidecars', () => {
     const value = fixture(), base = { channel: 'stable', version: '1.2.0', publishedAt: '2026-07-15T00:00:00.000Z', artifactUrl: 'https://releases.example.test/Cutout.app.tar.gz', signature: value.signature, signatureFile: 'Cutout.app.tar.gz.sig', artifactDigest: sha256(value.artifact), rolloutPercentage: 100, previousVersion: '1.1.0', previousManifestUrl: 'https://releases.example.test/v1.1.0/latest.json', sourceRevision: 'abc123', allowedHosts: ['releases.example.test'] }
-    expect(() => buildReleaseDocuments({ ...base, signingKeyPresent: false })).toThrow('TAURI_SIGNING_PRIVATE_KEY')
-    const generated = buildReleaseDocuments({ ...base, signingKeyPresent: true })
+    const generated = buildReleaseDocuments(base)
     expect(generated).toMatchObject({ manifest: { version: '1.2.0' }, sbom: { spdxVersion: 'SPDX-2.3' }, provenance: { version: 'cutout.provenance.v1' }, rollback: { targetVersion: '1.1.0' }, rollout: { percentage: 100 } })
     expect(generated.metadata.artifact.sha256).toBe(sha256(value.artifact))
   })
 
   it('emits every built platform in the manifest and enumerates them in supply-chain metadata', () => {
     const { platforms } = multiFixture()
-    const generated = buildReleaseDocuments({ channel: 'stable', version: '1.2.0', publishedAt: '2026-07-15T00:00:00.000Z', platforms: platforms.map(({ key, artifactUrl, signature, artifactDigest, signatureFile }) => ({ key, artifactUrl, signature, artifactDigest, signatureFile })), rolloutPercentage: 100, allowedHosts: ['releases.example.test'], signingKeyPresent: true })
+    const generated = buildReleaseDocuments({ channel: 'stable', version: '1.2.0', publishedAt: '2026-07-15T00:00:00.000Z', platforms: platforms.map(({ key, artifactUrl, signature, artifactDigest, signatureFile }) => ({ key, artifactUrl, signature, artifactDigest, signatureFile })), rolloutPercentage: 100, allowedHosts: ['releases.example.test'] })
     expect(Object.keys(generated.manifest.platforms)).toEqual(['darwin-aarch64', 'darwin-x86_64', 'windows-x86_64', 'linux-x86_64'])
     expect(generated.metadata.platforms.map((p: { key: string }) => p.key)).toEqual(['darwin-aarch64', 'darwin-x86_64', 'windows-x86_64', 'linux-x86_64'])
     expect(generated.sbom.packages).toHaveLength(4)
@@ -88,7 +87,7 @@ describe('signed update artifact policy', () => {
   it('requires darwin-aarch64 as the mandatory primary platform', () => {
     const { platforms } = multiFixture()
     const withoutPrimary = platforms.filter((p) => p.key !== 'darwin-aarch64').map(({ key, artifactUrl, signature, artifactDigest, signatureFile }) => ({ key, artifactUrl, signature, artifactDigest, signatureFile }))
-    expect(() => buildReleaseDocuments({ channel: 'stable', version: '1.2.0', publishedAt: '2026-07-15T00:00:00.000Z', platforms: withoutPrimary, rolloutPercentage: 100, allowedHosts: ['releases.example.test'], signingKeyPresent: true })).toThrow('darwin-aarch64')
+    expect(() => buildReleaseDocuments({ channel: 'stable', version: '1.2.0', publishedAt: '2026-07-15T00:00:00.000Z', platforms: withoutPrimary, rolloutPercentage: 100, allowedHosts: ['releases.example.test'] })).toThrow('darwin-aarch64')
   })
 
   it('fails closed when a non-primary platform is insecure or unsigned', () => {
@@ -117,7 +116,7 @@ describe('signed update artifact policy', () => {
       await writeFile(`${artifactPath}.sig`, sign(null, artifact, privateKey).toString('base64'))
       platformArgs.push('--platform', `${spec.key}=${artifactPath}`)
     }
-    const result = spawnSync(process.execPath, ['scripts/update-artifacts.mjs', 'generate', ...platformArgs, '--artifact-base-url', 'https://releases.example.test', '--version', '1.2.0', '--channel', 'stable', '--rollout', '100', '--allowed-hosts', 'releases.example.test', '--output', join(root, 'out')], { cwd: process.cwd(), env: { ...process.env, TAURI_SIGNING_PRIVATE_KEY: 'TEST-ONLY-NOT-A-TAURI-KEY' }, encoding: 'utf8' })
+    const result = spawnSync(process.execPath, ['scripts/update-artifacts.mjs', 'generate', ...platformArgs, '--artifact-base-url', 'https://releases.example.test', '--version', '1.2.0', '--channel', 'stable', '--rollout', '100', '--allowed-hosts', 'releases.example.test', '--output', join(root, 'out')], { cwd: process.cwd(), encoding: 'utf8' })
     expect(result.status, result.stderr).toBe(0)
     const manifest = JSON.parse(await readFile(join(root, 'out', 'stable', 'latest.json'), 'utf8'))
     expect(Object.keys(manifest.platforms)).toEqual(['darwin-aarch64', 'darwin-x86_64', 'windows-x86_64', 'linux-x86_64'])
@@ -128,7 +127,7 @@ describe('signed update artifact policy', () => {
   it('writes a self-consistent release directory through the production CLI', async () => {
     const value = fixture(), root = await mkdtemp(join(tmpdir(), 'cutout-update-')), artifact = join(root, 'Cutout.app.tar.gz')
     await writeFile(artifact, value.artifact); await writeFile(`${artifact}.sig`, value.signature)
-    const result = spawnSync(process.execPath, ['scripts/update-artifacts.mjs', 'generate', '--artifact', artifact, '--version', '1.2.0', '--channel', 'beta', '--rollout', '25', '--artifact-url', 'https://releases.example.test/Cutout.app.tar.gz', '--allowed-hosts', 'releases.example.test', '--output', join(root, 'out')], { cwd: process.cwd(), env: { ...process.env, TAURI_SIGNING_PRIVATE_KEY: 'TEST-ONLY-NOT-A-TAURI-KEY' }, encoding: 'utf8' })
+    const result = spawnSync(process.execPath, ['scripts/update-artifacts.mjs', 'generate', '--artifact', artifact, '--version', '1.2.0', '--channel', 'beta', '--rollout', '25', '--artifact-url', 'https://releases.example.test/Cutout.app.tar.gz', '--allowed-hosts', 'releases.example.test', '--output', join(root, 'out')], { cwd: process.cwd(), encoding: 'utf8' })
     expect(result.status, result.stderr).toBe(0)
     const directory = join(root, 'out', 'beta'), metadata = JSON.parse(await readFile(join(directory, 'release-metadata.json'), 'utf8'))
     expect(metadata.sbom.sha256).toBe(sha256(await readFile(join(directory, 'sbom.spdx.json'))))

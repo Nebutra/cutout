@@ -3,7 +3,7 @@
   "name": "configure-macos-notarization-gh-release",
   "title": "Configure macOS notarization and GitHub release signing",
   "description": "Issue and install Developer ID credentials, configure Apple notarization and Tauri updater signing in the protected GitHub release environment, and verify Cutout's update release path.",
-  "status": "planning",
+  "status": "in_progress",
   "dev_type": null,
   "scope": null,
   "package": null,
@@ -18,7 +18,10 @@
   "commit": null,
   "pr_url": null,
   "subtasks": [],
-  "children": [],
+  "children": [
+    "07-22-verify-release-credentials",
+    "07-22-publish-v0-1-2"
+  ],
   "parent": null,
   "relatedFiles": [],
   "notes": "",

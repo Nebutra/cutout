@@ -1,6 +1,7 @@
 [package]
 name = "app"
-version = "0.1.1"
+version = "0.1.2"
+default-run = "app"
 description = "Local-first AI design production workspace"
 authors = ["Nebutra AI Native Team"]
 license = "Apache-2.0"
@@ -13,6 +14,10 @@ rust-version = "1.77.2"
 [lib]
 name = "app_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
+
+[[bin]]
+name = "verify-updater-signature"
+path = "src/bin/verify_updater_signature.rs"
 
 [build-dependencies]
 tauri-build = { version = "2.6.3", features = [] }
@@ -30,6 +35,7 @@ tauri-plugin-fs = "2"
 thiserror = "2"
 tokio = { version = "1", features = ["fs", "sync", "time"] }
 base64 = "0.22"
+minisign-verify = "0.2.5"
 sha2 = "0.10"
 libc = "0.2"
 keyring = "3"

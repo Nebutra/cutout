@@ -107,7 +107,6 @@ function normalizeReleasePlatforms(input) {
 export function buildReleaseDocuments(input) {
   if (!channels.has(input.channel)) throw new Error('Update channel must be stable or beta.')
   parseVersion(input.version)
-  if (!input.signingKeyPresent) throw new Error('TAURI_SIGNING_PRIVATE_KEY is required for release artifact generation.')
   const platforms = normalizeReleasePlatforms(input).map((entry) => {
     const url = new URL(entry.artifactUrl)
     if (url.protocol !== 'https:') throw new Error('Update artifact URL must use HTTPS.')
