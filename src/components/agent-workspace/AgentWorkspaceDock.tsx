@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode 
 import {
   AlertTriangle,
   Check,
+  ChevronLeft,
   ChevronRight,
   CircleStop,
   Clock3,
@@ -136,6 +137,7 @@ export interface AgentWorkspaceDockProps {
   readonly onAgentAction?: (eventId: string, action: 'proceed-anyway', brief: string) => void
   readonly onEditMessage?: (eventId: string, message: string) => void | Promise<void>
   readonly onRegenerateMessage?: (eventId: string) => void
+  readonly onSelectAgentResponse?: (sourceEventId: string, responseEventId: string) => void
 }
 
 const DEFAULT_LABELS: AgentDockLabels = {
@@ -177,6 +179,7 @@ export function AgentWorkspaceDock({
   onAgentAction,
   onEditMessage,
   onRegenerateMessage,
+  onSelectAgentResponse,
 }: AgentWorkspaceDockProps) {
   const labels = { ...DEFAULT_LABELS, ...labelOverrides }
   const presentation = deriveDockPresentation(viewModel, {
@@ -220,6 +223,7 @@ export function AgentWorkspaceDock({
             onAgentAction={onAgentAction}
             onEditMessage={onEditMessage}
             onRegenerateMessage={viewModel.summary.status === 'running' ? undefined : onRegenerateMessage}
+            onSelectAgentResponse={viewModel.summary.status === 'running' ? undefined : onSelectAgentResponse}
             onApproveTool={onApproveTool}
             onDenyTool={onDenyTool}
             onRetry={presentation.mode === 'repair' ? onRetry : undefined}
@@ -317,6 +321,7 @@ export function AgentRunFeed({
   onAgentAction,
   onEditMessage,
   onRegenerateMessage,
+  onSelectAgentResponse,
   onRetry,
   retryLabel,
 }: {
@@ -332,6 +337,7 @@ export function AgentRunFeed({
   readonly onAgentAction?: AgentWorkspaceDockProps['onAgentAction']
   readonly onEditMessage?: AgentWorkspaceDockProps['onEditMessage']
   readonly onRegenerateMessage?: AgentWorkspaceDockProps['onRegenerateMessage']
+  readonly onSelectAgentResponse?: AgentWorkspaceDockProps['onSelectAgentResponse']
   readonly onRetry?: () => void
   readonly retryLabel?: string
 }) {
@@ -389,7 +395,7 @@ export function AgentRunFeed({
             ? [...items].reverse().find((item) => item.type === 'error')?.id
             : undefined
           return items.map((item) => (
-            <FeedRow key={item.id} item={item} detailsLabel={detailsLabel} onApproveTool={onApproveTool} onDenyTool={onDenyTool} onCancelTool={onCancelTool} onRetryTool={onRetryTool} onAgentAction={onAgentAction} onEditMessage={onEditMessage} onRegenerateMessage={onRegenerateMessage} showMessageAction={item.id === latestActionId} onRetry={item.id === latestErrorId ? onRetry : undefined} retryLabel={retryLabel} />
+            <FeedRow key={item.id} item={item} detailsLabel={detailsLabel} onApproveTool={onApproveTool} onDenyTool={onDenyTool} onCancelTool={onCancelTool} onRetryTool={onRetryTool} onAgentAction={onAgentAction} onEditMessage={onEditMessage} onRegenerateMessage={onRegenerateMessage} onSelectAgentResponse={onSelectAgentResponse} showMessageAction={item.id === latestActionId} onRetry={item.id === latestErrorId ? onRetry : undefined} retryLabel={retryLabel} />
           ))
         })()}
         <div ref={endRef} />
@@ -398,7 +404,7 @@ export function AgentRunFeed({
   )
 }
 
-function FeedRow({ item, detailsLabel, onApproveTool, onDenyTool, onCancelTool, onRetryTool, onAgentAction, onEditMessage, onRegenerateMessage, showMessageAction = false, onRetry, retryLabel }: {
+function FeedRow({ item, detailsLabel, onApproveTool, onDenyTool, onCancelTool, onRetryTool, onAgentAction, onEditMessage, onRegenerateMessage, onSelectAgentResponse, showMessageAction = false, onRetry, retryLabel }: {
   readonly item: AgentFeedItem
   readonly detailsLabel: string
   readonly onApproveTool?: AgentWorkspaceDockProps['onApproveTool']
@@ -408,6 +414,7 @@ function FeedRow({ item, detailsLabel, onApproveTool, onDenyTool, onCancelTool, 
   readonly onAgentAction?: AgentWorkspaceDockProps['onAgentAction']
   readonly onEditMessage?: AgentWorkspaceDockProps['onEditMessage']
   readonly onRegenerateMessage?: AgentWorkspaceDockProps['onRegenerateMessage']
+  readonly onSelectAgentResponse?: AgentWorkspaceDockProps['onSelectAgentResponse']
   readonly showMessageAction?: boolean
   readonly onRetry?: () => void
   readonly retryLabel?: string
@@ -475,7 +482,13 @@ function FeedRow({ item, detailsLabel, onApproveTool, onDenyTool, onCancelTool, 
           >
             {activity ? (
               <div role="status" className="flex items-start gap-2.5">
-                <LoaderCircle className="mt-0.5 size-3.5 shrink-0 animate-spin text-muted-foreground" />
+                {activity.state === 'complete'
+                  ? <Check className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
+                  : activity.state === 'failed'
+                    ? <AlertTriangle className="mt-0.5 size-3.5 shrink-0 text-destructive" />
+                    : activity.state === 'cancelled'
+                      ? <CircleStop className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
+                      : <LoaderCircle className="mt-0.5 size-3.5 shrink-0 animate-spin text-muted-foreground" />}
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
                     <p className="font-medium">{activity.label}</p>
@@ -543,21 +556,26 @@ function FeedRow({ item, detailsLabel, onApproveTool, onDenyTool, onCancelTool, 
             )}
           </article>
           {!pending && !editing && !activity ? (
-            <MessageActions
-              align={isUser ? 'end' : 'start'}
-              message={item.detail}
-              allowEdit={isUser && Boolean(onEditMessage)}
-              allowRegenerate={!isUser && Boolean(item.regeneratable && onRegenerateMessage)}
-              onEdit={() => {
-                setEditValue(item.detail)
-                setEditError(null)
-                setEditing(true)
-                window.setTimeout(() => editRef.current?.focus(), 0)
-              }}
-              action={showMessageAction ? item.action : undefined}
-              onAction={onAgentAction ? () => onAgentAction(item.id, item.action!.type, item.action!.brief) : undefined}
-              onRegenerate={onRegenerateMessage ? () => onRegenerateMessage(item.id) : undefined}
-            />
+            <div className={cn('flex min-h-7 items-center gap-1', isUser ? 'justify-end' : 'justify-start')}>
+              {item.branch ? (
+                <ResponseBranchNavigator branch={item.branch} onSelectResponse={onSelectAgentResponse} />
+              ) : null}
+              <MessageActions
+                align={isUser ? 'end' : 'start'}
+                message={item.detail}
+                allowEdit={isUser && Boolean(onEditMessage)}
+                allowRegenerate={!isUser && Boolean(item.regeneratable && onRegenerateMessage)}
+                onEdit={() => {
+                  setEditValue(item.detail)
+                  setEditError(null)
+                  setEditing(true)
+                  window.setTimeout(() => editRef.current?.focus(), 0)
+                }}
+                action={showMessageAction ? item.action : undefined}
+                onAction={onAgentAction ? () => onAgentAction(item.id, item.action!.type, item.action!.brief) : undefined}
+                onRegenerate={onRegenerateMessage ? () => onRegenerateMessage(item.id) : undefined}
+              />
+            </div>
           ) : null}
         </div>
       </div>
@@ -693,6 +711,54 @@ function MessageActions({
             <TooltipContent>{action.label}</TooltipContent>
           </Tooltip>
         ) : null}
+      </div>
+    </TooltipProvider>
+  )
+}
+
+function ResponseBranchNavigator({
+  branch,
+  onSelectResponse,
+}: {
+  readonly branch: NonNullable<Extract<AgentFeedItem, { readonly type: 'message' }>['branch']>
+  readonly onSelectResponse?: AgentWorkspaceDockProps['onSelectAgentResponse']
+}) {
+  return (
+    <TooltipProvider delayDuration={300}>
+      <div className="flex h-7 w-[6.75rem] shrink-0 items-center justify-between text-muted-foreground" aria-label={`Response ${branch.selectedIndex + 1} of ${branch.count}`}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              aria-label="Previous response"
+              disabled={!branch.previousEventId || !onSelectResponse}
+              onClick={() => branch.previousEventId && onSelectResponse?.(branch.sourceEventId, branch.previousEventId)}
+            >
+              <ChevronLeft />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Previous response</TooltipContent>
+        </Tooltip>
+        <span className="w-10 text-center text-[11px] tabular-nums" aria-hidden="true">
+          {branch.selectedIndex + 1} / {branch.count}
+        </span>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              aria-label="Next response"
+              disabled={!branch.nextEventId || !onSelectResponse}
+              onClick={() => branch.nextEventId && onSelectResponse?.(branch.sourceEventId, branch.nextEventId)}
+            >
+              <ChevronRight />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Next response</TooltipContent>
+        </Tooltip>
       </div>
     </TooltipProvider>
   )

@@ -104,6 +104,10 @@ pub fn run() {
             commands::workspace_bridge::workspace_revision_preview_export,
             #[cfg(desktop)]
             commands::workspace_bridge::workspace_revision_apply_export,
+            #[cfg(desktop)]
+            commands::workspace_bridge::workspace_run_events_read,
+            #[cfg(desktop)]
+            commands::workspace_bridge::workspace_run_events_write,
         ])
         .setup(|app| {
             // Local file secret store replaces the OS keychain (no access prompts

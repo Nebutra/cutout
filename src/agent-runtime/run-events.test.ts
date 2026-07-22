@@ -6,6 +6,9 @@ import {
   createRunEventStore,
   recoverInterruptedRunEvents,
   replayRunEvents,
+  projectActiveConversation,
+  projectAgentResponseBranches,
+  resolveActiveConversationHead,
   type AgentRunEvent,
 } from './run-events'
 
@@ -18,6 +21,62 @@ describe('agent run events', () => {
     ])
     expect(store.activeRun?.intent).toBe('Make it blue')
     expect(store.events.at(-1)).toMatchObject({ type: 'message-revised', targetEventId: 'intent', message: 'Make it green' })
+  })
+  it('replays immutable response siblings and restores the selected conversation head', () => {
+    const events = [
+      createRunEvent('run-1', { type: 'run-started', mode: 'create' }, { eventId: 'start-1', at: 1 }),
+      createRunEvent('run-1', { type: 'intent-recorded', intent: 'Hello' }, { eventId: 'user', at: 2 }),
+      createRunEvent('run-1', { type: 'agent-message', message: 'First', responseToEventId: 'user' }, { eventId: 'first', at: 3 }),
+      createRunEvent('run-2', { type: 'run-started', mode: 'create' }, { eventId: 'start-2', at: 4 }),
+      createRunEvent('run-2', { type: 'agent-message', message: 'Second', responseToEventId: 'user' }, { eventId: 'second', at: 5 }),
+      createRunEvent('run-2', { type: 'branch-selected', sourceEventId: 'user', responseEventId: 'first' }, { eventId: 'select-first', at: 6 }),
+      createRunEvent('run-3', { type: 'run-started', mode: 'create' }, { eventId: 'start-3', at: 7 }),
+      createRunEvent('run-3', { type: 'intent-recorded', intent: 'Continue first', parentEventId: 'first' }, { eventId: 'follow-first', at: 8 }),
+      createRunEvent('run-3', { type: 'agent-message', message: 'First continuation', responseToEventId: 'follow-first' }, { eventId: 'first-next', at: 9 }),
+    ]
+
+    expect(projectAgentResponseBranches(events)[0]).toMatchObject({
+      selectedIndex: 0,
+      selectedResponse: { eventId: 'first' },
+      responses: [{ eventId: 'first' }, { eventId: 'second' }],
+    })
+    expect(projectActiveConversation(events).map((event) => event.eventId)).toEqual([
+      'user', 'first', 'follow-first', 'first-next',
+    ])
+    expect(resolveActiveConversationHead(events)?.eventId).toBe('first-next')
+  })
+
+  it('hides descendants of an unselected sibling without deleting their events', () => {
+    const events = [
+      started('run-1', 'start-1', 1),
+      createRunEvent('run-1', { type: 'intent-recorded', intent: 'Hello' }, { eventId: 'user', at: 2 }),
+      createRunEvent('run-1', { type: 'agent-message', message: 'First', responseToEventId: 'user' }, { eventId: 'first', at: 3 }),
+      started('run-2', 'start-2', 4),
+      createRunEvent('run-2', { type: 'agent-message', message: 'Second', responseToEventId: 'user' }, { eventId: 'second', at: 5 }),
+      createRunEvent('run-2', { type: 'intent-recorded', intent: 'Continue second', parentEventId: 'second' }, { eventId: 'follow-second', at: 6 }),
+      createRunEvent('run-2', { type: 'branch-selected', sourceEventId: 'user', responseEventId: 'first' }, { eventId: 'select-first', at: 7 }),
+    ]
+
+    expect(projectActiveConversation(events).map((event) => event.eventId)).toEqual(['user', 'first'])
+    expect(events.map((event) => event.eventId)).toContain('follow-second')
+  })
+
+  it('allows durable branch selection after the latest run was cancelled', () => {
+    let store = replayRunEvents([
+      started('run', 'start', 1),
+      createRunEvent('run', { type: 'intent-recorded', intent: 'Hello' }, { eventId: 'user', at: 2 }),
+      createRunEvent('run', { type: 'agent-message', message: 'First', responseToEventId: 'user' }, { eventId: 'first', at: 3 }),
+      createRunEvent('run', { type: 'agent-message', message: 'Second', responseToEventId: 'user' }, { eventId: 'second', at: 4 }),
+      createRunEvent('run', { type: 'run-cancelled', reason: 'Stopped' }, { eventId: 'cancel', at: 5 }),
+    ])
+
+    store = appendRunEvent(store, createRunEvent('run', {
+      type: 'branch-selected', sourceEventId: 'user', responseEventId: 'first',
+    }, { eventId: 'select-first', at: 6 }))
+
+    expect(store.events.at(-1)).toMatchObject({ type: 'branch-selected', responseEventId: 'first' })
+    expect(projectAgentResponseBranches(store.events)[0]?.selectedResponse.eventId).toBe('first')
+    expect(store.activeRun?.status).toBe('cancelled')
   })
   it('projects the latest evidence when a material is regenerated in one run', () => {
     const store = replayRunEvents([

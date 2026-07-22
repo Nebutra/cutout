@@ -5318,16 +5318,23 @@ var agentRunEventSchema = discriminatedUnion("type", [
 	}).strict(),
 	runEventBaseSchema.extend({
 		type: literal("intent-recorded"),
-		intent: eventText
+		intent: eventText,
+		parentEventId: eventText.optional()
 	}).strict(),
 	runEventBaseSchema.extend({
 		type: literal("steer-recorded"),
-		instruction: eventText
+		instruction: eventText,
+		parentEventId: eventText.optional()
 	}).strict(),
 	runEventBaseSchema.extend({
 		type: literal("message-revised"),
 		targetEventId: eventText,
 		message: eventText
+	}).strict(),
+	runEventBaseSchema.extend({
+		type: literal("branch-selected"),
+		sourceEventId: eventText,
+		responseEventId: eventText
 	}).strict(),
 	runEventBaseSchema.extend({
 		type: literal("plan-recorded"),
@@ -5432,6 +5439,7 @@ var agentRunEventSchema = discriminatedUnion("type", [
 	runEventBaseSchema.extend({
 		type: literal("agent-message"),
 		message: eventText,
+		responseToEventId: eventText.optional(),
 		action: object({
 			type: literal("proceed-anyway"),
 			label: eventText,
@@ -5467,6 +5475,53 @@ function createRunEventStore() {
 function replayRunEvents(events) {
 	return events.reduce(appendRunEvent, createRunEventStore());
 }
+/** Resolve explicit response links first, then infer the nearest preceding
+* user turn for legacy linear transcripts. */
+function resolveAgentResponseSource(events, response) {
+	const responseIndex = events.findIndex((event) => event.eventId === response.eventId);
+	if (responseIndex < 0) return null;
+	if (response.responseToEventId) {
+		const explicit = events.find((event, index) => index < responseIndex && event.eventId === response.responseToEventId && (event.type === "intent-recorded" || event.type === "steer-recorded"));
+		if (explicit) return explicit;
+	}
+	for (let index = responseIndex - 1; index >= 0; index -= 1) {
+		const event = events[index];
+		if (event?.type === "intent-recorded" || event?.type === "steer-recorded") return event;
+	}
+	return null;
+}
+/** Group immutable sibling responses and replay the latest valid explicit
+* selection. With no selection event, the latest response is the legacy
+* linear fallback. */
+function projectAgentResponseBranches(events) {
+	const users = events.filter((event) => event.type === "intent-recorded" || event.type === "steer-recorded");
+	const responsesBySource = /* @__PURE__ */ new Map();
+	for (const event of events) {
+		if (event.type !== "agent-message") continue;
+		const source = resolveAgentResponseSource(events, event);
+		if (!source) continue;
+		const siblings = responsesBySource.get(source.eventId) ?? [];
+		siblings.push(event);
+		responsesBySource.set(source.eventId, siblings);
+	}
+	const selectionBySource = /* @__PURE__ */ new Map();
+	for (const event of events) {
+		if (event.type !== "branch-selected") continue;
+		if (responsesBySource.get(event.sourceEventId)?.some((response) => response.eventId === event.responseEventId)) selectionBySource.set(event.sourceEventId, event.responseEventId);
+	}
+	return users.flatMap((source) => {
+		const responses = responsesBySource.get(source.eventId) ?? [];
+		if (responses.length === 0) return [];
+		const selectedId = selectionBySource.get(source.eventId);
+		const selectedIndex = Math.max(0, selectedId ? responses.findIndex((response) => response.eventId === selectedId) : responses.length - 1);
+		return [{
+			source,
+			responses,
+			selectedResponse: responses[selectedIndex],
+			selectedIndex
+		}];
+	});
+}
 /**
 * Pure append/replay reducer. It never invokes tools or reads external state.
 * Event payloads intentionally expose observable facts only, never hidden
@@ -5482,6 +5537,13 @@ function appendRunEvent(store, event) {
 			activeRunId: event.runId,
 			events: [...store.events, event],
 			activeRun
+		};
+	}
+	if (event.type === "branch-selected") {
+		if (!projectAgentResponseBranches(store.events).find((item) => item.source.eventId === event.sourceEventId && item.responses.some((response) => response.eventId === event.responseEventId))) return store;
+		return {
+			...store,
+			events: [...store.events, event]
 		};
 	}
 	if (event.runId !== store.activeRunId || !store.activeRun) return store;
@@ -5532,7 +5594,8 @@ function reduceActiveRun(run, event) {
 			intent: event.intent
 		};
 		case "steer-recorded":
-		case "message-revised": return run;
+		case "message-revised":
+		case "branch-selected": return run;
 		case "plan-recorded": return {
 			...run,
 			plan: {

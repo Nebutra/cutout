@@ -410,7 +410,7 @@ fn eligible_path(path: &str) -> bool {
             .next()
             .is_some_and(|name| name.starts_with("readme") || name == "design.md")
 }
-fn credential_content(bytes: &[u8]) -> bool {
+pub(crate) fn credential_content(bytes: &[u8]) -> bool {
     let s = String::from_utf8_lossy(bytes);
     contains_credential_token(&s, "sk-", 8)
         || contains_credential_token(&s, "ghp_", 20)
@@ -418,6 +418,11 @@ fn credential_content(bytes: &[u8]) -> bool {
 }
 fn contains_credential_token(value: &str, prefix: &str, minimum_suffix: usize) -> bool {
     value.match_indices(prefix).any(|(index, _)| {
+        if value[..index].chars().next_back().is_some_and(|character| {
+            character.is_ascii_alphanumeric() || matches!(character, '_' | '-')
+        }) {
+            return false;
+        }
         value[index + prefix.len()..]
             .chars()
             .take_while(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '_' | '-'))

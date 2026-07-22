@@ -253,6 +253,7 @@ import {
   type AgentRunLease,
 } from "@/agent-runtime/run-coordinator";
 import { useAgentRunEvents } from "@/agent-runtime/use-agent-run-events";
+import { resolveActiveConversationHead } from "@/agent-runtime/run-events";
 import { consumeComposerDraft } from "./composer-draft";
 import {
   createAgentRunRetryControl,
@@ -350,6 +351,7 @@ export function IntentWorkspace({
   const [runCancelled, setRunCancelled] = useState(false);
   const {
     store: agentRunEvents,
+    repositoryNotice: agentRunEventsRepositoryNotice,
     startRun: startAgentRun,
     record: emitRunEvent,
     recordMany: emitRunEvents,
@@ -360,6 +362,12 @@ export function IntentWorkspace({
       onDesignMarkdownImport: (asset) =>
         getStoreState().setDesignMarkdown(asset),
     });
+  useEffect(() => {
+    if (!agentRunEventsRepositoryNotice) return;
+    toast.warning("Agent history not saved to Git", {
+      description: agentRunEventsRepositoryNotice,
+    });
+  }, [agentRunEventsRepositoryNotice]);
   const [webSearchEnabled, setWebSearchEnabled] = useState(
     () => initialWorkspace?.webSearchEnabled ?? false,
   );
@@ -907,7 +915,10 @@ export function IntentWorkspace({
     preparing: agentBusy && workflowPhase === "idle",
     elapsedSeconds,
     runError: currentAgentRunError,
-    notices: executionNotices,
+    notices: [
+      ...executionNotices,
+      ...(agentRunEventsRepositoryNotice ? [agentRunEventsRepositoryNotice] : []),
+    ],
     runEvents: agentRunEvents,
     liveAgentMessage: liveAgentLabel
       ? {
@@ -1264,12 +1275,16 @@ export function IntentWorkspace({
       briefOverride?: string;
       ignoreSelectedMaterial?: boolean;
       regenerateTargetEventId?: string;
+      regenerateSourceEventId?: string;
       regenerateFallbackReply?: string;
     } = {},
   ): Promise<void> {
     const baseText = (options.briefOverride ?? brief).trim();
     if (!baseText) return;
     const text = withCanvasAnnotations(baseText, canvasAnnotations);
+    const conversationParentEventId = resolveActiveConversationHead(
+      agentRunEvents.events,
+    )?.eventId;
     const requestedMaterial = options.ignoreSelectedMaterial
       ? null
       : selectedMaterial;
@@ -1402,7 +1417,9 @@ export function IntentWorkspace({
     if (mode === "create" && !requestedMaterial && !options.skipToolGate) {
       const toolGate = await tryToolGate(text, chatAssignment, lease, {
         regenerateTargetEventId: options.regenerateTargetEventId,
+        regenerateSourceEventId: options.regenerateSourceEventId,
         regenerateFallbackReply: options.regenerateFallbackReply,
+        parentEventId: conversationParentEventId,
       });
       intentAlreadyRecorded = true;
       // A newer submission may have superseded this lease while tryToolGate
@@ -1436,7 +1453,11 @@ export function IntentWorkspace({
     const runId = `workspace:${lease.id}`;
     startAgentRun(mode, { runId });
     if (!intentAlreadyRecorded) {
-      emitRunEvent(runId, { type: "intent-recorded", intent: text });
+      emitRunEvent(runId, {
+        type: "intent-recorded",
+        intent: text,
+        parentEventId: conversationParentEventId,
+      });
     }
     setRunCancelled(false);
     try {
@@ -1593,7 +1614,9 @@ export function IntentWorkspace({
     lease: AgentRunLease,
     options: {
       readonly regenerateTargetEventId?: string;
+      readonly regenerateSourceEventId?: string;
       readonly regenerateFallbackReply?: string;
+      readonly parentEventId?: string;
     } = {},
   ): Promise<{
     handled: boolean;
@@ -1655,11 +1678,13 @@ export function IntentWorkspace({
       replyTool,
     ].filter((tool) => tool !== null);
     const capabilityContext = agentCapabilityContext(tools);
-    const reviseRegeneratedReply = async (
+    const appendRegeneratedReply = async (
       draftReply: string | undefined,
     ): Promise<boolean> => {
       const targetEventId = options.regenerateTargetEventId;
       if (!targetEventId) return false;
+      const sourceEventId = options.regenerateSourceEventId;
+      if (!sourceEventId) return true;
       const fallbackReply =
         draftReply?.trim() || options.regenerateFallbackReply?.trim();
       if (!fallbackReply) return true;
@@ -1671,10 +1696,20 @@ export function IntentWorkspace({
         capabilityContext,
       );
       if (agentRunCoordinatorRef.current.isActive(lease)) {
+        const responseEventId = crypto.randomUUID();
+        emitRunEvent(
+          toolRunId,
+          {
+            type: "agent-message",
+            message: streamedReply,
+            responseToEventId: sourceEventId,
+          },
+          { eventId: responseEventId },
+        );
         emitRunEvent(toolRunId, {
-          type: "message-revised",
-          targetEventId,
-          message: streamedReply,
+          type: "branch-selected",
+          sourceEventId,
+          responseEventId,
         });
       }
       return true;
@@ -1694,60 +1729,109 @@ export function IntentWorkspace({
     // resolve. The astryx/regeneration branches below call startAgentRun again with
     // the same runId, which is a no-op once the run is already active.
     startAgentRun("create", { runId: toolRunId });
+    const userTurnEventId = options.regenerateSourceEventId ?? crypto.randomUUID();
     // Project the user's turn into the conversation before the model replies
     // (greetings, questions, and build requests all share this chat surface).
     if (!options.regenerateTargetEventId) {
-      emitRunEvent(toolRunId, { type: "intent-recorded", intent: text });
+      emitRunEvent(
+        toolRunId,
+        { type: "intent-recorded", intent: text, parentEventId: options.parentEventId },
+        { eventId: userTurnEventId },
+      );
     }
-
-    const toolLoop = await runToolLoop(personalizedGenerationRef.current, {
-      runId: toolRunId,
-      providerId: chat.providerId,
-      model: chat.model,
-      prompt: [
-        "The user is talking to a design-tool Agent. Call at most one of the non-question tools " +
-          "below, and only if the request explicitly matches it. You may also call " +
-          "`ask_clarifying_question` first if needed — after it returns an answer, decide whether " +
-          "to then call one of the other tools with that answer in hand, or finish.",
-        astryxTool
-          ? "- `compile_astryx_theme`: the user is asking to map DESIGN.md colors to Astryx theme " +
-            "variables and/or generate/compile an Astryx theme."
-          : null,
-        regenerationTool
-          ? "- `configure_prototype_regeneration`: the user is asking to redo/regenerate the design " +
-            "system, or to control whether pages generate in parallel or one at a time, for the " +
-            "prototype suite that already exists."
-          : null,
-        pageTargetingTool
-          ? "- `select_pages_to_regenerate`: the user is naming one or more specific existing pages " +
-            "to redo, leaving the rest of the prototype suite untouched."
-          : null,
-        "- `reply_conversationally`: the message is not a build/design request at all — a greeting, " +
-          "small talk, a question, or too vague to plan a product from.",
-        "- `ask_clarifying_question`: the request IS a real build/design request, but a key decision " +
-          "(platform, primary user, a must-have feature) is genuinely ambiguous enough that guessing " +
-          "would likely produce the wrong direction. Do not ask for politeness or a detail you can " +
-          "reasonably decide yourself.",
-        "- `proceed_with_generation`: the message is a real design/build request that is clear enough " +
-          "to proceed. Prefer calling this (with a distilled, self-contained brief) over doing nothing " +
-          "— especially when the message is rambling or buried in asides and a cleaned-up brief would " +
-          "produce a better result. Preserve every concrete requirement; do not add scope.",
-        "If none of these fit, call nothing — it falls through to the design pipeline with the " +
-          "original message unchanged.",
-        "",
-        capabilityContext,
-        "",
-        `User: ${text}`,
-      ]
-        .filter((line) => line !== null)
-        .join("\n"),
-      tools,
-      // +2 when ask_clarifying_question is on offer: one step to ask, one
-      // more to decide-and-call (or finish) after the answer comes back —
-      // on top of the existing "more than one actionable tool" allowance.
-      maxSteps: (actionableToolCount > 1 ? 3 : 2) + 2,
-      signal: lease.controller.signal,
+    const preparationStepId = `step:prepare:${toolRunId}`;
+    emitRunEvent(toolRunId, {
+      type: "step-started",
+      stepId: preparationStepId,
+      label: "Preparing the run",
+      detail: "Checking your request…",
     });
+
+    let toolLoop: Awaited<ReturnType<typeof runToolLoop>>;
+    try {
+      toolLoop = await runToolLoop(personalizedGenerationRef.current, {
+        runId: toolRunId,
+        providerId: chat.providerId,
+        model: chat.model,
+        prompt: [
+          "The user is talking to a design-tool Agent. Call at most one of the non-question tools " +
+            "below, and only if the request explicitly matches it. You may also call " +
+            "`ask_clarifying_question` first if needed — after it returns an answer, decide whether " +
+            "to then call one of the other tools with that answer in hand, or finish.",
+          astryxTool
+            ? "- `compile_astryx_theme`: the user is asking to map DESIGN.md colors to Astryx theme " +
+              "variables and/or generate/compile an Astryx theme."
+            : null,
+          regenerationTool
+            ? "- `configure_prototype_regeneration`: the user is asking to redo/regenerate the design " +
+              "system, or to control whether pages generate in parallel or one at a time, for the " +
+              "prototype suite that already exists."
+            : null,
+          pageTargetingTool
+            ? "- `select_pages_to_regenerate`: the user is naming one or more specific existing pages " +
+              "to redo, leaving the rest of the prototype suite untouched."
+            : null,
+          "- `reply_conversationally`: the message is not a build/design request at all — a greeting, " +
+            "small talk, a question, or too vague to plan a product from.",
+          "- `ask_clarifying_question`: the request IS a real build/design request, but a key decision " +
+            "(platform, primary user, a must-have feature) is genuinely ambiguous enough that guessing " +
+            "would likely produce the wrong direction. Do not ask for politeness or a detail you can " +
+            "reasonably decide yourself.",
+          "- `proceed_with_generation`: the message is a real design/build request that is clear enough " +
+            "to proceed. Prefer calling this (with a distilled, self-contained brief) over doing nothing " +
+            "— especially when the message is rambling or buried in asides and a cleaned-up brief would " +
+            "produce a better result. Preserve every concrete requirement; do not add scope.",
+          "If none of these fit, call nothing — it falls through to the design pipeline with the " +
+            "original message unchanged.",
+          "",
+          capabilityContext,
+          "",
+          `User: ${text}`,
+        ]
+          .filter((line) => line !== null)
+          .join("\n"),
+        tools,
+        // +2 when ask_clarifying_question is on offer: one step to ask, one
+        // more to decide-and-call (or finish) after the answer comes back —
+        // on top of the existing "more than one actionable tool" allowance.
+        maxSteps: (actionableToolCount > 1 ? 3 : 2) + 2,
+        signal: lease.controller.signal,
+      });
+      emitRunEvent(
+        toolRunId,
+        toolLoop.ok
+          ? {
+              type: "step-succeeded",
+              stepId: preparationStepId,
+              label: "Preparing the run",
+              detail: "Request checked.",
+            }
+          : {
+              type: "step-failed",
+              stepId: preparationStepId,
+              label: "Preparing the run",
+              detail: toolLoop.error,
+            },
+      );
+    } catch (error) {
+      emitRunEvent(
+        toolRunId,
+        lease.controller.signal.aborted
+          ? {
+              type: "step-cancelled",
+              stepId: preparationStepId,
+              label: "Preparing the run",
+              detail: "Request checking was cancelled.",
+            }
+          : {
+              type: "step-failed",
+              stepId: preparationStepId,
+              label: "Preparing the run",
+              detail: errorMessage(error),
+            },
+      );
+      throw error;
+    }
     // A newer submission may have superseded this lease while the model call
     // above was in flight (createAssets begins the lease synchronously,
     // before this await, so a second submission aborts this one). Discard
@@ -1774,7 +1858,7 @@ export function IntentWorkspace({
       };
     }
     if (!toolLoop.data.called) {
-      if (await reviseRegeneratedReply(toolLoop.data.text)) {
+      if (await appendRegeneratedReply(toolLoop.data.text)) {
         return {
           handled: true,
           regenerationDecision: null,
@@ -1825,7 +1909,7 @@ export function IntentWorkspace({
       options.regenerateTargetEventId &&
       (!conversationalCall || conversationalCall.error)
     ) {
-      await reviseRegeneratedReply(toolLoop.data.text);
+      await appendRegeneratedReply(toolLoop.data.text);
       return {
         handled: true,
         regenerationDecision: null,
@@ -1864,19 +1948,23 @@ export function IntentWorkspace({
           refinedBrief: null,
         };
       }
+      const responseEventId = crypto.randomUUID();
       emitRunEvent(
         toolRunId,
-        options.regenerateTargetEventId
-          ? {
-              type: "message-revised",
-              targetEventId: options.regenerateTargetEventId,
-              message: streamedReply,
-            }
-          : {
-              type: "agent-message",
-              message: streamedReply,
-            },
+        {
+          type: "agent-message",
+          message: streamedReply,
+          responseToEventId: userTurnEventId,
+        },
+        { eventId: responseEventId },
       );
+      if (options.regenerateTargetEventId && options.regenerateSourceEventId) {
+        emitRunEvent(toolRunId, {
+          type: "branch-selected",
+          sourceEventId: options.regenerateSourceEventId,
+          responseEventId,
+        });
+      }
       return {
         handled: true,
         regenerationDecision: null,
@@ -3617,6 +3705,9 @@ export function IntentWorkspace({
                     emitRunEvent(runId, {
                       type: "steer-recorded",
                       instruction: consumed.submitted,
+                      parentEventId: resolveActiveConversationHead(
+                        agentRunEvents.events,
+                      )?.eventId,
                     });
                     return;
                   }
@@ -3744,7 +3835,17 @@ export function IntentWorkspace({
                   briefOverride: target.sourceMessage,
                   ignoreSelectedMaterial: true,
                   regenerateTargetEventId: target.targetEventId,
+                  regenerateSourceEventId: target.sourceEventId,
                   regenerateFallbackReply: target.targetMessage,
+                });
+              }}
+              onSelectAgentResponse={(sourceEventId, responseEventId) => {
+                const runId = agentRunEvents.activeRunId;
+                if (!runId) return;
+                emitRunEvent(runId, {
+                  type: "branch-selected",
+                  sourceEventId,
+                  responseEventId,
                 });
               }}
               onOpenArtifact={(kind) => {

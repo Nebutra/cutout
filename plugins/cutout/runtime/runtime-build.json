@@ -27,7 +27,7 @@
     "scripts/cutout-mcp-server.mjs": "c2e2314ba44f93d8f2781149691f8a627d9c069b932978f40068a0b154b5db09",
     "scripts/cutout-registry-adapter.mjs": "80458166d21ca2bce2d7604064c028e37cce1a3fc69c2c8f5654951e3aa8b4b1",
     "scripts/cutout-workflows.mjs": "29579d3f7f5ffa3ef5aac58b0eda3c6f231c176bf387fc9d9b3cdef7b4ee419e",
-    "src/agent-runtime/run-events.ts": "9d33ccf6a21c84801b98791942df819279f283768d92b3b25c6d9381fc6ca1af",
+    "src/agent-runtime/run-events.ts": "f53e7d445e9e8fe0ecffa67f82a758c0045683c22ec7e8126506e390bbad2a4f",
     "src/agent-runtime/tool-durability.node.ts": "a8886acac85ca686982b38c71508657bf54cd58acce5edc7e01e94b010d6c40b",
     "src/agent-runtime/tool-durability.ts": "3bb8eb399015fa45f7b598b1f238836446b6e49479f89725794e94dafa49e5fc",
     "src/brand-kit/compiler.ts": "504602c00381b8095917b1ecf5dbf48a4fecdadba161d3a861e88fa7a85ad62c",
