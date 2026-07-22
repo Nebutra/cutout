@@ -4,7 +4,7 @@
   "product": {
     "name": "Cutout",
     "positioning": "Agent-native Design OS with a visual workbench and repo-native control plane",
-    "packageVersion": "0.1.2"
+    "packageVersion": "0.1.3"
   },
   "protocol": {
     "control": "cutout.control.v1",

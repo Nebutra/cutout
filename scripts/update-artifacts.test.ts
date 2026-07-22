@@ -17,7 +17,7 @@ function fixture(version = '1.2.0') {
   return { artifact, signature, manifest: { version, notes: 'Fixture', pub_date: '2026-07-15T00:00:00.000Z', platforms: { 'darwin-aarch64': { url: `https://releases.example.test/Cutout-${version}.app.tar.gz`, signature } } } }
 }
 
-const updaterSuffix: Record<string, string> = { 'darwin-aarch64': '.app.tar.gz', 'darwin-x86_64': '.app.tar.gz', 'windows-x86_64': '.nsis.zip', 'linux-x86_64': '.AppImage.tar.gz' }
+const updaterSuffix: Record<string, string> = { 'darwin-aarch64': '.app.tar.gz', 'darwin-x86_64': '.app.tar.gz', 'windows-x86_64': '.exe', 'linux-x86_64': '.AppImage' }
 
 function multiFixture(version = '1.2.0') {
   const { privateKey } = generateKeyPairSync('ed25519')
@@ -93,10 +93,10 @@ describe('signed update artifact policy', () => {
   it('fails closed when a non-primary platform is insecure or unsigned', () => {
     const value = fixture()
     const insecure = structuredClone(value.manifest) as typeof value.manifest & { platforms: Record<string, { url: string; signature: string }> }
-    insecure.platforms['windows-x86_64'] = { url: 'http://releases.example.test/windows.nsis.zip', signature: value.signature }
+    insecure.platforms['windows-x86_64'] = { url: 'http://releases.example.test/windows.exe', signature: value.signature }
     expect(() => validateUpdateManifest(insecure, { allowedHosts: ['releases.example.test'] })).toThrow('HTTPS')
     const unsigned = structuredClone(value.manifest) as typeof insecure
-    unsigned.platforms['linux-x86_64'] = { url: 'https://releases.example.test/linux.AppImage.tar.gz', signature: '   ' }
+    unsigned.platforms['linux-x86_64'] = { url: 'https://releases.example.test/linux.AppImage', signature: '   ' }
     expect(() => validateUpdateManifest(unsigned, { allowedHosts: ['releases.example.test'] })).toThrow('signature is missing')
   })
 
@@ -106,8 +106,8 @@ describe('signed update artifact policy', () => {
     const specs = [
       { key: 'darwin-aarch64', file: 'macos-aarch64-Cutout.app.tar.gz' },
       { key: 'darwin-x86_64', file: 'macos-x86_64-Cutout.app.tar.gz' },
-      { key: 'windows-x86_64', file: 'windows-x86_64-Cutout-setup.nsis.zip' },
-      { key: 'linux-x86_64', file: 'linux-x86_64-Cutout.AppImage.tar.gz' },
+      { key: 'windows-x86_64', file: 'windows-x86_64-Cutout-setup.exe' },
+      { key: 'linux-x86_64', file: 'linux-x86_64-Cutout.AppImage' },
     ]
     const platformArgs: string[] = []
     for (const spec of specs) {
@@ -120,7 +120,7 @@ describe('signed update artifact policy', () => {
     expect(result.status, result.stderr).toBe(0)
     const manifest = JSON.parse(await readFile(join(root, 'out', 'stable', 'latest.json'), 'utf8'))
     expect(Object.keys(manifest.platforms)).toEqual(['darwin-aarch64', 'darwin-x86_64', 'windows-x86_64', 'linux-x86_64'])
-    expect(manifest.platforms['windows-x86_64'].url).toBe('https://releases.example.test/windows-x86_64-Cutout-setup.nsis.zip')
+    expect(manifest.platforms['windows-x86_64'].url).toBe('https://releases.example.test/windows-x86_64-Cutout-setup.exe')
     expect(() => validateUpdateManifest(manifest, { allowedHosts: ['releases.example.test'] })).not.toThrow()
   })
 

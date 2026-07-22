@@ -1,6 +1,6 @@
 import process from 'node:process'
 
-const SERVER_INFO = { name: 'cutout-headless', version: '0.1.2' }
+const SERVER_INFO = { name: 'cutout-headless', version: '0.1.3' }
 let PROJECT_ROOT
 let closeHeadlessRuntime
 let executeControl

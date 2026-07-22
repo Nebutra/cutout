@@ -61,8 +61,8 @@ describe('cross-platform release workflow', () => {
     for (const key of ['darwin-aarch64', 'darwin-x86_64', 'windows-x86_64', 'linux-x86_64']) {
       expect(generateStep.run).toContain(key)
     }
-    expect(generateStep.run).toContain('windows-x86_64-*.nsis.zip')
-    expect(generateStep.run).toContain('linux-x86_64-*.AppImage.tar.gz')
+    expect(generateStep.run).toContain('windows-x86_64-*.exe')
+    expect(generateStep.run).toContain('linux-x86_64-*.AppImage')
     expect(generateStep.run).toContain('--platform')
     expect(generateStep.run).toContain('--artifact-base-url')
     expect(generateStep.run).toContain('mapfile -t artifacts')
@@ -87,12 +87,13 @@ describe('cross-platform release workflow', () => {
     ])
   })
 
-  it('scopes Apple credentials to the macOS preparation and build steps', async () => {
+  it('scopes Apple credentials to the macOS preparation, build, and DMG notarization steps', async () => {
     const source = await readFile('.github/workflows/release-update.yml', 'utf8')
     const workflow = YAML.parse(source)
     const buildSteps = workflow.jobs.build.steps
     const preparation = buildSteps.find((step: { name?: string }) => step.name === 'Prepare Apple signing and notarization credentials')
     const macBuild = buildSteps.find((step: { name?: string }) => step.name === 'Build signed and notarized macOS bundles')
+    const dmgNotarization = buildSteps.find((step: { name?: string }) => step.name === 'Notarize and staple macOS DMG')
     const nonMacBuild = buildSteps.find((step: { name?: string }) => step.name === 'Build non-macOS bundles')
     const appleNames = [
       'APPLE_CERTIFICATE',
@@ -108,10 +109,12 @@ describe('cross-platform release workflow', () => {
 
     expect(preparation.if).toBe("runner.os == 'macOS'")
     expect(macBuild.if).toBe("runner.os == 'macOS'")
+    expect(dmgNotarization.if).toBe("runner.os == 'macOS'")
     expect(nonMacBuild.if).toBe("runner.os != 'macOS'")
     expect(appleSecretConsumers).toEqual([
       'Prepare Apple signing and notarization credentials',
       'Build signed and notarized macOS bundles',
+      'Notarize and staple macOS DMG',
     ])
     expect(JSON.stringify(workflow.jobs.validate)).not.toContain('secrets.APPLE_')
     expect(JSON.stringify(workflow.jobs.publish)).not.toContain('secrets.APPLE_')
@@ -134,6 +137,10 @@ describe('cross-platform release workflow', () => {
       'GITHUB_TOKEN',
       'TAURI_SIGNING_PRIVATE_KEY',
       'TAURI_SIGNING_PRIVATE_KEY_PASSWORD',
+    ])
+    expect(Object.keys(dmgNotarization.env)).toEqual([
+      'APPLE_API_KEY',
+      'APPLE_API_ISSUER',
     ])
     expect(JSON.stringify(nonMacBuild)).not.toContain('APPLE_')
   })
@@ -169,19 +176,28 @@ describe('cross-platform release workflow', () => {
     const workflow = YAML.parse(source)
     const buildSteps = workflow.jobs.build.steps
     const macBuildIndex = buildSteps.findIndex((step: { name?: string }) => step.name === 'Build signed and notarized macOS bundles')
+    const dmgNotarizationIndex = buildSteps.findIndex((step: { name?: string }) => step.name === 'Notarize and staple macOS DMG')
     const verificationIndex = buildSteps.findIndex((step: { name?: string }) => step.name === 'Verify signed and notarized macOS bundles')
     const cleanupIndex = buildSteps.findIndex((step: { name?: string }) => step.name === 'Remove temporary Apple notarization key')
     const uploadIndex = buildSteps.findIndex((step: { uses?: string }) => step.uses?.startsWith('actions/upload-artifact@'))
     const macBuild = buildSteps[macBuildIndex]
+    const dmgNotarization = buildSteps[dmgNotarizationIndex]
     const verification = buildSteps[verificationIndex]
 
     expect(verification.if).toBe("runner.os == 'macOS'")
+    expect(dmgNotarizationIndex).toBeGreaterThan(macBuildIndex)
+    expect(verificationIndex).toBeGreaterThan(dmgNotarizationIndex)
     expect(verificationIndex).toBeGreaterThan(macBuildIndex)
     expect(cleanupIndex).toBeGreaterThan(verificationIndex)
     expect(uploadIndex).toBeGreaterThan(verificationIndex)
     expect(uploadIndex).toBeGreaterThan(cleanupIndex)
     expect(macBuild.with.args).not.toContain('--skip-stapling')
     expect(macBuild.with.args).not.toContain('--no-sign')
+    expect(dmgNotarization.run).toContain('Expected exactly one macOS DMG')
+    expect(dmgNotarization.run).toContain('xcrun notarytool submit')
+    expect(dmgNotarization.run).toContain('--key "$APPLE_API_KEY_PATH"')
+    expect(dmgNotarization.run).toContain('--wait')
+    expect(dmgNotarization.run).toContain('xcrun stapler staple')
     expect(verification.run).toContain('$bundle_root/macos/')
     expect(verification.run).toContain('$bundle_root/dmg/')
     expect(verification.run.match(/codesign --verify/g)).toHaveLength(2)
@@ -190,7 +206,7 @@ describe('cross-platform release workflow', () => {
     expect(verification.run.match(/xcrun stapler validate/g)).toHaveLength(2)
   })
 
-  it('cryptographically verifies one updater archive per matrix entry before upload', async () => {
+  it('cryptographically verifies one updater artifact per matrix entry before upload', async () => {
     const source = await readFile('.github/workflows/release-update.yml', 'utf8')
     const workflow = YAML.parse(source)
     const buildSteps = workflow.jobs.build.steps
@@ -201,8 +217,8 @@ describe('cross-platform release workflow', () => {
     expect(verificationIndex).toBeGreaterThan(-1)
     expect(uploadIndex).toBeGreaterThan(verificationIndex)
     expect(verification.run).toContain('*.app.tar.gz')
-    expect(verification.run).toContain('*.nsis.zip')
-    expect(verification.run).toContain('*.AppImage.tar.gz')
+    expect(verification.run).toContain('*.exe')
+    expect(verification.run).toContain('*.AppImage')
     expect(verification.run).toContain('Expected exactly one updater artifact')
     expect(verification.run).toContain('--bin verify-updater-signature')
     expect(verification.run).toContain('"$updater_artifact.sig"')

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.3 - 2026-07-22
+
+- Superseded the unpublished `v0.1.2` release after its macOS DMGs correctly failed the notarization gate.
+- Explicitly submit each signed macOS DMG for Apple notarization, wait for acceptance, staple its ticket, and verify Gatekeeper acceptance before upload.
+- Align Windows and Linux updater verification and manifests with Tauri v2's signed native NSIS `.exe` and `.AppImage` artifacts.
+
 ## 0.1.2 - 2026-07-22
 
 - Restored Retry for interrupted Agent runs after reopening a project, preserving the original brief and existing approval boundaries.

@@ -11,22 +11,22 @@ export const releaseArtifactIds = Object.freeze([
 
 const allowedSuffixes = Object.freeze([
   '.app.tar.gz', '.app.tar.gz.sig', '.dmg',
-  '.msi', '.msi.zip', '.msi.zip.sig', '.exe', '.nsis.zip', '.nsis.zip.sig',
-  '.AppImage', '.AppImage.tar.gz', '.AppImage.tar.gz.sig', '.deb',
+  '.msi', '.exe', '.exe.sig',
+  '.AppImage', '.AppImage.sig', '.deb',
 ])
 
 const requiredBundles = Object.freeze({
   'release-macos-aarch64': ['.dmg', '.app.tar.gz', '.app.tar.gz.sig'],
   'release-macos-x86_64': ['.dmg', '.app.tar.gz', '.app.tar.gz.sig'],
-  'release-windows-x86_64': ['.msi', '.exe', '.nsis.zip', '.nsis.zip.sig'],
-  'release-linux-x86_64': ['.AppImage', '.deb', '.AppImage.tar.gz', '.AppImage.tar.gz.sig'],
+  'release-windows-x86_64': ['.msi', '.exe', '.exe.sig'],
+  'release-linux-x86_64': ['.AppImage', '.AppImage.sig', '.deb'],
 })
 
 const uniqueUpdaterBundles = Object.freeze({
   'release-macos-aarch64': ['.app.tar.gz', '.app.tar.gz.sig'],
   'release-macos-x86_64': ['.app.tar.gz', '.app.tar.gz.sig'],
-  'release-windows-x86_64': ['.nsis.zip', '.nsis.zip.sig'],
-  'release-linux-x86_64': ['.AppImage.tar.gz', '.AppImage.tar.gz.sig'],
+  'release-windows-x86_64': ['.exe', '.exe.sig'],
+  'release-linux-x86_64': ['.AppImage', '.AppImage.sig'],
 })
 
 function isWithin(parent, child) {

@@ -40,7 +40,7 @@
 - Keep `bundle.createUpdaterArtifacts` enabled and require the macOS `.app.tar.gz` plus sibling `.sig`; the static manifest embeds signature content, never a path or URL.
 - Generate a dedicated password-protected Tauri updater signing key pair. Store `TAURI_SIGNING_PRIVATE_KEY` and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` only as protected `release` environment secrets, and store the complete public key as the `CUTOUT_UPDATER_PUBKEY` environment variable. Missing signing material must hard fail.
 - Scope the updater private key and password only to the exact commit-pinned Tauri build actions that sign bundles. Do not expose them to checkout, package installation, tests, caches, artifact upload, metadata generation, or Release publication.
-- Before uploading each platform workflow artifact, require exactly one updater archive and sibling `.sig`, then cryptographically verify the sidecar against `CUTOUT_UPDATER_PUBKEY` with the repository-owned Rust verifier. Metadata generation must consume verified sidecars without receiving the private key.
+- Before uploading each platform workflow artifact, require exactly one updater artifact and sibling `.sig`, then cryptographically verify the sidecar against `CUTOUT_UPDATER_PUBKEY` with the repository-owned Rust verifier. Metadata generation must consume verified sidecars without receiving the private key.
 - Generate and validate separate stable/beta manifests with SHA-256, SPDX SBOM, provenance, rollback metadata and previous-version compatibility. Deterministic rollout metadata must not modify the signed artifact or its signature.
 - Run `pnpm test:update-artifacts` for update, 204/no-update, bad signature, bad URL, unauthorized rollback and staged cohort cases.
 
@@ -50,9 +50,9 @@
 - Use explicit bundle targets per platform (`app,dmg`, `nsis,msi`, and `appimage,deb`); do not reuse the macOS defaults on Windows or Linux.
 - Matrix jobs have read-only repository access and upload uniquely named workflow artifacts. Only the final job receives `contents: write`.
 - Collect platform outputs under collision-free names, require expected installer/updater files, reject symlinks, and publish `SHA256SUMS` with the release.
-- Reject multiple updater archives or signature sidecars for one platform; never select the first filesystem match.
+- Reject multiple updater artifacts or signature sidecars for one platform; never select the first filesystem match.
 - Create the GitHub Release as a draft, upload and validate the complete asset set, then make it public. Never publish a partial matrix as a successful release.
-- The generated updater manifest must include and verify the signed updater archive for Apple Silicon macOS, Intel macOS, Windows x64, and Linux x64 before publication. Native installer availability alone is not update evidence.
+- The generated updater manifest must include and verify the signed updater artifact for Apple Silicon macOS, Intel macOS, Windows x64, and Linux x64 before publication. Native installer availability alone is not update evidence.
 - The packaged desktop app checks after an 8-second startup delay and at most once per 24 hours by default. Home shows the Update action only after a newer signed release is discovered; the action opens Updates & Support for download and verified install/restart.
 - The Tauri updater signature is not Apple notarization or Windows Authenticode. Keep those distribution claims blocked until their independent credentials and verification evidence exist.
 

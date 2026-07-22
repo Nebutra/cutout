@@ -13506,7 +13506,7 @@ function sanitizeMessage(message) {
 //#region scripts/cutout-mcp-server.mjs
 var SERVER_INFO = {
 	name: "cutout-headless",
-	version: "0.1.2"
+	version: "0.1.3"
 };
 var PROJECT_ROOT;
 var closeHeadlessRuntime;

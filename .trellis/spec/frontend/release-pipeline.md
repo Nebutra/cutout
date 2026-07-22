@@ -33,14 +33,14 @@ installer version differs from their release version.
 - The generated `latest.json` advertises every built platform. Its `platforms`
   map carries `darwin-aarch64`, `darwin-x86_64`, `windows-x86_64`, and
   `linux-x86_64`, each with its own HTTPS updater URL and signature. The Windows
-  auto-update target is the NSIS bundle (`.nsis.zip`); the MSI ships only as a
-  downloadable installer. The Linux target is the AppImage updater archive
-  (`.AppImage.tar.gz`). `darwin-aarch64` is the mandatory primary anchor —
+  auto-update target is the signed NSIS installer (`.exe`); the MSI ships only
+  as a downloadable installer. The Linux target is the signed `.AppImage`.
+  `darwin-aarch64` is the mandatory primary anchor —
   validation still fails closed if it is absent, and every other present
   platform is validated with the same HTTPS/allowlist/signature checks.
 - The collector treats each platform's updater artifact and `.sig` as required
-  (`.app.tar.gz(.sig)` on macOS, `.nsis.zip(.sig)` on Windows,
-  `.AppImage.tar.gz(.sig)` on Linux). A missing updater bundle for any platform
+  (`.app.tar.gz(.sig)` on macOS, `.exe(.sig)` on Windows, and
+  `.AppImage(.sig)` on Linux). A missing updater bundle for any platform
   fails the release rather than publishing a partial manifest.
 - Matrix jobs receive `contents: read`; only the final publish job receives
   `contents: write`.
@@ -65,11 +65,13 @@ installer version differs from their release version.
   temporary key is removed after packaging, including failed builds.
 - macOS artifacts are uploadable only after the generated `.app` and `.dmg`
   both pass Developer ID signature verification, Gatekeeper assessment, and
-  stapled-ticket validation. Tauri's macOS build must wait for notarization and
-  stapling before these checks run.
+  stapled-ticket validation. Tauri's macOS build waits for app notarization and
+  stapling; because the DMG is created afterward, release CI must separately
+  submit the signed DMG with `notarytool --wait` and staple it before these
+  checks run.
 - Private keys remain CI secrets. Public endpoint/key configuration remains CI
   variables and is compiled into release builds.
-- Each matrix job requires exactly one platform updater archive and sibling
+- Each matrix job requires exactly one platform updater artifact and sibling
   sidecar, then uses the repository-owned `verify-updater-signature` binary to
   verify that archive against `CUTOUT_UPDATER_PUBKEY` before workflow-artifact
   upload. The publish job consumes only these verified sidecars; metadata
@@ -108,11 +110,11 @@ installer version differs from their release version.
 | Any matrix job fails | Do not start `publish` |
 | Required platform/bundle is absent | Collector fails before Release creation |
 | Symlink or duplicate output is found | Collector fails closed |
-| Any platform's updater archive/signature is absent | Collector and metadata generation fail closed |
+| Any platform's updater artifact/signature is absent | Collector and metadata generation fail closed |
 | Public key is empty or malformed | Stop before invoking the Tauri bundler |
 | Updater key or password is absent | Tauri signing fails and no platform artifact is uploaded |
 | Updater sidecar does not verify against the release public key | Do not upload the platform workflow artifact |
-| More than one updater archive or sidecar exists for a platform | Fail before metadata generation |
+| More than one updater artifact or sidecar exists for a platform | Fail before metadata generation |
 | Any Apple signing/notarization secret is absent on macOS | Stop before invoking the macOS Tauri build |
 | App or DMG signature, Gatekeeper, or stapler validation fails | Do not upload that macOS workflow artifact |
 | Release tag already has a Release | Refuse immutable asset replacement |

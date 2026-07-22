@@ -11,8 +11,8 @@ const channels = new Set(['stable', 'beta'])
 export const updaterPlatforms = Object.freeze({
   'darwin-aarch64': { asset: 'macos-aarch64', updaterSuffix: '.app.tar.gz' },
   'darwin-x86_64': { asset: 'macos-x86_64', updaterSuffix: '.app.tar.gz' },
-  'windows-x86_64': { asset: 'windows-x86_64', updaterSuffix: '.nsis.zip' },
-  'linux-x86_64': { asset: 'linux-x86_64', updaterSuffix: '.AppImage.tar.gz' },
+  'windows-x86_64': { asset: 'windows-x86_64', updaterSuffix: '.exe' },
+  'linux-x86_64': { asset: 'linux-x86_64', updaterSuffix: '.AppImage' },
 })
 const primaryPlatform = 'darwin-aarch64'
 const platformOrder = Object.freeze(Object.keys(updaterPlatforms))

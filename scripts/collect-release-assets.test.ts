@@ -11,8 +11,8 @@ async function fixture() {
   const files: Record<string, string[]> = {
     'release-macos-aarch64': ['Cutout.app.tar.gz', 'Cutout.app.tar.gz.sig', 'Cutout.dmg'],
     'release-macos-x86_64': ['Cutout.app.tar.gz', 'Cutout.app.tar.gz.sig', 'Cutout.dmg'],
-    'release-windows-x86_64': ['Cutout.msi', 'Cutout-setup.exe', 'Cutout-setup.nsis.zip', 'Cutout-setup.nsis.zip.sig'],
-    'release-linux-x86_64': ['Cutout.AppImage', 'Cutout.deb', 'Cutout.AppImage.tar.gz', 'Cutout.AppImage.tar.gz.sig'],
+    'release-windows-x86_64': ['Cutout.msi', 'Cutout-setup.exe', 'Cutout-setup.exe.sig'],
+    'release-linux-x86_64': ['Cutout.AppImage', 'Cutout.AppImage.sig', 'Cutout.deb'],
   }
   for (const artifactId of releaseArtifactIds) {
     const directory = join(input, artifactId, 'nested')
@@ -50,23 +50,23 @@ describe('release asset collection', () => {
 
   it('hard-fails when a platform updater artifact or signature is missing', async () => {
     const windows = await fixture()
-    await rm(join(windows.input, 'release-windows-x86_64', 'nested', 'Cutout-setup.nsis.zip.sig'))
-    await expect(collectReleaseAssets({ inputDir: windows.input, outputDir: windows.output })).rejects.toThrow('missing required .nsis.zip.sig')
+    await rm(join(windows.input, 'release-windows-x86_64', 'nested', 'Cutout-setup.exe.sig'))
+    await expect(collectReleaseAssets({ inputDir: windows.input, outputDir: windows.output })).rejects.toThrow('missing required .exe.sig')
     const linux = await fixture()
-    await rm(join(linux.input, 'release-linux-x86_64', 'nested', 'Cutout.AppImage.tar.gz'))
-    await expect(collectReleaseAssets({ inputDir: linux.input, outputDir: linux.output })).rejects.toThrow('missing required .AppImage.tar.gz')
+    await rm(join(linux.input, 'release-linux-x86_64', 'nested', 'Cutout.AppImage'))
+    await expect(collectReleaseAssets({ inputDir: linux.input, outputDir: linux.output })).rejects.toThrow('missing required .AppImage')
   })
 
-  it('rejects ambiguous updater archives or signatures for one platform', async () => {
-    const archives = await fixture()
-    const windowsDir = join(archives.input, 'release-windows-x86_64', 'nested')
-    await writeFile(join(windowsDir, 'Cutout-alternate.nsis.zip'), 'duplicate archive')
-    await expect(collectReleaseAssets({ inputDir: archives.input, outputDir: archives.output })).rejects.toThrow('exactly one .nsis.zip output; found 2')
+  it('rejects ambiguous updater artifacts or signatures for one platform', async () => {
+    const artifacts = await fixture()
+    const windowsDir = join(artifacts.input, 'release-windows-x86_64', 'nested')
+    await writeFile(join(windowsDir, 'Cutout-alternate.exe'), 'duplicate updater')
+    await expect(collectReleaseAssets({ inputDir: artifacts.input, outputDir: artifacts.output })).rejects.toThrow('exactly one .exe output; found 2')
 
     const signatures = await fixture()
     const linuxDir = join(signatures.input, 'release-linux-x86_64', 'nested')
-    await writeFile(join(linuxDir, 'Cutout-alternate.AppImage.tar.gz.sig'), 'duplicate signature')
-    await expect(collectReleaseAssets({ inputDir: signatures.input, outputDir: signatures.output })).rejects.toThrow('exactly one .AppImage.tar.gz.sig output; found 2')
+    await writeFile(join(linuxDir, 'Cutout-alternate.AppImage.sig'), 'duplicate signature')
+    await expect(collectReleaseAssets({ inputDir: signatures.input, outputDir: signatures.output })).rejects.toThrow('exactly one .AppImage.sig output; found 2')
   })
 
   it('rejects symbolic links and nested input/output boundaries', async () => {
