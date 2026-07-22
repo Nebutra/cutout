@@ -66,6 +66,12 @@ export interface WorkspaceAuthorizationResult {
   label: string | null
 }
 
+export interface NativeRunEventStoreSnapshot {
+  store: unknown
+  sha256: string | null
+  exists: boolean
+}
+
 export interface GitCapability {
   available: boolean
   repository: boolean
@@ -156,6 +162,12 @@ export interface NativeBridge {
   scanRepository?(): Promise<NativeRepositoryScanResult>
   /** Optional local Git capability, available in the desktop host only. */
   authorizeWorkspace?(): Promise<WorkspaceAuthorizationResult>
+  readRunEventStore?(workspaceHandle: string): Promise<NativeRunEventStoreSnapshot>
+  writeRunEventStore?(
+    workspaceHandle: string,
+    expectedSha256: string | null,
+    store: unknown,
+  ): Promise<NativeRunEventStoreSnapshot>
   gitCapability?(workspaceHandle: string): Promise<GitCapability>
   gitStatus?(workspaceHandle: string): Promise<GitStatusSnapshot>
   gitLog?(workspaceHandle: string, limit?: number, skip?: number): Promise<GitCommitSummary[]>
@@ -225,6 +237,14 @@ export const tauriBridge: NativeBridge = {
   },
   scanRepository: () => invoke<NativeRepositoryScanResult>('scan_repository'),
   authorizeWorkspace: () => invoke<WorkspaceAuthorizationResult>('registry_authorize_workspace'),
+  readRunEventStore: (workspaceHandle) =>
+    invoke<NativeRunEventStoreSnapshot>('workspace_run_events_read', { workspaceHandle }),
+  writeRunEventStore: (workspaceHandle, expectedSha256, store) =>
+    invoke<NativeRunEventStoreSnapshot>('workspace_run_events_write', {
+      workspaceHandle,
+      expectedSha256,
+      store,
+    }),
   gitCapability: (workspaceHandle) => invoke<GitCapability>('git_capability', { workspaceHandle }),
   gitStatus: (workspaceHandle) => invoke<GitStatusSnapshot>('git_status', { workspaceHandle }),
   gitLog: (workspaceHandle, limit, skip) => invoke<GitCommitSummary[]>('git_log', { workspaceHandle, limit: limit ?? null, skip: skip ?? null }),

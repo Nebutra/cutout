@@ -29,9 +29,10 @@ const missingRequirementSchema = z.object({
 
 export const agentRunEventSchema = z.discriminatedUnion('type', [
   runEventBaseSchema.extend({ type: z.literal('run-started'), mode: z.enum(['create', 'repair']) }).strict(),
-  runEventBaseSchema.extend({ type: z.literal('intent-recorded'), intent: eventText }).strict(),
-  runEventBaseSchema.extend({ type: z.literal('steer-recorded'), instruction: eventText }).strict(),
+  runEventBaseSchema.extend({ type: z.literal('intent-recorded'), intent: eventText, parentEventId: eventText.optional() }).strict(),
+  runEventBaseSchema.extend({ type: z.literal('steer-recorded'), instruction: eventText, parentEventId: eventText.optional() }).strict(),
   runEventBaseSchema.extend({ type: z.literal('message-revised'), targetEventId: eventText, message: eventText }).strict(),
+  runEventBaseSchema.extend({ type: z.literal('branch-selected'), sourceEventId: eventText, responseEventId: eventText }).strict(),
   runEventBaseSchema.extend({ type: z.literal('plan-recorded'), planId: eventText, summary: eventText, stepIds: z.array(eventText) }).strict(),
   runEventBaseSchema.extend({ type: z.enum(['step-started', 'step-succeeded']), stepId: eventText, label: eventText, detail: eventText.optional() }).strict(),
   runEventBaseSchema.extend({ type: z.enum(['step-failed', 'step-cancelled']), stepId: eventText, label: eventText, detail: eventText }).strict(),
@@ -63,6 +64,7 @@ export const agentRunEventSchema = z.discriminatedUnion('type', [
   runEventBaseSchema.extend({
     type: z.literal('agent-message'),
     message: eventText,
+    responseToEventId: eventText.optional(),
     action: z.object({
       type: z.literal('proceed-anyway'),
       label: eventText,
@@ -98,15 +100,22 @@ export type AgentRunEvent =
   | (RunEventBase & {
       readonly type: 'intent-recorded'
       readonly intent: string
+      readonly parentEventId?: string
     })
   | (RunEventBase & {
       readonly type: 'steer-recorded'
       readonly instruction: string
+      readonly parentEventId?: string
     })
   | (RunEventBase & {
       readonly type: 'message-revised'
       readonly targetEventId: string
       readonly message: string
+    })
+  | (RunEventBase & {
+      readonly type: 'branch-selected'
+      readonly sourceEventId: string
+      readonly responseEventId: string
     })
   | (RunEventBase & {
       readonly type: 'plan-recorded'
@@ -204,6 +213,7 @@ export type AgentRunEvent =
   | (RunEventBase & {
       readonly type: 'agent-message'
       readonly message: string
+      readonly responseToEventId?: string
       readonly action?: {
         readonly type: 'proceed-anyway'
         readonly label: string
@@ -317,6 +327,119 @@ export function replayRunEvents(
   return events.reduce(appendRunEvent, createRunEventStore())
 }
 
+export type AgentUserTurnEvent = Extract<AgentRunEvent, { type: 'intent-recorded' | 'steer-recorded' }>
+export type AgentResponseEvent = Extract<AgentRunEvent, { type: 'agent-message' }>
+
+export interface AgentResponseBranch {
+  readonly source: AgentUserTurnEvent
+  readonly responses: readonly AgentResponseEvent[]
+  readonly selectedResponse: AgentResponseEvent
+  readonly selectedIndex: number
+}
+
+/** Resolve explicit response links first, then infer the nearest preceding
+ * user turn for legacy linear transcripts. */
+export function resolveAgentResponseSource(
+  events: readonly AgentRunEvent[],
+  response: AgentResponseEvent,
+): AgentUserTurnEvent | null {
+  const responseIndex = events.findIndex((event) => event.eventId === response.eventId)
+  if (responseIndex < 0) return null
+  if (response.responseToEventId) {
+    const explicit = events.find((event, index): event is AgentUserTurnEvent =>
+      index < responseIndex
+      && event.eventId === response.responseToEventId
+      && (event.type === 'intent-recorded' || event.type === 'steer-recorded'))
+    if (explicit) return explicit
+  }
+  for (let index = responseIndex - 1; index >= 0; index -= 1) {
+    const event = events[index]
+    if (event?.type === 'intent-recorded' || event?.type === 'steer-recorded') return event
+  }
+  return null
+}
+
+/** Group immutable sibling responses and replay the latest valid explicit
+ * selection. With no selection event, the latest response is the legacy
+ * linear fallback. */
+export function projectAgentResponseBranches(
+  events: readonly AgentRunEvent[],
+): readonly AgentResponseBranch[] {
+  const users = events.filter((event): event is AgentUserTurnEvent =>
+    event.type === 'intent-recorded' || event.type === 'steer-recorded')
+  const responsesBySource = new Map<string, AgentResponseEvent[]>()
+  for (const event of events) {
+    if (event.type !== 'agent-message') continue
+    const source = resolveAgentResponseSource(events, event)
+    if (!source) continue
+    const siblings = responsesBySource.get(source.eventId) ?? []
+    siblings.push(event)
+    responsesBySource.set(source.eventId, siblings)
+  }
+
+  const selectionBySource = new Map<string, string>()
+  for (const event of events) {
+    if (event.type !== 'branch-selected') continue
+    const siblings = responsesBySource.get(event.sourceEventId)
+    if (siblings?.some((response) => response.eventId === event.responseEventId)) {
+      selectionBySource.set(event.sourceEventId, event.responseEventId)
+    }
+  }
+
+  return users.flatMap((source) => {
+    const responses = responsesBySource.get(source.eventId) ?? []
+    if (responses.length === 0) return []
+    const selectedId = selectionBySource.get(source.eventId)
+    const selectedIndex = Math.max(0, selectedId
+      ? responses.findIndex((response) => response.eventId === selectedId)
+      : responses.length - 1)
+    return [{ source, responses, selectedResponse: responses[selectedIndex]!, selectedIndex }]
+  })
+}
+
+/** Project only the active path through the conversation DAG. Descendants of
+ * an unselected sibling remain durable but are hidden until that branch is
+ * selected again. */
+export function projectActiveConversation(
+  events: readonly AgentRunEvent[],
+): readonly (AgentUserTurnEvent | AgentResponseEvent)[] {
+  const branches = new Map(projectAgentResponseBranches(events).map((branch) => [branch.source.eventId, branch]))
+  const result: (AgentUserTurnEvent | AgentResponseEvent)[] = []
+  let activeResponseId: string | null = null
+
+  for (const event of events) {
+    if (event.type !== 'intent-recorded' && event.type !== 'steer-recorded') continue
+    if (event.parentEventId && event.parentEventId !== activeResponseId) continue
+    result.push(event)
+    const selectedResponse = branches.get(event.eventId)?.selectedResponse
+    if (selectedResponse) {
+      result.push(selectedResponse)
+      activeResponseId = selectedResponse.eventId
+    }
+  }
+  const includedIds = new Set(result.map((event) => event.eventId))
+  for (const event of events) {
+    if (event.type === 'agent-message' && !resolveAgentResponseSource(events, event)) {
+      includedIds.add(event.eventId)
+    }
+  }
+  return events.filter((event): event is AgentUserTurnEvent | AgentResponseEvent =>
+    includedIds.has(event.eventId)
+    && (event.type === 'intent-recorded' || event.type === 'steer-recorded' || event.type === 'agent-message'))
+}
+
+/** The selected response is the only valid parent for the next user turn. */
+export function resolveActiveConversationHead(
+  events: readonly AgentRunEvent[],
+): AgentResponseEvent | null {
+  const projected = projectActiveConversation(events)
+  for (let index = projected.length - 1; index >= 0; index -= 1) {
+    const event = projected[index]
+    if (event?.type === 'agent-message') return event
+  }
+  return null
+}
+
 /** A renderer restart cannot resume in-memory provider calls. Close any
  * persisted running lifecycle so historical timers do not keep advancing. */
 export function recoverInterruptedRunEvents(
@@ -360,6 +483,14 @@ export function appendRunEvent(
       events: [...store.events, event],
       activeRun,
     }
+  }
+
+  if (event.type === 'branch-selected') {
+    const branch = projectAgentResponseBranches(store.events).find((item) =>
+      item.source.eventId === event.sourceEventId
+      && item.responses.some((response) => response.eventId === event.responseEventId))
+    if (!branch) return store
+    return { ...store, events: [...store.events, event] }
   }
 
   if (event.runId !== store.activeRunId || !store.activeRun) return store
@@ -461,6 +592,7 @@ function reduceActiveRun(
       return { ...run, intent: event.intent }
     case 'steer-recorded':
     case 'message-revised':
+    case 'branch-selected':
       return run
     case 'plan-recorded':
       return {

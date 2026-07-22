@@ -1,0 +1,4 @@
+{"file":".trellis/spec/frontend/agent-control-safety.md","reason":"Review branch events, retries, receipts, workspace authority, and fail-closed persistence."}
+{"file":".trellis/spec/frontend/state-management.md","reason":"Verify event DAG recovery and IndexedDB/.cutout synchronization without duplicate bubbles."}
+{"file":".trellis/spec/frontend/component-guidelines.md","reason":"Review accessible previous/next controls, stable dimensions, and selected-branch behavior."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Apply full frontend tests, type-check, lint, build, and regression review."}

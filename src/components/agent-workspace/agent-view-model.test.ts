@@ -525,6 +525,66 @@ describe('buildAgentViewModel', () => {
     expect(replies[0]).not.toHaveProperty('regeneratable')
   })
 
+  it('renders only the selected sibling with stable branch navigation metadata', () => {
+    const runEvents = replayRunEvents([
+      createRunEvent('run:1', { type: 'run-started', mode: 'create' }, { eventId: 's1', at: 1 }),
+      createRunEvent('run:1', { type: 'intent-recorded', intent: 'Who are you?' }, { eventId: 'user', at: 2 }),
+      createRunEvent('run:1', { type: 'agent-message', message: 'First reply', responseToEventId: 'user' }, { eventId: 'first', at: 3 }),
+      createRunEvent('run:2', { type: 'run-started', mode: 'create' }, { eventId: 's2', at: 4 }),
+      createRunEvent('run:2', { type: 'agent-message', message: 'Second reply', responseToEventId: 'user' }, { eventId: 'second', at: 5 }),
+      createRunEvent('run:2', { type: 'branch-selected', sourceEventId: 'user', responseEventId: 'second' }, { eventId: 'select', at: 6 }),
+    ])
+    const model = buildAgentViewModel({
+      brief: 'Who are you?', workflowPhase: 'idle', stages: [], outcome: null,
+      working: false, elapsedSeconds: 0, runError: null, runEvents,
+    })
+
+    expect(model.feed.filter((item) => item.type === 'message')).toEqual([
+      expect.objectContaining({ id: 'user', role: 'user' }),
+      expect.objectContaining({
+        id: 'second',
+        detail: 'Second reply',
+        branch: {
+          sourceEventId: 'user',
+          selectedIndex: 1,
+          count: 2,
+          previousEventId: 'first',
+          nextEventId: undefined,
+        },
+        regeneratable: true,
+      }),
+    ])
+    expect(selectLatestAgentMessageRegenerationTarget(runEvents.events)?.targetEventId).toBe('second')
+  })
+
+  it('replaces the runtime preparing bubble with one durable terminal activity row', () => {
+    const runEvents = replayRunEvents([
+      createRunEvent('run', { type: 'run-started', mode: 'create' }, { eventId: 'start', at: 1 }),
+      createRunEvent('run', { type: 'intent-recorded', intent: 'Hello' }, { eventId: 'user', at: 2 }),
+      createRunEvent('run', {
+        type: 'step-started', stepId: 'step:prepare:run', label: 'Preparing the run', detail: 'Checking your request…',
+      }, { eventId: 'prepare-start', at: 3 }),
+      createRunEvent('run', {
+        type: 'step-succeeded', stepId: 'step:prepare:run', label: 'Preparing the run', detail: 'Request checked.',
+      }, { eventId: 'prepare-done', at: 4 }),
+      createRunEvent('run', { type: 'agent-message', message: 'Hello', responseToEventId: 'user' }, { eventId: 'reply', at: 5 }),
+    ])
+    const model = buildAgentViewModel({
+      brief: 'Hello', workflowPhase: 'idle', stages: [], outcome: null,
+      working: false, elapsedSeconds: 0, runError: null, runEvents,
+    })
+
+    expect(model.feed.filter((item) => item.type === 'message')).toEqual([
+      expect.objectContaining({ id: 'user' }),
+      expect.objectContaining({
+        id: 'prepare-done',
+        activity: expect.objectContaining({ label: 'Preparing the run', state: 'complete' }),
+      }),
+      expect.objectContaining({ id: 'reply' }),
+    ])
+    expect(model.feed.some((item) => item.id.startsWith('runtime:activity:'))).toBe(false)
+  })
+
   it('suppresses message regeneration while another run is active', () => {
     const runEvents = replayRunEvents([
       createRunEvent('run', { type: 'run-started', mode: 'create' }, { eventId: 'start', at: 1 }),

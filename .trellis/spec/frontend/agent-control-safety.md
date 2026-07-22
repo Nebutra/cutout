@@ -24,10 +24,10 @@ receipts. `.cutout` state and provenance remain authoritative.
   user-facing message, and `retryable` flag. `createAgentRunRetryControl(...)`
   may expose a run-level callback only from that classification or an existing
   material repair plan.
-- `selectLatestAgentMessageRegenerationTarget(events)` returns the latest
-  durable Agent message id, its effective revised text, and the nearest
-  preceding effective revised user intent/steer. `AgentWorkspaceDock` exposes
-  that action through `onRegenerateMessage(eventId)` only while no run is active.
+- `selectLatestAgentMessageRegenerationTarget(events)` returns the selected
+  durable Agent response, its effective text, and the user turn it answers.
+  `AgentWorkspaceDock` exposes Regenerate only while no run is active and uses
+  durable `branch-selected` events for sibling response navigation.
 
 ### 3. Contracts
 
@@ -91,10 +91,21 @@ receipts. `.cutout` state and provenance remain authoritative.
   `Continue` takes precedence over transient `Retry`, and both are hidden while
   another run is active.
 - Message-level Regenerate is distinct from run-level and paid-tool Retry. Only
-  the latest completed durable `agent-message` is eligible. It reuses the
-  effective source user turn, ignores selected-material repair context, emits
-  no duplicate `intent-recorded` event, and replaces the Agent reply through a
-  durable `message-revised` event.
+  the selected response at the active conversation head is eligible. It reuses
+  the effective source user turn, ignores selected-material repair context,
+  emits no duplicate `intent-recorded` event, appends an immutable sibling
+  `agent-message`, and selects it through a durable `branch-selected` event.
+- User turns may link to the selected Agent response with `parentEventId`, and
+  Agent responses may link to their source turn with `responseToEventId`.
+  Legacy unlinked transcripts replay linearly. Branch selection remains
+  appendable after a run reaches a terminal or cancelled state.
+- Desktop repository history binds only through the current opaque authorized
+  workspace handle. It reconciles `workspace.v1` and `.cutout/run-events.json`
+  by event ID while preserving both source orders, rejects divergent payloads
+  for the same ID, and writes the validated union with the native CAS digest.
+  Read, credential-policy, or CAS failure preserves local history and shows
+  generic Git-sync copy without exposing the native payload or secret-shaped
+  content.
 - A retry or regeneration attempt supersedes the prior stopped UI only after
   route/provider preflight and lease acceptance. At that boundary it clears
   both persisted `runError` and the canonical generation error before awaiting
@@ -130,7 +141,7 @@ receipts. `.cutout` state and provenance remain authoritative.
 | Reopened project with retryable persisted `runError` and non-empty project brief | Reconstruct one run-level `Retry` callback |
 | Reopened project with missing brief or a non-retryable persisted error | Do not expose run-level `Retry` |
 | Cancellation, credential/auth failure, missing material, policy/moderation denial, invalid model/configuration, or HTTP 400/401/403/404/422 | Do not expose transient run-level `Retry` |
-| Latest completed Agent message has an effective preceding user turn and no run is active | Expose one icon-only `Regenerate response` action |
+| Selected Agent response at the active head has an effective source user turn and no run is active | Expose one icon-only `Regenerate response` action |
 | Agent reply is older, pending, non-durable, lacks a source turn, or another run is active | Do not expose message Regenerate |
 | Regenerate tool gate returns no call or selects a non-conversational tool | Revise through the conversational path; never enter asset generation |
 | Regenerate tool gate fails | Publish the new classified run failure; never resume or fall through to the asset pipeline |
@@ -144,11 +155,12 @@ receipts. `.cutout` state and provenance remain authoritative.
   perform no external or managed-export effect.
 - Good run recovery: a network-interrupted run shows one `Retry` below the
   latest error, and the click creates a new run with the preserved brief.
-- Good message regeneration: the latest Agent reply shows a circular-arrow
-  icon, reuses the revised source user turn, and replaces that reply without a
-  second user bubble or paid asset execution.
-- Base: older Agent replies remain readable but have no regeneration action;
-  the current latest reply is the only eligible target.
+- Good message regeneration: the selected Agent reply shows a circular-arrow
+  icon, reuses the source user turn, appends a sibling response, selects it,
+  and exposes stable previous/next navigation without a second user bubble or
+  paid asset execution.
+- Base: sibling Agent replies remain recoverable through branch navigation;
+  only the selected response at the active head is eligible for regeneration.
 - Bad: reconstruct `{ id, grantedAt }` from a CLI flag, execute after a failed
   claim, follow a workspace symlink, attach page-wide axe output to every
   scenario, report delivery success without exact artifact hashes, or route a
@@ -180,10 +192,15 @@ receipts. `.cutout` state and provenance remain authoritative.
   source, restored-project fallback, original-brief preservation, latest
   error-row placement, active-run suppression, repair-plan precedence, and
   separation from tool-level retry callbacks.
-- Message regeneration: latest-only eligibility, icon accessibility, edited
-  source resolution, revised Agent projection, no duplicate user/Agent bubbles,
-  selected-material isolation, no-call/non-conversational fail-closed behavior,
-  and stale-error clearing before the awaited tool-gate boundary.
+- Message regeneration: active-head eligibility, icon accessibility, source
+  resolution, immutable sibling projection, durable previous/next selection,
+  no duplicate user turns, selected-material isolation, restart/legacy
+  recovery, no-call/non-conversational fail-closed behavior, and stale-error
+  clearing before the awaited tool-gate boundary.
+- Repository history: authorization after mount, opaque-handle read/write,
+  deterministic ordered union, identical legacy deduplication, branch
+  selection restoration, divergent-ID rejection, CAS conflict, credential
+  rejection, local-state preservation, and sanitized in-product failure copy.
 - Run `pnpm agent:validate` after every CLI, MCP, protocol, capability, Skill,
   manifest, or plugin-runtime change.
 
@@ -218,10 +235,11 @@ createAssets('create', {
   briefOverride: target.sourceMessage,
   ignoreSelectedMaterial: true,
   regenerateTargetEventId: target.targetEventId,
+  regenerateSourceEventId: target.sourceEventId,
   regenerateFallbackReply: target.targetMessage,
 })
 ```
 
 The first form appends another user turn and may fall into material or asset
 generation. The second reuses the durable turn, isolates message regeneration
-from canvas repair, and revises the existing Agent reply.
+from canvas repair, and appends a selected sibling Agent reply.

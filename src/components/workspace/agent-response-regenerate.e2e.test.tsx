@@ -131,7 +131,7 @@ describe('Agent response regeneration workspace flow', () => {
     host = undefined
   })
 
-  it('clears stale errors before the tool gate resolves and revises the reply without another user turn', async () => {
+  it('clears stale errors and appends a selected sibling without another user turn', async () => {
     const gateStarted = deferred<void>()
     const gateResult = deferred<Result<GenerateWithToolsOutput>>()
     const events = replayRunEvents([
@@ -201,18 +201,21 @@ describe('Agent response regeneration workspace flow', () => {
 
     expect(await waitFor(() => host!.textContent?.includes('Fresh response'))).toBe(true)
     expect(host.querySelectorAll('[data-slot="user-message"]')).toHaveLength(1)
-    expect(host.querySelectorAll('[data-slot="agent-message"]')).toHaveLength(1)
+    expect(host.querySelectorAll('[data-slot="agent-message"]')).toHaveLength(2)
     expect(host.textContent).not.toContain('Old response')
+    expect(host.querySelector('[aria-label="Response 2 of 2"]')?.textContent).toContain('2 / 2')
     expect(getStoreState().workspaceSnapshot?.runError).toBeNull()
-    expect(getStoreState().workspaceSnapshot?.agentRunEvents?.events).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          type: 'message-revised',
-          targetEventId: 'agent',
-          message: 'Fresh response',
-        }),
-      ]),
-    )
+    const persistedEvents = getStoreState().workspaceSnapshot?.agentRunEvents?.events ?? []
+    expect(persistedEvents).toEqual(expect.arrayContaining([
+      expect.objectContaining({ type: 'agent-message', message: 'Fresh response', responseToEventId: 'user' }),
+      expect.objectContaining({ type: 'branch-selected', sourceEventId: 'user' }),
+      expect.objectContaining({ type: 'step-succeeded', label: 'Preparing the run', detail: 'Request checked.' }),
+    ]))
+    expect(persistedEvents.some((event) => event.type === 'message-revised' && event.targetEventId === 'agent')).toBe(false)
+
+    await act(async () => host!.querySelector<HTMLButtonElement>('[aria-label="Previous response"]')!.click())
+    expect(await waitFor(() => host!.textContent?.includes('Old response'))).toBe(true)
+    expect(host.querySelector('[aria-label="Response 1 of 2"]')?.textContent).toContain('1 / 2')
   }, 15_000)
 
   it('treats a direct no-tool answer as a message regeneration instead of entering the asset pipeline', async () => {
@@ -259,16 +262,13 @@ describe('Agent response regeneration workspace flow', () => {
 
     expect(await waitFor(() => host!.textContent?.includes('Fresh response'))).toBe(true)
     expect(host.querySelectorAll('[data-slot="user-message"]')).toHaveLength(1)
-    expect(host.querySelectorAll('[data-slot="agent-message"]')).toHaveLength(1)
+    expect(host.querySelectorAll('[data-slot="agent-message"]')).toHaveLength(2)
     expect(host.textContent).not.toContain('Old response')
-    expect(getStoreState().workspaceSnapshot?.agentRunEvents?.events).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          type: 'message-revised',
-          targetEventId: 'agent',
-          message: 'Fresh response',
-        }),
-      ]),
-    )
+    const persistedEvents = getStoreState().workspaceSnapshot?.agentRunEvents?.events ?? []
+    expect(persistedEvents).toEqual(expect.arrayContaining([
+      expect.objectContaining({ type: 'agent-message', message: 'Fresh response', responseToEventId: 'user' }),
+      expect.objectContaining({ type: 'branch-selected', sourceEventId: 'user' }),
+    ]))
+    expect(persistedEvents.some((event) => event.type === 'message-revised' && event.targetEventId === 'agent')).toBe(false)
   }, 15_000)
 })

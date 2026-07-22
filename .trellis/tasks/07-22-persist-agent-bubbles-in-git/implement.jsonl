@@ -1,0 +1,4 @@
+{"file":".trellis/spec/frontend/agent-control-safety.md","reason":"Preserve durable run identity, Retry separation, event replay safety, and controlled .cutout authority."}
+{"file":".trellis/spec/frontend/state-management.md","reason":"Keep desktop recovery, persisted projections, and repository event state consistent."}
+{"file":".trellis/spec/frontend/component-guidelines.md","reason":"Implement stable accessible branch navigation controls without layout shifts."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Trace event DAG data through producer, persistence, replay, UI projection, and Git."}
