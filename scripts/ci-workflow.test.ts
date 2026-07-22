@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
-const workflow = readFileSync('.github/workflows/ci.yml', 'utf8')
+const workflow = readFileSync('.github/workflows/ci.yml', 'utf8').replaceAll('\r\n', '\n')
 
 describe('CI workflow contract', () => {
   it('is reusable as the exact release quality gate with read-only repository access', () => {

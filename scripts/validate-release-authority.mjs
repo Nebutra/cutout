@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 import { readFile, readdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import YAML from 'yaml'
