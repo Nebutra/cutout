@@ -33,12 +33,25 @@ installer version differs from their release version.
 - Matrix jobs receive `contents: read`; only the final publish job receives
   `contents: write`.
 - Required protected environment values:
-  `TAURI_SIGNING_PRIVATE_KEY`, optional
-  `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`, and `CUTOUT_UPDATER_PUBKEY`.
+  `TAURI_SIGNING_PRIVATE_KEY`, `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`, and
+  `CUTOUT_UPDATER_PUBKEY`. The updater private key must be password-protected.
   GitHub distribution defaults the stable endpoint to the repository's
   `releases/latest/download/latest.json` and the allowlist to `github.com`.
   `CUTOUT_UPDATER_STABLE_ENDPOINTS`, `CUTOUT_UPDATER_ALLOWED_HOSTS`, and
   `CUTOUT_UPDATER_BETA_ENDPOINTS` are optional approved-host overrides.
+- The protected `release` environment also owns `APPLE_CERTIFICATE` (base64
+  PKCS#12), `APPLE_CERTIFICATE_PASSWORD`, `APPLE_SIGNING_IDENTITY`,
+  `APPLE_API_KEY`, `APPLE_API_ISSUER`, and `APPLE_API_PRIVATE_KEY`. These Apple
+  secrets are scoped only to macOS preparation and build steps; Windows and
+  Linux Tauri steps receive none of them.
+- The macOS preparation step hard-fails when any Apple input is absent, writes
+  `APPLE_API_PRIVATE_KEY` to `$RUNNER_TEMP/AuthKey_<key-id>.p8` with mode
+  `0600`, and exports only `APPLE_API_KEY_PATH` for the Tauri process. The
+  temporary key is removed after packaging, including failed builds.
+- macOS artifacts are uploadable only after the generated `.app` and `.dmg`
+  both pass Developer ID signature verification, Gatekeeper assessment, and
+  stapled-ticket validation. Tauri's macOS build must wait for notarization and
+  stapling before these checks run.
 - Private keys remain CI secrets. Public endpoint/key configuration remains CI
   variables and is compiled into release builds.
 - The committed Tauri updater config remains fail-closed. Before packaging,
@@ -77,6 +90,9 @@ installer version differs from their release version.
 | Symlink or duplicate output is found | Collector fails closed |
 | Updater archive/signature is absent | Metadata generation fails |
 | Public key is empty or malformed | Stop before invoking the Tauri bundler |
+| Updater key password is absent | Stop before invoking the Tauri bundler |
+| Any Apple signing/notarization secret is absent on macOS | Stop before invoking the macOS Tauri build |
+| App or DMG signature, Gatekeeper, or stapler validation fails | Do not upload that macOS workflow artifact |
 | Release tag already has a Release | Refuse immutable asset replacement |
 | Upload is incomplete | Release remains a draft, not a public success |
 | Browser/dev build has no updater config | Home action remains absent |
@@ -106,8 +122,9 @@ installer version differs from their release version.
   basenames, required outputs, symlink rejection, directory boundaries, and
   deterministic SHA-256 output.
 - `scripts/release-workflow.test.ts`: four-entry matrix, validate/build/publish
-  dependency graph, least-privilege permissions, isolated Tauri action, and
-  draft promotion.
+  dependency graph, least-privilege permissions, isolated macOS/non-macOS Tauri
+  actions, Apple secret scoping and temporary key handling, macOS
+  signature/notarization verification, and draft promotion.
 - `scripts/ci-platform-contracts.test.ts`: browser installation ordering,
   platform-specific executable selection, and LF/CRLF frontmatter parsing.
 - `scripts/update-artifacts.test.ts`: signature, HTTPS/allowlist, rollback,
