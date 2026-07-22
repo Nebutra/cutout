@@ -3,4 +3,4 @@ describe('NodeStarterConsumerHost browser evidence',()=>{it('serves a real built
 
 function processAlive(pid:number){try{process.kill(pid,0);return true}catch{return false}}
 
-describe('workspace cleanup portability',()=>{it('gives Windows file handles a bounded retry window',async()=>{const remove=vi.fn().mockResolvedValue(undefined);await removeWorkspaceRoot('C:\\Temp\\cutout-next',remove);expect(remove).toHaveBeenCalledWith('C:\\Temp\\cutout-next',{recursive:true,force:true,maxRetries:10,retryDelay:200})})})
+describe('workspace cleanup portability',()=>{it('gives Windows file handles a bounded retry window',async()=>{const remove=vi.fn().mockResolvedValue(undefined);await removeWorkspaceRoot('C:\\Temp\\cutout-next',remove);expect(remove).toHaveBeenCalledWith('C:\\Temp\\cutout-next',{recursive:true,force:true,maxRetries:20,retryDelay:250})})})

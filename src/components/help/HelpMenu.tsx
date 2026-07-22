@@ -15,6 +15,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { useSettingsUI } from '@/components/settings/settings-ui'
+import { PRODUCT_VERSION } from '@/product-version'
 
 const REPO_URL = 'https://g.ktvsky.com/luzikai/asset-cutout-studio'
 
@@ -56,7 +57,7 @@ export function HelpMenu() {
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
-            Cutout v0.1.4
+            Cutout v{PRODUCT_VERSION}
           </DropdownMenuLabel>
         </DropdownMenuContent>
       </DropdownMenu>

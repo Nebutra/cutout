@@ -42,6 +42,9 @@ export function UpdatesSection(props: {
   const progress = state.total
     ? Math.min(100, Math.round((state.downloaded / state.total) * 100))
     : undefined;
+  const visibleChannels = (["stable", "beta"] as const).filter(
+    (channel) => state.capability?.channels[channel].available,
+  );
 
   const statusText = (() => {
     if (state.phase === "loading")
@@ -103,30 +106,32 @@ export function UpdatesSection(props: {
         </Button>
       </div>
       <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-        <div
-          role="group"
-          aria-label={t({
-            id: "settings.updates.channel_aria",
-            message: "Update channel",
-          })}
-          className="flex rounded-md bg-muted/40 p-0.5"
-        >
-          {(["stable", "beta"] as const).map((channel) => (
-            <Button
-              key={channel}
-              size="sm"
-              variant={
-                state.preferences.channel === channel ? "secondary" : "ghost"
-              }
-              aria-pressed={state.preferences.channel === channel}
-              onClick={() => controller.setChannel(channel)}
-            >
-              {channel === "stable"
-                ? t({ id: "settings.updates.stable", message: "Stable" })
-                : t({ id: "settings.updates.beta", message: "Beta" })}
-            </Button>
-          ))}
-        </div>
+        {visibleChannels.length > 1 ? (
+          <div
+            role="group"
+            aria-label={t({
+              id: "settings.updates.channel_aria",
+              message: "Update channel",
+            })}
+            className="flex rounded-md bg-muted/40 p-0.5"
+          >
+            {visibleChannels.map((channel) => (
+              <Button
+                key={channel}
+                size="sm"
+                variant={
+                  state.preferences.channel === channel ? "secondary" : "ghost"
+                }
+                aria-pressed={state.preferences.channel === channel}
+                onClick={() => controller.setChannel(channel)}
+              >
+                {channel === "stable"
+                  ? t({ id: "settings.updates.stable", message: "Stable" })
+                  : t({ id: "settings.updates.beta", message: "Beta" })}
+              </Button>
+            ))}
+          </div>
+        ) : null}
         <label className="flex items-center gap-2 text-xs">
           <span>
             <Trans id="settings.updates.check_automatically">

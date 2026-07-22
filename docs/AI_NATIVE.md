@@ -147,5 +147,7 @@ Useful overrides:
 - `imageProviderId` / `imageModel`: image generation model.
 - `validationProviderId` / `validationModel`: vision QA model.
 - `reference`: `auto`, `none`, `mockup`, or `board`.
-- `referencePath`: absolute image path to use instead of current app state.
+- `referencePath`: safe relative path below `ai-native/imports/`. Copy the file
+  into that host-owned staging directory before submitting the command; absolute
+  paths and traversal are rejected.
 - `writeArtifacts: false`: return metadata without writing generated images.

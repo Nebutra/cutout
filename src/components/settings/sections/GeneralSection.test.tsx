@@ -6,15 +6,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   setDeveloperMode: vi.fn(),
-  setRememberDir: vi.fn(),
 }));
 
 vi.mock("next-themes", () => ({
   useTheme: () => ({ theme: "system", setTheme: vi.fn() }),
-}));
-vi.mock("@/hooks/queries/export-prefs", () => ({
-  useExportPrefs: () => ({ data: { rememberDir: true } }),
-  useSetRememberDir: () => ({ mutate: mocks.setRememberDir }),
 }));
 vi.mock("@/i18n/switch", () => ({ switchLocale: vi.fn() }));
 vi.mock("@/workspace/navigation", () => ({
@@ -58,11 +53,10 @@ describe("GeneralSection", () => {
 
   it("keeps the expected preference order and accessible Developer mode control", () => {
     const rows = [...(host.firstElementChild?.children ?? [])];
-    expect(rows).toHaveLength(4);
+    expect(rows).toHaveLength(3);
     expect(rows[0]?.textContent).toContain("Theme");
     expect(rows[1]?.textContent).toContain("Language");
-    expect(rows[2]?.textContent).toContain("Remember export folder");
-    expect(rows[3]?.textContent).toContain("Developer mode");
+    expect(rows[2]?.textContent).toContain("Developer mode");
 
     const developerMode = host.querySelector(
       '[role="switch"][aria-label="Developer mode"]',

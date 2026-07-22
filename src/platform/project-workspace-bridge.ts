@@ -9,10 +9,7 @@ export function createProjectWorkspaceBridge(call:Invoke=invoke){
   return {
     read:(workspaceHandle:string)=>call<WorkspaceRevision>('workspace_revision_read',{workspaceHandle}),
     previewExport:(workspaceHandle:string,expectedSha256:string,document:DesignDocument)=>call<WorkspaceExportPlan>('workspace_revision_preview_export',{workspaceHandle,expectedSha256,document}),
-    applyExport:(planId:string,approvalId:string)=>{
-      if(!approvalId.trim())throw new Error('Explicit approval id is required.')
-      return call<WorkspaceRevision>('workspace_revision_apply_export',{planId,approvalId})
-    },
+    applyExport:(planId:string)=>call<WorkspaceRevision>('workspace_revision_apply_export',{planId}),
   }
 }
 
@@ -26,5 +23,5 @@ export class ProjectWorkspaceBinding {
   async bind(){this.#baseline=await this.bridge.read(this.workspaceHandle);return this.#baseline}
   async detectExternalChange(){const current=await this.bridge.read(this.workspaceHandle);return{changed:Boolean(this.#baseline&&current.sha256!==this.#baseline.sha256),current,baseline:this.#baseline}}
   async previewExport(document:DesignDocument){if(!this.#baseline)throw new Error('Import the authoritative workspace revision before export.');return this.bridge.previewExport(this.workspaceHandle,this.#baseline.sha256,document)}
-  async applyExport(plan:WorkspaceExportPlan,approvalId:string){if(plan.conflict)throw new Error('External Design IR changed; resolve the conflict before export.');const revision=await this.bridge.applyExport(plan.id,approvalId);this.#baseline=revision;return revision}
+  async applyExport(plan:WorkspaceExportPlan){if(plan.conflict)throw new Error('External Design IR changed; resolve the conflict before export.');const revision=await this.bridge.applyExport(plan.id);this.#baseline=revision;return revision}
 }

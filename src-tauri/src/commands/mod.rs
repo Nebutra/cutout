@@ -4,6 +4,7 @@ pub mod agent_host;
 pub mod ai;
 pub mod ai_native;
 pub mod git;
+pub mod native_approval;
 pub mod registry_desktop;
 pub mod save_assets;
 pub mod save_bundle;

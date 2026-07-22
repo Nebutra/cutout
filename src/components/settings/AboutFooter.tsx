@@ -6,9 +6,7 @@
  */
 import { toast } from 'sonner'
 import { useLingui } from '@lingui/react/macro'
-
-/** Build version. Bump alongside `package.json` / `Cargo.toml`. */
-const APP_VERSION = '0.1.4'
+import { PRODUCT_VERSION } from '@/product-version'
 
 export function AboutFooter() {
   const { t } = useLingui()
@@ -26,7 +24,7 @@ export function AboutFooter() {
       }
       className="w-full truncate rounded-md px-2.5 py-1.5 text-left text-[11px] text-muted-foreground/70 transition-colors hover:text-muted-foreground"
     >
-      Cutout v{APP_VERSION} · Tauri 2 · React 19
+      Cutout v{PRODUCT_VERSION} · Tauri 2 · React 19
     </button>
   )
 }

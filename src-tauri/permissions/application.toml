@@ -5,8 +5,13 @@ commands.allow = ["save_assets", "save_bundle", "scan_repository", "ai_native_pa
 
 [[permission]]
 identifier = "provider-secrets-network"
-description = "Allows host-owned provider keychain and policy-checked AI transport commands."
-commands.allow = ["set_key", "key_status", "delete_key", "list_key_status", "load_providers", "save_providers", "ai_proxy_request", "ai_proxy_stream", "ai_image_edit", "set_vectorizer_api_key", "vectorizer_key_status", "delete_vectorizer_api_key", "vectorize_local_vtracer", "vectorize_vectorizer_ai"]
+description = "Allows host-owned provider secret, discovery/draft and policy-checked AI transport commands."
+commands.allow = ["set_key", "key_status", "delete_key", "list_key_status", "load_providers", "save_providers", "discover_provider_candidates", "create_provider_draft", "check_provider_draft", "import_provider_draft", "cancel_provider_draft", "ai_proxy_request", "ai_proxy_stream", "ai_image_edit", "set_vectorizer_api_key", "vectorizer_key_status", "delete_vectorizer_api_key", "vectorize_local_vtracer", "vectorize_vectorizer_ai"]
+
+[[permission]]
+identifier = "git-version-control"
+description = "Allows read and explicitly-previewed mutation of the authorized project git repository."
+commands.allow = ["git_capability", "git_status", "git_log", "git_commit_files", "git_commit_diff", "git_branches", "git_branch_compare", "git_diff", "git_stage", "git_unstage", "git_preview_mutation", "git_apply_mutation", "git_commit", "git_create_branch", "git_switch_branch", "git_push_preview", "git_push"]
 
 [[permission]]
 identifier = "registry-and-agent-host"

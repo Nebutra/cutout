@@ -1,7 +1,11 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import type {
+  UpdateChannel,
+  UpdateChannelCapability,
+  UpdateRetryAction,
+} from "./contracts";
 
-export type UpdateChannel = "stable" | "beta";
 export type UpdatePhase =
   | "idle"
   | "checking"
@@ -21,6 +25,8 @@ export interface UpdateSnapshot {
   contentLength?: number;
   error?: string;
   unavailableReason?: string;
+  retryAction?: UpdateRetryAction;
+  channelCapabilities?: Readonly<Record<UpdateChannel, UpdateChannelCapability>>;
 }
 
 export interface UpdaterRuntime {

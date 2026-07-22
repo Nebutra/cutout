@@ -148,15 +148,8 @@ export interface VectorizeSvgResult {
 }
 
 export interface NativeBridge {
-  /**
-   * Persist assets. When `destDir` is a valid existing directory the native
-   * side writes there directly (no picker); otherwise it opens the folder
-   * picker. `destDir` is the remembered-output-folder path (see export prefs).
-   */
-  saveAssets(
-    assets: SaveAssetInput[],
-    destDir?: string,
-  ): Promise<SaveAssetsResult>
+  /** Persist assets under a fresh native folder-picker grant. */
+  saveAssets(assets: SaveAssetInput[]): Promise<SaveAssetsResult>
   /** Atomically write a nested multi-file bundle under a native-picked root. */
   saveBundle(bundle: SaveBundleInput): Promise<SaveBundleResult>
   /** Opens a native folder picker and returns a metadata-only safe inventory. */
@@ -216,10 +209,9 @@ function toPayload(asset: SaveAssetInput): SaveAssetPayload {
 
 /** Concrete Tauri implementation of {@link NativeBridge}. */
 export const tauriBridge: NativeBridge = {
-  saveAssets: (assets, destDir) =>
+  saveAssets: (assets) =>
     invoke<SaveAssetsResult>('save_assets', {
       assets: assets.map(toPayload),
-      destDir: destDir ?? null,
     }),
   saveBundle: (bundle) => {
     const payload: SaveBundlePayload = {

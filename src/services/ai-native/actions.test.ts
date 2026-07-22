@@ -40,12 +40,13 @@ describe('AI Native semantic slice actions', () => {
     expect(
       parseAiNativeAction({
         type: 'import-design-md',
-        path: '/tmp/DESIGN.md',
+        path: 'DESIGN.md',
       }),
     ).toEqual({
       type: 'import-design-md',
-      path: '/tmp/DESIGN.md',
+      path: 'DESIGN.md',
     })
+    expect(() => parseAiNativeAction({ type: 'import-design-md', path: '/tmp/DESIGN.md' })).toThrow('relative ai-native/imports')
   })
 
   it('parses provider drafts with the refined wire-protocol contract', () => {

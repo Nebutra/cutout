@@ -737,8 +737,21 @@ fn run_git(cwd: Option<&Path>, args: &[&str]) -> Result<String, String> {
 }
 
 fn run_git_bytes(cwd: Option<&Path>, args: &[&str]) -> Result<Vec<u8>, String> {
+    if let Some(root) = cwd {
+        validate_repository_config(root)?;
+    }
     let mut command = Command::new("git");
+    configure_safe_git_command(&mut command);
+    let hooks = std::env::temp_dir().join("cutout-empty-git-hooks");
+    let _ = std::fs::create_dir_all(&hooks);
     command
+        .arg("-c")
+        .arg(format!("core.hooksPath={}", hooks.display()))
+        .args(["-c", "core.fsmonitor=false"])
+        .args(["-c", "core.untrackedCache=false"])
+        .args(["-c", "diff.external="])
+        .args(["-c", "credential.helper="])
+        .args(["-c", "protocol.file.allow=never"])
         .args(args)
         .env("LC_ALL", "C")
         .env("GIT_TERMINAL_PROMPT", "0")
@@ -788,6 +801,75 @@ fn run_git_bytes(cwd: Option<&Path>, args: &[&str]) -> Result<Vec<u8>, String> {
         return Err("Git could not complete the requested local operation.".into());
     }
     Ok(stdout)
+}
+
+fn configure_safe_git_command(command: &mut Command) {
+    let null_config = if cfg!(windows) { "NUL" } else { "/dev/null" };
+    command
+        .env("GIT_CONFIG_NOSYSTEM", "1")
+        .env("GIT_CONFIG_GLOBAL", null_config)
+        .env_remove("GIT_CONFIG_SYSTEM")
+        .env_remove("GIT_CONFIG_COUNT")
+        .env_remove("GIT_DIR")
+        .env_remove("GIT_WORK_TREE")
+        .env_remove("GIT_EXEC_PATH")
+        .env_remove("GIT_EXTERNAL_DIFF")
+        .env_remove("GIT_SSH_COMMAND")
+        .env_remove("GIT_ASKPASS")
+        .env_remove("SSH_ASKPASS");
+    for index in 0..64 {
+        command
+            .env_remove(format!("GIT_CONFIG_KEY_{index}"))
+            .env_remove(format!("GIT_CONFIG_VALUE_{index}"));
+    }
+}
+
+fn validate_repository_config(root: &Path) -> Result<(), String> {
+    let mut command = Command::new("git");
+    configure_safe_git_command(&mut command);
+    let output = command
+        .current_dir(root)
+        .args([
+            "config",
+            "--local",
+            "--no-includes",
+            "--name-only",
+            "--list",
+        ])
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .output()
+        .map_err(|_| "Git is not available on this device.".to_string())?;
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        if stderr.contains("not a git repository") {
+            return Ok(());
+        }
+        return Err(format!(
+            "Unable to validate repository Git configuration: {}",
+            stderr.trim()
+        ));
+    }
+    for key in String::from_utf8_lossy(&output.stdout).lines() {
+        let key = key.trim().to_ascii_lowercase();
+        let executable = key == "core.hookspath"
+            || key == "core.fsmonitor"
+            || key == "diff.external"
+            || key == "credential.helper"
+            || key == "include.path"
+            || key.starts_with("includeif.")
+            || (key.starts_with("diff.") && key.ends_with(".command"))
+            || (key.starts_with("filter.")
+                && (key.ends_with(".clean")
+                    || key.ends_with(".smudge")
+                    || key.ends_with(".process")));
+        if executable {
+            return Err(format!(
+                "Repository Git configuration contains executable key {key}; remove it before using Cutout Git."
+            ));
+        }
+    }
+    Ok(())
 }
 
 fn read_bounded(mut reader: impl Read, limit: usize) -> Result<Vec<u8>, String> {
@@ -1235,5 +1317,25 @@ mod tests {
         )
         .unwrap_err()
         .contains("expired"));
+    }
+
+    #[test]
+    fn rejects_repository_local_executable_configuration() {
+        let root = tempfile::tempdir().unwrap();
+        let status = Command::new("git")
+            .current_dir(root.path())
+            .args(["init", "--quiet"])
+            .status()
+            .unwrap();
+        assert!(status.success());
+        let status = Command::new("git")
+            .current_dir(root.path())
+            .args(["config", "core.fsmonitor", "malicious-helper"])
+            .status()
+            .unwrap();
+        assert!(status.success());
+        assert!(validate_repository_config(root.path())
+            .unwrap_err()
+            .contains("core.fsmonitor"));
     }
 }

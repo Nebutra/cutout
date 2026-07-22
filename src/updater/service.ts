@@ -3,7 +3,7 @@ import { getVersion } from "@tauri-apps/api/app";
 import { getAuthorizedWorkspace } from "@/platform/authorized-workspace";
 import { createTauriAgentHostService } from "@/agent-host/tauri-service";
 import { createTauriUpdaterRuntime, type UpdateSnapshot } from "./runtime";
-import type { UpdateBackend, UpdateInstallSafety, UpdatePreferenceStore, UpdatePreferences } from "./contracts";
+import { UpdateOperationError, type UpdateBackend, type UpdateInstallSafety, type UpdatePreferenceStore, type UpdatePreferences, type UpdateRetryAction } from "./contracts";
 import { createUpdateOrchestrator } from "./orchestrator";
 
 const PREFERENCES_KEY = "cutout.updates.preferences.v1";
@@ -25,7 +25,7 @@ export function createLocalUpdatePreferences(storage: Pick<Storage, "getItem" | 
 
 function hasActiveAgentRun() {
   const run = getStoreState().workspaceSnapshot?.agentRunEvents?.activeRun;
-  return Boolean(run && run.status !== "cancelled");
+  return run?.status === "running";
 }
 
 export function createDesktopUpdateOrchestrator(input: {
@@ -35,21 +35,42 @@ export function createDesktopUpdateOrchestrator(input: {
 }) {
   const runtime = createTauriUpdaterRuntime();
   const readVersion = input.getAppVersion ?? getVersion;
+  const operationFailure = async (error: unknown, fallback: UpdateRetryAction) => {
+    const status = await runtime.getStatus().catch(() => undefined);
+    return new UpdateOperationError(
+      status?.error ?? (error instanceof Error ? error.message : String(error)),
+      status?.retryAction ?? fallback,
+    );
+  };
   const backend: UpdateBackend = {
     async capability() {
       const status = await runtime.getStatus();
       const unavailable = status.unavailableReason;
-      return {
+      const stable = status.channelCapabilities?.stable ?? {
         available: !unavailable,
+        ...(unavailable ? { reason: unavailable } : {}),
+      };
+      const beta = status.channelCapabilities?.beta ?? {
+        available: false,
+        reason: "Beta updates are not configured in this build.",
+      };
+      const available = stable.available || beta.available;
+      return {
+        available,
         currentVersion: await readVersion().catch(() => "unknown"),
-        reason: unavailable,
-        endpointConfigured: !unavailable,
-        pubkeyConfigured: !unavailable,
+        reason: available ? undefined : unavailable,
+        endpointConfigured: available,
+        pubkeyConfigured: available,
+        channels: { stable, beta },
       };
     },
     async check(channel) {
-      const snapshot = await runtime.check(channel) as RuntimeSnapshot;
-      return snapshot.availableVersion ? { version: snapshot.availableVersion, notes: snapshot.releaseNotes, publishedAt: snapshot.publishedAt } : undefined;
+      try {
+        const snapshot = await runtime.check(channel) as RuntimeSnapshot;
+        return snapshot.availableVersion ? { version: snapshot.availableVersion, notes: snapshot.releaseNotes, publishedAt: snapshot.publishedAt } : undefined;
+      } catch (error) {
+        throw await operationFailure(error, "check");
+      }
     },
     async download(_release, onProgress) {
       const unsubscribe = await runtime.subscribeProgress((snapshot) =>
@@ -58,13 +79,25 @@ export function createDesktopUpdateOrchestrator(input: {
       try {
         const snapshot = await runtime.download();
         onProgress(snapshot.downloadedBytes, snapshot.contentLength);
+      } catch (error) {
+        throw await operationFailure(error, "download");
       } finally {
         unsubscribe();
       }
     },
-    async cancel() { await runtime.cancel(); },
+    async cancel() {
+      try {
+        await runtime.cancel();
+      } catch (error) {
+        throw await operationFailure(error, "download");
+      }
+    },
     async installAndRestart() {
-      await runtime.installAndRelaunch(getAuthorizedWorkspace()?.handle);
+      try {
+        await runtime.installAndRelaunch(getAuthorizedWorkspace()?.handle);
+      } catch (error) {
+        throw await operationFailure(error, "download");
+      }
     },
   };
   const safety: UpdateInstallSafety = {

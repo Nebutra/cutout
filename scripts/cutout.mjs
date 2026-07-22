@@ -10,6 +10,7 @@ import {
 import { capabilityStatus, discoveryHandshake, listSkills, readSkill } from './cutout-external-control.mjs'
 import { closeRegistryRuntime, registryApplyInstall, registryGet, registryList, registryPlanInstall, registryReceipt } from './cutout-registry.mjs'
 import { workflowCompatibility, workflowGet, workflowList } from './cutout-workflows.mjs'
+import { PRODUCT_VERSION } from './lib/product-version.mjs'
 
 async function main(argv) {
   const { projectRoot, args } = parseGlobalFlags(argv)
@@ -21,7 +22,7 @@ async function main(argv) {
 
   switch (command) {
     case 'discover':
-      return { ok: true, response: await discoveryHandshake(projectRoot, { name: 'cutout-cli', version: '0.1.4' }) }
+      return { ok: true, response: await discoveryHandshake(projectRoot, { name: 'cutout-cli', version: PRODUCT_VERSION }) }
     case 'capabilities':
       return { ok: true, response: await capabilityStatus() }
     case 'skills':
@@ -77,7 +78,7 @@ function jsonFlag(args, name) {
   }
 }
 
-async function workflow(projectRoot,args){const[action,...rest]=args;if(action==='list')return{ok:true,response:{packs:await workflowList(projectRoot)}};if(action==='get'&&rest[0])return{ok:true,response:await workflowGet(projectRoot,rest[0],flag(rest,'--version'))};if(action==='compat'&&rest[0]){const pack=await workflowGet(projectRoot,rest[0],flag(rest,'--version'));return{ok:true,response:workflowCompatibility(pack,{cutoutVersion:flag(rest,'--cutout')??'0.1.4',capabilities:flag(rest,'--capabilities')?.split(',').filter(Boolean)??[]})}}throw new Error('Use: workflow list|get|compat.')}
+async function workflow(projectRoot,args){const[action,...rest]=args;if(action==='list')return{ok:true,response:{packs:await workflowList(projectRoot)}};if(action==='get'&&rest[0])return{ok:true,response:await workflowGet(projectRoot,rest[0],flag(rest,'--version'))};if(action==='compat'&&rest[0]){const pack=await workflowGet(projectRoot,rest[0],flag(rest,'--version'));return{ok:true,response:workflowCompatibility(pack,{cutoutVersion:flag(rest,'--cutout')??PRODUCT_VERSION,capabilities:flag(rest,'--capabilities')?.split(',').filter(Boolean)??[]})}}throw new Error('Use: workflow list|get|compat.')}
 
 async function registry(projectRoot, args) {
   const [action, ...rest] = args

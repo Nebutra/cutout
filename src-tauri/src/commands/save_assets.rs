@@ -5,6 +5,8 @@
 //! per-file `failed[]` (partial success) instead of all-or-nothing `Promise.all`, and a
 //! path-traversal guard on every write.
 
+use std::fs::OpenOptions;
+use std::io::Write;
 use std::path::{Path, PathBuf};
 
 use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
@@ -158,24 +160,10 @@ async fn pick_folder<R: Runtime>(app: &AppHandle<R>) -> Result<Option<PathBuf>, 
     }
 }
 
-/// Resolve an explicit (remembered) destination directory. Used only when it
-/// still exists as a directory, so a stale/removed remembered path silently
-/// falls back to the picker instead of failing every write.
-fn resolve_dest(dest_dir: &Option<String>) -> Option<PathBuf> {
-    let dir = dest_dir.as_ref()?;
-    let path = PathBuf::from(dir);
-    if path.is_dir() {
-        Some(path)
-    } else {
-        None
-    }
-}
-
 #[tauri::command]
 pub async fn save_assets<R: Runtime>(
     app: AppHandle<R>,
     assets: Vec<AssetInput>,
-    dest_dir: Option<String>,
 ) -> Result<SaveAssetsResult, SaveError> {
     if assets.is_empty() {
         return Ok(SaveAssetsResult {
@@ -186,20 +174,20 @@ pub async fn save_assets<R: Runtime>(
         });
     }
 
-    // A valid remembered directory skips the picker; otherwise prompt as before.
-    let dir = match resolve_dest(&dest_dir) {
-        Some(dir) => dir,
-        None => match pick_folder(&app).await? {
-            Some(dir) => dir,
-            None => {
-                return Ok(SaveAssetsResult {
-                    canceled: true,
-                    output_dir: None,
-                    count: 0,
-                    failed: Vec::new(),
-                })
-            }
-        },
+    // A webview path is data, not authority. Every export gets a fresh native
+    // directory grant from the operating-system picker.
+    let dir = match pick_folder(&app).await? {
+        Some(dir) => {
+            std::fs::canonicalize(dir).map_err(|error| SaveError::ResolvePath(error.to_string()))?
+        }
+        None => {
+            return Ok(SaveAssetsResult {
+                canceled: true,
+                output_dir: None,
+                count: 0,
+                failed: Vec::new(),
+            })
+        }
     };
 
     let mut count = 0usize;
@@ -228,7 +216,7 @@ pub async fn save_assets<R: Runtime>(
             }
         };
 
-        match tokio::fs::write(&target, &bytes).await {
+        match write_without_following(&target, &bytes) {
             Ok(()) => count += 1,
             Err(e) => failed.push(FailedWrite {
                 name: asset.name.clone(),
@@ -243,6 +231,31 @@ pub async fn save_assets<R: Runtime>(
         count,
         failed,
     })
+}
+
+fn write_without_following(path: &Path, bytes: &[u8]) -> Result<(), std::io::Error> {
+    let mut options = OpenOptions::new();
+    options.write(true).create(true).truncate(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.custom_flags(libc::O_NOFOLLOW);
+    }
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::OpenOptionsExt;
+        const FILE_FLAG_OPEN_REPARSE_POINT: u32 = 0x0020_0000;
+        options.custom_flags(FILE_FLAG_OPEN_REPARSE_POINT);
+    }
+    let mut file = options.open(path)?;
+    if !file.metadata()?.is_file() {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "asset target must be a regular file",
+        ));
+    }
+    file.write_all(bytes)?;
+    file.sync_all()
 }
 
 #[cfg(test)]
@@ -304,22 +317,17 @@ mod tests {
         assert!(!is_within(dir, dir));
     }
 
+    #[cfg(unix)]
     #[test]
-    fn resolve_dest_uses_existing_directory() {
-        let tmp = std::env::temp_dir();
-        assert_eq!(
-            resolve_dest(&Some(tmp.to_string_lossy().into_owned())),
-            Some(tmp)
-        );
-    }
-
-    #[test]
-    fn resolve_dest_falls_back_when_absent_or_missing() {
-        assert_eq!(resolve_dest(&None), None);
-        assert_eq!(
-            resolve_dest(&Some("/no/such/dir/xyzzy-404".to_string())),
-            None
-        );
+    fn write_rejects_symbolic_link_targets() {
+        use std::os::unix::fs::symlink;
+        let root = tempfile::tempdir().unwrap();
+        let outside = root.path().join("outside");
+        std::fs::write(&outside, b"unchanged").unwrap();
+        let link = root.path().join("asset.png");
+        symlink(&outside, &link).unwrap();
+        assert!(write_without_following(&link, b"replacement").is_err());
+        assert_eq!(std::fs::read(&outside).unwrap(), b"unchanged");
     }
 
     #[test]

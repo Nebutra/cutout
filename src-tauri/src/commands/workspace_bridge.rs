@@ -161,14 +161,11 @@ pub async fn workspace_revision_preview_export(
 
 #[tauri::command]
 pub async fn workspace_revision_apply_export(
+    app: tauri::AppHandle,
     registry: State<'_, RegistryDesktopState>,
     state: State<'_, WorkspaceBridgeState>,
     plan_id: String,
-    approval_id: String,
 ) -> Result<WorkspaceRevision, String> {
-    if approval_id.trim().is_empty() {
-        return Err("Explicit approval id is required.".into());
-    }
     let plan = state
         .plans
         .lock()
@@ -178,6 +175,12 @@ pub async fn workspace_revision_apply_export(
     if plan.conflict {
         return Err("External Design IR changed; import or resolve before export.".into());
     }
+    crate::commands::native_approval::require_native_confirmation(
+        &app,
+        "Approve Design IR export",
+        "Write the reviewed Design IR revision into the selected workspace?",
+    )
+    .await?;
     let root = authorized(&registry, &plan.workspace_handle)?;
     let path = design_ir_path(&root).await?;
     let current = fs::read(&path).await.map_err(|e| e.to_string())?;
