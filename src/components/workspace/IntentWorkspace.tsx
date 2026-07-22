@@ -236,7 +236,10 @@ import {
   planPrototypeRepair,
   type PrototypeRepairPlan,
 } from "@/agent-runtime/prototype-repair";
-import { buildAgentViewModel } from "@/components/agent-workspace/agent-view-model";
+import {
+  buildAgentViewModel,
+  selectLatestAgentMessageRegenerationTarget,
+} from "@/components/agent-workspace/agent-view-model";
 import {
   assertImpactPlanCurrent,
   buildMaterialImpactPlan,
@@ -1260,11 +1263,12 @@ export function IntentWorkspace({
       skipToolGate?: boolean;
       briefOverride?: string;
       ignoreSelectedMaterial?: boolean;
+      regenerateTargetEventId?: string;
+      regenerateFallbackReply?: string;
     } = {},
   ): Promise<void> {
     const baseText = (options.briefOverride ?? brief).trim();
     if (!baseText) return;
-    setRetryableRunBrief(null);
     const text = withCanvasAnnotations(baseText, canvasAnnotations);
     const requestedMaterial = options.ignoreSelectedMaterial
       ? null
@@ -1377,6 +1381,11 @@ export function IntentWorkspace({
 
     const lease = agentRunCoordinatorRef.current.begin();
     activeRunRef.current = lease;
+    // Provider/route preflight has accepted the attempt. It now owns the UI,
+    // including conversational tool-gate returns that never reach generation.
+    setRunError(null);
+    setRetryableRunBrief(null);
+    getStoreState().clearGenError();
     // Set synchronously (not after tryToolGate resolves) so the composer's
     // `working`/disabled state covers the tool-gate phase too — otherwise a
     // second submission could re-enter createAssets while this one is still
@@ -1388,9 +1397,13 @@ export function IntentWorkspace({
     let clarifiedBrief: string | null = null;
     // Both the tool gate and a repair reuse an existing conversation turn. Do
     // not project either path as a second user bubble in the transcript.
-    let intentAlreadyRecorded = mode === "repair";
-    if (mode === "create" && !selectedMaterial && !options.skipToolGate) {
-      const toolGate = await tryToolGate(text, chatAssignment, lease);
+    let intentAlreadyRecorded =
+      mode === "repair" || Boolean(options.regenerateTargetEventId);
+    if (mode === "create" && !requestedMaterial && !options.skipToolGate) {
+      const toolGate = await tryToolGate(text, chatAssignment, lease, {
+        regenerateTargetEventId: options.regenerateTargetEventId,
+        regenerateFallbackReply: options.regenerateFallbackReply,
+      });
       intentAlreadyRecorded = true;
       // A newer submission may have superseded this lease while tryToolGate
       // awaited its model call. Stop here instead of falling through into
@@ -1411,7 +1424,6 @@ export function IntentWorkspace({
 
     setRunStartedAt(Date.now());
     setLiveAgentOutput("");
-    setRunError(null);
     const webSearchSupported = supportsWebSearch(chatAssignment, providerList);
     setExecutionNotices([
       ...composerRouteNotices(route),
@@ -1579,6 +1591,10 @@ export function IntentWorkspace({
     text: string,
     chat: ModelAssignment,
     lease: AgentRunLease,
+    options: {
+      readonly regenerateTargetEventId?: string;
+      readonly regenerateFallbackReply?: string;
+    } = {},
   ): Promise<{
     handled: boolean;
     regenerationDecision: RegenerationDecision | null;
@@ -1639,6 +1655,30 @@ export function IntentWorkspace({
       replyTool,
     ].filter((tool) => tool !== null);
     const capabilityContext = agentCapabilityContext(tools);
+    const reviseRegeneratedReply = async (
+      draftReply: string | undefined,
+    ): Promise<boolean> => {
+      const targetEventId = options.regenerateTargetEventId;
+      if (!targetEventId) return false;
+      const fallbackReply =
+        draftReply?.trim() || options.regenerateFallbackReply?.trim();
+      if (!fallbackReply) return true;
+      const streamedReply = await streamConversationalReply(
+        text,
+        fallbackReply,
+        chat,
+        lease,
+        capabilityContext,
+      );
+      if (agentRunCoordinatorRef.current.isActive(lease)) {
+        emitRunEvent(toolRunId, {
+          type: "message-revised",
+          targetEventId,
+          message: streamedReply,
+        });
+      }
+      return true;
+    };
     const actionableToolCount = [
       astryxTool,
       regenerationTool,
@@ -1656,7 +1696,9 @@ export function IntentWorkspace({
     startAgentRun("create", { runId: toolRunId });
     // Project the user's turn into the conversation before the model replies
     // (greetings, questions, and build requests all share this chat surface).
-    emitRunEvent(toolRunId, { type: "intent-recorded", intent: text });
+    if (!options.regenerateTargetEventId) {
+      emitRunEvent(toolRunId, { type: "intent-recorded", intent: text });
+    }
 
     const toolLoop = await runToolLoop(personalizedGenerationRef.current, {
       runId: toolRunId,
@@ -1722,6 +1764,7 @@ export function IntentWorkspace({
     }
     if (!toolLoop.ok) {
       console.info("[Cutout] tool gate failed:", toolLoop.error);
+      if (options.regenerateTargetEventId) throw new Error(toolLoop.error);
       return {
         handled: false,
         regenerationDecision: null,
@@ -1731,6 +1774,15 @@ export function IntentWorkspace({
       };
     }
     if (!toolLoop.data.called) {
+      if (await reviseRegeneratedReply(toolLoop.data.text)) {
+        return {
+          handled: true,
+          regenerationDecision: null,
+          pageTargetingDecision: null,
+          clarifiedBrief: null,
+          refinedBrief: null,
+        };
+      }
       return {
         handled: false,
         regenerationDecision: null,
@@ -1767,6 +1819,22 @@ export function IntentWorkspace({
       (call) => call.toolName === "ask_clarifying_question",
     );
 
+    // Regenerate is a message operation, never an implicit request to enter
+    // the paid asset pipeline when classification returns text or another tool.
+    if (
+      options.regenerateTargetEventId &&
+      (!conversationalCall || conversationalCall.error)
+    ) {
+      await reviseRegeneratedReply(toolLoop.data.text);
+      return {
+        handled: true,
+        regenerationDecision: null,
+        pageTargetingDecision: null,
+        clarifiedBrief: null,
+        refinedBrief: null,
+      };
+    }
+
     const failedAskCall = askCalls.find((call) => call.error);
     if (failedAskCall) {
       toast.error("Clarifying question failed", {
@@ -1796,10 +1864,19 @@ export function IntentWorkspace({
           refinedBrief: null,
         };
       }
-      emitRunEvent(toolRunId, {
-        type: "agent-message",
-        message: streamedReply,
-      });
+      emitRunEvent(
+        toolRunId,
+        options.regenerateTargetEventId
+          ? {
+              type: "message-revised",
+              targetEventId: options.regenerateTargetEventId,
+              message: streamedReply,
+            }
+          : {
+              type: "agent-message",
+              message: streamedReply,
+            },
+      );
       return {
         handled: true,
         regenerationDecision: null,
@@ -3656,6 +3733,19 @@ export function IntentWorkspace({
                 setBrief(message);
                 emitRunEvent(runId, { type: "message-revised", targetEventId, message });
                 void createAssets(repairPlan ? "repair" : "create", { briefOverride: message });
+              }}
+              onRegenerateMessage={(targetEventId) => {
+                if (working) return;
+                const target = selectLatestAgentMessageRegenerationTarget(
+                  agentRunEvents.events,
+                );
+                if (!target || target.targetEventId !== targetEventId) return;
+                void createAssets("create", {
+                  briefOverride: target.sourceMessage,
+                  ignoreSelectedMaterial: true,
+                  regenerateTargetEventId: target.targetEventId,
+                  regenerateFallbackReply: target.targetMessage,
+                });
               }}
               onOpenArtifact={(kind) => {
                 if (kind === "design-system" || kind === "design-markdown") {

@@ -24,6 +24,10 @@ receipts. `.cutout` state and provenance remain authoritative.
   user-facing message, and `retryable` flag. `createAgentRunRetryControl(...)`
   may expose a run-level callback only from that classification or an existing
   material repair plan.
+- `selectLatestAgentMessageRegenerationTarget(events)` returns the latest
+  durable Agent message id, its effective revised text, and the nearest
+  preceding effective revised user intent/steer. `AgentWorkspaceDock` exposes
+  that action through `onRegenerateMessage(eventId)` only while no run is active.
 
 ### 3. Contracts
 
@@ -67,6 +71,20 @@ receipts. `.cutout` state and provenance remain authoritative.
   error item, even when newer informational messages follow it. Repair-plan
   `Continue` takes precedence over transient `Retry`, and both are hidden while
   another run is active.
+- Message-level Regenerate is distinct from run-level and paid-tool Retry. Only
+  the latest completed durable `agent-message` is eligible. It reuses the
+  effective source user turn, ignores selected-material repair context, emits
+  no duplicate `intent-recorded` event, and replaces the Agent reply through a
+  durable `message-revised` event.
+- A retry or regeneration attempt supersedes the prior stopped UI only after
+  route/provider preflight and lease acceptance. At that boundary it clears
+  both persisted `runError` and the canonical generation error before awaiting
+  the tool gate, so an early conversational return cannot restore stale
+  `Run stopped` or `No result yet` state.
+- Message regeneration is fail-closed against asset generation. Tool-gate
+  failure becomes a new classified run error; no-call and non-conversational
+  tool results remain on the conversational revision path and never fall
+  through to the paid prototype pipeline.
 
 ### 4. Validation & Error Matrix
 
@@ -89,6 +107,10 @@ receipts. `.cutout` state and provenance remain authoritative.
 | Reopened project with retryable persisted `runError` and non-empty project brief | Reconstruct one run-level `Retry` callback |
 | Reopened project with missing brief or a non-retryable persisted error | Do not expose run-level `Retry` |
 | Cancellation, credential/auth failure, missing material, policy/moderation denial, invalid model/configuration, or HTTP 400/401/403/404/422 | Do not expose transient run-level `Retry` |
+| Latest completed Agent message has an effective preceding user turn and no run is active | Expose one icon-only `Regenerate response` action |
+| Agent reply is older, pending, non-durable, lacks a source turn, or another run is active | Do not expose message Regenerate |
+| Regenerate tool gate returns no call or selects a non-conversational tool | Revise through the conversational path; never enter asset generation |
+| Regenerate tool gate fails | Publish the new classified run failure; never resume or fall through to the asset pipeline |
 
 ### 5. Good / Base / Bad Cases
 
@@ -99,10 +121,18 @@ receipts. `.cutout` state and provenance remain authoritative.
   perform no external or managed-export effect.
 - Good run recovery: a network-interrupted run shows one `Retry` below the
   latest error, and the click creates a new run with the preserved brief.
+- Good message regeneration: the latest Agent reply shows a circular-arrow
+  icon, reuses the revised source user turn, and replaces that reply without a
+  second user bubble or paid asset execution.
+- Base: older Agent replies remain readable but have no regeneration action;
+  the current latest reply is the only eligible target.
 - Bad: reconstruct `{ id, grantedAt }` from a CLI flag, execute after a failed
   claim, follow a workspace symlink, attach page-wide axe output to every
   scenario, report delivery success without exact artifact hashes, or route a
   run-level retry through a prior paid-tool request id.
+- Bad: implement message Regenerate by calling the normal create path with a
+  new intent event or by letting a no-call classifier result fall into asset
+  generation.
 
 ### 6. Tests Required
 
@@ -125,6 +155,10 @@ receipts. `.cutout` state and provenance remain authoritative.
   source, restored-project fallback, original-brief preservation, latest
   error-row placement, active-run suppression, repair-plan precedence, and
   separation from tool-level retry callbacks.
+- Message regeneration: latest-only eligibility, icon accessibility, edited
+  source resolution, revised Agent projection, no duplicate user/Agent bubbles,
+  selected-material isolation, no-call/non-conversational fail-closed behavior,
+  and stale-error clearing before the awaited tool-gate boundary.
 - Run `pnpm agent:validate` after every CLI, MCP, protocol, capability, Skill,
   manifest, or plugin-runtime change.
 
@@ -145,3 +179,24 @@ await runtime.execute(request, { approval: reservation.approval })
 
 The first form lets the caller mint authority. The second keeps authorization
 host-issued, request-bound, expiring, and single-use.
+
+#### Wrong
+
+```ts
+createAssets('create', { briefOverride: priorPrompt })
+```
+
+#### Correct
+
+```ts
+createAssets('create', {
+  briefOverride: target.sourceMessage,
+  ignoreSelectedMaterial: true,
+  regenerateTargetEventId: target.targetEventId,
+  regenerateFallbackReply: target.targetMessage,
+})
+```
+
+The first form appends another user turn and may fall into material or asset
+generation. The second reuses the durable turn, isolates message regeneration
+from canvas repair, and revises the existing Agent reply.

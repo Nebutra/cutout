@@ -1,0 +1,2 @@
+{"file":".trellis/spec/frontend/agent-control-safety.md","reason":"Review message regeneration against run/tool retry separation and error lifecycle invariants."}
+{"file":".trellis/spec/frontend/release-pipeline.md","reason":"Review v0.1.4 source synchronization, validation gates, release publication, and installed-app evidence."}

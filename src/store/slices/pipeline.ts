@@ -81,6 +81,7 @@ export interface PipelineSlice {
   requestAgentRun(intent: PendingAgentRun['intent']): PendingAgentRun
   consumeAgentRun(): PendingAgentRun | null
   beginGen(phase: Exclude<GenPhase, 'idle'>): void
+  clearGenError(): void
   endGen(): void
   failGen(op: GenOp, message: string): void
   setGraph(spec: GraphSpec): void
@@ -144,6 +145,8 @@ export const createPipelineSlice: StateCreator<Store, [], [], PipelineSlice> = (
   clearDesignMarkdown: () => set({ designMarkdown: null }),
 
   beginGen: (phase) => set({ genPhase: phase, genError: null }),
+
+  clearGenError: () => set({ genError: null }),
 
   endGen: () => set({ genPhase: 'idle' }),
 

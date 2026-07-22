@@ -1,0 +1,2 @@
+{"file":".trellis/spec/frontend/agent-control-safety.md","reason":"Defines run-level Retry separation, canonical error state, durable event safety, and required regression coverage."}
+{"file":".trellis/spec/frontend/release-pipeline.md","reason":"Defines synchronized versions, immutable tags, signed updater artifacts, notarization, and atomic publication requirements."}

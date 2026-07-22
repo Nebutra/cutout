@@ -3,6 +3,7 @@ import type { OutcomeRuntimeState } from '@/agent-runtime/outcome-runtime'
 import { createRunEvent, replayRunEvents } from '@/agent-runtime/run-events'
 import {
   buildAgentViewModel,
+  selectLatestAgentMessageRegenerationTarget,
   type AgentStageFact,
 } from './agent-view-model'
 
@@ -491,6 +492,51 @@ describe('buildAgentViewModel', () => {
       detail: 'Tell me what you would like to design.',
       action: { type: 'proceed-anyway', label: 'Build it anyway', brief: 'hi' },
     })])
+  })
+
+  it('resolves the latest Agent reply to the effective revised user turn', () => {
+    const events = [
+      createRunEvent('run:1', { type: 'run-started', mode: 'create' }, { eventId: 's1', at: 1 }),
+      createRunEvent('run:1', { type: 'intent-recorded', intent: 'Make it blue' }, { eventId: 'u1', at: 2 }),
+      createRunEvent('run:1', { type: 'agent-message', message: 'First reply' }, { eventId: 'a1', at: 3 }),
+      createRunEvent('run:2', { type: 'run-started', mode: 'create' }, { eventId: 's2', at: 4 }),
+      createRunEvent('run:2', { type: 'steer-recorded', instruction: 'Use green instead' }, { eventId: 'u2', at: 5 }),
+      createRunEvent('run:2', { type: 'agent-message', message: 'Second reply' }, { eventId: 'a2', at: 6 }),
+      createRunEvent('run:2', { type: 'message-revised', targetEventId: 'u2', message: 'Use forest green instead' }, { eventId: 'r-u2', at: 7 }),
+      createRunEvent('run:2', { type: 'message-revised', targetEventId: 'a2', message: 'Revised second reply' }, { eventId: 'r-a2', at: 8 }),
+    ]
+
+    expect(selectLatestAgentMessageRegenerationTarget(events)).toEqual({
+      targetEventId: 'a2',
+      targetMessage: 'Revised second reply',
+      sourceEventId: 'u2',
+      sourceMessage: 'Use forest green instead',
+    })
+
+    const model = buildAgentViewModel({
+      brief: 'Use forest green instead', workflowPhase: 'idle', stages: [], outcome: null,
+      working: false, elapsedSeconds: 0, runError: null, runEvents: replayRunEvents(events),
+    })
+    const replies = model.feed.filter((item) => item.type === 'message' && item.role === 'agent')
+    expect(replies).toEqual([
+      expect.objectContaining({ id: 'a1', detail: 'First reply' }),
+      expect.objectContaining({ id: 'a2', detail: 'Revised second reply', regeneratable: true }),
+    ])
+    expect(replies[0]).not.toHaveProperty('regeneratable')
+  })
+
+  it('suppresses message regeneration while another run is active', () => {
+    const runEvents = replayRunEvents([
+      createRunEvent('run', { type: 'run-started', mode: 'create' }, { eventId: 'start', at: 1 }),
+      createRunEvent('run', { type: 'intent-recorded', intent: 'Who are you?' }, { eventId: 'user', at: 2 }),
+      createRunEvent('run', { type: 'agent-message', message: 'I am Cutout.' }, { eventId: 'agent', at: 3 }),
+    ])
+    const model = buildAgentViewModel({
+      brief: 'Who are you?', workflowPhase: 'idle', stages: [], outcome: null,
+      working: true, elapsedSeconds: 1, runError: null, runEvents,
+    })
+
+    expect(model.feed.find((item) => item.id === 'agent')).not.toHaveProperty('regeneratable')
   })
 
   it('projects user intent and agent replies as an ordered multi-turn chat transcript', () => {

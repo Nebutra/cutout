@@ -135,6 +135,7 @@ export interface AgentWorkspaceDockProps {
   readonly onRetryTool?: (toolCallId: string, requestId?: string) => void
   readonly onAgentAction?: (eventId: string, action: 'proceed-anyway', brief: string) => void
   readonly onEditMessage?: (eventId: string, message: string) => void | Promise<void>
+  readonly onRegenerateMessage?: (eventId: string) => void
 }
 
 const DEFAULT_LABELS: AgentDockLabels = {
@@ -175,6 +176,7 @@ export function AgentWorkspaceDock({
   onDenyTool,
   onAgentAction,
   onEditMessage,
+  onRegenerateMessage,
 }: AgentWorkspaceDockProps) {
   const labels = { ...DEFAULT_LABELS, ...labelOverrides }
   const presentation = deriveDockPresentation(viewModel, {
@@ -217,6 +219,7 @@ export function AgentWorkspaceDock({
             compact
             onAgentAction={onAgentAction}
             onEditMessage={onEditMessage}
+            onRegenerateMessage={viewModel.summary.status === 'running' ? undefined : onRegenerateMessage}
             onApproveTool={onApproveTool}
             onDenyTool={onDenyTool}
             onRetry={presentation.mode === 'repair' ? onRetry : undefined}
@@ -313,6 +316,7 @@ export function AgentRunFeed({
   onRetryTool,
   onAgentAction,
   onEditMessage,
+  onRegenerateMessage,
   onRetry,
   retryLabel,
 }: {
@@ -327,6 +331,7 @@ export function AgentRunFeed({
   readonly onRetryTool?: AgentWorkspaceDockProps['onRetryTool']
   readonly onAgentAction?: AgentWorkspaceDockProps['onAgentAction']
   readonly onEditMessage?: AgentWorkspaceDockProps['onEditMessage']
+  readonly onRegenerateMessage?: AgentWorkspaceDockProps['onRegenerateMessage']
   readonly onRetry?: () => void
   readonly retryLabel?: string
 }) {
@@ -384,7 +389,7 @@ export function AgentRunFeed({
             ? [...items].reverse().find((item) => item.type === 'error')?.id
             : undefined
           return items.map((item) => (
-            <FeedRow key={item.id} item={item} detailsLabel={detailsLabel} onApproveTool={onApproveTool} onDenyTool={onDenyTool} onCancelTool={onCancelTool} onRetryTool={onRetryTool} onAgentAction={onAgentAction} onEditMessage={onEditMessage} showMessageAction={item.id === latestActionId} onRetry={item.id === latestErrorId ? onRetry : undefined} retryLabel={retryLabel} />
+            <FeedRow key={item.id} item={item} detailsLabel={detailsLabel} onApproveTool={onApproveTool} onDenyTool={onDenyTool} onCancelTool={onCancelTool} onRetryTool={onRetryTool} onAgentAction={onAgentAction} onEditMessage={onEditMessage} onRegenerateMessage={onRegenerateMessage} showMessageAction={item.id === latestActionId} onRetry={item.id === latestErrorId ? onRetry : undefined} retryLabel={retryLabel} />
           ))
         })()}
         <div ref={endRef} />
@@ -393,7 +398,7 @@ export function AgentRunFeed({
   )
 }
 
-function FeedRow({ item, detailsLabel, onApproveTool, onDenyTool, onCancelTool, onRetryTool, onAgentAction, onEditMessage, showMessageAction = false, onRetry, retryLabel }: {
+function FeedRow({ item, detailsLabel, onApproveTool, onDenyTool, onCancelTool, onRetryTool, onAgentAction, onEditMessage, onRegenerateMessage, showMessageAction = false, onRetry, retryLabel }: {
   readonly item: AgentFeedItem
   readonly detailsLabel: string
   readonly onApproveTool?: AgentWorkspaceDockProps['onApproveTool']
@@ -402,6 +407,7 @@ function FeedRow({ item, detailsLabel, onApproveTool, onDenyTool, onCancelTool, 
   readonly onRetryTool?: AgentWorkspaceDockProps['onRetryTool']
   readonly onAgentAction?: AgentWorkspaceDockProps['onAgentAction']
   readonly onEditMessage?: AgentWorkspaceDockProps['onEditMessage']
+  readonly onRegenerateMessage?: AgentWorkspaceDockProps['onRegenerateMessage']
   readonly showMessageAction?: boolean
   readonly onRetry?: () => void
   readonly retryLabel?: string
@@ -541,6 +547,7 @@ function FeedRow({ item, detailsLabel, onApproveTool, onDenyTool, onCancelTool, 
               align={isUser ? 'end' : 'start'}
               message={item.detail}
               allowEdit={isUser && Boolean(onEditMessage)}
+              allowRegenerate={!isUser && Boolean(item.regeneratable && onRegenerateMessage)}
               onEdit={() => {
                 setEditValue(item.detail)
                 setEditError(null)
@@ -549,6 +556,7 @@ function FeedRow({ item, detailsLabel, onApproveTool, onDenyTool, onCancelTool, 
               }}
               action={showMessageAction ? item.action : undefined}
               onAction={onAgentAction ? () => onAgentAction(item.id, item.action!.type, item.action!.brief) : undefined}
+              onRegenerate={onRegenerateMessage ? () => onRegenerateMessage(item.id) : undefined}
             />
           ) : null}
         </div>
@@ -615,14 +623,18 @@ function MessageActions({
   align,
   message,
   allowEdit,
+  allowRegenerate,
   onEdit,
+  onRegenerate,
   action,
   onAction,
 }: {
   readonly align: 'start' | 'end'
   readonly message: string
   readonly allowEdit: boolean
+  readonly allowRegenerate: boolean
   readonly onEdit?: () => void
+  readonly onRegenerate?: () => void
   readonly action?: Extract<AgentFeedItem, { readonly type: 'message' }>['action']
   readonly onAction?: () => void
 }) {
@@ -659,6 +671,16 @@ function MessageActions({
               </Button>
             </TooltipTrigger>
             <TooltipContent>Edit</TooltipContent>
+          </Tooltip>
+        ) : null}
+        {allowRegenerate && onRegenerate ? (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button type="button" variant="ghost" size="icon-sm" aria-label="Regenerate response" onClick={onRegenerate}>
+                <RefreshCw />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Regenerate response</TooltipContent>
           </Tooltip>
         ) : null}
         {action && onAction ? (

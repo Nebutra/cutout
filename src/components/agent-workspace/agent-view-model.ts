@@ -50,6 +50,8 @@ export type AgentFeedItem =
       readonly title: 'You' | 'Agent'
       readonly detail: string
       readonly provenance: 'runtime'
+      /** Only the latest durable Agent reply may be regenerated. */
+      readonly regeneratable?: boolean
       readonly action?: {
         readonly type: 'proceed-anyway'
         readonly label: string
@@ -152,20 +154,69 @@ export function buildAgentViewModel(input: AgentViewModelInput): AgentWorkspaceV
   }
 }
 
+export interface AgentMessageRegenerationTarget {
+  readonly targetEventId: string
+  readonly targetMessage: string
+  readonly sourceEventId: string
+  readonly sourceMessage: string
+}
+
+/** Resolve the latest durable Agent reply and the effective user turn it answered. */
+export function selectLatestAgentMessageRegenerationTarget(
+  events: readonly AgentRunEvent[],
+): AgentMessageRegenerationTarget | null {
+  const revisions = latestMessageRevisions(events)
+  let targetIndex = -1
+  for (let index = events.length - 1; index >= 0; index -= 1) {
+    if (events[index]?.type === 'agent-message') {
+      targetIndex = index
+      break
+    }
+  }
+  if (targetIndex < 0) return null
+
+  const target = events[targetIndex]
+  if (target?.type !== 'agent-message') return null
+  const targetMessage = (revisions.get(target.eventId) ?? target.message).trim()
+  if (!targetMessage) return null
+  for (let index = targetIndex - 1; index >= 0; index -= 1) {
+    const source = events[index]
+    if (source?.type !== 'intent-recorded' && source?.type !== 'steer-recorded') continue
+    const sourceMessage = (revisions.get(source.eventId)
+      ?? (source.type === 'intent-recorded' ? source.intent : source.instruction)).trim()
+    if (!sourceMessage) return null
+    return {
+      targetEventId: target.eventId,
+      targetMessage,
+      sourceEventId: source.eventId,
+      sourceMessage,
+    }
+  }
+  return null
+}
+
 function buildFeed(input: AgentViewModelInput): readonly AgentFeedItem[] {
   const events = input.runEvents?.events ?? []
   const activeRunId = input.runEvents?.activeRunId
+  const regenerationTarget = input.working
+    ? null
+    : selectLatestAgentMessageRegenerationTarget(events)
 
   // Chat transcript spans every run so multi-turn dialogue stays visible.
-  const revisions = new Map(
-    events.flatMap((event) => event.type === 'message-revised' ? [[event.targetEventId, event.message] as const] : []),
-  )
+  const revisions = latestMessageRevisions(events)
   const conversationItems = collapseRepeatedIntentTurns(events).flatMap((event) => {
     const items = feedItemFromRunEvent(event)
     const revision = revisions.get(event.eventId)
-    return revision
-      ? items.map((item) => item.type === 'message' && item.role === 'user' ? { ...item, detail: revision } : item)
-      : items
+    return items.map((item) => {
+      if (item.type !== 'message') return item
+      return {
+        ...item,
+        ...(revision ? { detail: revision } : {}),
+        ...(item.role === 'agent' && item.id === regenerationTarget?.targetEventId
+          ? { regeneratable: true }
+          : {}),
+      }
+    })
   })
   const liveMessageItem: AgentFeedItem[] = input.liveAgentMessage
     ? [{
@@ -253,6 +304,14 @@ function buildFeed(input: AgentViewModelInput): readonly AgentFeedItem[] {
     ...eventItems,
     ...fallbackItems.filter((item) => !(hasDurableError && item.type === 'error')),
   ]
+}
+
+function latestMessageRevisions(events: readonly AgentRunEvent[]): ReadonlyMap<string, string> {
+  return new Map(
+    events.flatMap((event) => event.type === 'message-revised'
+      ? [[event.targetEventId, event.message] as const]
+      : []),
+  )
 }
 
 /**
