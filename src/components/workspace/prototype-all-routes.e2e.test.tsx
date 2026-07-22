@@ -15,7 +15,6 @@ import type { GenerateInput } from '@/services/ai/types'
 import type { ModelAssignments } from '@/services/ai/model-assignment-types'
 import type { PrototypePage, PrototypePlan } from '@/prototype/prototype-plan'
 import type { VisualGenerationTask } from '@/visual-generation'
-import { defaultPaidToolPreferences } from '@/agent-runtime/paid-tool-preferences'
 import { IntentWorkspace } from './IntentWorkspace'
 import { installE2eLocalStorage } from './intent-workspace.e2e.testkit'
 
@@ -89,7 +88,9 @@ vi.mock('@/agent-runtime/use-desktop-tool-loop', () => ({
       const id = persistArtifact(bytes, mediaType)
       return { artifactId: id, sha256: id.slice('artifact:sha256:'.length) }
     },
-    visualPreferences: () => defaultPaidToolPreferences,
+    visualBudget: () => ({
+      ceiling: { currency: 'USD' as const, amount: 0.08 },
+    }),
   }),
 }))
 
@@ -416,6 +417,10 @@ describe('brief → every planned route — rendered IntentWorkspace', () => {
       new Set(['prototype:Atlas']),
     )
     for (const task of desktopHarness.tasks) {
+      expect(task.budget).toMatchObject({
+        approvalPolicy: 'explicit',
+        ceiling: { currency: 'USD', amount: 0.08 },
+      })
       expect(task.prompt.objective).toContain('Suite route contract (all planned screens)')
       expect(task.prompt.objective).toContain('Final DESIGN.md:')
       expect(task.prompt.objective).toContain(

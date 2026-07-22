@@ -62,6 +62,7 @@ describe('desktop visual tool prompt contract', () => {
       request: expect.objectContaining({
         intent: 'Generate visual for task:1 (generate:1)',
         prompt,
+        approvalPolicy: 'explicit',
       }),
     }))
   })

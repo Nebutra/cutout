@@ -14,7 +14,7 @@ describe("settings section grouping", () => {
     const dialog = source("SettingsDialog.tsx");
 
     expect(general).not.toMatch(/Paid actions|Local recovery/);
-    expect(ai).toContain("PaidActionsSection");
+    expect(ai).toContain("ModelAssignments");
     expect(general).toContain("settings.developer_mode.title");
     expect(support).toContain("UpdatesSection");
     expect(support).toContain("RecoverySection");

@@ -491,11 +491,6 @@ msgid "settings.speech.auto_play_aria"
 msgstr "Reproducir automáticamente respuestas TTS"
 
 #. js-lingui-explicit-id
-#: src/components/settings/sections/PaidActionsSection.tsx
-msgid "settings.paid_actions.auto_approve_aria"
-msgstr "Aprobar automáticamente acciones de pago dentro del presupuesto"
-
-#. js-lingui-explicit-id
 #: src/components/home/ProjectHome.tsx
 msgid "home.nav_back"
 msgstr "Atrás"
@@ -589,11 +584,6 @@ msgstr "Cambiar tema"
 #: src/components/settings/sections/SpeechSection.tsx
 msgid "settings.speech.host_unavailable_suffix"
 msgstr "Los cambios aquí no se pueden guardar hasta entonces."
-
-#. js-lingui-explicit-id
-#: src/components/settings/ProviderForm.tsx
-msgid "settings.provider_protocol_chat_completions"
-msgstr "OpenAI Chat Completions"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/UpdatesSection.tsx
@@ -1500,11 +1490,6 @@ msgid "settings.personalization.tool_assisted_memory_desc"
 msgstr "Permite que las herramientas aprobadas aporten señales de preferencia."
 
 #. js-lingui-explicit-id
-#: src/components/settings/sections/PaidActionsSection.tsx
-msgid "settings.paid_actions.hint"
-msgstr "Permite que el Agent continúe automáticamente solo dentro de este límite por acción."
-
-#. js-lingui-explicit-id
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.title"
 msgstr "Biblioteca"
@@ -1603,16 +1588,6 @@ msgstr "Bloqueado"
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.kit_editor_description"
 msgstr "Gestiona la proyección aprobada del kit direccionada por contenido."
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/PaidActionsSection.tsx
-msgid "settings.paid_actions.maximum_cost_aria"
-msgstr "Coste máximo en USD de una acción de pago"
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/PaidActionsSection.tsx
-msgid "settings.paid_actions.maximum_cost"
-msgstr "Máximo por acción (USD)"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/PersonalizationSection.tsx
@@ -1814,6 +1789,16 @@ msgid "topbar.tabs_overview"
 msgstr "Pestañas abiertas"
 
 #. js-lingui-explicit-id
+#: src/components/settings/ProviderForm.tsx
+msgid "settings.provider_protocol_chat_completions"
+msgstr "OpenAI Chat Completions"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderForm.tsx
+msgid "settings.provider_protocol_responses"
+msgstr "OpenAI Responses"
+
+#. js-lingui-explicit-id
 #: src/components/settings/ModelSlot.tsx
 msgid "settings.optional_fallback_model_placeholder"
 msgstr "Modelo de respaldo opcional"
@@ -1822,11 +1807,6 @@ msgstr "Modelo de respaldo opcional"
 #: src/components/source/DropZone.tsx
 msgid "source.dropzone_hint"
 msgstr "o haz clic para explorar · PNG, JPEG, WebP"
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/PaidActionsSection.tsx
-msgid "settings.paid_actions.title"
-msgstr "Acciones de pago"
 
 #. js-lingui-explicit-id
 #: src/components/library/KitLibraryInspector.tsx
@@ -2210,11 +2190,6 @@ msgstr "Resuelve los candidatos {0} en conflicto antes de publicar."
 #: src/components/library/ReviewBranchEditor.tsx
 msgid "review_branch.resolved"
 msgstr "resuelto"
-
-#. js-lingui-explicit-id
-#: src/components/settings/ProviderForm.tsx
-msgid "settings.provider_protocol_responses"
-msgstr "OpenAI Responses"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/UpdatesSection.tsx

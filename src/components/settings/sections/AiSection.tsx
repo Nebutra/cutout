@@ -33,7 +33,6 @@ import { VectorizerPanel } from "../VectorizerPanel";
 import { ProviderDirectory } from "../ProviderDirectory";
 import type { ProviderDefinition } from "@/services/ai/provider-registry";
 import { modelRoutingCoverage } from "../model-routing-summary";
-import { PaidActionsSection } from "./PaidActionsSection";
 import { useQuery } from "@tanstack/react-query";
 import { discoverProviderCandidates, type ProviderDiscoveryCandidate } from "@/services/ai/provider-discovery";
 
@@ -161,7 +160,6 @@ export function AiSection() {
       </Button>
 
       <ModelAssignments onConnect={() => setView({ mode: "add" })} />
-      <PaidActionsSection />
     </div>
   );
 }

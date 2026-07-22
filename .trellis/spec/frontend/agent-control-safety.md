@@ -29,6 +29,9 @@ receipts. `.cutout` state and provenance remain authoritative.
 
 - A host-issued `cutout.approval-lease.v1` lease binds its project, subject,
   operation digest, expected revision, approval id, issue time, and expiry.
+- Desktop paid-tool requests always require explicit approval. Their budget
+  ceilings come from the matching host capability estimate, never a persisted
+  user allowance, and the desktop host policy does not project a `maxCost`.
 - Lease reservation and the complete control request run under the same
   project-scoped external-control lock. Reserved leases are single-use even
   when the operation returns a denied or invalid response.

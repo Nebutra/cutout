@@ -3103,7 +3103,7 @@ export function IntentWorkspace({
     );
     const runId = `workspace:${lease.id}`;
     const referenceIds = await Promise.all(referenceImages.map((bytes) => desktopTools.persistReference(bytes, "image/png", runId)));
-    const preferences = desktopTools.visualPreferences();
+    const budget = desktopTools.visualBudget();
 
     // Each attempt re-executes the visual task with the (possibly QA-corrected)
     // prompt; the resolved asset is captured so the artifact keeps its media type.
@@ -3117,7 +3117,7 @@ export function IntentWorkspace({
     const generatePage = async (prompt: string): Promise<Uint8Array> => {
       attemptCount += 1;
       const taskRunId = attemptCount === 1 ? String(lease.id) : `${lease.id}:qa${attemptCount}`;
-      const task = createPrototypePageVisualTask({ runId: taskRunId, plan, page, image, prompt, referenceArtifactIds: referenceIds, preferences });
+      const task = createPrototypePageVisualTask({ runId: taskRunId, plan, page, image, prompt, referenceArtifactIds: referenceIds, budget });
       const execution = await desktopTools.visualRuntime.execute(runId, task, lease.controller.signal);
       agentRunCoordinatorRef.current.checkpoint(lease);
       const asset = execution.promotion ? await desktopTools.resolveArtifact(execution.promotion.masterArtifactId) : null;

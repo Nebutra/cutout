@@ -53,4 +53,45 @@ describe("desktop visual tool bridge", () => {
       "request:1",
     );
   });
+
+  it("uses the routed host capability estimate for each paid request", async () => {
+    let requested: Parameters<DesktopToolLoop["request"]>[0] | undefined;
+    const loop: DesktopToolLoop = {
+      request: vi.fn(async (input) => { requested = input }),
+      settled: vi.fn(async () => ({ ok: false as const, error: "stop", events: [] })),
+      cancel: vi.fn(),
+      approve: vi.fn(),
+      deny: vi.fn(),
+      retry: vi.fn(),
+    };
+    const invoker = createDesktopVisualToolInvoker({
+      loop,
+      expectedRevision: () => 1,
+      estimateFor: (capability) => capability === "generate-image"
+        ? { currency: "USD", amount: 0.08 }
+        : { currency: "USD", amount: 0.12 },
+      resolveArtifact: vi.fn(),
+    });
+
+    await expect(invoker.invoke({
+      runId: "run:1",
+      taskId: "task:1",
+      nodeId: "edit:1",
+      requestId: "request:1",
+      capability: "edit-image",
+      preferredModel: "image-model",
+      allowCompatibleFallback: true,
+      requiredCapabilities: ["image-edit"],
+      prompt: "Refine the page",
+      inputArtifactIds: ["artifact:1"],
+      references: [],
+      budgetCeiling: { currency: "USD", amount: 1 },
+      approvalPolicy: "auto-within-budget",
+    })).rejects.toThrow("stop");
+
+    expect(requested?.request).toMatchObject({
+      approvalPolicy: "explicit",
+      budgetCeiling: { currency: "USD", amount: 0.12 },
+    });
+  });
 });

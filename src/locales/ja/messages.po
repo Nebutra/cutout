@@ -491,11 +491,6 @@ msgid "settings.speech.auto_play_aria"
 msgstr "TTS 応答を自動再生"
 
 #. js-lingui-explicit-id
-#: src/components/settings/sections/PaidActionsSection.tsx
-msgid "settings.paid_actions.auto_approve_aria"
-msgstr "予算内の有料アクションを自動承認"
-
-#. js-lingui-explicit-id
 #: src/components/home/ProjectHome.tsx
 msgid "home.nav_back"
 msgstr "戻る"
@@ -589,11 +584,6 @@ msgstr "テーマを変更"
 #: src/components/settings/sections/SpeechSection.tsx
 msgid "settings.speech.host_unavailable_suffix"
 msgstr "それまでは、ここでの変更は保存できません。"
-
-#. js-lingui-explicit-id
-#: src/components/settings/ProviderForm.tsx
-msgid "settings.provider_protocol_chat_completions"
-msgstr "OpenAI Chat Completions"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/UpdatesSection.tsx
@@ -1500,11 +1490,6 @@ msgid "settings.personalization.tool_assisted_memory_desc"
 msgstr "承認済みツールが設定シグナルを提供できるようにします。"
 
 #. js-lingui-explicit-id
-#: src/components/settings/sections/PaidActionsSection.tsx
-msgid "settings.paid_actions.hint"
-msgstr "この 1 回あたりの上限額以内でのみ、Agent の自動続行を許可します。"
-
-#. js-lingui-explicit-id
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.title"
 msgstr "ライブラリ"
@@ -1603,16 +1588,6 @@ msgstr "ロック中"
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.kit_editor_description"
 msgstr "承認済みのコンテンツアドレス指定キット投影を管理します。"
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/PaidActionsSection.tsx
-msgid "settings.paid_actions.maximum_cost_aria"
-msgstr "有料アクション 1 回あたりの最大 USD コスト"
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/PaidActionsSection.tsx
-msgid "settings.paid_actions.maximum_cost"
-msgstr "1 回あたりの最大額（USD）"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/PersonalizationSection.tsx
@@ -1814,6 +1789,16 @@ msgid "topbar.tabs_overview"
 msgstr "開いているタブ"
 
 #. js-lingui-explicit-id
+#: src/components/settings/ProviderForm.tsx
+msgid "settings.provider_protocol_chat_completions"
+msgstr "OpenAI Chat Completions"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderForm.tsx
+msgid "settings.provider_protocol_responses"
+msgstr "OpenAI Responses"
+
+#. js-lingui-explicit-id
 #: src/components/settings/ModelSlot.tsx
 msgid "settings.optional_fallback_model_placeholder"
 msgstr "フォールバックモデル(任意)"
@@ -1822,11 +1807,6 @@ msgstr "フォールバックモデル(任意)"
 #: src/components/source/DropZone.tsx
 msgid "source.dropzone_hint"
 msgstr "またはクリックして参照 · PNG、JPEG、WebP"
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/PaidActionsSection.tsx
-msgid "settings.paid_actions.title"
-msgstr "有料アクション"
 
 #. js-lingui-explicit-id
 #: src/components/library/KitLibraryInspector.tsx
@@ -2210,11 +2190,6 @@ msgstr "公開前に{0}件の競合する候補を解決してください。"
 #: src/components/library/ReviewBranchEditor.tsx
 msgid "review_branch.resolved"
 msgstr "解決済み"
-
-#. js-lingui-explicit-id
-#: src/components/settings/ProviderForm.tsx
-msgid "settings.provider_protocol_responses"
-msgstr "OpenAI Responses"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/UpdatesSection.tsx

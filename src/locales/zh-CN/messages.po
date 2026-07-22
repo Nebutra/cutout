@@ -491,11 +491,6 @@ msgid "settings.speech.auto_play_aria"
 msgstr "自动播放 TTS 回复"
 
 #. js-lingui-explicit-id
-#: src/components/settings/sections/PaidActionsSection.tsx
-msgid "settings.paid_actions.auto_approve_aria"
-msgstr "在预算范围内自动批准付费操作"
-
-#. js-lingui-explicit-id
 #: src/components/home/ProjectHome.tsx
 msgid "home.nav_back"
 msgstr "后退"
@@ -589,11 +584,6 @@ msgstr "切换主题"
 #: src/components/settings/sections/SpeechSection.tsx
 msgid "settings.speech.host_unavailable_suffix"
 msgstr "在此之前，此处的更改无法保存。"
-
-#. js-lingui-explicit-id
-#: src/components/settings/ProviderForm.tsx
-msgid "settings.provider_protocol_chat_completions"
-msgstr "OpenAI Chat Completions"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/UpdatesSection.tsx
@@ -1500,11 +1490,6 @@ msgid "settings.personalization.tool_assisted_memory_desc"
 msgstr "允许已批准的工具贡献偏好信号。"
 
 #. js-lingui-explicit-id
-#: src/components/settings/sections/PaidActionsSection.tsx
-msgid "settings.paid_actions.hint"
-msgstr "仅在单次操作不超过此额度时，允许 Agent 自动继续。"
-
-#. js-lingui-explicit-id
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.title"
 msgstr "库"
@@ -1603,16 +1588,6 @@ msgstr "已锁定"
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.kit_editor_description"
 msgstr "管理已批准的、内容寻址的套件投影。"
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/PaidActionsSection.tsx
-msgid "settings.paid_actions.maximum_cost_aria"
-msgstr "单次付费操作的最高美元成本"
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/PaidActionsSection.tsx
-msgid "settings.paid_actions.maximum_cost"
-msgstr "单次最高额度（USD）"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/PersonalizationSection.tsx
@@ -1814,6 +1789,16 @@ msgid "topbar.tabs_overview"
 msgstr "打开的标签页"
 
 #. js-lingui-explicit-id
+#: src/components/settings/ProviderForm.tsx
+msgid "settings.provider_protocol_chat_completions"
+msgstr "OpenAI Chat Completions"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderForm.tsx
+msgid "settings.provider_protocol_responses"
+msgstr "OpenAI Responses"
+
+#. js-lingui-explicit-id
 #: src/components/settings/ModelSlot.tsx
 msgid "settings.optional_fallback_model_placeholder"
 msgstr "可选的备用模型"
@@ -1822,11 +1807,6 @@ msgstr "可选的备用模型"
 #: src/components/source/DropZone.tsx
 msgid "source.dropzone_hint"
 msgstr "或点击浏览 · PNG、JPEG、WebP"
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/PaidActionsSection.tsx
-msgid "settings.paid_actions.title"
-msgstr "付费操作"
 
 #. js-lingui-explicit-id
 #: src/components/library/KitLibraryInspector.tsx
@@ -2210,11 +2190,6 @@ msgstr "请在发布前解决冲突的 {0} 候选项。"
 #: src/components/library/ReviewBranchEditor.tsx
 msgid "review_branch.resolved"
 msgstr "已解决"
-
-#. js-lingui-explicit-id
-#: src/components/settings/ProviderForm.tsx
-msgid "settings.provider_protocol_responses"
-msgstr "OpenAI Responses"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/UpdatesSection.tsx
