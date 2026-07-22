@@ -15,6 +15,10 @@ Make the Git workspace Playwright fixture reach assertions reliably and restore 
   could assert the Git dock and diff review.
 - Unit coverage for the merged Git/collapse control already passes; this task
   restores the missing browser-level evidence.
+- After the fixture reached assertions, desktop screenshots exposed a real
+  layout defect: the absolute Git drawer covers the left side of the main Git
+  review. The review remains accessible in the DOM but its title and patch text
+  begin underneath the 24rem/27rem drawer and are visually hidden.
 
 ## Requirements
 
@@ -29,6 +33,9 @@ Make the Git workspace Playwright fixture reach assertions reliably and restore 
   authorization data used by the visual fixture.
 - Add browser assertions for the single `Hide Git` control: Git glyph by
   default and collapse glyph on hover or keyboard focus.
+- When a Git review is open on desktop, offset the main workspace by the exact
+  Git drawer width so the dock and review are simultaneously visible. Preserve
+  the existing stacked narrow layout.
 - Keep desktop and narrow layout overflow assertions and screenshots stable.
 
 ## Acceptance Criteria
@@ -37,6 +44,8 @@ Make the Git workspace Playwright fixture reach assertions reliably and restore 
       without timing out.
 - [ ] The Git dock and `Git diff review` region are visible after deterministic
       repository authorization and file selection.
+- [ ] At desktop widths, the Git review starts at or after the Git drawer's
+      right edge; its title and patch text are not occluded.
 - [ ] The `Hide Git` button visually swaps from Git to collapse state on
       interaction without changing its dimensions.
 - [ ] Desktop and mobile/narrow scenarios have no horizontal document overflow.
@@ -46,7 +55,8 @@ Make the Git workspace Playwright fixture reach assertions reliably and restore 
 
 ## Out Of Scope
 
-- Changing Git workspace product behavior or native command contracts.
+- Changing Git command behavior, native command contracts, or review data.
 - Redesigning the dock, diff review, workspace rail, or repository picker.
+- Changing Agent, Files, Design, or other drawer positioning.
 - Adding fixed sleeps or increasing global Playwright timeouts to mask the
   failing setup.

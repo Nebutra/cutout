@@ -3683,7 +3683,10 @@ export function IntentWorkspace({
 
       <main
         data-workspace-panel="canvas-main"
-        className="order-1 flex min-h-0 min-w-0 flex-1 flex-col lg:order-none"
+        className={cn(
+          "order-1 flex min-h-0 min-w-0 flex-1 flex-col lg:order-none",
+          gitDockVisible && gitReview && "lg:ml-[24rem] 2xl:ml-[27rem]",
+        )}
       >
         <section
           className={cn(

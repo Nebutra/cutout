@@ -68,6 +68,32 @@ Wrong: a Git glyph on the left plus a second `Hide Git` icon on the right.
 Correct: one 28x28 `Hide Git` button whose Git glyph swaps to the panel-close
 glyph on hover or keyboard focus.
 
+### Visual fixtures for host-backed drawers
+
+Visual tests for drawers that call Tauri/native commands must install their
+deterministic command map with `page.addInitScript` before `page.goto`. A mock
+installed after the app loads can miss startup calls, and a catch-all response
+must not return a valid payload for unrelated commands.
+
+- Locate rail and drawer controls by role plus accessible name, not a `title`
+  attribute that the shared component does not own.
+- Wait for observable UI state such as the authorized repository, changed file,
+  and review region. Do not use fixed sleeps or larger global timeouts.
+- Removing `test.skip` is not enough: assert that visible text geometry does
+  not overlap an absolute drawer and stays inside the review viewport.
+- When a responsive drawer width changes by breakpoint, cover each width with
+  computed geometry. For the Git drawer this is 24rem at `lg` and 27rem at
+  `2xl`, with the main review starting at the drawer's right edge.
+- Keep screenshots for representative theme/viewport combinations, and use
+  assertion-only breakpoint cases when another snapshot would add no visual
+  information.
+
+Wrong: assert `toBeVisible()` on review text that exists in the DOM but is
+painted underneath an absolute drawer.
+
+Correct: compare the drawer box with the rendered text range, assert zero gap
+between drawer and review at desktop breakpoints, then capture the snapshot.
+
 ### Workspace rail items
 
 Workspace rail entries share one stable item component even when their targets
