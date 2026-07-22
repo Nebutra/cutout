@@ -520,3 +520,37 @@ Removed the desktop paid-action allowance UI and persistence, enforced explicit 
 ### Next Steps
 
 - None - task complete
+
+
+## Session 16: Publish Cutout v0.1.3
+
+**Date**: 2026-07-22
+**Task**: Publish Cutout v0.1.3
+**Branch**: `main`
+
+### Summary
+
+Attempted immutable v0.1.2 release, diagnosed post-build DMG notarization and Tauri v2 updater artifact suffix failures, preserved the failed tag unpublished, fixed the release pipeline, synchronized v0.1.3, and published a successful protected four-platform latest GitHub Release with notarized macOS bundles, signed updater artifacts, checksums, provenance, SBOM, rollout, and rollback metadata in workflow 29893926338.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `168d6ac` | (see git log) |
+| `672dd63` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
