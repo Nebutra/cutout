@@ -1,0 +1,3 @@
+{"file":".trellis/spec/frontend/agent-control-safety.md","reason":"Verify restored transient retries remain fail-closed for auth, policy, configuration, cancellation, and paid-tool cases."}
+{"file":".trellis/spec/frontend/component-guidelines.md","reason":"Verify exactly one accessible Retry action is rendered on the latest error row."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Apply focused unit, lint, TypeScript, and regression checks."}

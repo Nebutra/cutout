@@ -55,6 +55,11 @@ receipts. `.cutout` state and provenance remain authoritative.
   { briefOverride })` invocation with the original submitted brief. It does not
   resume an in-flight stream, reuse a paid-tool request id, or bypass the
   existing tool receipt/retry machinery.
+- The Agent view and retry controller consume one canonical current error:
+  persisted `runError` first, otherwise the normalized generation error. When
+  reopening a project, a retryable persisted error plus the current non-empty
+  project brief may reconstruct the run-level Retry callback; no second brief
+  copy is added to `WorkspaceSnapshot`.
 - The dock attaches the single run-level `Retry`/`Continue` action to the latest
   error item, even when newer informational messages follow it. Repair-plan
   `Continue` takes precedence over transient `Retry`, and both are hidden while
@@ -78,6 +83,8 @@ receipts. `.cutout` state and provenance remain authoritative.
 | Receipt claims success with failed target or mismatched artifacts | Schema validation fails |
 | No coding backend/workspace is injected | Return `capability-required`, never simulated success |
 | Timeout, fetch/network failure, temporary upstream failure, or HTTP 408/429/500/502/503/504 | May expose run-level `Retry` with the original brief |
+| Reopened project with retryable persisted `runError` and non-empty project brief | Reconstruct one run-level `Retry` callback |
+| Reopened project with missing brief or a non-retryable persisted error | Do not expose run-level `Retry` |
 | Cancellation, credential/auth failure, missing material, policy/moderation denial, invalid model/configuration, or HTTP 400/401/403/404/422 | Do not expose transient run-level `Retry` |
 
 ### 5. Good / Base / Bad Cases
@@ -111,7 +118,8 @@ receipts. `.cutout` state and provenance remain authoritative.
   explicit ambiguous/non-color evidence.
 - Delivery/coding: exact artifact index, unique target ids, failed/cancelled
   state, missing executor, bounded commands/paths/budgets, and receipt readback.
-- Run recovery: classification precedence, original-brief preservation, latest
+- Run recovery: classification precedence, canonical display/retry error
+  source, restored-project fallback, original-brief preservation, latest
   error-row placement, active-run suppression, repair-plan precedence, and
   separation from tool-level retry callbacks.
 - Run `pnpm agent:validate` after every CLI, MCP, protocol, capability, Skill,

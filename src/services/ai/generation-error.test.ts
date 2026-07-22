@@ -7,6 +7,7 @@ describe("classifyGenerationError", () => {
     "TypeError: Failed to fetch",
     "network error",
     "Service temporarily unavailable",
+    "The connection to the AI provider was interrupted. Try again to continue.",
     "Upstream request failed",
     "HTTP 500 from provider",
     "HTTP 503 from provider",

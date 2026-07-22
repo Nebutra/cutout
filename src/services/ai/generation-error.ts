@@ -88,7 +88,7 @@ const TRANSIENT_PATTERNS = [
   /network\s?error/i,
   /network connectivity/i,
   /could not reach/i,
-  /connection (?:refused|reset|closed|interrupted)/i,
+  /connection\b.*\b(?:refused|reset|closed|interrupted)\b/i,
   /econn(?:refused|reset|aborted)/i,
   /dns error/i,
   /temporarily unavailable/i,

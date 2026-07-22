@@ -2,7 +2,7 @@
 import { act, createElement } from 'react'
 import { createRoot } from 'react-dom/client'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { AgentWorkspaceDock } from './AgentWorkspaceDock'
+import { AgentRunFeed, AgentWorkspaceDock } from './AgentWorkspaceDock'
 import type { AgentWorkspaceViewModel } from './agent-view-model'
 
 const viewModel: AgentWorkspaceViewModel = {
@@ -98,6 +98,39 @@ describe('stopped-run retry', () => {
     expect(retryButtons[0].closest('article')?.textContent).toContain('Latest transport interruption')
     expect(retryButtons[0].getAttribute('type')).toBe('button')
     await act(async () => click(retryButtons[0]))
+    expect(onRetry).toHaveBeenCalledTimes(1)
+  })
+
+  it('keeps run Retry separate from a paid-tool Retry action', async () => {
+    const onRetry = vi.fn()
+    const onRetryTool = vi.fn()
+    container = document.createElement('div')
+    document.body.append(container)
+    await act(async () => createRoot(container!).render(createElement(AgentRunFeed, {
+      items: [
+        { id: 'error', type: 'error', status: 'stopped', title: 'Run stopped', detail: 'Service temporarily unavailable', provenance: 'runtime' },
+        { id: 'tool', type: 'tool', status: 'stopped', title: 'Generate hero', detail: 'Paid image request failed', provenance: 'runtime', toolCallId: 'tool-1', requestId: 'request-1', actions: ['retry'] },
+      ],
+      heading: 'Conversation',
+      emptyLabel: 'No activity',
+      detailsLabel: 'Execution details',
+      retryLabel: 'Retry',
+      onRetry,
+      onRetryTool,
+    })))
+
+    const retryButtons = [...container.querySelectorAll('button')]
+      .filter((button) => button.textContent?.trim() === 'Retry')
+    expect(retryButtons).toHaveLength(2)
+
+    const runRetry = retryButtons.find((button) => button.closest('article')?.textContent?.includes('Service temporarily unavailable'))
+    const toolRetry = retryButtons.find((button) => button.closest('article')?.textContent?.includes('Generate hero'))
+    await act(async () => click(runRetry!))
+    expect(onRetry).toHaveBeenCalledTimes(1)
+    expect(onRetryTool).not.toHaveBeenCalled()
+
+    await act(async () => click(toolRetry!))
+    expect(onRetryTool).toHaveBeenCalledWith('tool-1', 'request-1')
     expect(onRetry).toHaveBeenCalledTimes(1)
   })
 })

@@ -251,7 +251,10 @@ import {
 } from "@/agent-runtime/run-coordinator";
 import { useAgentRunEvents } from "@/agent-runtime/use-agent-run-events";
 import { consumeComposerDraft } from "./composer-draft";
-import { createAgentRunRetryControl } from "./agent-run-retry";
+import {
+  createAgentRunRetryControl,
+  resolveAgentRunError,
+} from "./agent-run-retry";
 import {
   collectLiveText,
   createLiveTextBatcher,
@@ -878,11 +881,17 @@ export function IntentWorkspace({
     Boolean(prototypeArtifacts.designSystem),
     productionRepairRegionIds,
   );
+  const currentAgentRunError = resolveAgentRunError(
+    runError,
+    genError?.message ?? null,
+  );
   const runRetryControl = createAgentRunRetryControl(
     {
       working,
       hasRepairPlan: Boolean(repairPlan),
       retryableBrief: retryableRunBrief,
+      currentError: currentAgentRunError,
+      projectBrief: brief,
     },
     createAssets,
   );
@@ -894,9 +903,7 @@ export function IntentWorkspace({
     working,
     preparing: agentBusy && workflowPhase === "idle",
     elapsedSeconds,
-    runError:
-      runError ??
-      (genError ? userFacingGenerationError(genError.message) : null),
+    runError: currentAgentRunError,
     notices: executionNotices,
     runEvents: agentRunEvents,
     liveAgentMessage: liveAgentLabel
