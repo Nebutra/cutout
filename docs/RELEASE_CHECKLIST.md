@@ -25,7 +25,7 @@
 - Keep hardened runtime enabled and entitlements minimal.
 - Issue a `Developer ID Application` certificate from the reviewed CSR, install it with the matching private key, and record the certificate's team identifier in the release evidence. Export the identity as a password-protected PKCS#12 payload outside the repository.
 - Configure the protected GitHub `release` environment with `APPLE_CERTIFICATE` (base64 PKCS#12), `APPLE_CERTIFICATE_PASSWORD`, `APPLE_SIGNING_IDENTITY`, `APPLE_API_KEY` (App Store Connect key ID), `APPLE_API_ISSUER`, and `APPLE_API_PRIVATE_KEY` (complete `.p8` content). Do not store `APPLE_API_KEY_PATH`; the workflow creates it under `$RUNNER_TEMP` with mode `0600` and removes it after the macOS build.
-- Confirm Apple secrets appear only on the macOS credential-preparation and Tauri build steps. Windows and Linux jobs receive no Apple certificate, identity, issuer, key ID, private-key content, or private-key path.
+- Confirm Apple secrets appear only on the macOS credential-preparation, Tauri app notarization build, and explicit DMG notarization steps. Windows and Linux jobs receive no Apple certificate, identity, issuer, key ID, private-key content, or private-key path.
 - Run `scripts/release-macos.sh --distribute`; missing signing or notarization prerequisites must hard fail.
 - Require the GitHub macOS build to wait for Tauri's notarization and stapling, then validate both the `.app` and `.dmg` with `codesign --verify --deep --strict --verbose=2`, Gatekeeper (`spctl`), and `xcrun stapler validate` before artifact upload.
 - Inspect release evidence with `codesign -dvvv --entitlements :-` and re-run Gatekeeper assessment on a clean machine.
@@ -39,6 +39,7 @@
 - Exercise check, verified download, Agent Host checkpoint, install, and relaunch against a staged signed release before enabling rollout. Signature verification remains mandatory in the official Tauri updater plugin.
 - Keep `bundle.createUpdaterArtifacts` enabled and require the macOS `.app.tar.gz` plus sibling `.sig`; the static manifest embeds signature content, never a path or URL.
 - Generate a dedicated password-protected Tauri updater signing key pair. Store `TAURI_SIGNING_PRIVATE_KEY` and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` only as protected `release` environment secrets, and store the complete public key as the `CUTOUT_UPDATER_PUBKEY` environment variable. Missing signing material must hard fail.
+- Scope the updater private key and password only to the fail-fast validation gate immediately before packaging and the exact commit-pinned Tauri build actions that sign bundles. Do not expose them to checkout, package installation, tests, artifact upload, metadata generation, or Release publication.
 - Generate and validate separate stable/beta manifests with SHA-256, SPDX SBOM, provenance, rollback metadata and previous-version compatibility. Deterministic rollout metadata must not modify the signed artifact or its signature.
 - Run `pnpm test:update-artifacts` for update, 204/no-update, bad signature, bad URL, unauthorized rollback and staged cohort cases.
 
