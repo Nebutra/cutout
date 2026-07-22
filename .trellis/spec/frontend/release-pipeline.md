@@ -119,6 +119,10 @@ installer version differs from their release version.
   plugin source fingerprints and mirrored text trees normalize both forms.
   Cross-platform tests use native path parsing and Windows `.cmd` shims for
   package executables; unsupported Windows process-tree control fails closed.
+  Tests that launch real compilers, browsers, packagers, or other child
+  processes declare an explicit per-test timeout sized for the slowest supported
+  CI platform. Do not rely on the framework's short default timeout, raise the
+  global timeout, or skip a platform to hide normal process startup variance.
   Screenshot baselines run on macOS Chrome, while platform-neutral contract
   tests remain matrixed across macOS, Linux, and Windows.
 - AppShell initializes once, delays automatic checking for 8 seconds, and uses
@@ -199,6 +203,9 @@ installer version differs from their release version.
   publication, draft promotion, and multi-platform manifest generation.
 - `scripts/ci-platform-contracts.test.ts`: browser installation ordering,
   platform-specific executable selection, and LF/CRLF frontmatter parsing.
+- Child-process integration tests: explicit per-test timeout budgets that still
+  fail closed on a stuck compiler/browser/packager and cover the slowest CI
+  platform without platform skips.
 - `scripts/update-artifacts.test.ts`: signature, HTTPS/allowlist, downgrade
   rejection, unsupported rollout/rollback flags, SBOM, provenance,
   multi-platform manifest generation (all four platform keys, non-primary
