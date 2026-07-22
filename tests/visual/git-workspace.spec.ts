@@ -17,7 +17,7 @@ test.beforeEach(async ({ page }) => {
     const status = { repositoryId: 'repo.fixture', snapshotToken: 'snapshot.fixture', branch: 'main', upstream: 'origin/main', ahead: 1, behind: 0, detached: false, files: [{ path: 'src/app.tsx', originalPath: null, indexStatus: ' ', worktreeStatus: 'M', conflicted: false }] }
     ;(window as unknown as { __TAURI_INTERNALS__: { invoke: (command: string) => Promise<unknown> } }).__TAURI_INTERNALS__ = {
       invoke: async (command) => {
-        if (command === 'ai_native_poll' || command === 'load_providers' || command === 'list_key_status') return []
+        if (command === 'load_providers' || command === 'list_key_status') return []
         if (command === 'key_status') return false
         if (command.startsWith('agent_host_')) return { status: 'running', events: [], runs: {} }
         if (command === 'registry_authorize_workspace') return { canceled: false, handle: 'workspace:fixture', label: 'Fixture repository' }

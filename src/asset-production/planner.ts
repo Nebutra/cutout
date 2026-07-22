@@ -10,7 +10,7 @@ export interface AssetProductionPlanItem {
   readonly manifestItemId: string
   readonly pageId: string
   readonly regionId: string
-  readonly route: AssetProductionRoute | 'ignore-code-ui'
+  readonly route: Exclude<AssetProductionRoute, 'semantic-repair'> | 'ignore-code-ui'
   readonly required?: boolean
   readonly transparent?: boolean
   readonly boardGroupKey?: string
@@ -27,6 +27,7 @@ export interface CompileAssetProductionPlanInput {
 export async function compileAssetProductionPlan(
   input: CompileAssetProductionPlanInput,
 ): Promise<AssetProductionPlan> {
+  assertCurrentRoutes(input.items)
   assertUniqueManifestItems(input.items)
   const normalized = input.items
     .map((item) => ({
@@ -111,6 +112,15 @@ export async function compileAssetProductionPlan(
       .map((item) => item.manifestItemId),
     createdAt: input.createdAt ?? Date.now(),
   })
+}
+
+function assertCurrentRoutes(items: readonly AssetProductionPlanItem[]): void {
+  for (const item of items) {
+    const route: unknown = item.route
+    if (route === 'semantic-repair') {
+      throw new Error('semantic-repair is decode-only and cannot be emitted by new asset production plans')
+    }
+  }
 }
 
 function assertUniqueManifestItems(items: readonly AssetProductionPlanItem[]): void {

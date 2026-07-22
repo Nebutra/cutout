@@ -9,7 +9,7 @@ import {
   diagnosticBundleBytes,
   resetUiState,
 } from "@/local-recovery";
-import { getAiNativeDiagnostics } from "@/services/ai-native/diagnostics";
+import { getRuntimeDiagnostics } from "@/services/runtime-diagnostics";
 import {
   getAuthorizedWorkspace,
   subscribeAuthorizedWorkspace,
@@ -61,7 +61,7 @@ export function RecoverySection() {
       version: PRODUCT_VERSION,
       safeMode: false,
       events: [
-        ...getAiNativeDiagnostics().map((item) => ({
+        ...getRuntimeDiagnostics().map((item) => ({
           at: new Date(item.at).toISOString(),
           level: item.level,
           scope: "ui" as const,

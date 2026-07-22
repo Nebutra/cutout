@@ -23,9 +23,8 @@ deliberate, not an immutability violation.
 ### 1. Scope / Trigger
 
 Apply this contract whenever the source panel, project restore, automatic
-analysis, AI-native actions, or the worker cutout request changes. Threshold,
-minimum area, merge gap, and padding are algorithm inputs, not user or Agent
-preferences.
+analysis, or the worker cutout request changes. Threshold, minimum area, merge
+gap, and padding are algorithm inputs, not user or Agent preferences.
 
 ### 2. Signatures
 
@@ -44,8 +43,6 @@ parseAiNativeAction(action: unknown): AiNativeAction
   surfaces expose no slider, reset, patch, or numeric quick-fix command.
 - `ProjectRestoreInput.params` remains optional for legacy decoding, but
   `restoreProject` ignores its value and installs `DEFAULT_PARAMS`.
-- AI-native snapshots omit internal params. The action schema rejects
-  `set-param`, `set-params`, and `reset-params`.
 - `useAutoRun` analyzes each newly loaded `autoAnalyze` source identity once.
   Agent-managed sources with `autoAnalyze: false` and restored sources that
   already contain slices do not start a duplicate worker run.
@@ -58,7 +55,6 @@ parseAiNativeAction(action: unknown): AiNativeAction
 | Condition | Required behavior |
 |---|---|
 | Legacy project contains custom params | Restore succeeds; runtime uses `DEFAULT_PARAMS` |
-| AI-native request uses a removed parameter action | Schema parsing fails; no dispatch branch runs |
 | New product-managed source loads | Start exactly one analysis with slices |
 | Agent-managed source loads | Do not start a duplicate analysis |
 | Restored source already has slices | Preserve the restored projection; do not auto-rerun |
@@ -79,7 +75,6 @@ parseAiNativeAction(action: unknown): AiNativeAction
   empty states contain no mutation commands.
 - Store regression proving the params object is frozen, mutation actions are
   absent, and custom legacy restore values normalize to defaults.
-- AI-native schema and snapshot regressions for removed actions and fields.
 - Auto-run hook regressions for one run per source identity and no duplicate
   Agent-managed run.
 - Repository guidance regression covering current CLI/API documentation and
@@ -141,7 +136,6 @@ compileAssetProductionPlan(input: CompileAssetProductionPlanInput): Promise<Asse
 reduceAssetProduction(snapshot: AssetProductionSnapshot, event: AssetProductionEvent): AssetProductionSnapshot
 beginAssetProduction(input: BeginAssetProductionInput): AssetProductionSnapshot
 publishAssetProductionTask(input: PublishAssetProductionTaskInput): AssetProductionSnapshot
-publishSemanticSliceProduction(input: SemanticProductionInput): Promise<SemanticProductionResult>
 projectProductionMaterials(snapshot: AssetProductionSnapshot, runId?: string): readonly ProductionMaterialProjection[]
 projectProductionReviewQueue(snapshot: AssetProductionSnapshot, runId?: string): readonly ProductionReviewProjection[]
 createRestoreInputFromProject(record: LocalProjectRecord): Promise<ProjectRestoreInput>
@@ -158,11 +152,13 @@ the Zustand store carries `assetProduction: AssetProductionSnapshot`.
 - Every new output binds `projectRevisionId`, `planId`, `runId`, `taskId`,
   `manifestItemId`, source artifact hash, output artifact hash, route, bounds,
   CV parameters, diagnostics, QA verdict, and lineage where applicable.
-- `direct-generate`, `board-cutout`, `semantic-repair`, and `import-cutout` are
-  explicit routes. No executor may silently reinterpret one as another.
-- Lifecycle composition belongs to `asset-production/coordinator.ts`. Prototype,
-  manual/tool, and semantic adapters may own execution strategy, but they must
-  not duplicate the candidate -> review -> verify transition sequence.
+- `direct-generate`, `board-cutout`, and `import-cutout` are current explicit
+  routes. No executor may silently reinterpret one as another.
+- `semantic-repair` remains decode-only for historical production snapshots.
+  New planners and executors must not emit it.
+- Lifecycle composition belongs to `asset-production/coordinator.ts`. Prototype
+  and manual/tool adapters may own execution strategy, but they must not
+  duplicate the candidate -> review -> verify transition sequence.
 - Starting a new run explicitly supersedes the previous active run. Merely
   changing `activeRunId` while leaving the old run `running` is invalid history.
 - Content bytes are stored under `artifact:sha256:<digest>`. Concurrent writes
@@ -179,13 +175,6 @@ the Zustand store carries `assetProduction: AssetProductionSnapshot`.
 - Repair targets and pending canvas status derive from the current task
   projection. `failedRegionIds` is not workspace state or persistence input;
   region ids are grouping metadata produced at the repair-planner boundary.
-- `run-semantic-slices` compiles one stable `semantic-repair` task per unique
-  semantic spec. Multiple generation routes are candidates for that task. A
-  validated pass may become `ready`; missing output is `failed`; rejected,
-  skipped, or unavailable QA is `needs-review`.
-- Semantic outputs always enter content-addressed storage and the production
-  snapshot. `writeArtifacts=false` suppresses only the optional human-readable
-  file copy, never authoritative publication.
 - Restore resolves missing projected slice blobs from their output artifact id
   or exact production task publication before rebuilding UI state.
 
@@ -199,9 +188,8 @@ the Zustand store carries `assetProduction: AssetProductionSnapshot`.
 | Output changes after approval | Invalidate the old decision receipt |
 | Run is cancelled or superseded | Late results cannot publish or mark the run complete |
 | New run starts while another run is active | Mark the old run `cancelled`, preserve settled task history, then bind the new run as active |
-| Semantic plan contains duplicate spec ids | Reject the plan before generation/task binding |
-| Semantic output exists but QA is rejected, skipped, or unavailable | Persist candidate and evidence as `needs-review`; do not export |
-| Semantic output is missing | Record non-waivable `semantic-output-missing`; keep it visible in Review without a slice |
+| New planner input requests `semantic-repair` | Reject before hashing or task binding; the route is decode-only |
+| Historical snapshot contains `semantic-repair` | Decode and restore it without treating the route as a current planner option |
 | Restore lacks projected blob but has a valid artifact id | Materialize from content-addressed storage |
 | Restore lacks both blob and recoverable artifact | Fail recovery explicitly; do not invent pixels or readiness |
 | Legacy project lacks production metadata | Add an idempotent `legacy-unverified` snapshot; do not invent QA or manifest evidence |
@@ -213,9 +201,6 @@ the Zustand store carries `assetProduction: AssetProductionSnapshot`.
 - Base: a quality issue publishes evidence as `needs-review`; UI can inspect it,
   but consumers stay blocked until a receipt bound to that exact revision is
   recorded.
-- Good semantic: the command returns `production.planId`, `runId`, status and
-  task ids; the Agent snapshot exposes the same run and the UI projects ready
-  or review slices from it.
 - Bad: a component appends a Blob to `analysis.slices` and treats
   `slices.length > 0` as production completion.
 
@@ -224,7 +209,9 @@ the Zustand store carries `assetProduction: AssetProductionSnapshot`.
 - Reducer tests: illegal transitions, stale run/plan, cancellation, partial
   success, waiver invalidation, and authority supersession.
 - Adapter tests: prototype board/direct routes, manual worker, Agent tool,
-  semantic publication, targeted repair, and cross-entry overwrite prevention.
+  targeted repair, and cross-entry overwrite prevention.
+- Planner/persistence tests: current inputs reject `semantic-repair` while
+  historical snapshots containing it still decode.
 - Coordinator tests: new-run supersession, shared publication sequence, carry
   of settled revisions, cancellation and finalize behavior.
 - Projection tests: review and failed tasks remain visible with and without an

@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { compileAssetProductionPlan } from './planner'
+import { assetProductionSnapshotSchema } from './contracts'
+import {
+  compileAssetProductionPlan,
+  type AssetProductionPlanItem,
+} from './planner'
 
 const sourceRevision = {
   projectRevisionId: 'revision:1',
@@ -73,5 +77,42 @@ describe('asset production planner', () => {
         { manifestItemId: 'asset:one', pageId: 'home', regionId: 'b', route: 'direct-generate' },
       ],
     })).rejects.toThrow('Duplicate asset manifest item')
+  })
+
+  it('rejects decode-only semantic repair routes in new plans', async () => {
+    const historicalItem = {
+      manifestItemId: 'asset:legacy-semantic',
+      pageId: 'home',
+      regionId: 'hero',
+      route: 'semantic-repair',
+    } as unknown as AssetProductionPlanItem
+
+    await expect(compileAssetProductionPlan({
+      sourceRevision,
+      items: [historicalItem],
+    })).rejects.toThrow('semantic-repair is decode-only')
+  })
+
+  it('still decodes historical snapshots containing semantic repair tasks', async () => {
+    const currentPlan = await compileAssetProductionPlan({
+      sourceRevision,
+      items: [{
+        manifestItemId: 'asset:legacy-semantic',
+        pageId: 'home',
+        regionId: 'hero',
+        route: 'direct-generate',
+      }],
+      createdAt: 10,
+    })
+    const historicalPlan = structuredClone(currentPlan)
+    historicalPlan.tasks[0]!.route = 'semantic-repair'
+
+    expect(assetProductionSnapshotSchema.parse({
+      version: 'asset-production-snapshot.v1',
+      revision: 1,
+      plans: { [historicalPlan.planId]: historicalPlan },
+      runs: {},
+      activePlanId: historicalPlan.planId,
+    }).plans[historicalPlan.planId]?.tasks[0]?.route).toBe('semantic-repair')
   })
 })

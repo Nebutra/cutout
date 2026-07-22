@@ -1,7 +1,7 @@
 [[permission]]
 identifier = "project-files"
-description = "Allows bounded project asset, bundle, repository scan and AI-native queue commands."
-commands.allow = ["save_assets", "save_bundle", "scan_repository", "ai_native_paths", "ai_native_poll", "ai_native_complete", "ai_native_read_file", "ai_native_write_artifact"]
+description = "Allows bounded project asset, bundle and repository scan commands."
+commands.allow = ["save_assets", "save_bundle", "scan_repository"]
 
 [[permission]]
 identifier = "provider-secrets-network"

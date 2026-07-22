@@ -1,24 +1,24 @@
-export type AiNativeDiagnosticLevel = 'info' | 'warn' | 'error'
+export type RuntimeDiagnosticLevel = 'info' | 'warn' | 'error'
 
-export interface AiNativeDiagnostic {
+export interface RuntimeDiagnostic {
   readonly id: string
   readonly at: number
-  readonly level: AiNativeDiagnosticLevel
+  readonly level: RuntimeDiagnosticLevel
   readonly scope: string
   readonly message: string
   readonly details?: unknown
 }
 
 const MAX_DIAGNOSTICS = 80
-const diagnostics: AiNativeDiagnostic[] = []
+const diagnostics: RuntimeDiagnostic[] = []
 
-export function recordAiNativeDiagnostic(input: {
-  readonly level: AiNativeDiagnosticLevel
+export function recordRuntimeDiagnostic(input: {
+  readonly level: RuntimeDiagnosticLevel
   readonly scope: string
   readonly message: string
   readonly details?: unknown
-}): AiNativeDiagnostic {
-  const diagnostic: AiNativeDiagnostic = {
+}): RuntimeDiagnostic {
+  const diagnostic: RuntimeDiagnostic = {
     id: crypto.randomUUID(),
     at: Date.now(),
     level: input.level,
@@ -32,10 +32,10 @@ export function recordAiNativeDiagnostic(input: {
   return diagnostic
 }
 
-export function getAiNativeDiagnostics(): readonly AiNativeDiagnostic[] {
+export function getRuntimeDiagnostics(): readonly RuntimeDiagnostic[] {
   return diagnostics
 }
 
-export function clearAiNativeDiagnostics(): void {
+export function clearRuntimeDiagnostics(): void {
   diagnostics.length = 0
 }

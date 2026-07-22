@@ -163,4 +163,4 @@ pnpm tauri build         # 桌面安装包
 
 技术栈：Tauri 2、React 19、Vite 8、TypeScript、Tailwind v4、shadcn/ui。
 
-深入阅读：[Codex 插件](docs/CODEX_PLUGIN.md) · [Agent 集成](docs/AGENT_INTEGRATION.md) · [Headless Agent Control](docs/HEADLESS_AGENT_CONTROL.md) · [AI Native](docs/AI_NATIVE.md)
+深入阅读：[Codex 插件](docs/CODEX_PLUGIN.md) · [Agent 集成](docs/AGENT_INTEGRATION.md) · [Headless Agent Control](docs/HEADLESS_AGENT_CONTROL.md)
