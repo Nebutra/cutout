@@ -40,7 +40,7 @@ import type {
   GenerationService,
   ProviderService,
 } from './types'
-import type { ProviderConfig } from './provider-types'
+import { effectiveProviderWireProtocol, type ProviderConfig } from './provider-types'
 import { resolveModel } from './models'
 import { tauriFetch } from './tauri-fetch'
 import { apiBaseUrl } from './base-url'
@@ -471,8 +471,9 @@ export function createLocalGenerationService(
       const cfg = await resolveConfig(input.providerId)
       if (!cfg) return err('provider not configured')
       const modelId = resolveModel(cfg.kind, cfg.defaultModel, input.model)
-      const fetch = tauriFetch(cfg.id, cfg.kind)
-      const baseURL = apiBaseUrl(cfg.kind, cfg.baseUrl)
+      const wireProtocol = effectiveProviderWireProtocol(cfg)
+      const fetch = tauriFetch(cfg.id, cfg.kind, wireProtocol)
+      const baseURL = apiBaseUrl(cfg.kind, cfg.baseUrl, wireProtocol)
       const prompt = input.prompt ?? ''
       const stopWhen = stepCountIs(4)
       try {
@@ -701,7 +702,11 @@ export function createLocalGenerationService(
       // endpoint, not /chat/completions. Call the proxied endpoint directly so
       // OpenAI-compatible relays that return URL-shaped image data don't fail
       // the AI SDK's stricter `b64_json` response schema.
-      if (cfg.kind === 'openai' || cfg.kind === 'openai-compatible') {
+      const wireProtocol = effectiveProviderWireProtocol(cfg)
+      if (
+        (cfg.kind === 'openai' || cfg.kind === 'openai-compatible') &&
+        (wireProtocol === 'responses' || wireProtocol === 'chat-completions')
+      ) {
         if (instructionSourceCount(input) !== 1) {
           return err('provide exactly one of prompt, system, or promptRef')
         }
@@ -730,11 +735,12 @@ export function createLocalGenerationService(
 
         try {
           if (input.signal?.aborted) return err('Operation aborted')
-          const baseUrl = apiBaseUrl(cfg.kind, cfg.baseUrl)
+          const baseUrl = apiBaseUrl(cfg.kind, cfg.baseUrl, wireProtocol)
           if (!baseUrl) return err('provider has no base URL for image generation')
           const res = await invoke<ProxyResponse>('ai_proxy_request', {
             providerId: cfg.id,
             kind: cfg.kind,
+            wireProtocol,
             url: `${baseUrl}/images/generations`,
             method: 'POST',
             headers: { 'content-type': 'application/json' },
@@ -792,10 +798,14 @@ export function createLocalGenerationService(
       if (input.signal?.aborted) return err('Operation aborted')
       if (!cfg) return err('provider not configured')
       // The edits endpoint is OpenAI-shaped; other kinds have no `/images/edits`.
-      if (cfg.kind !== 'openai' && cfg.kind !== 'openai-compatible') {
+      const wireProtocol = effectiveProviderWireProtocol(cfg)
+      if (
+        (cfg.kind !== 'openai' && cfg.kind !== 'openai-compatible') ||
+        (wireProtocol !== 'responses' && wireProtocol !== 'chat-completions')
+      ) {
         return err('image edit requires an OpenAI-compatible provider')
       }
-      const baseUrl = apiBaseUrl(cfg.kind, cfg.baseUrl)
+      const baseUrl = apiBaseUrl(cfg.kind, cfg.baseUrl, wireProtocol)
       if (!baseUrl) return err('provider has no base URL for image edit')
       if (input.images.length === 0) {
         return err('at least one reference image is required')
@@ -809,6 +819,7 @@ export function createLocalGenerationService(
         const res = await invoke<{ images: string[] }>('ai_image_edit', {
           providerId: cfg.id,
           kind: cfg.kind,
+          wireProtocol,
           baseUrl,
           model: modelId,
           prompt: input.prompt,

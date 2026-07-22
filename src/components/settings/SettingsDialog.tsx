@@ -3,8 +3,8 @@
  *
  * A controlled shadcn `Dialog` with a left sidebar (master-detail), opened from
  * the TopBar gear and the `⌘,` accelerator (both via `AppShell` + `settings-ui`).
- * No router — `section` is local state. General and AI are the only sections;
- * About is a footer line. Every control inside applies instantly.
+ * No router — `section` is local state. About is a footer line. Every control
+ * inside applies instantly.
  */
 import { useEffect, useState } from 'react'
 import { Trans } from '@lingui/react/macro'
@@ -23,7 +23,6 @@ import { IntegrationsSection } from './sections/IntegrationsSection'
 import { ArchivedSection } from './sections/ArchivedSection'
 import { PersonalizationSection } from './sections/PersonalizationSection'
 import { SpeechSection } from './sections/SpeechSection'
-import { AdvancedSection } from './sections/AdvancedSection'
 import { UpdatesSupportSection } from './sections/UpdatesSupportSection'
 import type { DesktopUpdateController } from '@/updater/service'
 import { focusSettingsTarget, type SettingsTarget } from './settings-ui'
@@ -90,8 +89,6 @@ export function SettingsDialog({
                 onRestoreProject={onRestoreProject}
                 onDeleteProject={onDeleteProject}
               />
-            ) : section === 'advanced' ? (
-              <AdvancedSection />
             ) : section === 'updates-support' ? (
               <UpdatesSupportSection prepareRecoverySnapshot={prepareUpdateRecoverySnapshot} updateController={updateController} />
             ) : (

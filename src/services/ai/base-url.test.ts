@@ -14,6 +14,23 @@ describe('apiBaseUrl', () => {
     ).toBe('https://relay.example.com/v1')
   })
 
+  it('uses protocol-specific defaults for custom endpoints', () => {
+    expect(
+      apiBaseUrl(
+        'openai-compatible',
+        'https://relay.example.com',
+        'anthropic-messages',
+      ),
+    ).toBe('https://relay.example.com/v1')
+    expect(
+      apiBaseUrl(
+        'openai-compatible',
+        'https://relay.example.com',
+        'google-generate-content',
+      ),
+    ).toBe('https://relay.example.com/v1beta')
+  })
+
   it('keeps explicit API paths unchanged', () => {
     expect(apiBaseUrl('openai-compatible', 'https://relay.example.com/v1')).toBe(
       'https://relay.example.com/v1',
@@ -23,9 +40,12 @@ describe('apiBaseUrl', () => {
     ).toBe('https://relay.example.com/api/openai')
   })
 
-  it('does not add /v1 for non-OpenAI-shaped providers', () => {
+  it('uses native defaults for first-party protocols', () => {
     expect(apiBaseUrl('anthropic', 'https://api.anthropic.com')).toBe(
-      'https://api.anthropic.com',
+      'https://api.anthropic.com/v1',
+    )
+    expect(apiBaseUrl('google', 'https://generativelanguage.googleapis.com')).toBe(
+      'https://generativelanguage.googleapis.com/v1beta',
     )
   })
 })

@@ -36,6 +36,15 @@ function paidToolExecutionPrompt(
   `prompt` when present.
 - The shared `paidToolRequestSchema` owns parsing for desktop and control
   protocol paths. Consumers must not create a duplicate schema.
+- Desktop product requests always use `approvalPolicy: 'explicit'` and set
+  `budgetCeiling` from the matching host capability estimate. No desktop
+  preference or local-storage value may enable automatic continuation.
+- The desktop visual bridge enforces that policy at its boundary even if a
+  shared visual task carries `auto-within-budget`. Its task-level aggregate
+  ceiling covers generation plus editing, while each paid request receives the
+  estimate for the capability it will route.
+- `auto-within-budget` remains part of the shared protocol for external
+  controllers and other non-desktop consumers.
 
 ## 4. Validation & Error Matrix
 

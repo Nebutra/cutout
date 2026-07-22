@@ -28,6 +28,37 @@ describe('listEndpointModels', () => {
     expect(await listEndpointModels(cfg())).toEqual(['a', 'b'])
   })
 
+  it('parses a Google { models:[{name}] } body and strips the models prefix', async () => {
+    invokeMock.mockResolvedValue({
+      status: 200,
+      headers: {},
+      body: JSON.stringify({ models: [{ name: 'models/gemini-2.5-pro' }] }),
+    })
+    expect(await listEndpointModels(cfg({ wireProtocol: 'google-generate-content' }))).toEqual([
+      'gemini-2.5-pro',
+    ])
+    expect(invokeMock).toHaveBeenCalledWith(
+      'ai_proxy_request',
+      expect.objectContaining({
+        url: 'https://relay/v1/models',
+        wireProtocol: 'google-generate-content',
+      }),
+    )
+  })
+
+  it('uses /v1beta for a pathless Google-protocol endpoint', async () => {
+    invokeMock.mockResolvedValue({
+      status: 200,
+      headers: {},
+      body: JSON.stringify({ models: [{ name: 'models/gemini-2.5-pro' }] }),
+    })
+    await listEndpointModels(cfg({ baseUrl: 'https://relay', wireProtocol: 'google-generate-content' }))
+    expect(invokeMock).toHaveBeenCalledWith(
+      'ai_proxy_request',
+      expect.objectContaining({ url: 'https://relay/v1beta/models' }),
+    )
+  })
+
   it('returns [] and does not call the proxy when there is no baseUrl', async () => {
     const result = await listEndpointModels(cfg({ baseUrl: undefined }))
     expect(result).toEqual([])
@@ -63,6 +94,7 @@ describe('listEndpointModels', () => {
         url: 'https://relay/v1/models',
         kind: 'openai-compatible',
         providerId: 'p1',
+        wireProtocol: 'chat-completions',
       }),
     )
   })

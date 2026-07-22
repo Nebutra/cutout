@@ -242,6 +242,7 @@ describe('GenerationService.generateImages', () => {
       expect.objectContaining({
         providerId: 'p1',
         kind: 'openai-compatible',
+        wireProtocol: 'chat-completions',
         url: 'https://relay.example/v1/images/generations',
         method: 'POST',
       }),
@@ -250,6 +251,29 @@ describe('GenerationService.generateImages', () => {
     expect(body.model).toBe('gpt-image-2')
     expect(body.prompt).toContain('Return the requested object.')
     expect(body.prompt).toContain('政府官网')
+  })
+
+  it('does not route a custom Google protocol through OpenAI image generation', async () => {
+    const model = { id: 'google-model' }
+    const createModel = vi.fn(async () => model)
+    const registry = new GenerationAdapterRegistry([{
+      kind: 'openai-compatible',
+      policy: () => ({ auth: 'rust-keychain-proxy', headerStrategy: 'openai-compatible', baseURL: 'https://relay.example/v1beta' }),
+      createModel,
+    }])
+    generateTextMock.mockResolvedValueOnce({
+      files: [{ mediaType: 'image/png', uint8Array: new Uint8Array([1, 2, 3]) }],
+    })
+    const generation = createLocalGenerationService(
+      providersWith([cfg({ wireProtocol: 'google-generate-content' })]),
+      prompts,
+      registry,
+    )
+
+    const result = await generation.generateImages({ providerId: 'p1', prompt: 'make an icon' })
+
+    expect(result).toEqual(ok([{ mediaType: 'image/png', bytes: new Uint8Array([1, 2, 3]) }]))
+    expect(invokeMock).not.toHaveBeenCalled()
   })
 
   it('surfaces image endpoint HTTP failures', async () => {

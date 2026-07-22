@@ -1,6 +1,6 @@
 import { invoke } from '@tauri-apps/api/core'
 import { z } from 'zod'
-import { openAIWireProtocolSchema, providerConfigSchema, providerKindSchema, type ProviderConfig } from './provider-types'
+import { providerWireProtocolSchema, providerConfigSchema, providerKindSchema, type ProviderConfig, type ProviderWireProtocol } from './provider-types'
 
 const credentialPreviewSchema = z.object({
   sourceType: z.enum(['environment', 'keychain', 'config-literal', 'none']),
@@ -12,7 +12,7 @@ const credentialPreviewSchema = z.object({
 export const providerDiscoveryCandidateSchema = z.object({
   id: z.string().min(1), source: z.string().min(1), sourceLabel: z.string().min(1),
   configLocation: z.string().optional(), kind: providerKindSchema, label: z.string().min(1),
-  baseUrl: z.string().optional(), wireProtocol: openAIWireProtocolSchema.optional(),
+  baseUrl: z.string().optional(), wireProtocol: providerWireProtocolSchema.optional(),
   modelHint: z.string().optional(), credential: credentialPreviewSchema,
   warnings: z.array(z.string()),
 }).strict()
@@ -24,7 +24,7 @@ export async function discoverProviderCandidates(): Promise<ProviderDiscoveryCan
 }
 
 export async function createProviderDraft(input: {
-  kind: string; baseUrl: string; wireProtocol?: 'responses' | 'chat-completions';
+  kind: string; baseUrl: string; wireProtocol?: ProviderWireProtocol;
   candidateId?: string; providerId?: string; secret?: string
 }): Promise<string> {
   const value = await invoke<unknown>('create_provider_draft', { input })

@@ -8,7 +8,7 @@
  */
 import { useShallow } from 'zustand/react/shallow'
 import { useStore } from './index'
-import type { Params, Slice, SourceState, Store } from './types'
+import type { Slice, SourceState, Store } from './types'
 import type { AnalysisStatus } from './types'
 import {
   currentProductionRunId,
@@ -23,7 +23,6 @@ export interface ExportItem {
 }
 
 export const selectSource = (s: Store): SourceState => s.source
-export const selectParams = (s: Store): Params => s.params
 export const selectStatus = (s: Store): AnalysisStatus => s.analysis.status
 export const selectRunId = (s: Store): number => s.analysis.runId
 export const selectError = (s: Store): string | null => s.analysis.error
@@ -79,7 +78,6 @@ export function selectExportPayloadFor(s: Store, id: string): ExportItem[] {
 /* --- Ready-made hooks (thin wrappers so components skip importing `useStore`) --- */
 
 export const useSource = (): SourceState => useStore(selectSource)
-export const useParams = (): Params => useStore(selectParams)
 export const useStatus = (): AnalysisStatus => useStore(selectStatus)
 export const usePreviewBitmap = (): ImageBitmap | null =>
   useStore(selectPreviewBitmap)

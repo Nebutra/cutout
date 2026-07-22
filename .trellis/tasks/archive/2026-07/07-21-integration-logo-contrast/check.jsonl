@@ -1,0 +1,3 @@
+{"file":".trellis/spec/frontend/index.md","reason":"Frontend package guidance and verification scope."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Quality review context for the shared UI and tests."}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"Verify all integration surfaces consume the same registry and component."}

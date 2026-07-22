@@ -73,6 +73,10 @@ import {
   type LockedComposerRoute,
 } from "@/agent-runtime/composer-execution";
 import { recordAiNativeDiagnostic } from "@/services/ai-native/diagnostics";
+import {
+  classifyGenerationError,
+  userFacingGenerationError,
+} from "@/services/ai/generation-error";
 import { useModelAssignments } from "@/hooks/queries/ai-settings";
 import { useProviders } from "@/hooks/queries/providers";
 import {
@@ -247,6 +251,10 @@ import {
 } from "@/agent-runtime/run-coordinator";
 import { useAgentRunEvents } from "@/agent-runtime/use-agent-run-events";
 import { consumeComposerDraft } from "./composer-draft";
+import {
+  createAgentRunRetryControl,
+  resolveAgentRunError,
+} from "./agent-run-retry";
 import {
   collectLiveText,
   createLiveTextBatcher,
@@ -503,6 +511,9 @@ export function IntentWorkspace({
   const [liveAgentLabel, setLiveAgentLabel] = useState<string | null>(null);
   const [runError, setRunError] = useState<string | null>(
     () => initialWorkspace?.runError ?? null,
+  );
+  const [retryableRunBrief, setRetryableRunBrief] = useState<string | null>(
+    null,
   );
   const [namingStatus, setNamingStatus] = useState<NamingStatus>(
     () => initialWorkspace?.namingStatus ?? "idle",
@@ -870,6 +881,20 @@ export function IntentWorkspace({
     Boolean(prototypeArtifacts.designSystem),
     productionRepairRegionIds,
   );
+  const currentAgentRunError = resolveAgentRunError(
+    runError,
+    genError?.message ?? null,
+  );
+  const runRetryControl = createAgentRunRetryControl(
+    {
+      working,
+      hasRepairPlan: Boolean(repairPlan),
+      retryableBrief: retryableRunBrief,
+      currentError: currentAgentRunError,
+      projectBrief: brief,
+    },
+    createAssets,
+  );
   const agentViewModel = buildAgentViewModel({
     brief,
     workflowPhase,
@@ -878,9 +903,7 @@ export function IntentWorkspace({
     working,
     preparing: agentBusy && workflowPhase === "idle",
     elapsedSeconds,
-    runError:
-      runError ??
-      (genError ? userFacingGenerationError(genError.message) : null),
+    runError: currentAgentRunError,
     notices: executionNotices,
     runEvents: agentRunEvents,
     liveAgentMessage: liveAgentLabel
@@ -1061,6 +1084,7 @@ export function IntentWorkspace({
     getStoreState().endGen();
     setRunCancelled(true);
     setRunError(null);
+    setRetryableRunBrief(null);
     setLiveAgentOutput("");
     setLiveAgentLabel(null);
     setNamingStatus((status) =>
@@ -1240,6 +1264,7 @@ export function IntentWorkspace({
   ): Promise<void> {
     const baseText = (options.briefOverride ?? brief).trim();
     if (!baseText) return;
+    setRetryableRunBrief(null);
     const text = withCanvasAnnotations(baseText, canvasAnnotations);
     const requestedMaterial = options.ignoreSelectedMaterial
       ? null
@@ -1488,7 +1513,8 @@ export function IntentWorkspace({
         return;
       }
       const message = errorMessage(error);
-      const displayMessage = userFacingGenerationError(message);
+      const classification = classifyGenerationError(message);
+      const displayMessage = classification.displayMessage;
       recordAiNativeDiagnostic({
         level: "error",
         scope: "workspace.create-assets",
@@ -1505,6 +1531,7 @@ export function IntentWorkspace({
         },
       });
       setRunError(displayMessage);
+      setRetryableRunBrief(classification.retryable ? baseText : null);
       toast.error("Generation failed", {
         description: displayMessage,
       });
@@ -3076,7 +3103,7 @@ export function IntentWorkspace({
     );
     const runId = `workspace:${lease.id}`;
     const referenceIds = await Promise.all(referenceImages.map((bytes) => desktopTools.persistReference(bytes, "image/png", runId)));
-    const preferences = desktopTools.visualPreferences();
+    const budget = desktopTools.visualBudget();
 
     // Each attempt re-executes the visual task with the (possibly QA-corrected)
     // prompt; the resolved asset is captured so the artifact keeps its media type.
@@ -3090,7 +3117,7 @@ export function IntentWorkspace({
     const generatePage = async (prompt: string): Promise<Uint8Array> => {
       attemptCount += 1;
       const taskRunId = attemptCount === 1 ? String(lease.id) : `${lease.id}:qa${attemptCount}`;
-      const task = createPrototypePageVisualTask({ runId: taskRunId, plan, page, image, prompt, referenceArtifactIds: referenceIds, preferences });
+      const task = createPrototypePageVisualTask({ runId: taskRunId, plan, page, image, prompt, referenceArtifactIds: referenceIds, budget });
       const execution = await desktopTools.visualRuntime.execute(runId, task, lease.controller.signal);
       agentRunCoordinatorRef.current.checkpoint(lease);
       const asset = execution.promotion ? await desktopTools.resolveArtifact(execution.promotion.masterArtifactId) : null;
@@ -3303,16 +3330,27 @@ export function IntentWorkspace({
             setFilesDockVisible(false);
             setDesignDockVisible(false);
           }}
-          onOpenAssets={library.open}
-          onOpenDesign={() => {
+          onOpenAssets={() => {
             setAgentDockVisible(false);
             setFilesDockVisible(false);
             setDesignDockVisible(false);
             setGitDockVisible(false);
-            onOpenDesignOs("specimen");
+            library.open();
+          }}
+          onOpenDesign={() => {
+            setDesignDockVisible((visible) => !visible);
+            setAgentDockVisible(false);
+            setFilesDockVisible(false);
+            setGitDockVisible(false);
           }}
           inspectorActive={designDockVisible}
-          onOpenDeliver={() => onOpenDesignOs("delivery")}
+          onOpenDeliver={() => {
+            setAgentDockVisible(false);
+            setFilesDockVisible(false);
+            setDesignDockVisible(false);
+            setGitDockVisible(false);
+            onOpenDesignOs("delivery");
+          }}
           advanced={advanced}
           onOpenAdvanced={onOpenAdvanced}
           onCollapseSidebar={() => setSidebarCollapsed(true)}
@@ -3576,16 +3614,14 @@ export function IntentWorkspace({
                 ) : null
               }
               labels={
-                repairPlan ? { retry: "Continue" } : undefined
+                runRetryControl.label
+                  ? { retry: runRetryControl.label }
+                  : undefined
               }
               onCancel={
                 working && activeRunRef.current ? stopActiveRun : undefined
               }
-              onRetry={
-                !working && repairPlan
-                  ? () => void createAssets("repair")
-                  : undefined
-              }
+              onRetry={runRetryControl.onRetry}
               onApproveTool={(toolCallId, requestId) =>
                 void desktopTools.loop.approve(toolCallId, requestId)
               }
@@ -3654,7 +3690,10 @@ export function IntentWorkspace({
 
       <main
         data-workspace-panel="canvas-main"
-        className="order-1 flex min-h-0 min-w-0 flex-1 flex-col lg:order-none"
+        className={cn(
+          "order-1 flex min-h-0 min-w-0 flex-1 flex-col lg:order-none",
+          gitDockVisible && gitReview && "lg:ml-[24rem] 2xl:ml-[27rem]",
+        )}
       >
         <section
           className={cn(
@@ -6695,42 +6734,6 @@ function errorMessage(error: unknown): string {
   return String(error);
 }
 
-function userFacingGenerationError(message: string): string {
-  const lower = message.toLowerCase();
-
-  if (
-    lower.includes("api_key") ||
-    lower.includes("api key") ||
-    lower.includes("unauthorized") ||
-    lower.includes("invalid key")
-  ) {
-    return "The selected AI provider needs a valid API key. Open Settings and update the provider.";
-  }
-
-  if (
-    lower.includes("timed out") ||
-    lower.includes("timeout") ||
-    lower.includes("request failed") ||
-    lower.includes("network") ||
-    lower.includes("fetch failed")
-  ) {
-    return "The connection to the AI provider was interrupted. Try again to continue.";
-  }
-
-  if (
-    lower.includes("schema") ||
-    lower.includes("json") ||
-    lower.includes("structured")
-  ) {
-    return "The AI response could not be processed. Try again to continue.";
-  }
-
-  if (message.trim().length === 0) return "Generation stopped.";
-  return message.length > 180
-    ? "Generation stopped. Try again to continue."
-    : message;
-}
-
 function recoverWorkflowPhase(
   snapshot: WorkspaceSnapshot | null | undefined,
   artifacts: ReturnType<typeof recoverPrototypeArtifacts>,
@@ -6939,7 +6942,7 @@ function RailItem({
       aria-label={label}
       aria-pressed={active}
       className={cn(
-        "flex w-12 flex-col items-center gap-1 rounded-md px-1 py-2 text-[10px] transition-colors",
+        "flex size-12 shrink-0 flex-col items-center justify-center gap-1 rounded-md px-1 text-[10px] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background",
         active
           ? "bg-muted text-foreground"
           : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",

@@ -1,37 +1,40 @@
-import type { ProviderKind } from './provider-types'
+import {
+  defaultProviderWireProtocol,
+  type ProviderKind,
+  type ProviderWireProtocol,
+} from './provider-types'
 
 function trimTrailingSlashes(value: string): string {
   return value.replace(/\/+$/, '')
 }
 
-function isOpenAIShaped(kind: ProviderKind): boolean {
-  return kind === 'openai' || OPENAI_COMPATIBLE_KINDS.has(kind)
-}
-
-const OPENAI_COMPATIBLE_KINDS = new Set([
-  'openai-compatible','dashscope','deepseek','zhipu','moonshot','volcengine',
-  'siliconflow','openrouter','together','groq','fireworks','xai','mistral',
-  'ollama','vllm','lm-studio',
-])
-
 /**
- * OpenAI-compatible SDKs expect `baseURL` to be the API prefix, normally `/v1`.
- * Many gateway consoles are shared with the API host, so users naturally paste
- * the root origin. Treat a pathless OpenAI-shaped URL as `{origin}/v1`.
+ * SDKs expect `baseURL` to be the protocol API prefix. Many gateway consoles
+ * share the API host, so pathless custom URLs get the protocol's standard path.
+ * Explicit non-root paths are preserved for relays mounted below a prefix.
  */
 export function apiBaseUrl(
   kind: ProviderKind,
   baseUrl: string | undefined,
+  wireProtocol?: ProviderWireProtocol,
 ): string | undefined {
   if (!baseUrl) return undefined
   const trimmed = trimTrailingSlashes(baseUrl.trim())
-  if (!isOpenAIShaped(kind)) return trimmed
+  const protocol = wireProtocol ?? defaultProviderWireProtocol(kind)
+  const defaultPath = protocol === 'google-generate-content'
+    ? '/v1beta'
+    : protocol === 'responses' ||
+        protocol === 'chat-completions' ||
+        protocol === 'anthropic-messages'
+      ? '/v1'
+      : undefined
+  if (!defaultPath) return trimmed
 
   try {
     const parsed = new URL(trimmed)
     const path = trimTrailingSlashes(parsed.pathname)
     if (path === '') {
-      parsed.pathname = '/v1'
+      parsed.pathname = defaultPath
       parsed.search = ''
       parsed.hash = ''
       return trimTrailingSlashes(parsed.toString())

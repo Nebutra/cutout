@@ -8,6 +8,7 @@ pub mod registry_desktop;
 pub mod save_assets;
 pub mod save_bundle;
 pub mod scan_repository;
+pub mod secret_store;
 pub mod speech;
 #[cfg(desktop)]
 pub mod updater;

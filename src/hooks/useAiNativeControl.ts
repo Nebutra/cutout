@@ -13,7 +13,6 @@ import { ZodError } from 'zod'
 import { useServices } from '@/services/context'
 import type { ServiceRegistry } from '@/services/types'
 import { getStoreState, useStore } from '@/store'
-import type { ParamKey } from '@/store/types'
 import {
   baseName,
   blobToBytes,
@@ -44,9 +43,7 @@ import {
   createAiNativeDiagnosticsSnapshot,
   createAiNativeSnapshot,
   parseAiNativeAction,
-  PARAM_KEYS,
   resetAiNativeDiagnosticsSnapshot,
-  validateParamValue,
   type AiNativeCommandEnvelope,
   type AiNativeCommandResult,
 } from '@/services/ai-native/actions'
@@ -195,20 +192,6 @@ export function useAiNativeControl({ analyze }: AiNativeControlOptions): void {
         case 'set-brief':
           getStoreState().setBrief(action.text)
           return createAiNativeSnapshot(getStoreState())
-
-        case 'set-param': {
-          const value = validateParamValue(action.key, action.value)
-          getStoreState().setParam(action.key, value)
-          return { params: getStoreState().params }
-        }
-
-        case 'set-params':
-          applyParams(action.params)
-          return { params: getStoreState().params }
-
-        case 'reset-params':
-          getStoreState().resetParams()
-          return { params: getStoreState().params }
 
         case 'import-board':
           await importBoard(action.path, action.name)
@@ -773,22 +756,6 @@ async function readImageFile(path: string, nameOverride: string | undefined) {
     throw new Error(`Unsupported image file: ${name}`)
   }
   return { blob, name }
-}
-
-function applyParams(params: Partial<Record<ParamKey, number>>): void {
-  const validated: Partial<Record<ParamKey, number>> = {}
-  for (const key of PARAM_KEYS) {
-    const value = params[key]
-    if (value !== undefined) {
-      validated[key] = validateParamValue(key, value)
-    }
-  }
-  for (const key of PARAM_KEYS) {
-    const value = validated[key]
-    if (value !== undefined) {
-      getStoreState().setParam(key, value)
-    }
-  }
 }
 
 async function completeCommand(

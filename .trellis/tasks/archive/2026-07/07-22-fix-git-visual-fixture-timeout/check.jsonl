@@ -1,0 +1,2 @@
+{"file":".trellis/spec/frontend/component-guidelines.md","reason":"Verify one Hide Git control, focus/hover glyph swap, stable dimensions, and reduced-motion-safe semantics."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Require focused Playwright, unit, lint, TypeScript, and diff verification before completion."}

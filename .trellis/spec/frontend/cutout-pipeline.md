@@ -18,6 +18,85 @@
 `frame.data` is worker-owned; stages 2–4 mutate it in place (spec 4b). This is
 deliberate, not an immutability violation.
 
+## Scenario: Product-Owned Cutout Parameters
+
+### 1. Scope / Trigger
+
+Apply this contract whenever the source panel, project restore, automatic
+analysis, AI-native actions, or the worker cutout request changes. Threshold,
+minimum area, merge gap, and padding are algorithm inputs, not user or Agent
+preferences.
+
+### 2. Signatures
+
+```typescript
+const DEFAULT_PARAMS: Readonly<CutoutParams>
+restoreProject(input: ProjectRestoreInput): void
+useAutoRun(analyze: (wantSlices: boolean) => void): void
+parseAiNativeAction(action: unknown): AiNativeAction
+```
+
+### 3. Contracts
+
+- `DEFAULT_PARAMS` is the sole product-owned configuration supplied to the
+  deterministic worker pipeline.
+- Store state exposes no `setParam` or `resetParams` mutation API. UI and Agent
+  surfaces expose no slider, reset, patch, or numeric quick-fix command.
+- `ProjectRestoreInput.params` remains optional for legacy decoding, but
+  `restoreProject` ignores its value and installs `DEFAULT_PARAMS`.
+- AI-native snapshots omit internal params. The action schema rejects
+  `set-param`, `set-params`, and `reset-params`.
+- `useAutoRun` analyzes each newly loaded `autoAnalyze` source identity once.
+  Agent-managed sources with `autoAnalyze: false` and restored sources that
+  already contain slices do not start a duplicate worker run.
+- Image-specific automatic estimation may replace the default provider later,
+  but it must remain behind the worker `CutoutParams` boundary and must not
+  reintroduce manual controls.
+
+### 4. Validation & Error Matrix
+
+| Condition | Required behavior |
+|---|---|
+| Legacy project contains custom params | Restore succeeds; runtime uses `DEFAULT_PARAMS` |
+| AI-native request uses a removed parameter action | Schema parsing fails; no dispatch branch runs |
+| New product-managed source loads | Start exactly one analysis with slices |
+| Agent-managed source loads | Do not start a duplicate analysis |
+| Restored source already has slices | Preserve the restored projection; do not auto-rerun |
+| Analysis returns no regions | Show neutral retry guidance without parameter terminology or numeric tuning |
+
+### 5. Good / Base / Bad Cases
+
+- Good: importing a new sheet automatically cuts it with internal defaults and
+  presents results without asking the user to tune computer-vision values.
+- Base: a sheet produces no reusable regions; the UI suggests another source
+  and leaves explicit rerun available without exposing implementation knobs.
+- Bad: a hidden CLI action, persisted legacy value, settings reset, or empty-
+  state quick fix can mutate the worker parameters.
+
+### 6. Tests Required
+
+- Static UI regression proving parameter components are absent and settings /
+  empty states contain no mutation commands.
+- Store regression proving the params object is frozen, mutation actions are
+  absent, and custom legacy restore values normalize to defaults.
+- AI-native schema and snapshot regressions for removed actions and fields.
+- Auto-run hook regressions for one run per source identity and no duplicate
+  Agent-managed run.
+- Repository guidance regression covering current CLI/API documentation and
+  historical design instructions that could otherwise reintroduce controls.
+
+### 7. Wrong vs Correct
+
+```typescript
+// Wrong: make algorithm internals a supported control surface.
+store.setParam('threshold', 236)
+dispatch({ type: 'set-params', params: { minArea: 400 } })
+
+// Correct: keep the parameter contract behind automatic source analysis.
+const params = DEFAULT_PARAMS
+worker.postMessage({ type: 'analyze', imageId, runId, params, wantSlices: true })
+```
+
 ## Board Compliance Diagnostics (task `07-17-board-compliance-diagnostics`)
 
 The white pipeline silently degrades when the image model ignores the

@@ -57,7 +57,7 @@ export function RecoverySection() {
     const generatedAt = new Date().toISOString();
     return createDiagnosticBundle({
       generatedAt,
-      version: "0.1.1",
+      version: "0.1.3",
       safeMode: false,
       events: [
         ...getAiNativeDiagnostics().map((item) => ({

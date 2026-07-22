@@ -1,0 +1,5 @@
+{"file":".trellis/spec/frontend/byok-user-copy.md","reason":"Preserve BYOK credential and user-copy contracts."}
+{"file":".trellis/spec/frontend/agent-control-safety.md","reason":"Keep provider traffic and secret handling within the controlled Rust boundary."}
+{"file":".trellis/spec/frontend/type-safety.md","reason":"Synchronize persisted protocol discriminants across TypeScript and Rust."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"The protocol selection crosses UI, persistence, discovery, proxy, and adapter layers."}
+{"file":".trellis/tasks/07-21-provider-protocol-families/research/protocol-family-mvp.md","reason":"Evidence-backed protocol matrix, compatibility rules, and MVP scope."}

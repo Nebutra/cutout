@@ -1,6 +1,6 @@
 # Asset Cutout Studio — SOTA Refactor Architecture Spec (Tauri 2 + React 19)
 
-**Status:** v1 buildable spec · **Target:** macOS-first (arm64 + x64 DMG), cross-platform-ready · **Source:** port of Electron `asset-cutout-studio`
+**Status:** historical v1 architecture. The 2026-07-21 product contract supersedes every manual cutout parameter UI, action, and state mutation described below; the pipeline parameter type remains internal. · **Target:** macOS-first (arm64 + x64 DMG), cross-platform-ready · **Source:** port of Electron `asset-cutout-studio`
 
 ### Locked tooling versions (user-mandated)
 
@@ -22,9 +22,9 @@
 
 Asset Cutout Studio is a single-purpose desktop tool: drop a sprite/asset sheet with a white background, auto-segment it into individual transparent PNG slices via a 6-stage pixel pipeline, then rename and export those slices. The current Electron build runs the entire pipeline (`floodBackground → alpha cut → featherEdges → findComponents → mergeBoxes → padBox/cropCanvas`) **synchronously on the UI thread**, freezing the window on large sheets, and exposes exactly one IPC seam (`save-assets`) that base64-decodes PNGs and writes them to a chosen folder. The value is entirely in the pipeline; the shell is thin.
 
-The refactor keeps that value intact and re-homes it for performance and productization. The pixel pipeline moves **verbatim** (same thresholds, same output) into a **Web Worker + OffscreenCanvas**, unblocking the UI and enabling live parameter preview. The shell moves from Electron to **Tauri 2 + Rust**, shrinking the native surface to one typed `save_assets` command with least-privilege filesystem scope. The UI becomes a **React 19** split-view (left source + params / center transparent preview / right slice grid + inspector) built on **shadcn/ui** over Radix. Crucially, every I/O-shaped operation (export now; accounts, cloud library, cloud cutout, sharing later) is funneled through a **services/api interface layer** wrapped by **TanStack Query**, so the future backend is a file-swap, not a refactor — **we build the seams, not the server.**
+The refactor keeps that value intact and re-homes it for performance and productization. The pixel pipeline moves **verbatim** (same thresholds, same output) into a **Web Worker + OffscreenCanvas**, unblocking the UI while analysis runs automatically. The shell moves from Electron to **Tauri 2 + Rust**, shrinking the native surface to one typed `save_assets` command with least-privilege filesystem scope. The UI becomes a **React 19** split-view (left source / center transparent preview / right slice grid + inspector) built on **shadcn/ui** over Radix. Crucially, every I/O-shaped operation (export now; accounts, cloud library, cloud cutout, sharing later) is funneled through a **services/api interface layer** wrapped by **TanStack Query**, so the future backend is a file-swap, not a refactor — **we build the seams, not the server.**
 
-The stack is chosen to fit *this* app: a compute-heavy, offline-first image tool that will grow server features. Rust/Tauri gives a tiny, secure, fast-launching native shell without the pipeline rewrite (JS pixel code ports as-is to the worker). React 19 + shadcn gives a dense, keyboard-first, themeable UI we own the source of. Zustand owns synchronous ephemeral state (params at 60fps, selection); TanStack Query owns the I/O boundary even when today it points at local stubs.
+The stack is chosen to fit *this* app: a compute-heavy, offline-first image tool that will grow server features. Rust/Tauri gives a tiny, secure, fast-launching native shell without the pipeline rewrite (JS pixel code ports as-is to the worker). React 19 + shadcn gives a dense, keyboard-first, themeable UI we own the source of. Zustand owns synchronous ephemeral state and the internal pipeline configuration; TanStack Query owns the I/O boundary even when today it points at local stubs.
 
 ### Technology roles
 
@@ -36,7 +36,7 @@ The stack is chosen to fit *this* app: a compute-heavy, offline-first image tool
 | **TypeScript** | End-to-end types across UI, worker protocol, service interfaces. |
 | **TailwindCSS v4** | Utility styling + theme tokens (checkerboard, dark mode). |
 | **shadcn/ui (Radix)** | Copy-in component source (Slider, Card, Resizable, Tabs, Sonner, etc.); owns a11y. |
-| **Zustand** | Synchronous client state: source ref, 4 params, slices, selection, worker status. |
+| **Zustand** | Synchronous client state: source ref, internal cutout defaults, slices, selection, worker status. |
 | **TanStack Query v5** | I/O boundary: export mutations now; asset-library/session/cloud queries later. |
 | **Web Worker + OffscreenCanvas** | Off-thread 6-stage pixel pipeline; live preview; PNG blob encoding. |
 | **services/api layer** | Interface seam (`CutoutService`, `AssetRepository`, `SessionService`); local impls in v1, remote impls later. |
@@ -48,7 +48,7 @@ The stack is chosen to fit *this* app: a compute-heavy, offline-first image tool
 | **react-aria** | shadcn/Radix already covers a11y (focus, roving tabindex, ARIA); a second a11y layer is redundant and fights the aesthetic. |
 | **cmdk / command palette (v1)** | Deferred. Keyboard shortcuts + TopBar tooltips cover discoverability for v1's small action set. |
 | **Rust pixel rewrite (v1)** | The JS pipeline is battle-tested; porting to a worker preserves output and ships faster. Rust is a later perf option behind the same `CutoutService` seam. |
-| **Undo/redo, multi-sheet, manual box editing** | Pipeline is deterministic from 4 params ("undo" = move slider back); multi-sheet/library is the future server's job. Out of "port + productize" scope. |
+| **Undo/redo, multi-sheet, manual box editing** | The pipeline is deterministic from product-owned internal defaults; multi-sheet/library is the future server's job. Out of "port + productize" scope. |
 | **Building the backend** | Locked: seams only. No server code in v1. |
 
 ---
@@ -145,8 +145,6 @@ asset-cutout-studio/
     │   │   ├── DropZone.tsx         # drag-drop + hidden file input
     │   │   ├── SourceCanvas.tsx     # draws source bitmap, fit-to-pane
     │   │   ├── SourceMeta.tsx       # W×H · filename · N MB
-    │   │   ├── ParameterControls.tsx
-    │   │   └── ParameterSlider.tsx  # label+value+Slider (onValueChange live, onValueCommit debounced)
     │   ├── preview/
     │   │   ├── PreviewPanel.tsx
     │   │   ├── PreviewCanvas.tsx    # result bitmap blit + selected-bbox overlay
@@ -169,7 +167,7 @@ asset-cutout-studio/
     │   │   └── ExportBar.tsx        # per-slice export + export-all mirror
     │   ├── status/
     │   │   └── StatusBar.tsx        # count · bytes · active param summary
-    │   └── ui/                       # shadcn copy-in (button, slider, card, resizable, tabs,
+    │   └── ui/                       # shadcn copy-in (button, card, resizable, tabs,
     │                                 #   tooltip, dropdown-menu, input, badge, skeleton,
     │                                 #   sonner, alert-dialog, separator, label)
     │
@@ -203,7 +201,7 @@ asset-cutout-studio/
     │
     ├── hooks/
     │   ├── useAnalysisBridge.ts      # store ⇄ worker glue; runId stale-drop; bitmap.close()
-    │   ├── useParamAutoRun.ts        # debounced setParam → beginAnalysis (~120ms)
+    │   ├── useAutoRun.ts             # analyze each newly loaded product-managed source once
     │   ├── useHotkeys.ts             # ⌘O/⌘R/⌘⇧E/⌘E/[ ]/arrows/Enter/Esc
     │   └── queries/
     │       ├── keys.ts               # queryKeys factory (assetKeys, sessionKeys)
@@ -214,7 +212,7 @@ asset-cutout-studio/
     ├── store/
     │   ├── index.ts                  # create() + slice composition + actions
     │   ├── types.ts                  # Store, Params, Slice, SourceState, AnalysisState, WorkerStatus
-    │   ├── selectors.ts              # selectParams/selectSlices/selectSelectedSlice/selectExportPayload
+    │   ├── selectors.ts              # selectSlices/selectSelectedSlice/selectExportPayload
     │   └── slices/
     │       ├── source.ts   params.ts   analysis.ts   selection.ts
     │
@@ -222,7 +220,7 @@ asset-cutout-studio/
         ├── utils.ts                  # cn() (shadcn), clsx/tailwind-merge
         ├── image.ts                  # createImageBitmap helpers, blob↔bytes
         ├── filename.ts               # default name gen, sanitize (mirror Rust for parity)
-        └── constants.ts              # PARAM_RANGES (table below), MAX_LIVE_PREVIEW_MP
+        └── constants.ts              # shared import and preview limits
 ```
 
 ---
@@ -298,7 +296,7 @@ Rendering (`render.worker-side.ts`) is **separate** (needs OffscreenCanvas): `re
 
 **Immutability note:** `applyAlphaCut`/`featherEdges` mutate the worker-owned `ArrayBuffer` in place — this is correct high-perf design (nothing else references it), **not** a violation of the app's immutability rule (which targets shared state). Flagged so no reviewer "fixes" it into per-pixel allocation.
 
-**Message protocol (`workers/protocol.ts`):** image uploaded **once**, then each slider change transfers zero image bytes:
+**Message protocol (`workers/protocol.ts`):** image uploaded **once**, then analysis and explicit reruns transfer zero image bytes:
 ```ts
 type WorkerRequest =
   | { type:'loadImage'; imageId:string; bitmap:ImageBitmap }        // once (transfer bitmap)
@@ -325,7 +323,7 @@ interface SliceOut { id:string; index:number; box:Box; png:Blob; width:number; h
 **shadcn component map:**
 | Need | Component |
 |---|---|
-| 4 param sliders | **Slider** (`onValueChange` live label / `onValueCommit` debounced analyze) |
+| Automatic cutout | No parameter UI; source load starts analysis with internal defaults |
 | Import/Rerun/Export | **Button** (default/outline/ghost/icon) |
 | Slice cards | **Card** |
 | Rename | **Input** (Enter commit / Esc revert) |
@@ -338,15 +336,15 @@ interface SliceOut { id:string; index:number; box:Box; png:Blob; width:number; h
 | Loading grid | **Skeleton** |
 | Overwrite confirm | **AlertDialog** |
 
-**Param ranges (the contract — `lib/constants.ts`):**
-| Param | min | max | step | default |
-|---|---|---|---|---|
-| `threshold` | 220 | 255 | 1 | **246** |
-| `minArea` | 80 | 5000 | 20 | **900** |
-| `mergeGap` | 0 | 80 | 1 | **18** |
-| `padding` | 0 | 40 | 1 | **10** |
+**Internal pipeline defaults (not a product control):**
+| Param | value |
+|---|---|
+| `threshold` | **246** |
+| `minArea` | **900** |
+| `mergeGap` | **18** |
+| `padding` | **10** |
 
-**Productization (each earns its place):** selected-slice **bbox overlay** on preview (closes card↔sheet loop); **remembered output dir** within a session; per-card **hover actions** (export/rename/copy-PNG); **dark mode**; **zero-regions quick-fix** buttons ("−10 threshold" / "−50% min-area" nudge + rerun); count/dims/bytes readouts.
+**Productization (each earns its place):** selected-slice **bbox overlay** on preview (closes card↔sheet loop); **remembered output dir** within a session; per-card **hover actions** (export/rename/copy-PNG); **dark mode**; a parameter-free zero-regions state that suggests a different source sheet; count/dims/bytes readouts.
 
 **Keyboard (`useHotkeys`, no cmdk):** ⌘O import · ⌘R rerun · ⌘⇧E export all · ⌘E export selected · `[`/`]` prev/next · arrows grid nav · Enter rename · Esc clear. Discoverable via TopBar tooltips.
 
@@ -358,13 +356,13 @@ interface SliceOut { id:string; index:number; box:Box; png:Blob; width:number; h
 
 **Zustand store (`store/`, single store, sliced):**
 ```ts
-interface Params { threshold:246; minArea:900; mergeGap:18; padding:10 }  // ranges §4c
+interface Params { threshold:246; minArea:900; mergeGap:18; padding:10 }  // internal defaults §4c
 interface SourceState { bitmap:ImageBitmap|null; name:string; width:number; height:number }
 interface Slice { id:string /*uuid*/; index:number; name:string; box:Box; blob:Blob;
                   objectUrl:string; selected:boolean }
 interface AnalysisState { status:'idle'|'running'|'done'|'error'; runId:number; error:string|null;
                           previewBitmap:ImageBitmap|null; slices:Slice[] }
-// actions: loadImage(file) · setParam(k,v) · beginAnalysis()->runId ·
+// actions: loadImage(file) · beginAnalysis()->runId ·
 //          applyAnalysisResult(runId,r) [drops if stale] · failAnalysis · selectSlice · renameSlice · clearSelection
 ```
 `ImageBitmap` is the transfer unit both ways (not `HTMLImageElement`, not `dataUrl` — those bloat snapshots). Selectors are co-located, `useShallow` for arrays. `selectExportPayload` feeds the export mutation with default names `${name}-01.png` (2-pad). **Memory correctness:** `bitmap.close()` on stale/superseded results and on replacement — real GPU-leak guard, not optional.
@@ -384,7 +382,7 @@ interface ServiceRegistry { session:SessionService; cutout:CutoutService; assets
 **TanStack Query (`hooks/queries/`) — where it earns its place in v1:**
 | Concern | Owner | Why |
 |---|---|---|
-| 4 params, slider drag | Zustand | sync, 60×/sec |
+| internal cutout defaults | Zustand | deterministic worker input |
 | selection / rename | Zustand | ephemeral, no I/O |
 | worker status / preview | Zustand | push-based local compute, not a cache |
 | **exportOne / exportAll** | **Query mutation** | async, can fail (disk/cancel), needs `isPending/isError` — replaces manual `导出中...` DOM juggling |
@@ -412,13 +410,13 @@ export function useExportAll() {
 
 ---
 
-## 6. Data Flow Walkthrough — drop → tweak → rename → export
+## 6. Data Flow Walkthrough — drop → rerun → rename → export
 
 ```
 1. DROP IMAGE  (UI → Store → Worker)
    DropZone.onFile(file) ─▶ store.loadImage(file):
      createImageBitmap(file) → set source{bitmap,name,w,h}; reset analysis; revoke old objectUrls
-   useParamAutoRun sees new source ─▶ worker.postMessage({type:'loadImage', imageId, bitmap}, [bitmap])
+   useAutoRun sees new source ─▶ worker.postMessage({type:'loadImage', imageId, bitmap}, [bitmap])
    store.beginAnalysis() → runId=1 ─▶ postMessage({type:'analyze', runId:1, imageId, params, wantSlices:true})
 
 2. WORKER RUNS  (Worker)
@@ -432,12 +430,11 @@ export function useExportAll() {
    useAnalysisBridge.onmessage: if runId !== store.runId → close() bitmaps, DROP (no tear)
      preview → store.previewBitmap = full  (PreviewCanvas blits; PreviewMeta "N regions")
      slices  → store.applyAnalysisResult: map to Slice[] (uuid, name `${name}-01.png`, objectUrl)
-   Grid fills (SliceCard thumbnails); StatusBar "12 slices · 3.2 MB · threshold 246"
+   Grid fills (SliceCard thumbnails); StatusBar "12 slices · 3.2 MB"
 
-4. TWEAK SLIDER  (UI → Store → Worker, debounced, stale-dropped)
-   ParameterSlider.onValueChange(v) → store.setParam (label updates 0ms)
-   ParameterSlider.onValueCommit(v) → useParamAutoRun debounce ~120ms → beginAnalysis() runId=2
-     postMessage({type:'analyze', runId:2, imageId, params, wantSlices:false})  // preview-only during drag
+4. EXPLICIT RERUN  (UI → Store → Worker, stale-dropped)
+   Rerun action → beginAnalysis() runId=2
+     postMessage({type:'analyze', runId:2, imageId, params:DEFAULT_PARAMS, wantSlices:true})
    Worker's newer runId supersedes: runPipeline inter-stage `if(signal.aborted) return`
    Late runId=1 reply arrives after runId=2 → bridge drops it + close() bitmaps (no GPU leak)
    Guard: source >~4MP → commit-only (skip live preview) to stay smooth
@@ -466,9 +463,9 @@ export function useExportAll() {
 
 **Phase 0 — Scaffold (blocks all; do first, solo)**
 - [ ] `pnpm create vite@latest` (react-ts) — **pin Vite to 7.x**; add Tailwind v4, path alias `@`, TanStack Query, Zustand
-- [ ] `pnpm dlx shadcn@latest init`; add: button slider card resizable tabs tooltip dropdown-menu input badge skeleton sonner alert-dialog separator label
+- [ ] `pnpm dlx shadcn@latest init`; add: button card resizable tabs tooltip dropdown-menu input badge skeleton sonner alert-dialog separator label
 - [ ] `pnpm dlx @tauri-apps/cli init`; `tauri.conf.json` (window/CSP/bundle), `capabilities/default.json`, `Cargo.toml` deps
-- [ ] `globals.css` tokens (light/.dark) + `bg-checker`; `lib/utils.ts` `cn()`; `lib/constants.ts` PARAM_RANGES
+- [ ] `globals.css` tokens (light/.dark) + `bg-checker`; `lib/utils.ts` `cn()`
 - [ ] Empty `AppShell` + `Providers` renders; `pnpm tauri dev` boots a window
 
 **Phase 1 — Tauri shell + save (parallelizable with Phase 2)**
@@ -487,10 +484,10 @@ export function useExportAll() {
 **Phase 3 — State + services (needs Phase 2 protocol; parallel with Phase 1)**
 - [ ] `store/` slices + selectors + `bitmap.close()` lifecycle
 - [ ] `services/types.ts` interfaces; `local/` impls; `context.ts` `createLocalRegistry`
-- [ ] `hooks/`: `useAnalysisBridge` (runId stale-drop), `useParamAutoRun` (debounce), `queries/` (keys, export mutations, stubs)
+- [ ] `hooks/`: `useAnalysisBridge` (runId stale-drop), `useAutoRun` (new-source analysis), `queries/` (keys, export mutations, stubs)
 
 **Phase 4 — UI split-view (needs Phase 0 shadcn + Phase 3 store)**
-- [ ] `WorkspaceLayout` Resizable 3-pane; SourcePanel+DropZone+SourceCanvas+ParameterControls
+- [ ] `WorkspaceLayout` Resizable 3-pane; SourcePanel+DropZone+SourceCanvas
 - [ ] PreviewPanel+PreviewCanvas (blit + bbox overlay); RightRail Tabs/stacked; SliceGrid/Card/Thumb
 - [ ] InspectorPanel+SliceNameField+ExportBar; TopBar+actions+ThemeToggle; StatusBar
 - [ ] Wire `useHotkeys`; empty/loading/error/zero-region states
@@ -543,7 +540,7 @@ export function useExportAll() {
 | 4 | **`fs_scope().allow_directory` runtime API** name/signature | tauri-plugin-fs v2 |
 | 5 | **OffscreenCanvas + `convertToBlob` + `createImageBitmap` + ImageBitmap transfer** in WKWebView on min macOS (Safari 16.4+ / macOS 13.3+) | smoke test on target OS; fallback: worker `ImageData` → main-thread `canvas.toBlob` |
 | 6 | **CSP** must allow `worker-src 'self' blob:`, `img-src 'self' data: blob:` | `tauri.conf.json` |
-| 7 | **shadcn CLI** `pnpm dlx shadcn@latest` (renamed from `shadcn-ui`); Resizable `autoSaveId`/`withHandle`; Sonner is current toast; Slider `onValueCommit` fires on release | shadcn/ui docs |
+| 7 | **shadcn CLI** `pnpm dlx shadcn@latest` (renamed from `shadcn-ui`); Resizable `autoSaveId`/`withHandle`; Sonner is current toast | shadcn/ui docs |
 | 8 | **Tailwind v4** (`@theme` CSS-first, `@tailwindcss/vite` plugin) vs v3 config file — changes init + token declaration | scaffold; Tailwind v4 + Vite 7 |
 | 9 | **React 19 peer-dep** support across Radix packages | pin versions |
 | 10 | **TanStack Query v5** `queryOptions`, `gcTime` (not `cacheTime`), `signal` in `queryFn` ctx, `cancelQueries`/`invalidateQueries`; Zustand v5 `useShallow` from `zustand/react/shallow` | confirmed via Context7; re-confirm on install |
@@ -558,7 +555,7 @@ export function useExportAll() {
 | 1 | **`mergeBoxes` DSU diverges from original** (transitive grow-then-recheck) → different slices than Electron | HIGH | Fixed-point pass on set rectangles; golden-fixture tests gate the port (§8); fall back to iterating set-rect merges (provably equivalent) if divergence found |
 | 2 | **OffscreenCanvas/`convertToBlob` missing/buggy on target WKWebView** | HIGH | Smoke-test Phase 2 on min macOS; fallback = pure pipeline in worker + `ImageData`→main-thread `canvas.toBlob` (pixel math still off-thread) |
 | 3 | **Tauri v2 API drift** (permission strings, dialog return, fs-scope API) | MED | §9 verify-list before coding Phase 1; single `platform/native.ts` + `capabilities/default.json` localize all churn |
-| 4 | **GPU memory leak** from un-closed `ImageBitmap`s on rapid slider drags | MED | `bitmap.close()` wired into stale-drop + replacement in `useAnalysisBridge`/`applyAnalysisResult`; test drag-storm |
+| 4 | **GPU memory leak** from un-closed `ImageBitmap`s on rapid source replacement or reruns | MED | `bitmap.close()` wired into stale-drop + replacement in `useAnalysisBridge`/`applyAnalysisResult`; test replacement/rerun storms |
 | 5 | **Live preview jank on large (>4MP) sheets** | MED | Pixel-count guard → commit-only re-run above threshold; `wantSlices:false` during drag (preview-only); debounce 120ms |
 | 6 | **Filename parity** Rust sanitize ≠ JS `/[^\w.-]+/g` (run-collapse; ASCII `\w`) | MED | Replicate `+` collapse in `sanitize_filename`; or `regex` crate with `unicode(false)`; unit-test against JS outputs; mirror in `lib/filename.ts` |
 | 7 | **Unsigned DMG Gatekeeper friction** | LOW | Document right-click-Open / `xattr -dr com.apple.quarantine`; leave `signingIdentity`/notarization seams for later |

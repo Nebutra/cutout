@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: superpowers:executing-plans (inline, this session). Steps use checkbox (`- [ ]`) syntax. Honor @superpowers:test-driven-development for logic modules and @vercel:react-best-practices for `.tsx`.
 
-**Goal:** Consolidate every settings affordance into one `⌘,` Settings dialog (General + AI sections), and add AI model-assignment by output modality backed by `/v1/models` discovery + plugin-store.
+**Goal:** Consolidate every settings affordance into one `⌘,` Settings dialog (General + AI sections), and add AI model-assignment by output modality backed by `/v1/models` discovery + plugin-store. Cutout algorithm configuration is product-owned and is not a Settings affordance.
 
 **Architecture:** A controlled shadcn `Dialog` with a left sidebar (no router). Reuses all shipped BYOK code (hooks/service/Rust) and i18n; adds a thin model-assignment layer persisted via `@tauri-apps/plugin-store`. Spec: `docs/superpowers/specs/2026-07-02-settings-page-design.md`.
 
@@ -18,7 +18,7 @@
 |---|---|---|
 | `src/components/settings/SettingsDialog.tsx` | Dialog shell: sidebar + body + footer; `section` state | new |
 | `src/components/settings/SettingsSidebar.tsx` | section nav (general \| ai) | new |
-| `src/components/settings/sections/GeneralSection.tsx` | theme · language · reset params | new |
+| `src/components/settings/sections/GeneralSection.tsx` | theme · language | new |
 | `src/components/settings/sections/AiSection.tsx` | credentials (list+form) + models block | new |
 | `src/components/settings/AboutFooter.tsx` | version/stack line | new |
 | `src/components/settings/ModelSlot.tsx` | one modality → model picker | new (P3) |
@@ -52,9 +52,8 @@
 
 - [ ] Theme: segmented control (Light / Dark / System) via `useTheme().setTheme` + `theme` (not `resolvedTheme`, so System is selectable). Instant-apply.
 - [ ] Language: a compact segmented/radio control reusing the `activateLocale` + `SUPPORTED`/`LABEL` logic (extract shared label map from `LanguageSwitcher` so it is not duplicated). Instant-apply, no reload.
-- [ ] Reset parameters: a `Button variant=outline` calling `store.resetParams()` + a success toast.
 - [ ] All strings via `Trans`/`t`.
-- [ ] Commit: `feat(settings): General section (theme, language, reset)`
+- [ ] Commit: `feat(settings): General section (theme and language)`
 
 ### Task 3: Gear opens dialog; retire dropdown; ⌘,
 **Files:** Modify `SettingsMenu.tsx`, `TopBar.tsx`, `useHotkeys.ts`, `AppShell.tsx`

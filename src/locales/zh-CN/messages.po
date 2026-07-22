@@ -168,16 +168,6 @@ msgid "export.toast_success"
 msgstr "{savedCount, plural, other {已导出 # 个切片}}"
 
 #. js-lingui-explicit-id
-#: src/components/slices/SliceGridEmpty.tsx
-msgid "slices.empty_lower_threshold"
-msgstr "阈值 −10"
-
-#. js-lingui-explicit-id
-#: src/components/slices/SliceGridEmpty.tsx
-msgid "slices.empty_halve_min_area"
-msgstr "最小面积 −50%"
-
-#. js-lingui-explicit-id
 #: src/components/library/TeamGovernancePanel.tsx
 msgid "team.host_required_description"
 msgstr "需要一个桌面协作主机才能进行评审或创建只读分享。"
@@ -232,11 +222,6 @@ msgstr "添加与版本绑定的评论"
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.add_tag_placeholder"
 msgstr "添加标签"
-
-#. js-lingui-explicit-id
-#: src/components/settings/SettingsSidebar.tsx
-msgid "settings.section_advanced"
-msgstr "高级"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
@@ -320,6 +305,11 @@ msgid "preview.analyzing"
 msgstr "分析中…"
 
 #. js-lingui-explicit-id
+#: src/components/settings/ProviderForm.tsx
+msgid "settings.provider_protocol_anthropic_messages"
+msgstr "Anthropic Messages"
+
+#. js-lingui-explicit-id
 #: src/components/settings/VectorizerPanel.tsx
 msgid "vectorizer.api_id_saved"
 msgstr "API ID 已保存"
@@ -332,12 +322,17 @@ msgstr "API Key"
 #. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
 msgid "settings.keychain_trust"
-msgstr "API 密钥仅存于系统钥匙串,并在原生层注入——永不进入网页。"
+msgstr "API 密钥仅保存在本机，并在原生层注入——永不进入网页。"
 
 #. js-lingui-explicit-id
 #: src/components/settings/VectorizerPanel.tsx
 msgid "vectorizer.mode_label"
 msgstr "API 模式"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderForm.tsx
+msgid "settings.provider_api_protocol"
+msgstr "API 协议"
 
 #. js-lingui-explicit-id
 #: src/components/settings/VectorizerPanel.tsx
@@ -496,11 +491,6 @@ msgid "settings.speech.auto_play_aria"
 msgstr "自动播放 TTS 回复"
 
 #. js-lingui-explicit-id
-#: src/components/settings/sections/PaidActionsSection.tsx
-msgid "settings.paid_actions.auto_approve_aria"
-msgstr "在预算范围内自动批准付费操作"
-
-#. js-lingui-explicit-id
 #: src/components/home/ProjectHome.tsx
 msgid "home.nav_back"
 msgstr "后退"
@@ -599,6 +589,11 @@ msgstr "在此之前，此处的更改无法保存。"
 #: src/components/settings/sections/UpdatesSection.tsx
 msgid "settings.updates.check_automatically"
 msgstr "自动检查"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderForm.tsx
+msgid "settings.check_connection_load_models"
+msgstr "检查凭证并加载模型"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/UpdatesSection.tsx
@@ -938,6 +933,11 @@ msgid "settings.personalization.personality_custom"
 msgstr "自定义"
 
 #. js-lingui-explicit-id
+#: src/components/settings/ProviderForm.tsx
+msgid "settings.provider_kind_openai_compatible"
+msgstr "自定义端点"
+
+#. js-lingui-explicit-id
 #: src/components/settings/sections/PersonalizationSection.tsx
 msgid "settings.personalization.custom_instructions"
 msgstr "自定义指令"
@@ -954,14 +954,9 @@ msgid "settings.updates.up_to_date"
 msgstr "Cutout 在 {0} 通道上已是最新。"
 
 #. js-lingui-explicit-id
-#: src/components/source/ParameterControls.tsx
-msgid "source.params_aria"
-msgstr "抠图参数"
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/AdvancedSection.tsx
-msgid "settings.reset_params_label"
-msgstr "切图参数"
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.provider_source_keychain"
+msgstr "Cutout 钥匙串"
 
 #. js-lingui-explicit-id
 #: src/components/home/SidebarAccount.tsx
@@ -1052,7 +1047,7 @@ msgid "settings.integrations.desktop_not_installed"
 msgstr "未安装桌面提供方。"
 
 #. js-lingui-explicit-id
-#: src/components/settings/sections/AdvancedSection.tsx
+#: src/components/settings/sections/GeneralSection.tsx
 msgid "settings.developer_mode.title"
 msgstr "开发者模式"
 
@@ -1085,6 +1080,16 @@ msgstr "断开连接"
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.discover_references"
 msgstr "发现参考资料"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.discovered_on_mac"
+msgstr "在这台 Mac 上发现"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.discovered_providers"
+msgstr "发现的提供方"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/PersonalizationSection.tsx
@@ -1171,6 +1176,11 @@ msgstr "输入 API Key"
 #: src/components/settings/VectorizerPanel.tsx
 msgid "vectorizer.secret_placeholder"
 msgstr "输入 API 密钥"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderForm.tsx
+msgid "settings.enter_model_manually"
+msgstr "手动输入模型 ID"
 
 #. js-lingui-explicit-id
 #: src/components/library/KitLibraryInspector.tsx
@@ -1323,6 +1333,11 @@ msgid "global_library.section_aria"
 msgstr "全局库"
 
 #. js-lingui-explicit-id
+#: src/components/settings/ProviderForm.tsx
+msgid "settings.provider_protocol_google_generate_content"
+msgstr "Google GenerateContent"
+
+#. js-lingui-explicit-id
 #: src/components/home/ProjectHome.tsx
 msgid "home.layout_grid"
 msgstr "网格视图"
@@ -1457,7 +1472,7 @@ msgstr "保持听写界面可见"
 #. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
 msgid "settings.dialog_form_desc"
-msgstr "密钥仅保存在系统钥匙串，永不进入网页或磁盘明文。"
+msgstr "密钥仅保存在本机，原生层注入，永不进入网页。"
 
 #. js-lingui-explicit-id
 #: src/components/library/KitLibraryInspector.tsx
@@ -1473,11 +1488,6 @@ msgstr "语言"
 #: src/components/settings/sections/PersonalizationSection.tsx
 msgid "settings.personalization.tool_assisted_memory_desc"
 msgstr "允许已批准的工具贡献偏好信号。"
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/PaidActionsSection.tsx
-msgid "settings.paid_actions.hint"
-msgstr "仅在单次操作不超过此额度时，允许 Agent 自动继续。"
 
 #. js-lingui-explicit-id
 #: src/components/library/GlobalLibraryView.tsx
@@ -1578,16 +1588,6 @@ msgstr "已锁定"
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.kit_editor_description"
 msgstr "管理已批准的、内容寻址的套件投影。"
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/PaidActionsSection.tsx
-msgid "settings.paid_actions.maximum_cost_aria"
-msgstr "单次付费操作的最高美元成本"
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/PaidActionsSection.tsx
-msgid "settings.paid_actions.maximum_cost"
-msgstr "单次最高额度（USD）"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/PersonalizationSection.tsx
@@ -1731,6 +1731,16 @@ msgid "slices.empty_no_regions_title"
 msgstr "未找到区域"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.no_reusable_credential"
+msgstr "没有可复用的凭据"
+
+#. js-lingui-explicit-id
+#: src/components/slices/SliceGridEmpty.tsx
+msgid "slices.empty_no_regions_automatic_hint"
+msgstr "未找到可复用区域。请尝试其他素材图。"
+
+#. js-lingui-explicit-id
 #: src/components/settings/ProviderRow.tsx
 #: src/components/settings/VectorizerPanel.tsx
 msgid "settings.status_unconfigured"
@@ -1780,8 +1790,13 @@ msgstr "打开的标签页"
 
 #. js-lingui-explicit-id
 #: src/components/settings/ProviderForm.tsx
-msgid "settings.provider_kind_openai_compatible"
-msgstr "OpenAI 兼容"
+msgid "settings.provider_protocol_chat_completions"
+msgstr "OpenAI Chat Completions"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderForm.tsx
+msgid "settings.provider_protocol_responses"
+msgstr "OpenAI Responses"
 
 #. js-lingui-explicit-id
 #: src/components/settings/ModelSlot.tsx
@@ -1792,21 +1807,6 @@ msgstr "可选的备用模型"
 #: src/components/source/DropZone.tsx
 msgid "source.dropzone_hint"
 msgstr "或点击浏览 · PNG、JPEG、WebP"
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/PaidActionsSection.tsx
-msgid "settings.paid_actions.title"
-msgstr "付费操作"
-
-#. js-lingui-explicit-id
-#: src/components/source/ParameterControls.tsx
-msgid "source.params_heading"
-msgstr "参数"
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/AdvancedSection.tsx
-msgid "settings.reset_done_toast"
-msgstr "参数已重置"
 
 #. js-lingui-explicit-id
 #: src/components/library/KitLibraryInspector.tsx
@@ -1915,6 +1915,11 @@ msgstr "预览诊断信息"
 #: src/components/library/RegistryInstallPanel.tsx
 msgid "registry_install.preview_install"
 msgstr "预览安装"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.provider_source_environment"
+msgstr "进程环境变量"
 
 #. js-lingui-explicit-id
 #: src/components/settings/VectorizerPanel.tsx
@@ -2131,11 +2136,6 @@ msgid "topbar.rerun_label"
 msgstr "重新分析"
 
 #. js-lingui-explicit-id
-#: src/components/source/ParameterControls.tsx
-msgid "source.params_reset"
-msgstr "重置"
-
-#. js-lingui-explicit-id
 #: src/components/settings/sections/PersonalizationSection.tsx
 msgid "settings.personalization.reset"
 msgstr "重置"
@@ -2154,16 +2154,6 @@ msgstr "重置失败"
 #: src/components/settings/sections/RecoverySection.tsx
 msgid "settings.recovery.hint"
 msgstr "重置界面偏好，或导出已脱敏的本地诊断包。不会删除项目数据。"
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/AdvancedSection.tsx
-msgid "settings.reset_params"
-msgstr "重置参数"
-
-#. js-lingui-explicit-id
-#: src/components/source/ParameterControls.tsx
-msgid "source.params_reset_title"
-msgstr "将参数重置为默认值"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/PersonalizationSection.tsx
@@ -2211,11 +2201,6 @@ msgstr "仅在你选择「安装并重启」后才会重启。进行中的 Agent
 #: src/components/settings/sections/ArchivedSection.tsx
 msgid "home.restore"
 msgstr "恢复"
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/AdvancedSection.tsx
-msgid "settings.reset_params_hint"
-msgstr "将白底阈值、最小面积、合并间距与内边距恢复为默认值。"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/PersonalizationSection.tsx
@@ -2331,6 +2316,11 @@ msgid "global_library.select_item_aria"
 msgstr "选择 {0}"
 
 #. js-lingui-explicit-id
+#: src/components/settings/ProviderForm.tsx
+msgid "settings.select_model"
+msgstr "选择模型"
+
+#. js-lingui-explicit-id
 #: src/components/inspector/InspectorPanel.tsx
 msgid "inspector.empty_has_slices"
 msgstr "选择一个切片以重命名、检视并导出。"
@@ -2373,7 +2363,7 @@ msgid "settings.key_show"
 msgstr "显示"
 
 #. js-lingui-explicit-id
-#: src/components/settings/sections/AdvancedSection.tsx
+#: src/components/settings/sections/GeneralSection.tsx
 msgid "settings.developer_mode.hint"
 msgstr "在项目内显示只读的 DAG、Design IR 和回执审计工具。"
 
@@ -2542,12 +2532,7 @@ msgstr "该文件无法解码为图像。"
 #. js-lingui-explicit-id
 #: src/components/settings/KeyField.tsx
 msgid "settings.key_hint"
-msgstr "密钥仅写入系统钥匙串，永不回传或显示。"
-
-#. js-lingui-explicit-id
-#: src/components/slices/SliceGridEmpty.tsx
-msgid "slices.empty_no_regions_hint"
-msgstr "参数对该素材图可能过于严格，试试放宽："
+msgstr "密钥仅保存在本机，永不回传或显示。"
 
 #. js-lingui-explicit-id
 #: src/components/preview/PreviewCanvas.tsx
@@ -2575,7 +2560,7 @@ msgstr "这将把“{0}”从本地存储中移除，此操作无法撤销。"
 #. js-lingui-explicit-id
 #: src/components/settings/ProviderRow.tsx
 msgid "settings.remove_confirm_desc"
-msgstr "将删除「{label}」的配置及其保存在系统钥匙串中的密钥，此操作无法撤销。"
+msgstr "将删除「{label}」的配置及其本机保存的密钥，此操作无法撤销。"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/SpeechSection.tsx
@@ -2701,6 +2686,7 @@ msgid "settings.updates.download_progress_aria"
 msgstr "更新下载进度"
 
 #. js-lingui-explicit-id
+#: src/components/home/SidebarAccount.tsx
 #: src/components/settings/sections/UpdatesSection.tsx
 msgid "settings.updates.title"
 msgstr "更新"
@@ -2798,7 +2784,7 @@ msgid "global_library.meta_version"
 msgstr "版本"
 
 #. js-lingui-explicit-id
-#. placeholder {0}: state.release.version
+#: src/components/home/SidebarAccount.tsx
 #: src/components/settings/sections/UpdatesSection.tsx
 msgid "settings.updates.version_available"
 msgstr "版本 {0} 可用。"
@@ -2897,57 +2883,3 @@ msgstr "打开的标签页和最近关闭的标签页会显示在这里"
 #: src/components/home/ProjectHome.tsx
 msgid "home.your_projects"
 msgstr "你的项目"
-#. js-lingui-explicit-id
-#: src/components/settings/ProviderForm.tsx
-msgid "settings.provider_api_protocol"
-msgstr "API 协议"
-
-#. js-lingui-explicit-id
-#: src/components/settings/ProviderForm.tsx
-msgid "settings.provider_protocol_responses"
-msgstr "Responses API"
-
-#. js-lingui-explicit-id
-#: src/components/settings/ProviderForm.tsx
-msgid "settings.provider_protocol_chat_completions"
-msgstr "Chat Completions"
-
-#. js-lingui-explicit-id
-#: src/components/settings/ProviderForm.tsx
-msgid "settings.check_connection_load_models"
-msgstr "检查连接并加载模型"
-
-#. js-lingui-explicit-id
-#: src/components/settings/ProviderForm.tsx
-msgid "settings.select_model"
-msgstr "选择模型"
-
-#. js-lingui-explicit-id
-#: src/components/settings/ProviderForm.tsx
-msgid "settings.enter_model_manually"
-msgstr "手动输入模型 ID"
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.provider_source_environment"
-msgstr "进程环境变量"
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.provider_source_keychain"
-msgstr "Cutout 钥匙串"
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.discovered_providers"
-msgstr "发现的提供方"
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.discovered_on_mac"
-msgstr "在这台 Mac 上发现"
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.no_reusable_credential"
-msgstr "没有可复用的凭据"

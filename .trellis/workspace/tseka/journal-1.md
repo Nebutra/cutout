@@ -18,7 +18,9 @@ Replaced the hard-coded plan review dashboard with safe AI-authored Markdown art
 
 ### Main Changes
 
-- Detailed change bullets were not supplied; see the summary above.
+- Made monochrome integration SVGs theme-aware and standardized the shared icon box at 20x20px.
+- Bundled official Pencil and Paper app marks with exact upstream URLs and SHA-256 provenance.
+- Updated unit coverage and desktop/mobile light/dark Playwright baselines.
 
 ### Git Commits
 
@@ -51,7 +53,14 @@ Fixed long generated prompts being rejected by the 20,000-character audit intent
 
 ### Main Changes
 
-- Detailed change bullets were not supplied; see the summary above.
+- Vertically centered compact connector logos and replaced the Canva mark.
+- Added Retry for transient interrupted Agent runs while excluding policy,
+  authentication, configuration, material, and cancellation failures.
+- Unified the Git dock identity and collapse control; hover/focus swaps the Git
+  branch icon to the drawer-close icon.
+- Added OpenAI Responses, OpenAI Chat Completions, Anthropic Messages, and
+  Google GenerateContent custom endpoint protocols across UI, TypeScript, Rust,
+  docs, locales, and visual coverage.
 
 ### Git Commits
 
@@ -61,7 +70,13 @@ Fixed long generated prompts being rejected by the 20,000-character audit intent
 
 ### Testing
 
-- Validation was not recorded for this session.
+- Connector unit, lint, type-check, brand, and desktop/mobile visual checks.
+- Agent retry focused tests, lint, and type-check.
+- Git dock unit and accessibility checks; its legacy visual fixture remains
+  skipped because the fixture times out before assertions.
+- Provider protocol Vitest 74/74, Rust AI tests 46/46, Provider Playwright
+  10/10, lint, TypeScript build, Agent contract validation, Rust formatting,
+  and diff checks.
 
 ### Status
 
@@ -223,6 +238,276 @@ Added atomic macOS, Windows, and Linux GitHub releases; version and artifact val
 | Hash | Message |
 |------|---------|
 | `eb31446` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 8: Fix integration logo readability
+
+**Date**: 2026-07-21
+**Task**: Fix integration logo readability
+**Branch**: `main`
+
+### Summary
+
+Theme-adapted integration marks, bundled official Pencil and Paper assets with reproducible provenance, standardized 20px rendering, and refreshed desktop/mobile visual coverage.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `0e5a45f` | fix: improve integration logo readability |
+
+### Testing
+
+- Focused Vitest: 9 tests passed.
+- Focused oxlint and `tsc -b`: passed.
+- Affected Playwright visual suite: 8 desktop/mobile tests passed.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 9: Remove manual cutout controls
+
+**Date**: 2026-07-21
+**Task**: Remove manual cutout controls
+**Branch**: `main`
+
+### Summary
+
+Removed all manual cutout parameter surfaces, preserved legacy project compatibility through internal defaults, updated Agent/CLI contracts, verified and installed the new macOS app.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `90a45fd` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 10: Merge Advanced settings into General
+
+**Date**: 2026-07-21
+**Task**: Merge Advanced settings into General
+**Branch**: `main`
+
+### Summary
+
+Removed the single-control Advanced tab, moved Developer mode to General with interaction coverage, rebuilt and installed the updated macOS app.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `4d6213e` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 11: Polish connectors, agent retry, Git dock, and provider protocols
+
+**Date**: 2026-07-21
+**Task**: Polish connectors, agent retry, Git dock, and provider protocols
+**Branch**: `main`
+
+### Summary
+
+Centered connector logos and updated Canva branding; added safe retry for transient Agent failures; unified the Git dock identity and collapse control; added four executable provider protocol families with non-billable credential/catalog checks, exhaustive adapters, Rust auth routing, docs, specs, locales, and visual coverage.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `c1475ef` | (see git log) |
+| `fe77a65` | (see git log) |
+| `bf41e12` | (see git log) |
+| `ed6b6eb` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 12: Unify workspace rail navigation
+
+**Date**: 2026-07-22
+**Task**: Unify workspace rail navigation
+**Branch**: `main`
+
+### Summary
+
+Unified Design and Deliver rail presentation, restored Design drawer toggle semantics, preserved inline Deliver routing, added focus and interaction coverage, and validated the Agent contract plus desktop browser flow.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `9ca9b6d` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 13: Restore provider bundle boundary and install Cutout
+
+**Date**: 2026-07-22
+**Task**: Restore provider bundle boundary and install Cutout
+**Branch**: `main`
+
+### Summary
+
+Deferred provider catalog metadata out of the frontend entry, restored the production bundle gate, built and smoke-tested the Apple Silicon Cutout app, moved the previous installation to Trash, installed the new bundle, and verified it launched.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `bd44c16` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 14: Restore Git visual coverage and reopened Agent Retry
+
+**Date**: 2026-07-22
+**Task**: Restore Git visual coverage and reopened Agent Retry
+**Branch**: `main`
+
+### Summary
+
+Restored deterministic Git workspace visual coverage and fixed Retry reconstruction for transient Agent failures after reopening a project.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `c0f8a67` | (see git log) |
+| `6d487e7` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 15: Remove desktop paid operation limit
+
+**Date**: 2026-07-22
+**Task**: Remove desktop paid operation limit
+**Branch**: `main`
+
+### Summary
+
+Removed the desktop paid-action allowance UI and persistence, enforced explicit approval with host-derived capability estimates across desktop and prototype visual paths, preserved shared protocol budgets and auto-within-budget support, updated specs and locales, and passed focused tests, lint, typecheck, i18n validation, agent validation, production build, and diff checks.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `e2501c2` | (see git log) |
 
 ### Testing
 

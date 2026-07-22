@@ -5,7 +5,7 @@
  * closes the previous source bitmap, disposes the previous analysis (preview
  * bitmap + slice objectUrls), installs the new bitmap under a fresh `imageId`,
  * and returns state to `idle`. The worker upload + first `beginAnalysis` are
- * driven by `useParamAutoRun` reacting to the new `imageId`.
+ * driven by `useAutoRun` reacting to the new `imageId`.
  */
 import type { StateCreator } from 'zustand'
 import type { SourceState, Store } from '@/store/types'

@@ -165,16 +165,7 @@ jobs:
           echo "APPLE_API_KEY_PATH=$apple_api_key_path" >> "$GITHUB_ENV"
           printf '%s' "$APPLE_API_PRIVATE_KEY" > "$apple_api_key_path"
           chmod 0600 "$apple_api_key_path"
-      - name: Require protected updater signing configuration
-        shell: bash
-        env:
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-        run: |
-          set -euo pipefail
-          test -n "$TAURI_SIGNING_PRIVATE_KEY" || { echo 'TAURI_SIGNING_PRIVATE_KEY is required' >&2; exit 1; }
-          test -n "$TAURI_SIGNING_PRIVATE_KEY_PASSWORD" || { echo 'TAURI_SIGNING_PRIVATE_KEY_PASSWORD is required' >&2; exit 1; }
-      - name: Build signed bundles and notarize/staple macOS app
+      - name: Build signed and notarized macOS bundles
         if: runner.os == 'macOS'
         uses: tauri-apps/tauri-action@1deb371b0cd8bd54025b384f1cd735e725c4060f
         env:
@@ -224,6 +215,24 @@ jobs:
             --issuer "$APPLE_API_ISSUER" \
             --wait
           xcrun stapler staple "${dmgs[0]}"
+      - name: Verify updater artifact signature
+        shell: bash
+        env:
+          BUNDLE_ROOT: src-tauri/target/${{ matrix.target }}/release/bundle
+          RUNNER_OS: ${{ runner.os }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          case "$RUNNER_OS" in
+            macOS) updater_artifacts=("$BUNDLE_ROOT/macos/"*.app.tar.gz) ;;
+            Windows) updater_artifacts=("$BUNDLE_ROOT/nsis/"*.exe) ;;
+            Linux) updater_artifacts=("$BUNDLE_ROOT/appimage/"*.AppImage) ;;
+            *) echo "Unsupported release runner: $RUNNER_OS" >&2; exit 1 ;;
+          esac
+          test "${#updater_artifacts[@]}" -eq 1 || { echo "Expected exactly one updater artifact, found ${#updater_artifacts[@]}" >&2; exit 1; }
+          updater_artifact="${updater_artifacts[0]}"
+          test -f "$updater_artifact.sig" || { echo "Missing updater signature sidecar: $updater_artifact.sig" >&2; exit 1; }
+          cargo run --locked --manifest-path src-tauri/Cargo.toml --bin verify-updater-signature -- "$updater_artifact" "$updater_artifact.sig"
       - name: Verify signed and notarized macOS bundles
         if: runner.os == 'macOS'
         shell: bash
@@ -293,7 +302,6 @@ jobs:
       - name: Generate and validate updater metadata
         shell: bash
         env:
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           RELEASE_TAG: ${{ needs.validate.outputs.tag }}
           RELEASE_VERSION: ${{ needs.validate.outputs.version }}
           CHANNEL: ${{ needs.validate.outputs.channel }}
@@ -302,14 +310,28 @@ jobs:
           PREVIOUS_MANIFEST_URL: ${{ github.event_name == 'workflow_dispatch' && inputs.previous_manifest_url || '' }}
         run: |
           set -euo pipefail
-          artifact="$(find dist/release-assets -maxdepth 1 -name 'macos-aarch64-*.app.tar.gz' -type f -print -quit)"
-          test -n "$artifact" && test -f "$artifact.sig"
           base="https://github.com/${GITHUB_REPOSITORY}/releases/download/${RELEASE_TAG}"
+          declare -A globs=(
+            [darwin-aarch64]='macos-aarch64-*.app.tar.gz'
+            [darwin-x86_64]='macos-x86_64-*.app.tar.gz'
+            [windows-x86_64]='windows-x86_64-*.exe'
+            [linux-x86_64]='linux-x86_64-*.AppImage'
+          )
+          platform_args=()
+          primary_sig=''
+          for key in darwin-aarch64 darwin-x86_64 windows-x86_64 linux-x86_64; do
+            mapfile -t artifacts < <(find dist/release-assets -maxdepth 1 -name "${globs[$key]}" -type f -print | LC_ALL=C sort)
+            test "${#artifacts[@]}" -eq 1 || { echo "Expected exactly one updater artifact for $key, found ${#artifacts[@]}" >&2; exit 1; }
+            artifact="${artifacts[0]}"
+            test -f "$artifact.sig" || { echo "Missing updater signature for $key" >&2; exit 1; }
+            platform_args+=(--platform "$key=$artifact")
+            if [ "$key" = darwin-aarch64 ]; then primary_sig="$artifact.sig"; fi
+          done
           rollback_args=()
           if test -n "$PREVIOUS_VERSION"; then rollback_args+=(--previous-version "$PREVIOUS_VERSION"); fi
           if test -n "$PREVIOUS_MANIFEST_URL"; then rollback_args+=(--previous-manifest-url "$PREVIOUS_MANIFEST_URL"); fi
-          pnpm update:generate -- --artifact "$artifact" --version "$RELEASE_VERSION" --channel "$CHANNEL" --rollout "$ROLLOUT" --artifact-url "$base/$(basename "$artifact")" --allowed-hosts "$CUTOUT_UPDATER_ALLOWED_HOSTS" --revision "$GITHUB_SHA" --output dist/update "${rollback_args[@]}"
-          pnpm update:validate -- --manifest "dist/update/$CHANNEL/latest.json" --signature "$artifact.sig" --allowed-hosts "$CUTOUT_UPDATER_ALLOWED_HOSTS"
+          pnpm update:generate -- "${platform_args[@]}" --artifact-base-url "$base" --version "$RELEASE_VERSION" --channel "$CHANNEL" --rollout "$ROLLOUT" --allowed-hosts "$CUTOUT_UPDATER_ALLOWED_HOSTS" --revision "$GITHUB_SHA" --output dist/update "${rollback_args[@]}"
+          pnpm update:validate -- --manifest "dist/update/$CHANNEL/latest.json" --signature "$primary_sig" --allowed-hosts "$CUTOUT_UPDATER_ALLOWED_HOSTS"
           cp "dist/update/$CHANNEL/"* dist/release-assets/
           node scripts/collect-release-assets.mjs checksums --directory dist/release-assets
       - name: Create draft release, upload verified assets, and publish

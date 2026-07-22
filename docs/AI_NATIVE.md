@@ -34,12 +34,10 @@ Generated experimental assets are written to `artifacts/`.
 ```sh
 pnpm ai get-state
 pnpm ai get-ai-config
-pnpm ai upsert-provider '{"kind":"openai-compatible","label":"Mox","baseUrl":"https://aigw.mox.ktvsky.com","defaultModel":"gpt-image-1","enabled":true}'
+pnpm ai upsert-provider '{"kind":"openai-compatible","label":"Mox","baseUrl":"https://aigw.mox.ktvsky.com","wireProtocol":"chat-completions","defaultModel":"gpt-image-1","enabled":true}'
 echo "$OPENAI_API_KEY" | pnpm ai set-provider-key <providerId> -
 pnpm ai set-model-assignment image <providerId> gpt-image-1
 pnpm ai set-brief "政府官网"
-pnpm ai set-param threshold 246
-pnpm ai set-params '{"threshold":246,"minArea":900,"mergeGap":18,"padding":10}'
 pnpm ai import-board /absolute/path/sheet.png
 pnpm ai import-mockup /absolute/path/mockup.png
 pnpm ai run-cutout
@@ -62,9 +60,7 @@ Envelope format:
   "id": "stable-command-id",
   "client": "codex",
   "action": {
-    "type": "set-param",
-    "key": "threshold",
-    "value": 246
+    "type": "get-state"
   }
 }
 ```
@@ -83,9 +79,6 @@ Supported action types:
 - `set-provider-key`
 - `test-provider`
 - `set-brief`
-- `set-param`
-- `set-params`
-- `reset-params`
 - `import-board`
 - `import-mockup`
 - `run-cutout`

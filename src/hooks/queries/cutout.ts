@@ -4,7 +4,7 @@
  * Export is async and can fail (disk error, user cancel), so it lives in a
  * TanStack Query mutation — `isPending`/`isError` replace the old manual
  * "导出中…" DOM juggling. The payload is snapshotted from the store at
- * mutate-time (not render-time), so an in-flight slider drag can't corrupt it.
+ * mutate-time (not render-time), so later store changes can't corrupt it.
  */
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { getStoreState } from '@/store'

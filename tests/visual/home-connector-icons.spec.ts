@@ -17,6 +17,7 @@ test("Home connector popover renders nine stable icons across themes and scroll"
   await expect(
     menu.locator('[data-integration-icon="cutout.canva"].lucide-palette'),
   ).toHaveCount(0);
+  const lightSimpleIconColors = new Map<string, string>();
   for (const dark of [false, true]) {
     await page.evaluate(
       (enabled) => document.documentElement.classList.toggle("dark", enabled),
@@ -25,21 +26,37 @@ test("Home connector popover renders nine stable icons across themes and scroll"
     for (const icon of await icons.all()) {
       const facts = await icon.evaluate((element) => {
         const box = element.getBoundingClientRect(),
+          rowBox = element.closest('[role="menuitem"]')?.getBoundingClientRect(),
           style = getComputedStyle(element),
-          svg = element.matches("svg") ? element : element.querySelector("svg");
+          svg = element.matches("svg") ? element : element.querySelector("svg"),
+          image = element.querySelector("img");
         return {
           id: element.getAttribute("data-integration-icon"),
+          size: element.getAttribute("data-icon-size"),
           source: element.getAttribute("data-icon-source"),
+          kind: element.getAttribute("data-icon-kind"),
           width: box.width,
           height: box.height,
+          rowCenterOffset: rowBox
+            ? Math.abs(
+                box.top + box.height / 2 - (rowBox.top + rowBox.height / 2),
+              )
+            : Number.POSITIVE_INFINITY,
           svgWidth: svg?.getBoundingClientRect().width ?? 0,
           svgHeight: svg?.getBoundingClientRect().height ?? 0,
+          imageWidth: image?.getBoundingClientRect().width ?? 0,
+          imageHeight: image?.getBoundingClientRect().height ?? 0,
+          naturalWidth: image?.naturalWidth ?? 0,
+          naturalHeight: image?.naturalHeight ?? 0,
           geometry:
             svg?.querySelectorAll("path,circle,rect,polygon,polyline").length ??
             0,
           path: svg?.querySelector("path")?.getAttribute("d") ?? "",
           gradient: svg?.querySelector("linearGradient")?.id ?? "",
           fill: svg?.querySelector("path")?.getAttribute("fill") ?? "",
+          pathFill: svg?.querySelector("path")
+            ? getComputedStyle(svg.querySelector("path")!).fill
+            : "",
           color: style.color,
           background: style.backgroundColor,
           mask: style.maskImage,
@@ -47,18 +64,42 @@ test("Home connector popover renders nine stable icons across themes and scroll"
       });
       expect(facts.width).toBeCloseTo(16, 0);
       expect(facts.height).toBeCloseTo(16, 0);
-      expect(facts.svgWidth).toBeCloseTo(16, 0);
-      expect(facts.svgHeight).toBeCloseTo(16, 0);
+      expect(facts.rowCenterOffset).toBeLessThanOrEqual(0.5);
+      expect(facts.size).toBe("compact");
       expect(facts.mask).toBe("none");
-      expect(facts.geometry).toBeGreaterThan(0);
       expect(facts.color).not.toBe("rgba(0, 0, 0, 0)");
       expect(facts.background).toBe("rgba(0, 0, 0, 0)");
-      if (simpleIcons.has(facts.id!)) expect(facts.source).toBe("Simple Icons");
-      else if (facts.id === "cutout.canva") {
-        expect(facts.source).toBe("Canva Developers");
-        expect(facts.path.length).toBeGreaterThan(1000);
-        expect(facts.gradient).toBe("canva-a");
-        expect(facts.fill).toBe("url(#canva-a)");
+      if (facts.kind === "image") {
+        expect(facts.imageWidth).toBeCloseTo(16, 0);
+        expect(facts.imageHeight).toBeCloseTo(16, 0);
+        expect(facts.naturalWidth).toBeGreaterThan(0);
+        expect(facts.naturalHeight).toBeGreaterThan(0);
+      } else {
+        expect(facts.svgWidth).toBeCloseTo(16, 0);
+        expect(facts.svgHeight).toBeCloseTo(16, 0);
+        expect(facts.geometry).toBeGreaterThan(0);
+      }
+      if (simpleIcons.has(facts.id!)) {
+        expect(facts.source).toBe("Simple Icons");
+        expect(facts.kind).toBe("monochrome-svg");
+        expect(facts.fill).toBe("");
+        expect(facts.pathFill).toBe(facts.color);
+        if (dark) {
+          expect(facts.color).not.toBe(lightSimpleIconColors.get(facts.id!));
+        } else {
+          lightSimpleIconColors.set(facts.id!, facts.color);
+        }
+      } else if (facts.id === "cutout.canva") {
+        expect(facts.source).toBe("Iconify (Boxicons Brands)");
+        expect(facts.kind).toBe("monochrome-svg");
+        expect(facts.path.length).toBeGreaterThan(300);
+        expect(facts.gradient).toBe("");
+        expect(facts.fill).toBe("currentColor");
+        expect(facts.pathFill).toBe(facts.color);
+      } else if (facts.id === "cutout.pencil") {
+        expect(facts.source).toBe("pen.dev");
+      } else if (facts.id === "cutout.paper") {
+        expect(facts.source).toBe("paper.design");
       } else expect(facts.source).toBe("Cutout generic");
     }
     await icons.last().scrollIntoViewIfNeeded();
@@ -66,5 +107,22 @@ test("Home connector popover renders nine stable icons across themes and scroll"
     await expect(menu).toHaveScreenshot(
       `home-connectors-${dark ? "dark" : "light"}.png`,
     );
+  }
+
+  await menu.getByRole("menuitem", { name: "Add connectors" }).click();
+  const dialogIcons = page
+    .getByRole("dialog", { name: "Manage connectors" })
+    .locator("[data-integration-icon]");
+  expect(await dialogIcons.count()).toBe(9);
+  for (const icon of await dialogIcons.all()) {
+    const facts = await icon.evaluate((element) => {
+      const style = getComputedStyle(element);
+      return {
+        size: element.getAttribute("data-icon-size"),
+        width: Number.parseFloat(style.width),
+        height: Number.parseFloat(style.height),
+      };
+    });
+    expect(facts).toMatchObject({ size: "default", width: 20, height: 20 });
   }
 });

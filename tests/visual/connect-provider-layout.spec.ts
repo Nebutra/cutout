@@ -102,3 +102,42 @@ test("Connect Provider remains bounded and every category is reachable", async (
     dialog.getByText("Connect a provider", { exact: true }),
   ).toHaveCount(0);
 });
+
+test("Custom endpoint exposes explicit protocol families without overflow", async ({
+  page,
+}) => {
+  await open(page);
+  const dialog = page.getByRole("dialog");
+  const tabs = dialog.getByRole("tablist", { name: "Provider categories" });
+  if (await tabs.isVisible()) {
+    await tabs.getByRole("tab", { name: "Custom", exact: true }).click();
+  } else {
+    await dialog.getByRole("combobox", { name: "Provider categories" }).selectOption("custom");
+  }
+  const custom = dialog.getByRole("button").filter({ hasText: "Custom endpoint" });
+  await custom.scrollIntoViewIfNeeded();
+  await custom.click();
+
+  const protocol = dialog.getByRole("combobox", { name: "API protocol" });
+  await expect(protocol).toContainText("OpenAI Chat Completions");
+  await protocol.click();
+  for (const label of [
+    "OpenAI Responses",
+    "OpenAI Chat Completions",
+    "Anthropic Messages",
+    "Google GenerateContent",
+  ]) {
+    await expect(page.getByRole("option", { name: label, exact: true })).toBeVisible();
+  }
+  await page.keyboard.press("Escape");
+
+  const geometry = await dialog.evaluate((element) => ({
+    clientWidth: element.clientWidth,
+    scrollWidth: element.scrollWidth,
+    right: element.getBoundingClientRect().right,
+    viewport: innerWidth,
+  }));
+  expect(geometry.scrollWidth).toBeLessThanOrEqual(geometry.clientWidth);
+  expect(geometry.right).toBeLessThanOrEqual(geometry.viewport);
+  await expect(dialog.getByRole("button", { name: "Check credentials and load models" })).toBeVisible();
+});

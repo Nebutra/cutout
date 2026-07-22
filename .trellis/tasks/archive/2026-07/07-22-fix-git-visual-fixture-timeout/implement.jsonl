@@ -1,0 +1,2 @@
+{"file":".trellis/spec/frontend/component-guidelines.md","reason":"Preserve the single accessible Git identity/collapse control and its stable hover/focus behavior."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Keep the fixture-only repair narrow and verify it without weakening production behavior."}

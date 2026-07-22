@@ -48,6 +48,34 @@ describe('AI Native semantic slice actions', () => {
     })
   })
 
+  it('parses provider drafts with the refined wire-protocol contract', () => {
+    expect(parseAiNativeAction({
+      type: 'upsert-provider',
+      provider: {
+        kind: 'openai-compatible',
+        label: 'Anthropic relay',
+        baseUrl: 'https://relay.example/v1',
+        wireProtocol: 'anthropic-messages',
+        defaultModel: 'claude-sonnet-4-6',
+        enabled: true,
+      },
+    })).toMatchObject({
+      type: 'upsert-provider',
+      provider: { wireProtocol: 'anthropic-messages' },
+    })
+
+    expect(() => parseAiNativeAction({
+      type: 'upsert-provider',
+      provider: {
+        kind: 'deepseek',
+        label: 'Invalid',
+        wireProtocol: 'anthropic-messages',
+        defaultModel: 'deepseek-chat',
+        enabled: true,
+      },
+    })).toThrow('not supported for deepseek')
+  })
+
   it('parses a semantic slice plan action', () => {
     const action = parseAiNativeAction({
       type: 'plan-semantic-slices',
@@ -88,6 +116,18 @@ describe('AI Native semantic slice actions', () => {
         routes: ['board-collage'],
       }),
     ).toThrow()
+  })
+
+  it.each([
+    { type: 'set-param', key: 'threshold', value: 240 },
+    { type: 'set-params', params: { minArea: 400 } },
+    { type: 'reset-params' },
+  ])('rejects removed manual parameter action $type', (action) => {
+    expect(() => parseAiNativeAction(action)).toThrow()
+  })
+
+  it('does not expose internal cutout parameters in snapshots', () => {
+    expect(createAiNativeSnapshot(getStoreState())).not.toHaveProperty('params')
   })
 
   it('exposes authoritative production state to external Agent snapshots', async () => {

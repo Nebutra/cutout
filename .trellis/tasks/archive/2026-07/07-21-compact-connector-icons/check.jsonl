@@ -1,0 +1,3 @@
+{"file":".trellis/spec/frontend/index.md","reason":"Frontend package guidance and verification scope."}
+{"file":".trellis/spec/frontend/integration-brand-icons.md","reason":"Verify provenance, responsive size contract, theme contrast, and tests."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Frontend quality review context."}

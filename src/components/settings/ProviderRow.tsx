@@ -192,8 +192,8 @@ export function ProviderRow({ provider, onEdit }: ProviderRowProps) {
               </AlertDialogTitle>
               <AlertDialogDescription>
                 <Trans id="settings.remove_confirm_desc">
-                  This removes the configuration for “{label}” and its key stored
-                  in the system keychain. This action cannot be undone.
+                  This removes the configuration for “{label}” and its locally
+                  stored key. This action cannot be undone.
                 </Trans>
               </AlertDialogDescription>
             </AlertDialogHeader>

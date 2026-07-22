@@ -1,0 +1,3 @@
+{"file":".trellis/spec/frontend/paid-tool-prompt-contract.md","reason":"Verify shared protocol compatibility and paid-tool request validation remain intact."}
+{"file":".trellis/spec/frontend/agent-control-safety.md","reason":"Verify the desktop path still requires explicit approval and preserves authorization and receipt boundaries."}
+{"file":".trellis/spec/frontend/byok-user-copy.md","reason":"Verify the removed cost-setting copy does not remain in UI or locale catalogs."}

@@ -6,37 +6,20 @@
  * Claude Code, or a CLI can inspect without touching browser-only objects.
  */
 import { z } from 'zod'
-import { PARAM_RANGE_BY_KEY } from '@/lib/constants'
 import { graphSpecSchema } from '@/dag/graph-spec'
 import { intentProfileSchema } from '@/dag/intent-types'
 import { modelAssignmentSchema } from '@/services/ai/model-assignment-types'
-import { providerConfigSchema } from '@/services/ai/provider-types'
-import type { DagNodeOutput, ParamKey, Store } from '@/store/types'
+import { providerDraftSchema } from '@/services/ai/provider-types'
+import type { DagNodeOutput, Store } from '@/store/types'
 import {
   clearAiNativeDiagnostics,
   getAiNativeDiagnostics,
 } from './diagnostics'
 import { currentProductionRunId } from '@/asset-production'
 
-export const PARAM_KEYS = ['threshold', 'minArea', 'mergeGap', 'padding'] as const
-
-const paramKeySchema = z.enum(PARAM_KEYS)
 const slotIdSchema = z.enum(['chat', 'image'])
 const semanticSliceRouteSchema = z.enum(['text-to-image', 'image-to-image'])
 const semanticSliceReferenceSchema = z.enum(['auto', 'none', 'mockup', 'board'])
-const providerDraftSchema = providerConfigSchema.extend({
-  id: z.string().min(1).optional(),
-})
-
-const paramsPatchSchema = z
-  .object({
-    threshold: z.number().optional(),
-    minArea: z.number().optional(),
-    mergeGap: z.number().optional(),
-    padding: z.number().optional(),
-  })
-  .strict()
-
 export const aiNativeActionSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('ping') }),
   z.object({ type: z.literal('get-state') }),
@@ -59,13 +42,6 @@ export const aiNativeActionSchema = z.discriminatedUnion('type', [
   }),
   z.object({ type: z.literal('test-provider'), id: z.string().min(1) }),
   z.object({ type: z.literal('set-brief'), text: z.string() }),
-  z.object({
-    type: z.literal('set-param'),
-    key: paramKeySchema,
-    value: z.number(),
-  }),
-  z.object({ type: z.literal('set-params'), params: paramsPatchSchema }),
-  z.object({ type: z.literal('reset-params') }),
   z.object({
     type: z.literal('import-board'),
     path: z.string().min(1),
@@ -159,17 +135,6 @@ export function parseAiNativeAction(action: unknown): AiNativeAction {
   return aiNativeActionSchema.parse(action)
 }
 
-export function validateParamValue(key: ParamKey, value: number): number {
-  const range = PARAM_RANGE_BY_KEY[key]
-  if (!Number.isFinite(value)) {
-    throw new Error(`${key} must be a finite number.`)
-  }
-  if (value < range.min || value > range.max) {
-    throw new Error(`${key} must be between ${range.min} and ${range.max}.`)
-  }
-  return value
-}
-
 export function createAiNativeSnapshot(store: Store) {
   const slices = store.analysis.slices.map((slice) => ({
     id: slice.id,
@@ -190,7 +155,6 @@ export function createAiNativeSnapshot(store: Store) {
   return {
     brief: store.brief,
     intent: store.intent,
-    params: store.params,
     source: {
       present: Boolean(store.source.bitmap),
       name: store.source.name,

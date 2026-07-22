@@ -58,6 +58,50 @@ describe('GitWorkspaceDock', () => {
     vi.clearAllMocks()
   })
 
+  it('uses one accessible Git control that reveals the collapse glyph on interaction', async () => {
+    const onClose = vi.fn()
+    await act(async () => root.render(
+      <SettingsUIProvider value={{ open: openSettings }}>
+        <GitWorkspaceDock onClose={onClose} />
+      </SettingsUIProvider>,
+    ))
+    await act(async () => {})
+
+    const hideGitControls = host.querySelectorAll('button[aria-label="Hide Git"]')
+    expect(hideGitControls).toHaveLength(1)
+
+    const hideGit = hideGitControls[0] as HTMLButtonElement
+    expect(hideGit.title).toBe('Hide Git')
+    expect(hideGit.className).toContain('size-7')
+    expect(hideGit.closest('header')?.className).toContain('h-12')
+    expect(hideGit.closest('header')?.textContent).toContain('Git')
+    expect(hideGit.closest('header')?.textContent).toContain('main')
+    expect(host.querySelectorAll('button[aria-label="Refresh Git"]')).toHaveLength(1)
+    expect([...host.querySelectorAll('button')].filter((button) => button.textContent?.trim() === 'Push')).toHaveLength(1)
+
+    const gitGlyph = hideGit.querySelector('[data-git-dock-icon="git"]')
+    expect(gitGlyph?.classList.contains('opacity-100')).toBe(true)
+    expect(gitGlyph?.classList.contains('group-hover:opacity-0')).toBe(true)
+    expect(gitGlyph?.classList.contains('group-focus-visible:opacity-0')).toBe(true)
+    expect(gitGlyph?.classList.contains('motion-reduce:transition-none')).toBe(true)
+    expect(gitGlyph?.getAttribute('aria-hidden')).toBe('true')
+    expect(gitGlyph?.getAttribute('focusable')).toBe('false')
+
+    const collapseGlyph = hideGit.querySelector('[data-git-dock-icon="collapse"]')
+    expect(collapseGlyph?.classList.contains('opacity-0')).toBe(true)
+    expect(collapseGlyph?.classList.contains('group-hover:opacity-100')).toBe(true)
+    expect(collapseGlyph?.classList.contains('group-focus-visible:opacity-100')).toBe(true)
+    expect(collapseGlyph?.classList.contains('motion-reduce:transition-none')).toBe(true)
+    expect(collapseGlyph?.getAttribute('aria-hidden')).toBe('true')
+    expect(collapseGlyph?.getAttribute('focusable')).toBe('false')
+
+    act(() => hideGit.focus())
+    expect(document.activeElement).toBe(hideGit)
+
+    act(() => hideGit.click())
+    expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
   it('keeps pull requests unavailable and routes to Integrations', async () => {
     await act(async () => root.render(
       <SettingsUIProvider value={{ open: openSettings }}>

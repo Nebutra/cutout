@@ -16,9 +16,11 @@ is billing them. Provider billing is the only source of truth.
 
 **Boundary**: Budget guardrails stay *internal*. `estimatedCost` / `budgetCeiling`
 remain in the `tool-approval-requested` event schema (`src/agent-runtime/run-events.ts`)
-and the paid-tool contract (`src/control-protocol/paid-tool-contract.ts`) for
-auto-approval decisions. The budget-ceiling *setting* input (`PaidActionsSection.tsx`)
-is allowed — it configures the guardrail, it is not a charge display.
+and the paid-tool contract (`src/control-protocol/paid-tool-contract.ts`). The
+desktop app does not expose a billing or cost-management preference: desktop
+paid requests require explicit approval and use host-derived capability estimates
+as execution ceilings. External controllers may still use the shared protocol's
+bounded auto-approval policy.
 
 ```ts
 // Wrong (old copy)

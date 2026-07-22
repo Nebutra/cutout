@@ -1,0 +1,2 @@
+{"file":".trellis/spec/frontend/cutout-pipeline.md","reason":"Verify source loading and analysis still honor pipeline invariants."}
+{"file":".trellis/spec/frontend/agent-control-safety.md","reason":"Verify removed AI-native parameter actions leave no undocumented control path."}

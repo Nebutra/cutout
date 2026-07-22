@@ -22,12 +22,14 @@ This directory contains guidelines for frontend development. Fill in each file w
 | [Type Safety](./type-safety.md) | Type patterns, validation | To fill |
 | [Cutout Pipeline](./cutout-pipeline.md) | `src/algorithm/` edge-matting contract & invariants | Filled |
 | [BYOK User Copy](./byok-user-copy.md) | No billing-estimate copy; approval-notification & transport-error contracts | Filled |
+| [BYOK Provider Protocols](./byok-provider-protocols.md) | Provider kind/protocol matrix, Rust auth, legacy defaults, and non-billable connection checks | Filled |
 | [AI Rich-Text Artifacts](./ai-rich-text-artifacts.md) | Structured execution data with safe AI-authored Markdown review artifacts | Filled |
 | [Paid-Tool Prompt Contract](./paid-tool-prompt-contract.md) | Separate bounded audit intent from complete provider execution prompts | Filled |
 | [Codex Plugin Infrastructure](./codex-plugin.md) | Self-contained plugin runtime, project binding, packaging and drift validation | Filled |
 | [Prototype Route-Suite Generation](./prototype-generation.md) | Agent-authored route graphs, complete page generation, and cross-page visual consistency | Filled |
 | [Desktop Release Pipeline](./release-pipeline.md) | Atomic cross-platform native builds, updater evidence, and GitHub Release publication | Filled |
 | [Agent Control Safety](./agent-control-safety.md) | Durable claims, host-issued approval leases, controlled paths, governance evidence, and composite receipts | Filled |
+| [Integration Brand Icons](./integration-brand-icons.md) | Local brand asset provenance, theme contrast, accessibility, and visual verification | Filled |
 
 ---
 

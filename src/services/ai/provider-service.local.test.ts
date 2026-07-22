@@ -22,9 +22,9 @@ const cfg = (over: Partial<ProviderConfig> = {}): ProviderConfig => ({
   ...over,
 })
 
-function mockProviderTest(response: { status: number; body: string }) {
+function mockProviderTest(response: { status: number; body: string }, provider = cfg()) {
   invokeMock.mockImplementation((command: string) => {
-    if (command === 'load_providers') return Promise.resolve([cfg()])
+    if (command === 'load_providers') return Promise.resolve([provider])
     if (command === 'ai_proxy_request') return Promise.resolve(response)
     return Promise.resolve(undefined)
   })
@@ -61,6 +61,10 @@ describe('LocalProviderService.test', () => {
     const result = await createLocalProviderService().test('p1')
 
     expect(result).toEqual(ok({ model: 'chat-model' }))
+    expect(invokeMock).toHaveBeenCalledWith(
+      'ai_proxy_request',
+      expect.objectContaining({ wireProtocol: 'chat-completions' }),
+    )
   })
 
   it('rejects a 200 HTML web console response', async () => {
@@ -78,13 +82,34 @@ describe('LocalProviderService.test', () => {
     }
   })
 
-  it('rejects JSON that is not an OpenAI-compatible models list', async () => {
+  it('rejects JSON that is not a supported models list', async () => {
     mockProviderTest({ status: 200, body: JSON.stringify({ ok: true }) })
 
     const result = await createLocalProviderService().test('p1')
 
     expect(result.ok).toBe(false)
-    if (!result.ok) expect(result.error).toContain('{ data: [...] }')
+    if (!result.ok) expect(result.error).toContain('data/models catalog')
+  })
+
+  it('accepts a Google models catalog and forwards the selected protocol', async () => {
+    invokeMock.mockImplementation((command: string) => {
+      if (command === 'load_providers') {
+        return Promise.resolve([cfg({ wireProtocol: 'google-generate-content' })])
+      }
+      if (command === 'ai_proxy_request') {
+        return Promise.resolve({
+          status: 200,
+          body: JSON.stringify({ models: [{ name: 'models/gemini-2.5-pro' }] }),
+        })
+      }
+      return Promise.resolve(undefined)
+    })
+
+    await expect(createLocalProviderService().test('p1')).resolves.toEqual(ok({ model: 'chat-model' }))
+    expect(invokeMock).toHaveBeenCalledWith(
+      'ai_proxy_request',
+      expect.objectContaining({ wireProtocol: 'google-generate-content' }),
+    )
   })
 
   it('normalizes a pathless OpenAI-compatible base URL before probing /models', async () => {
@@ -98,6 +123,23 @@ describe('LocalProviderService.test', () => {
     expect(invokeMock).toHaveBeenCalledWith(
       'ai_proxy_request',
       expect.objectContaining({ url: 'https://relay.example.com/v1/models' }),
+    )
+  })
+
+  it('uses the first-party catalog URL without issuing a generation request', async () => {
+    mockProviderTest(
+      { status: 200, body: JSON.stringify({ data: [{ id: 'gpt-5.4' }] }) },
+      cfg({ kind: 'openai', baseUrl: undefined, wireProtocol: undefined, defaultModel: 'gpt-5.4' }),
+    )
+
+    await expect(createLocalProviderService().test('p1')).resolves.toEqual(ok({ model: 'gpt-5.4' }))
+    expect(invokeMock).toHaveBeenCalledWith(
+      'ai_proxy_request',
+      expect.objectContaining({
+        method: 'GET',
+        url: 'https://api.openai.com/v1/models',
+        wireProtocol: 'responses',
+      }),
     )
   })
 })

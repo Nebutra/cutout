@@ -1,0 +1,2 @@
+{"file":".trellis/spec/frontend/release-pipeline.md","reason":"Verify the final workflow and Release evidence against the authoritative contract."}
+{"file":"docs/RELEASE_CHECKLIST.md","reason":"Verify all public distribution gates and artifact claims."}

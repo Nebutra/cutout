@@ -1,0 +1,3 @@
+{"file":".trellis/spec/frontend/index.md","reason":"Frontend package guidance and checklist."}
+{"file":".trellis/spec/frontend/integration-brand-icons.md","reason":"Authoritative integration icon asset, sizing, accessibility, and visual test contract."}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"Keep sizing and asset selection centralized in the shared icon component and registry."}

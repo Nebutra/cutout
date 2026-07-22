@@ -1,0 +1,2 @@
+{"file":".trellis/spec/frontend/cutout-pipeline.md","reason":"Preserve the internal edge-matting and worker parameter contract while removing product controls."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"The change spans UI, state, persistence, and AI-native action boundaries."}

@@ -1,6 +1,6 @@
 {
   "protocol": "cutout.codex-plugin-runtime.v1",
-  "packageVersion": "0.1.1",
+  "packageVersion": "0.1.3",
   "sourceHashes": {
     "node_modules/.pnpm/js-sha256@0.10.1/node_modules/js-sha256/src/sha256.js": "10dbc92fbdb2ed3939c16ea9c726c7653f5ec7dfdb010c9904404268cb424a08",
     "node_modules/.pnpm/zod@4.4.3/node_modules/zod/v4/classic/errors.js": "b155316267f79068ddc2dddc7046e13785804b768ca36e6deff1691d154f7c20",
@@ -24,7 +24,7 @@
     "scripts/cutout-external-control.mjs": "1737a84c1601540114eefca8b35dd987e06c19dca5e3b875dc872ac3702a9c0f",
     "scripts/cutout-headless-adapter.mjs": "a3029e9899331e5c9cdbb19f1893ba364231b41b10befe75f8e3e9176d821886",
     "scripts/cutout-mcp-bundle-entry.mjs": "422391f0184bb4039972a61e66c07d3318b87111774e05c9e9a03737dae07110",
-    "scripts/cutout-mcp-server.mjs": "adc2a5610b89edfbf850ed923f9fcacd2cb27b7e2859fcb9d2a56a454cd1b0c9",
+    "scripts/cutout-mcp-server.mjs": "89f8e91f55e106202f2054f0452d28ad3075d750197235b2080b06a3632ee447",
     "scripts/cutout-registry-adapter.mjs": "80458166d21ca2bce2d7604064c028e37cce1a3fc69c2c8f5654951e3aa8b4b1",
     "scripts/cutout-workflows.mjs": "29579d3f7f5ffa3ef5aac58b0eda3c6f231c176bf387fc9d9b3cdef7b4ee419e",
     "src/agent-runtime/run-events.ts": "9d33ccf6a21c84801b98791942df819279f283768d92b3b25c6d9381fc6ca1af",

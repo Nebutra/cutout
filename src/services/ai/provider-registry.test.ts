@@ -43,13 +43,13 @@ describe("provider definition registry", () => {
     ]);
     expect(registry.adaptersFor("deepseek")).toEqual([
       expect.objectContaining({
-        protocol: "openai-compatible",
+        wireProtocols: ["chat-completions"],
         capabilities: ["text", "reasoning", "tools"],
       }),
     ]);
     expect(registry.adaptersFor("ollama")).toEqual([
       expect.objectContaining({
-        protocol: "openai-compatible",
+        wireProtocols: ["chat-completions"],
         capabilities: ["text", "vision", "tools"],
       }),
     ]);
@@ -130,9 +130,23 @@ describe("provider brand assets", () => {
     expect(registry.definition("openai-compatible")?.icon?.id).toBe(
       "cutout:compatible",
     );
-    expect(registry.definition('openai')?.openAIWireProtocols).toEqual(['responses', 'chat-completions'])
-    expect(registry.definition('deepseek')?.openAIWireProtocols).toEqual(['chat-completions'])
-    expect(registry.definition('openai-compatible')?.openAIWireProtocols).toEqual(['responses', 'chat-completions'])
+    expect(registry.definition('openai')?.wireProtocols).toEqual(['responses', 'chat-completions'])
+    expect(registry.definition('anthropic')?.wireProtocols).toEqual(['anthropic-messages'])
+    expect(registry.definition('google')?.wireProtocols).toEqual(['google-generate-content'])
+    expect(registry.definition('deepseek')?.wireProtocols).toEqual(['chat-completions'])
+    expect(registry.definition('openai-compatible')?.wireProtocols).toEqual([
+      'responses',
+      'chat-completions',
+      'anthropic-messages',
+      'google-generate-content',
+    ])
+    expect(registry.definition('openai-compatible')?.label).toBe('Custom endpoint')
+    expect(registry.adaptersFor('openai-compatible')[0]?.wireProtocols).toEqual([
+      'responses',
+      'chat-completions',
+      'anthropic-messages',
+      'google-generate-content',
+    ])
     expect(registry.definition("ollama")?.icon?.id).toBe("simple-icons:ollama");
   });
 });

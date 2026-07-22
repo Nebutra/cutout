@@ -3,9 +3,9 @@
  *
  * Provider config (non-secret) is persisted via `load_providers`/`save_providers`;
  * secrets go straight to the OS keychain via `set_key` and are never held in JS.
- * `test()` reuses the already-loaded config to run a tiny generation through the
- * proxy — no extra round-trip, and no import cycle (it constructs a generation
- * service from the local config, not from the registry).
+ * `test()` verifies credentials and endpoint catalog access through the Rust
+ * proxy. It deliberately does not issue a generation request because the four
+ * supported protocol families have no common, standardized no-cost probe.
  */
 import { invoke } from '@tauri-apps/api/core'
 import { err, isOk, ok } from '@/services/types'
@@ -13,12 +13,13 @@ import type { Result } from '@/services/types'
 import type { ProviderService } from './types'
 import {
   providerConfigsSchema,
-  defaultOpenAIWireProtocol,
+  defaultProviderWireProtocol,
+  effectiveProviderWireProtocol,
   type ProviderConfig,
   type ProviderDraft,
 } from './provider-types'
-import { createLocalGenerationService } from './generation-service.local'
 import { apiBaseUrl } from './base-url'
+import { parseProviderModelIds } from './provider-model-catalog'
 
 /** Row shape returned by the Rust `list_key_status` command. */
 interface KeyStatusRow {
@@ -53,7 +54,7 @@ function isLikelyHtml(body: string): boolean {
 function validateModelsResponse(body: string): Result<void> {
   if (isLikelyHtml(body)) {
     return err(
-      'HTTP 200 but /models returned a web page, not OpenAI-compatible JSON. Check that Base URL points to the API endpoint, not the web console.',
+      'HTTP 200 but /models returned a web page, not provider API JSON. Check that Base URL points to the API endpoint, not the web console.',
     )
   }
 
@@ -62,17 +63,13 @@ function validateModelsResponse(body: string): Result<void> {
     parsed = JSON.parse(body)
   } catch {
     return err(
-      'HTTP 200 but /models did not return OpenAI-compatible JSON. Check that Base URL points to the API endpoint.',
+      'HTTP 200 but /models did not return provider API JSON. Check that Base URL points to the API endpoint.',
     )
   }
 
-  const data =
-    parsed && typeof parsed === 'object'
-      ? (parsed as { data?: unknown }).data
-      : undefined
-  if (!Array.isArray(data)) {
+  if (!parseProviderModelIds(parsed)) {
     return err(
-      'HTTP 200 but /models did not return an OpenAI-compatible { data: [...] } response.',
+      'HTTP 200 but /models did not return a supported data/models catalog response.',
     )
   }
   return ok(undefined)
@@ -86,7 +83,7 @@ async function loadProviders(): Promise<ProviderConfig[]> {
     ...provider,
     ...(provider.wireProtocol
       ? {}
-      : { wireProtocol: defaultOpenAIWireProtocol(provider.kind) }),
+      : { wireProtocol: defaultProviderWireProtocol(provider.kind) }),
   }))
 }
 
@@ -159,19 +156,21 @@ export function createLocalProviderService(): ProviderService {
       const cfg = list.find((p) => p.id === id)
       if (!cfg) return err('provider not configured')
 
-      // Prefer a MODEL-AGNOSTIC probe for endpoints with an explicit base URL
-      // (openai-compatible / relays): GET `{baseUrl}/models` validates the key +
-      // base URL without depending on the model being a chat model — a chat
-      // `ping` would falsely fail for an image model (e.g. gpt-image). The raw
-      // HTTP status is surfaced so 404 (base URL / missing `/v1`) vs 401 (key)
-      // is obvious.
-      if (cfg.baseUrl) {
+      // GET `{baseUrl}/models` verifies host policy, protocol-specific auth,
+      // endpoint normalization, and catalog parsing without incurring a model
+      // call. It does not claim that a selected model can generate; there is no
+      // cross-family standardized no-cost OPTIONS/HEAD generation probe.
+      const configuredBaseUrl = cfg.baseUrl ?? (await import('./provider-registry'))
+        .createBuiltinProviderRegistry().definition(cfg.kind)?.defaultBaseUrl
+      if (configuredBaseUrl) {
         try {
-          const baseUrl = apiBaseUrl(cfg.kind, cfg.baseUrl) ?? cfg.baseUrl
+          const wireProtocol = effectiveProviderWireProtocol(cfg)
+          const baseUrl = apiBaseUrl(cfg.kind, configuredBaseUrl, wireProtocol) ?? configuredBaseUrl
           const url = `${baseUrl}/models`
           const res = await invoke<ProxyResponse>('ai_proxy_request', {
             providerId: id,
             kind: cfg.kind,
+            wireProtocol,
             url,
             method: 'GET',
             headers: {},
@@ -189,15 +188,7 @@ export function createLocalProviderService(): ProviderService {
         }
       }
 
-      // Vendor kinds without a base URL: a tiny text round-trip. Resolve config
-      // from the list we already hold — no extra invoke, no import cycle.
-      const generation = createLocalGenerationService({ list: async () => list })
-      const result = await generation.generateText({
-        providerId: id,
-        model: cfg.defaultModel,
-        prompt: 'ping',
-      })
-      return isOk(result) ? ok({ model: cfg.defaultModel }) : err(result.error)
+      return err('provider has no model catalog endpoint configured')
     },
   }
 }

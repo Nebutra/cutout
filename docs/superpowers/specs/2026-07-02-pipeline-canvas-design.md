@@ -63,7 +63,7 @@ interface PipelineActions {
 }
 ```
 
-- **`board` node ⇄ existing cutout state.** The `board` artifact IS the cutout **source**: setting it calls `store.loadImage(...)`, which triggers `useAutoRun` → the worker → `store.analysis` (preview + slices). So the `board→slices` transition is the pipeline we already have; the `board` node hosts the **parameter sliders + transparent preview**, the `slices` node hosts the **slice grid + inspector**. No algorithm change.
+- **`board` node ⇄ existing cutout state.** The `board` artifact IS the cutout **source**: setting it calls `store.loadImage(...)`, which triggers `useAutoRun` → the worker → `store.analysis` (preview + slices). So the `board→slices` transition is the pipeline we already have; the `board` node hosts the **transparent preview**, while the `slices` node hosts the **slice grid + inspector**. Internal algorithm defaults are not exposed by either node.
 - **Staleness.** Changing an upstream artifact (`resetFrom`) clears downstream nodes so the canvas never shows a board that no longer matches its mockup.
 
 ## 5. React Flow integration
@@ -75,12 +75,12 @@ src/components/canvas/
   nodes/
     BriefNode.tsx           # brief textarea + [✨ 生成原型图] + [导入原型图]
     MockupNode.tsx          # mockup image + [拆解为素材板 ▶] [重新生成] [导入替换] [◄ 反向]
-    BoardNode.tsx           # transparent preview + ParameterControls (reused) + [导入替换] [◄ 合成原型图]
+    BoardNode.tsx           # transparent preview + [导入替换] [◄ 合成原型图]
     SlicesNode.tsx          # SliceGrid (reused) + [语义命名] + export; expandable
   edges/TransitionEdge.tsx  # directed edge with a run button + running/done/error state
 ```
 
-- **Nodes are custom React components** = plain shadcn cards → calm/opaque, reuse `ParameterControls`, `SliceGrid`, `DropZone`, `ProviderRow`-style patterns. This is why React Flow fits: we fully own the node UI.
+- **Nodes are custom React components** = plain shadcn cards → calm/opaque, reuse `SliceGrid`, `DropZone`, `ProviderRow`-style patterns. This is why React Flow fits: we fully own the node UI.
 - `PipelineCanvas` replaces `WorkspaceLayout` in `AppShell`. TopBar/StatusBar/Settings unchanged. Canvas `Background` = a subtle flat dot/none (opaque), `Controls` + `MiniMap` for the "画布感".
 - View state (positions) may be layout-driven (fixed chain) in V1; store owns artifacts/status.
 
@@ -100,7 +100,7 @@ All go through `GenerationService.generateImages({ providerId, model, promptRef,
 
 ## 7. Cutout transition (deterministic, reused)
 
-`board→slices` = the existing worker pipeline. When `board` becomes ready, `useAutoRun` runs analysis; `BoardNode` shows params + preview, `SlicesNode` shows the grid. Zero algorithm change; the transition edge just visualizes it (running/done).
+`board→slices` = the existing worker pipeline. When `board` becomes ready, `useAutoRun` runs analysis with product-owned internal defaults; `BoardNode` shows the preview and `SlicesNode` shows the grid. The transition edge just visualizes it (running/done).
 
 ## 8. Semantic naming (`name` on the slices node)
 
@@ -125,11 +125,11 @@ src/services/ai/naming.ts            # vision → structured slice names
 src/hooks/queries/pipeline.ts        # useRunTransition / useNameSlices mutations
 src/components/AppShell.tsx          # WorkspaceLayout → PipelineCanvas
 ```
-Retired: the two-tab `SourcePanel` mode logic, `GeneratePanel` (folded into `BriefNode`/`MockupNode`), `WorkspaceLayout` (→ canvas). `SourceCanvas`/`PreviewCanvas`/`SliceGrid`/`ParameterControls` are reused inside nodes.
+Retired: the two-tab `SourcePanel` mode logic, `GeneratePanel` (folded into `BriefNode`/`MockupNode`), `WorkspaceLayout` (→ canvas). `SourceCanvas`/`PreviewCanvas`/`SliceGrid` are reused inside nodes. Manual cutout controls are retired; node actions do not expose algorithm configuration.
 
 ## 11. Phased plan
 
-- **P1 — Canvas skeleton, no regression.** Install `@xyflow/react`; `PipelineCanvas` with just **`board` + `slices`** nodes wrapping the existing preview/params/grid; import-board; replace `WorkspaceLayout`. Everything that works today works on the canvas. (De-risks the big swap first.)
+- **P1 — Canvas skeleton, no regression.** Install `@xyflow/react`; `PipelineCanvas` with just **`board` + `slices`** nodes wrapping the existing preview/grid; import-board; replace `WorkspaceLayout`. Everything that works today works on the canvas. (De-risks the big swap first.)
 - **P2 — Forward generation.** Add `brief` + `mockup` nodes; `ui-mockup-generation`; wire brief→mockup→board(deconstruct). Full forward chain on the canvas.
 - **P3 — Bidirectional + naming.** `compose` (board→mockup); `ui-slice-naming` vision step.
 - **P4 — Freeform & polish.** add-node, multiple mockups/boards, edge re-run, richer UX — enabled by the graph model.
@@ -138,7 +138,7 @@ Retired: the two-tab `SourcePanel` mode logic, `GeneratePanel` (folded into `Bri
 
 | # | Risk | Mitigation |
 |---|---|---|
-| 1 | Big-bang workspace swap regresses the working cutout | P1 wraps the EXISTING preview/params/grid in nodes first — no algorithm/store change; ship canvas before generation |
+| 1 | Big-bang workspace swap regresses the working cutout | P1 wraps the existing preview/grid in nodes first and leaves internal algorithm configuration unchanged; ship canvas before generation |
 | 2 | React Flow ↔ React 19 peer | verify `@xyflow/react` v12 peer on install (supports 19); isolate in `PipelineCanvas` |
 | 3 | Aesthetic regression (canvas looks gimmicky) | flat opaque bg, plain shadcn node cards, no neon/glass — per the project UI rule |
 | 4 | Node UI perf (RF renders DOM nodes) | only a handful of stage nodes in V1 → non-issue; slices grid stays virtualized inside one node |

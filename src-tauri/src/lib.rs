@@ -106,6 +106,16 @@ pub fn run() {
             commands::workspace_bridge::workspace_revision_apply_export,
         ])
         .setup(|app| {
+            // Local file secret store replaces the OS keychain (no access prompts
+            // on unsigned builds). Resolve its directory once, here.
+            {
+                use tauri::Manager;
+                let dir = app
+                    .path()
+                    .app_config_dir()
+                    .expect("app config dir must resolve for secret storage");
+                commands::secret_store::init_dir(dir);
+            }
             #[cfg(desktop)]
             {
                 app.handle()

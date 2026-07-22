@@ -1,7 +1,7 @@
 /**
  * The custom-fetch auth proxy (spec §1/§3) — the only key-adjacent JS.
  *
- * `tauriFetch(providerId, kind)` returns a `fetch`-compatible function that the
+ * `tauriFetch(providerId, kind, wireProtocol)` returns a `fetch`-compatible function that the
  * AI SDK provider factories are given. It receives the SDK-built `Request`,
  * extracts url/method/headers/body (stripping any auth header — the SDK sends a
  * dummy key), and forwards to a Rust command. **Rust reads the real key from the
@@ -17,7 +17,7 @@
  * buffered call `response.json()` drains the stream and parses normally.
  */
 import { Channel, invoke } from '@tauri-apps/api/core'
-import type { ProviderKind } from './provider-types'
+import type { ProviderKind, ProviderWireProtocol } from './provider-types'
 
 /** Buffered proxy result — mirrors the Rust `ProxyResponse` (camelCase). */
 interface ProxyResponse {
@@ -213,6 +213,7 @@ function wantsStream(url: string, accept: string, body: string): boolean {
 async function bufferedResponse(
   providerId: string,
   kind: ProviderKind,
+  wireProtocol: ProviderWireProtocol | undefined,
   url: string,
   method: string,
   headers: Record<string, string>,
@@ -221,6 +222,7 @@ async function bufferedResponse(
   const res = await invoke<ProxyResponse>('ai_proxy_request', {
     providerId,
     kind,
+    wireProtocol,
     url,
     method,
     headers,
@@ -244,6 +246,7 @@ async function bufferedResponse(
 async function streamingResponse(
   providerId: string,
   kind: ProviderKind,
+  wireProtocol: ProviderWireProtocol | undefined,
   url: string,
   method: string,
   headers: Record<string, string>,
@@ -307,6 +310,7 @@ async function streamingResponse(
   void invoke<void>('ai_proxy_stream', {
     providerId,
     kind,
+    wireProtocol,
     url,
     method,
     headers,
@@ -336,6 +340,7 @@ async function streamingResponse(
 export function tauriFetch(
   providerId: string,
   kind: ProviderKind,
+  wireProtocol?: ProviderWireProtocol,
 ): typeof globalThis.fetch {
   return async (input, init) => {
     // Normalize both call forms — fetch(url, init) and fetch(Request) — via a
@@ -352,6 +357,7 @@ export function tauriFetch(
       return streamingResponse(
         providerId,
         kind,
+        wireProtocol,
         url,
         method,
         headers,
@@ -359,6 +365,6 @@ export function tauriFetch(
         request.signal ?? init?.signal ?? null,
       )
     }
-    return bufferedResponse(providerId, kind, url, method, headers, body)
+    return bufferedResponse(providerId, kind, wireProtocol, url, method, headers, body)
   }
 }

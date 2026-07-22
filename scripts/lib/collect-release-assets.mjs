@@ -11,15 +11,22 @@ export const releaseArtifactIds = Object.freeze([
 
 const allowedSuffixes = Object.freeze([
   '.app.tar.gz', '.app.tar.gz.sig', '.dmg',
-  '.msi', '.msi.zip', '.msi.zip.sig', '.exe', '.nsis.zip', '.nsis.zip.sig',
-  '.AppImage', '.AppImage.tar.gz', '.AppImage.tar.gz.sig', '.deb',
+  '.msi', '.exe', '.exe.sig',
+  '.AppImage', '.AppImage.sig', '.deb',
 ])
 
 const requiredBundles = Object.freeze({
   'release-macos-aarch64': ['.dmg', '.app.tar.gz', '.app.tar.gz.sig'],
   'release-macos-x86_64': ['.dmg', '.app.tar.gz', '.app.tar.gz.sig'],
-  'release-windows-x86_64': ['.msi', '.exe'],
-  'release-linux-x86_64': ['.AppImage', '.deb'],
+  'release-windows-x86_64': ['.msi', '.exe', '.exe.sig'],
+  'release-linux-x86_64': ['.AppImage', '.AppImage.sig', '.deb'],
+})
+
+const uniqueUpdaterBundles = Object.freeze({
+  'release-macos-aarch64': ['.app.tar.gz', '.app.tar.gz.sig'],
+  'release-macos-x86_64': ['.app.tar.gz', '.app.tar.gz.sig'],
+  'release-windows-x86_64': ['.exe', '.exe.sig'],
+  'release-linux-x86_64': ['.AppImage', '.AppImage.sig'],
 })
 
 function isWithin(parent, child) {
@@ -64,6 +71,10 @@ export async function collectReleaseAssets({ inputDir, outputDir, artifactIds = 
     const names = files.map((file) => basename(file))
     for (const suffix of requiredBundles[artifactId]) {
       if (!names.some((name) => name.endsWith(suffix))) throw new Error(`${artifactId} is missing required ${suffix} output.`)
+    }
+    for (const suffix of uniqueUpdaterBundles[artifactId]) {
+      const matches = names.filter((name) => name.endsWith(suffix))
+      if (matches.length !== 1) throw new Error(`${artifactId} must contain exactly one ${suffix} output; found ${matches.length}.`)
     }
     for (const source of files) {
       const destination = join(output, `${artifactId.replace(/^release-/, '')}-${basename(source)}`)

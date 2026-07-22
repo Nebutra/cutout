@@ -5,6 +5,8 @@ import { buildReleaseDocuments, readSignedArtifact, sha256, validateUpdateManife
 
 const [command, ...argv] = process.argv.slice(2)
 const args = Object.fromEntries(argv.map((value, index) => value.startsWith('--') ? [value.slice(2), argv[index + 1] && !argv[index + 1].startsWith('--') ? argv[index + 1] : 'true'] : null).filter(Boolean))
+// Repeated flags (e.g. --platform) collapse under Object.fromEntries; collect them explicitly.
+const platformFlags = argv.flatMap((value, index) => value === '--platform' && argv[index + 1] && !argv[index + 1].startsWith('--') ? [argv[index + 1]] : [])
 const json = (value) => `${JSON.stringify(value, null, 2)}\n`
 
 if (command === 'validate') {
@@ -13,10 +15,9 @@ if (command === 'validate') {
   validateUpdateManifest(manifest, { expectedSignature: signature, allowedHosts: list(args['allowed-hosts']) })
   process.stdout.write(`Valid updater manifest ${manifest.version}.\n`)
 } else if (command === 'generate') {
-  const artifactPath = resolve(required('artifact')), signaturePath = resolve(args.signature ?? `${artifactPath}.sig`)
-  const signed = await readSignedArtifact(artifactPath, signaturePath)
   const channel = args.channel ?? 'stable', output = resolve(args.output ?? 'dist/update')
-  const documents = buildReleaseDocuments({ channel, version: required('version'), notes: args.notes, publishedAt: args['pub-date'] ?? new Date().toISOString(), artifactUrl: required('artifact-url'), signature: signed.signature, signatureFile: basename(signaturePath), artifactDigest: signed.digest, rolloutPercentage: Number(args.rollout ?? (channel === 'stable' ? 100 : 10)), previousVersion: args['previous-version'], previousManifestUrl: args['previous-manifest-url'], sourceRevision: args.revision ?? process.env.GITHUB_SHA ?? 'local', allowedHosts: list(args['allowed-hosts']), signingKeyPresent: Boolean(process.env.TAURI_SIGNING_PRIVATE_KEY) })
+  const platforms = await resolvePlatforms()
+  const documents = buildReleaseDocuments({ channel, version: required('version'), notes: args.notes, publishedAt: args['pub-date'] ?? new Date().toISOString(), platforms, rolloutPercentage: Number(args.rollout ?? (channel === 'stable' ? 100 : 10)), previousVersion: args['previous-version'], previousManifestUrl: args['previous-manifest-url'], sourceRevision: args.revision ?? process.env.GITHUB_SHA ?? 'local', allowedHosts: list(args['allowed-hosts']) })
   const directory = join(output, channel); await mkdir(directory, { recursive: true })
   const rendered = { 'latest.json': json(documents.manifest), 'rollout.json': json(documents.rollout), 'rollback.json': json(documents.rollback), 'sbom.spdx.json': json(documents.sbom), 'provenance.json': json(documents.provenance) }
   documents.metadata.sbom.sha256 = sha256(rendered['sbom.spdx.json'])
@@ -28,3 +29,19 @@ if (command === 'validate') {
 
 function required(name) { const value = args[name]; if (!value || value === 'true') throw new Error(`--${name} is required.`); return value }
 function list(value) { return value ? value.split(',').map((item) => item.trim().toLowerCase()).filter(Boolean) : undefined }
+
+async function resolvePlatforms() {
+  if (platformFlags.length) {
+    const base = required('artifact-base-url').replace(/\/+$/, '')
+    return Promise.all(platformFlags.map(async (spec) => {
+      const eq = spec.indexOf('=')
+      if (eq <= 0) throw new Error(`--platform expects <key>=<artifactPath>, got: ${spec}`)
+      const key = spec.slice(0, eq), artifactPath = resolve(spec.slice(eq + 1)), signaturePath = `${artifactPath}.sig`
+      const signed = await readSignedArtifact(artifactPath, signaturePath)
+      return { key, artifactUrl: `${base}/${basename(artifactPath)}`, signature: signed.signature, artifactDigest: signed.digest, signatureFile: basename(signaturePath) }
+    }))
+  }
+  const artifactPath = resolve(required('artifact')), signaturePath = resolve(args.signature ?? `${artifactPath}.sig`)
+  const signed = await readSignedArtifact(artifactPath, signaturePath)
+  return [{ key: 'darwin-aarch64', artifactUrl: required('artifact-url'), signature: signed.signature, artifactDigest: signed.digest, signatureFile: basename(signaturePath) }]
+}

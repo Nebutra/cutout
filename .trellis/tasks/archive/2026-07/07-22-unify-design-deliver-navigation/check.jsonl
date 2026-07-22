@@ -1,0 +1,2 @@
+{"file":".trellis/spec/frontend/index.md","reason":"Verify the navigation change against the repository's frontend quality expectations."}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"Check that all rail entries continue to share one implementation and interaction contract."}

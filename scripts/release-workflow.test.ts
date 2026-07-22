@@ -53,48 +53,42 @@ describe('cross-platform release workflow', () => {
     expect(publishScript).toContain('gh release edit')
   })
 
-  it('scopes the updater private key to required consumers and keeps its password out of publication', async () => {
+  it('feeds every platform updater artifact into the manifest generator', async () => {
+    const source = await readFile('.github/workflows/release-update.yml', 'utf8')
+    const workflow = YAML.parse(source)
+    const generateStep = workflow.jobs.publish.steps.find((step: { name?: string }) => step.name === 'Generate and validate updater metadata')
+
+    for (const key of ['darwin-aarch64', 'darwin-x86_64', 'windows-x86_64', 'linux-x86_64']) {
+      expect(generateStep.run).toContain(key)
+    }
+    expect(generateStep.run).toContain('windows-x86_64-*.exe')
+    expect(generateStep.run).toContain('linux-x86_64-*.AppImage')
+    expect(generateStep.run).toContain('--platform')
+    expect(generateStep.run).toContain('--artifact-base-url')
+    expect(generateStep.run).toContain('mapfile -t artifacts')
+    expect(generateStep.run).toContain('Expected exactly one updater artifact for')
+  })
+
+  it('scopes updater signing secrets only to the pinned signing actions', async () => {
     const source = await readFile('.github/workflows/release-update.yml', 'utf8')
     const workflow = YAML.parse(source)
     const buildSteps = workflow.jobs.build.steps
     const publishSteps = workflow.jobs.publish.steps
     const allSteps = [...workflow.jobs.validate.steps, ...buildSteps, ...publishSteps]
-    const privateKeyConsumers = allSteps
-      .filter((step: { env?: Record<string, string> }) => step.env?.TAURI_SIGNING_PRIVATE_KEY === '${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}')
+    const signingSecretConsumers = allSteps
+      .filter((step: { env?: Record<string, string> }) => JSON.stringify(step.env ?? {}).includes('secrets.TAURI_SIGNING_PRIVATE_KEY'))
       .map((step: { name?: string }) => step.name)
-    const passwordConsumers = allSteps
-      .filter((step: { env?: Record<string, string> }) => step.env?.TAURI_SIGNING_PRIVATE_KEY_PASSWORD === '${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}')
-      .map((step: { name?: string }) => step.name)
-    const publicGate = buildSteps.find((step: { name?: string }) => step.name === 'Require protected updater public configuration')
-    const signingGateIndex = buildSteps.findIndex((step: { name?: string }) => step.name === 'Require protected updater signing configuration')
-    const macBuildIndex = buildSteps.findIndex((step: { name?: string }) => step.name === 'Build signed bundles and notarize/staple macOS app')
-    const signingGate = buildSteps[signingGateIndex]
     const metadataGeneration = publishSteps.find((step: { name?: string }) => step.name === 'Generate and validate updater metadata')
 
     expect(workflow.jobs.build.env).not.toHaveProperty('TAURI_SIGNING_PRIVATE_KEY')
     expect(workflow.jobs.build.env).not.toHaveProperty('TAURI_SIGNING_PRIVATE_KEY_PASSWORD')
     expect(workflow.jobs.publish.env).not.toHaveProperty('TAURI_SIGNING_PRIVATE_KEY')
     expect(workflow.jobs.publish.env).not.toHaveProperty('TAURI_SIGNING_PRIVATE_KEY_PASSWORD')
-    expect(privateKeyConsumers).toEqual([
-      'Require protected updater signing configuration',
-      'Build signed bundles and notarize/staple macOS app',
-      'Build non-macOS bundles',
-      'Generate and validate updater metadata',
-    ])
-    expect(passwordConsumers).toEqual([
-      'Require protected updater signing configuration',
-      'Build signed bundles and notarize/staple macOS app',
+    expect(signingSecretConsumers).toEqual([
+      'Build signed and notarized macOS bundles',
       'Build non-macOS bundles',
     ])
-    expect(publicGate.run).not.toContain('TAURI_SIGNING_PRIVATE_KEY')
-    expect(macBuildIndex).toBe(signingGateIndex + 1)
-    expect(Object.keys(signingGate.env)).toEqual([
-      'TAURI_SIGNING_PRIVATE_KEY',
-      'TAURI_SIGNING_PRIVATE_KEY_PASSWORD',
-    ])
-    expect(signingGate.run).toContain('TAURI_SIGNING_PRIVATE_KEY is required')
-    expect(signingGate.run).toContain('TAURI_SIGNING_PRIVATE_KEY_PASSWORD is required')
-    expect(Object.keys(metadataGeneration.env)).toContain('TAURI_SIGNING_PRIVATE_KEY')
+    expect(metadataGeneration.env).not.toHaveProperty('TAURI_SIGNING_PRIVATE_KEY')
     expect(metadataGeneration.env).not.toHaveProperty('TAURI_SIGNING_PRIVATE_KEY_PASSWORD')
   })
 
@@ -103,9 +97,9 @@ describe('cross-platform release workflow', () => {
     const workflow = YAML.parse(source)
     const buildSteps = workflow.jobs.build.steps
     const preparation = buildSteps.find((step: { name?: string }) => step.name === 'Prepare Apple signing and notarization credentials')
-    const macBuild = buildSteps.find((step: { name?: string }) => step.name === 'Build signed bundles and notarize/staple macOS app')
-    const nonMacBuild = buildSteps.find((step: { name?: string }) => step.name === 'Build non-macOS bundles')
+    const macBuild = buildSteps.find((step: { name?: string }) => step.name === 'Build signed and notarized macOS bundles')
     const dmgNotarization = buildSteps.find((step: { name?: string }) => step.name === 'Notarize and staple macOS DMG')
+    const nonMacBuild = buildSteps.find((step: { name?: string }) => step.name === 'Build non-macOS bundles')
     const appleNames = [
       'APPLE_CERTIFICATE',
       'APPLE_CERTIFICATE_PASSWORD',
@@ -120,11 +114,11 @@ describe('cross-platform release workflow', () => {
 
     expect(preparation.if).toBe("runner.os == 'macOS'")
     expect(macBuild.if).toBe("runner.os == 'macOS'")
-    expect(nonMacBuild.if).toBe("runner.os != 'macOS'")
     expect(dmgNotarization.if).toBe("runner.os == 'macOS'")
+    expect(nonMacBuild.if).toBe("runner.os != 'macOS'")
     expect(appleSecretConsumers).toEqual([
       'Prepare Apple signing and notarization credentials',
-      'Build signed bundles and notarize/staple macOS app',
+      'Build signed and notarized macOS bundles',
       'Notarize and staple macOS DMG',
     ])
     expect(JSON.stringify(workflow.jobs.validate)).not.toContain('secrets.APPLE_')
@@ -144,11 +138,14 @@ describe('cross-platform release workflow', () => {
       'APPLE_API_KEY',
       'APPLE_API_ISSUER',
     ])
-    expect(Object.keys(dmgNotarization.env)).toEqual(['APPLE_API_KEY', 'APPLE_API_ISSUER'])
     expect(Object.keys(nonMacBuild.env)).toEqual([
       'GITHUB_TOKEN',
       'TAURI_SIGNING_PRIVATE_KEY',
       'TAURI_SIGNING_PRIVATE_KEY_PASSWORD',
+    ])
+    expect(Object.keys(dmgNotarization.env)).toEqual([
+      'APPLE_API_KEY',
+      'APPLE_API_ISSUER',
     ])
     expect(JSON.stringify(nonMacBuild)).not.toContain('APPLE_')
   })
@@ -158,16 +155,13 @@ describe('cross-platform release workflow', () => {
     const workflow = YAML.parse(source)
     const buildSteps = workflow.jobs.build.steps
     const preparationIndex = buildSteps.findIndex((step: { name?: string }) => step.name === 'Prepare Apple signing and notarization credentials')
-    const macBuildIndex = buildSteps.findIndex((step: { name?: string }) => step.name === 'Build signed bundles and notarize/staple macOS app')
+    const macBuildIndex = buildSteps.findIndex((step: { name?: string }) => step.name === 'Build signed and notarized macOS bundles')
     const updaterGate = buildSteps.find((step: { name?: string }) => step.name === 'Require protected updater public configuration')
-    const updaterSigningGate = buildSteps.find((step: { name?: string }) => step.name === 'Require protected updater signing configuration')
     const preparation = buildSteps[preparationIndex]
     const cleanup = buildSteps.find((step: { name?: string }) => step.name === 'Remove temporary Apple notarization key')
 
     expect(updaterGate.run).toContain('CUTOUT_UPDATER_PUBKEY is required')
     expect(updaterGate.run).not.toContain('TAURI_SIGNING_PRIVATE_KEY')
-    expect(updaterSigningGate.run).toContain('TAURI_SIGNING_PRIVATE_KEY is required')
-    expect(updaterSigningGate.run).toContain('TAURI_SIGNING_PRIVATE_KEY_PASSWORD is required')
     expect(macBuildIndex).toBeGreaterThan(preparationIndex)
     for (const name of Object.keys(preparation.env)) {
       expect(preparation.run).toContain(`${name} is required`)
@@ -186,7 +180,7 @@ describe('cross-platform release workflow', () => {
     const source = await readFile('.github/workflows/release-update.yml', 'utf8')
     const workflow = YAML.parse(source)
     const buildSteps = workflow.jobs.build.steps
-    const macBuildIndex = buildSteps.findIndex((step: { name?: string }) => step.name === 'Build signed bundles and notarize/staple macOS app')
+    const macBuildIndex = buildSteps.findIndex((step: { name?: string }) => step.name === 'Build signed and notarized macOS bundles')
     const dmgNotarizationIndex = buildSteps.findIndex((step: { name?: string }) => step.name === 'Notarize and staple macOS DMG')
     const verificationIndex = buildSteps.findIndex((step: { name?: string }) => step.name === 'Verify signed and notarized macOS bundles')
     const cleanupIndex = buildSteps.findIndex((step: { name?: string }) => step.name === 'Remove temporary Apple notarization key')
@@ -195,16 +189,16 @@ describe('cross-platform release workflow', () => {
     const dmgNotarization = buildSteps[dmgNotarizationIndex]
     const verification = buildSteps[verificationIndex]
 
-    expect(dmgNotarization.if).toBe("runner.os == 'macOS'")
-    expect(dmgNotarizationIndex).toBeGreaterThan(macBuildIndex)
     expect(verification.if).toBe("runner.os == 'macOS'")
+    expect(dmgNotarizationIndex).toBeGreaterThan(macBuildIndex)
     expect(verificationIndex).toBeGreaterThan(dmgNotarizationIndex)
+    expect(verificationIndex).toBeGreaterThan(macBuildIndex)
     expect(cleanupIndex).toBeGreaterThan(verificationIndex)
     expect(uploadIndex).toBeGreaterThan(verificationIndex)
     expect(uploadIndex).toBeGreaterThan(cleanupIndex)
     expect(macBuild.with.args).not.toContain('--skip-stapling')
     expect(macBuild.with.args).not.toContain('--no-sign')
-    expect(dmgNotarization.run).toContain('$bundle_root/dmg/')
+    expect(dmgNotarization.run).toContain('Expected exactly one macOS DMG')
     expect(dmgNotarization.run).toContain('xcrun notarytool submit "${dmgs[0]}"')
     expect(dmgNotarization.run).toContain('--key "$APPLE_API_KEY_PATH"')
     expect(dmgNotarization.run).toContain('--key-id "$APPLE_API_KEY"')
@@ -218,6 +212,25 @@ describe('cross-platform release workflow', () => {
     expect(verification.run).toContain('spctl --assess --type execute')
     expect(verification.run).toContain('spctl --assess --type open')
     expect(verification.run.match(/xcrun stapler validate/g)).toHaveLength(2)
+  })
+
+  it('cryptographically verifies one updater artifact per matrix entry before upload', async () => {
+    const source = await readFile('.github/workflows/release-update.yml', 'utf8')
+    const workflow = YAML.parse(source)
+    const buildSteps = workflow.jobs.build.steps
+    const verificationIndex = buildSteps.findIndex((step: { name?: string }) => step.name === 'Verify updater artifact signature')
+    const uploadIndex = buildSteps.findIndex((step: { uses?: string }) => step.uses?.startsWith('actions/upload-artifact@'))
+    const verification = buildSteps[verificationIndex]
+
+    expect(verificationIndex).toBeGreaterThan(-1)
+    expect(uploadIndex).toBeGreaterThan(verificationIndex)
+    expect(verification.run).toContain('*.app.tar.gz')
+    expect(verification.run).toContain('*.exe')
+    expect(verification.run).toContain('*.AppImage')
+    expect(verification.run).toContain('Expected exactly one updater artifact')
+    expect(verification.run).toContain('--bin verify-updater-signature')
+    expect(verification.run).toContain('"$updater_artifact.sig"')
+    expect(verification.env).not.toHaveProperty('TAURI_SIGNING_PRIVATE_KEY')
   })
 
   it('tests a safe workspace read and launches the host-native packaged app before publishing', async () => {

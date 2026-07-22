@@ -20,6 +20,7 @@ use super::ai_proxy::{
 };
 use super::auth_header::auth_headers;
 use super::keys::read_secret;
+use super::providers::{ProviderKind, ProviderWireProtocol};
 
 /// Base64-encoded PNG image(s) returned from the edits endpoint. gpt-image always
 /// answers base64 (`data[].b64_json`); the webview decodes to bytes.
@@ -93,8 +94,24 @@ fn parse_edit_response(body: &str) -> Result<Vec<String>, ProxyError> {
 /// Build the injected auth header map for the edits request. Only the keychain
 /// auth header is set — reqwest's `.multipart(form)` sets `content-type` (with
 /// the boundary) itself, so we must NOT set it here.
-fn build_auth_headers(kind: &str, secret: &str) -> Result<HeaderMap, ProxyError> {
-    let injected = auth_headers(kind, secret).ok_or(ProxyError::UnknownKind)?;
+fn build_auth_headers(
+    kind: ProviderKind,
+    wire_protocol: Option<ProviderWireProtocol>,
+    secret: &str,
+) -> Result<HeaderMap, ProxyError> {
+    let effective = kind
+        .effective_wire_protocol(wire_protocol)
+        .map_err(ProxyError::UnsupportedWireProtocol)?;
+    if !matches!(
+        effective,
+        Some(ProviderWireProtocol::Responses | ProviderWireProtocol::ChatCompletions)
+    ) {
+        return Err(ProxyError::UnsupportedWireProtocol(
+            "image edit requires an OpenAI wire protocol".to_string(),
+        ));
+    }
+    let injected =
+        auth_headers(kind, wire_protocol, secret).map_err(ProxyError::UnsupportedWireProtocol)?;
     let mut map = HeaderMap::new();
     for (name, value) in injected {
         let hn = HeaderName::from_bytes(name.as_bytes()).map_err(|_| ProxyError::BadHeader)?;
@@ -117,6 +134,7 @@ fn build_auth_headers(kind: &str, secret: &str) -> Result<HeaderMap, ProxyError>
 pub async fn ai_image_edit(
     provider_id: String,
     kind: String,
+    wire_protocol: Option<ProviderWireProtocol>,
     base_url: String,
     model: String,
     prompt: String,
@@ -139,7 +157,10 @@ pub async fn ai_image_edit(
     enforce_host(&kind, &url)?; // SSRF guard (https + allowed host)
     enforce_resolved_host(&kind, &url).await?;
     let secret = read_secret(&provider_id).map_err(ProxyError::from)?;
-    let header_map = build_auth_headers(&kind, &secret)?;
+    let provider_kind: ProviderKind =
+        serde_json::from_value(serde_json::Value::String(kind.clone()))
+            .map_err(|_| ProxyError::UnknownKind)?;
+    let header_map = build_auth_headers(provider_kind, wire_protocol, &secret)?;
 
     let fidelity = input_fidelity.as_deref().unwrap_or("high");
     let form = build_edit_form(&model, &prompt, images, size.as_deref(), fidelity);
@@ -230,7 +251,7 @@ mod tests {
 
     #[test]
     fn build_auth_headers_injects_bearer_and_marks_sensitive() {
-        let map = build_auth_headers("openai", "sk-secret").unwrap();
+        let map = build_auth_headers(ProviderKind::Openai, None, "sk-secret").unwrap();
         assert_eq!(map.get("authorization").unwrap(), "Bearer sk-secret");
         assert!(map.get("authorization").unwrap().is_sensitive());
         // No content-type — reqwest sets the multipart boundary itself.
@@ -238,10 +259,14 @@ mod tests {
     }
 
     #[test]
-    fn build_auth_headers_rejects_unknown_kind() {
+    fn build_auth_headers_rejects_non_openai_protocol() {
         assert!(matches!(
-            build_auth_headers("unknown-provider", "k"),
-            Err(ProxyError::UnknownKind)
+            build_auth_headers(
+                ProviderKind::OpenaiCompatible,
+                Some(ProviderWireProtocol::AnthropicMessages),
+                "k"
+            ),
+            Err(ProxyError::UnsupportedWireProtocol(_))
         ));
     }
 }

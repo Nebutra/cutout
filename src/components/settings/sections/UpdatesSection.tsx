@@ -67,11 +67,13 @@ export function UpdatesSection(props: {
     if (
       state.release &&
       ["available", "downloading", "ready", "installing"].includes(state.phase)
-    )
+    ) {
+      const version = state.release.version;
       return t({
         id: "settings.updates.version_available",
-        message: `Version ${state.release.version} is available.`,
+        message: `Version ${version} is available.`,
       });
+    }
     if (state.phase === "error") return state.error;
     return null;
   })();

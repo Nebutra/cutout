@@ -22,6 +22,7 @@ import { Trans, useLingui } from "@lingui/react/macro";
 import { plural } from "@lingui/core/macro";
 import type { ProviderConfig } from "@/services/ai/provider-types";
 import { useProviders } from "@/hooks/queries/providers";
+import { useCapabilityBindings } from "@/hooks/queries/ai-settings";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ProviderRow } from "../ProviderRow";
@@ -32,7 +33,6 @@ import { VectorizerPanel } from "../VectorizerPanel";
 import { ProviderDirectory } from "../ProviderDirectory";
 import type { ProviderDefinition } from "@/services/ai/provider-registry";
 import { modelRoutingCoverage } from "../model-routing-summary";
-import { PaidActionsSection } from "./PaidActionsSection";
 import { useQuery } from "@tanstack/react-query";
 import { discoverProviderCandidates, type ProviderDiscoveryCandidate } from "@/services/ai/provider-discovery";
 
@@ -88,8 +88,8 @@ export function AiSection() {
           </h2>
           <p className="mt-0.5 text-xs text-muted-foreground">
             <Trans id="settings.dialog_form_desc">
-              Keys are stored only in the system keychain, never written to the
-              web page or disk in plaintext.
+              Keys are stored locally on this device and injected natively, never
+              sent to the web page.
             </Trans>
           </p>
         </div>
@@ -108,8 +108,8 @@ export function AiSection() {
       <div className="flex items-start gap-2 rounded-lg border border-border bg-card/40 px-3 py-2 text-xs text-muted-foreground">
         <ShieldCheck className="mt-0.5 size-3.5 shrink-0 text-emerald-500" />
         <Trans id="settings.keychain_trust">
-          API keys are stored only in your OS keychain and injected in the
-          native layer — they never enter the web page.
+          API keys are stored locally on this device and injected in the native
+          layer — they never enter the web page.
         </Trans>
       </div>
 
@@ -160,7 +160,6 @@ export function AiSection() {
       </Button>
 
       <ModelAssignments onConnect={() => setView({ mode: "add" })} />
-      <PaidActionsSection />
     </div>
   );
 }
@@ -193,7 +192,8 @@ const ModelAssignments = memo(function ModelAssignments({
   const [advanced, setAdvanced] = useState(false);
   const providers = useProviders();
   const list = providers.data ?? [];
-  const coverage = modelRoutingCoverage(list);
+  const bindings = useCapabilityBindings();
+  const coverage = modelRoutingCoverage(list, bindings.data);
   const localizedDimensions: Record<
     (typeof MODEL_DIMENSIONS)[number]["task"],
     { label: string; description: string }

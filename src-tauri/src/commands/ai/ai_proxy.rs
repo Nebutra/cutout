@@ -37,6 +37,7 @@ use tauri::ipc::{Channel, InvokeResponseBody};
 
 use super::auth_header::{auth_headers, STRIPPED_INBOUND_HEADERS};
 use super::keys::{read_secret, KeyError};
+use super::providers::{ProviderKind, ProviderWireProtocol};
 
 const DEFAULT_BUFFERED_TIMEOUT_SECS: u64 = 120;
 const GENERATION_BUFFERED_TIMEOUT_SECS: u64 = 600;
@@ -61,6 +62,8 @@ pub enum ProxyError {
     Keychain,
     #[error("unknown provider kind")]
     UnknownKind,
+    #[error("unsupported provider wire protocol: {0}")]
+    UnsupportedWireProtocol(String),
     #[error("invalid request url")]
     BadUrl,
     #[error("host not allowed for this provider kind")]
@@ -239,11 +242,17 @@ fn requires_secret(kind: &str) -> bool {
     !matches!(kind, "ollama" | "vllm" | "lm-studio")
 }
 
+fn parse_provider_kind(kind: &str) -> Result<ProviderKind, ProxyError> {
+    serde_json::from_value(serde_json::Value::String(kind.to_string()))
+        .map_err(|_| ProxyError::UnknownKind)
+}
+
 /// Parse the method (default POST when empty) and build the outgoing header map:
 /// forward client headers minus stripped/auth headers, then insert the injected
 /// auth headers (overwriting, so a client-sent `anthropic-version` is replaced).
 fn build_method_and_headers(
-    kind: &str,
+    kind: ProviderKind,
+    wire_protocol: Option<ProviderWireProtocol>,
     method: &str,
     headers: HashMap<String, String>,
     secret: &str,
@@ -254,7 +263,8 @@ fn build_method_and_headers(
         Method::from_bytes(method.as_bytes()).map_err(|_| ProxyError::BadMethod)?
     };
 
-    let injected = auth_headers(kind, secret).ok_or(ProxyError::UnknownKind)?;
+    let injected =
+        auth_headers(kind, wire_protocol, secret).map_err(ProxyError::UnsupportedWireProtocol)?;
 
     let mut map = HeaderMap::new();
     for (name, value) in headers {
@@ -330,6 +340,9 @@ pub(crate) fn buffered_timeout_for_url(url: &str) -> u64 {
         || url.contains("/chat/completions")
         || url.ends_with("/responses")
         || url.contains("/responses?")
+        || url.ends_with("/messages")
+        || url.contains("/messages?")
+        || url.contains(":generateContent")
     {
         GENERATION_BUFFERED_TIMEOUT_SECS
     } else {
@@ -363,6 +376,7 @@ pub(crate) fn request_error_message(error: &reqwest::Error) -> String {
 pub async fn ai_proxy_request(
     provider_id: String,
     kind: String,
+    wire_protocol: Option<ProviderWireProtocol>,
     url: String,
     method: String,
     headers: HashMap<String, String>,
@@ -373,13 +387,14 @@ pub async fn ai_proxy_request(
     } else {
         String::new()
     };
-    request_with_secret(&kind, &url, &method, headers, body, &secret).await
+    request_with_secret(&kind, wire_protocol, &url, &method, headers, body, &secret).await
 }
 
 /// Internal one-shot request for pre-persistence provider checks. The caller owns
 /// secret resolution; the value never crosses back through IPC or enters Keychain.
 pub(crate) async fn request_with_secret(
     kind: &str,
+    wire_protocol: Option<ProviderWireProtocol>,
     url: &str,
     method: &str,
     headers: HashMap<String, String>,
@@ -388,7 +403,9 @@ pub(crate) async fn request_with_secret(
 ) -> Result<ProxyResponse, ProxyError> {
     enforce_host(kind, url)?;
     enforce_resolved_host(kind, url).await?;
-    let (method, header_map) = build_method_and_headers(kind, method, headers, secret)?;
+    let provider_kind = parse_provider_kind(kind)?;
+    let (method, header_map) =
+        build_method_and_headers(provider_kind, wire_protocol, method, headers, secret)?;
 
     // Bound the whole call. Image endpoints use a longer cap; text/model probes
     // keep the shorter default so a bad relay does not hang the app.
@@ -422,6 +439,7 @@ pub(crate) async fn request_with_secret(
 pub async fn ai_proxy_stream(
     provider_id: String,
     kind: String,
+    wire_protocol: Option<ProviderWireProtocol>,
     url: String,
     method: String,
     headers: HashMap<String, String>,
@@ -436,7 +454,9 @@ pub async fn ai_proxy_stream(
     } else {
         String::new()
     };
-    let (method, header_map) = build_method_and_headers(&kind, &method, headers, &secret)?;
+    let provider_kind = parse_provider_kind(&kind)?;
+    let (method, header_map) =
+        build_method_and_headers(provider_kind, wire_protocol, &method, headers, &secret)?;
 
     // Streaming: only a connect timeout (no overall cap — a long token stream is
     // expected to outlive any fixed request timeout).
@@ -620,8 +640,14 @@ mod tests {
         inbound.insert("content-type".to_string(), "application/json".to_string());
         inbound.insert("host".to_string(), "spoof".to_string());
 
-        let (method, map) =
-            build_method_and_headers("anthropic", "POST", inbound, "real-secret").unwrap();
+        let (method, map) = build_method_and_headers(
+            ProviderKind::Anthropic,
+            None,
+            "POST",
+            inbound,
+            "real-secret",
+        )
+        .unwrap();
 
         assert_eq!(method, Method::POST);
         // Injected real key overrides the dummy.
@@ -636,14 +662,22 @@ mod tests {
 
     #[test]
     fn build_headers_defaults_method_to_post() {
-        let (method, _) = build_method_and_headers("openai", "", HashMap::new(), "k").unwrap();
+        let (method, _) =
+            build_method_and_headers(ProviderKind::Openai, None, "", HashMap::new(), "k").unwrap();
         assert_eq!(method, Method::POST);
     }
 
     #[test]
-    fn build_headers_unknown_kind_errors() {
-        let err = build_method_and_headers("nope", "POST", HashMap::new(), "k").unwrap_err();
-        assert!(matches!(err, ProxyError::UnknownKind));
+    fn build_headers_reject_unsupported_protocol() {
+        let err = build_method_and_headers(
+            ProviderKind::Deepseek,
+            Some(ProviderWireProtocol::AnthropicMessages),
+            "POST",
+            HashMap::new(),
+            "k",
+        )
+        .unwrap_err();
+        assert!(matches!(err, ProxyError::UnsupportedWireProtocol(_)));
     }
 
     #[test]
@@ -662,6 +696,16 @@ mod tests {
         );
         assert_eq!(
             buffered_timeout_for_url("https://api.example.com/v1/responses"),
+            GENERATION_BUFFERED_TIMEOUT_SECS
+        );
+        assert_eq!(
+            buffered_timeout_for_url("https://api.example.com/v1/messages"),
+            GENERATION_BUFFERED_TIMEOUT_SECS
+        );
+        assert_eq!(
+            buffered_timeout_for_url(
+                "https://api.example.com/v1beta/models/gemini:generateContent"
+            ),
             GENERATION_BUFFERED_TIMEOUT_SECS
         );
         assert_eq!(

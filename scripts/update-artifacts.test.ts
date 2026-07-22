@@ -17,6 +17,18 @@ function fixture(version = '1.2.0') {
   return { artifact, signature, manifest: { version, notes: 'Fixture', pub_date: '2026-07-15T00:00:00.000Z', platforms: { 'darwin-aarch64': { url: `https://releases.example.test/Cutout-${version}.app.tar.gz`, signature } } } }
 }
 
+const updaterSuffix: Record<string, string> = { 'darwin-aarch64': '.app.tar.gz', 'darwin-x86_64': '.app.tar.gz', 'windows-x86_64': '.exe', 'linux-x86_64': '.AppImage' }
+
+function multiFixture(version = '1.2.0') {
+  const { privateKey } = generateKeyPairSync('ed25519')
+  const platforms = Object.keys(updaterSuffix).map((key) => {
+    const artifact = Buffer.from(`fixture-${key}-${version}`)
+    const signature = sign(null, artifact, privateKey).toString('base64')
+    return { key, artifact, signature, artifactUrl: `https://releases.example.test/${key}-Cutout-${version}${updaterSuffix[key]}`, artifactDigest: sha256(artifact), signatureFile: `${key}-Cutout-${version}${updaterSuffix[key]}.sig` }
+  })
+  return { platforms }
+}
+
 async function fixtureServer(routes: Record<string, { status: number; body?: unknown }>) {
   const server = createServer((request, response) => { const route = routes[request.url ?? ''] ?? { status: 404 }; response.statusCode = route.status; if (route.body) response.end(JSON.stringify(route.body)); else response.end() })
   servers.push(server); await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
@@ -55,18 +67,67 @@ describe('signed update artifact policy', () => {
     expect(value.manifest.platforms['darwin-aarch64'].signature).toBe(before)
   })
 
-  it('generates hash, SBOM, provenance and rollback metadata and hard-fails without a release key', () => {
+  it('generates hash, SBOM, provenance and rollback metadata from verified sidecars', () => {
     const value = fixture(), base = { channel: 'stable', version: '1.2.0', publishedAt: '2026-07-15T00:00:00.000Z', artifactUrl: 'https://releases.example.test/Cutout.app.tar.gz', signature: value.signature, signatureFile: 'Cutout.app.tar.gz.sig', artifactDigest: sha256(value.artifact), rolloutPercentage: 100, previousVersion: '1.1.0', previousManifestUrl: 'https://releases.example.test/v1.1.0/latest.json', sourceRevision: 'abc123', allowedHosts: ['releases.example.test'] }
-    expect(() => buildReleaseDocuments({ ...base, signingKeyPresent: false })).toThrow('TAURI_SIGNING_PRIVATE_KEY')
-    const generated = buildReleaseDocuments({ ...base, signingKeyPresent: true })
+    const generated = buildReleaseDocuments(base)
     expect(generated).toMatchObject({ manifest: { version: '1.2.0' }, sbom: { spdxVersion: 'SPDX-2.3' }, provenance: { version: 'cutout.provenance.v1' }, rollback: { targetVersion: '1.1.0' }, rollout: { percentage: 100 } })
     expect(generated.metadata.artifact.sha256).toBe(sha256(value.artifact))
+  })
+
+  it('emits every built platform in the manifest and enumerates them in supply-chain metadata', () => {
+    const { platforms } = multiFixture()
+    const generated = buildReleaseDocuments({ channel: 'stable', version: '1.2.0', publishedAt: '2026-07-15T00:00:00.000Z', platforms: platforms.map(({ key, artifactUrl, signature, artifactDigest, signatureFile }) => ({ key, artifactUrl, signature, artifactDigest, signatureFile })), rolloutPercentage: 100, allowedHosts: ['releases.example.test'] })
+    expect(Object.keys(generated.manifest.platforms)).toEqual(['darwin-aarch64', 'darwin-x86_64', 'windows-x86_64', 'linux-x86_64'])
+    expect(generated.metadata.platforms.map((p: { key: string }) => p.key)).toEqual(['darwin-aarch64', 'darwin-x86_64', 'windows-x86_64', 'linux-x86_64'])
+    expect(generated.sbom.packages).toHaveLength(4)
+    expect(generated.provenance.subject).toHaveLength(4)
+    expect(() => validateUpdateManifest(generated.manifest, { allowedHosts: ['releases.example.test'] })).not.toThrow()
+  })
+
+  it('requires darwin-aarch64 as the mandatory primary platform', () => {
+    const { platforms } = multiFixture()
+    const withoutPrimary = platforms.filter((p) => p.key !== 'darwin-aarch64').map(({ key, artifactUrl, signature, artifactDigest, signatureFile }) => ({ key, artifactUrl, signature, artifactDigest, signatureFile }))
+    expect(() => buildReleaseDocuments({ channel: 'stable', version: '1.2.0', publishedAt: '2026-07-15T00:00:00.000Z', platforms: withoutPrimary, rolloutPercentage: 100, allowedHosts: ['releases.example.test'] })).toThrow('darwin-aarch64')
+  })
+
+  it('fails closed when a non-primary platform is insecure or unsigned', () => {
+    const value = fixture()
+    const insecure = structuredClone(value.manifest) as typeof value.manifest & { platforms: Record<string, { url: string; signature: string }> }
+    insecure.platforms['windows-x86_64'] = { url: 'http://releases.example.test/windows.exe', signature: value.signature }
+    expect(() => validateUpdateManifest(insecure, { allowedHosts: ['releases.example.test'] })).toThrow('HTTPS')
+    const unsigned = structuredClone(value.manifest) as typeof insecure
+    unsigned.platforms['linux-x86_64'] = { url: 'https://releases.example.test/linux.AppImage', signature: '   ' }
+    expect(() => validateUpdateManifest(unsigned, { allowedHosts: ['releases.example.test'] })).toThrow('signature is missing')
+  })
+
+  it('generates a four-platform manifest through the production CLI', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'cutout-update-multi-'))
+    const { privateKey } = generateKeyPairSync('ed25519')
+    const specs = [
+      { key: 'darwin-aarch64', file: 'macos-aarch64-Cutout.app.tar.gz' },
+      { key: 'darwin-x86_64', file: 'macos-x86_64-Cutout.app.tar.gz' },
+      { key: 'windows-x86_64', file: 'windows-x86_64-Cutout-setup.exe' },
+      { key: 'linux-x86_64', file: 'linux-x86_64-Cutout.AppImage' },
+    ]
+    const platformArgs: string[] = []
+    for (const spec of specs) {
+      const artifactPath = join(root, spec.file), artifact = Buffer.from(`fixture-${spec.key}`)
+      await writeFile(artifactPath, artifact)
+      await writeFile(`${artifactPath}.sig`, sign(null, artifact, privateKey).toString('base64'))
+      platformArgs.push('--platform', `${spec.key}=${artifactPath}`)
+    }
+    const result = spawnSync(process.execPath, ['scripts/update-artifacts.mjs', 'generate', ...platformArgs, '--artifact-base-url', 'https://releases.example.test', '--version', '1.2.0', '--channel', 'stable', '--rollout', '100', '--allowed-hosts', 'releases.example.test', '--output', join(root, 'out')], { cwd: process.cwd(), encoding: 'utf8' })
+    expect(result.status, result.stderr).toBe(0)
+    const manifest = JSON.parse(await readFile(join(root, 'out', 'stable', 'latest.json'), 'utf8'))
+    expect(Object.keys(manifest.platforms)).toEqual(['darwin-aarch64', 'darwin-x86_64', 'windows-x86_64', 'linux-x86_64'])
+    expect(manifest.platforms['windows-x86_64'].url).toBe('https://releases.example.test/windows-x86_64-Cutout-setup.exe')
+    expect(() => validateUpdateManifest(manifest, { allowedHosts: ['releases.example.test'] })).not.toThrow()
   })
 
   it('writes a self-consistent release directory through the production CLI', async () => {
     const value = fixture(), root = await mkdtemp(join(tmpdir(), 'cutout-update-')), artifact = join(root, 'Cutout.app.tar.gz')
     await writeFile(artifact, value.artifact); await writeFile(`${artifact}.sig`, value.signature)
-    const result = spawnSync(process.execPath, ['scripts/update-artifacts.mjs', 'generate', '--artifact', artifact, '--version', '1.2.0', '--channel', 'beta', '--rollout', '25', '--artifact-url', 'https://releases.example.test/Cutout.app.tar.gz', '--allowed-hosts', 'releases.example.test', '--output', join(root, 'out')], { cwd: process.cwd(), env: { ...process.env, TAURI_SIGNING_PRIVATE_KEY: 'TEST-ONLY-NOT-A-TAURI-KEY' }, encoding: 'utf8' })
+    const result = spawnSync(process.execPath, ['scripts/update-artifacts.mjs', 'generate', '--artifact', artifact, '--version', '1.2.0', '--channel', 'beta', '--rollout', '25', '--artifact-url', 'https://releases.example.test/Cutout.app.tar.gz', '--allowed-hosts', 'releases.example.test', '--output', join(root, 'out')], { cwd: process.cwd(), encoding: 'utf8' })
     expect(result.status, result.stderr).toBe(0)
     const directory = join(root, 'out', 'beta'), metadata = JSON.parse(await readFile(join(directory, 'release-metadata.json'), 'utf8'))
     expect(metadata.sbom.sha256).toBe(sha256(await readFile(join(directory, 'sbom.spdx.json'))))

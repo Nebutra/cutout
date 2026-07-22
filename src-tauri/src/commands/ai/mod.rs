@@ -1,6 +1,6 @@
 //! BYOK (bring-your-own-key) AI infrastructure commands.
 //!
-//! - [`auth_header`] — pure per-kind auth header shaping.
+//! - [`auth_header`] — pure protocol-aware auth header shaping.
 //! - [`keys`]        — OS-keychain key management (no secret ever returned to JS).
 //! - [`providers`]   — non-secret provider-config persistence (app-config JSON).
 //! - [`ai_proxy`]    — secure transport: inject the key in Rust, proxy the request,

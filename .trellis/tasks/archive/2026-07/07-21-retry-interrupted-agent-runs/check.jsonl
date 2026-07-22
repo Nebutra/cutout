@@ -1,0 +1,3 @@
+{"file":".trellis/spec/frontend/component-guidelines.md","reason":"Verify the dock and workspace callback contract remains consistent."}
+{"file":".trellis/spec/frontend/agent-control-safety.md","reason":"Review retry behavior against run and paid-action safety invariants."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Apply the frontend verification checklist."}
