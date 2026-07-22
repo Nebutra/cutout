@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 16
+- **Total Sessions**: 17
 - **Last Active**: 2026-07-22
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~556 | Active |
+| `journal-1.md` | ~589 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 17 | 2026-07-22 | Persist Agent conversation branches in Git | `3043e27` | `main` |
 | 16 | 2026-07-22 | Publish Cutout v0.1.3 | `168d6ac`, `672dd63` | `main` |
 | 15 | 2026-07-22 | Remove desktop paid operation limit | `e2501c2` | `main` |
 | 14 | 2026-07-22 | Restore Git visual coverage and reopened Agent Retry | `c0f8a67`, `6d487e7` | `main` |

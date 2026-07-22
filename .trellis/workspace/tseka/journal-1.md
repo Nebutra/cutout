@@ -554,3 +554,36 @@ Attempted immutable v0.1.2 release, diagnosed post-build DMG notarization and Ta
 ### Next Steps
 
 - None - task complete
+
+
+## Session 17: Persist Agent conversation branches in Git
+
+**Date**: 2026-07-22
+**Task**: Persist Agent conversation branches in Git
+**Branch**: `main`
+
+### Summary
+
+Implemented immutable sibling Agent responses with previous/next selection, durable preparing lifecycle rows, authorized .cutout/run-events.json reconciliation and CAS persistence, project-isolation safeguards, and full frontend/Rust/visual regression coverage.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `3043e27` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
