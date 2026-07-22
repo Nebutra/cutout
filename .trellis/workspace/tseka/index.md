@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 17
+- **Total Sessions**: 18
 - **Last Active**: 2026-07-22
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~590 | Active |
+| `journal-1.md` | ~621 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 18 | 2026-07-22 | Reinstall local Cutout v0.1.4 | - | `release/v0.1.4` |
 | 17 | 2026-07-22 | Ship Agent response regeneration in v0.1.4 | `4297089`, `cd8fcd1` | `release/v0.1.4` |
 | 16 | 2026-07-22 | Publish Cutout v0.1.3 | `168d6ac`, `672dd63` | `main` |
 | 15 | 2026-07-22 | Remove desktop paid operation limit | `e2501c2` | `main` |

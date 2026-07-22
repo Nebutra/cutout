@@ -588,3 +588,34 @@ Added latest-response Regenerate with durable revision semantics, fixed stale re
 ### Next Steps
 
 - None - task complete
+
+
+## Session 18: Reinstall local Cutout v0.1.4
+
+**Date**: 2026-07-22
+**Task**: Reinstall local Cutout v0.1.4
+**Branch**: `release/v0.1.4`
+
+### Summary
+
+Redownloaded and checksum-verified the stable Apple Silicon DMG, preserved the prior app bundle in Trash, reinstalled Cutout v0.1.4, validated signature/Gatekeeper/notarization, and confirmed the app window and existing local projects.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+(No commits - planning session)
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
