@@ -33,6 +33,14 @@ receipts. `.cutout` state and provenance remain authoritative.
 
 - A host-issued `cutout.approval-lease.v1` lease binds its project, subject,
   operation digest, expected revision, approval id, issue time, and expiry.
+- The durable headless lease catalog authenticates every authority-bearing
+  field and state transition with HMAC-SHA256 using a host key outside the
+  workspace. `issued`, `reserved`, and `consumed` records are re-signed on
+  transition; workspace edits cannot mint or replay a lease.
+- Desktop registry installs and workspace exports do not accept a webview
+  approval token as authority. The native host presents an OS-level warning
+  confirmation after preview and emits the receipt approval id only after the
+  user approves it.
 - Desktop paid-tool requests always require explicit approval. Their budget
   ceilings come from the matching host capability estimate, never a persisted
   user allowance, and the desktop host policy does not project a `maxCost`.
@@ -50,6 +58,17 @@ receipts. `.cutout` state and provenance remain authoritative.
   leases; recovery requeues only leases expired at the shared clock boundary.
 - Controlled reads reject absolute paths, traversal, symlink roots/components,
   non-regular files, identity changes, and size/count limit violations.
+- AI Native reference reads are relative to the host-owned
+  `ai-native/imports/` staging root and reject absolute paths, traversal,
+  symlinks, non-regular files, and files over the bounded import size.
+- Both TypeScript and native repository scanners reject trees deeper than 64
+  directory levels before continuing traversal.
+- The stdio MCP entry never derives project authority from the launch
+  process's current directory. Without `CUTOUT_PROJECT_ROOT`, only static
+  discovery remains available and every project-bound tool fails closed.
+- Native Git commands ignore system/global configuration and executable
+  environment overrides, disable hooks/helpers/external diff/file transport,
+  and reject executable repo-local config keys before running against a repo.
 - The Node command host exposes a fixed command enum, `shell: false`, an
   allowlisted environment, bounded duration/output, and POSIX process-group
   cancellation. Unsupported Windows process-tree control fails as
@@ -91,6 +110,9 @@ receipts. `.cutout` state and provenance remain authoritative.
 | Condition | Required behavior |
 | --- | --- |
 | Forged, expired, replayed, stale, or mismatched lease | Reject before dispatching the effect |
+| Workspace lease file changes state, reservation, or response without the host key | Reject the catalog signature before reservation or completion |
+| Desktop apply receives a caller-authored approval string | It has no authority; require native confirmation after preview |
+| Project-bound MCP tool runs without `CUTOUT_PROJECT_ROOT` | Return `project-binding-required` without reading or writing project state |
 | Registry apply omits either `planId` or `approvalLeaseId` | Reject; never downgrade to a dry-run response |
 | Registry content or workspace state changes after preview | Reject the stale `planId` before writing |
 | Claim missing, terminal, delayed, cancelled, or held by another owner | Do not start heartbeat or effect |
@@ -99,6 +121,7 @@ receipts. `.cutout` state and provenance remain authoritative.
 | Concurrent request at the same revision | Exactly one reservation succeeds; the other conflicts or deduplicates |
 | Transaction journal remains after interruption | Recover deterministically before accepting another mutation |
 | Path/root is a symlink or changes identity | Reject without returning controlled file contents or launching a command |
+| Repository exceeds the depth budget or declares executable Git config | Reject before deeper scanning or Git execution |
 | Platform cannot enforce required process-tree semantics | Return `capability-required` |
 | Axe violation target is outside a scenario | Do not attach it to that scenario |
 | Receipt claims success with failed target or mismatched artifacts | Schema validation fails |
@@ -139,14 +162,16 @@ receipts. `.cutout` state and provenance remain authoritative.
 - Durable host/effect: competing live store instances, terminal/cancelled
   nodes, expiry boundary, live-host startup, takeover, and idempotent re-entry.
 - CLI/MCP adapters: forged, expired, replayed, revision-mismatched, and
-  operation-mismatched leases plus real concurrent processes.
+  operation-mismatched leases, authenticated state-transition tampering, a
+  missing MCP root binding, plus real concurrent processes.
 - Registry adapters: required plan/lease pair, legacy approval rejection,
   changed-plan rejection before reservation, and single-use lease replay.
 - Node filesystem store: run events and ledger in one transaction, recovery
   from an interrupted journal, and stale revision conflict.
 - Source scanner/tool host/Tauri: traversal, symlink root/component,
-  replacement/identity drift, least-privilege capability drift, and unsupported
-  platform behavior.
+  replacement/identity drift, absolute AI Native imports, over-depth trees,
+  executable Git configuration, least-privilege capability drift, and
+  unsupported platform behavior.
 - Governance: Document roots, multiple scenarios, unrelated axe targets, and
   explicit ambiguous/non-color evidence.
 - Delivery/coding: exact artifact index, unique target ids, failed/cancelled

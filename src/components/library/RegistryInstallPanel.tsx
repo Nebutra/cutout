@@ -41,7 +41,7 @@ export function RegistryInstallPanel({ item, files }: { readonly item: RegistryI
             message: `${plural(plan.files.length, { one: '# file', other: '# files' })} · ${plural(plan.conflicts.length, { one: '# conflict', other: '# conflicts' })}`,
           })}</p>
           {plan.files.map((file) => <p key={file.path}>{file.status} · {file.path}</p>)}
-          <Button className="mt-2" size="sm" disabled={Boolean(plan.conflicts.length)} onClick={() => void bridge?.apply(plan.id, `approval.${crypto.randomUUID()}`).then(setReceipt)}>
+          <Button className="mt-2" size="sm" disabled={Boolean(plan.conflicts.length)} onClick={() => void bridge?.apply(plan.id).then(setReceipt)}>
             <ShieldCheck />
             <Trans id="registry_install.approve_and_install">Approve and install</Trans>
           </Button>

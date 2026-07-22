@@ -1,6 +1,6 @@
 const semanticVersion = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z]+(?:[.-][0-9A-Za-z]+)*)?$/
 
-export function validateReleaseVersions({ packageVersion, tauriVersion, cargoToml, expected }) {
+export function validateReleaseVersions({ packageVersion, tauriVersion, cargoToml, dependentVersions = {}, expected }) {
   const cargoVersion = cargoToml.match(/^version\s*=\s*"([^"]+)"/m)?.[1]
   const versions = { package: packageVersion, tauri: tauriVersion, cargo: cargoVersion ?? 'missing' }
 
@@ -9,6 +9,10 @@ export function validateReleaseVersions({ packageVersion, tauriVersion, cargoTom
   }
   if (!semanticVersion.test(packageVersion)) {
     throw new Error(`Release version is not valid semantic versioning: ${packageVersion}.`)
+  }
+  const dependentDrift = Object.entries(dependentVersions).filter(([, version]) => version !== packageVersion)
+  if (dependentDrift.length) {
+    throw new Error(`Release version drift: ${dependentDrift.map(([name, version]) => `${name}=${version}`).join(', ')}, package=${packageVersion}.`)
   }
   if (expected !== undefined && !semanticVersion.test(expected)) {
     throw new Error(`Expected release version is not valid semantic versioning: ${expected}.`)

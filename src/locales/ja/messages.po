@@ -2079,11 +2079,6 @@ msgid "registry_install.section_aria"
 msgstr "レジストリのインストール"
 
 #. js-lingui-explicit-id
-#: src/components/settings/sections/GeneralSection.tsx
-msgid "settings.remember_dir_label"
-msgstr "エクスポートフォルダを記憶"
-
-#. js-lingui-explicit-id
 #: src/components/settings/ProviderRow.tsx
 #: src/components/settings/VectorizerPanel.tsx
 msgid "settings.remove_action"
@@ -2226,11 +2221,6 @@ msgstr "再試行"
 #: src/components/settings/sections/PersonalizationSection.tsx
 msgid "settings.personalization.use_memory_desc"
 msgstr "承認済みの設定を今後のセッションで再利用します。"
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/GeneralSection.tsx
-msgid "settings.remember_dir_hint"
-msgstr "エクスポートのたびに確認せず、前回のフォルダを再利用します。"
 
 #. js-lingui-explicit-id
 #: src/components/library/ReviewBranchEditor.tsx

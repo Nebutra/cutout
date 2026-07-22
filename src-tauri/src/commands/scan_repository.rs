@@ -12,6 +12,7 @@ use tokio::sync::oneshot;
 const MAX_ENTRIES: usize = 10_000;
 const MAX_FILE_BYTES: u64 = 2 * 1024 * 1024;
 const MAX_TOTAL_BYTES: u64 = 25 * 1024 * 1024;
+const MAX_DEPTH: usize = 64;
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -121,7 +122,7 @@ fn scan_selected_root(root: &Path) -> Result<RepositoryScanResult, ScanError> {
         .ok_or_else(|| ScanError::Invalid("selected repository has no safe display name".into()))?
         .to_owned();
     let mut state = ScanState::default();
-    walk(&canonical, &canonical, &mut state)?;
+    walk(&canonical, &canonical, 0, &mut state)?;
     state.entries.sort_by(|a, b| a.path.cmp(&b.path));
     let framework_hints = framework_hints(&state.entries);
     Ok(RepositoryScanResult {
@@ -141,7 +142,17 @@ struct ScanState {
     accepted_bytes: u64,
 }
 
-fn walk(root: &Path, directory: &Path, state: &mut ScanState) -> Result<(), ScanError> {
+fn walk(
+    root: &Path,
+    directory: &Path,
+    depth: usize,
+    state: &mut ScanState,
+) -> Result<(), ScanError> {
+    if depth > MAX_DEPTH {
+        return Err(ScanError::Invalid(format!(
+            "repository scan depth limit ({MAX_DEPTH}) exceeded"
+        )));
+    }
     let canonical = fs::canonicalize(directory).map_err(io_error)?;
     ensure_contained(root, &canonical)?;
     let mut children = fs::read_dir(&canonical)
@@ -169,7 +180,7 @@ fn walk(root: &Path, directory: &Path, state: &mut ScanState) -> Result<(), Scan
                 state.excluded.ignored_directory += 1;
                 continue;
             }
-            walk(root, &target, state)?;
+            walk(root, &target, depth + 1, state)?;
             continue;
         }
         if !metadata.is_file() {
@@ -557,5 +568,18 @@ mod tests {
 
         let error = scan_selected_root(&alias).unwrap_err();
         assert!(error.to_string().contains("real directory"));
+    }
+
+    #[test]
+    fn scan_rejects_trees_beyond_depth_budget() {
+        let root = tempdir().unwrap();
+        let mut current = root.path().to_path_buf();
+        for depth in 0..=MAX_DEPTH {
+            current = current.join(format!("d{depth}"));
+            fs::create_dir(&current).unwrap();
+        }
+        File::create(current.join("source.ts")).unwrap();
+        let error = scan_selected_root(root.path()).unwrap_err();
+        assert!(error.to_string().contains("depth limit"));
     }
 }

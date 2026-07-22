@@ -1,0 +1,4 @@
+{"file":".trellis/spec/frontend/release-pipeline.md","reason":"Defines the current atomic release, updater, signing, and desktop controller contracts that this task hardens."}
+{"file":".trellis/spec/frontend/agent-control-safety.md","reason":"Defines approval, controlled-path, CLI/MCP, and Agent validation boundaries relevant to issue #12."}
+{"file":".trellis/spec/frontend/byok-provider-protocols.md","reason":"Defines provider identity, protocol, secret injection, and network policy boundaries relevant to issue #12."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Updater and security changes cross Rust commands, TypeScript services, workflow metadata, UI, and docs."}

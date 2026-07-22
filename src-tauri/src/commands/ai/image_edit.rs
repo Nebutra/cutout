@@ -13,10 +13,11 @@
 use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
 use reqwest::multipart::{Form, Part};
 use serde::Serialize;
+use tauri::AppHandle;
 
 use super::ai_proxy::{
-    buffered_timeout_for_url, build_client, enforce_host, enforce_resolved_host,
-    request_error_message, ProxyError,
+    buffered_timeout_for_url, build_client_for_target, enforce_host, enforce_resolved_host,
+    request_error_message, resolve_provider_request, ProxyError,
 };
 use super::auth_header::auth_headers;
 use super::keys::read_secret;
@@ -132,6 +133,7 @@ fn build_auth_headers(
 /// paths.
 #[tauri::command]
 pub async fn ai_image_edit(
+    app: AppHandle,
     provider_id: String,
     kind: String,
     wire_protocol: Option<ProviderWireProtocol>,
@@ -154,20 +156,19 @@ pub async fn ai_image_edit(
     }
 
     let url = format!("{}/images/edits", base_url.trim_end_matches('/'));
-    enforce_host(&kind, &url)?; // SSRF guard (https + allowed host)
-    enforce_resolved_host(&kind, &url).await?;
+    let (provider, effective_protocol) =
+        resolve_provider_request(&app, &provider_id, &kind, wire_protocol, &url)?;
+    enforce_host(provider.kind.as_str(), &url)?;
+    let target = enforce_resolved_host(provider.kind.as_str(), &url).await?;
     let secret = read_secret(&provider_id).map_err(ProxyError::from)?;
-    let provider_kind: ProviderKind =
-        serde_json::from_value(serde_json::Value::String(kind.clone()))
-            .map_err(|_| ProxyError::UnknownKind)?;
-    let header_map = build_auth_headers(provider_kind, wire_protocol, &secret)?;
+    let header_map = build_auth_headers(provider.kind, Some(effective_protocol), &secret)?;
 
     let fidelity = input_fidelity.as_deref().unwrap_or("high");
     let form = build_edit_form(&model, &prompt, images, size.as_deref(), fidelity);
 
     // Image edits can take several minutes on production models; use the image
     // endpoint timeout instead of the shorter text/probe cap.
-    let client = build_client(Some(buffered_timeout_for_url(&url)));
+    let client = build_client_for_target(Some(buffered_timeout_for_url(&url)), &target)?;
     let resp = client
         .post(&url)
         .headers(header_map)

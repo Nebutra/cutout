@@ -107,6 +107,7 @@ export async function compileStarter(input: StarterCompilerInput): Promise<Start
   const documentValidation = validateDesignDocument(parsed.document)
   if (!documentValidation.ok) throw new Error(`Invalid DesignDocument: ${documentValidation.error}`)
   const document = documentValidation.data.document
+  assertSafeCssTokens(document)
   const documentFingerprint = await fingerprint(document)
   await validateDesignKit(document, parsed.kit, documentFingerprint)
   const manifest = await validatePersistedComponentManifest(document, parsed.candidates)
@@ -376,9 +377,9 @@ function renderTanStackFiles(document: DesignDocument, candidates: readonly Reso
 
 function renderVueComponent(candidate: ResolvedCandidate, assets: readonly StarterAsset[]) {
   const asset = assets.find((item) => item.candidateId === candidate.id)
-  return `<script setup lang="ts">\ninterface Props { eyebrow?: string }\nwithDefaults(defineProps<Props>(), { eyebrow: '' })\n</script>\n\n<template>\n  <section class="cutout-component cutout-${slug(candidate.name)}" data-cutout-component="${candidate.componentId}">\n    <div class="cutout-component__content"><h2>${escapeJsxText(candidate.name)}</h2><p>${escapeJsxText(candidate.description ?? candidate.name)}</p><p v-if="eyebrow">{{ eyebrow }}</p><slot name="actions" /></div>\n${asset ? `    <img class="cutout-component__asset" src="/${asset.outputPath.replace(/^public\//, '')}" alt="" data-material-id="${asset.materialId}" />\n` : ''}  </section>\n</template>\n`
+  return `<script setup lang="ts">\ninterface Props { eyebrow?: string }\nwithDefaults(defineProps<Props>(), { eyebrow: '' })\n</script>\n\n<template>\n  <section class="cutout-component cutout-${slug(candidate.name)}" data-cutout-component="${escapeHtmlAttribute(candidate.componentId)}">\n    <div class="cutout-component__content"><h2>${escapeJsxText(candidate.name)}</h2><p>${escapeJsxText(candidate.description ?? candidate.name)}</p><p v-if="eyebrow">{{ eyebrow }}</p><slot name="actions" /></div>\n${asset ? `    <img class="cutout-component__asset" src="/${escapeHtmlAttribute(asset.outputPath.replace(/^public\//, ''))}" alt="" data-material-id="${escapeHtmlAttribute(asset.materialId)}" />\n` : ''}  </section>\n</template>\n`
 }
-function renderNuxtPage(document: DesignDocument, page: PrototypePage, candidates: readonly ResolvedCandidate[]) { const names = candidates.filter((candidate) => candidate.sourcePageIds.includes(page.id)).map((candidate) => candidate.exportName); return `<template>\n  <main class="cutout-page" data-cutout-page="${page.id}">\n    <header class="cutout-page__header"><p class="cutout-page__purpose">${escapeJsxText(page.purpose)}</p><h1>${escapeJsxText(page.name)}</h1><p>${escapeJsxText(document.needs[0]?.statement ?? document.prototype?.plan.product.summary ?? '')}</p></header>\n${names.map((name) => `    <Generated${name} />`).join('\n')}\n  </main>\n</template>\n` }
+function renderNuxtPage(document: DesignDocument, page: PrototypePage, candidates: readonly ResolvedCandidate[]) { const names = candidates.filter((candidate) => candidate.sourcePageIds.includes(page.id)).map((candidate) => candidate.exportName); return `<template>\n  <main class="cutout-page" data-cutout-page="${escapeHtmlAttribute(page.id)}">\n    <header class="cutout-page__header"><p class="cutout-page__purpose">${escapeJsxText(page.purpose)}</p><h1>${escapeJsxText(page.name)}</h1><p>${escapeJsxText(document.needs[0]?.statement ?? document.prototype?.plan.product.summary ?? '')}</p></header>\n${names.map((name) => `    <Generated${name} />`).join('\n')}\n  </main>\n</template>\n` }
 function renderTanStackRouter(pages: readonly PrototypePage[], candidates: readonly ResolvedCandidate[]) { const imports = candidates.map((candidate) => `import { ${candidate.exportName} } from './components/${candidate.exportName}'`); const routes = pages.map((page, index) => { const components = candidates.filter((candidate) => candidate.sourcePageIds.includes(page.id)).map((candidate) => `<${candidate.exportName} />`).join(''); return `const route${index} = createRoute({ getParentRoute: () => rootRoute, path: ${JSON.stringify(page.route)}, component: () => <main className="cutout-page" data-cutout-page=${JSON.stringify(page.id)}><header className="cutout-page__header"><p>${escapeJsxText(page.purpose)}</p><h1>${escapeJsxText(page.name)}</h1></header>${components}</main> })` }); return [`import { createRootRoute, createRoute, createRouter } from '@tanstack/react-router'`, ...imports, '', 'const rootRoute = createRootRoute()', ...routes, `const routeTree = rootRoute.addChildren([${pages.map((_, index) => `route${index}`).join(', ')}])`, 'export const router = createRouter({ routeTree })', "declare module '@tanstack/react-router' { interface Register { router: typeof router } }", ''].join('\n') }
 function nuxtPagePath(route: string) { const normalized = route.replace(/^\/+|\/+$/g, ''); if (!normalized) return 'pages/index.vue'; if (!normalized.split('/').every((segment) => /^[A-Za-z0-9_-]+$/.test(segment))) throw new Error(`Prototype route "${route}" cannot be represented as a safe Nuxt path.`); return `pages/${normalized}.vue` }
 function registryMetadata(framework: z.infer<typeof starterFrameworkSchema>, document: DesignDocument, routes: readonly string[], candidates: readonly ResolvedCandidate[]) { return `${JSON.stringify({ version: 'cutout.starter-registry.v1', framework, source: { documentId: document.meta.id, revisionId: document.revision.id }, routes, components: candidates.map(({ id, exportName, tokenIds }) => ({ id, exportName, tokenIds })) }, null, 2)}\n` }
@@ -455,7 +456,7 @@ function renderViteRouter(document: DesignDocument, candidates: readonly Resolve
 function renderComponentCss(document: DesignDocument, candidates: readonly ResolvedCandidate[]): string {
   const color = document.tokens.find((token) => token.kind === 'color' && candidates.some((candidate) => candidate.tokenIds.includes(token.id)))
   const radius = document.tokens.find((token) => token.kind === 'radius' && candidates.some((candidate) => candidate.tokenIds.includes(token.id)))
-  return `.cutout-page { min-height: 100vh; padding: clamp(1.5rem, 4vw, 4rem); background: #fff; color: #111827; }\n.cutout-page__header { max-width: 72rem; margin: 0 auto 2rem; }\n.cutout-page__purpose { color: ${color ? `var(--cutout-token-${slug(color.name)}, ${color.value})` : '#4b5563'}; font-weight: 600; }\n.cutout-component { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2rem; align-items: center; max-width: 72rem; margin: 0 auto 1rem; padding: clamp(1.5rem, 4vw, 3rem); border: 1px solid color-mix(in srgb, currentColor 14%, transparent); border-radius: ${radius ? `var(--cutout-token-${slug(radius.name)}, ${radius.value})` : '0.5rem'}; }\n.cutout-component__content { max-width: 44rem; }\n.cutout-component__asset { display: block; max-width: min(20rem, 35vw); height: auto; }\n@media (max-width: 640px) { .cutout-component { grid-template-columns: 1fr; } .cutout-component__asset { max-width: 100%; } }\n`
+  return `.cutout-page { min-height: 100vh; padding: clamp(1.5rem, 4vw, 4rem); background: #fff; color: #111827; }\n.cutout-page__header { max-width: 72rem; margin: 0 auto 2rem; }\n.cutout-page__purpose { color: ${color ? `var(--cutout-token-${slug(color.name)})` : '#4b5563'}; font-weight: 600; }\n.cutout-component { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2rem; align-items: center; max-width: 72rem; margin: 0 auto 1rem; padding: clamp(1.5rem, 4vw, 3rem); border: 1px solid color-mix(in srgb, currentColor 14%, transparent); border-radius: ${radius ? `var(--cutout-token-${slug(radius.name)})` : '0.5rem'}; }\n.cutout-component__content { max-width: 44rem; }\n.cutout-component__asset { display: block; max-width: min(20rem, 35vw); height: auto; }\n@media (max-width: 640px) { .cutout-component { grid-template-columns: 1fr; } .cutout-component__asset { max-width: 100%; } }\n`
 }
 
 function renderPackageJson(framework: z.infer<typeof starterFrameworkSchema>, title: string): string {
@@ -518,6 +519,18 @@ function nextImportPrefix(route: string): string {
 
 function escapeJsxText(value: string): string {
   return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/{/g, '&#123;').replace(/}/g, '&#125;')
+}
+
+function escapeHtmlAttribute(value: string): string {
+  return value.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+}
+
+function assertSafeCssTokens(document: DesignDocument): void {
+  for (const token of document.tokens) {
+    if (/[{};@<>\r\n]/.test(token.value) || /(?:url|expression)\s*\(/i.test(token.value)) {
+      throw new Error(`Design token "${token.id}" contains an unsafe CSS value.`)
+    }
+  }
 }
 
 function slug(value: string): string {

@@ -5,9 +5,11 @@ import { capabilityStatus, discoveryHandshake, listSkills, readSkill } from './c
 import { closeRegistryRuntime, registryApplyInstall, registryGet, registryList, registryPlanInstall, registryReceipt } from './cutout-registry.mjs'
 import { MCP_TOOLS, runMcpServer } from './cutout-mcp-server.mjs'
 import { workflowCompatibility, workflowGet, workflowList } from './cutout-workflows.mjs'
+import { PRODUCT_VERSION } from './lib/product-version.mjs'
 
 runMcpServer({
-  projectRoot: process.env.CUTOUT_PROJECT_ROOT || process.cwd(),
+  serverVersion: PRODUCT_VERSION,
+  projectRoot: process.env.CUTOUT_PROJECT_ROOT,
   closeHeadlessRuntime,
   executeControl,
   executeGovernance,

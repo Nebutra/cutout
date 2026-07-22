@@ -185,13 +185,10 @@ pub async fn registry_preview_install(
 
 #[tauri::command]
 pub async fn registry_apply_install(
+    app: AppHandle,
     state: State<'_, RegistryDesktopState>,
     plan_id: String,
-    approval_id: String,
 ) -> Result<InstallReceipt, String> {
-    if approval_id.trim().is_empty() {
-        return Err("Opaque approval id is required.".into());
-    }
     if let Some(receipt) = state.receipts.lock().map_err(lock)?.get(&plan_id).cloned() {
         return Ok(receipt);
     }
@@ -205,6 +202,17 @@ pub async fn registry_apply_install(
     if !plan.conflicts.is_empty() {
         return Err("Install has unresolved conflicts.".into());
     }
+    let approval_id = crate::commands::native_approval::require_native_confirmation(
+        &app,
+        "Approve registry install",
+        &format!(
+            "Install {} {} into the selected workspace? This writes {} reviewed file(s).",
+            plan.item_id,
+            plan.item_version,
+            plan.files.len()
+        ),
+    )
+    .await?;
     let root = authorized(&state, &plan.workspace_handle)?;
     let receipt = apply_plan(&root, &plan, approval_id, None).await?;
     state

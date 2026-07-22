@@ -9,6 +9,7 @@
     "workspace-revision-bridge",
     "project-files",
     "provider-secrets-network",
+    "git-version-control",
     "registry-and-agent-host",
     "speech-host"
   ]

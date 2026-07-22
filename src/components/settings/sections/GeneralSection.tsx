@@ -3,7 +3,6 @@
  *
  *   Theme     light / dark / system   (next-themes)
  *   Language  en / zh-CN / ja / fr / es, live switch (Lingui `activateLocale`, persisted)
- *   Export     remember the last export folder
  *   Developer expose read-only project audit tools
  */
 import { type ReactNode, useState } from "react";
@@ -12,10 +11,6 @@ import { useTheme } from "next-themes";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import {
-  useExportPrefs,
-  useSetRememberDir,
-} from "@/hooks/queries/export-prefs";
 import { switchLocale } from "@/i18n/switch";
 import { SUPPORTED, LOCALE_LABEL, type Locale } from "@/i18n/config";
 import {
@@ -56,8 +51,6 @@ export function GeneralSection() {
   const { t, i18n } = useLingui();
   const { theme, setTheme } = useTheme();
   const currentLocale = i18n.locale as Locale;
-  const exportPrefs = useExportPrefs();
-  const setRememberDir = useSetRememberDir();
   const [developerMode, setDeveloperModeState] = useState(
     () => loadWorkspaceNavigation().advanced,
   );
@@ -95,26 +88,6 @@ export function GeneralSection() {
             </Button>
           ))}
         </div>
-      </Row>
-
-      <Row
-        label={
-          <Trans id="settings.remember_dir_label">Remember export folder</Trans>
-        }
-        hint={
-          <Trans id="settings.remember_dir_hint">
-            Reuse the last folder instead of asking on every export.
-          </Trans>
-        }
-      >
-        <Switch
-          checked={exportPrefs.data?.rememberDir ?? false}
-          onCheckedChange={(on) => setRememberDir.mutate(on)}
-          aria-label={t({
-            id: "settings.remember_dir_label",
-            message: "Remember export folder",
-          })}
-        />
       </Row>
 
       <Row

@@ -1,4 +1,10 @@
 export type UpdateChannel = "stable" | "beta";
+export type UpdateRetryAction = "check" | "download" | "install";
+
+export interface UpdateChannelCapability {
+  readonly available: boolean;
+  readonly reason?: string;
+}
 
 export interface UpdateRelease {
   readonly version: string;
@@ -12,6 +18,20 @@ export interface UpdateCapability {
   readonly reason?: string;
   readonly endpointConfigured: boolean;
   readonly pubkeyConfigured: boolean;
+  readonly channels: Readonly<Record<UpdateChannel, UpdateChannelCapability>>;
+}
+
+export class UpdateOperationError extends Error {
+  readonly retryAction: UpdateRetryAction;
+
+  constructor(
+    message: string,
+    retryAction: UpdateRetryAction,
+  ) {
+    super(message);
+    this.name = "UpdateOperationError";
+    this.retryAction = retryAction;
+  }
 }
 
 export interface UpdateBackend {
@@ -61,4 +81,5 @@ export interface UpdateState {
   readonly downloaded: number;
   readonly total?: number;
   readonly error?: string;
+  readonly retryAction?: UpdateRetryAction;
 }

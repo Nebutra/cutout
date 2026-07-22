@@ -21,9 +21,10 @@ test("Updates stays truthful and configurable without a desktop runtime", async 
   await expect(updates.getByRole("status")).toContainText("available only in the Cutout desktop app");
   await expect(updates.getByRole("button", { name: "Check now" })).toBeDisabled();
 
-  const beta = updates.getByRole("button", { name: "Beta" });
-  await beta.click();
-  await expect(beta).toHaveAttribute("aria-pressed", "true");
+  // Browser builds have no compiled updater endpoints, so they must not offer
+  // a channel choice that only a packaged desktop runtime can support.
+  await expect(updates.getByRole("group", { name: "Update channel" })).toHaveCount(0);
+  await expect(updates.getByRole("button", { name: "Beta" })).toHaveCount(0);
   const automatic = updates.getByRole("switch", { name: "Check for updates automatically" });
   await automatic.click();
   await expect(automatic).toHaveAttribute("aria-checked", "false");

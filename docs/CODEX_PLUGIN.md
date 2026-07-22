@@ -31,9 +31,10 @@ export CUTOUT_PROJECT_ROOT=/absolute/path/to/the/controlled/project
 codex
 ```
 
-If the variable is missing, discovery tools that do not read project state stay
-available, while project-bound tools return `project-binding-required`. Set the
-variable and start a new Codex session.
+If the variable is missing, static discovery tools remain available while
+project-bound tools return `project-binding-required`; the server does not use
+the launch directory as an implicit project. Set the variable and start a new
+Codex session.
 
 ## Repo Marketplace
 

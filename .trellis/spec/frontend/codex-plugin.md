@@ -42,9 +42,10 @@ The installed stdio server signature is:
   included repository source module.
 - Static discovery data: `runtime-data/cutout.agent-capabilities.json` and an
   exact copy of `skills/`.
-- `CUTOUT_PROJECT_ROOT`: optional only for non-project discovery
-  (`cutout_capabilities_status`, `cutout_skills_list`, `cutout_skill_read`),
-  required for every project-bound tool including handshake.
+- `CUTOUT_PROJECT_ROOT` is optional only for static non-project discovery
+  (`cutout_capabilities_status`, `cutout_skills_list`, `cutout_skill_read`) and
+  required for every project-bound tool including handshake. The process
+  current directory is never promoted to project authority.
 - Project root is host-owned. No tool parameter may replace it and the server
   must not search parent, sibling, home, or arbitrary paths to infer it.
 - `scripts/cutout-mcp-server.mjs` owns tool schemas and dispatch. Source MCP and
@@ -67,16 +68,17 @@ The installed stdio server signature is:
 - Good: build a self-contained runtime, set an explicit project root, call
   handshake/capabilities/Skill read, preview, request approval, apply, and read
   verified deliverables.
-- Base: install without a project root; capability and Skill discovery work,
-  while handshake truthfully reports setup required.
+- Base: install without a project root; static capability and Skill discovery
+  work, while handshake truthfully reports setup required.
 - Bad: point `.mcp.json` at a developer checkout, use `process.cwd()` from the
   plugin cache as a project, scan for `.cutout`, or claim hosted/OAuth behavior.
 
 ### 6. Tests Required
 
-- `scripts/codex-plugin.test.ts`: spawn the committed bundle as a real process.
-  Assert discovery without binding, `project-binding-required`, Skill reference
-  reads, a valid bound handshake, and a valid project validation result.
+- `scripts/codex-plugin.test.ts`: spawn both the source and committed bundle as
+  real processes. Assert discovery without binding, project-bound
+  `project-binding-required`, Skill reference reads, a valid bound handshake,
+  and a valid project validation result.
 - `scripts/cutout-adapters.test.ts`: prove the source CLI/MCP behavior remains
   compatible after shared-adapter extraction.
 - `scripts/roadmap.test.ts`: retain canonical roadmap structure and links.

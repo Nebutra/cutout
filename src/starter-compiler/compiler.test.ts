@@ -201,6 +201,12 @@ describe('Starter Compiler v1', () => {
     await expect(compileStarter({ ...(await input()), framework: 'unknown' as never })).rejects.toThrow()
   })
 
+  it('rejects token values that can escape generated CSS', async () => {
+    const unsafe = document()
+    unsafe.tokens[0] = { ...unsafe.tokens[0]!, value: 'red; } body { display: none' }
+    await expect(compileStarter({ ...(await input()), document: unsafe })).rejects.toThrow('unsafe CSS value')
+  })
+
   it('keeps page membership without inventing a component-to-region mapping from co-location', async () => {
     const ambiguous = document()
     ambiguous.prototype!.plan.pages[0]!.regions[0] = {

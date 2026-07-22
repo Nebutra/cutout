@@ -19,13 +19,11 @@ import type {
 } from '@/services/types'
 import { isErr, isOk } from '@/services/types'
 import type { VectorizerAiMode } from '@/platform/native'
-import { rememberedDir, rememberLastDir } from '@/services/export-prefs.local'
 import { ensureSvgName } from '@/lib/filename'
 import { assetKeys } from './keys'
 
 /** Options accepted by both export mutations. */
 export interface ExportOptions {
-  readonly destDir?: string
 }
 
 export interface ExportSvgOptions extends ExportOptions {
@@ -49,25 +47,13 @@ function unwrap(result: Result<SaveManyOutcome>): SaveManyOutcome {
   return result.data
 }
 
-/**
- * Run an export with the remembered-output-folder applied: an explicit
- * `opts.destDir` wins; otherwise the persisted remembered dir (when enabled) is
- * used, skipping the native picker. On a successful, non-canceled export the
- * chosen folder is remembered (a no-op unless remembering is on).
- */
+/** Run an export under a fresh native folder-picker grant. */
 async function runExport(
   assets: AssetRepository,
   payload: AssetToSave[],
-  opts?: ExportOptions,
+  _opts?: ExportOptions,
 ): Promise<SaveManyOutcome> {
-  const destDir = opts?.destDir ?? (await rememberedDir())
-  const outcome = unwrap(
-    await assets.saveMany(payload, destDir ? { destDir } : undefined),
-  )
-  if (!outcome.canceled && outcome.outputDir) {
-    await rememberLastDir(outcome.outputDir)
-  }
-  return outcome
+  return unwrap(await assets.saveMany(payload))
 }
 
 async function mapWithConcurrency<T, R>(

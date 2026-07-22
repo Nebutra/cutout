@@ -7,6 +7,7 @@ import type { EverythingInput, RepositoryInventoryEntry } from '@/ingestion/ever
 
 const MAX_FILE_BYTES = 100 * 1024 * 1024
 const MAX_REPOSITORY_ENTRIES = 10_000
+const MAX_REPOSITORY_DEPTH = 64
 const IGNORED_DIRECTORY = new Set(['.git', 'node_modules', 'dist', 'build', 'coverage', '.next', '.nuxt'])
 const SECRET_PATH = /(^|\/)(?:\.env(?:\.|$)|[^/]*(?:secret|credential|api[-_]?key|private[-_]?key|token)[^/]*)(?:\/|$)/i
 const ALLOWLISTED_CONFIG = /^(?:package(?:-lock)?\.json|pnpm-lock\.yaml|yarn\.lock|bun\.lockb|tsconfig(?:\.[^/]+)?\.json|vite\.config\.[^/]+|next\.config\.[^/]+|nuxt\.config\.[^/]+|tailwind\.config\.[^/]+|postcss\.config\.[^/]+|components\.json|eslint\.config\.[^/]+|\.eslintrc(?:\.[^/]+)?|prettier\.config\.[^/]+|\.prettierrc(?:\.[^/]+)?|README(?:\.[^/]+)?|DESIGN\.md)$/i
@@ -70,7 +71,8 @@ export async function scanSourceInput(
 
 async function inventory(directory: string, root: string): Promise<readonly RepositoryInventoryEntry[]> {
   const entries: RepositoryInventoryEntry[] = []
-  const visit = async (current: string): Promise<void> => {
+  const visit = async (current: string, depth: number): Promise<void> => {
+    if (depth > MAX_REPOSITORY_DEPTH) throw new Error(`Repository scan depth exceeds ${MAX_REPOSITORY_DEPTH}.`)
     await assertStableDirectory(root, current)
     const names = await readdir(current)
     for (const name of names.sort((left, right) => left.localeCompare(right))) {
@@ -79,7 +81,7 @@ async function inventory(directory: string, root: string): Promise<readonly Repo
       const stat = await lstat(target)
       if (stat.isSymbolicLink()) continue
       if (stat.isDirectory()) {
-        if (!IGNORED_DIRECTORY.has(name)) await visit(target)
+        if (!IGNORED_DIRECTORY.has(name)) await visit(target, depth + 1)
         continue
       }
       if (!stat.isFile()) continue
@@ -89,7 +91,7 @@ async function inventory(directory: string, root: string): Promise<readonly Repo
       entries.push({ path, bytes: digest.bytes, sha256: digest.sha256 })
     }
   }
-  await visit(directory)
+  await visit(directory, 0)
   return entries
 }
 

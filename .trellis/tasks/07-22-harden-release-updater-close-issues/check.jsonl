@@ -1,0 +1,4 @@
+{"file":".trellis/spec/frontend/release-pipeline.md","reason":"Review release gating, signing, updater state, and claim boundaries against the updated executable contract."}
+{"file":".trellis/spec/frontend/agent-control-safety.md","reason":"Review every issue #12 command, lease, path, and Agent surface for fail-closed behavior and synchronized manifests."}
+{"file":"docs/RELEASE_CHECKLIST.md","reason":"Verify the implementation satisfies the public distribution quality and truthfulness checklist."}
+{"file":"cutout.agent-capabilities.json","reason":"Validate Agent-surface and security-boundary claims remain synchronized with CLI, MCP, protocol, and plugin runtime."}

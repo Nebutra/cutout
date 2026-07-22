@@ -26,7 +26,7 @@
 
 use std::collections::HashMap;
 use std::error::Error as StdError;
-use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 
 use futures_util::StreamExt;
 use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
@@ -34,10 +34,11 @@ use reqwest::Method;
 use serde::Serialize;
 use serde_json::json;
 use tauri::ipc::{Channel, InvokeResponseBody};
+use tauri::AppHandle;
 
 use super::auth_header::{auth_headers, STRIPPED_INBOUND_HEADERS};
 use super::keys::{read_secret, KeyError};
-use super::providers::{ProviderKind, ProviderWireProtocol};
+use super::providers::{load_providers_sync, ProviderConfig, ProviderKind, ProviderWireProtocol};
 
 const DEFAULT_BUFFERED_TIMEOUT_SECS: u64 = 120;
 const GENERATION_BUFFERED_TIMEOUT_SECS: u64 = 600;
@@ -76,6 +77,12 @@ pub enum ProxyError {
     Request(String),
     #[error("stream channel closed")]
     Channel,
+    #[error("provider is not configured")]
+    ProviderNotConfigured,
+    #[error("provider is disabled")]
+    ProviderDisabled,
+    #[error("request does not match the configured provider binding")]
+    ProviderBinding,
 }
 
 impl Serialize for ProxyError {
@@ -175,22 +182,37 @@ fn is_forbidden_remote_host(host: &str) -> bool {
 
 fn is_non_public_ip(ip: IpAddr) -> bool {
     match ip {
-        IpAddr::V4(ip) => {
-            ip.is_private()
-                || ip.is_loopback()
-                || ip.is_link_local()
-                || ip.is_unspecified()
-                || ip.is_multicast()
-                || ip == Ipv4Addr::BROADCAST
-        }
+        IpAddr::V4(ip) => is_non_public_ipv4(ip),
         IpAddr::V6(ip) => {
+            if let Some(mapped) = ip.to_ipv4_mapped() {
+                return is_non_public_ipv4(mapped);
+            }
             ip.is_loopback()
                 || ip.is_unspecified()
                 || ip.is_multicast()
                 || is_ipv6_unique_local(ip)
                 || is_ipv6_link_local(ip)
+                || is_ipv6_documentation(ip)
         }
     }
+}
+
+fn is_non_public_ipv4(ip: Ipv4Addr) -> bool {
+    let [a, b, c, _] = ip.octets();
+    ip.is_private()
+        || ip.is_loopback()
+        || ip.is_link_local()
+        || ip.is_unspecified()
+        || ip.is_multicast()
+        || ip == Ipv4Addr::BROADCAST
+        || a == 0
+        || (a == 100 && (64..=127).contains(&b))
+        || (a == 192 && b == 0 && c == 0)
+        || (a == 192 && b == 0 && c == 2)
+        || (a == 198 && (b == 18 || b == 19))
+        || (a == 198 && b == 51 && c == 100)
+        || (a == 203 && b == 0 && c == 113)
+        || a >= 240
 }
 
 fn is_ipv6_unique_local(ip: Ipv6Addr) -> bool {
@@ -201,25 +223,44 @@ fn is_ipv6_link_local(ip: Ipv6Addr) -> bool {
     o[0] == 0xfe && o[1] & 0xc0 == 0x80
 }
 
+fn is_ipv6_documentation(ip: Ipv6Addr) -> bool {
+    let o = ip.octets();
+    o[0] == 0x20 && o[1] == 0x01 && o[2] == 0x0d && o[3] == 0xb8
+}
+
+pub(crate) struct ResolvedTarget {
+    host: String,
+    addresses: Vec<SocketAddr>,
+}
+
 /// Resolve immediately before connecting and reject any non-public address.
 /// This closes the hostname-to-private-address DNS rebinding gap left by URL
 /// syntax checks. Explicit local providers are intentionally exempt because
 /// their contract is loopback-only.
-pub(crate) async fn enforce_resolved_host(kind: &str, url: &str) -> Result<(), ProxyError> {
-    if matches!(kind, "ollama" | "vllm" | "lm-studio") {
-        return Ok(());
-    }
+pub(crate) async fn enforce_resolved_host(
+    kind: &str,
+    url: &str,
+) -> Result<ResolvedTarget, ProxyError> {
     let parsed = reqwest::Url::parse(url).map_err(|_| ProxyError::BadUrl)?;
     let host = parsed.host_str().ok_or(ProxyError::BadUrl)?;
+    let local = matches!(kind, "ollama" | "vllm" | "lm-studio");
     if let Ok(ip) = host
         .trim_start_matches('[')
         .trim_end_matches(']')
         .parse::<IpAddr>()
     {
-        return if is_non_public_ip(ip) {
-            Err(ProxyError::DisallowedHost)
+        let allowed = if local {
+            normalized_ip(ip).is_loopback()
         } else {
-            Ok(())
+            !is_non_public_ip(ip)
+        };
+        return if allowed {
+            Ok(ResolvedTarget {
+                host: host.to_string(),
+                addresses: Vec::new(),
+            })
+        } else {
+            Err(ProxyError::DisallowedHost)
         };
     }
     let port = parsed.port_or_known_default().ok_or(ProxyError::BadUrl)?;
@@ -227,14 +268,31 @@ pub(crate) async fn enforce_resolved_host(kind: &str, url: &str) -> Result<(), P
         .await
         .map_err(|_| ProxyError::DisallowedHost)?
         .collect();
-    if addresses.is_empty()
-        || addresses
-            .iter()
-            .any(|address| is_non_public_ip(address.ip()))
-    {
+    let invalid = addresses.is_empty()
+        || addresses.iter().any(|address| {
+            if local {
+                !normalized_ip(address.ip()).is_loopback()
+            } else {
+                is_non_public_ip(address.ip())
+            }
+        });
+    if invalid {
         Err(ProxyError::DisallowedHost)
     } else {
-        Ok(())
+        Ok(ResolvedTarget {
+            host: host.to_string(),
+            addresses,
+        })
+    }
+}
+
+fn normalized_ip(ip: IpAddr) -> IpAddr {
+    match ip {
+        IpAddr::V6(ip) => ip
+            .to_ipv4_mapped()
+            .map(IpAddr::V4)
+            .unwrap_or(IpAddr::V6(ip)),
+        value => value,
     }
 }
 
@@ -317,18 +375,106 @@ fn is_sensitive_response_header(name: &str) -> bool {
 
 /// Build an HTTP client with sane timeouts. `overall` (seconds) bounds the whole
 /// request; left `None` for streaming so long token streams aren't cut. A
-/// connect timeout applies either way. Falls back to the default client on error.
+/// connect timeout applies either way. Client construction fails closed so a
+/// configuration error can never drop DNS pinning or redirect policy.
 ///
 /// `pub(crate)` so the sibling multipart `image_edit` command reuses the same
 /// client builder for the `/images/edits` call.
-pub(crate) fn build_client(overall: Option<u64>) -> reqwest::Client {
+pub(crate) fn build_client_for_target(
+    overall: Option<u64>,
+    target: &ResolvedTarget,
+) -> Result<reqwest::Client, ProxyError> {
     let mut builder = reqwest::Client::builder()
         .connect_timeout(std::time::Duration::from_secs(30))
         .redirect(reqwest::redirect::Policy::none());
+    if !target.addresses.is_empty() {
+        builder = builder.resolve_to_addrs(&target.host, &target.addresses);
+    }
     if let Some(secs) = overall {
         builder = builder.timeout(std::time::Duration::from_secs(secs));
     }
-    builder.build().unwrap_or_else(|_| reqwest::Client::new())
+    builder
+        .build()
+        .map_err(|_| ProxyError::Request("could not construct secure HTTP client".into()))
+}
+
+fn default_base_url(kind: ProviderKind) -> Option<&'static str> {
+    Some(match kind {
+        ProviderKind::Openai => "https://api.openai.com/v1",
+        ProviderKind::Anthropic => "https://api.anthropic.com/v1",
+        ProviderKind::Google => "https://generativelanguage.googleapis.com/v1beta",
+        ProviderKind::Dashscope => "https://dashscope.aliyuncs.com/compatible-mode/v1",
+        ProviderKind::Deepseek => "https://api.deepseek.com/v1",
+        ProviderKind::Zhipu => "https://open.bigmodel.cn/api/paas/v4",
+        ProviderKind::Moonshot => "https://api.moonshot.cn/v1",
+        ProviderKind::Volcengine => "https://ark.cn-beijing.volces.com/api/v3",
+        ProviderKind::Siliconflow => "https://api.siliconflow.cn/v1",
+        ProviderKind::Openrouter => "https://openrouter.ai/api/v1",
+        ProviderKind::Together => "https://api.together.xyz/v1",
+        ProviderKind::Groq => "https://api.groq.com/openai/v1",
+        ProviderKind::Fireworks => "https://api.fireworks.ai/inference/v1",
+        ProviderKind::Xai => "https://api.x.ai/v1",
+        ProviderKind::Mistral => "https://api.mistral.ai/v1",
+        ProviderKind::Ollama => "http://127.0.0.1:11434/v1",
+        ProviderKind::Vllm => "http://127.0.0.1:8000/v1",
+        ProviderKind::LmStudio => "http://127.0.0.1:1234/v1",
+        ProviderKind::Gateway | ProviderKind::OpenaiCompatible => return None,
+    })
+}
+
+pub(crate) fn resolve_provider_request(
+    app: &AppHandle,
+    provider_id: &str,
+    supplied_kind: &str,
+    supplied_protocol: Option<ProviderWireProtocol>,
+    url: &str,
+) -> Result<(ProviderConfig, ProviderWireProtocol), ProxyError> {
+    let provider = load_providers_sync(app)
+        .map_err(|_| ProxyError::ProviderNotConfigured)?
+        .into_iter()
+        .find(|provider| provider.id == provider_id)
+        .ok_or(ProxyError::ProviderNotConfigured)?;
+    if !provider.enabled {
+        return Err(ProxyError::ProviderDisabled);
+    }
+    if provider.kind.as_str() != supplied_kind {
+        return Err(ProxyError::ProviderBinding);
+    }
+    let effective = provider
+        .kind
+        .effective_wire_protocol(provider.wire_protocol)
+        .map_err(ProxyError::UnsupportedWireProtocol)?
+        .ok_or(ProxyError::ProviderBinding)?;
+    if supplied_protocol.is_some_and(|value| value != effective) {
+        return Err(ProxyError::ProviderBinding);
+    }
+    let base = provider
+        .base_url
+        .as_deref()
+        .or_else(|| default_base_url(provider.kind))
+        .ok_or(ProxyError::ProviderBinding)?;
+    enforce_bound_url(base, url)?;
+    Ok((provider, effective))
+}
+
+fn enforce_bound_url(base: &str, request: &str) -> Result<(), ProxyError> {
+    let base = reqwest::Url::parse(base).map_err(|_| ProxyError::ProviderBinding)?;
+    let request = reqwest::Url::parse(request).map_err(|_| ProxyError::BadUrl)?;
+    if base.scheme() != request.scheme()
+        || base.host_str() != request.host_str()
+        || base.port_or_known_default() != request.port_or_known_default()
+    {
+        return Err(ProxyError::ProviderBinding);
+    }
+    let prefix = base.path().trim_end_matches('/');
+    if !prefix.is_empty()
+        && prefix != "/"
+        && request.path() != prefix
+        && !request.path().starts_with(&format!("{prefix}/"))
+    {
+        return Err(ProxyError::ProviderBinding);
+    }
+    Ok(())
 }
 
 /// Generative endpoints can run substantially longer than catalog and health
@@ -374,6 +520,7 @@ pub(crate) fn request_error_message(error: &reqwest::Error) -> String {
 /// Buffered request: read key, inject auth, send, return status/headers/body.
 #[tauri::command]
 pub async fn ai_proxy_request(
+    app: AppHandle,
     provider_id: String,
     kind: String,
     wire_protocol: Option<ProviderWireProtocol>,
@@ -382,12 +529,23 @@ pub async fn ai_proxy_request(
     headers: HashMap<String, String>,
     body: Option<String>,
 ) -> Result<ProxyResponse, ProxyError> {
+    let (provider, effective_protocol) =
+        resolve_provider_request(&app, &provider_id, &kind, wire_protocol, &url)?;
     let secret = if requires_secret(&kind) {
         read_secret(&provider_id).map_err(ProxyError::from)?
     } else {
         String::new()
     };
-    request_with_secret(&kind, wire_protocol, &url, &method, headers, body, &secret).await
+    request_with_secret(
+        provider.kind.as_str(),
+        Some(effective_protocol),
+        &url,
+        &method,
+        headers,
+        body,
+        &secret,
+    )
+    .await
 }
 
 /// Internal one-shot request for pre-persistence provider checks. The caller owns
@@ -402,14 +560,14 @@ pub(crate) async fn request_with_secret(
     secret: &str,
 ) -> Result<ProxyResponse, ProxyError> {
     enforce_host(kind, url)?;
-    enforce_resolved_host(kind, url).await?;
+    let target = enforce_resolved_host(kind, url).await?;
     let provider_kind = parse_provider_kind(kind)?;
     let (method, header_map) =
         build_method_and_headers(provider_kind, wire_protocol, method, headers, secret)?;
 
     // Bound the whole call. Image endpoints use a longer cap; text/model probes
     // keep the shorter default so a bad relay does not hang the app.
-    let client = build_client(Some(buffered_timeout_for_url(&url)));
+    let client = build_client_for_target(Some(buffered_timeout_for_url(&url)), &target)?;
     let mut req = client.request(method, url).headers(header_map);
     if let Some(body) = body {
         req = req.body(body);
@@ -437,6 +595,7 @@ pub(crate) async fn request_with_secret(
 /// as frames on `on_chunk` (see the module-level streaming contract).
 #[tauri::command]
 pub async fn ai_proxy_stream(
+    app: AppHandle,
     provider_id: String,
     kind: String,
     wire_protocol: Option<ProviderWireProtocol>,
@@ -447,20 +606,28 @@ pub async fn ai_proxy_stream(
     on_chunk: Channel<InvokeResponseBody>,
 ) -> Result<(), ProxyError> {
     // --- Pre-flight: failures here reject the command (no head frame yet). ---
-    enforce_host(&kind, &url)?;
-    enforce_resolved_host(&kind, &url).await?;
+    let (provider, effective_protocol) =
+        resolve_provider_request(&app, &provider_id, &kind, wire_protocol, &url)?;
+    let bound_kind = provider.kind.as_str();
+    enforce_host(bound_kind, &url)?;
+    let target = enforce_resolved_host(bound_kind, &url).await?;
     let secret = if requires_secret(&kind) {
         read_secret(&provider_id).map_err(ProxyError::from)?
     } else {
         String::new()
     };
-    let provider_kind = parse_provider_kind(&kind)?;
-    let (method, header_map) =
-        build_method_and_headers(provider_kind, wire_protocol, &method, headers, &secret)?;
+    let provider_kind = provider.kind;
+    let (method, header_map) = build_method_and_headers(
+        provider_kind,
+        Some(effective_protocol),
+        &method,
+        headers,
+        &secret,
+    )?;
 
     // Streaming: only a connect timeout (no overall cap — a long token stream is
     // expected to outlive any fixed request timeout).
-    let client = build_client(None);
+    let client = build_client_for_target(None, &target)?;
     let mut req = client.request(method, &url).headers(header_map);
     if let Some(body) = body {
         req = req.body(body);
@@ -576,6 +743,46 @@ mod tests {
                 Err(ProxyError::DisallowedHost)
             ));
         }
+    }
+
+    #[test]
+    fn address_policy_normalizes_mapped_and_reserved_addresses() {
+        for address in [
+            "::ffff:127.0.0.1",
+            "::ffff:10.0.0.1",
+            "100.64.0.1",
+            "192.0.2.1",
+            "198.18.0.1",
+            "198.51.100.1",
+            "203.0.113.1",
+            "2001:db8::1",
+        ] {
+            assert!(is_non_public_ip(address.parse().unwrap()), "{address}");
+        }
+        assert!(!is_non_public_ip("8.8.8.8".parse().unwrap()));
+    }
+
+    #[test]
+    fn configured_base_binding_rejects_cross_origin_and_prefix_confusion() {
+        assert!(enforce_bound_url(
+            "https://relay.example/api/v1",
+            "https://relay.example/api/v1/models"
+        )
+        .is_ok());
+        assert!(matches!(
+            enforce_bound_url(
+                "https://relay.example/api/v1",
+                "https://attacker.example/api/v1/models"
+            ),
+            Err(ProxyError::ProviderBinding)
+        ));
+        assert!(matches!(
+            enforce_bound_url(
+                "https://relay.example/api/v1",
+                "https://relay.example/api/v10/models"
+            ),
+            Err(ProxyError::ProviderBinding)
+        ));
     }
 
     #[test]

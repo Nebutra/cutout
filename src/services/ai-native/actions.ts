@@ -20,6 +20,9 @@ import { currentProductionRunId } from '@/asset-production'
 const slotIdSchema = z.enum(['chat', 'image'])
 const semanticSliceRouteSchema = z.enum(['text-to-image', 'image-to-image'])
 const semanticSliceReferenceSchema = z.enum(['auto', 'none', 'mockup', 'board'])
+const importPathSchema = z.string().min(1).max(240)
+  .regex(/^[A-Za-z0-9][A-Za-z0-9._/-]*$/, 'Expected a relative ai-native/imports path.')
+  .refine((value) => !value.split('/').some((segment) => segment === '' || segment === '.' || segment === '..'), 'Expected a relative ai-native/imports path.')
 export const aiNativeActionSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('ping') }),
   z.object({ type: z.literal('get-state') }),
@@ -44,12 +47,12 @@ export const aiNativeActionSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('set-brief'), text: z.string() }),
   z.object({
     type: z.literal('import-board'),
-    path: z.string().min(1),
+    path: importPathSchema,
     name: z.string().optional(),
   }),
   z.object({
     type: z.literal('import-mockup'),
-    path: z.string().min(1),
+    path: importPathSchema,
     name: z.string().optional(),
   }),
   z.object({
@@ -74,7 +77,7 @@ export const aiNativeActionSchema = z.discriminatedUnion('type', [
     model: z.string().min(1).optional(),
     sourceKind: z.enum(['brief', 'mockup', 'board', 'mixed']).optional(),
     reference: semanticSliceReferenceSchema.optional(),
-    referencePath: z.string().min(1).optional(),
+    referencePath: importPathSchema.optional(),
     maxSlices: z.number().int().positive().max(100).optional(),
   }),
   z.object({
@@ -84,7 +87,7 @@ export const aiNativeActionSchema = z.discriminatedUnion('type', [
     model: z.string().min(1).optional(),
     sourceKind: z.enum(['brief', 'mockup', 'board', 'mixed']).optional(),
     reference: semanticSliceReferenceSchema.optional(),
-    referencePath: z.string().min(1).optional(),
+    referencePath: importPathSchema.optional(),
     maxSlices: z.number().int().positive().max(100).optional(),
     imageProviderId: z.string().min(1).optional(),
     imageModel: z.string().min(1).optional(),
@@ -109,7 +112,7 @@ export const aiNativeActionSchema = z.discriminatedUnion('type', [
   }),
   z.object({
     type: z.literal('import-design-md'),
-    path: z.string().min(1),
+    path: importPathSchema,
     name: z.string().min(1).optional(),
   }),
   z.object({ type: z.literal('clear-design-md') }),

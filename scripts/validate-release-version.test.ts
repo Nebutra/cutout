@@ -10,6 +10,7 @@ describe('release version contract', () => {
 
   it('rejects source manifest drift', () => {
     expect(() => validateReleaseVersions({ packageVersion: '1.2.3', tauriVersion: '1.2.4', cargoToml: cargo('1.2.3') })).toThrow('Release version drift')
+    expect(() => validateReleaseVersions({ packageVersion: '1.2.3', tauriVersion: '1.2.3', cargoToml: cargo('1.2.3'), dependentVersions: { agentCapabilities: '1.2.2' } })).toThrow('agentCapabilities=1.2.2')
   })
 
   it('rejects a tag that does not match the reviewed source version', () => {
