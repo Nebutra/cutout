@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 12
+- **Total Sessions**: 13
 - **Last Active**: 2026-07-22
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~422 | Active |
+| `journal-1.md` | ~455 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 13 | 2026-07-22 | Restore provider bundle boundary and install Cutout | `bd44c16` | `main` |
 | 12 | 2026-07-22 | Unify workspace rail navigation | `9ca9b6d` | `main` |
 | 11 | 2026-07-21 | Polish connectors, agent retry, Git dock, and provider protocols | `c1475ef`, `fe77a65`, `bf41e12`, `ed6b6eb` | `main` |
 | 10 | 2026-07-21 | Merge Advanced settings into General | `4d6213e` | `main` |

@@ -420,3 +420,36 @@ Unified Design and Deliver rail presentation, restored Design drawer toggle sema
 ### Next Steps
 
 - None - task complete
+
+
+## Session 13: Restore provider bundle boundary and install Cutout
+
+**Date**: 2026-07-22
+**Task**: Restore provider bundle boundary and install Cutout
+**Branch**: `main`
+
+### Summary
+
+Deferred provider catalog metadata out of the frontend entry, restored the production bundle gate, built and smoke-tested the Apple Silicon Cutout app, moved the previous installation to Trash, installed the new bundle, and verified it launched.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `bd44c16` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
