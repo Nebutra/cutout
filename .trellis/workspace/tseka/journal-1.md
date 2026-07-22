@@ -387,3 +387,36 @@ Centered connector logos and updated Canva branding; added safe retry for transi
 ### Next Steps
 
 - None - task complete
+
+
+## Session 12: Unify workspace rail navigation
+
+**Date**: 2026-07-22
+**Task**: Unify workspace rail navigation
+**Branch**: `main`
+
+### Summary
+
+Unified Design and Deliver rail presentation, restored Design drawer toggle semantics, preserved inline Deliver routing, added focus and interaction coverage, and validated the Agent contract plus desktop browser flow.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `9ca9b6d` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

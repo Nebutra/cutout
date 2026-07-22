@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 11
-- **Last Active**: 2026-07-21
+- **Total Sessions**: 12
+- **Last Active**: 2026-07-22
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~376 | Active |
+| `journal-1.md` | ~422 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 12 | 2026-07-22 | Unify workspace rail navigation | `9ca9b6d` | `main` |
 | 11 | 2026-07-21 | Polish connectors, agent retry, Git dock, and provider protocols | `c1475ef`, `fe77a65`, `bf41e12`, `ed6b6eb` | `main` |
 | 10 | 2026-07-21 | Merge Advanced settings into General | `4d6213e` | `main` |
 | 9 | 2026-07-21 | Remove manual cutout controls | `90a45fd` | `main` |
