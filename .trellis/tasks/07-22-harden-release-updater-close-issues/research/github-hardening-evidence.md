@@ -28,6 +28,14 @@
 - Created active tag ruleset `Protect release tags` (`id=19530200`) for
   `refs/tags/v*` with deletion and non-fast-forward updates blocked and no
   bypass actors.
+- Created active main ruleset `Protect main` (`id=19535513`) for
+  `refs/heads/main`. It requires pull requests, dismissal of stale approvals,
+  resolved review threads, strict `Quality gate` status, and blocks deletion
+  and non-fast-forward updates with no bypass actors.
+- Restricted Actions to GitHub-owned actions plus the exact approved commit
+  SHAs for `pnpm/action-setup`, `dtolnay/rust-toolchain`, and
+  `Swatinem/rust-cache`; repository SHA-pinning enforcement is enabled.
+- Merged the hardening through PR #14 after all 14 required checks passed.
 
 ## Remaining Personnel Prerequisite
 
@@ -36,8 +44,13 @@ Current releases therefore require explicit single-maintainer approval but do
 not provide independent review. After a second trusted reviewer is added,
 replace the reviewer and set `prevent_self_review=true`.
 
-## Deferred Until Workflow Merge
+## Dependency Alert Disposition
 
-- Require the new aggregate CI quality check on `main` and require pull requests.
-- Switch Actions to selected-only and enable SHA pin enforcement after every
-  workflow reference on `main` is commit-pinned.
+- `fast-uri` is overridden to patched version `3.1.4` at the pnpm workspace
+  authority and verified absent from the production audit.
+- `@hono/node-server` remains transitively owned by the Model Context Protocol
+  SDK through `shadcn`; its fix requires the incompatible 2.x major line.
+  Do not force the major override without upstream compatibility evidence.
+- Rust alerts for `glib 0.18.5` (Tauri/GTK Linux stack) and `atty 0.2.14`
+  (`vtracer` through clap 2) have no narrow application-level upgrade path;
+  retain alerts for upstream tracking rather than dismissing them.

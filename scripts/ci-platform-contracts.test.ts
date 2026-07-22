@@ -5,6 +5,7 @@ import { resolveChromeExecutable } from '../playwright.config'
 import { normalizeText, sha256NormalizedText } from './lib/normalized-text.mjs'
 import { nodeCommandNeedsShell, resolveNodeCommand } from './lib/node-command.mjs'
 import { parseSkillFrontmatter } from './lib/skill-frontmatter.mjs'
+import { resolveVitestMaxWorkers } from './lib/vitest-workers.ts'
 
 describe('cross-platform CI contracts', () => {
   it('installs Chromium before running the contract test suite', async () => {
@@ -37,6 +38,12 @@ describe('cross-platform CI contracts', () => {
     expect(resolveChromeExecutable(undefined, 'win32')).toBeUndefined()
     expect(resolveChromeExecutable(undefined, 'darwin')).toContain('Google Chrome.app')
     expect(resolveChromeExecutable('/custom/chrome', 'linux')).toBe('/custom/chrome')
+  })
+
+  it('caps Vitest concurrency on Windows runners', () => {
+    expect(resolveVitestMaxWorkers('win32')).toBe(2)
+    expect(resolveVitestMaxWorkers('darwin')).toBeUndefined()
+    expect(resolveVitestMaxWorkers('linux')).toBeUndefined()
   })
 
   it.each(['\n', '\r\n'])('accepts product skill frontmatter with %j line endings', (eol) => {
