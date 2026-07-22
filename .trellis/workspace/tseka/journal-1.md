@@ -487,3 +487,36 @@ Restored deterministic Git workspace visual coverage and fixed Retry reconstruct
 ### Next Steps
 
 - None - task complete
+
+
+## Session 15: Remove desktop paid operation limit
+
+**Date**: 2026-07-22
+**Task**: Remove desktop paid operation limit
+**Branch**: `main`
+
+### Summary
+
+Removed the desktop paid-action allowance UI and persistence, enforced explicit approval with host-derived capability estimates across desktop and prototype visual paths, preserved shared protocol budgets and auto-within-budget support, updated specs and locales, and passed focused tests, lint, typecheck, i18n validation, agent validation, production build, and diff checks.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `e2501c2` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
