@@ -33,8 +33,10 @@
   resolved review threads, strict `Quality gate` status, and blocks deletion
   and non-fast-forward updates with no bypass actors.
 - Restricted Actions to GitHub-owned actions plus the exact approved commit
-  SHAs for `pnpm/action-setup`, `dtolnay/rust-toolchain`, and
-  `Swatinem/rust-cache`; repository SHA-pinning enforcement is enabled.
+  SHAs for `pnpm/action-setup`, `dtolnay/rust-toolchain`,
+  `Swatinem/rust-cache`, and `tauri-apps/tauri-action`; repository SHA-pinning
+  enforcement is enabled. JavaScript actions are pinned to reviewed Node 24
+  revisions, with a workflow contract preventing runtime regressions.
 - Merged the hardening through PR #14 after all 14 required checks passed.
 
 ## Remaining Personnel Prerequisite

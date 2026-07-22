@@ -67,6 +67,26 @@ describe('cross-platform release workflow', () => {
     }
   })
 
+  it('keeps JavaScript actions on approved Node 24 revisions', async () => {
+    const approved = new Map([
+      ['actions/checkout', '3d3c42e5aac5ba805825da76410c181273ba90b1'],
+      ['actions/setup-node', '820762786026740c76f36085b0efc47a31fe5020'],
+      ['pnpm/action-setup', '0ebf47130e4866e96fce0953f49152a61190b271'],
+      ['actions/upload-artifact', '043fb46d1a93c77aae656e7c1c64a875d1fc6a0a'],
+      ['actions/download-artifact', '3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c'],
+      ['actions/attest-build-provenance', '0f67c3f4856b2e3261c31976d6725780e5e4c373'],
+    ])
+
+    const paths = ['.github/workflows/ci.yml', '.github/workflows/release-update.yml']
+    const sources = await Promise.all(paths.map(async (path) => `${path}\n${await readFile(path, 'utf8')}`))
+    const source = sources.join('\n')
+    for (const [action, revision] of approved) {
+      const references = [...source.matchAll(new RegExp(`${action}@([a-f0-9]{40})`, 'g'))]
+      expect(references.length, action).toBeGreaterThan(0)
+      for (const reference of references) expect(reference[1], action).toBe(revision)
+    }
+  })
+
   it('makes manual releases main-line, immutable, and policy-free', async () => {
     const source = await readFile('.github/workflows/release-update.yml', 'utf8')
     const workflow = YAML.parse(source)
