@@ -28,6 +28,9 @@ receipts. `.cutout` state and provenance remain authoritative.
   durable Agent message id, its effective revised text, and the nearest
   preceding effective revised user intent/steer. `AgentWorkspaceDock` exposes
   that action through `onRegenerateMessage(eventId)` only while no run is active.
+- The supported external controller surface is `cutout.control.v1` through the
+  CLI/MCP adapters. The desktop invoke registry exposes no legacy GUI Queue or
+  WebView automation command family.
 
 ### 3. Contracts
 
@@ -58,9 +61,12 @@ receipts. `.cutout` state and provenance remain authoritative.
   leases; recovery requeues only leases expired at the shared clock boundary.
 - Controlled reads reject absolute paths, traversal, symlink roots/components,
   non-regular files, identity changes, and size/count limit violations.
-- AI Native reference reads are relative to the host-owned
-  `ai-native/imports/` staging root and reject absolute paths, traversal,
-  symlinks, non-regular files, and files over the bounded import size.
+- External controllers never fall back to a hidden desktop/WebView queue when
+  `cutout.control.v1` lacks a provider or effect. They return the explicit
+  `capability-required` or unsupported result instead.
+- Runtime diagnostics used by desktop recovery are an internal observation
+  mechanism. They do not accept commands, paths, credentials, or approval data
+  and do not form a second Agent control surface.
 - Both TypeScript and native repository scanners reject trees deeper than 64
   directory levels before continuing traversal.
 - The stdio MCP entry never derives project authority from the launch
@@ -113,6 +119,7 @@ receipts. `.cutout` state and provenance remain authoritative.
 | Workspace lease file changes state, reservation, or response without the host key | Reject the catalog signature before reservation or completion |
 | Desktop apply receives a caller-authored approval string | It has no authority; require native confirmation after preview |
 | Project-bound MCP tool runs without `CUTOUT_PROJECT_ROOT` | Return `project-binding-required` without reading or writing project state |
+| Caller attempts the retired desktop GUI Queue compatibility surface | No script, bridge, invoke handler, or permission exists; use `cutout.control.v1` |
 | Registry apply omits either `planId` or `approvalLeaseId` | Reject; never downgrade to a dry-run response |
 | Registry content or workspace state changes after preview | Reject the stale `planId` before writing |
 | Claim missing, terminal, delayed, cancelled, or held by another owner | Do not start heartbeat or effect |
@@ -169,9 +176,9 @@ receipts. `.cutout` state and provenance remain authoritative.
 - Node filesystem store: run events and ledger in one transaction, recovery
   from an interrupted journal, and stale revision conflict.
 - Source scanner/tool host/Tauri: traversal, symlink root/component,
-  replacement/identity drift, absolute AI Native imports, over-depth trees,
-  executable Git configuration, least-privilege capability drift, and
-  unsupported platform behavior.
+  replacement/identity drift, over-depth trees, executable Git configuration,
+  least-privilege capability drift, absence of legacy GUI Queue handlers and
+  permissions, and unsupported platform behavior.
 - Governance: Document roots, multiple scenarios, unrelated axe targets, and
   explicit ambiguous/non-color evidence.
 - Delivery/coding: exact artifact index, unique target ids, failed/cancelled

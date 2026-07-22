@@ -147,23 +147,3 @@ jobs:
 
 A changed operation, MCP tool, protocol version or package version must update
 the capability manifest in the same change.
-
-## Migration from the GUI queue
-
-The old `pnpm ai` queue and `window.__CUTOUT_AI__` API are compatibility-only.
-They write commands into a running WebView and do not provide the durable
-revision, approval, idempotency, replay, policy or output verification contract
-of `cutout.control.v1`.
-
-| Legacy intent | Supported replacement |
-| --- | --- |
-| inspect current project | `context`, `materials`, `validate` |
-| maintain a multi-turn task | `run start/get/events/cancel` |
-| import an idea/story/file/repository | `ingest` dry-run, then approved apply |
-| change Design Markdown or tokens | `patch` dry-run; headless v1 does not apply patches |
-| export tokens/design system | `export-kit` dry-run, then approved apply |
-| export implementation starter | `export-starter` dry-run, then approved apply |
-| invoke a configured model | no headless replacement yet; use a separately trusted provider host |
-
-Do not bridge a missing v1 capability by silently falling back to the GUI
-queue. Return the explicit `capability-required` or unsupported result instead.
