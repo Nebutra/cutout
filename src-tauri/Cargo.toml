@@ -44,7 +44,7 @@ futures-util = "0.3"
 tauri-plugin-os = "2"
 tauri-plugin-store = "2"
 image = "0.23.10"
-vtracer = "0.6.5"
+vtracer = { path = "vendor/vtracer", version = "0.6.5" }
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-updater = "2.10.1"

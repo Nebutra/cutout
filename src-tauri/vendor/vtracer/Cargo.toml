@@ -1,0 +1,29 @@
+[package]
+name = "vtracer"
+version = "0.6.5"
+authors = ["Chris Tsang <chris.2y3@outlook.com>"]
+edition = "2021"
+description = "A library to convert images into vector graphics."
+license = "MIT OR Apache-2.0"
+homepage = "http://www.visioncortex.org/vtracer"
+repository = "https://github.com/visioncortex/vtracer/"
+categories = ["graphics"]
+keywords = ["svg", "computer-graphics"]
+publish = false
+autobins = false
+autoexamples = false
+autotests = false
+autobenches = false
+
+[features]
+wasm = ["fastrand/js"]
+
+[lib]
+name = "vtracer"
+path = "src/lib.rs"
+crate-type = ["rlib"]
+
+[dependencies]
+fastrand = "2.3"
+image = "0.23.10"
+visioncortex = "0.8.8"
