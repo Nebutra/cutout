@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.6 - 2026-07-23
+
+- Keep regenerate preparation activity transient: show only the current unresolved activity while work is active, replace it with the first streamed reply, and retain terminal evidence in the execution timeline.
+
 ## 0.1.5 - 2026-07-22
 
 - Persist Agent conversation runs and immutable response branches in Git-managed `.cutout/run-events.json` state.
