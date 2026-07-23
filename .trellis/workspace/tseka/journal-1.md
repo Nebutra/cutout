@@ -722,3 +722,36 @@ Added staged Agent routing for deterministic asset-sheet slicing and Apple Visio
 ### Next Steps
 
 - None - task complete
+
+
+## Session 22: Remediate Dependabot dependency chains
+
+**Date**: 2026-07-23
+**Task**: Remediate Dependabot dependency chains
+**Branch**: `chore/archive-remediate-dependabot-alerts`
+
+### Summary
+
+Removed the shadcn/MCP/Hono dependency graph by vendoring its exact Tailwind support CSS, vendored a library-only VTracer 0.6.5 to eliminate Clap 2 and atty, preserved licenses and provenance, passed full local and GitHub CI, merged PR #23, and left glib visible as constrained by Tauri's Linux GTK stack.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `901bbcf` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
