@@ -869,6 +869,7 @@ function phaseTitle(phase: WorkspaceWorkflowPhase): string {
     case 'planning': return 'Planning the outcome'
     case 'review': return 'Reviewing the plan'
     case 'design-system': return 'Creating the design system'
+    case 'design-system-selection': return 'Choosing a design direction'
     case 'generating-suite': return 'Generating prototype pages'
     case 'idle': return 'Preparing the run'
   }

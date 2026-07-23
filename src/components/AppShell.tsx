@@ -60,6 +60,10 @@ import {
 import { isErr } from "@/services/types";
 import type { BundleRepository } from "@/services/types";
 import type { DesignDocument } from "@/design-ir";
+import {
+  selectedDesignMarkdownBinding,
+  type SelectedDesignMarkdownBinding,
+} from "@/prototype/design-system-candidates";
 import type { StarterPlan } from "@/starter-compiler";
 import { useServices } from "@/services/context";
 import type {
@@ -878,7 +882,8 @@ export function AppShell() {
 
   const exportWorkbenchKit = useCallback(
     async (itemId: string) => {
-      const current = getStoreState().workspaceSnapshot?.designDocument;
+      const workspace = getStoreState().workspaceSnapshot;
+      const current = workspace?.designDocument;
       if (!current) return;
       const {
         compileBrandKitOperation,
@@ -947,6 +952,7 @@ export function AppShell() {
       const compiled = await compileDesignKitOperation(
         current,
         headlessTokenAdapters(current.tokens),
+        selectedDesignMarkdownBinding(workspace, current),
       );
       if (isErr(compiled)) {
         toast.error("Design Kit is blocked", { description: compiled.error });
@@ -1002,7 +1008,8 @@ export function AppShell() {
   );
 
   const generateSpecimen = useCallback(async () => {
-    const current = getStoreState().workspaceSnapshot?.designDocument;
+    const workspace = getStoreState().workspaceSnapshot;
+    const current = workspace?.designDocument;
     if (!current) {
       toast.error("No DesignDocument is available");
       return;
@@ -1014,6 +1021,7 @@ export function AppShell() {
     const compiled = await compileDesignKitOperation(
       current,
       headlessTokenAdapters(current.tokens),
+      selectedDesignMarkdownBinding(workspace, current),
     );
     if (isErr(compiled)) {
       toast.error("Could not generate specimen", {
@@ -1174,6 +1182,7 @@ export function AppShell() {
         services.bundles,
         snapshot.designOsAuthoring ?? undefined,
         brandViComplete,
+        selectedDesignMarkdownBinding(snapshot, current),
       );
       const outcomeId =
         snapshot.outcome?.contract.id ?? `outcome:${current.meta.id}`;
@@ -1254,6 +1263,7 @@ export function AppShell() {
         services.bundles,
         snapshot.designOsAuthoring ?? undefined,
         brandViComplete,
+        selectedDesignMarkdownBinding(snapshot, current),
       );
       try {
         const replayed = await center.preview(request);
@@ -1439,6 +1449,7 @@ export function AppShell() {
       const kit = await compileDesignKitOperation(
         current,
         headlessTokenAdapters(current.tokens),
+        selectedDesignMarkdownBinding(snapshot, current),
       );
       const components = await compileComponentsOperation(
         current,
@@ -2325,6 +2336,7 @@ async function buildUnifiedLocalDeliveryCenter(
   bundles: BundleRepository,
   authoring: DesignOsAuthoringState | undefined,
   brandViComplete: boolean,
+  selectedDesignMarkdown?: SelectedDesignMarkdownBinding,
 ) {
   const [operations, designKitModule, componentModule, deliveryModule] =
     await Promise.all([
@@ -2337,6 +2349,7 @@ async function buildUnifiedLocalDeliveryCenter(
   const designKitResult = await operations.compileDesignKitOperation(
     document,
     headlessTokenAdapters(document.tokens),
+    selectedDesignMarkdown,
   );
   if (isErr(designKitResult)) throw new Error(designKitResult.error);
   const designKit = designKitResult.data;

@@ -7,9 +7,14 @@ import type {
 } from './schema'
 import { validateDesignDocument } from './validate'
 import { err, isOk, ok, type Result } from '@/services/types'
-import type { WorkspaceSnapshot } from '@/workspace/workspace-snapshot'
+import type {
+  PersistedPrototypeDesignSystem,
+  WorkspaceSnapshot,
+} from '@/workspace/workspace-snapshot'
 import type { LocalProjectRecord } from '@/services/local/project-repository.local'
 import { readRasterDimensions } from '@/lib/raster-dimensions'
+import { parseEditableDesignMarkdown } from '@/prototype/design-md'
+import { projectDesignMarkdownTokens } from '@/prototype/design-md-export'
 
 const LEGACY_ACTOR_ID = 'cutout-legacy-workspace'
 
@@ -106,6 +111,7 @@ export function migrateWorkspaceV1(input: LegacyWorkspaceV1Input): WorkspaceSnap
     humanLoopChoiceId: input.humanLoopChoiceId ?? null,
     humanLoopCustomAnswer: input.humanLoopCustomAnswer ?? '',
     prototypeDesignSystem: input.prototypeDesignSystem ?? null,
+    prototypeDesignSystemCandidates: input.prototypeDesignSystemCandidates ?? null,
     prototypePages: input.prototypePages ?? [],
     selectedPrototypePageId: input.selectedPrototypePageId ?? null,
     runError: input.runError ?? null,
@@ -335,6 +341,28 @@ export async function projectWorkspaceSnapshotToDesignDocument(
         tool: `asset-production.v1:${slice.production!.evidence.runId}:${slice.production!.evidence.taskId}`,
       }]),
   ).values()]
+  const candidateState = workspace.prototypeDesignSystemCandidates
+  const candidateProvenance = candidateState
+    ? candidateState.set.candidates.flatMap((candidate) => candidate.provenanceIds.map((id) => ({
+        id,
+        operation: 'derive' as const,
+        sourceIds: [projectSourceId],
+        actor: { kind: 'agent' as const, id: 'cutout.prototype-orchestrator' },
+        recordedAt: toIso(project.updatedAt),
+        tool: 'cutout.design-system-candidates.v1',
+      })))
+    : []
+  const selectionProvenance = candidateState?.set.selection
+    ? [{
+        id: candidateState.set.selection.provenanceId,
+        operation: candidateState.set.selection.actor.kind === 'human' ? 'manual' as const : 'derive' as const,
+        sourceIds: [projectSourceId],
+        actor: candidateState.set.selection.actor,
+        recordedAt: candidateState.set.selection.selectedAt,
+        tool: 'cutout.candidate-selection.v1',
+      }]
+    : []
+  const projectedTokens = selectedCandidateTokens(candidateState)
   const document: DesignDocument = {
     version: 'design-ir.v1',
     meta: {
@@ -368,9 +396,15 @@ export async function projectWorkspaceSnapshotToDesignDocument(
         }
       : undefined,
     materials,
-    provenance: [provenance, ...productionProvenance],
+    candidateSets: candidateState ? [candidateState.set] : [],
+    provenance: [
+      provenance,
+      ...productionProvenance,
+      ...candidateProvenance,
+      ...selectionProvenance,
+    ],
     brands: [],
-    tokens: [],
+    tokens: projectedTokens,
     components: [],
     relations: [],
   }
@@ -443,6 +477,34 @@ export async function designDocumentToWorkspaceSnapshot(
     })
   }
 
+  const candidateSet = valid.candidateSets.find((candidate) => candidate.kind === 'design-system')
+  const candidateArtifacts: Record<string, PersistedPrototypeDesignSystem> = {}
+  if (candidateSet) {
+    for (const candidate of candidateSet.candidates) {
+      if (candidate.status !== 'ready') continue
+      const visualId = candidate.outputs.find((output) => output.role === 'design-system')?.materialId
+      const markdownId = candidate.outputs.find((output) => output.role === 'design-markdown')?.materialId
+      const visual = visualId ? valid.materials.find((material) => material.id === visualId) : null
+      const markdown = markdownId ? valid.materials.find((material) => material.id === markdownId) : null
+      if (!visual || !markdown) continue
+      const [bytes, content] = await Promise.all([
+        resolveBytes(visual, resolver),
+        resolveText(markdown, resolver),
+      ])
+      if (!bytes || content === null) continue
+      const size = currentContent(visual).pixelSize ?? readRasterDimensions(bytes)
+      if (!size) continue
+      candidateArtifacts[candidate.id] = {
+        name: visual.name,
+        designMarkdown: content,
+        bytes,
+        mediaType: currentContent(visual).mediaType ?? 'application/octet-stream',
+        width: size.width,
+        height: size.height,
+      }
+    }
+  }
+
   const snapshot: WorkspaceSnapshot = {
     ...emptyWorkspace(),
     prototypePlan: valid.prototype?.plan ?? null,
@@ -455,6 +517,9 @@ export async function designDocumentToWorkspaceSnapshot(
           width: designImageSize?.width ?? 1,
           height: designImageSize?.height ?? 1,
         }
+      : null,
+    prototypeDesignSystemCandidates: candidateSet
+      ? { set: candidateSet, artifacts: candidateArtifacts }
       : null,
     prototypePages: pageArtifacts,
     attachments,
@@ -476,6 +541,7 @@ function emptyWorkspace(): WorkspaceSnapshot {
     humanLoopChoiceId: null,
     humanLoopCustomAnswer: '',
     prototypeDesignSystem: null,
+    prototypeDesignSystemCandidates: null,
     prototypePages: [],
     selectedPrototypePageId: null,
     runError: null,
@@ -526,6 +592,43 @@ async function legacyMaterials(input: {
       createdAt: input.createdAt,
     }))
   }
+  const candidateState = input.workspace.prototypeDesignSystemCandidates
+  if (candidateState) {
+    const directions = new Map(
+      candidateState.set.proposal.directions.map((direction) => [direction.id, direction]),
+    )
+    for (const candidate of candidateState.set.candidates) {
+      const artifact = candidateState.artifacts[candidate.id]
+      if (!artifact || candidate.status !== 'ready') continue
+      const direction = directions.get(candidate.directionId)
+      const visualId = candidate.outputs.find((output) => output.role === 'design-system')?.materialId
+      const markdownId = candidate.outputs.find((output) => output.role === 'design-markdown')?.materialId
+      if (!visualId || !markdownId) continue
+      materials.push(await material({
+        id: visualId,
+        kind: 'design-system',
+        name: direction?.label ?? artifact.name,
+        referenceId: `content:${visualId}:image`,
+        uri: legacyUri(input.projectId, `workspace/design-system-candidates/${candidate.id}/image`),
+        mediaType: artifact.mediaType,
+        bytes: artifact.bytes,
+        pixelSize: intrinsicSize(artifact.width, artifact.height, artifact.bytes),
+        provenanceId: candidate.provenanceIds[0] ?? input.provenanceId,
+        createdAt: input.createdAt,
+      }))
+      materials.push(await material({
+        id: markdownId,
+        kind: 'design-markdown',
+        name: `${direction?.label ?? artifact.name} DESIGN.md`,
+        referenceId: `content:${markdownId}`,
+        uri: legacyUri(input.projectId, `workspace/design-system-candidates/${candidate.id}/DESIGN.md`),
+        mediaType: 'text/markdown',
+        bytes: textBytes(artifact.designMarkdown),
+        provenanceId: candidate.provenanceIds[0] ?? input.provenanceId,
+        createdAt: input.createdAt,
+      }))
+    }
+  }
   for (const artifact of input.workspace.prototypePages) {
     materials.push(await material({
       id: `material:prototype-page:${artifact.page.id}`,
@@ -556,6 +659,22 @@ async function legacyMaterials(input: {
     }))
   }
   return materials
+}
+
+function selectedCandidateTokens(
+  candidateState: WorkspaceSnapshot['prototypeDesignSystemCandidates'],
+): DesignDocument['tokens'] {
+  const selected = candidateState?.set.selection
+  const artifact = selected ? candidateState?.artifacts[selected.candidateId] : null
+  if (!selected || !artifact) return []
+  try {
+    return [...projectDesignMarkdownTokens(
+      parseEditableDesignMarkdown(artifact.designMarkdown),
+      { provenanceId: selected.provenanceId },
+    )]
+  } catch {
+    return []
+  }
 }
 
 async function material(input: {

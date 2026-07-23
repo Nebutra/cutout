@@ -37,6 +37,16 @@ function prototypePagePrompt(
   page: PrototypePage,
   finalDesignMarkdown?: string | null,
 ): string
+
+function designSystemExplorationForPlan(
+  plan: PrototypePlan,
+): CandidateExplorationDecision
+
+function selectPrototypeDesignSystemCandidate(
+  candidateSet: PrototypeDesignSystemCandidateSet,
+  candidateId: string,
+  actor: { readonly kind: 'human' | 'agent'; readonly id: string },
+): PrototypeDesignSystemCandidateSet
 ```
 
 ## 3. Contracts
@@ -60,6 +70,24 @@ function prototypePagePrompt(
   reference, and the validated `designSystem.designMarkdown` is the final text
   contract. The pre-synthesis imported/correction context is only an input to
   design-system creation and must not bypass the resulting document.
+- New Agent-authored plans resolve `designSystem.exploration` before visual
+  generation. `count` must equal `directions.length`, remain within declared
+  runtime bounds, and each direction declares a thesis, varied axes, and
+  preserved constraints. Historical plans cross one compatibility boundary
+  into a single conservative direction.
+- A candidate count greater than one is a resumable workflow boundary. Generate
+  and persist every candidate's visual plus image-grounded `DESIGN.md`, retain
+  failed siblings, set `workflowPhase = 'design-system-selection'`, and return
+  without generating pages. Never suspend a React promise while waiting for a
+  selection.
+- Exactly one ready candidate from a one-candidate proposal may be selected by
+  the Agent. Any multi-direction proposal requires a human selection, even if
+  only one sibling succeeded; this keeps partial failure visible rather than
+  silently narrowing the creative decision.
+- Selection starts a new bounded continuation. It re-resolves providers, reuses
+  the persisted plan and exact selected artifact, does not append a duplicate
+  user intent, and sends only the selected bytes plus selected `DESIGN.md` to
+  page generation and Asset Production.
 - If the artifact's `designMarkdown` is invalid, page generation may fall back
   to the earlier text context, while retaining the design-system image
   reference. Invalid companion documentation must not erase valid visual media.
@@ -83,6 +111,11 @@ function prototypePagePrompt(
 | Existing explicit `primary-flow` workspace | preserve its selected scope |
 | Valid image-grounded `designSystem.designMarkdown` | include it in every page prompt as `Final DESIGN.md` |
 | Invalid final `designSystem.designMarkdown` | fall back to pre-synthesis text context; keep the image identity reference |
+| Count exceeds `bounds.maxCandidates` | reject the plan; never clamp silently |
+| Direction count differs from resolved count | reject the executable plan |
+| Multiple-direction proposal has no selection | persist candidate results and stop before page generation |
+| Selection references failed/missing candidate | reject without changing the singular selected projection |
+| Candidate base revision differs from current revision | reject as stale and require regeneration |
 
 ## 5. Good / Base / Bad Cases
 
@@ -97,6 +130,13 @@ function prototypePagePrompt(
 - Bad: the design-system image and final `DESIGN.md` are created, but page
   generation receives only the imported text that existed before image
   grounding, so the screens ignore refinements discovered from the visual.
+- Good: the Agent proposes two deliberate directions, both retain the same
+  product identity, the user selects one, and every page/production binding uses
+  only that candidate.
+- Base: a constrained request resolves one direction and continues without an
+  unnecessary comparison step.
+- Bad: three provider calls reuse the same prompt and random seed variance is
+  presented as three authored directions.
 
 ## 6. Tests Required
 
@@ -113,6 +153,13 @@ function prototypePagePrompt(
   and a rule unique to the synthesized final `DESIGN.md`.
 - Real-provider benchmark remains gated by credentials and reports transport
   failures separately from deterministic product regressions.
+- Candidate contract tests: dynamic bounds, exact direction counts, ready-only
+  selection, human selection for multi-direction proposals, stale revision
+  rejection, and legacy one-candidate recovery.
+- Persistence test: candidate visuals/Markdown, selection, provenance, and
+  selected token projection survive workspace -> Design IR -> workspace.
+- Rendered comparison test: cards have stable media dimensions, failed siblings
+  remain visible, details open, and pages do not start before selection.
 
 ## 7. Wrong vs Correct
 
@@ -143,4 +190,18 @@ await generatePrototypePageSet({
 const pageDesignContext = isValidDesignMarkdown(designSystem.designMarkdown)
   ? designSystem.designMarkdown
   : preSynthesisContext
+```
+
+```ts
+// Wrong: multiple candidates immediately collapse back to the first result.
+const selected = candidates[0]
+await generatePages(selected)
+
+// Correct: publish a durable selection boundary and resume in a later run.
+if (candidateSet.proposal.count > 1) {
+  setWorkflowPhase('design-system-selection')
+  return
+}
+const selected = selectPrototypeDesignSystemCandidate(candidateSet, readyId, agent)
+await generatePages(selectedPrototypeDesignSystem(selected))
 ```

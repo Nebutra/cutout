@@ -153,6 +153,23 @@ describe('PrototypePlan', () => {
 
     const authored = prototypePlanSchema.parse({
       ...structuredClone(validPlan),
+      designSystem: {
+        ...structuredClone(validPlan.designSystem),
+        exploration: {
+          mode: 'auto',
+          decidedBy: 'agent',
+          count: 1,
+          rationale: 'The requirement already establishes one clear visual direction.',
+          directions: [{
+            id: 'direction:primary',
+            label: 'Primary direction',
+            thesis: 'Preserve the requested product identity.',
+            vary: ['visual treatment'],
+            preserve: ['product intent'],
+          }],
+          bounds: { maxCandidates: 8, maxParallelism: 2 },
+        },
+      },
       reviewDocument: {
         format: 'markdown',
         primaryFlow: '# Primary flow\n\nA focused review.',

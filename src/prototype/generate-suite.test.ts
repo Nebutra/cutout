@@ -237,6 +237,31 @@ describe('prototype suite generation helpers', () => {
     expect(prompt).not.toContain('button states, input fields')
   })
 
+  it('makes candidate directions distinct while preserving the product contract', () => {
+    const quiet = prototypeDesignSystemPrompt(plan, undefined, {
+      id: 'quiet',
+      label: 'Quiet editorial',
+      thesis: 'Restrained hierarchy and generous negative space.',
+      vary: ['density', 'typography personality'],
+      preserve: ['product identity', 'platform contract'],
+    })
+    const expressive = prototypeDesignSystemPrompt(plan, undefined, {
+      id: 'expressive',
+      label: 'Expressive studio',
+      thesis: 'Tactile surfaces and bold shape language.',
+      vary: ['shape language', 'material treatment'],
+      preserve: ['product identity', 'platform contract'],
+    })
+
+    expect(quiet).toContain('Quiet editorial')
+    expect(expressive).toContain('Expressive studio')
+    expect(quiet).not.toBe(expressive)
+    expect(quiet).toContain(`Product: ${plan.product.name}`)
+    expect(expressive).toContain(`Product: ${plan.product.name}`)
+    expect(quiet).toContain('Preserve across every candidate: product identity; platform contract')
+    expect(expressive).toContain('Preserve across every candidate: product identity; platform contract')
+  })
+
   it('keeps image-grounded DESIGN.md synthesis design-only', () => {
     const system = prototypeDesignMarkdownSynthesisSystem(plan)
 

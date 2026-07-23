@@ -7,6 +7,7 @@
  */
 import { z } from 'zod'
 import { prototypePlanSchema } from '@/prototype/prototype-plan'
+import { candidateSetSchema } from '@/candidate-selection/contracts'
 
 const idSchema = z.string().min(1).max(160)
 const isoDateTimeSchema = z.iso.datetime({ offset: true })
@@ -389,11 +390,17 @@ export const designDocumentSchema = z.object({
   components: z.array(componentSchema).default([]),
   prototype: prototypeSubtreeSchema.optional(),
   materials: z.array(materialSchema).default([]),
+  /** Historical Design IR documents omit this additive collection; validation normalizes it to `[]`. */
+  candidateSets: z.array(candidateSetSchema).optional(),
   provenance: z.array(provenanceSchema).default([]),
   relations: z.array(relationSchema).default([]),
 }).strict()
 
 export type DesignDocument = z.infer<typeof designDocumentSchema>
+/** Cross-collection consumers use the validated shape, where additive defaults are materialized. */
+export type NormalizedDesignDocument = Omit<DesignDocument, 'candidateSets'> & {
+  candidateSets: NonNullable<DesignDocument['candidateSets']>
+}
 export type DesignDocumentMeta = z.infer<typeof designDocumentMetaSchema>
 export type DesignDocumentRevision = z.infer<typeof designDocumentRevisionSchema>
 export type DesignNeed = z.infer<typeof needSchema>

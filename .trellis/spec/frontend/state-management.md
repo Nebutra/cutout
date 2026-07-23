@@ -109,3 +109,93 @@ Every recovery change must cover:
 
 This contract prevents the historical state where restart recovery discarded a design-system
 visual for invalid YAML while independently restoring prototype pages as ready.
+
+## Scenario: Persisted Design System Candidates
+
+### 1. Scope / Trigger
+
+Apply whenever Design System candidate generation, workspace persistence,
+legacy Design IR projection, candidate selection, or Design Kit consumption
+changes.
+
+### 2. Signatures
+
+```ts
+interface WorkspaceSnapshot {
+  readonly prototypeDesignSystem: PersistedPrototypeDesignSystem | null
+  readonly prototypeDesignSystemCandidates?: {
+    readonly set: CandidateSet
+    readonly artifacts: Readonly<Record<string, PersistedPrototypeDesignSystem>>
+  } | null
+}
+
+function recoverPrototypeDesignSystemCandidateSet(
+  persisted: PersistedPrototypeDesignSystemCandidateSet | null | undefined,
+  legacySelected?: PersistedPrototypeDesignSystem | null,
+): PrototypeDesignSystemCandidateSet | null
+```
+
+### 3. Contracts
+
+- `prototypeDesignSystemCandidates.set` is the generic grouping/selection
+  contract. `artifacts` is a workspace compatibility cache for binary bytes;
+  Design IR materials and content references remain authoritative.
+- `prototypeDesignSystem` remains the selected singular projection consumed by
+  existing page and production code. It must never point at an unselected
+  candidate.
+- Ready candidates project to distinct `design-system` and `design-markdown`
+  materials with candidate provenance. The selection receipt gets its own
+  provenance record.
+- Only the selected candidate's validated `DESIGN.md` projects to Design IR
+  tokens. Design Kit receives the exact selected Markdown material binding;
+  CSS, Tailwind, JSON, and theme outputs derive from the corresponding tokens.
+- Historical singular workspaces recover as one selected candidate without
+  rewriting their image, Markdown, pages, or current downstream behavior.
+- Compilers and persisted-manifest validators compute document fingerprints
+  from `validateDesignDocument(...).data.document`, because additive defaults
+  such as `candidateSets: []` are part of the normalized cross-compiler
+  contract. Semantic declaration checks may still inspect the caller-authored
+  relation set when legacy materialization would hide a missing declaration.
+
+### 4. Validation & Error Matrix
+
+| Condition | Required behavior |
+| --- | --- |
+| Persisted candidate set fails schema validation | ignore the candidate wrapper; preserve recoverable singular/page media |
+| Ready candidate lacks artifact bytes | do not expose it as selectable |
+| Candidate output references missing material/provenance | Design IR validation fails closed |
+| Selected Markdown hash/revision differs from material | Design Kit compilation fails closed |
+| Legacy singular system exists without candidate field | wrap as one selected compatibility candidate |
+| Unselected multi-direction set reloads | restore `design-system-selection`, not `idle` |
+| Two compilers fingerprint raw vs normalized IR | reject as drift; update both to fingerprint the validated normalized document |
+
+### 5. Good / Base / Bad Cases
+
+- Good: two candidates persist, one is selected, tokens and exports bind to its
+  Markdown, and both directions remain inspectable after reload.
+- Base: an old project with one system restores exactly as before through a
+  one-candidate selected wrapper.
+- Bad: the UI stores candidate bytes but Design IR still contains only a
+  mutable alias with no grouping, provenance, or selected token lineage.
+
+### 6. Tests Required
+
+- Candidate runtime unit tests for status updates and human/Agent selection.
+- Workspace fingerprint and repository round-trip coverage for candidate state.
+- Legacy projection coverage for candidate materials, selection provenance,
+  selected tokens, and workspace reconstruction.
+- Compiler coverage proving exact selected `DESIGN.md` emission and SHA/revision
+  rejection.
+
+### 7. Wrong vs Correct
+
+```ts
+// Wrong: every generated direction becomes downstream authority.
+tokens = candidates.flatMap(projectTokens)
+
+// Correct: selection controls the singular projection and token lineage.
+const artifact = artifacts[candidateSet.selection.candidateId]
+tokens = projectDesignMarkdownTokens(parseEditableDesignMarkdown(artifact.designMarkdown), {
+  provenanceId: candidateSet.selection.provenanceId,
+})
+```
