@@ -168,4 +168,4 @@ pnpm tauri build         # desktop package
 
 Stack: Tauri 2, React 19, Vite 8, TypeScript, Tailwind v4, and shadcn/ui.
 
-Read more: [Codex plugin](docs/CODEX_PLUGIN.md) · [Agent integration](docs/AGENT_INTEGRATION.md) · [Headless Agent Control](docs/HEADLESS_AGENT_CONTROL.md) · [AI Native](docs/AI_NATIVE.md)
+Read more: [Codex plugin](docs/CODEX_PLUGIN.md) · [Agent integration](docs/AGENT_INTEGRATION.md) · [Headless Agent Control](docs/HEADLESS_AGENT_CONTROL.md)

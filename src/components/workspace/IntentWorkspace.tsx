@@ -72,7 +72,7 @@ import {
   supportsWebSearch,
   type LockedComposerRoute,
 } from "@/agent-runtime/composer-execution";
-import { recordAiNativeDiagnostic } from "@/services/ai-native/diagnostics";
+import { recordRuntimeDiagnostic } from "@/services/runtime-diagnostics";
 import {
   classifyGenerationError,
   userFacingGenerationError,
@@ -1548,7 +1548,7 @@ export function IntentWorkspace({
       const message = errorMessage(error);
       const classification = classifyGenerationError(message);
       const displayMessage = classification.displayMessage;
-      recordAiNativeDiagnostic({
+      recordRuntimeDiagnostic({
         level: "error",
         scope: "workspace.create-assets",
         message,
@@ -2148,7 +2148,7 @@ export function IntentWorkspace({
     if (isErr(result)) {
       console.info("[Cutout] prototype planner failed:", result.error);
       const displayMessage = userFacingGenerationError(result.error);
-      recordAiNativeDiagnostic({
+      recordRuntimeDiagnostic({
         level: "error",
         scope: "prototype-planner",
         message: result.error,
@@ -2222,7 +2222,7 @@ export function IntentWorkspace({
         ? null
         : prototypeDesignSystem;
     const assetManifest = createPrototypeAssetManifest(plan, pages);
-    recordAiNativeDiagnostic({
+    recordRuntimeDiagnostic({
       level: "info",
       scope: "prototype-asset-manifest",
       message: "Generated prototype asset manifest for this run.",

@@ -36,7 +36,7 @@
     "active": true,
     "createUpdaterArtifacts": true,
     "targets": ["app", "dmg"],
-    "copyright": "Copyright © 2026 Nebutra AI Native Team",
+    "copyright": "Copyright © 2026 Nebutra Team",
     "category": "public.app-category.graphics-design",
     "icon": [
       "icons/icon.png",

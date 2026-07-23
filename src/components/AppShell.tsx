@@ -39,7 +39,6 @@ import type { LiveDesignOsArtifacts } from "@/components/design-os-workbench/liv
 import { buildTokenContrastGovernance } from "@/components/design-os-workbench/token-governance";
 import { LibraryUIProvider } from "@/components/library/library-ui";
 import { useAnalysisBridge } from "@/hooks/useAnalysisBridge";
-import { useAiNativeControl } from "@/hooks/useAiNativeControl";
 import { useAutoRun } from "@/hooks/useAutoRun";
 import { useHotkeys, type HotkeyHandlers } from "@/hooks/useHotkeys";
 import { useImageImport } from "@/hooks/useImageImport";
@@ -102,7 +101,7 @@ import {
   markCleanExit,
   startCrashSession,
 } from "@/local-recovery";
-import { recordAiNativeDiagnostic } from "@/services/ai-native/diagnostics";
+import { recordRuntimeDiagnostic } from "@/services/runtime-diagnostics";
 import { clearAuthorizedWorkspaceForProjectTransition, getAuthorizedWorkspace, subscribeAuthorizedWorkspace } from "@/platform/authorized-workspace";
 import { bindTauriAgentHostLifecycle, createTauriAgentHostService } from "@/agent-host/tauri-service";
 import { projectDurableHostEvents } from "@/agent-host/run-event-projection";
@@ -312,7 +311,7 @@ export function AppShell() {
     crashSessionStartedRef.current = true;
     const marker = createLocalStorageCrashMarkerStore(localStorage);
     const result = startCrashSession(marker, { sessionId: crypto.randomUUID(), now: new Date().toISOString() });
-    if (result.crashed) recordAiNativeDiagnostic({ level: "warn", scope: "startup", message: result.safeMode ? "Repeated unclean startup; safe mode recommended." : "Recovered from an unclean startup.", details: { crashCount: result.marker.crashCount, safeMode: result.safeMode } });
+    if (result.crashed) recordRuntimeDiagnostic({ level: "warn", scope: "startup", message: result.safeMode ? "Repeated unclean startup; safe mode recommended." : "Recovered from an unclean startup.", details: { crashCount: result.marker.crashCount, safeMode: result.safeMode } });
     const clean = () => markCleanExit(marker);
     window.addEventListener("pagehide", clean, { once: true });
     return () => window.removeEventListener("pagehide", clean);
@@ -333,7 +332,6 @@ export function AppShell() {
   // One bridge / one worker for the whole shell (auto-run + manual rerun).
   const { analyze } = useAnalysisBridge();
   useAutoRun(analyze);
-  useAiNativeControl({ analyze });
 
   const { importFile, openPicker, pickFile, inputProps } = useImageImport();
   const { exportAll, exportOne } = useExport();

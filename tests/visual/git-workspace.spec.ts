@@ -19,7 +19,7 @@ test.beforeEach(async ({ page }) => {
     let runEventSha256: string | null = null
     ;(window as unknown as { __TAURI_INTERNALS__: { invoke: (command: string, input?: unknown) => Promise<unknown> } }).__TAURI_INTERNALS__ = {
       invoke: async (command, input) => {
-        if (command === 'ai_native_poll' || command === 'load_providers' || command === 'list_key_status') return []
+        if (command === 'load_providers' || command === 'list_key_status') return []
         if (command === 'key_status') return false
         if (command.startsWith('agent_host_')) return { status: 'running', events: [], runs: {} }
         if (command === 'registry_authorize_workspace') return { canceled: false, handle: 'workspace:fixture', label: 'Fixture repository' }
