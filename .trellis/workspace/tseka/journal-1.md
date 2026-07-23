@@ -854,3 +854,36 @@ Separated durable preparation lifecycle evidence from transient conversation pro
 ### Next Steps
 
 - None - task complete
+
+
+## Session 26: Release and install Cutout v0.1.6
+
+**Date**: 2026-07-23
+**Task**: Release and install Cutout v0.1.6
+**Branch**: `chore/archive-release-install-v0-1-6`
+
+### Summary
+
+Prepared, reviewed, merged, tagged, signed, notarized, published, verified, and installed Cutout v0.1.6 from the public Apple Silicon DMG; preserved user data and moved the old v0.1.5 app to Trash.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `ca28859b8a9a25e73fa9fb7c3cc703b4489f2091` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
