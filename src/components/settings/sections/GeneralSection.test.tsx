@@ -4,22 +4,10 @@ import { setupI18n } from "@lingui/core";
 import { I18nProvider } from "@lingui/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({
-  setDeveloperMode: vi.fn(),
-}));
-
 vi.mock("next-themes", () => ({
   useTheme: () => ({ theme: "system", setTheme: vi.fn() }),
 }));
 vi.mock("@/i18n/switch", () => ({ switchLocale: vi.fn() }));
-vi.mock("@/workspace/navigation", () => ({
-  loadWorkspaceNavigation: () => ({
-    version: 2,
-    mode: "canvas",
-    advanced: true,
-  }),
-  setDeveloperMode: mocks.setDeveloperMode,
-}));
 
 import { GeneralSection } from "./GeneralSection";
 
@@ -33,7 +21,6 @@ describe("GeneralSection", () => {
   let root: Root;
 
   beforeEach(() => {
-    vi.clearAllMocks();
     host = document.createElement("div");
     document.body.append(host);
     root = createRoot(host);
@@ -51,29 +38,12 @@ describe("GeneralSection", () => {
     host.remove();
   });
 
-  it("keeps the expected preference order and accessible Developer mode control", () => {
+  it("keeps the expected preference order without project developer controls", () => {
     const rows = [...(host.firstElementChild?.children ?? [])];
-    expect(rows).toHaveLength(3);
+    expect(rows).toHaveLength(2);
     expect(rows[0]?.textContent).toContain("Theme");
     expect(rows[1]?.textContent).toContain("Language");
-    expect(rows[2]?.textContent).toContain("Developer mode");
-
-    const developerMode = host.querySelector(
-      '[role="switch"][aria-label="Developer mode"]',
-    ) as HTMLButtonElement | null;
-    expect(developerMode).not.toBeNull();
-    expect(developerMode?.getAttribute("aria-checked")).toBe("true");
-  });
-
-  it("persists Developer mode immediately through workspace navigation", () => {
-    const developerMode = host.querySelector(
-      '[role="switch"][aria-label="Developer mode"]',
-    ) as HTMLButtonElement;
-
-    act(() => developerMode.click());
-
-    expect(mocks.setDeveloperMode).toHaveBeenCalledOnce();
-    expect(mocks.setDeveloperMode).toHaveBeenCalledWith(false);
-    expect(developerMode.getAttribute("aria-checked")).toBe("false");
+    expect(host.textContent).not.toContain("Developer mode");
+    expect(host.querySelector('[role="switch"]')).toBeNull();
   });
 });

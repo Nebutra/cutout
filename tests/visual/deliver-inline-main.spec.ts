@@ -1,14 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
-
-const navigationKey = "cutout.workspace-navigation.v2";
-const navigationEvent = "cutout:workspace-navigation";
-
-async function navigate(page: Page, value: object) {
-  await page.evaluate(({ key, event, next }) => {
-    localStorage.setItem(key, JSON.stringify(next));
-    window.dispatchEvent(new Event(event));
-  }, { key: navigationKey, event: navigationEvent, next: value });
-}
+import { expect, test } from "@playwright/test";
 
 test("Deliver is one inline responsive workspace while inspectors stay separate", async ({ page }, testInfo) => {
   await page.goto("/");
@@ -71,7 +61,7 @@ test("Deliver is one inline responsive workspace while inspectors stay separate"
     await expect(deliver).toHaveScreenshot(`deliver-inline-${dark ? "dark" : "light"}.png`);
   }
 
-  await navigate(page, { version: 2, mode: "canvas", advanced: false });
+  await page.getByRole("button", { name: "Back to Canvas" }).click();
   await expect(deliver).toHaveCount(0);
   if (testInfo.project.name === "mobile-chrome") await page.setViewportSize({ width: 1024, height: 915 });
   const designButton = page.getByRole("button", { name: "Design", exact: true });
@@ -93,10 +83,4 @@ test("Deliver is one inline responsive workspace while inspectors stay separate"
   await expect(inspector.getByRole("tab", { name: /Delivery center|Kits|Components|Starter/ })).toHaveCount(0);
   await expect(inspector.getByText("System inspector", { exact: true }).first()).toBeVisible();
   await inspector.getByRole("button", { name: "Close" }).click();
-
-  await navigate(page, { version: 2, mode: "canvas", advanced: true });
-  await page.getByRole("button", { name: /Open advanced audit|Advanced/, exact: true }).click();
-  const developer = page.getByRole("dialog", { name: "Developer audit" });
-  await developer.getByText("Host diagnostics", { exact: true }).click();
-  await expect(developer.getByText(/Axe host (available|unavailable)/)).toBeVisible();
 });

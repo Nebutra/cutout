@@ -1047,11 +1047,6 @@ msgid "settings.integrations.desktop_not_installed"
 msgstr "El proveedor de escritorio no está instalado."
 
 #. js-lingui-explicit-id
-#: src/components/settings/sections/GeneralSection.tsx
-msgid "settings.developer_mode.title"
-msgstr "Modo de desarrollador"
-
-#. js-lingui-explicit-id
 #: src/components/settings/sections/RecoverySection.tsx
 msgid "settings.recovery.diagnostic_preview_aria"
 msgstr "Vista previa del paquete de diagnóstico"
@@ -2351,11 +2346,6 @@ msgstr "Atajo"
 #: src/components/settings/VectorizerPanel.tsx
 msgid "settings.key_show"
 msgstr "Mostrar"
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/GeneralSection.tsx
-msgid "settings.developer_mode.hint"
-msgstr "Muestra herramientas de solo lectura de DAG, Design IR y auditoría de recibos dentro de los proyectos."
 
 #. js-lingui-explicit-id
 #: src/components/inspector/SliceDimensions.tsx

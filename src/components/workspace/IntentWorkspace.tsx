@@ -35,7 +35,6 @@ import {
   Plus,
   Route,
   ScanLine,
-  ShieldCheck,
   Sparkles,
   Tag,
   Trash2,
@@ -344,12 +343,8 @@ type DesignMarkdownAsset = ReturnType<
 
 export function IntentWorkspace({
   onOpenDesignOs = () => {},
-  advanced = false,
-  onOpenAdvanced,
 }: {
   readonly onOpenDesignOs?: (tab?: "overview" | "delivery" | "specimen") => void;
-  readonly advanced?: boolean;
-  readonly onOpenAdvanced?: () => void;
 }) {
   const { t } = useLingui();
   const services = useServices();
@@ -3828,8 +3823,6 @@ export function IntentWorkspace({
             setGitDockVisible(false);
             onOpenDesignOs("delivery");
           }}
-          advanced={advanced}
-          onOpenAdvanced={onOpenAdvanced}
           onCollapseSidebar={() => setSidebarCollapsed(true)}
         />
       </div>
@@ -7569,8 +7562,6 @@ function WorkspaceRail({
   onOpenDesign,
   inspectorActive,
   onOpenDeliver,
-  advanced,
-  onOpenAdvanced,
   onCollapseSidebar,
 }: {
   readonly agentActive: boolean;
@@ -7583,8 +7574,6 @@ function WorkspaceRail({
   readonly onOpenDesign: () => void;
   readonly inspectorActive: boolean;
   readonly onOpenDeliver: () => void;
-  readonly advanced?: boolean;
-  readonly onOpenAdvanced?: () => void;
   readonly onCollapseSidebar: () => void;
 }) {
   return (
@@ -7635,13 +7624,6 @@ function WorkspaceRail({
         label="Deliver"
         onClick={onOpenDeliver}
       />
-      {advanced && onOpenAdvanced ? (
-        <RailItem
-          icon={<ShieldCheck className="size-4" />}
-          label="Advanced"
-          onClick={onOpenAdvanced}
-        />
-      ) : null}
     </nav>
   );
 }

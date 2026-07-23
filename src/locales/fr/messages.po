@@ -1047,11 +1047,6 @@ msgid "settings.integrations.desktop_not_installed"
 msgstr "Le fournisseur de bureau n’est pas installé."
 
 #. js-lingui-explicit-id
-#: src/components/settings/sections/GeneralSection.tsx
-msgid "settings.developer_mode.title"
-msgstr "Mode développeur"
-
-#. js-lingui-explicit-id
 #: src/components/settings/sections/RecoverySection.tsx
 msgid "settings.recovery.diagnostic_preview_aria"
 msgstr "Aperçu du bundle de diagnostic"
@@ -2351,11 +2346,6 @@ msgstr "Raccourci"
 #: src/components/settings/VectorizerPanel.tsx
 msgid "settings.key_show"
 msgstr "Afficher"
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/GeneralSection.tsx
-msgid "settings.developer_mode.hint"
-msgstr "Affiche des outils de lecture seule pour le DAG, le Design IR et l'audit des reçus dans les projets."
 
 #. js-lingui-explicit-id
 #: src/components/inspector/SliceDimensions.tsx

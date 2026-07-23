@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 21
+- **Total Sessions**: 22
 - **Last Active**: 2026-07-23
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~724 | Active |
+| `journal-1.md` | ~757 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 22 | 2026-07-23 | Remove project developer mode | `c085038` | `remove/developer-mode` |
 | 21 | 2026-07-23 | Faithful uploaded-material extraction | `5f41ac9` | `chore/archive-general-material-extraction` |
 | 20 | 2026-07-23 | Remove legacy GUI queue | `1cce065` | `cleanup/legacy-code` |
 | 19 | 2026-07-22 | Harden release updater and close security issues | `957be1c`, `039c07a`, `8617887`, `0bc05f9`, `827581e` | `chore/archive-harden-release-task` |
