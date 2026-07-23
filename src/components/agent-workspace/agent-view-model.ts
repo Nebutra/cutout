@@ -235,20 +235,42 @@ function buildFeed(input: AgentViewModelInput): readonly AgentFeedItem[] {
       }
     })
   })
-  const liveMessageItem: AgentFeedItem[] = input.liveAgentMessage
+  const activePreparation = selectActivePreparationEvent(input.runEvents)
+  const hasLiveAgentText = Boolean(input.liveAgentMessage?.text.trim())
+  const liveAgentMessage = input.liveAgentMessage
+    && (!input.working || !activePreparation || hasLiveAgentText)
+    ? input.liveAgentMessage
+    : null
+  const liveMessageItem: AgentFeedItem[] = liveAgentMessage
     ? [{
-        id: input.liveAgentMessage.id,
+        id: liveAgentMessage.id,
         type: 'message',
         role: 'agent',
         status: 'pending',
         title: 'Agent',
-        detail: input.liveAgentMessage.text,
+        detail: liveAgentMessage.text,
         provenance: 'runtime',
+      }]
+    : []
+  const preparationActivityItem: AgentFeedItem[] = input.working && !hasLiveAgentText && activePreparation
+    ? [{
+        id: activePreparation.eventId,
+        type: 'message',
+        role: 'agent',
+        status: 'pending',
+        title: 'Agent',
+        detail: activePreparation.detail ?? 'Checking your request…',
+        provenance: 'runtime',
+        activity: {
+          label: activePreparation.label,
+          elapsedLabel: input.elapsedSeconds > 0 ? formatElapsed(input.elapsedSeconds) : null,
+          state: 'running',
+        },
       }]
     : []
   const activeStage = input.stages.find((stage) => stage.status === 'running')
   const hasDurableActivity = Boolean(projectExecutionTimeline(input.runEvents))
-  const activityItem: AgentFeedItem[] = input.working && !input.liveAgentMessage && !hasDurableActivity && (input.preparing || activeStage)
+  const activityItem: AgentFeedItem[] = input.working && !input.liveAgentMessage && !activePreparation && !hasDurableActivity && (input.preparing || activeStage)
     ? [{
         id: `runtime:activity:${activeStage?.id ?? input.workflowPhase}`,
         type: 'message',
@@ -310,7 +332,7 @@ function buildFeed(input: AgentViewModelInput): readonly AgentFeedItem[] {
   }))
 
   const fallbackItems = [...noticeItems, ...materialItems, ...errorItems]
-  const eventItems = [...conversationItems, ...liveMessageItem, ...activityItem, ...activeOpsItems]
+  const eventItems = [...conversationItems, ...liveMessageItem, ...preparationActivityItem, ...activityItem, ...activeOpsItems]
   if (eventItems.length === 0) return fallbackItems
 
   // Durable events are authoritative for facts they contain, but the current
@@ -325,28 +347,35 @@ function buildFeed(input: AgentViewModelInput): readonly AgentFeedItem[] {
 }
 
 function projectConversationFeedEvents(events: readonly AgentRunEvent[]): readonly AgentRunEvent[] {
-  const selectedConversation = collapseRepeatedIntentTurns(projectActiveConversation(events))
-  const includedIds = new Set(selectedConversation.map((event) => event.eventId))
-  const latestPreparingByStep = new Map<string, AgentRunEvent>()
-  for (const event of events) {
-    if (
-      (event.type === 'step-started'
-        || event.type === 'step-succeeded'
-        || event.type === 'step-failed'
-        || event.type === 'step-cancelled')
-      && isPreparingStepEvent(event)
-    ) latestPreparingByStep.set(event.stepId, event)
-  }
-  for (const event of latestPreparingByStep.values()) includedIds.add(event.eventId)
-  return events.filter((event) => includedIds.has(event.eventId))
+  return collapseRepeatedIntentTurns(projectActiveConversation(events))
 }
 
-function isPreparingStepEvent(event: AgentRunEvent): boolean {
+type StepLifecycleEvent = Extract<AgentRunEvent, {
+  type: 'step-started' | 'step-succeeded' | 'step-failed' | 'step-cancelled'
+}>
+type PreparationLifecycleEvent = StepLifecycleEvent & {
+  readonly stepId: `step:prepare:${string}`
+}
+
+function isPreparingStepEvent(event: AgentRunEvent): event is PreparationLifecycleEvent {
   return (event.type === 'step-started'
     || event.type === 'step-succeeded'
     || event.type === 'step-failed'
     || event.type === 'step-cancelled')
     && event.stepId.startsWith('step:prepare:')
+}
+
+/** Preparation is durable audit evidence but only an unresolved active step is chat activity. */
+function selectActivePreparationEvent(
+  store: AgentRunEventStore | null | undefined,
+): PreparationLifecycleEvent | null {
+  const activeRunId = store?.activeRunId
+  if (!activeRunId) return null
+  let latest: PreparationLifecycleEvent | null = null
+  for (const event of store.events) {
+    if (event.runId === activeRunId && isPreparingStepEvent(event)) latest = event
+  }
+  return latest?.type === 'step-started' ? latest : null
 }
 
 function latestMessageRevisions(events: readonly AgentRunEvent[]): ReadonlyMap<string, string> {
@@ -514,22 +543,7 @@ function feedItemFromRunEvent(event: AgentRunEvent): readonly AgentFeedItem[] {
       }]
     case 'step-started':
     case 'step-succeeded':
-      if (isPreparingStepEvent(event)) {
-        return [{
-          id: event.eventId,
-          type: 'message',
-          role: 'agent',
-          status: event.type === 'step-started' ? 'pending' : 'complete',
-          title: 'Agent',
-          detail: event.detail ?? (event.type === 'step-started' ? 'Checking your request…' : 'Request checked.'),
-          provenance: 'runtime',
-          activity: {
-            label: event.label,
-            elapsedLabel: null,
-            state: event.type === 'step-started' ? 'running' : 'complete',
-          },
-        }]
-      }
+      if (isPreparingStepEvent(event)) return []
       return [{
         id: event.eventId,
         type: 'stage',
@@ -626,18 +640,7 @@ function feedItemFromRunEvent(event: AgentRunEvent): readonly AgentFeedItem[] {
         outputRefs: event.outputRefs,
       }]
     case 'step-failed':
-      if (isPreparingStepEvent(event)) {
-        return [{
-          id: event.eventId,
-          type: 'message',
-          role: 'agent',
-          status: 'complete',
-          title: 'Agent',
-          detail: event.detail,
-          provenance: 'runtime',
-          activity: { label: event.label, elapsedLabel: null, state: 'failed' },
-        }]
-      }
+      if (isPreparingStepEvent(event)) return []
       return [{ id: event.eventId, type: 'error', status: 'stopped', title: 'Run stopped', detail: `${event.label}: ${event.detail}`, provenance: 'runtime' }]
     case 'tool-failed':
       if (CHAT_SURFACE_TOOLS.has(event.tool)) return []
@@ -653,18 +656,7 @@ function feedItemFromRunEvent(event: AgentRunEvent): readonly AgentFeedItem[] {
         actions: ['retry'],
       }]
     case 'step-cancelled':
-      if (isPreparingStepEvent(event)) {
-        return [{
-          id: event.eventId,
-          type: 'message',
-          role: 'agent',
-          status: 'complete',
-          title: 'Agent',
-          detail: event.detail,
-          provenance: 'runtime',
-          activity: { label: event.label, elapsedLabel: null, state: 'cancelled' },
-        }]
-      }
+      if (isPreparingStepEvent(event)) return []
       return [{ id: event.eventId, type: 'notice', status: 'complete', title: event.label, detail: event.detail, provenance: 'runtime' }]
     case 'tool-cancelled':
       if (CHAT_SURFACE_TOOLS.has(event.tool)) return []

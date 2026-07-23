@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 24
+- **Total Sessions**: 25
 - **Last Active**: 2026-07-23
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~823 | Active |
+| `journal-1.md` | ~856 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 25 | 2026-07-23 | Fix regenerate activity bubble duplication | `bd185d0` | `fix/regenerate-bubble-duplication` |
 | 24 | 2026-07-23 | Selectable Design System Variants | `f413a90` | `chore/archive-design-system-variants` |
 | 23 | 2026-07-23 | Remediate Dependabot dependency chains | `901bbcf` | `chore/archive-remediate-dependabot-alerts` |
 | 22 | 2026-07-23 | Remove project developer mode | `c085038` | `remove/developer-mode` |

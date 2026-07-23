@@ -557,32 +557,116 @@ describe('buildAgentViewModel', () => {
     expect(selectLatestAgentMessageRegenerationTarget(runEvents.events)?.targetEventId).toBe('second')
   })
 
-  it('replaces the runtime preparing bubble with one durable terminal activity row', () => {
+  it('projects one unresolved preparation activity for the active run', () => {
     const runEvents = replayRunEvents([
-      createRunEvent('run', { type: 'run-started', mode: 'create' }, { eventId: 'start', at: 1 }),
-      createRunEvent('run', { type: 'intent-recorded', intent: 'Hello' }, { eventId: 'user', at: 2 }),
-      createRunEvent('run', {
-        type: 'step-started', stepId: 'step:prepare:run', label: 'Preparing the run', detail: 'Checking your request…',
-      }, { eventId: 'prepare-start', at: 3 }),
-      createRunEvent('run', {
-        type: 'step-succeeded', stepId: 'step:prepare:run', label: 'Preparing the run', detail: 'Request checked.',
-      }, { eventId: 'prepare-done', at: 4 }),
-      createRunEvent('run', { type: 'agent-message', message: 'Hello', responseToEventId: 'user' }, { eventId: 'reply', at: 5 }),
+      createRunEvent('run:old', { type: 'run-started', mode: 'create' }, { eventId: 'old-start', at: 1 }),
+      createRunEvent('run:old', { type: 'intent-recorded', intent: 'Hello' }, { eventId: 'user', at: 2 }),
+      createRunEvent('run:old', { type: 'step-started', stepId: 'step:prepare:old', label: 'Preparing old run' }, { eventId: 'old-prepare-start', at: 3 }),
+      createRunEvent('run:old', { type: 'step-succeeded', stepId: 'step:prepare:old', label: 'Preparing old run' }, { eventId: 'old-prepare-done', at: 4 }),
+      createRunEvent('run:old', { type: 'agent-message', message: 'Old response', responseToEventId: 'user' }, { eventId: 'old-response', at: 5 }),
+      createRunEvent('run:new', { type: 'run-started', mode: 'repair' }, { eventId: 'new-start', at: 6 }),
+      createRunEvent('run:new', { type: 'step-started', stepId: 'step:prepare:new', label: 'Preparing the run', detail: 'Checking your request…' }, { eventId: 'new-prepare-start', at: 7 }),
     ])
     const model = buildAgentViewModel({
       brief: 'Hello', workflowPhase: 'idle', stages: [], outcome: null,
-      working: false, elapsedSeconds: 0, runError: null, runEvents,
+      working: true, preparing: true, elapsedSeconds: 2, runError: null, runEvents,
     })
 
-    expect(model.feed.filter((item) => item.type === 'message')).toEqual([
-      expect.objectContaining({ id: 'user' }),
-      expect.objectContaining({
-        id: 'prepare-done',
-        activity: expect.objectContaining({ label: 'Preparing the run', state: 'complete' }),
-      }),
-      expect.objectContaining({ id: 'reply' }),
-    ])
+    const activities = model.feed.filter((item) => item.type === 'message' && item.activity)
+    expect(activities).toEqual([expect.objectContaining({
+      id: 'new-prepare-start',
+      status: 'pending',
+      detail: 'Checking your request…',
+      activity: expect.objectContaining({ label: 'Preparing the run', state: 'running' }),
+    })])
+    expect(model.feed.filter((item) => item.type === 'message' && item.role === 'user')).toHaveLength(1)
+    expect(model.feed.filter((item) => item.type === 'message' && item.role === 'agent')).toHaveLength(2)
     expect(model.feed.some((item) => item.id.startsWith('runtime:activity:'))).toBe(false)
+  })
+
+  it('lets live Agent output supersede unresolved preparation activity', () => {
+    const runEvents = replayRunEvents([
+      createRunEvent('run', { type: 'run-started', mode: 'repair' }, { eventId: 'start', at: 1 }),
+      createRunEvent('run', { type: 'step-started', stepId: 'step:prepare:run', label: 'Preparing the run' }, { eventId: 'prepare', at: 2 }),
+    ])
+    const input = {
+      brief: 'Hello', workflowPhase: 'idle', stages: [], outcome: null,
+      working: true, preparing: true, elapsedSeconds: 1, runError: null, runEvents,
+    } as const
+    const awaitingText = buildAgentViewModel({
+      ...input,
+      liveAgentMessage: { id: 'runtime:stream:run', label: 'Agent is responding', text: '' },
+    })
+    const model = buildAgentViewModel({
+      ...input,
+      liveAgentMessage: { id: 'runtime:stream:run', label: 'Agent is responding', text: 'Fresh response' },
+    })
+
+    expect(awaitingText.feed.filter((item) => item.type === 'message')).toEqual([
+      expect.objectContaining({ id: 'prepare', activity: expect.objectContaining({ state: 'running' }) }),
+    ])
+    expect(model.feed.filter((item) => item.type === 'message')).toEqual([
+      expect.objectContaining({ id: 'runtime:stream:run', detail: 'Fresh response' }),
+    ])
+    expect(model.feed.some((item) => item.type === 'message' && item.activity)).toBe(false)
+  })
+
+  it.each(['step-succeeded', 'step-failed', 'step-cancelled'] as const)(
+    'keeps %s preparation evidence out of the conversation transcript',
+    (type) => {
+      const terminal = type === 'step-succeeded'
+        ? { type, stepId: 'step:prepare:run', label: 'Preparing the run', detail: 'Request checked.' } as const
+        : { type, stepId: 'step:prepare:run', label: 'Preparing the run', detail: `${type} evidence` } as const
+      const runEvents = replayRunEvents([
+        createRunEvent('run', { type: 'run-started', mode: 'repair' }, { eventId: 'start', at: 1 }),
+        createRunEvent('run', { type: 'intent-recorded', intent: 'Hello' }, { eventId: 'user', at: 2 }),
+        createRunEvent('run', { type: 'step-started', stepId: 'step:prepare:run', label: 'Preparing the run' }, { eventId: 'prepare-start', at: 3 }),
+        createRunEvent('run', terminal, { eventId: 'prepare-terminal', at: 4 }),
+      ])
+      const model = buildAgentViewModel({
+        brief: 'Hello', workflowPhase: 'idle', stages: [], outcome: null,
+        working: true, preparing: true, elapsedSeconds: 1, runError: null, runEvents,
+      })
+
+      expect(model.feed.filter((item) => item.type === 'message')).toEqual([
+        expect.objectContaining({ id: 'user', role: 'user' }),
+      ])
+      expect(model.execution?.steps).toContainEqual(expect.objectContaining({
+        id: 'step:prepare:run',
+        status: type === 'step-succeeded' ? 'succeeded' : type === 'step-failed' ? 'failed' : 'cancelled',
+      }))
+      expect(runEvents.events).toContainEqual(expect.objectContaining({ eventId: 'prepare-terminal', type }))
+    },
+  )
+
+  it('does not resurrect preparation activity when response branches change', () => {
+    const baseEvents = [
+      createRunEvent('run:1', { type: 'run-started', mode: 'create' }, { eventId: 'start-1', at: 1 }),
+      createRunEvent('run:1', { type: 'intent-recorded', intent: 'Who are you?' }, { eventId: 'user', at: 2 }),
+      createRunEvent('run:1', { type: 'step-started', stepId: 'step:prepare:1', label: 'Preparing the run' }, { eventId: 'prepare-1-start', at: 3 }),
+      createRunEvent('run:1', { type: 'step-succeeded', stepId: 'step:prepare:1', label: 'Preparing the run' }, { eventId: 'prepare-1-done', at: 4 }),
+      createRunEvent('run:1', { type: 'agent-message', message: 'First reply', responseToEventId: 'user' }, { eventId: 'first', at: 5 }),
+      createRunEvent('run:2', { type: 'run-started', mode: 'repair' }, { eventId: 'start-2', at: 6 }),
+      createRunEvent('run:2', { type: 'step-started', stepId: 'step:prepare:2', label: 'Preparing the run' }, { eventId: 'prepare-2-start', at: 7 }),
+      createRunEvent('run:2', { type: 'step-succeeded', stepId: 'step:prepare:2', label: 'Preparing the run' }, { eventId: 'prepare-2-done', at: 8 }),
+      createRunEvent('run:2', { type: 'agent-message', message: 'Second reply', responseToEventId: 'user' }, { eventId: 'second', at: 9 }),
+    ]
+    for (const [selectedId, selectionAt] of [['first', 10], ['second', 11]] as const) {
+      const runEvents = replayRunEvents([
+        ...baseEvents,
+        createRunEvent('run:2', { type: 'branch-selected', sourceEventId: 'user', responseEventId: selectedId }, { eventId: `select-${selectedId}`, at: selectionAt }),
+      ])
+      const model = buildAgentViewModel({
+        brief: 'Who are you?', workflowPhase: 'idle', stages: [], outcome: null,
+        working: false, elapsedSeconds: 0, runError: null, runEvents,
+      })
+
+      expect(model.feed.filter((item) => item.type === 'message')).toEqual([
+        expect.objectContaining({ id: 'user' }),
+        expect.objectContaining({ id: selectedId, branch: expect.objectContaining({ count: 2 }) }),
+      ])
+      expect(model.feed.some((item) => item.type === 'message' && item.activity)).toBe(false)
+    }
   })
 
   it('suppresses message regeneration while another run is active', () => {

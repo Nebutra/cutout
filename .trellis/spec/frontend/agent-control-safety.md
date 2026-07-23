@@ -108,6 +108,13 @@ receipts. `.cutout` state and provenance remain authoritative.
   the effective source user turn, ignores selected-material repair context,
   emits no duplicate `intent-recorded` event, appends an immutable sibling
   `agent-message`, and selects it through a durable `branch-selected` event.
+- Durable run events and durable chat rows have different lifetimes. A
+  `step:prepare:<run-id>` lifecycle remains authoritative Git/audit evidence,
+  but the conversation projects at most one preparation activity bubble: the
+  current run's unresolved `step-started` event while work is active. An empty
+  stream placeholder does not replace it; the first non-empty live Agent text
+  does. `step-succeeded`, `step-failed`, and `step-cancelled` remain available
+  to the execution timeline and receipts but never become terminal chat rows.
 - User turns may link to the selected Agent response with `parentEventId`, and
   Agent responses may link to their source turn with `responseToEventId`.
   Legacy unlinked transcripts replay linearly. Branch selection remains
@@ -161,6 +168,10 @@ receipts. `.cutout` state and provenance remain authoritative.
 | Agent reply is older, pending, non-durable, lacks a source turn, or another run is active | Do not expose message Regenerate |
 | Regenerate tool gate returns no call or selects a non-conversational tool | Revise through the conversational path; never enter asset generation |
 | Regenerate tool gate fails | Publish the new classified run failure; never resume or fall through to the asset pipeline |
+| Current run has an unresolved `step:prepare:*` start and no non-empty live Agent text | Show exactly one pending preparation activity bubble |
+| Live Agent label exists but streamed text is still empty | Keep the preparation activity visible; do not replace it with a blank pending bubble |
+| First non-empty live Agent text arrives | Replace the preparation activity with one live Agent message |
+| Preparation succeeds, fails, or is cancelled | Keep the terminal event in audit/timeline state and render zero preparation chat bubbles |
 
 ### 5. Good / Base / Bad Cases
 
@@ -175,6 +186,9 @@ receipts. `.cutout` state and provenance remain authoritative.
   icon, reuses the source user turn, appends a sibling response, selects it,
   and exposes stable previous/next navigation without a second user bubble or
   paid asset execution.
+- Good preparation projection: repeated regeneration appends distinct durable
+  preparation lifecycles, while chat shows one current activity during request
+  checking and no preparation activity after completion or branch switching.
 - Base: sibling Agent replies remain recoverable through branch navigation;
   only the selected response at the active head is eligible for regeneration.
 - Bad: reconstruct `{ id, grantedAt }` from a CLI flag, execute after a failed
@@ -184,6 +198,9 @@ receipts. `.cutout` state and provenance remain authoritative.
 - Bad: implement message Regenerate by calling the normal create path with a
   new intent event or by letting a no-call classifier result fall into asset
   generation.
+- Bad: add the latest event for every historical preparation step to the
+  conversation feed. Unique per-run step IDs then accumulate permanent bubbles
+  and overlap the current live reply.
 
 ### 6. Tests Required
 
@@ -213,6 +230,11 @@ receipts. `.cutout` state and provenance remain authoritative.
   no duplicate user turns, selected-material isolation, restart/legacy
   recovery, no-call/non-conversational fail-closed behavior, and stale-error
   clearing before the awaited tool-gate boundary.
+- Preparation activity: historical and current runs, empty versus non-empty
+  live stream state, succeeded/failed/cancelled terminals, repeated
+  regeneration, both branch directions, exact DOM activity/message counts,
+  and proof that terminal preparation evidence remains persisted and visible
+  through the execution timeline.
 - Repository history: authorization after mount, opaque-handle read/write,
   deterministic ordered union, identical legacy deduplication, branch
   selection restoration, divergent-ID rejection, CAS conflict, credential
@@ -262,3 +284,22 @@ createAssets('create', {
 The first form appends another user turn and may fall into material or asset
 generation. The second reuses the durable turn, isolates message regeneration
 from canvas repair, and appends a selected sibling Agent reply.
+
+#### Wrong
+
+```ts
+for (const event of latestPreparationEventByStep.values()) {
+  conversationEventIds.add(event.eventId)
+}
+```
+
+#### Correct
+
+```ts
+const activePreparation = selectActivePreparationEvent(runEvents)
+const showPreparation = working && activePreparation && !liveAgentText.trim()
+```
+
+The first form confuses append-only audit durability with conversation lifetime
+and retains one row per regeneration. The second derives one ephemeral display
+state from the authoritative active-run lifecycle without deleting evidence.
