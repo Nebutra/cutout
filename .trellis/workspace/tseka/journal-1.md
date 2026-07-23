@@ -821,3 +821,36 @@ Added Agent-resolved Design System candidate generation, comparison and explicit
 ### Next Steps
 
 - None - task complete
+
+
+## Session 25: Fix regenerate activity bubble duplication
+
+**Date**: 2026-07-23
+**Task**: Fix regenerate activity bubble duplication
+**Branch**: `fix/regenerate-bubble-duplication`
+
+### Summary
+
+Separated durable preparation lifecycle evidence from transient conversation projection; added live-text precedence, terminal suppression, branch and DOM regressions, and captured the contract in Agent safety specs.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `bd185d0` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
