@@ -722,3 +722,36 @@ Added staged Agent routing for deterministic asset-sheet slicing and Apple Visio
 ### Next Steps
 
 - None - task complete
+
+
+## Session 22: Remove project developer mode
+
+**Date**: 2026-07-23
+**Task**: Remove project developer mode
+**Branch**: `remove/developer-mode`
+
+### Summary
+
+Removed the General settings developer toggle, workspace Advanced rail action, developer audit dialog/export, and advanced navigation capability; added safe migration for retired local state and updated unit, visual, localization, and state-management contracts.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `23aaf73` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
