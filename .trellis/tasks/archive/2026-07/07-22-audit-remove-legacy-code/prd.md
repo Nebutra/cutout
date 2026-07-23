@@ -78,7 +78,7 @@ contracts, updater behavior, and current product workflows.
   execution, and diagnostic bundle export under a neutral module name.
 - [x] Current core workflows and public Agent/release contracts remain valid.
 - [x] Focused and full validation pass for the final deletion set.
-- [ ] Changes are delivered to `main` without including unrelated work.
+- [x] Changes are delivered to `main` without including unrelated work.
 
 ## Out Of Scope
 

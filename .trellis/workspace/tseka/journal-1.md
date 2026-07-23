@@ -656,3 +656,36 @@ Hardened Cutout security boundaries and updater trust, protected release governa
 ### Next Steps
 
 - None - task complete
+
+
+## Session 20: Remove legacy GUI queue
+
+**Date**: 2026-07-23
+**Task**: Remove legacy GUI queue
+**Branch**: `cleanup/legacy-code`
+
+### Summary
+
+Removed the deprecated GUI Queue, Queue-only semantic experiment, native handlers and permissions; retained persisted compatibility and runtime diagnostics; merged PR #19 after full cross-platform quality gates.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `1cce065` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
