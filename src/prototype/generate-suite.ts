@@ -3,6 +3,7 @@ import { parseDesignMarkdown, parseEditableDesignMarkdown } from './design-md'
 import { hasExportableTokens } from './design-md-export'
 import { createPrototypeAssetManifest } from './asset-manifest'
 import type { PrototypeSuiteScope } from './scope'
+import type { CandidateDirection } from '@/candidate-selection/contracts'
 
 export {
   DEFAULT_PROTOTYPE_SUITE_SCOPE,
@@ -120,8 +121,9 @@ export function prototypePagePrompt(
 export function prototypeDesignSystemPrompt(
   plan: PrototypePlan,
   importedDesignMarkdown?: string | null,
+  direction?: CandidateDirection,
 ): string {
-  const designMd = prototypeDesignMarkdown(plan, importedDesignMarkdown)
+  const designMd = prototypeDesignMarkdown(plan, importedDesignMarkdown, direction)
   const referenceStrategy = designSystemReferenceStrategy(plan)
   return [
     `Create ONE polished professional design-system reference image for this prototype suite.`,
@@ -141,6 +143,17 @@ export function prototypeDesignSystemPrompt(
     `- Spacing: ${plan.designSystem.spacing}`,
     `- Component principles: ${plan.designSystem.componentPrinciples.join('; ')}`,
     `- Asset direction: ${plan.designSystem.assetDirection}`,
+    ...(direction
+      ? [
+          ``,
+          `Deliberate candidate direction:`,
+          `- Name: ${direction.label}`,
+          `- Thesis: ${direction.thesis}`,
+          `- Vary from sibling candidates: ${direction.vary.join('; ')}`,
+          `- Preserve across every candidate: ${direction.preserve.join('; ')}`,
+          `Express this exact thesis clearly. Do not collapse toward a generic midpoint or imitate an undeclared sibling direction.`,
+        ]
+      : []),
     ``,
     `Agent-readable DESIGN.md source of truth to visualize:`,
     designMd,
@@ -155,6 +168,7 @@ export function prototypeDesignSystemPrompt(
 export function prototypeDesignMarkdownSynthesisSystem(
   plan: PrototypePlan,
   importedDesignMarkdown?: string | null,
+  direction?: CandidateDirection,
 ): string {
   return [
     'You are a senior design-system documentation engineer.',
@@ -179,6 +193,9 @@ export function prototypeDesignMarkdownSynthesisSystem(
     `Primary goal: ${plan.product.primaryGoal}`,
     `Planned style summary: ${plan.designSystem.styleSummary}`,
     `Planned asset direction: ${plan.designSystem.assetDirection}`,
+    direction ? `Candidate direction: ${direction.label} — ${direction.thesis}` : '',
+    direction ? `Axes intentionally varied: ${direction.vary.join('; ')}` : '',
+    direction ? `Constraints preserved: ${direction.preserve.join('; ')}` : '',
     '',
     importedDesignMarkdown
       ? [
@@ -193,6 +210,7 @@ export function prototypeDesignMarkdownSynthesisSystem(
 export function prototypeDesignMarkdown(
   plan: PrototypePlan,
   importedDesignMarkdown?: string | null,
+  direction?: CandidateDirection,
 ): string {
   const imported = importedDesignMarkdown?.trim()
   const parsedImported = imported ? parseDesignMarkdown(imported) : null
@@ -238,8 +256,8 @@ export function prototypeDesignMarkdown(
         ].join('\n')
       : '# Overview',
     parsedImported
-      ? `${plan.product.name} maps the imported DESIGN.md contract onto this prototype suite. ${plan.designSystem.styleSummary}`
-      : `${plan.product.name} uses a planner-authored visual contract for ${plan.product.platform}. ${plan.designSystem.styleSummary}`,
+      ? `${plan.product.name} maps the imported DESIGN.md contract onto this prototype suite. ${plan.designSystem.styleSummary}${direction ? ` Candidate direction: ${direction.label} — ${direction.thesis}` : ''}`
+      : `${plan.product.name} uses a planner-authored visual contract for ${plan.product.platform}. ${plan.designSystem.styleSummary}${direction ? ` Candidate direction: ${direction.label} — ${direction.thesis}` : ''}`,
     '',
     ...(parsedImported
       ? []

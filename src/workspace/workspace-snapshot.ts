@@ -16,12 +16,14 @@ import type { CompositeDeliveryReceipt, DeliveryPlan, DeliveryRequest } from '@/
 import type { ApprovedDeliverableReceipt } from '@/global-library'
 import type { BrandViRun } from '@/brand-kit'
 import type { CanvasAnnotation } from '@/components/workspace/canvas-annotations'
+import type { CandidateSet } from '@/candidate-selection/contracts'
 
 export type WorkspaceWorkflowPhase =
   | 'idle'
   | 'planning'
   | 'review'
   | 'design-system'
+  | 'design-system-selection'
   | 'generating-suite'
 
 export type WorkspaceNamingStatus =
@@ -44,6 +46,11 @@ export interface PersistedPrototypeDesignSystem extends PersistedPrototypeImage 
   readonly designMarkdown: string
 }
 
+export interface PersistedPrototypeDesignSystemCandidateSet {
+  readonly set: CandidateSet
+  readonly artifacts: Readonly<Record<string, PersistedPrototypeDesignSystem>>
+}
+
 export interface PersistedPrototypePage extends PersistedPrototypeImage {
   readonly page: PrototypePage
 }
@@ -63,6 +70,8 @@ export interface WorkspaceSnapshot {
   readonly humanLoopChoiceId: string | null
   readonly humanLoopCustomAnswer: string
   readonly prototypeDesignSystem: PersistedPrototypeDesignSystem | null
+  /** Additive multi-direction state; the singular field remains the selected projection. */
+  readonly prototypeDesignSystemCandidates?: PersistedPrototypeDesignSystemCandidateSet | null
   readonly prototypePages: readonly PersistedPrototypePage[]
   readonly selectedPrototypePageId: string | null
   readonly runError: string | null
@@ -114,6 +123,7 @@ export function createEmptyWorkspaceSnapshot(
     humanLoopChoiceId: null,
     humanLoopCustomAnswer: '',
     prototypeDesignSystem: null,
+    prototypeDesignSystemCandidates: null,
     prototypePages: [],
     selectedPrototypePageId: null,
     runError: null,
@@ -132,6 +142,7 @@ export function isWorkspaceSnapshotEmpty(
   return (
     !snapshot.prototypePlan &&
     !snapshot.prototypeDesignSystem &&
+    !snapshot.prototypeDesignSystemCandidates &&
     snapshot.prototypePages.length === 0 &&
     !snapshot.selectedPrototypePageId &&
     !snapshot.runError &&
@@ -182,6 +193,21 @@ export function workspaceSnapshotFingerprint(
       ].join(':'),
     )
     .join(',')
+  const designCandidates = snapshot.prototypeDesignSystemCandidates
+    ? textFingerprint(JSON.stringify({
+        set: snapshot.prototypeDesignSystemCandidates.set,
+        artifacts: Object.fromEntries(
+          Object.entries(snapshot.prototypeDesignSystemCandidates.artifacts).map(([id, artifact]) => [id, {
+            name: artifact.name,
+            mediaType: artifact.mediaType,
+            width: artifact.width,
+            height: artifact.height,
+            bytes: artifact.bytes.byteLength,
+            designMarkdown: textFingerprint(artifact.designMarkdown),
+          }]),
+        ),
+      }))
+    : ''
   const attachments = (snapshot.attachments ?? [])
     .map((attachment) =>
       [
@@ -201,6 +227,7 @@ export function workspaceSnapshotFingerprint(
     snapshot.humanLoopChoiceId ?? '',
     snapshot.humanLoopCustomAnswer,
     design,
+    designCandidates,
     pages,
     snapshot.selectedPrototypePageId ?? '',
     snapshot.runError ?? '',
@@ -243,6 +270,7 @@ function hasWorkspaceProjectionInput(snapshot: WorkspaceSnapshot): boolean {
   return Boolean(
     snapshot.prototypePlan ||
       snapshot.prototypeDesignSystem ||
+      snapshot.prototypeDesignSystemCandidates ||
       snapshot.prototypePages.length > 0 ||
       snapshot.selectedPrototypePageId ||
       snapshot.runError ||

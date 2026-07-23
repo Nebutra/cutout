@@ -119,6 +119,20 @@ export function createLocalPrototypePlan(
       ],
       assetDirection:
         'Generate only reusable artwork, covers, icons, decorative motifs, and material textures; ignore ordinary code-reproducible UI chrome.',
+      exploration: {
+        mode: 'auto',
+        decidedBy: 'fallback',
+        count: 1,
+        rationale: 'The local fallback keeps one conservative visual direction because no Agent-authored comparison proposal is available.',
+        directions: [{
+          id: 'fallback-direction',
+          label: 'Core direction',
+          thesis: 'Express the inferred product intent as one coherent, production-ready visual system.',
+          vary: ['visual execution'],
+          preserve: ['product intent', 'platform conventions', 'source identity'],
+        }],
+        bounds: { maxCandidates: 8, maxParallelism: 2 },
+      },
     },
     pages: [
       {

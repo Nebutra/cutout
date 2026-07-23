@@ -658,6 +658,7 @@ function workspaceWasMigrated(workspace: WorkspaceSnapshot | null): boolean {
     || workspace.humanLoopChoiceId === undefined
     || workspace.humanLoopCustomAnswer === undefined
     || workspace.prototypeDesignSystem === undefined
+    || workspace.prototypeDesignSystemCandidates === undefined
     || workspace.prototypePages === undefined
     || workspace.selectedPrototypePageId === undefined
     || workspace.runError === undefined
@@ -677,6 +678,7 @@ function mergeWorkspaceProjection(
     ...base,
     prototypePlan: projected.prototypePlan,
     prototypeDesignSystem: projected.prototypeDesignSystem,
+    prototypeDesignSystemCandidates: projected.prototypeDesignSystemCandidates,
     prototypePages: projected.prototypePages,
     attachments: projected.attachments,
   }
@@ -702,6 +704,21 @@ function sameRepresentableWorkspace(
               width: workspace.prototypeDesignSystem.width,
               height: workspace.prototypeDesignSystem.height,
               bytes: workspace.prototypeDesignSystem.bytes.byteLength,
+            }
+          : null,
+        designSystemCandidates: workspace.prototypeDesignSystemCandidates
+          ? {
+              set: workspace.prototypeDesignSystemCandidates.set,
+              artifacts: Object.fromEntries(
+                Object.entries(workspace.prototypeDesignSystemCandidates.artifacts).map(([id, artifact]) => [id, {
+                  name: artifact.name,
+                  designMarkdown: artifact.designMarkdown,
+                  mediaType: artifact.mediaType,
+                  width: artifact.width,
+                  height: artifact.height,
+                  bytes: artifact.bytes.byteLength,
+                }]),
+              ),
             }
           : null,
         pages: workspace.prototypePages.map((page) => ({
@@ -747,6 +764,16 @@ async function createLegacyContentResolver(
     )
   } else if (record.designMarkdown) {
     add('workspace/DESIGN.md', new TextEncoder().encode(record.designMarkdown.content))
+  }
+  const candidateState = record.workspace?.prototypeDesignSystemCandidates
+  if (candidateState) {
+    for (const [candidateId, artifact] of Object.entries(candidateState.artifacts)) {
+      add(`workspace/design-system-candidates/${candidateId}/image`, artifact.bytes)
+      add(
+        `workspace/design-system-candidates/${candidateId}/DESIGN.md`,
+        new TextEncoder().encode(artifact.designMarkdown),
+      )
+    }
   }
   for (const page of record.workspace?.prototypePages ?? []) {
     add(`workspace/pages/${page.page.id}`, page.bytes)

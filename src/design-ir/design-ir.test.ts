@@ -92,7 +92,10 @@ describe('Design IR v1', () => {
   })
   it('accepts a canonical minimal document', () => {
     const parsed = designDocumentSchema.parse(document())
-    expect(validateDesignDocument(parsed)).toEqual({ ok: true, data: { document: parsed } })
+    expect(validateDesignDocument(parsed)).toEqual({
+      ok: true,
+      data: { document: { ...parsed, candidateSets: [] } },
+    })
   })
 
   it('persists a versioned Brand VI selection without treating unselected work as approved', () => {

@@ -140,6 +140,18 @@ import {
   type PrototypePageArtifact,
 } from "@/prototype/prototype-artifact-recovery";
 import {
+  createPrototypeDesignSystemCandidateSet,
+  directionForCandidate,
+  persistPrototypeDesignSystemCandidateSet,
+  readyPrototypeDesignSystemCandidates,
+  recoverPrototypeDesignSystemCandidateSet,
+  selectPrototypeDesignSystemCandidate,
+  selectedPrototypeDesignSystem,
+  updatePrototypeDesignSystemCandidate,
+  type PrototypeDesignSystemCandidateSet,
+} from "@/prototype/design-system-candidates";
+import type { CandidateDirection } from "@/candidate-selection/contracts";
+import {
   renderDesignSource,
   type DesignSourceFormat,
 } from "@/prototype/design-md-export";
@@ -414,6 +426,13 @@ export function IntentWorkspace({
   const [prototypeDesignSystem, setPrototypeDesignSystem] =
     useState<PrototypeDesignSystemArtifact | null>(
       () => initialPrototypeArtifacts.designSystem,
+    );
+  const [prototypeDesignSystemCandidates, setPrototypeDesignSystemCandidates] =
+    useState<PrototypeDesignSystemCandidateSet | null>(() =>
+      recoverPrototypeDesignSystemCandidateSet(
+        initialWorkspace?.prototypeDesignSystemCandidates,
+        initialWorkspace?.prototypeDesignSystem,
+      ),
     );
   const prototypeArtifacts = useMemo(
     () =>
@@ -976,6 +995,9 @@ export function IntentWorkspace({
       prototypeDesignSystem: prototypeDesignSystem
         ? persistPrototypeDesignSystem(prototypeDesignSystem)
         : null,
+      prototypeDesignSystemCandidates: prototypeDesignSystemCandidates
+        ? persistPrototypeDesignSystemCandidateSet(prototypeDesignSystemCandidates)
+        : null,
       prototypePages: prototypePages.map(persistPrototypePage),
       selectedPrototypePageId,
       runError,
@@ -1013,6 +1035,7 @@ export function IntentWorkspace({
     namingStatus,
     outcome,
     prototypeDesignSystem,
+    prototypeDesignSystemCandidates,
     prototypePages,
     prototypePlan,
     prototypeScope,
@@ -1282,6 +1305,8 @@ export function IntentWorkspace({
       regenerateTargetEventId?: string;
       regenerateSourceEventId?: string;
       regenerateFallbackReply?: string;
+      /** Resume page generation after an explicit Design System candidate selection. */
+      resumeSelectedDesignSystem?: PrototypeDesignSystemArtifact;
     } = {},
   ): Promise<void> {
     const baseText = (options.briefOverride ?? brief).trim();
@@ -1407,7 +1432,9 @@ export function IntentWorkspace({
     // Both the tool gate and a repair reuse an existing conversation turn. Do
     // not project either path as a second user bubble in the transcript.
     let intentAlreadyRecorded =
-      mode === "repair" || Boolean(options.regenerateTargetEventId);
+      mode === "repair" ||
+      Boolean(options.regenerateTargetEventId) ||
+      Boolean(options.resumeSelectedDesignSystem);
     if (mode === "create" && !requestedMaterial && !options.skipToolGate) {
       const toolGate = await tryToolGate(text, chatAssignment, lease, {
         regenerateTargetEventId: options.regenerateTargetEventId,
@@ -1552,7 +1579,7 @@ export function IntentWorkspace({
     setRunCancelled(false);
     try {
       let plan = prototypePlan;
-      let plannerBrief = repair
+      let plannerBrief = repair || options.resumeSelectedDesignSystem
         ? text
         : await researchedBrief(
             clarifiedBrief ?? text,
@@ -1624,6 +1651,7 @@ export function IntentWorkspace({
                 ? [plannedImpact.effectiveTarget.id]
                 : undefined,
           materialReference,
+          selectedDesignSystem: options.resumeSelectedDesignSystem,
         },
         lease,
       );
@@ -1673,6 +1701,41 @@ export function IntentWorkspace({
           if (activeRunRef.current === lease) activeRunRef.current = null;
         }
       }
+    }
+  }
+
+  function chooseDesignSystemCandidate(candidateId: string): void {
+    if (!prototypeDesignSystemCandidates) return;
+    try {
+      if (
+        designDocument &&
+        !prototypeDesignSystemCandidates.set.baseRevisionId.startsWith("workspace.v1:") &&
+        prototypeDesignSystemCandidates.set.baseRevisionId !== designDocument.revision.id
+      ) {
+        throw new Error(
+          "The project changed after these directions were generated. Regenerate them before selecting.",
+        );
+      }
+      const selected = selectPrototypeDesignSystemCandidate(
+        prototypeDesignSystemCandidates,
+        candidateId,
+        { kind: "human", id: "workspace-user" },
+      );
+      const artifact = selectedPrototypeDesignSystem(selected);
+      if (!artifact) throw new Error("The selected Design System output is unavailable.");
+      setPrototypeDesignSystemCandidates(selected);
+      setPrototypeDesignSystem(artifact);
+      setRunError(null);
+      setSelectedMaterial(null);
+      void createAssets("create", {
+        skipToolGate: true,
+        ignoreSelectedMaterial: true,
+        resumeSelectedDesignSystem: artifact,
+      });
+    } catch (error) {
+      const message = errorMessage(error);
+      setRunError(message);
+      toast.error("Could not select this direction", { description: message });
     }
   }
 
@@ -2326,6 +2389,8 @@ export function IntentWorkspace({
       readonly materialReference?: Uint8Array;
       /** Overrides the page-count heuristic below when the user explicitly asked for one or the other. */
       readonly forceParallel?: boolean;
+      /** Exact promoted candidate supplied by the selection continuation. */
+      readonly selectedDesignSystem?: PrototypeDesignSystemArtifact;
     },
     lease: AgentRunLease,
   ): Promise<void> {
@@ -2350,7 +2415,7 @@ export function IntentWorkspace({
     const reusableDesignSystem =
       options.startFresh || options.repair?.generateDesignSystem
         ? null
-        : prototypeDesignSystem;
+        : options.selectedDesignSystem ?? prototypeDesignSystem;
     const assetManifest = createPrototypeAssetManifest(plan, pages);
     recordRuntimeDiagnostic({
       level: "info",
@@ -2376,6 +2441,7 @@ export function IntentWorkspace({
     if (options.startFresh) {
       setPrototypePages(reusablePages);
       setPrototypeDesignSystem(null);
+      setPrototypeDesignSystemCandidates(null);
       setSelectedPrototypePageId(
         reusablePages.length > 0 ? (reusablePages[0]?.page.id ?? null) : null,
       );
@@ -2400,17 +2466,36 @@ export function IntentWorkspace({
           .join("\n\n")
       : importedDesignMarkdown?.content;
 
-    let designSystem =
-      reusableDesignSystem ??
-      (await generatePrototypeDesignSystem(
-        plan,
-        image,
-        chat,
-        generationContext,
-        options.materialReference,
-        lease,
-      ));
-    if (!reusableDesignSystem) setPrototypeDesignSystem(designSystem);
+    let designSystem = reusableDesignSystem;
+    if (!designSystem) {
+      const existingCandidates = options.startFresh
+        ? null
+        : prototypeDesignSystemCandidates;
+      const selectedExisting = selectedPrototypeDesignSystem(existingCandidates);
+      if (selectedExisting) {
+        designSystem = selectedExisting;
+        setPrototypeDesignSystem(selectedExisting);
+      } else if (
+        existingCandidates &&
+        existingCandidates.set.proposal.count > 1 &&
+        readyPrototypeDesignSystemCandidates(existingCandidates).length > 0
+      ) {
+        autoNamePendingRef.current = false;
+        setNamingStatus("idle");
+        setWorkflowPhase("design-system-selection");
+        return;
+      } else {
+        designSystem = await generatePrototypeDesignSystemCandidates(
+          plan,
+          image,
+          chat,
+          generationContext,
+          options.materialReference,
+          lease,
+        );
+        if (!designSystem) return;
+      }
+    }
 
     if (options.repair?.synthesizeDesignMarkdown && reusableDesignSystem) {
       const designMarkdown =
@@ -3099,11 +3184,12 @@ export function IntentWorkspace({
     designMarkdown: string | undefined,
     materialReference: Uint8Array | undefined,
     lease: AgentRunLease,
+    direction?: CandidateDirection,
   ): Promise<PrototypeDesignSystemArtifact> {
     agentRunCoordinatorRef.current.checkpoint(lease);
     const prompt = applyPendingSteers(
       lease,
-      prototypeDesignSystemPrompt(plan, designMarkdown),
+      prototypeDesignSystemPrompt(plan, designMarkdown, direction),
     );
     // Attached reference images condition the design system on the user's visual
     // direction (垫图, via editImage). editImage is provider-specific, so on
@@ -3159,14 +3245,108 @@ export function IntentWorkspace({
       asset.bytes,
       designMarkdown,
       lease,
+      direction,
     );
-    const fallbackDesignMarkdown = prototypeDesignMarkdown(plan, designMarkdown);
+    const fallbackDesignMarkdown = prototypeDesignMarkdown(plan, designMarkdown, direction);
     const resolvedDesignMarkdown =
       groundedDesignMarkdown &&
       !designSystemMarkdownValidationError(groundedDesignMarkdown)
         ? groundedDesignMarkdown
         : fallbackDesignMarkdown;
-    return assetToDesignSystemArtifact(asset, resolvedDesignMarkdown);
+    return assetToDesignSystemArtifact(
+      asset,
+      resolvedDesignMarkdown,
+      direction?.label ?? "Design system",
+    );
+  }
+
+  async function generatePrototypeDesignSystemCandidates(
+    plan: PrototypePlan,
+    image: ModelAssignment,
+    chat: ModelAssignment,
+    designMarkdown: string | undefined,
+    materialReference: Uint8Array | undefined,
+    lease: AgentRunLease,
+  ): Promise<PrototypeDesignSystemArtifact | null> {
+    let candidateSet = createPrototypeDesignSystemCandidateSet({
+      plan,
+      baseRevisionId: designDocument?.revision.id ?? "workspace.v1:unprojected",
+    });
+    const publish = (next: PrototypeDesignSystemCandidateSet) => {
+      candidateSet = next;
+      agentRunCoordinatorRef.current.publish(lease, () =>
+        setPrototypeDesignSystemCandidates(next),
+      );
+    };
+    publish(candidateSet);
+
+    const candidateIds = candidateSet.set.candidates.map((candidate) => candidate.id);
+    let cursor = 0;
+    const worker = async () => {
+      for (;;) {
+        const candidateId = candidateIds[cursor];
+        cursor += 1;
+        if (!candidateId) return;
+        publish(updatePrototypeDesignSystemCandidate(candidateSet, candidateId, { status: "generating" }));
+        try {
+          const direction = directionForCandidate(candidateSet, candidateId);
+          const artifact = await generatePrototypeDesignSystem(
+            plan,
+            image,
+            chat,
+            designMarkdown,
+            materialReference,
+            lease,
+            direction,
+          );
+          publish(updatePrototypeDesignSystemCandidate(candidateSet, candidateId, {
+            status: "ready",
+            artifact,
+          }));
+        } catch (error) {
+          if (lease.controller.signal.aborted || !agentRunCoordinatorRef.current.isActive(lease)) {
+            publish(updatePrototypeDesignSystemCandidate(candidateSet, candidateId, { status: "cancelled" }));
+            throw error;
+          }
+          publish(updatePrototypeDesignSystemCandidate(candidateSet, candidateId, {
+            status: "failed",
+            error: errorMessage(error),
+          }));
+        }
+      }
+    };
+    const concurrency = Math.min(
+      candidateSet.set.proposal.bounds.maxParallelism,
+      candidateIds.length,
+    );
+    await Promise.all(Array.from({ length: concurrency }, () => worker()));
+    agentRunCoordinatorRef.current.checkpoint(lease);
+
+    const readyIds = readyPrototypeDesignSystemCandidates(candidateSet);
+    if (readyIds.length === 0) {
+      const details = candidateSet.set.candidates
+        .filter((candidate) => candidate.error)
+        .map((candidate) => candidate.error)
+        .join(" ");
+      throw new Error(details || "No Design System candidate completed successfully.");
+    }
+    if (candidateSet.set.proposal.count > 1) {
+      autoNamePendingRef.current = false;
+      setNamingStatus("idle");
+      setWorkflowPhase("design-system-selection");
+      return null;
+    }
+
+    const selected = selectPrototypeDesignSystemCandidate(
+      candidateSet,
+      readyIds[0]!,
+      { kind: "agent", id: "cutout.prototype-orchestrator" },
+    );
+    publish(selected);
+    const artifact = selectedPrototypeDesignSystem(selected);
+    if (!artifact) throw new Error("The selected Design System candidate is unavailable.");
+    setPrototypeDesignSystem(artifact);
+    return artifact;
   }
 
   async function streamConversationalReply(
@@ -3214,6 +3394,7 @@ export function IntentWorkspace({
     imageBytes: Uint8Array,
     importedMarkdown: string | undefined,
     lease: AgentRunLease,
+    direction?: CandidateDirection,
   ): Promise<string | null> {
     const runId = `workspace:${lease.id}`;
     const stepId = `step:${lease.id}:design-markdown`;
@@ -3230,7 +3411,7 @@ export function IntentWorkspace({
     const input = {
       providerId: chat.providerId,
       model: chat.model,
-      system: prototypeDesignMarkdownSynthesisSystem(plan, importedMarkdown),
+      system: prototypeDesignMarkdownSynthesisSystem(plan, importedMarkdown, direction),
       input: [
         {
           type: "text" as const,
@@ -3483,10 +3664,11 @@ export function IntentWorkspace({
   async function assetToDesignSystemArtifact(
     asset: { readonly bytes: Uint8Array; readonly mediaType: string },
     designMarkdown: string,
+    name = "Design system",
   ): Promise<PrototypeDesignSystemArtifact> {
     const artifact = await decodePrototypeImage(asset, (base) => ({
       ...base,
-      name: "Design system",
+      name,
       designMarkdown,
     }));
     const error = prototypeMediaValidationError(artifact);
@@ -4114,6 +4296,8 @@ export function IntentWorkspace({
             prototypePlan={prototypePlan}
             prototypePages={prototypePages}
             prototypeDesignSystem={prototypeDesignSystem}
+            prototypeDesignSystemCandidates={prototypeDesignSystemCandidates}
+            onSelectDesignSystemCandidate={chooseDesignSystemCandidate}
             selectedPrototypePageId={selectedPrototypePageId}
             onPrototypePageSelect={setSelectedPrototypePageId}
             prototypeScope={prototypeScope}
@@ -5665,6 +5849,8 @@ function OutputSurface({
   prototypePlan,
   prototypePages,
   prototypeDesignSystem,
+  prototypeDesignSystemCandidates,
+  onSelectDesignSystemCandidate,
   selectedPrototypePageId,
   onPrototypePageSelect,
   prototypeScope,
@@ -5706,6 +5892,8 @@ function OutputSurface({
   readonly prototypePlan: PrototypePlan | null;
   readonly prototypePages: readonly PrototypePageArtifact[];
   readonly prototypeDesignSystem: PrototypeDesignSystemArtifact | null;
+  readonly prototypeDesignSystemCandidates: PrototypeDesignSystemCandidateSet | null;
+  readonly onSelectDesignSystemCandidate: (candidateId: string) => void;
   readonly selectedPrototypePageId: string | null;
   readonly onPrototypePageSelect: (pageId: string) => void;
   readonly prototypeScope: PrototypeSuiteScope;
@@ -5732,6 +5920,7 @@ function OutputSurface({
   readonly creativeBranches: CreativeBoardState["branches"];
 }) {
   const [previewPageId, setPreviewPageId] = useState<string | null>(null);
+  const [candidateHistoryOpen, setCandidateHistoryOpen] = useState(false);
   const prototypeArtifacts = useMemo(
     () =>
       projectPrototypeArtifacts({
@@ -5768,6 +5957,20 @@ function OutputSurface({
     : missingPageCount > 0
       ? `${missingPageCount} prototype page${missingPageCount === 1 ? "" : "s"} still needs to be generated.`
       : "Prototype screens are available. Continue to extract assets.";
+
+  if (
+    prototypeDesignSystemCandidates &&
+    !prototypeDesignSystemCandidates.set.selection &&
+    prototypeDesignSystemCandidates.set.proposal.count > 1 &&
+    readyPrototypeDesignSystemCandidates(prototypeDesignSystemCandidates).length > 0
+  ) {
+    return (
+      <DesignSystemCandidateComparison
+        candidateSet={prototypeDesignSystemCandidates}
+        onSelect={onSelectDesignSystemCandidate}
+      />
+    );
+  }
 
   // Constrained orchestration board: once a prototype result exists, results +
   // materials are arranged on one governed canvas (design system · pages · assets).
@@ -5958,6 +6161,30 @@ function OutputSurface({
             detail={runError ?? continuationDetail}
             onContinue={onPrimaryAction}
           />
+        ) : null}
+        {prototypeDesignSystemCandidates?.set.selection &&
+        prototypeDesignSystemCandidates.set.proposal.count > 1 ? (
+          <>
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              className="absolute right-3 top-3 z-20"
+              onClick={() => setCandidateHistoryOpen(true)}
+            >
+              <Palette /> Directions
+            </Button>
+            <Dialog open={candidateHistoryOpen} onOpenChange={setCandidateHistoryOpen}>
+              <DialogContent className="h-[min(88vh,54rem)] max-w-[min(96vw,90rem)] overflow-hidden p-0">
+                <DialogTitle className="sr-only">Design System directions</DialogTitle>
+                <DesignSystemCandidateComparison
+                  candidateSet={prototypeDesignSystemCandidates}
+                  onSelect={onSelectDesignSystemCandidate}
+                  readOnly
+                />
+              </DialogContent>
+            </Dialog>
+          </>
         ) : null}
       </div>
     );
@@ -6215,6 +6442,166 @@ function PrototypePlanReview({
       }
     />
   );
+}
+
+function DesignSystemCandidateComparison({
+  candidateSet,
+  onSelect,
+  readOnly = false,
+}: {
+  readonly candidateSet: PrototypeDesignSystemCandidateSet;
+  readonly onSelect: (candidateId: string) => void;
+  readonly readOnly?: boolean;
+}) {
+  return (
+    <div className="flex h-full min-h-0 flex-col bg-background">
+      <div className="shrink-0 border-b border-border px-4 py-3">
+        <div className="flex items-center gap-2">
+          <Palette className="size-4 text-muted-foreground" />
+          <h2 className="text-sm font-semibold">Choose a Design System direction</h2>
+        </div>
+        <p className="mt-1 max-w-3xl text-xs leading-5 text-muted-foreground">
+          {candidateSet.set.proposal.rationale}
+        </p>
+      </div>
+      <div className="min-h-0 flex-1 overflow-x-auto overflow-y-hidden p-4">
+        <div className="flex h-full min-w-max snap-x snap-mandatory gap-3">
+          {candidateSet.set.candidates.map((candidate) => {
+            const direction = candidateSet.set.proposal.directions.find(
+              (item) => item.id === candidate.directionId,
+            );
+            return (
+              <DesignSystemCandidateCard
+                key={candidate.id}
+                candidateId={candidate.id}
+                status={candidate.status}
+                error={candidate.error}
+                direction={direction}
+                artifact={candidateSet.artifacts[candidate.id] ?? null}
+                onSelect={onSelect}
+                readOnly={readOnly}
+                selected={candidateSet.set.selection?.candidateId === candidate.id}
+              />
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DesignSystemCandidateCard({
+  candidateId,
+  status,
+  error,
+  direction,
+  artifact,
+  onSelect,
+  readOnly,
+  selected,
+}: {
+  readonly candidateId: string;
+  readonly status: PrototypeDesignSystemCandidateSet["set"]["candidates"][number]["status"];
+  readonly error?: string;
+  readonly direction?: CandidateDirection;
+  readonly artifact: PrototypeDesignSystemArtifact | null;
+  readonly onSelect: (candidateId: string) => void;
+  readonly readOnly: boolean;
+  readonly selected: boolean;
+}) {
+  const [url, setUrl] = useState<string | null>(null);
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    if (!artifact) {
+      setUrl(null);
+      return;
+    }
+    const next = URL.createObjectURL(artifact.blob);
+    setUrl(next);
+    return () => URL.revokeObjectURL(next);
+  }, [artifact]);
+  const colors = artifact ? designMarkdownSwatches(artifact.designMarkdown) : [];
+
+  return (
+    <article className="flex h-full w-[min(82vw,32rem)] snap-start flex-col overflow-hidden rounded-md border border-border bg-background sm:w-[28rem]">
+      <button
+        type="button"
+        disabled={!artifact}
+        onClick={() => setOpen(true)}
+        className="relative aspect-[4/3] w-full shrink-0 overflow-hidden border-b border-border bg-muted/30 text-muted-foreground disabled:cursor-default"
+      >
+        {url ? (
+          <img src={url} alt="" className="h-full w-full object-contain" />
+        ) : status === "failed" ? (
+          <span className="px-6 text-xs">Generation failed</span>
+        ) : (
+          <Loader2 className={cn("mx-auto size-5", status === "generating" && "animate-spin")} />
+        )}
+      </button>
+      <div className="flex min-h-0 flex-1 flex-col p-3">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h3 className="text-sm font-semibold">{direction?.label ?? "Design direction"}</h3>
+            <p className="mt-1 text-xs leading-5 text-muted-foreground">
+              {direction?.thesis ?? "A generated Design System direction."}
+            </p>
+          </div>
+          <span className="shrink-0 text-[10px] font-medium uppercase text-muted-foreground">
+            {status}
+          </span>
+        </div>
+        {colors.length > 0 ? (
+          <div className="mt-3 flex gap-1" aria-label="Design token colors">
+            {colors.map((color) => (
+              <span
+                key={color}
+                title={color}
+                className="size-7 border border-black/10"
+                style={{ backgroundColor: color }}
+              />
+            ))}
+          </div>
+        ) : null}
+        {direction ? (
+          <div className="mt-3 grid grid-cols-2 gap-3 text-[11px] leading-4 text-muted-foreground">
+            <p><span className="font-medium text-foreground">Varies</span><br />{direction.vary.join(", ")}</p>
+            <p><span className="font-medium text-foreground">Preserves</span><br />{direction.preserve.join(", ")}</p>
+          </div>
+        ) : null}
+        {error ? <p className="mt-3 text-xs text-destructive">{error}</p> : null}
+        <div className="mt-auto flex items-center justify-end gap-2 pt-4">
+          {artifact ? (
+            <Button type="button" variant="ghost" size="sm" onClick={() => setOpen(true)}>
+              <ImageIcon /> Preview
+            </Button>
+          ) : null}
+          <Button
+            type="button"
+            size="sm"
+            disabled={readOnly || status !== "ready" || !artifact}
+            onClick={() => onSelect(candidateId)}
+          >
+            <Check /> {selected ? "Selected" : readOnly ? "Not selected" : "Use this direction"}
+          </Button>
+        </div>
+      </div>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-h-[90vh] max-w-5xl overflow-y-auto">
+          <DialogTitle>{direction?.label ?? artifact?.name ?? "Design System"}</DialogTitle>
+          {url ? <img src={url} alt="" className="w-full border border-border object-contain" /> : null}
+          {artifact ? (
+            <pre className="overflow-x-auto whitespace-pre-wrap rounded-md bg-muted p-3 text-xs leading-5">
+              {artifact.designMarkdown}
+            </pre>
+          ) : null}
+        </DialogContent>
+      </Dialog>
+    </article>
+  );
+}
+
+function designMarkdownSwatches(markdown: string): readonly string[] {
+  return [...new Set(markdown.match(/#[0-9a-fA-F]{6}\b/g) ?? [])].slice(0, 8);
 }
 
 function HumanLoopQuestion({
@@ -6889,6 +7276,7 @@ function resolveAssetStage({
   if (workflowPhase === "planning") return "planning";
   if (workflowPhase === "review") return "review";
   if (workflowPhase === "design-system") return "design-system";
+  if (workflowPhase === "design-system-selection") return "design-system";
   if (workflowPhase === "generating-suite") return "mockup";
   if (genPhase === "generating-mockup") return "mockup";
   if (genPhase === "deconstructing") return "deconstruct";
@@ -7060,6 +7448,18 @@ function recoverWorkflowPhase(
   artifacts: ReturnType<typeof recoverPrototypeArtifacts>,
 ): WorkflowPhase {
   if (!snapshot?.prototypePlan) return "idle";
+  const candidates = recoverPrototypeDesignSystemCandidateSet(
+    snapshot.prototypeDesignSystemCandidates,
+    snapshot.prototypeDesignSystem,
+  );
+  if (
+    candidates &&
+    !candidates.set.selection &&
+    candidates.set.proposal.count > 1 &&
+    readyPrototypeDesignSystemCandidates(candidates).length > 0
+  ) {
+    return "design-system-selection";
+  }
   if (artifacts.pages.length > 0 || artifacts.designSystem)
     return "idle";
   return "review";

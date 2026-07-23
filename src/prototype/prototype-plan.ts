@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { candidateExplorationDecisionSchema } from '@/candidate-selection/contracts'
 import type { Result } from '@/services/types'
 import { err, ok } from '@/services/types'
 
@@ -116,6 +117,17 @@ export const prototypeReviewDocumentSchema = z.object({
   fullPlan: z.string().min(1).max(40_000),
 })
 
+export const prototypeDesignSystemSchema = z.object({
+  styleSummary: z.string().min(1),
+  palette: z.array(z.string().min(1)).min(1),
+  typography: z.string().min(1),
+  spacing: z.string().min(1),
+  componentPrinciples: z.array(z.string().min(1)).min(1),
+  assetDirection: z.string().min(1),
+  /** Historical plans omit this; every newly generated plan must resolve it. */
+  exploration: candidateExplorationDecisionSchema.optional(),
+})
+
 export const prototypePlanSchema = z.object({
   version: z.literal('prototype-plan.v0'),
   product: z.object({
@@ -126,14 +138,7 @@ export const prototypePlanSchema = z.object({
     primaryGoal: z.string().min(1),
     platform: z.string().min(1),
   }),
-  designSystem: z.object({
-    styleSummary: z.string().min(1),
-    palette: z.array(z.string().min(1)).min(1),
-    typography: z.string().min(1),
-    spacing: z.string().min(1),
-    componentPrinciples: z.array(z.string().min(1)).min(1),
-    assetDirection: z.string().min(1),
-  }),
+  designSystem: prototypeDesignSystemSchema,
   pages: z.array(prototypePageSchema).min(1).max(12),
   flows: z.array(prototypeFlowSchema).min(1),
   reviewDocument: prototypeReviewDocumentSchema.optional(),
@@ -146,6 +151,9 @@ export const prototypePlanSchema = z.object({
 /** New planner runs must author both review artifacts. The persisted schema
  * above stays backward-compatible with workspace records from older builds. */
 export const generatedPrototypePlanSchema = prototypePlanSchema.extend({
+  designSystem: prototypeDesignSystemSchema.extend({
+    exploration: candidateExplorationDecisionSchema,
+  }),
   reviewDocument: prototypeReviewDocumentSchema,
 })
 
