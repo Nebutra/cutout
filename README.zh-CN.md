@@ -20,16 +20,19 @@ Cutout 的权威数据不是聊天记录或截图，而是项目中的 `.cutout`
 
 ## 安装 macOS App
 
-从 [Cutout v0.1.4 Release](https://github.com/Nebutra/cutout/releases/tag/v0.1.4) 下载 Apple Silicon DMG，然后将 Cutout 拖入 Applications。
+从 [Cutout v0.1.5 Release](https://github.com/Nebutra/cutout/releases/tag/v0.1.5) 下载 Apple Silicon DMG，然后将 Cutout 拖入 Applications。
 
 公开的 macOS 构建会在发布前完成 Developer ID 签名、Apple 公证和票据装订。
+
+macOS、Windows、更新器签名、审查人与隐私发布门槛见
+[代码签名策略](docs/CODE_SIGNING_POLICY.md)。
 
 ## 安装 Codex 插件
 
 需要 Codex CLI `0.144.5` 或兼容的插件版本。
 
 ```bash
-codex plugin marketplace add Nebutra/cutout --ref v0.1.4
+codex plugin marketplace add Nebutra/cutout --ref v0.1.5
 codex plugin add cutout@cutout-local
 codex plugin list
 ```
@@ -37,7 +40,7 @@ codex plugin list
 `codex plugin list` 应显示：
 
 ```text
-cutout@cutout-local  installed, enabled  0.1.4
+cutout@cutout-local  installed, enabled  0.1.5
 ```
 
 Codex 在会话开始时捕获插件的 Skill 和 MCP 工具。安装或更新插件后，请新建会话。

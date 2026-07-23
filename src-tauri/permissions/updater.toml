@@ -11,9 +11,11 @@ commands.allow = [
 
 [[permission]]
 identifier = "workspace-revision-bridge"
-description = "Allows conflict-checked Design IR revision import and explicitly approved export for an authorized workspace."
+description = "Allows conflict-checked Design IR revision exchange and bounded Agent run-event persistence for an authorized workspace."
 commands.allow = [
   "workspace_revision_read",
   "workspace_revision_preview_export",
   "workspace_revision_apply_export",
+  "workspace_run_events_read",
+  "workspace_run_events_write",
 ]

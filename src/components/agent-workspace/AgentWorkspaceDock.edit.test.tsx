@@ -136,6 +136,31 @@ describe('stopped-run retry', () => {
 })
 
 describe('message regeneration', () => {
+  it('keeps branch navigation visible and selects previous and next sibling responses', async () => {
+    const onSelectAgentResponse = vi.fn()
+    container = document.createElement('div')
+    document.body.append(container)
+    await act(async () => createRoot(container!).render(createElement(AgentRunFeed, {
+      items: [{
+        id: 'agent-second', type: 'message', role: 'agent', status: 'complete', title: 'Agent', detail: 'Second reply', provenance: 'runtime',
+        branch: { sourceEventId: 'user', selectedIndex: 1, count: 3, previousEventId: 'agent-first', nextEventId: 'agent-third' },
+      }],
+      heading: 'Conversation',
+      emptyLabel: 'No activity',
+      detailsLabel: 'Execution details',
+      onSelectAgentResponse,
+    })))
+
+    const navigator = container.querySelector('[aria-label="Response 2 of 3"]')
+    expect(navigator).toBeTruthy()
+    expect(navigator?.textContent).toContain('2 / 3')
+    expect(navigator?.className).not.toContain('opacity-0')
+    await act(async () => click(container!.querySelector('[aria-label="Previous response"]')!))
+    expect(onSelectAgentResponse).toHaveBeenCalledWith('user', 'agent-first')
+    await act(async () => click(container!.querySelector('[aria-label="Next response"]')!))
+    expect(onSelectAgentResponse).toHaveBeenCalledWith('user', 'agent-third')
+  })
+
   it('renders one icon-only action for the latest eligible Agent reply and invokes its callback', async () => {
     const onRegenerateMessage = vi.fn()
     container = document.createElement('div')

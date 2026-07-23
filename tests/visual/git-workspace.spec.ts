@@ -15,12 +15,20 @@ function boxesOverlap(
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(({ commitOid }) => {
     const status = { repositoryId: 'repo.fixture', snapshotToken: 'snapshot.fixture', branch: 'main', upstream: 'origin/main', ahead: 1, behind: 0, detached: false, files: [{ path: 'src/app.tsx', originalPath: null, indexStatus: ' ', worktreeStatus: 'M', conflicted: false }] }
-    ;(window as unknown as { __TAURI_INTERNALS__: { invoke: (command: string) => Promise<unknown> } }).__TAURI_INTERNALS__ = {
-      invoke: async (command) => {
+    let runEventStore: unknown = { version: 'agent-run-events.v1', activeRunId: null, events: [], activeRun: null }
+    let runEventSha256: string | null = null
+    ;(window as unknown as { __TAURI_INTERNALS__: { invoke: (command: string, input?: unknown) => Promise<unknown> } }).__TAURI_INTERNALS__ = {
+      invoke: async (command, input) => {
         if (command === 'load_providers' || command === 'list_key_status') return []
         if (command === 'key_status') return false
         if (command.startsWith('agent_host_')) return { status: 'running', events: [], runs: {} }
         if (command === 'registry_authorize_workspace') return { canceled: false, handle: 'workspace:fixture', label: 'Fixture repository' }
+        if (command === 'workspace_run_events_read') return { store: runEventStore, sha256: runEventSha256, exists: runEventSha256 !== null }
+        if (command === 'workspace_run_events_write') {
+          runEventStore = (input as { store: unknown }).store
+          runEventSha256 = 'b'.repeat(64)
+          return { store: runEventStore, sha256: runEventSha256, exists: true }
+        }
         if (command === 'git_capability') return { available: true, repository: true, gitVersion: 'git version fixture', repositoryId: 'repo.fixture', message: null }
         if (command === 'git_status') return status
         if (command === 'git_log') return [{ oid: commitOid, shortOid: 'aaaaaaa', parents: [], author: 'Ada', authoredAt: '2026-07-20T10:00:00+08:00', decorations: ['HEAD -> main'], subject: 'Add Git workspace' }]

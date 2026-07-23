@@ -102,7 +102,7 @@ import {
   startCrashSession,
 } from "@/local-recovery";
 import { recordRuntimeDiagnostic } from "@/services/runtime-diagnostics";
-import { getAuthorizedWorkspace, subscribeAuthorizedWorkspace } from "@/platform/authorized-workspace";
+import { clearAuthorizedWorkspaceForProjectTransition, getAuthorizedWorkspace, subscribeAuthorizedWorkspace } from "@/platform/authorized-workspace";
 import { bindTauriAgentHostLifecycle, createTauriAgentHostService } from "@/agent-host/tauri-service";
 import { projectDurableHostEvents } from "@/agent-host/run-event-projection";
 import { createRunEventStore } from "@/agent-runtime/run-events";
@@ -1678,6 +1678,7 @@ export function AppShell() {
 
       restoringRef.current = true;
       try {
+        clearAuthorizedWorkspaceForProjectTransition(activeProjectId, id);
         activeRecordRef.current = loaded.data;
         lastSavedFingerprintRef.current = "";
         const restoreInput = await createRestoreInputFromProject(loaded.data);
@@ -1737,6 +1738,7 @@ export function AppShell() {
     await saveActiveProjectNow();
     const project = createEmptyProjectRecord();
 
+    clearAuthorizedWorkspaceForProjectTransition(activeProjectId, project.id);
     restoringRef.current = true;
     activeRecordRef.current = project;
     lastSavedFingerprintRef.current = "";
@@ -1748,7 +1750,7 @@ export function AppShell() {
       restoringRef.current = false;
     });
     return project;
-  }, [resetProject, saveActiveProjectNow]);
+  }, [activeProjectId, resetProject, saveActiveProjectNow]);
   const requestNewProject = useCallback(() => {
     void newProject();
   }, [newProject]);

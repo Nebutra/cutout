@@ -19,6 +19,7 @@ import {
   sha256Bytes,
 } from '@/asset-production'
 import { selectExportPayload } from '@/store/selectors'
+import { createRunEvent, projectAgentResponseBranches, replayRunEvents } from '@/agent-runtime/run-events'
 
 const pngBlob = (byte = 1) =>
   new Blob([new Uint8Array([byte])], { type: 'image/png' })
@@ -498,6 +499,34 @@ describe('project-repository.local', () => {
       'checkout prototype',
     )
     expect(loaded.data.workspace?.agentRunEvents?.events).toHaveLength(2)
+  })
+
+  it('restores Agent response branches and their selected sibling after restart', async () => {
+    const repo = makeRepo()
+    const agentRunEvents = replayRunEvents([
+      createRunEvent('run-1', { type: 'run-started', mode: 'create' }, { eventId: 'start-1', at: 1 }),
+      createRunEvent('run-1', { type: 'intent-recorded', intent: 'Hello' }, { eventId: 'user', at: 2 }),
+      createRunEvent('run-1', { type: 'agent-message', message: 'First', responseToEventId: 'user' }, { eventId: 'first', at: 3 }),
+      createRunEvent('run-2', { type: 'run-started', mode: 'create' }, { eventId: 'start-2', at: 4 }),
+      createRunEvent('run-2', { type: 'agent-message', message: 'Second', responseToEventId: 'user' }, { eventId: 'second', at: 5 }),
+      createRunEvent('run-2', { type: 'branch-selected', sourceEventId: 'user', responseEventId: 'first' }, { eventId: 'selected', at: 6 }),
+    ])
+    const project = {
+      ...createEmptyProjectRecord(326),
+      name: 'Branched conversation',
+      brief: 'Hello',
+      status: 'Draft' as const,
+      workspace: { ...planningSnapshot(), agentRunEvents },
+    }
+
+    expect((await repo.save(project)).ok).toBe(true)
+    const loaded = await repo.load(project.id)
+
+    expect(loaded.ok).toBe(true)
+    if (!loaded.ok) return
+    const restoredEvents = loaded.data.workspace?.agentRunEvents?.events ?? []
+    expect(projectAgentResponseBranches(restoredEvents)[0]?.selectedResponse.eventId).toBe('first')
+    expect(restoredEvents).toEqual(agentRunEvents.events)
   })
 
   it('archives and restores projects without deleting them', async () => {

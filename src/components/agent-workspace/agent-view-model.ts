@@ -7,6 +7,12 @@ import type {
   AgentRunEvent,
   AgentRunEventStore,
 } from '@/agent-runtime/run-events'
+import {
+  projectActiveConversation,
+  projectAgentResponseBranches,
+  resolveActiveConversationHead,
+  resolveAgentResponseSource,
+} from '@/agent-runtime/run-events'
 import { CHAT_SURFACE_TOOLS, toolEventLabel } from '@/agent-runtime/tool-loop'
 import type { MoneyEstimate } from '@/control-protocol'
 import { projectExecutionTimeline, type ExecutionTimeline } from './execution-timeline'
@@ -50,7 +56,7 @@ export type AgentFeedItem =
       readonly title: 'You' | 'Agent'
       readonly detail: string
       readonly provenance: 'runtime'
-      /** Only the latest durable Agent reply may be regenerated. */
+      /** Only the selected durable response at the active head may be regenerated. */
       readonly regeneratable?: boolean
       readonly action?: {
         readonly type: 'proceed-anyway'
@@ -61,6 +67,14 @@ export type AgentFeedItem =
       readonly activity?: {
         readonly label: string
         readonly elapsedLabel: string | null
+        readonly state?: 'running' | 'complete' | 'failed' | 'cancelled'
+      }
+      readonly branch?: {
+        readonly sourceEventId: string
+        readonly selectedIndex: number
+        readonly count: number
+        readonly previousEventId?: string
+        readonly nextEventId?: string
       }
     }
   | {
@@ -161,38 +175,26 @@ export interface AgentMessageRegenerationTarget {
   readonly sourceMessage: string
 }
 
-/** Resolve the latest durable Agent reply and the effective user turn it answered. */
+/** Resolve the selected response at the active head and its effective source turn. */
 export function selectLatestAgentMessageRegenerationTarget(
   events: readonly AgentRunEvent[],
 ): AgentMessageRegenerationTarget | null {
   const revisions = latestMessageRevisions(events)
-  let targetIndex = -1
-  for (let index = events.length - 1; index >= 0; index -= 1) {
-    if (events[index]?.type === 'agent-message') {
-      targetIndex = index
-      break
-    }
-  }
-  if (targetIndex < 0) return null
-
-  const target = events[targetIndex]
-  if (target?.type !== 'agent-message') return null
+  const target = resolveActiveConversationHead(events)
+  if (!target) return null
   const targetMessage = (revisions.get(target.eventId) ?? target.message).trim()
   if (!targetMessage) return null
-  for (let index = targetIndex - 1; index >= 0; index -= 1) {
-    const source = events[index]
-    if (source?.type !== 'intent-recorded' && source?.type !== 'steer-recorded') continue
-    const sourceMessage = (revisions.get(source.eventId)
-      ?? (source.type === 'intent-recorded' ? source.intent : source.instruction)).trim()
-    if (!sourceMessage) return null
-    return {
-      targetEventId: target.eventId,
-      targetMessage,
-      sourceEventId: source.eventId,
-      sourceMessage,
-    }
+  const source = resolveAgentResponseSource(events, target)
+  if (!source) return null
+  const sourceMessage = (revisions.get(source.eventId)
+    ?? (source.type === 'intent-recorded' ? source.intent : source.instruction)).trim()
+  if (!sourceMessage) return null
+  return {
+    targetEventId: target.eventId,
+    targetMessage,
+    sourceEventId: source.eventId,
+    sourceMessage,
   }
-  return null
 }
 
 function buildFeed(input: AgentViewModelInput): readonly AgentFeedItem[] {
@@ -204,14 +206,29 @@ function buildFeed(input: AgentViewModelInput): readonly AgentFeedItem[] {
 
   // Chat transcript spans every run so multi-turn dialogue stays visible.
   const revisions = latestMessageRevisions(events)
-  const conversationItems = collapseRepeatedIntentTurns(events).flatMap((event) => {
+  const branchesByResponse = new Map(projectAgentResponseBranches(events).flatMap((branch) =>
+    branch.responses.map((response) => [response.eventId, branch] as const)))
+  const conversationEvents = projectConversationFeedEvents(events)
+  const conversationItems = conversationEvents.flatMap((event) => {
     const items = feedItemFromRunEvent(event)
     const revision = revisions.get(event.eventId)
     return items.map((item) => {
       if (item.type !== 'message') return item
+      const branch = event.type === 'agent-message' ? branchesByResponse.get(event.eventId) : undefined
       return {
         ...item,
         ...(revision ? { detail: revision } : {}),
+        ...(branch && branch.responses.length > 1
+          ? {
+              branch: {
+                sourceEventId: branch.source.eventId,
+                selectedIndex: branch.selectedIndex,
+                count: branch.responses.length,
+                previousEventId: branch.responses[branch.selectedIndex - 1]?.eventId,
+                nextEventId: branch.responses[branch.selectedIndex + 1]?.eventId,
+              },
+            }
+          : {}),
         ...(item.role === 'agent' && item.id === regenerationTarget?.targetEventId
           ? { regeneratable: true }
           : {}),
@@ -243,6 +260,7 @@ function buildFeed(input: AgentViewModelInput): readonly AgentFeedItem[] {
         activity: {
           label: activeStage ? `Creating ${activeStage.label}` : phaseTitle(input.workflowPhase),
           elapsedLabel: input.elapsedSeconds > 0 ? formatElapsed(input.elapsedSeconds) : null,
+          state: 'running',
         },
       }]
     : []
@@ -254,7 +272,7 @@ function buildFeed(input: AgentViewModelInput): readonly AgentFeedItem[] {
       const activeEvents = events.filter((event) => event.runId === activeRunId)
       const unresolvedApprovalIds = unresolvedToolApprovalEventIds(activeEvents)
       return collapseToolLifecycle(activeEvents.flatMap((event) => {
-        if (event.type === 'intent-recorded' || event.type === 'steer-recorded' || event.type === 'message-revised' || event.type === 'agent-message') return []
+        if (event.type === 'intent-recorded' || event.type === 'steer-recorded' || event.type === 'message-revised' || event.type === 'branch-selected' || event.type === 'agent-message' || isPreparingStepEvent(event)) return []
         if (event.type === 'tool-approval-requested' && !unresolvedApprovalIds.has(event.eventId)) return []
         return feedItemFromRunEvent(event)
       }))
@@ -306,6 +324,31 @@ function buildFeed(input: AgentViewModelInput): readonly AgentFeedItem[] {
   ]
 }
 
+function projectConversationFeedEvents(events: readonly AgentRunEvent[]): readonly AgentRunEvent[] {
+  const selectedConversation = collapseRepeatedIntentTurns(projectActiveConversation(events))
+  const includedIds = new Set(selectedConversation.map((event) => event.eventId))
+  const latestPreparingByStep = new Map<string, AgentRunEvent>()
+  for (const event of events) {
+    if (
+      (event.type === 'step-started'
+        || event.type === 'step-succeeded'
+        || event.type === 'step-failed'
+        || event.type === 'step-cancelled')
+      && isPreparingStepEvent(event)
+    ) latestPreparingByStep.set(event.stepId, event)
+  }
+  for (const event of latestPreparingByStep.values()) includedIds.add(event.eventId)
+  return events.filter((event) => includedIds.has(event.eventId))
+}
+
+function isPreparingStepEvent(event: AgentRunEvent): boolean {
+  return (event.type === 'step-started'
+    || event.type === 'step-succeeded'
+    || event.type === 'step-failed'
+    || event.type === 'step-cancelled')
+    && event.stepId.startsWith('step:prepare:')
+}
+
 function latestMessageRevisions(events: readonly AgentRunEvent[]): ReadonlyMap<string, string> {
   return new Map(
     events.flatMap((event) => event.type === 'message-revised'
@@ -320,7 +363,7 @@ function latestMessageRevisions(events: readonly AgentRunEvent[]): ReadonlyMap<s
  * intents that have no intervening reply (including legacy failed-run logs).
  */
 function collapseRepeatedIntentTurns(
-  events: readonly AgentRunEvent[],
+  events: readonly (Extract<AgentRunEvent, { type: 'intent-recorded' | 'steer-recorded' | 'agent-message' }>)[],
 ): readonly Extract<AgentRunEvent, { type: 'intent-recorded' | 'steer-recorded' | 'agent-message' }>[] {
   const result: Extract<AgentRunEvent, { type: 'intent-recorded' | 'steer-recorded' | 'agent-message' }>[] = []
   for (const event of events) {
@@ -458,6 +501,7 @@ function feedItemFromRunEvent(event: AgentRunEvent): readonly AgentFeedItem[] {
         provenance: 'runtime',
       }]
     case 'message-revised':
+    case 'branch-selected':
       return []
     case 'plan-recorded':
       return [{
@@ -470,6 +514,22 @@ function feedItemFromRunEvent(event: AgentRunEvent): readonly AgentFeedItem[] {
       }]
     case 'step-started':
     case 'step-succeeded':
+      if (isPreparingStepEvent(event)) {
+        return [{
+          id: event.eventId,
+          type: 'message',
+          role: 'agent',
+          status: event.type === 'step-started' ? 'pending' : 'complete',
+          title: 'Agent',
+          detail: event.detail ?? (event.type === 'step-started' ? 'Checking your request…' : 'Request checked.'),
+          provenance: 'runtime',
+          activity: {
+            label: event.label,
+            elapsedLabel: null,
+            state: event.type === 'step-started' ? 'running' : 'complete',
+          },
+        }]
+      }
       return [{
         id: event.eventId,
         type: 'stage',
@@ -566,6 +626,18 @@ function feedItemFromRunEvent(event: AgentRunEvent): readonly AgentFeedItem[] {
         outputRefs: event.outputRefs,
       }]
     case 'step-failed':
+      if (isPreparingStepEvent(event)) {
+        return [{
+          id: event.eventId,
+          type: 'message',
+          role: 'agent',
+          status: 'complete',
+          title: 'Agent',
+          detail: event.detail,
+          provenance: 'runtime',
+          activity: { label: event.label, elapsedLabel: null, state: 'failed' },
+        }]
+      }
       return [{ id: event.eventId, type: 'error', status: 'stopped', title: 'Run stopped', detail: `${event.label}: ${event.detail}`, provenance: 'runtime' }]
     case 'tool-failed':
       if (CHAT_SURFACE_TOOLS.has(event.tool)) return []
@@ -581,6 +653,18 @@ function feedItemFromRunEvent(event: AgentRunEvent): readonly AgentFeedItem[] {
         actions: ['retry'],
       }]
     case 'step-cancelled':
+      if (isPreparingStepEvent(event)) {
+        return [{
+          id: event.eventId,
+          type: 'message',
+          role: 'agent',
+          status: 'complete',
+          title: 'Agent',
+          detail: event.detail,
+          provenance: 'runtime',
+          activity: { label: event.label, elapsedLabel: null, state: 'cancelled' },
+        }]
+      }
       return [{ id: event.eventId, type: 'notice', status: 'complete', title: event.label, detail: event.detail, provenance: 'runtime' }]
     case 'tool-cancelled':
       if (CHAT_SURFACE_TOOLS.has(event.tool)) return []

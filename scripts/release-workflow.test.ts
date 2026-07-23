@@ -21,6 +21,7 @@ describe('cross-platform release workflow', () => {
       with: { source_sha: '${{ needs.validate.outputs.sha }}' },
     })
     expect(workflow.jobs.build.needs).toEqual(['validate', 'quality'])
+    expect(workflow.jobs.build.permissions).toEqual({ contents: 'read' })
     expect(workflow.jobs.publish.needs).toEqual(['validate', 'quality', 'build'])
     expect(workflow.jobs.publish.permissions).toEqual({ contents: 'write', 'id-token': 'write', attestations: 'write' })
   })
@@ -29,7 +30,7 @@ describe('cross-platform release workflow', () => {
     const source = await readFile('.github/workflows/release-update.yml', 'utf8')
     const workflow = YAML.parse(source)
     const buildActions = workflow.jobs.build.steps.filter((step: { uses?: string }) => step.uses?.startsWith('tauri-apps/tauri-action@'))
-    const artifactUpload = workflow.jobs.build.steps.find((step: { uses?: string }) => step.uses?.startsWith('actions/upload-artifact@'))
+    const artifactUpload = workflow.jobs.build.steps.find((step: { name?: string }) => step.name === 'Upload platform release artifacts')
     const configInjection = workflow.jobs.build.steps.find((step: { name?: string }) => step.name === 'Inject updater public key into release-only Tauri config')
     const publishScript = workflow.jobs.publish.steps.at(-1).run
 
@@ -232,7 +233,7 @@ describe('cross-platform release workflow', () => {
     const dmgNotarizationIndex = buildSteps.findIndex((step: { name?: string }) => step.name === 'Notarize and staple macOS DMG')
     const verificationIndex = buildSteps.findIndex((step: { name?: string }) => step.name === 'Verify signed and notarized macOS bundles')
     const cleanupIndex = buildSteps.findIndex((step: { name?: string }) => step.name === 'Remove temporary Apple notarization key')
-    const uploadIndex = buildSteps.findIndex((step: { uses?: string }) => step.uses?.startsWith('actions/upload-artifact@'))
+    const uploadIndex = buildSteps.findIndex((step: { name?: string }) => step.name === 'Upload platform release artifacts')
     const macBuild = buildSteps[macBuildIndex]
     const dmgNotarization = buildSteps[dmgNotarizationIndex]
     const verification = buildSteps[verificationIndex]
@@ -267,7 +268,7 @@ describe('cross-platform release workflow', () => {
     const workflow = YAML.parse(source)
     const buildSteps = workflow.jobs.build.steps
     const verificationIndex = buildSteps.findIndex((step: { name?: string }) => step.name === 'Verify updater artifact signature')
-    const uploadIndex = buildSteps.findIndex((step: { uses?: string }) => step.uses?.startsWith('actions/upload-artifact@'))
+    const uploadIndex = buildSteps.findIndex((step: { name?: string }) => step.name === 'Upload platform release artifacts')
     const verification = buildSteps[verificationIndex]
 
     expect(verificationIndex).toBeGreaterThan(-1)
@@ -281,27 +282,24 @@ describe('cross-platform release workflow', () => {
     expect(verification.env).not.toHaveProperty('TAURI_SIGNING_PRIVATE_KEY')
   })
 
-  it('fails closed unless Windows installers have the expected Authenticode signer and timestamp', async () => {
+  it('publishes explicitly unsigned Windows installers with signed updater metadata', async () => {
     const source = await readFile('.github/workflows/release-update.yml', 'utf8')
     const workflow = YAML.parse(source)
     const steps = workflow.jobs.build.steps
-    const preparation = steps.find((step: { name?: string }) => step.name === 'Prepare Windows Authenticode certificate')
-    const verification = steps.find((step: { name?: string }) => step.name === 'Verify Windows Authenticode signatures')
-    const cleanup = steps.find((step: { name?: string }) => step.name === 'Remove temporary Windows signing material')
+    const updaterVerifyIndex = steps.findIndex((step: { name?: string }) => step.name === 'Verify updater artifact signature')
+    const verificationIndex = steps.findIndex((step: { name?: string }) => step.name === 'Verify intentionally unsigned Windows installers')
+    const verification = steps[verificationIndex]
 
-    expect(preparation.if).toBe("runner.os == 'Windows'")
-    expect(Object.keys(preparation.env)).toEqual(['WINDOWS_CERTIFICATE', 'WINDOWS_CERTIFICATE_PASSWORD'])
-    expect(preparation.run).toContain('Import-PfxCertificate')
-    expect(preparation.run).toContain('1.3.6.1.5.5.7.3.3')
-    expect(preparation.run.indexOf('CUTOUT_WINDOWS_CERTIFICATE_PATH=')).toBeLessThan(preparation.run.indexOf('Import-PfxCertificate'))
-    expect(preparation.run).toContain('CUTOUT_WINDOWS_IMPORTED_THUMBPRINTS=')
-    expect(preparation.run).toContain('Remove-Item $pfxPath')
+    expect(updaterVerifyIndex).toBeGreaterThan(-1)
+    expect(verificationIndex).toBeGreaterThan(updaterVerifyIndex)
+    expect(verification.if).toBe("runner.os == 'Windows'")
+    expect(source).not.toContain('WINDOWS_CERTIFICATE_PASSWORD')
+    expect(source).not.toContain('secrets.WINDOWS_CERTIFICATE')
+    expect(source).not.toContain('SIGNPATH_')
+    expect(source).not.toContain('SignPath/')
     expect(verification.run).toContain('Get-AuthenticodeSignature')
-    expect(verification.run).toContain("Status -ne 'Valid'")
-    expect(verification.run).toContain('SignerCertificate.Thumbprint')
-    expect(verification.run).toContain('TimeStamperCertificate')
-    expect(cleanup.if).toBe("always() && runner.os == 'Windows'")
-    expect(cleanup.run).toContain("CUTOUT_WINDOWS_IMPORTED_THUMBPRINTS -split ';'")
+    expect(verification.run).toContain("Status -ne 'NotSigned'")
+    expect(verification.run).toContain('Expected intentionally unsigned installer')
   })
 
   it('attests the complete release asset set before the single publisher runs', async () => {

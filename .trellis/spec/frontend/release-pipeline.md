@@ -37,8 +37,9 @@ installer version differs from their release version.
 - The generated `latest.json` advertises every built platform. Its `platforms`
   map carries `darwin-aarch64`, `darwin-x86_64`, `windows-x86_64`, and
   `linux-x86_64`, each with its own HTTPS updater URL and signature. The Windows
-  auto-update target is the signed NSIS installer (`.exe`); the MSI ships only
-  as a downloadable installer. The Linux target is the signed `.AppImage`.
+  auto-update target is the Tauri-signed NSIS installer (`.exe`); the MSI ships
+  only as a downloadable installer. The Linux target is the Tauri-signed
+  `.AppImage`.
   `darwin-aarch64` is the mandatory primary anchor —
   validation still fails closed if it is absent, and every other present
   platform is validated with the same HTTPS/allowlist/signature checks.
@@ -66,8 +67,8 @@ installer version differs from their release version.
   `TAURI_SIGNING_PRIVATE_KEY`, `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`, and
   `CUTOUT_UPDATER_PUBKEY`. The updater private key must be password-protected.
   The private key and password are step-scoped only to the pinned Tauri build
-  actions that create updater signatures. Setup, tests, artifact upload, and
-  the publish job receive neither signing secret.
+  actions. Setup, tests, artifact upload, and the publish job receive neither
+  signing secret.
   GitHub distribution defaults the stable endpoint to the repository's
   `releases/latest/download/latest.json` and the allowlist to `github.com`.
   `CUTOUT_UPDATER_STABLE_ENDPOINTS`, `CUTOUT_UPDATER_ALLOWED_HOSTS`, and
@@ -77,12 +78,15 @@ installer version differs from their release version.
   `APPLE_API_KEY`, `APPLE_API_ISSUER`, and `APPLE_API_PRIVATE_KEY`. These Apple
   secrets are scoped only to macOS preparation, Tauri build, and explicit DMG
   notarization steps; Windows and Linux Tauri steps receive none of them.
-- The protected environment also owns `WINDOWS_CERTIFICATE` (base64 PKCS#12)
-  and `WINDOWS_CERTIFICATE_PASSWORD`. The Windows job imports that certificate
-  into the ephemeral current-user store, injects only its SHA-1 thumbprint into
-  the ignored merge config, requires SHA-256 signing and an HTTPS timestamp,
-  verifies the NSIS and MSI signer plus timestamp, and always removes the
-  temporary certificate material.
+- Windows NSIS and MSI installers are intentionally published without
+  Authenticode. The Windows job requires exactly one installer of each type and
+  verifies `Get-AuthenticodeSignature` status `NotSigned` so the release cannot
+  accidentally claim a signer or timestamp that does not exist. Windows users
+  may receive Microsoft Defender SmartScreen warnings.
+- The Windows NSIS updater artifact still requires the independent Tauri
+  updater signature produced by the pinned build action. That sidecar is
+  cryptographically verified before workflow-artifact upload, alongside the
+  checksums and GitHub provenance generated for every release asset.
 - The macOS preparation step hard-fails when any Apple input is absent, writes
   `APPLE_API_PRIVATE_KEY` to `$RUNNER_TEMP/AuthKey_<key-id>.p8` with mode
   `0600`, and exports only `APPLE_API_KEY_PATH` for the Tauri process. The
@@ -119,6 +123,10 @@ installer version differs from their release version.
   plugin source fingerprints and mirrored text trees normalize both forms.
   Cross-platform tests use native path parsing and Windows `.cmd` shims for
   package executables; unsupported Windows process-tree control fails closed.
+  Tests that launch real compilers, browsers, packagers, or other child
+  processes declare an explicit per-test timeout sized for the slowest supported
+  CI platform. Do not rely on the framework's short default timeout, raise the
+  global timeout, or skip a platform to hide normal process startup variance.
   Screenshot baselines run on macOS Chrome, while platform-neutral contract
   tests remain matrixed across macOS, Linux, and Windows.
 - AppShell initializes once, delays automatic checking for 8 seconds, and uses
@@ -151,8 +159,8 @@ installer version differs from their release version.
 | Any Apple signing/notarization secret is absent on macOS | Stop before invoking the macOS Tauri build |
 | App notarization or explicit DMG notarization is not accepted | Do not run artifact upload or publication |
 | App or DMG signature, Gatekeeper, or stapler validation fails | Do not upload that macOS workflow artifact |
-| Windows certificate is absent, invalid, expired, lacks code-signing EKU, or has no private key | Stop before the Windows Tauri build |
-| NSIS or MSI Authenticode signer/status/timestamp is invalid | Do not upload the Windows workflow artifact |
+| Windows NSIS or MSI count differs from one | Do not upload the Windows workflow artifact |
+| NSIS or MSI unexpectedly carries an Authenticode signature | Fail until the signing policy and verification contract are deliberately updated |
 | GitHub provenance attestation fails | Keep the Release unpublished |
 | Release tag already has a Release | Refuse immutable asset replacement |
 | Upload is incomplete | Release remains a draft, not a public success |
@@ -169,6 +177,9 @@ installer version differs from their release version.
 - Good: Tauri receives an Apple `Accepted` result for the app, the workflow
   receives a separate `Accepted` result for the DMG, and both artifacts report
   `source=Notarized Developer ID` before upload.
+- Good: the Windows job proves the NSIS and MSI are intentionally unsigned,
+  verifies the independent Tauri updater signature for NSIS, and publishes the
+  same checksums and GitHub provenance evidence as every other platform.
 - Good: the delayed desktop check discovers a newer signed GitHub release; one
   compact Home action appears and opens the existing update controls.
 - Base: a manual build selects an existing version tag reachable from `main`
@@ -192,13 +203,16 @@ installer version differs from their release version.
   symlink rejection, directory boundaries, and deterministic SHA-256 output.
 - `scripts/release-workflow.test.ts`: four-entry matrix, validate/build/publish
   dependency graph, least-privilege permissions, isolated macOS/non-macOS Tauri
-  actions pinned to a reviewed commit, all Action SHA pins, Apple/Windows/updater
-  secret scoping, temporary key handling, updater sidecar verification,
-  app-before-DMG notarization ordering, macOS signature/notarization
-  verification, Windows Authenticode, attestation, single-authority
-  publication, draft promotion, and multi-platform manifest generation.
+  actions pinned to a reviewed commit, all Action SHA pins, Apple/updater secret
+  scoping, temporary key handling, app-before-DMG notarization ordering, macOS
+  signature/notarization verification, explicit unsigned Windows validation,
+  attestation, single-authority publication, draft promotion, and
+  multi-platform manifest generation.
 - `scripts/ci-platform-contracts.test.ts`: browser installation ordering,
   platform-specific executable selection, and LF/CRLF frontmatter parsing.
+- Child-process integration tests: explicit per-test timeout budgets that still
+  fail closed on a stuck compiler/browser/packager and cover the slowest CI
+  platform without platform skips.
 - `scripts/update-artifacts.test.ts`: signature, HTTPS/allowlist, downgrade
   rejection, unsupported rollout/rollback flags, SBOM, provenance,
   multi-platform manifest generation (all four platform keys, non-primary
@@ -242,6 +256,18 @@ publish:
 
 Build jobs produce isolated workflow artifacts. One final owner validates the
 complete set, creates a draft, uploads once, and only then publishes.
+
+#### Correct
+
+```yaml
+- name: Verify updater artifact signature
+  run: verify-updater-signature <nsis> <nsis.sig>
+- name: Verify intentionally unsigned Windows installers
+  run: require-authenticode-status NotSigned <nsis> <msi>
+```
+
+The updater signature authenticates the exact NSIS bytes while the explicit
+`NotSigned` check keeps the separate Authenticode distribution claim truthful.
 
 Do not create a second updater controller inside the Home sidebar or implement
 a direct `fetch()` against GitHub there. That would duplicate the persisted
