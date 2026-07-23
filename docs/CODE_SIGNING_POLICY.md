@@ -7,18 +7,17 @@ before a draft release becomes public.
 
 ## Windows
 
-Windows publication is blocked until the Cutout project is accepted by SignPath
-Foundation and the protected `release` environment contains the assigned
-SignPath configuration. Once active, free code signing is provided by
-[SignPath.io](https://about.signpath.io), certificate by
-[SignPath Foundation](https://signpath.org).
+Cutout currently publishes Windows NSIS and MSI installers without
+Authenticode. The release workflow verifies that both installers report
+`NotSigned`; no Windows certificate, password, private key, or remote signing
+service credential is required. Microsoft Defender SmartScreen may warn users
+before installation.
 
-The workflow sends only GitHub-hosted unsigned workflow artifacts to SignPath.
-It does not store or import a Windows certificate or private key. Returned NSIS
-and MSI installers must have a valid Authenticode signature from the configured
-SignPath certificate, a code-signing EKU, and a trusted timestamp. The final
-signed NSIS installer is then signed again with Cutout's independent Tauri
-updater key, and that updater signature is verified before publication.
+The Windows NSIS updater artifact still carries Cutout's independent Tauri
+updater signature. CI verifies that signature against the configured public key
+before publication. Public SHA-256 checksums and GitHub build provenance cover
+both Windows installers, but neither is represented as an Authenticode
+signature or trusted Windows publisher identity.
 
 ## macOS and updater signatures
 
@@ -32,5 +31,5 @@ Every updater artifact also requires an independent Tauri updater signature.
 - Approvers: [Nebutra organization owners](https://github.com/orgs/Nebutra/people?query=role%3Aowner)
 - Privacy policy: [Privacy and data lifecycle](./PRIVACY_DATA_LIFECYCLE.md)
 
-Cutout does not publish a platform artifact when any required signing,
-notarization, timestamp, updater-signature, checksum, or provenance check fails.
+Cutout does not publish a platform artifact when its required notarization,
+updater-signature, checksum, provenance, or explicit signing-status check fails.

@@ -4,7 +4,7 @@
 
 - Persist Agent conversation runs and immutable response branches in Git-managed `.cutout/run-events.json` state.
 - Keep regenerated responses as navigable sibling branches and continue new turns from the selected branch.
-- Preserve the hardened atomic four-platform release gates for notarization, Authenticode signing, updater signatures, checksums, and provenance.
+- Preserve the hardened atomic four-platform release gates for macOS notarization, updater signatures, checksums, and provenance; Windows NSIS/MSI installers are explicitly unsigned and may trigger SmartScreen warnings.
 
 ## 0.1.4 - 2026-07-22
 

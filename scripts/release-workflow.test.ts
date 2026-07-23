@@ -21,7 +21,7 @@ describe('cross-platform release workflow', () => {
       with: { source_sha: '${{ needs.validate.outputs.sha }}' },
     })
     expect(workflow.jobs.build.needs).toEqual(['validate', 'quality'])
-    expect(workflow.jobs.build.permissions).toEqual({ actions: 'read', contents: 'read' })
+    expect(workflow.jobs.build.permissions).toEqual({ contents: 'read' })
     expect(workflow.jobs.publish.needs).toEqual(['validate', 'quality', 'build'])
     expect(workflow.jobs.publish.permissions).toEqual({ contents: 'write', 'id-token': 'write', attestations: 'write' })
   })
@@ -76,7 +76,6 @@ describe('cross-platform release workflow', () => {
       ['actions/upload-artifact', '043fb46d1a93c77aae656e7c1c64a875d1fc6a0a'],
       ['actions/download-artifact', '3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c'],
       ['actions/attest-build-provenance', '0f67c3f4856b2e3261c31976d6725780e5e4c373'],
-      ['SignPath/github-action-submit-signing-request', 'b9d91eadd323de506c0c81cf0c7fe7438f3360fd'],
     ])
 
     const paths = ['.github/workflows/ci.yml', '.github/workflows/release-update.yml']
@@ -137,7 +136,6 @@ describe('cross-platform release workflow', () => {
     expect(signingSecretConsumers).toEqual([
       'Build signed and notarized macOS bundles',
       'Build non-macOS bundles',
-      'Re-sign SignPath-signed Windows updater artifact',
     ])
     expect(metadataGeneration.env).not.toHaveProperty('TAURI_SIGNING_PRIVATE_KEY')
     expect(metadataGeneration.env).not.toHaveProperty('TAURI_SIGNING_PRIVATE_KEY_PASSWORD')
@@ -284,66 +282,24 @@ describe('cross-platform release workflow', () => {
     expect(verification.env).not.toHaveProperty('TAURI_SIGNING_PRIVATE_KEY')
   })
 
-  it('uses SignPath without repository-held Windows certificate material and preserves both signature layers', async () => {
+  it('publishes explicitly unsigned Windows installers with signed updater metadata', async () => {
     const source = await readFile('.github/workflows/release-update.yml', 'utf8')
-    const artifactConfiguration = await readFile('.signpath/artifact-configurations/windows-installers.xml', 'utf8')
     const workflow = YAML.parse(source)
     const steps = workflow.jobs.build.steps
-    const configuration = steps.find((step: { name?: string }) => step.name === 'Require protected SignPath configuration')
-    const preparationIndex = steps.findIndex((step: { name?: string }) => step.name === 'Prepare unsigned Windows installers for SignPath')
-    const unsignedUploadIndex = steps.findIndex((step: { name?: string }) => step.name === 'Upload unsigned Windows installers for SignPath')
-    const signIndex = steps.findIndex((step: { name?: string }) => step.name === 'Sign Windows installers with SignPath')
-    const installIndex = steps.findIndex((step: { name?: string }) => step.name === 'Install SignPath-signed Windows installers')
-    const updaterSignIndex = steps.findIndex((step: { name?: string }) => step.name === 'Re-sign SignPath-signed Windows updater artifact')
     const updaterVerifyIndex = steps.findIndex((step: { name?: string }) => step.name === 'Verify updater artifact signature')
-    const sign = steps[signIndex]
-    const updaterSign = steps[updaterSignIndex]
-    const verification = steps.find((step: { name?: string }) => step.name === 'Verify Windows Authenticode signatures')
+    const verificationIndex = steps.findIndex((step: { name?: string }) => step.name === 'Verify intentionally unsigned Windows installers')
+    const verification = steps[verificationIndex]
 
-    expect(preparationIndex).toBeGreaterThan(-1)
-    expect(configuration.if).toBe("runner.os == 'Windows'")
-    expect(Object.keys(configuration.env)).toEqual([
-      'SIGNPATH_ORGANIZATION_ID',
-      'SIGNPATH_PROJECT_SLUG',
-      'SIGNPATH_SIGNING_POLICY_SLUG',
-      'SIGNPATH_ARTIFACT_CONFIGURATION_SLUG',
-      'SIGNPATH_WINDOWS_CERTIFICATE_THUMBPRINT',
-    ])
-    for (const name of Object.keys(configuration.env)) expect(configuration.run).toContain(name)
-    expect(configuration.run).toContain('$name is required')
-    expect(configuration.run).not.toContain('SIGNPATH_API_TOKEN')
-    expect(unsignedUploadIndex).toBeGreaterThan(preparationIndex)
-    expect(signIndex).toBeGreaterThan(unsignedUploadIndex)
-    expect(installIndex).toBeGreaterThan(signIndex)
-    expect(updaterSignIndex).toBeGreaterThan(installIndex)
-    expect(updaterVerifyIndex).toBeGreaterThan(updaterSignIndex)
-    expect(sign.uses).toBe('SignPath/github-action-submit-signing-request@b9d91eadd323de506c0c81cf0c7fe7438f3360fd')
-    expect(sign.with).toMatchObject({
-      'api-token': '${{ secrets.SIGNPATH_API_TOKEN }}',
-      'organization-id': '${{ vars.SIGNPATH_ORGANIZATION_ID }}',
-      'project-slug': '${{ vars.SIGNPATH_PROJECT_SLUG }}',
-      'signing-policy-slug': '${{ vars.SIGNPATH_SIGNING_POLICY_SLUG }}',
-      'artifact-configuration-slug': '${{ vars.SIGNPATH_ARTIFACT_CONFIGURATION_SLUG }}',
-      'wait-for-completion': true,
-    })
+    expect(updaterVerifyIndex).toBeGreaterThan(-1)
+    expect(verificationIndex).toBeGreaterThan(updaterVerifyIndex)
+    expect(verification.if).toBe("runner.os == 'Windows'")
     expect(source).not.toContain('WINDOWS_CERTIFICATE_PASSWORD')
     expect(source).not.toContain('secrets.WINDOWS_CERTIFICATE')
-    expect(artifactConfiguration).toContain('<pe-file path="Cutout-setup.exe">')
-    expect(artifactConfiguration).toContain('<msi-file path="Cutout.msi">')
-    expect(artifactConfiguration.match(/<authenticode-sign \/>/g)).toHaveLength(2)
-    expect(updaterSign.env).toEqual({
-      BUNDLE_ROOT: 'src-tauri/target/${{ matrix.target }}/release/bundle',
-      TAURI_SIGNING_PRIVATE_KEY: '${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}',
-      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: '${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}',
-    })
-    expect(updaterSign.run).toContain('pnpm tauri signer sign')
-    expect(updaterSign.run).toContain('signature sidecar was not regenerated')
+    expect(source).not.toContain('SIGNPATH_')
+    expect(source).not.toContain('SignPath/')
     expect(verification.run).toContain('Get-AuthenticodeSignature')
-    expect(verification.run).toContain("Status -ne 'Valid'")
-    expect(verification.run).toContain('SignerCertificate.Thumbprint')
-    expect(verification.run).toContain('SIGNPATH_WINDOWS_CERTIFICATE_THUMBPRINT')
-    expect(verification.run).toContain('1.3.6.1.5.5.7.3.3')
-    expect(verification.run).toContain('TimeStamperCertificate')
+    expect(verification.run).toContain("Status -ne 'NotSigned'")
+    expect(verification.run).toContain('Expected intentionally unsigned installer')
   })
 
   it('attests the complete release asset set before the single publisher runs', async () => {

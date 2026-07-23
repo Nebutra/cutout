@@ -37,8 +37,9 @@ installer version differs from their release version.
 - The generated `latest.json` advertises every built platform. Its `platforms`
   map carries `darwin-aarch64`, `darwin-x86_64`, `windows-x86_64`, and
   `linux-x86_64`, each with its own HTTPS updater URL and signature. The Windows
-  auto-update target is the signed NSIS installer (`.exe`); the MSI ships only
-  as a downloadable installer. The Linux target is the signed `.AppImage`.
+  auto-update target is the Tauri-signed NSIS installer (`.exe`); the MSI ships
+  only as a downloadable installer. The Linux target is the Tauri-signed
+  `.AppImage`.
   `darwin-aarch64` is the mandatory primary anchor —
   validation still fails closed if it is absent, and every other present
   platform is validated with the same HTTPS/allowlist/signature checks.
@@ -66,9 +67,8 @@ installer version differs from their release version.
   `TAURI_SIGNING_PRIVATE_KEY`, `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`, and
   `CUTOUT_UPDATER_PUBKEY`. The updater private key must be password-protected.
   The private key and password are step-scoped only to the pinned Tauri build
-  actions and the Windows step that regenerates the updater sidecar after
-  SignPath modifies the NSIS installer. Setup, tests, artifact upload, and the
-  publish job receive neither signing secret.
+  actions. Setup, tests, artifact upload, and the publish job receive neither
+  signing secret.
   GitHub distribution defaults the stable endpoint to the repository's
   `releases/latest/download/latest.json` and the allowlist to `github.com`.
   `CUTOUT_UPDATER_STABLE_ENDPOINTS`, `CUTOUT_UPDATER_ALLOWED_HOSTS`, and
@@ -78,19 +78,15 @@ installer version differs from their release version.
   `APPLE_API_KEY`, `APPLE_API_ISSUER`, and `APPLE_API_PRIVATE_KEY`. These Apple
   secrets are scoped only to macOS preparation, Tauri build, and explicit DMG
   notarization steps; Windows and Linux Tauri steps receive none of them.
-- Windows Authenticode uses SignPath's GitHub Actions connector. The protected
-  environment owns `SIGNPATH_API_TOKEN` plus the public configuration variables
-  `SIGNPATH_ORGANIZATION_ID`, `SIGNPATH_PROJECT_SLUG`,
-  `SIGNPATH_SIGNING_POLICY_SLUG`, `SIGNPATH_ARTIFACT_CONFIGURATION_SLUG`, and
-  `SIGNPATH_WINDOWS_CERTIFICATE_THUMBPRINT`. The job uploads fixed-name NSIS and
-  MSI workflow artifacts, submits them through the immutable pinned SignPath
-  action, restores only the returned signed files, and never imports or stores a
-  Windows certificate private key in GitHub.
-- Because Authenticode changes the NSIS bytes after Tauri's build, the Windows
-  job deletes the stale updater sidecar, regenerates it with the protected Tauri
-  updater key, verifies that sidecar against `CUTOUT_UPDATER_PUBKEY`, then
-  requires `Get-AuthenticodeSignature` status `Valid`, the configured signer
-  thumbprint, code-signing EKU, and a trusted timestamp for both NSIS and MSI.
+- Windows NSIS and MSI installers are intentionally published without
+  Authenticode. The Windows job requires exactly one installer of each type and
+  verifies `Get-AuthenticodeSignature` status `NotSigned` so the release cannot
+  accidentally claim a signer or timestamp that does not exist. Windows users
+  may receive Microsoft Defender SmartScreen warnings.
+- The Windows NSIS updater artifact still requires the independent Tauri
+  updater signature produced by the pinned build action. That sidecar is
+  cryptographically verified before workflow-artifact upload, alongside the
+  checksums and GitHub provenance generated for every release asset.
 - The macOS preparation step hard-fails when any Apple input is absent, writes
   `APPLE_API_PRIVATE_KEY` to `$RUNNER_TEMP/AuthKey_<key-id>.p8` with mode
   `0600`, and exports only `APPLE_API_KEY_PATH` for the Tauri process. The
@@ -163,10 +159,8 @@ installer version differs from their release version.
 | Any Apple signing/notarization secret is absent on macOS | Stop before invoking the macOS Tauri build |
 | App notarization or explicit DMG notarization is not accepted | Do not run artifact upload or publication |
 | App or DMG signature, Gatekeeper, or stapler validation fails | Do not upload that macOS workflow artifact |
-| SignPath token, organization/project/policy/configuration, or expected signer thumbprint is absent | Stop without uploading a Windows release artifact |
-| SignPath does not return exactly one fixed-name NSIS and MSI | Reject the signing result and preserve the unpublished release |
-| Authenticode changes NSIS but the Tauri updater sidecar is not regenerated and verified | Do not upload the Windows workflow artifact |
-| NSIS or MSI Authenticode signer/status/timestamp is invalid | Do not upload the Windows workflow artifact |
+| Windows NSIS or MSI count differs from one | Do not upload the Windows workflow artifact |
+| NSIS or MSI unexpectedly carries an Authenticode signature | Fail until the signing policy and verification contract are deliberately updated |
 | GitHub provenance attestation fails | Keep the Release unpublished |
 | Release tag already has a Release | Refuse immutable asset replacement |
 | Upload is incomplete | Release remains a draft, not a public success |
@@ -183,9 +177,9 @@ installer version differs from their release version.
 - Good: Tauri receives an Apple `Accepted` result for the app, the workflow
   receives a separate `Accepted` result for the DMG, and both artifacts report
   `source=Notarized Developer ID` before upload.
-- Good: SignPath signs the fixed-name Windows installer artifact from the exact
-  GitHub-hosted build, the job restores those bytes, regenerates the NSIS
-  updater sidecar, and validates both Authenticode signatures and timestamps.
+- Good: the Windows job proves the NSIS and MSI are intentionally unsigned,
+  verifies the independent Tauri updater signature for NSIS, and publishes the
+  same checksums and GitHub provenance evidence as every other platform.
 - Good: the delayed desktop check discovers a newer signed GitHub release; one
   compact Home action appears and opens the existing update controls.
 - Base: a manual build selects an existing version tag reachable from `main`
@@ -209,11 +203,11 @@ installer version differs from their release version.
   symlink rejection, directory boundaries, and deterministic SHA-256 output.
 - `scripts/release-workflow.test.ts`: four-entry matrix, validate/build/publish
   dependency graph, least-privilege permissions, isolated macOS/non-macOS Tauri
-  actions pinned to a reviewed commit, all Action SHA pins, Apple/SignPath/updater
-  secret scoping, temporary key handling, post-SignPath updater sidecar renewal,
-  app-before-DMG notarization ordering, macOS signature/notarization
-  verification, Windows Authenticode, attestation, single-authority
-  publication, draft promotion, and multi-platform manifest generation.
+  actions pinned to a reviewed commit, all Action SHA pins, Apple/updater secret
+  scoping, temporary key handling, app-before-DMG notarization ordering, macOS
+  signature/notarization verification, explicit unsigned Windows validation,
+  attestation, single-authority publication, draft promotion, and
+  multi-platform manifest generation.
 - `scripts/ci-platform-contracts.test.ts`: browser installation ordering,
   platform-specific executable selection, and LF/CRLF frontmatter parsing.
 - Child-process integration tests: explicit per-test timeout budgets that still
@@ -263,30 +257,17 @@ publish:
 Build jobs produce isolated workflow artifacts. One final owner validates the
 complete set, creates a draft, uploads once, and only then publishes.
 
-#### Wrong
-
-```yaml
-- name: Sign Windows installers remotely
-  uses: SignPath/github-action-submit-signing-request@<sha>
-- name: Upload platform release artifacts
-```
-
-The NSIS updater sidecar still authenticates the pre-Authenticode bytes and is
-invalid for the installer returned by SignPath.
-
 #### Correct
 
 ```yaml
-- name: Sign Windows installers remotely
-  uses: SignPath/github-action-submit-signing-request@<sha>
-- name: Re-sign final NSIS updater artifact
-  run: pnpm tauri signer sign <signed-nsis-path>
 - name: Verify updater artifact signature
+  run: verify-updater-signature <nsis> <nsis.sig>
+- name: Verify intentionally unsigned Windows installers
+  run: require-authenticode-status NotSigned <nsis> <msi>
 ```
 
-Remote Authenticode signing completes first. The stale `.sig` is removed, the
-final NSIS bytes receive a new Tauri updater signature, and both signature
-layers are verified before workflow-artifact upload.
+The updater signature authenticates the exact NSIS bytes while the explicit
+`NotSigned` check keeps the separate Authenticode distribution claim truthful.
 
 Do not create a second updater controller inside the Home sidebar or implement
 a direct `fetch()` against GitHub there. That would duplicate the persisted

@@ -26,9 +26,8 @@
 - Issue a `Developer ID Application` certificate from the reviewed CSR, install it with the matching private key, and record the certificate's team identifier in the release evidence. Export the identity as a password-protected PKCS#12 payload outside the repository.
 - Configure the protected GitHub `release` environment with `APPLE_CERTIFICATE` (base64 PKCS#12), `APPLE_CERTIFICATE_PASSWORD`, `APPLE_SIGNING_IDENTITY`, `APPLE_API_KEY` (App Store Connect key ID), `APPLE_API_ISSUER`, and `APPLE_API_PRIVATE_KEY` (complete `.p8` content). Do not store `APPLE_API_KEY_PATH`; the workflow creates it under `$RUNNER_TEMP` with mode `0600` and removes it after the macOS build.
 - Confirm Apple secrets appear only on the macOS credential-preparation, Tauri app notarization build, and explicit DMG notarization steps. Windows and Linux jobs receive no Apple certificate, identity, issuer, key ID, private-key content, or private-key path.
-- Obtain SignPath Foundation approval and configure the protected `release` environment with `SIGNPATH_API_TOKEN`, `SIGNPATH_ORGANIZATION_ID`, `SIGNPATH_PROJECT_SLUG`, `SIGNPATH_SIGNING_POLICY_SLUG`, `SIGNPATH_ARTIFACT_CONFIGURATION_SLUG`, and `SIGNPATH_WINDOWS_CERTIFICATE_THUMBPRINT`. Do not store or import a Windows certificate or private key in GitHub.
-- Upload the fixed-name unsigned NSIS/MSI workflow artifact, sign it through the immutable pinned SignPath action, restore exactly one returned installer of each type, then regenerate and verify the Tauri updater sidecar for the final signed NSIS bytes.
-- Require a `Valid` `Get-AuthenticodeSignature` result, the configured signer thumbprint, code-signing EKU, and a trusted timestamp for both NSIS and MSI before Windows artifacts are uploaded.
+- Publish exactly one Windows NSIS and one MSI installer without Authenticode. Require `Get-AuthenticodeSignature` status `NotSigned` for both so release evidence cannot imply a Windows publisher identity or timestamp that does not exist.
+- Keep the Windows NSIS updater sidecar independently signed with the protected Tauri updater key and verify it against `CUTOUT_UPDATER_PUBKEY` before artifact upload. Document that Microsoft Defender SmartScreen may warn before installation.
 - Run `scripts/release-macos.sh --distribute`; missing signing or notarization prerequisites must hard fail.
 - Require the GitHub macOS build to wait for Tauri's app notarization and stapling, submit the subsequently created DMG separately with `xcrun notarytool submit --wait`, staple the accepted DMG ticket, then validate both the `.app` and `.dmg` with `codesign --verify --deep --strict --verbose=2`, Gatekeeper (`spctl`), and `xcrun stapler validate` before artifact upload.
 - Inspect release evidence with `codesign -dvvv --entitlements :-` and re-run Gatekeeper assessment on a clean machine.
@@ -62,13 +61,13 @@
 - Attest every collected release asset with `actions/attest-build-provenance` after checksums are finalized and before the draft Release is created.
 - The generated updater manifest must include and verify the signed updater artifact for Apple Silicon macOS, Intel macOS, Windows x64, and Linux x64 before publication. Native installer availability alone is not update evidence.
 - The packaged desktop app checks after an 8-second startup delay and at most once per 24 hours by default. Home shows the Update action only after a newer signed release is discovered; the action opens Updates & Support for download and verified install/restart.
-- The Tauri updater signature is not Apple notarization or Windows Authenticode. Keep those distribution claims blocked until their independent credentials and verification evidence exist.
+- The Tauri updater signature is not Apple notarization or Windows Authenticode. Do not represent the intentionally unsigned Windows installers as Authenticode-signed or as a trusted Windows publisher.
 
 ## Truthful status
 
 - A local gate proves compilation and tests only.
 - A signed build is not notarized until Apple accepts it and the ticket is stapled.
-- Without active SignPath approval and protected configuration, report `distribution-blocked`, never `released`.
+- A public release may include intentionally unsigned Windows installers only when the workflow proves `NotSigned` and the code-signing policy discloses the resulting SmartScreen warning risk.
 - Without a protected updater key, published HTTPS manifest, platform signing evidence, and a GitHub attestation, report `updates-unavailable`, never `automatic updates enabled`.
 # Local recovery and supportability
 
