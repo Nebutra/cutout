@@ -97,6 +97,105 @@ describe('legacy workspace Design IR projection', () => {
     )
   })
 
+  it('projects Design System candidates, explicit selection, and selected DESIGN.md tokens', async () => {
+    const source = snapshot()
+    const selectedMarkdown = [
+      '---',
+      'tokens:',
+      '  color:',
+      '    background: "#ffffff"',
+      '    surface: "#f5f5f5"',
+      '    text: "#111111"',
+      '    primary: "#0055ff"',
+      '    accent: "#ffcc00"',
+      '  spacing:',
+      '    md: "16px"',
+      '  radius:',
+      '    md: "8px"',
+      '---',
+      '# Selected direction',
+    ].join('\n')
+    const candidateArtifact = {
+      name: 'Selected direction',
+      designMarkdown: selectedMarkdown,
+      bytes: new Uint8Array([7, 8, 9]),
+      mediaType: 'image/png',
+      width: 120,
+      height: 80,
+    }
+    const withCandidates: WorkspaceSnapshot = {
+      ...source,
+      prototypeDesignSystem: candidateArtifact,
+      prototypeDesignSystemCandidates: {
+        set: {
+          id: 'candidate-set:design-system:test',
+          kind: 'design-system',
+          baseRevisionId: 'design-revision:project:acme:1',
+          proposal: {
+            mode: 'auto',
+            decidedBy: 'agent',
+            count: 1,
+            rationale: 'One deliberate direction is sufficient.',
+            directions: [{
+              id: 'direction:selected',
+              label: 'Selected direction',
+              thesis: 'A crisp production system.',
+              vary: ['surface treatment'],
+              preserve: ['product identity'],
+            }],
+            bounds: { maxCandidates: 8, maxParallelism: 2 },
+          },
+          candidates: [{
+            id: 'candidate:selected',
+            directionId: 'direction:selected',
+            status: 'ready',
+            outputs: [
+              { role: 'design-system', materialId: 'material:design-system-candidate:candidate:selected:visual' },
+              { role: 'design-markdown', materialId: 'material:design-system-candidate:candidate:selected:markdown' },
+            ],
+            provenanceIds: ['provenance:design-system-candidate:candidate:selected'],
+          }],
+          selection: {
+            candidateId: 'candidate:selected',
+            selectedAt: '2026-07-23T00:00:00.000Z',
+            actor: { kind: 'human', id: 'workspace-user' },
+            baseRevisionId: 'design-revision:project:acme:1',
+            provenanceId: 'provenance:design-system-selection:test',
+          },
+        },
+        artifacts: { 'candidate:selected': candidateArtifact },
+      },
+    }
+
+    const document = await projectWorkspaceSnapshotToDesignDocument({
+      project: project(),
+      workspace: withCandidates,
+    })
+
+    expect(document.candidateSets).toHaveLength(1)
+    expect(document.materials.map((material) => material.id)).toContain(
+      'material:design-system-candidate:candidate:selected:markdown',
+    )
+    expect(document.provenance.map((item) => item.id)).toContain(
+      'provenance:design-system-selection:test',
+    )
+    expect(document.tokens.map((token) => token.value)).toContain('#0055ff')
+    expect(document.tokens.every((token) =>
+      token.provenanceId === 'provenance:design-system-selection:test',
+    )).toBe(true)
+
+    const content = contentByUri(withCandidates, document)
+    const restored = await designDocumentToWorkspaceSnapshot(document, {
+      resolveContent: (reference) => content.get(reference.uri),
+    })
+    expect(restored.ok).toBe(true)
+    if (!restored.ok) return
+    expect(restored.data.snapshot.prototypeDesignSystemCandidates?.set.selection?.candidateId)
+      .toBe('candidate:selected')
+    expect(restored.data.snapshot.prototypeDesignSystemCandidates?.artifacts['candidate:selected']?.designMarkdown)
+      .toBe(selectedMarkdown)
+  })
+
   it('does not project a prior Design IR back into itself', async () => {
     const source = snapshot()
     const first = await projectWorkspaceSnapshotToDesignDocument({
@@ -330,5 +429,14 @@ function contentByUri(snapshot: WorkspaceSnapshot, document: Awaited<ReturnType<
   if (markdown && snapshot.prototypeDesignSystem) content.set(markdown, new TextEncoder().encode(snapshot.prototypeDesignSystem.designMarkdown))
   if (page && snapshot.prototypePages[0]) content.set(page, snapshot.prototypePages[0].bytes)
   if (attachment && snapshot.attachments[0]) content.set(attachment, snapshot.attachments[0].bytes)
+  for (const [candidateId, artifact] of Object.entries(snapshot.prototypeDesignSystemCandidates?.artifacts ?? {})) {
+    const candidate = snapshot.prototypeDesignSystemCandidates?.set.candidates.find((item) => item.id === candidateId)
+    const visualId = candidate?.outputs.find((output) => output.role === 'design-system')?.materialId
+    const markdownId = candidate?.outputs.find((output) => output.role === 'design-markdown')?.materialId
+    const visual = visualId ? materials.get(visualId)?.revisions[0]?.content.uri : undefined
+    const candidateMarkdown = markdownId ? materials.get(markdownId)?.revisions[0]?.content.uri : undefined
+    if (visual) content.set(visual, artifact.bytes)
+    if (candidateMarkdown) content.set(candidateMarkdown, new TextEncoder().encode(artifact.designMarkdown))
+  }
   return content
 }

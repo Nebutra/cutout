@@ -1,0 +1,8 @@
+{"file":".trellis/spec/frontend/prototype-generation.md","reason":"Defines the current visual Design System, final DESIGN.md, page-prompt, suite completeness, and downstream slicing contracts that candidate selection must preserve."}
+{"file":".trellis/spec/frontend/state-management.md","reason":"Defines persisted artifact recovery and the rule that components consume one typed normalization boundary rather than interpreting persisted fields independently."}
+{"file":".trellis/spec/frontend/agent-control-safety.md","reason":"Defines truthful capability reporting, preview/apply, paid approval, revision binding, receipts, cancellation, and external Agent surface limits."}
+{"file":".trellis/spec/frontend/paid-tool-prompt-contract.md","reason":"Defines how user and Agent instructions enter paid visual calls without hidden prompt changes or fabricated approval."}
+{"file":".trellis/spec/frontend/cutout-pipeline.md","reason":"Defines Asset Production source revision and design-system binding contracts that selection changes must invalidate explicitly."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Required for the Design IR, persistence, runtime, UI, compiler, and external-contract data flow in this cross-layer change."}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"Guides reuse of visual-generation review gates, creative-board decisions, and generic candidate contracts instead of Design System-only duplication."}
+{"file":".trellis/tasks/07-23-design-system-variants/design.md","reason":"Owns the candidate-plan precedence, generic persisted contract, promotion/token authority, UX, compatibility, failure matrix, and rollback design."}

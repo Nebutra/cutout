@@ -110,6 +110,15 @@ async function createProjectWithWorkspace(
     prototypeDesignSystem: workspace.prototypeDesignSystem
       ? { ...(workspace.prototypeDesignSystem as Record<string, unknown>), bytes: new Uint8Array((workspace.prototypeDesignSystem as { bytes: number[] }).bytes) }
       : null,
+    prototypeDesignSystemCandidates: workspace.prototypeDesignSystemCandidates
+      ? {
+          ...(workspace.prototypeDesignSystemCandidates as Record<string, unknown>),
+          artifacts: Object.fromEntries(
+            Object.entries((workspace.prototypeDesignSystemCandidates as { artifacts: Record<string, { bytes: number[] }> }).artifacts)
+              .map(([id, artifact]) => [id, { ...artifact, bytes: new Uint8Array(artifact.bytes) }]),
+          ),
+        }
+      : null,
     prototypePages: Array.isArray(workspace.prototypePages)
       ? workspace.prototypePages.map((artifact) => ({
           ...(artifact as Record<string, unknown>),
@@ -180,6 +189,30 @@ function baseWorkspace(overrides: Record<string, unknown> = {}) {
   }
 }
 
+const fixturePng = Array.from(Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+  'base64',
+))
+
+function candidateDesignMarkdown(primary: string) {
+  return [
+    '---',
+    'tokens:',
+    '  color:',
+    '    background: "#ffffff"',
+    '    surface: "#f5f5f5"',
+    '    text: "#111111"',
+    `    primary: "${primary}"`,
+    '    accent: "#ffcc00"',
+    '  spacing:',
+    '    md: "16px"',
+    '  radius:',
+    '    md: "8px"',
+    '---',
+    '# Direction',
+  ].join('\n')
+}
+
 function plan(humanLoop: Record<string, unknown>) {
   const openDetails = {
     id: 'open-details', label: 'Open product details', trigger: 'click',
@@ -223,6 +256,56 @@ function completedWorkspace() {
     prototypeDesignSystem: { name: 'Northstar system', designMarkdown: '# Northstar', bytes, mediaType: 'image/png', width: 1, height: 1 },
     prototypePages: finishedPlan.pages.map((page: Record<string, unknown>) => ({ page, bytes, mediaType: 'image/png', width: 1, height: 1 })),
     selectedPrototypePageId: 'home', namingStatus: 'done',
+  })
+}
+
+function designSystemCandidateWorkspace() {
+  const candidatePlan = plan({ mode: 'continue', rationale: 'The product requirements are clear.' })
+  candidatePlan.designSystem = {
+    ...candidatePlan.designSystem,
+    exploration: {
+      mode: 'auto', decidedBy: 'agent', count: 2,
+      rationale: 'Two coherent directions expose the meaningful visual tradeoff.',
+      directions: [
+        { id: 'quiet', label: 'Quiet editorial', thesis: 'Restrained hierarchy and generous negative space.', vary: ['density'], preserve: ['product identity'] },
+        { id: 'expressive', label: 'Expressive studio', thesis: 'Tactile surfaces and bold shape language.', vary: ['shape language'], preserve: ['product identity'] },
+      ],
+      bounds: { maxCandidates: 8, maxParallelism: 2 },
+    },
+  }
+  const candidates = [
+    { id: 'candidate:quiet', directionId: 'quiet', color: '#0055ff' },
+    { id: 'candidate:expressive', directionId: 'expressive', color: '#cc2255' },
+  ]
+  return baseWorkspace({
+    workflowPhase: 'design-system-selection',
+    prototypePlan: candidatePlan,
+    prototypeDesignSystemCandidates: {
+      set: {
+        id: 'candidate-set:design-system:visual-test',
+        kind: 'design-system',
+        baseRevisionId: 'workspace.v1:unprojected',
+        proposal: candidatePlan.designSystem.exploration,
+        candidates: candidates.map((candidate) => ({
+          id: candidate.id,
+          directionId: candidate.directionId,
+          status: 'ready',
+          outputs: [
+            { role: 'design-system', materialId: `material:design-system-candidate:${candidate.id}:visual` },
+            { role: 'design-markdown', materialId: `material:design-system-candidate:${candidate.id}:markdown` },
+          ],
+          provenanceIds: [`provenance:design-system-candidate:${candidate.id}`],
+        })),
+      },
+      artifacts: Object.fromEntries(candidates.map((candidate) => [candidate.id, {
+        name: candidate.id,
+        designMarkdown: candidateDesignMarkdown(candidate.color),
+        bytes: fixturePng,
+        mediaType: 'image/png',
+        width: 1,
+        height: 1,
+      }])),
+    },
   })
 }
 
@@ -310,6 +393,25 @@ test('Home has one primary need entry and recent work remains reachable', async 
   await page.keyboard.type('A high-level product direction')
   await page.keyboard.press('ControlOrMeta+Enter')
   await expect(page.getByRole('complementary', { name: 'Agent workspace' })).toBeVisible()
+})
+
+test('Design System candidates pause downstream work and remain comparable', async ({ page }) => {
+  await createProjectWithWorkspace(page, designSystemCandidateWorkspace(), 'Candidate comparison')
+  const heading = page.getByRole('heading', { name: 'Choose a Design System direction' })
+  await expect(heading).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Quiet editorial' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Expressive studio' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Use this direction' })).toHaveCount(2)
+  await expect(page.getByText('Generating prototype pages')).toHaveCount(0)
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true)
+
+  await page.getByRole('button', { name: 'Preview' }).first().click()
+  await expect(page.getByRole('dialog').getByText('# Direction')).toBeVisible()
+  await page.keyboard.press('Escape')
+
+  await page.getByRole('button', { name: 'Use this direction' }).first().click()
+  await expect(heading).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Directions' })).toBeVisible()
 })
 
 test('a vague goal asks only for direction and offers delegation', async ({ page }) => {

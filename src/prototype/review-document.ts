@@ -10,10 +10,36 @@ export function prototypeReviewMarkdown(
   const authored = scope === 'primary-flow'
     ? plan.reviewDocument?.primaryFlow
     : plan.reviewDocument?.fullPlan
-  return authored?.trim() || legacyPrototypeReviewMarkdown(
+  const base = authored?.trim() || legacyPrototypeReviewMarkdown(
     plan,
     pagesForScope(plan, scope),
   )
+  const exploration = plan.designSystem.exploration
+  if (!exploration) return base
+  return [
+    base,
+    '',
+    '## Design System directions',
+    '',
+    `**${exploration.count} direction${exploration.count === 1 ? '' : 's'}** · ${exploration.mode} · ${exploration.decidedBy}`,
+    '',
+    exploration.rationale,
+    '',
+    ...exploration.directions.flatMap((direction) => [
+      `### ${direction.label}`,
+      '',
+      direction.thesis,
+      '',
+      `Varies: ${direction.vary.join(', ')}.`,
+      '',
+      `Preserves: ${direction.preserve.join(', ')}.`,
+      '',
+    ]),
+    `Runtime bounds: up to ${exploration.bounds.maxCandidates} candidates, ${exploration.bounds.maxParallelism} concurrent.`,
+    ...(exploration.estimate
+      ? ['', `Estimated provider cost: ${exploration.estimate.amount} ${exploration.estimate.currency}.`]
+      : []),
+  ].join('\n')
 }
 
 function legacyPrototypeReviewMarkdown(

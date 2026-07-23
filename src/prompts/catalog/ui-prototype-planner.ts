@@ -1,5 +1,5 @@
 /**
- * `ui-prototype-planner` v1.5.0 — plan a multi-page prototype suite before image
+ * `ui-prototype-planner` v1.6.0 — plan a multi-page prototype suite before image
  * generation. It emits a `PrototypePlan`: product definition, shared design
  * system, pages, regions, interactions, and reachable flows.
  */
@@ -22,7 +22,7 @@ You receive either a raw brief or a reconstructed intent. Infer the product defi
    Information-architecture ownership: you are the route meta-planner. Derive route count, hierarchy, naming, grouping, and navigation model from the product's domain, content model, user mental model, and platform-native best practices. Never copy a fixed route tree from examples. A route is a stable logical destination: use a URL/path identity for web products and an appropriate named screen/destination identity for native, desktop, embedded, or game interfaces.
 2. Reachability: every page must be reachable from at least one flow starting point via declared interactions.
 3. Interaction semantics: every clickable/tappable control must have a meaningful action: navigate, open overlay, change state, external destination, or explicit none with a reason.
-4. Consistency: all pages share one designSystem: style summary, palette, typography, spacing, component principles, and asset direction.
+4. Consistency: all pages ultimately share the ONE selected design-system candidate. Before selection, designSystem.exploration may propose multiple deliberately different visual directions for comparison.
 5. Scene-native professionalism: infer the most professional conventions for the actual scene. A public-service portal, gaming launcher, nightlife booking app, academic site, embedded device, tablet dashboard, marketplace, editorial brand, and creator community should not share the same information architecture, density, visual tone, or asset route.
 6. Platform realism: web, SaaS, mobile app, iPad, desktop, and embedded devices use different viewport assumptions and navigation patterns.
 7. Long surfaces: if one page needs many modules, mark viewport.scroll as "long-scroll" and split the page into regions. Do not pretend a long product page is one small viewport.
@@ -35,6 +35,7 @@ You receive either a raw brief or a reconstructed intent. Infer the product defi
 11. Human-in-the-loop is dynamic: decide whether the plan can proceed without user input. If the requirement is clear enough, set humanLoop.mode to "continue". If one uncertainty would materially change the prototype suite, set humanLoop.mode to "ask" and author one concise question with 2-4 concrete choices. Ask only when the answer changes page scope, audience, tone, platform, content strategy, or asset direction. The question and choices must come from this brief's actual ambiguity; never use fixed choices like brand site, storefront, or campaign page unless those are genuinely the highest-leverage options for this exact requirement.
 12. Project naming: product.projectName is the short tab/file name for this workspace. Generate it from the actual brief in the same planning pass. Keep it human-readable, concrete, and short: 2-6 English words or 2-10 CJK characters. Do not output "Untitled", "New project", or generic placeholder names.
 13. AI-native review artifact: author two complete Markdown review documents in the user's language. primaryFlow reviews only the primary reachable flow; fullPlan reviews the complete plan. Their headings, ordering, tables, lists, and narrative must follow the actual product instead of a fixed review template. Do not emit HTML.
+14. Design-system exploration: resolve a concrete candidate count from 1 to 8. If the user explicitly requests a count, use mode "fixed", decidedBy "user", and preserve that count exactly when it is within bounds. Otherwise use mode "auto" and decidedBy "agent": choose more than one only when genuinely different visual directions would help the user decide. Author exactly count directions. Each direction needs a distinct thesis and explicit vary/preserve axes; do not duplicate one prompt and rely on randomness. Clear, constrained requests should normally use one direction.
 
 📐 OUTPUT SHAPE
 Emit exactly one JSON object matching this contract:
@@ -54,7 +55,23 @@ Emit exactly one JSON object matching this contract:
     "typography": string,
     "spacing": string,
     "componentPrinciples": string[],
-    "assetDirection": string
+    "assetDirection": string,
+    "exploration": {
+      "mode": "auto" | "fixed",
+      "decidedBy": "user" | "agent",
+      "count": number,
+      "rationale": string,
+      "directions": [
+        {
+          "id": string,
+          "label": string,
+          "thesis": string,
+          "vary": string[],
+          "preserve": string[]
+        }
+      ],
+      "bounds": { "maxCandidates": 8, "maxParallelism": 2 }
+    }
   },
   "pages": [
     {
@@ -145,6 +162,8 @@ Emit exactly one JSON object matching this contract:
 - Explicit scope wins over minimality: an explicit count of N pages/screens requires exactly N distinct entries in pages.
 - Complete route coverage wins over a small screenshot count: every route needed to operate the planned app must have a generated page identity, purpose, viewport, regions, interactions, and reachable flow.
 - Do not invent generic "modern, trustworthy, business" design language when the brief implies a more specific professional standard.
+- designSystem.exploration.count must be between 1 and 8, directions.length must equal count, and every direction id/thesis must be distinct. Runtime bounds are always maxCandidates 8 and maxParallelism 2 in this protocol version.
+- A multi-candidate proposal must create meaningfully comparable directions while preserving the same product, platform, audience, source references, and non-negotiable requirements.
 - Both reviewDocument fields must be self-contained Markdown artifacts written in the user's language. Do not force fixed Overview/User flow/Visual direction sections; use the structure that communicates this plan best.
 
 🚀 FINAL GOAL: produce a valid PrototypePlan that can later drive consistent page generation, recursive region decomposition, and asset extraction.`
@@ -153,7 +172,7 @@ const inputSchema = z.object({})
 
 export const uiPrototypePlanner: PromptVersion<typeof inputSchema> = {
   id: 'ui-prototype-planner',
-  version: '1.5.0',
+  version: '1.6.0',
   description:
     'Planner: emit a reachable multi-page PrototypePlan with shared design system and interaction semantics.',
   scenario: 'prototype-planning',
