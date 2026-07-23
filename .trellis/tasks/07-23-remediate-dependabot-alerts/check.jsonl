@@ -1,0 +1,2 @@
+{"file":".trellis/spec/frontend/index.md","reason":"Repository frontend guideline index for consistency checks."}
+{"file":".trellis/tasks/07-23-remediate-dependabot-alerts/research/dependabot-feasibility.md","reason":"Expected dependency trees, upstream constraints, and unsafe approaches to reject."}
