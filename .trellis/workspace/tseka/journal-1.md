@@ -689,3 +689,36 @@ Removed the deprecated GUI Queue, Queue-only semantic experiment, native handler
 ### Next Steps
 
 - None - task complete
+
+
+## Session 21: Faithful uploaded-material extraction
+
+**Date**: 2026-07-23
+**Task**: Faithful uploaded-material extraction
+**Branch**: `chore/archive-general-material-extraction`
+
+### Summary
+
+Added staged Agent routing for deterministic asset-sheet slicing and Apple Vision foreground extraction, exact source-byte preservation, mask/provenance evidence, cancellation/source binding, truthful capability gaps, plugin/spec synchronization, and merged PR #21 after full cross-platform CI.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `5f41ac9` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
