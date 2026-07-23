@@ -189,6 +189,9 @@ describe('Agent response regeneration workspace flow', () => {
 
     expect(host.textContent).not.toContain('Stale stopped error')
     expect(getStoreState().genError).toBeNull()
+    expect(await waitFor(() => host!.querySelectorAll('[data-slot="agent-activity-bubble"]').length === 1)).toBe(true)
+    expect(host.querySelectorAll('[data-slot="user-message"]')).toHaveLength(1)
+    expect(host.querySelectorAll('[data-slot="agent-message"]')).toHaveLength(2)
 
     await act(async () => {
       gateResult.resolve(ok({
@@ -204,8 +207,9 @@ describe('Agent response regeneration workspace flow', () => {
     })
 
     expect(await waitFor(() => host!.textContent?.includes('Fresh response'))).toBe(true)
+    expect(await waitFor(() => host!.querySelectorAll('[data-slot="agent-activity-bubble"]').length === 0)).toBe(true)
     expect(host.querySelectorAll('[data-slot="user-message"]')).toHaveLength(1)
-    expect(host.querySelectorAll('[data-slot="agent-message"]')).toHaveLength(2)
+    expect(host.querySelectorAll('[data-slot="agent-message"]')).toHaveLength(1)
     expect(host.textContent).not.toContain('Old response')
     expect(host.querySelector('[aria-label="Response 2 of 2"]')?.textContent).toContain('2 / 2')
     expect(getStoreState().workspaceSnapshot?.runError).toBeNull()
@@ -213,6 +217,7 @@ describe('Agent response regeneration workspace flow', () => {
     expect(persistedEvents).toEqual(expect.arrayContaining([
       expect.objectContaining({ type: 'agent-message', message: 'Fresh response', responseToEventId: 'user' }),
       expect.objectContaining({ type: 'branch-selected', sourceEventId: 'user' }),
+      expect.objectContaining({ type: 'step-started', label: 'Preparing the run', detail: 'Checking your request…' }),
       expect.objectContaining({ type: 'step-succeeded', label: 'Preparing the run', detail: 'Request checked.' }),
     ]))
     expect(persistedEvents.some((event) => event.type === 'message-revised' && event.targetEventId === 'agent')).toBe(false)
@@ -220,9 +225,18 @@ describe('Agent response regeneration workspace flow', () => {
     await act(async () => host!.querySelector<HTMLButtonElement>('[aria-label="Previous response"]')!.click())
     expect(await waitFor(() => host!.textContent?.includes('Old response'))).toBe(true)
     expect(host.querySelector('[aria-label="Response 1 of 2"]')?.textContent).toContain('1 / 2')
+    expect(host.querySelectorAll('[data-slot="agent-activity-bubble"]')).toHaveLength(0)
+    expect(host.querySelectorAll('[data-slot="agent-message"]')).toHaveLength(1)
+
+    await act(async () => host!.querySelector<HTMLButtonElement>('[aria-label="Next response"]')!.click())
+    expect(await waitFor(() => host!.textContent?.includes('Fresh response'))).toBe(true)
+    expect(host.querySelector('[aria-label="Response 2 of 2"]')?.textContent).toContain('2 / 2')
+    expect(host.querySelectorAll('[data-slot="agent-activity-bubble"]')).toHaveLength(0)
+    expect(host.querySelectorAll('[data-slot="agent-message"]')).toHaveLength(1)
   }, 15_000)
 
   it('treats a direct no-tool answer as a message regeneration instead of entering the asset pipeline', async () => {
+    const gateStarted = deferred<void>()
     const gateResult = deferred<Result<GenerateWithToolsOutput>>()
     const events = replayRunEvents([
       createRunEvent('run:old', { type: 'run-started', mode: 'create' }, { eventId: 'start', at: 1 }),
@@ -243,7 +257,7 @@ describe('Agent response regeneration workspace flow', () => {
             <TooltipProvider>
               <SettingsUIProvider value={{ open: () => {} }}>
                 <LibraryUIProvider value={{ open: () => {}, openGlobal: () => {} }}>
-                  <ServiceProvider registry={fakeRegistry(() => {}, gateResult.promise)}>
+                  <ServiceProvider registry={fakeRegistry(() => gateStarted.resolve(), gateResult.promise)}>
                     <ImageImportActionsProvider value={{ openPicker: () => {} }}>
                       <IntentWorkspace />
                     </ImageImportActionsProvider>
@@ -260,13 +274,22 @@ describe('Agent response regeneration workspace flow', () => {
     await act(async () => { await new Promise((resolve) => setTimeout(resolve, 500)) })
     await act(async () => {
       regenerate!.click()
+      await gateStarted.promise
+    })
+
+    expect(await waitFor(() => host!.querySelectorAll('[data-slot="agent-activity-bubble"]').length === 1)).toBe(true)
+    expect(host.querySelectorAll('[data-slot="user-message"]')).toHaveLength(1)
+    expect(host.querySelectorAll('[data-slot="agent-message"]')).toHaveLength(2)
+
+    await act(async () => {
       gateResult.resolve(ok({ text: 'Direct answer', toolCalls: [] }))
       await Promise.resolve()
     })
 
     expect(await waitFor(() => host!.textContent?.includes('Fresh response'))).toBe(true)
+    expect(await waitFor(() => host!.querySelectorAll('[data-slot="agent-activity-bubble"]').length === 0)).toBe(true)
     expect(host.querySelectorAll('[data-slot="user-message"]')).toHaveLength(1)
-    expect(host.querySelectorAll('[data-slot="agent-message"]')).toHaveLength(2)
+    expect(host.querySelectorAll('[data-slot="agent-message"]')).toHaveLength(1)
     expect(host.textContent).not.toContain('Old response')
     const persistedEvents = getStoreState().workspaceSnapshot?.agentRunEvents?.events ?? []
     expect(persistedEvents).toEqual(expect.arrayContaining([
