@@ -25,7 +25,8 @@ describe("workspace rail source contract", () => {
   });
 
   it("keeps one accessible, focus-visible RailItem treatment", () => {
-    expect(source.match(/<RailItem/g)).toHaveLength(7);
+    expect(source.match(/<RailItem/g)).toHaveLength(6);
+    expect(source).not.toContain('label="Advanced"');
     expect(source).toContain("aria-label={label}");
     expect(source).toContain("aria-pressed={active}");
     expect(source).toContain("flex size-12 shrink-0 flex-col");

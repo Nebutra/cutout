@@ -45,9 +45,6 @@ test("Agent, Design and Deliver retain their consumers in the workspace panel ra
 }) => {
   await createProject(page);
   await expectOnlyPrimaryModes(page);
-  await expect(
-    page.getByRole("button", { name: "Open advanced audit" }),
-  ).toHaveCount(0);
 
   await expect(page.getByLabel("Message the Agent")).toBeVisible();
   const viewport = page.viewportSize()!;
@@ -150,53 +147,7 @@ for (const [legacyView, expectedMode] of [
     expect(persisted).toMatchObject({
       version: 2,
       mode: expectedMode === "Design" ? "canvas" : expectedMode.toLowerCase(),
-      advanced: false,
     });
+    expect(persisted).not.toHaveProperty("advanced");
   });
 }
-
-test("Developer mode restores an accessible redacted audit without changing primary navigation", async ({
-  page,
-}) => {
-  await page.addInitScript(
-    (key) =>
-      localStorage.setItem(
-        key,
-        JSON.stringify({ version: 2, mode: "agent", advanced: true }),
-      ),
-    navigationKey,
-  );
-  await createProject(page, "Audit a local design project");
-  await expectOnlyPrimaryModes(page);
-  const viewport = page.viewportSize()!;
-  if (viewport.width < 768) await page.setViewportSize({ width: 1024, height: viewport.height });
-  await page.getByRole("button", { name: "Advanced", exact: true }).click();
-  if (viewport.width < 768) await page.setViewportSize(viewport);
-  const dialog = page.getByRole("dialog", { name: "Developer audit" });
-  await expect(dialog).toBeVisible();
-  await expect(dialog.getByRole("tab")).toHaveCount(2);
-  await expect(dialog.getByRole("tab").allTextContents()).resolves.toEqual([
-    "Design IR",
-    "Receipts",
-  ]);
-  await expect(
-    dialog.getByText(
-      /Prompts, source content, secrets and local paths are excluded/,
-    ),
-  ).toBeVisible();
-  const link = dialog.getByRole("link", { name: "Export redacted report" }),
-    href = await link.getAttribute("href");
-  expect(href).toMatch(/^data:application\/json/);
-  const report = decodeURIComponent(href!.split(",")[1]!),
-    serialized = report.toLowerCase();
-  expect(serialized).not.toMatch(
-    /api.?key|authorization|prompt|sourcecontent|localpath|secret/,
-  );
-  expect(
-    await page.evaluate(
-      () =>
-        document.documentElement.scrollWidth <=
-        document.documentElement.clientWidth,
-    ),
-  ).toBe(true);
-});

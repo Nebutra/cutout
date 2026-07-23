@@ -1047,11 +1047,6 @@ msgid "settings.integrations.desktop_not_installed"
 msgstr "未安装桌面提供方。"
 
 #. js-lingui-explicit-id
-#: src/components/settings/sections/GeneralSection.tsx
-msgid "settings.developer_mode.title"
-msgstr "开发者模式"
-
-#. js-lingui-explicit-id
 #: src/components/settings/sections/RecoverySection.tsx
 msgid "settings.recovery.diagnostic_preview_aria"
 msgstr "诊断包预览"
@@ -2351,11 +2346,6 @@ msgstr "快捷键"
 #: src/components/settings/VectorizerPanel.tsx
 msgid "settings.key_show"
 msgstr "显示"
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/GeneralSection.tsx
-msgid "settings.developer_mode.hint"
-msgstr "在项目内显示只读的 DAG、Design IR 和回执审计工具。"
 
 #. js-lingui-explicit-id
 #: src/components/inspector/SliceDimensions.tsx
