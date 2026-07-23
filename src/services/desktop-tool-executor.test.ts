@@ -10,12 +10,16 @@ const imageCapability: PaidToolExecutorCapability = {
 }
 
 function request(
-  capability: 'generate-image' | 'edit-image' | 'cutout' = 'generate-image',
+  capability: 'generate-image' | 'edit-image' | 'cutout' | 'semantic-cutout' = 'generate-image',
   prompt?: string,
 ) {
   return paidToolRequestSchema.parse({
     capability,
-    ...(capability === 'cutout' ? { providerId: 'local', model: 'cutout-v1' } : { providerId: 'provider-1', model: 'image-1' }),
+    ...(capability === 'cutout'
+      ? { providerId: 'local', model: 'cutout-v1' }
+      : capability === 'semantic-cutout'
+        ? { providerId: 'local', model: 'apple-vision-foreground-v1' }
+        : { providerId: 'provider-1', model: 'image-1' }),
     intent: 'Create the approved visual',
     ...(prompt !== undefined ? { prompt } : {}),
     inputArtifactIds: capability === 'generate-image' ? [] : ['artifact:input'],
@@ -55,7 +59,11 @@ function harness(overrides: {
     },
     generation,
     cutout: { run: vi.fn(async () => ({ ok: true as const, data: { slices: [{ id: 'slice-1', index: 0, box: { x: 0, y: 0, width: 1, height: 1 }, png: new Blob([new Uint8Array([9])]), width: 1, height: 1 }] } })) },
-  } as unknown as Pick<ServiceRegistry, 'providers' | 'generation' | 'cutout'>
+    foregroundSegmentation: {
+      capabilities: vi.fn(async () => ({ ok: true as const, data: { available: true, platform: 'macos', backend: 'apple-vision' as const, reason: null } })),
+      segment: vi.fn(async () => ({ ok: true as const, data: { png: new Blob([new Uint8Array([8])], { type: 'image/png' }), width: 1, height: 1, instanceCount: 1, backend: 'apple-vision' as const } })),
+    },
+  } as unknown as Pick<ServiceRegistry, 'providers' | 'generation' | 'cutout' | 'foregroundSegmentation'>
   const executor = createDesktopToolExecutor({
     services, artifacts,
     capabilities: async () => [overrides.capability ?? imageCapability],
@@ -196,6 +204,39 @@ describe('desktop paid tool executor', () => {
       outputArtifactIds: ['artifact:cutout:1'],
       slices: [expect.objectContaining({ id: 'slice-1' })],
     }))
+  })
+
+  it('stores semantic mask evidence before publishing deterministic slices', async () => {
+    const sink = vi.fn()
+    const writeBatch = vi.fn()
+      .mockResolvedValueOnce(['artifact:mask'])
+      .mockResolvedValueOnce(['artifact:slice'])
+    const capability: PaidToolExecutorCapability = {
+      capability: 'semantic-cutout',
+      providerId: 'local',
+      model: 'apple-vision-foreground-v1',
+      available: true,
+      estimatedCost: { currency: 'USD', amount: 0 },
+    }
+    const semantic = harness({ capability, sink, writeBatch })
+
+    const result = await semantic.executor.execute(execution(request('semantic-cutout')))
+
+    expect(result.ok).toBe(true)
+    expect(semantic.services.providers.status).not.toHaveBeenCalled()
+    expect(semantic.services.foregroundSegmentation!.segment).toHaveBeenCalledWith(
+      expect.objectContaining({ bytes: new Uint8Array([7]) }),
+    )
+    expect(writeBatch).toHaveBeenCalledTimes(2)
+    expect(sink).toHaveBeenCalledWith(expect.objectContaining({
+      maskArtifactId: 'artifact:mask',
+      providerRoute: 'local/apple-vision-foreground-v1',
+      outputArtifactIds: ['artifact:slice'],
+    }))
+    expect(result.events.at(-1)).toMatchObject({
+      type: 'material-recorded',
+      material: { kind: 'cutout-slice', source: 'algorithm' },
+    })
   })
 
   it('does not publish cutout state when artifact commit fails', async () => {

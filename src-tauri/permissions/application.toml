@@ -4,6 +4,11 @@ description = "Allows bounded project asset, bundle and repository scan commands
 commands.allow = ["save_assets", "save_bundle", "scan_repository"]
 
 [[permission]]
+identifier = "foreground-segmentation"
+description = "Allows bounded local foreground segmentation through Apple Vision on supported macOS hosts."
+commands.allow = ["foreground_segmentation_capabilities", "foreground_segment"]
+
+[[permission]]
 identifier = "provider-secrets-network"
 description = "Allows host-owned provider secret, discovery/draft and policy-checked AI transport commands."
 commands.allow = ["set_key", "key_status", "delete_key", "list_key_status", "load_providers", "save_providers", "discover_provider_candidates", "create_provider_draft", "check_provider_draft", "import_provider_draft", "cancel_provider_draft", "ai_proxy_request", "ai_proxy_stream", "ai_image_edit", "set_vectorizer_api_key", "vectorizer_key_status", "delete_vectorizer_api_key", "vectorize_local_vtracer", "vectorize_vectorizer_ai"]

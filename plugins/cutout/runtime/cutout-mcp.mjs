@@ -4800,6 +4800,7 @@ var materialProductionEvidenceSchema = object({
 		failures: array(string().min(1).max(2e3)),
 		unavailable: boolean().optional()
 	}).strict().optional(),
+	maskArtifactId: idSchema$2.optional(),
 	providerRoute: string().min(1).max(240).optional(),
 	lineage: object({
 		previousRunId: idSchema$2,
@@ -5188,7 +5189,8 @@ var paidToolPromptMaxLength = 2e5;
 var paidToolCapabilitySchema = _enum([
 	"generate-image",
 	"edit-image",
-	"cutout"
+	"cutout",
+	"semantic-cutout"
 ]);
 var moneyEstimateSchema = object({
 	currency: string().regex(/^[A-Z]{3}$/),

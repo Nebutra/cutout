@@ -68,6 +68,10 @@ function fakeRegistry(
   return {
     session: { current: async () => ({ userId: 'test', isAuthenticated: false }) },
     cutout: { run: async () => notUsed() },
+    foregroundSegmentation: {
+      capabilities: async () => ok({ available: false, platform: 'test', backend: 'unavailable', reason: 'capability-required' }),
+      segment: async () => ({ ok: false, error: 'capability-required' }),
+    },
     assets: {
       list: async () => ok([]),
       load: notUsed,

@@ -3,6 +3,11 @@ import { describe, expect, it } from 'vitest'
 import { IndexedDbLibraryBlobStore, validateMediaBlob } from './blob-store'
 
 describe('content-addressed Global Library blobs', () => {
+  it('accepts supported BMP source artifacts', async () => {
+    const store=new IndexedDbLibraryBlobStore(new IDBFactory(),100)
+    await expect(store.put(new Uint8Array([66,77]),'image/bmp'))
+      .resolves.toMatchObject({mediaType:'image/bmp',size:2})
+  })
   it('deduplicates bytes and reports quota usage', async () => {
     const store=new IndexedDbLibraryBlobStore(new IDBFactory(),100)
     const first=await store.put(new Uint8Array([1,2,3]),'application/json')

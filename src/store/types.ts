@@ -25,6 +25,8 @@ export type Params = CutoutParams
 /** The loaded source sheet. `bitmap` is null until an image is dropped. */
 export interface SourceState {
   readonly bitmap: ImageBitmap | null
+  /** Exact encoded input retained for faithful processing and persistence. */
+  readonly encodedImage: Blob | null
   /** Base filename without extension, e.g. `asset-sheet`. Used for slice names. */
   readonly name: string
   readonly width: number
@@ -123,6 +125,8 @@ export interface ProjectRestoreInput {
   readonly source?: {
     readonly bitmap: ImageBitmap
     readonly name: string
+    /** Present for current records; absent for bitmap-only legacy restore inputs. */
+    readonly encodedImage?: Blob
   }
   readonly mockup?: MockupArtifact | null
   readonly designMarkdown?: DesignMarkdownAsset | null
@@ -298,6 +302,8 @@ export interface StoreActions {
   loadImage(input: {
     bitmap: ImageBitmap
     name: string
+    /** Exact uploaded/provider-returned encoding. Omit only for bitmap-only legacy callers. */
+    encodedImage?: Blob
     /** Defaults to true. Agent-managed cutout flows set false to avoid a duplicate run. */
     autoAnalyze?: boolean
   }): void

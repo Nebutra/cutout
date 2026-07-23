@@ -67,9 +67,11 @@ import {
   composerRouteNotices,
   composerModelValue,
   fixedModelValue,
-  lockComposerRoute,
+  lockComposerChatRoute,
+  lockComposerImageRoute,
   parseComposerModelValue,
   supportsWebSearch,
+  type LockedComposerChatRoute,
   type LockedComposerRoute,
 } from "@/agent-runtime/composer-execution";
 import { recordRuntimeDiagnostic } from "@/services/runtime-diagnostics";
@@ -157,6 +159,7 @@ import {
   configurePageTargetingTool,
   configureRegenerationTool,
   conversationalReplyTool,
+  materialProcessingToolForSource,
   proceedWithGenerationTool,
 } from "@/agent-runtime/tool-registry";
 import { createClarificationBridge } from "@/agent-runtime/clarification-bridge";
@@ -165,6 +168,7 @@ import type { GenerationDecision } from "@/prototype/generation-tool";
 import type { PageTargetingDecision } from "@/prototype/page-targeting-tool";
 import type { ConversationalReplyInput } from "@/prototype/conversational-reply-tool";
 import type { AskClarifyingQuestionInput } from "@/prototype/ask-clarifying-question-tool";
+import type { ProcessUploadedMaterialDecision } from "@/material-processing/process-uploaded-material-tool";
 import { CanvasBackgroundPicker } from "./CanvasBackgroundPicker";
 import { readCanvasBackground, writeCanvasBackground } from "./canvas-background";
 import {
@@ -208,6 +212,7 @@ import {
   type FilesPanelNode,
 } from "@/components/files-panel/FilesPanel";
 import { bytesToBlob, blobToBytes, decodeImage } from "@/lib/image";
+import { resolveSourceMaterial } from "@/store/source-material";
 import { forEachConcurrent } from "@/lib/async-pool";
 import {
   nameRegionSlices,
@@ -1338,14 +1343,7 @@ export function IntentWorkspace({
     // predate verification receipts have assigned providers with no record —
     // settle those with one probe here instead of blocking the run.
     await Promise.all(
-      [
-        ...new Set(
-          [
-            assignmentTable.chat?.providerId,
-            assignmentTable.image?.providerId,
-          ].filter((id): id is string => Boolean(id)),
-        ),
-      ]
+      [...new Set([assignmentTable.chat?.providerId].filter((id): id is string => Boolean(id)))]
         .filter((id) =>
           providerList.some((provider) => provider.id === id && provider.enabled),
         )
@@ -1358,20 +1356,21 @@ export function IntentWorkspace({
         ),
     );
     const routePolicy = await import("@/agent-runtime/route-policy");
-    let route: LockedComposerRoute;
+    const routePreferences = routePolicy.routePreferencesFromPolicy(
+      routePolicy.loadRoutePolicy(),
+    );
+    let chatRoute: LockedComposerChatRoute;
     try {
-      route = lockComposerRoute({
+      chatRoute = lockComposerChatRoute({
         model: composerModelPolicy,
         thinking: composerThinkingPolicy,
         assignments: assignmentTable,
         providers: providerList,
         hasReferenceImages: attachments.length > 0,
-        routePreferences: routePolicy.routePreferencesFromPolicy(
-          routePolicy.loadRoutePolicy(),
-        ),
+        routePreferences,
       });
       routePolicy.appendRouteReceipts(
-        [route.chatPolicy.routeReceipt, route.imagePolicy.routeReceipt]
+        [chatRoute.chatPolicy.routeReceipt]
           .filter((receipt) => receipt !== undefined)
           .map((receipt) => ({
             ...receipt,
@@ -1382,13 +1381,8 @@ export function IntentWorkspace({
       setRunError(errorMessage(error));
       return;
     }
-    lockedRouteRef.current = route;
-    const chatAssignment = route.chat;
-    const imageAssignment = route.image;
-    const providerKeyError = await providerKeyPreflightMessage([
-      chatAssignment.providerId,
-      imageAssignment.providerId,
-    ]);
+    const chatAssignment = chatRoute.chat;
+    const providerKeyError = await providerKeyPreflightMessage([chatAssignment.providerId]);
     if (providerKeyError) {
       setRunError(providerKeyError);
       return;
@@ -1437,6 +1431,102 @@ export function IntentWorkspace({
       // A clarifying answer already folds into the brief; otherwise use the
       // model's distilled brief from proceed_with_generation, if any.
       clarifiedBrief = toolGate.clarifiedBrief ?? toolGate.refinedBrief;
+      if (toolGate.materialDecision) {
+        const sourceBitmap = source.bitmap;
+        const sourceImageId = source.imageId;
+        if (!sourceBitmap || !sourceImageId || !toolGate.materialRunId) {
+          setRunError("The loaded source changed before material processing could start.");
+          finishActiveRun(lease);
+          if (activeRunRef.current === lease) activeRunRef.current = null;
+          setAgentBusy(false);
+          return;
+        }
+        try {
+          const sourceMaterial = await resolveSourceMaterial(source);
+          agentRunCoordinatorRef.current.checkpoint(lease);
+          if (getStoreState().source.imageId !== sourceImageId) {
+            throw new Error("The loaded source changed before material processing could start.");
+          }
+          await desktopTools.invoke({
+            runId: toolGate.materialRunId,
+            toolCallId: `material:${crypto.randomUUID()}`,
+            label: toolGate.materialDecision.operation === "extract-foreground"
+              ? "Extract foreground"
+              : "Split isolated assets",
+            capability: toolGate.materialDecision.operation === "extract-foreground"
+              ? "semantic-cutout"
+              : "cutout",
+            intent: toolGate.materialDecision.rationale,
+            image: chatAssignment,
+            signal: lease.controller.signal,
+            expectedSourceImageId: sourceImageId,
+            inputs: [{
+              id: `source:${sourceImageId}`,
+              mediaType: sourceMaterial.mediaType,
+              bytes: sourceMaterial.bytes,
+            }],
+          });
+          agentRunCoordinatorRef.current.checkpoint(lease);
+          finishActiveRun(lease);
+          if (activeRunRef.current === lease) activeRunRef.current = null;
+          setAgentBusy(false);
+          return;
+        } catch (error) {
+          if (lease.controller.signal.aborted
+            || !agentRunCoordinatorRef.current.isActive(lease)) {
+            return;
+          }
+          const message = errorMessage(error);
+          setRunError(message);
+          toast.error("Material processing failed", { description: message });
+          finishActiveRun(lease);
+          if (activeRunRef.current === lease) activeRunRef.current = null;
+          setAgentBusy(false);
+          return;
+        }
+      }
+    }
+
+    let route: LockedComposerRoute;
+    try {
+      const imageProviderId = assignmentTable.image?.providerId;
+      if (imageProviderId && providerList.some((provider) => provider.id === imageProviderId && provider.enabled)) {
+        await ensureProviderVerification(imageProviderId, async () => {
+          const result = await services.providers.test(imageProviderId);
+          if (isErr(result)) throw new Error(result.error);
+          return result.data;
+        });
+      }
+      const imageRoute = lockComposerImageRoute({
+        model: composerModelPolicy,
+        thinking: composerThinkingPolicy,
+        assignments: assignmentTable,
+        providers: providerList,
+        hasReferenceImages: attachments.length > 0,
+        routePreferences,
+      });
+      route = { ...chatRoute, ...imageRoute };
+      routePolicy.appendRouteReceipts(
+        [imageRoute.imagePolicy.routeReceipt]
+          .filter((receipt) => receipt !== undefined)
+          .map((receipt) => ({ ...receipt, personalization: personalizationContext.receipt })),
+      );
+    } catch (error) {
+      setRunError(errorMessage(error));
+      finishActiveRun(lease);
+      if (activeRunRef.current === lease) activeRunRef.current = null;
+      setAgentBusy(false);
+      return;
+    }
+    lockedRouteRef.current = route;
+    const imageAssignment = route.image;
+    const imageProviderKeyError = await providerKeyPreflightMessage([imageAssignment.providerId]);
+    if (imageProviderKeyError) {
+      setRunError(imageProviderKeyError);
+      finishActiveRun(lease);
+      if (activeRunRef.current === lease) activeRunRef.current = null;
+      setAgentBusy(false);
+      return;
     }
 
     setRunStartedAt(Date.now());
@@ -1625,6 +1715,8 @@ export function IntentWorkspace({
     clarifiedBrief: string | null;
     /** A model-distilled brief (from proceed_with_generation) to generate from. */
     refinedBrief: string | null;
+    materialDecision?: ProcessUploadedMaterialDecision;
+    materialRunId?: string;
   }> {
     const designMarkdownContent =
       prototypeDesignSystem?.designMarkdown.trim() ||
@@ -1663,6 +1755,7 @@ export function IntentWorkspace({
     // The model's explicit "run the pipeline" decision — it can distill a
     // cleaner brief from a rambling message before the expensive generation.
     const proceedTool = proceedWithGenerationTool();
+    const materialTool = materialProcessingToolForSource(Boolean(source.bitmap));
     const toolRunId = `workspace:tool:${crypto.randomUUID()}`;
     const askTool = askClarifyingQuestionTool(
       clarificationBridge,
@@ -1673,6 +1766,7 @@ export function IntentWorkspace({
       astryxTool,
       regenerationTool,
       pageTargetingTool,
+      materialTool,
       proceedTool,
       askTool,
       replyTool,
@@ -1718,6 +1812,7 @@ export function IntentWorkspace({
       astryxTool,
       regenerationTool,
       pageTargetingTool,
+      materialTool,
       proceedTool,
     ].filter((tool) => tool !== null).length;
     // askTool is always offered, and its execute() can call clarificationBridge.ask()
@@ -1770,6 +1865,13 @@ export function IntentWorkspace({
           pageTargetingTool
             ? "- `select_pages_to_regenerate`: the user is naming one or more specific existing pages " +
               "to redo, leaving the rest of the prototype suite untouched."
+            : null,
+          materialTool
+            ? "- `process_uploaded_material`: the user wants to process the image already loaded in " +
+              "the workspace. Choose `extract-foreground` for an ordinary photo/background-removal " +
+              "request. Choose `split-isolated-assets` only for an already separated white/transparent " +
+              "asset sheet. You MUST call this tool for those loaded-source requests instead of " +
+              "prototype generation. This preserves source pixels and never generates a replacement."
             : null,
           "- `reply_conversationally`: the message is not a build/design request at all — a greeting, " +
             "small talk, a question, or too vague to plan a product from.",
@@ -1891,6 +1993,9 @@ export function IntentWorkspace({
     const proceedCall = toolLoop.data.calls.find(
       (call) => call.toolName === "proceed_with_generation",
     );
+    const materialCall = toolLoop.data.calls.find(
+      (call) => call.toolName === "process_uploaded_material",
+    );
     const refinedBrief =
       proceedCall && !proceedCall.error
         ? (proceedCall.toolOutput as GenerationDecision).refinedBrief
@@ -1924,6 +2029,31 @@ export function IntentWorkspace({
       toast.error("Clarifying question failed", {
         description: failedAskCall.error,
       });
+    }
+
+    if (materialCall) {
+      emitRunEvents(toolLoop.data.events);
+      if (materialCall.error) {
+        toast.error("Material processing decision failed", {
+          description: materialCall.error,
+        });
+        return {
+          handled: true,
+          regenerationDecision: null,
+          pageTargetingDecision: null,
+          clarifiedBrief: null,
+          refinedBrief: null,
+        };
+      }
+      return {
+        handled: false,
+        regenerationDecision: null,
+        pageTargetingDecision: null,
+        clarifiedBrief: null,
+        refinedBrief: null,
+        materialDecision: materialCall.toolOutput as ProcessUploadedMaterialDecision,
+        materialRunId: toolRunId,
+      };
     }
 
     if (conversationalCall && !conversationalCall.error) {

@@ -1,0 +1,3 @@
+{"file":".trellis/spec/frontend/cutout-pipeline.md","reason":"Check deterministic and semantic extraction remain distinct, evidence is complete, and persisted snapshots stay compatible."}
+{"file":".trellis/spec/frontend/agent-control-safety.md","reason":"Check capability gaps fail closed, explicit approval and receipts remain intact, and no external Agent capability is falsely advertised."}
+{"file":".trellis/tasks/07-23-generalize-agent-material-processing/design.md","reason":"Check implementation against the complete data flow, platform boundary, failure matrix, and rollback contract."}

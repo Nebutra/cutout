@@ -15,6 +15,7 @@ import type { ServiceRegistry } from './types'
 import type { GenerationService, ProviderService } from './ai/types'
 import type { PromptService } from '@/prompts/types'
 import { createLocalCutoutService } from './local/cutout-service.local'
+import { createLocalForegroundSegmentationService } from './local/foreground-segmentation.local'
 import { createLocalAssetRepository } from './local/asset-repository.local'
 import { createLocalBundleRepository } from './local/bundle-repository.local'
 import { createLocalRepositorySourceService } from './local/repository-source.local'
@@ -36,6 +37,7 @@ export function createLocalRegistry(
   const prompts = createLocalPromptService()
   return {
     cutout: createLocalCutoutService(worker),
+    foregroundSegmentation: createLocalForegroundSegmentationService(bridge),
     assets: createLocalAssetRepository(bridge),
     bundles: createLocalBundleRepository(bridge),
     repositorySources: createLocalRepositorySourceService(bridge),

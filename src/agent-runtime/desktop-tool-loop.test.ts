@@ -206,6 +206,35 @@ describe("desktop tool loop", () => {
     resolve(undefined as never);
   });
 
+  it("propagates the owning run signal through approval and execution", async () => {
+    const waitingController = new AbortController();
+    const waiting = harness();
+    await waiting.loop.request(input({
+      signal: waitingController.signal,
+      request: { ...input().request, approvalPolicy: "explicit" },
+    }));
+    waitingController.abort();
+    await expect(waiting.loop.settled("tool", "request")).resolves.toMatchObject({
+      ok: false,
+      error: "Cancelled by user.",
+    });
+    expect(waiting.execute).not.toHaveBeenCalled();
+
+    const runningController = new AbortController();
+    const running = harness();
+    running.execute.mockImplementation(async (execution) => {
+      await new Promise<void>((resolve) =>
+        execution.signal?.addEventListener("abort", () => resolve(), { once: true }),
+      );
+      return { ok: false, error: "cancelled", events: [] };
+    });
+    const run = running.loop.request(input({ signal: runningController.signal }));
+    await vi.waitFor(() => expect(running.execute).toHaveBeenCalledOnce());
+    runningController.abort();
+    await run;
+    expect(running.execute.mock.calls[0]?.[0].signal?.aborted).toBe(true);
+  });
+
   it("records failure, retries with a new linked id, and rejects stale revisions", async () => {
     const failed = {
       ok: false as const,

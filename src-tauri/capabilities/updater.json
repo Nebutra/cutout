@@ -11,6 +11,7 @@
     "provider-secrets-network",
     "git-version-control",
     "registry-and-agent-host",
-    "speech-host"
+    "speech-host",
+    "foreground-segmentation"
   ]
 }

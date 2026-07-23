@@ -2,6 +2,7 @@
 
 pub mod agent_host;
 pub mod ai;
+pub mod foreground_segmentation;
 pub mod git;
 pub mod native_approval;
 pub mod registry_desktop;

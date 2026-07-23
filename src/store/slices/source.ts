@@ -15,6 +15,7 @@ import { supersedeActiveProduction } from '@/asset-production'
 /** The empty source (nothing dropped yet). */
 export const INITIAL_SOURCE: SourceState = {
   bitmap: null,
+  encodedImage: null,
   name: '',
   width: 0,
   height: 0,
@@ -24,7 +25,12 @@ export const INITIAL_SOURCE: SourceState = {
 
 export interface SourceSlice {
   source: SourceState
-  loadImage(input: { bitmap: ImageBitmap; name: string; autoAnalyze?: boolean }): void
+  loadImage(input: {
+    bitmap: ImageBitmap
+    name: string
+    encodedImage?: Blob
+    autoAnalyze?: boolean
+  }): void
 }
 
 export const createSourceSlice: StateCreator<Store, [], [], SourceSlice> = (
@@ -33,7 +39,7 @@ export const createSourceSlice: StateCreator<Store, [], [], SourceSlice> = (
 ) => ({
   source: INITIAL_SOURCE,
 
-  loadImage: ({ bitmap, name, autoAnalyze = true }) => {
+  loadImage: ({ bitmap, name, encodedImage, autoAnalyze = true }) => {
     const { source, analysis, assetProduction } = get()
     // Release the outgoing source + all analysis resources before replacing.
     source.bitmap?.close()
@@ -42,6 +48,7 @@ export const createSourceSlice: StateCreator<Store, [], [], SourceSlice> = (
     set({
       source: {
         bitmap,
+        encodedImage: encodedImage ?? null,
         name,
         width: bitmap.width,
         height: bitmap.height,

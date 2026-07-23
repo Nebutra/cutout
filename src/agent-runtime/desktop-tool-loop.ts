@@ -26,6 +26,10 @@ export interface DesktopToolLoopRequest {
   readonly request: PaidToolRequest;
   readonly capabilityLeaseId?: string;
   readonly requestDigest?: string;
+  /** Cancels approval or execution when the owning workspace run is superseded. */
+  readonly signal?: AbortSignal;
+  /** Internal source binding for loaded-material publication. */
+  readonly expectedSourceImageId?: string;
 }
 
 export interface DesktopToolLoopDependencies {
@@ -67,6 +71,7 @@ interface PendingCall {
   state: "approval" | "running" | "settled";
   result: Promise<DesktopToolExecutionResult>;
   resolve: (result: DesktopToolExecutionResult) => void;
+  removeExternalAbortListener?: () => void;
 }
 
 export function createDesktopToolLoop(
@@ -79,6 +84,19 @@ export function createDesktopToolLoop(
 
   const append = (events: readonly AgentRunEvent[]) => {
     if (events.length) dependencies.append(events);
+  };
+
+  const bindExternalAbort = (call: PendingCall) => {
+    const signal = call.input.signal;
+    if (!signal) return;
+    const cancelFromOwner = () => api.cancel(call.input.toolCallId, call.input.requestId);
+    if (signal.aborted) {
+      cancelFromOwner();
+      return;
+    }
+    signal.addEventListener("abort", cancelFromOwner, { once: true });
+    call.removeExternalAbortListener = () =>
+      signal.removeEventListener("abort", cancelFromOwner);
   };
 
   async function execute(
@@ -161,6 +179,7 @@ export function createDesktopToolLoop(
           );
     }
     call.state = "settled";
+    call.removeExternalAbortListener?.();
     const events = withReceipt(result, call.input)
     if (dependencies.durability) {
       await dependencies.durability.settle(call.input.requestId, attemptId, {
@@ -173,7 +192,7 @@ export function createDesktopToolLoop(
     call.resolve(result);
   }
 
-  return {
+  const api: DesktopToolLoop = {
     async request(input) {
       if (requestIds.has(input.requestId)) return;
       requestIds.add(input.requestId);
@@ -271,10 +290,13 @@ export function createDesktopToolLoop(
             { eventId: `event:${input.requestId}:tool-approved`, at: now() },
           ),
         ]);
+        bindExternalAbort(call);
+        if (call.state === "settled") return;
         await execute(call, false);
         return;
       }
       append([requested]);
+      bindExternalAbort(call);
     },
     async approve(toolCallId, requestId) {
       const call = calls.get(toolCallId);
@@ -307,6 +329,7 @@ export function createDesktopToolLoop(
       )
         return;
       call.state = "settled";
+      call.removeExternalAbortListener?.();
       append([
         createRunEvent(
           call.input.runId,
@@ -395,6 +418,7 @@ export function createDesktopToolLoop(
       return call.result;
     },
   };
+  return api;
 }
 
 function loopFailure(

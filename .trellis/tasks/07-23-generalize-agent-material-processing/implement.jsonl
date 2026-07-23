@@ -1,0 +1,3 @@
+{"file":".trellis/spec/frontend/cutout-pipeline.md","reason":"Defines deterministic white-background cutout, Asset Production evidence, compatibility, and test contracts that semantic extraction must extend without weakening."}
+{"file":".trellis/spec/frontend/agent-control-safety.md","reason":"Defines truthful capability reporting, approval leases, receipts, controlled Agent execution, and external control boundaries."}
+{"file":".trellis/tasks/07-23-generalize-agent-material-processing/design.md","reason":"Owns the staged Agent routing, Apple Vision service/native contract, semantic-cutout flow, compatibility, and failure matrix for this milestone."}

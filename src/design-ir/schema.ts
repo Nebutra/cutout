@@ -238,6 +238,7 @@ export const materialProductionEvidenceSchema = z.object({
     failures: z.array(z.string().min(1).max(2_000)),
     unavailable: z.boolean().optional(),
   }).strict().optional(),
+  maskArtifactId: idSchema.optional(),
   providerRoute: z.string().min(1).max(240).optional(),
   lineage: z.object({
     previousRunId: idSchema,

@@ -185,7 +185,12 @@ export function AgentWorkspaceDock({
   const presentation = deriveDockPresentation(viewModel, {
     hasIntervention: Boolean(intervention),
   })
-  const mayResolveApproval = viewModel.summary.status === 'running' || viewModel.summary.status === 'needs-repair'
+  const hasPendingApproval = viewModel.feed.some((item) => item.type === 'tool'
+    && item.status === 'waiting'
+    && item.actions?.includes('approve'))
+  const mayResolveApproval = viewModel.summary.status === 'running'
+    || viewModel.summary.status === 'needs-repair'
+    || (viewModel.summary.status === 'draft' && hasPendingApproval)
   const activeExecution = activeExecutionTimeline(viewModel.execution)
   // The composer owns the active-run stop action. Do not render a second,
   // visually disconnected cancel button for the same operation.
