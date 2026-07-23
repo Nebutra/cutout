@@ -15,6 +15,22 @@ export function isSupportedImage(file: File): boolean {
   return /\.(png|jpe?g|webp|bmp|gif)$/i.test(file.name)
 }
 
+/** Resolve a supported image's media type when a drag source omitted MIME metadata. */
+export function supportedImageMediaType(file: Pick<File, 'name' | 'type'>): string {
+  if (ACCEPTED_IMAGE_TYPES.includes(file.type)) return file.type
+  const extension = file.name.split('.').pop()?.toLowerCase()
+  const inferred = extension && ({
+    png: 'image/png',
+    jpg: 'image/jpeg',
+    jpeg: 'image/jpeg',
+    webp: 'image/webp',
+    bmp: 'image/bmp',
+    gif: 'image/gif',
+  } as const)[extension as 'png' | 'jpg' | 'jpeg' | 'webp' | 'bmp' | 'gif']
+  if (!inferred) throw new Error(`Unsupported image media type: ${file.type || file.name}`)
+  return inferred
+}
+
 /** Strip the directory + extension from a filename → a slice-name base. */
 export function baseName(fileName: string): string {
   const noDir = fileName.split(/[\\/]/).pop() ?? fileName

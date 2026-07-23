@@ -583,6 +583,47 @@ describe('project-repository.local', () => {
     getStoreState().resetProject()
   })
 
+  it('persists and restores the exact encoded source instead of normalizing it', async () => {
+    const state = getStoreState()
+    state.resetProject()
+    const bytes = Uint8Array.of(255, 216, 255, 224, 1, 2, 3)
+    state.loadImage({
+      bitmap: { width: 16, height: 12, close() {} } as ImageBitmap,
+      encodedImage: new Blob([bytes], { type: 'image/jpeg' }),
+      name: 'photo',
+      autoAnalyze: false,
+    })
+
+    const record = await createProjectRecordFromStore({
+      id: 'project:exact-source',
+      createdAt: 1,
+      state: getStoreState(),
+      now: 2,
+    })
+
+    expect(record.source?.blob.type).toBe('image/jpeg')
+    expect(new Uint8Array(await record.source!.blob.arrayBuffer())).toEqual(bytes)
+
+    const previous = globalThis.createImageBitmap
+    Object.defineProperty(globalThis, 'createImageBitmap', {
+      configurable: true,
+      value: vi.fn(async () => ({ width: 16, height: 12, close() {} } as ImageBitmap)),
+    })
+    try {
+      state.resetProject()
+      state.restoreProject(await createRestoreInputFromProject(record))
+      expect(getStoreState().source.encodedImage?.type).toBe('image/jpeg')
+      expect(new Uint8Array(await getStoreState().source.encodedImage!.arrayBuffer()))
+        .toEqual(bytes)
+    } finally {
+      Object.defineProperty(globalThis, 'createImageBitmap', {
+        configurable: true,
+        value: previous,
+      })
+      state.resetProject()
+    }
+  })
+
   it('round-trips per-region slice tree linkage (regionId/pageId) through save + restore', async () => {
     const createSpy = vi
       .spyOn(URL, 'createObjectURL')

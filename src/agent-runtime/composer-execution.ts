@@ -20,6 +20,16 @@ export interface LockedComposerRoute {
   readonly imagePolicy: ExecutionPolicyResult
 }
 
+export interface LockedComposerChatRoute {
+  readonly chat: ModelAssignment
+  readonly chatPolicy: ExecutionPolicyResult
+}
+
+export interface LockedComposerImageRoute {
+  readonly image: ModelAssignment
+  readonly imagePolicy: ExecutionPolicyResult
+}
+
 export function composerModelValue(policy: ComposerModelPolicy): string {
   if (policy.mode === 'auto') return 'auto'
   return fixedModelValue(policy.slot, policy.assignment)
@@ -59,6 +69,20 @@ export function lockComposerRoute(input: {
   readonly modelCatalog?:readonly ModelDescriptor[]
   readonly routePreferences?:RoutePreferences
 }): LockedComposerRoute {
+  const chat = lockComposerChatRoute(input)
+  const image = lockComposerImageRoute(input)
+  return { ...chat, ...image }
+}
+
+export function lockComposerChatRoute(input: {
+  readonly model: ComposerModelPolicy
+  readonly thinking: ComposerThinkingPolicy
+  readonly assignments: ModelAssignments
+  readonly providers: readonly ProviderConfig[]
+  readonly hasReferenceImages: boolean
+  readonly modelCatalog?: readonly ModelDescriptor[]
+  readonly routePreferences?: RoutePreferences
+}): LockedComposerChatRoute {
   const modelCatalog=input.modelCatalog??runtimeModelDescriptors(input.assignments,input.providers)
   const chatPolicy = routeExecutionPolicy({
     model: input.model,
@@ -69,6 +93,25 @@ export function lockComposerRoute(input: {
     modelCatalog,
     routePreferences:input.routePreferences,
   })
+  if (!chatPolicy.assignment || chatPolicy.status === 'blocked') {
+    throw new Error(routeError('chat/vision', chatPolicy))
+  }
+  return {
+    chat: { ...chatPolicy.assignment, effort: chatPolicy.reasoningEffort },
+    chatPolicy,
+  }
+}
+
+export function lockComposerImageRoute(input: {
+  readonly model: ComposerModelPolicy
+  readonly thinking: ComposerThinkingPolicy
+  readonly assignments: ModelAssignments
+  readonly providers: readonly ProviderConfig[]
+  readonly hasReferenceImages: boolean
+  readonly modelCatalog?: readonly ModelDescriptor[]
+  readonly routePreferences?: RoutePreferences
+}): LockedComposerImageRoute {
+  const modelCatalog=input.modelCatalog??runtimeModelDescriptors(input.assignments,input.providers)
   const imagePolicy = routeExecutionPolicy({
     model: input.model,
     thinking: input.thinking,
@@ -83,17 +126,11 @@ export function lockComposerRoute(input: {
     routePreferences:input.routePreferences,
   })
 
-  if (!chatPolicy.assignment || chatPolicy.status === 'blocked') {
-    throw new Error(routeError('chat/vision', chatPolicy))
-  }
   if (!imagePolicy.assignment || imagePolicy.status === 'blocked') {
     throw new Error(routeError('image', imagePolicy))
   }
-
   return {
-    chat: { ...chatPolicy.assignment, effort: chatPolicy.reasoningEffort },
     image: imagePolicy.assignment,
-    chatPolicy,
     imagePolicy,
   }
 }

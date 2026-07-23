@@ -161,6 +161,19 @@ describe('AgentWorkspaceDock', () => {
     expect(html).not.toContain('USD 0.08')
     expect(html).not.toContain('Provider estimate')
   })
+  it('keeps a real pending approval actionable during local preflight', () => {
+    const html = renderToStaticMarkup(createElement(AgentWorkspaceDock, {
+      viewModel: {
+        ...draftModel,
+        feed: [{ id: 'approval', type: 'tool', status: 'waiting', title: 'Split assets', detail: 'Local cutout', provenance: 'runtime', toolCallId: 'tool-1', requestId: 'request-1', approval: { status: 'required', reason: 'Explicit approval is required.' }, actions: ['approve', 'deny'] }],
+      },
+      composer: { value: '', disabled: true, onChange: vi.fn(), onSubmit: vi.fn() },
+      onApproveTool: vi.fn(),
+      onDenyTool: vi.fn(),
+    }))
+    expect(html).toContain('Approve')
+    expect(html).toContain('Deny')
+  })
   it('renders an empty draft as a compact intent prompt without empty run chrome', () => {
     const html = renderToStaticMarkup(createElement(AgentWorkspaceDock, {
       viewModel: draftModel,

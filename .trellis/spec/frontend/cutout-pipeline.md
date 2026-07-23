@@ -485,3 +485,117 @@ const t = smoothstep(24, 96, distToWhite(px))
 px.a = Math.min(px.a, Math.max(1, Math.round(t * 255)))
 unpremultiplyAgainstWhite(px) // when px.a < 250
 ```
+
+## Scenario: Faithful Uploaded-Material Processing
+
+### 1. Scope / Trigger
+
+Apply this contract when the Agent processes the currently loaded raster as an
+input material rather than generating a prototype. It covers isolated asset
+sheet slicing and semantic foreground extraction while preserving source
+pixels, provenance, cancellation, and source revision identity.
+
+### 2. Signatures
+
+```typescript
+type UploadedMaterialOperation =
+  | 'split-isolated-assets'
+  | 'extract-foreground'
+
+resolveSourceMaterial(source: SourceState): Promise<{
+  bytes: Uint8Array
+  mediaType: string
+  encoding: 'original' | 'normalized-png'
+}>
+
+foreground_segmentation_capabilities(): ForegroundSegmentationCapabilities
+foreground_segment(bytes: Vec<u8>): ForegroundSegmentationResult
+```
+
+`DesktopToolExecution.expectedSourceImageId` and `signal` bind execution to the
+source and Agent run that obtained approval. Production evidence may include
+`maskArtifactId` and the executor route.
+
+### 3. Contracts
+
+- `split-isolated-assets` uses the existing border-connected white/transparent
+  deterministic worker. It does not require an image-generation provider.
+- `extract-foreground` first uses Apple Vision on macOS 14+ to create a
+  full-size transparent PNG, then sends that result through the deterministic
+  worker to produce one or more slices. It never redraws source pixels.
+- Imported and provider-returned encoded bytes remain attached to `SourceState`
+  and are used for CAS persistence and material execution. Bitmap-only legacy
+  sources are explicitly normalized to PNG; they are never presented as exact
+  original encodings.
+- The full-size Vision result is stored as mask evidence but is not projected as
+  a user slice. Final PNG slices bind the original source artifact, mask
+  artifact, bounds, cutout parameters, provider route, QA, and lineage.
+- Semantic availability is queried immediately before artifact writes or
+  approval. A missing capability fails closed and cannot enter prototype,
+  image-edit, or image-generation routing.
+- Source identity, project revision, and cancellation are checked before
+  invocation, after source-byte resolution, after execution, and immediately
+  before Asset Production publication.
+- The Apple Vision bridge accepts bounded encoded inputs and validates output
+  dimensions, pixel count, row bytes, pixel format, checked byte length, and
+  `CVPixelBufferGetDataSize` before reading the native buffer.
+- This executor is desktop-internal. `cutout.control.v1`, CLI, MCP, and
+  `cutout.agent-capabilities.json` do not advertise a new operation.
+
+### 4. Validation & Error Matrix
+
+| Condition | Required behavior |
+|---|---|
+| No loaded source | Do not offer the uploaded-material decision tool |
+| Isolated white/transparent sheet | Run deterministic cutout only |
+| Foreground extraction on macOS 14+ | Require explicit approval, retain mask evidence, publish transparent slices |
+| Unsupported host or unavailable Vision | Return `capability-required` before artifact writes or approval; no generative fallback |
+| Source changes or run is cancelled | Do not publish output or mutate stopped/superseded UI state |
+| Vision returns no instances or unsafe buffer metadata | Fail closed; preserve the prior source and production state |
+| Semantic mask succeeds but deterministic slicing yields no subjects | Publish no production result; orphaned CAS evidence may remain |
+| Restored source has encoded bytes | Reuse the exact stored encoding and media type |
+| Legacy source has only an `ImageBitmap` | Normalize to PNG and mark the encoding as `normalized-png` |
+
+### 5. Good / Base / Bad Cases
+
+- Good: a JPEG photo remains byte-identical in source storage, Vision creates a
+  transparent mask, deterministic slicing publishes PNG assets, and production
+  evidence points to both source and mask artifacts.
+- Base: Windows, Linux, or older macOS reports `capability-required` without an
+  approval prompt and leaves the source ready for another supported operation.
+- Bad: re-encode every upload before persistence, silently reconstruct a
+  subject with an image model, or publish a late result after the source changed.
+
+### 6. Tests Required
+
+- Source store and project repository: exact byte/media-type round-trip for
+  imports and provider outputs; explicit PNG fallback for bitmap-only sources.
+- Agent routing E2E: deterministic slicing without an image assignment,
+  semantic capability preflight before approval, no prototype/generation
+  fallthrough, cancellation, and source replacement.
+- Desktop executor and sink: mask CAS evidence, final-slice-only projection,
+  provider route, revision/source binding, and atomic publication.
+- Native Rust: input limits, unsafe output dimensions, BGRA row padding,
+  unsupported hosts, and an ignored macOS 14 Apple Vision smoke fixture.
+- Full gates: `pnpm lint`, `pnpm test`, `pnpm build`, `pnpm agent:validate`,
+  `pnpm i18n:ci`, Tauri capability tests, `cargo fmt --check`, `cargo check`,
+  `cargo test`, and the ignored Vision smoke on a supported Mac.
+
+### 7. Wrong vs Correct
+
+```typescript
+// Wrong: normalize every upload and let unavailable extraction fall through.
+const bytes = await bitmapToBytes(source.bitmap)
+await generateOrEditSubject(bytes)
+
+// Correct: preserve the encoded source, preflight the selected capability,
+// and bind publication to the approved source identity.
+const material = await resolveSourceMaterial(source)
+await foregroundSegmentation.capabilities()
+await desktopTools.invoke({
+  capability: 'semantic-cutout',
+  inputs: [{ id: source.imageId, ...material }],
+  expectedSourceImageId: source.imageId,
+  signal: lease.controller.signal,
+})
+```

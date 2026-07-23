@@ -130,6 +130,7 @@ export type ProductionIssue = z.infer<typeof productionIssueSchema>
 
 export const productionTaskEvidenceSchema = z.object({
   sourceArtifactId: id.optional(),
+  maskArtifactId: id.optional(),
   bounds: z.object({
     x: z.number().nonnegative(),
     y: z.number().nonnegative(),

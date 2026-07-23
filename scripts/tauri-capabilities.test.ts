@@ -64,4 +64,19 @@ describe('Tauri capability least privilege contract', () => {
       'commands.allow = ["save_assets", "save_bundle", "scan_repository"]',
     )
   })
+
+  it('registers foreground segmentation as a narrow desktop capability', async () => {
+    const [modules, handlers, permissions, desktopCapability] = await Promise.all([
+      readRepositoryFile('src-tauri/src/commands/mod.rs'),
+      readRepositoryFile('src-tauri/src/lib.rs'),
+      readRepositoryFile('src-tauri/permissions/application.toml'),
+      readCapability('updater'),
+    ])
+
+    expect(modules).toContain('pub mod foreground_segmentation;')
+    expect(handlers).toContain('foreground_segmentation_capabilities')
+    expect(handlers).toContain('foreground_segment')
+    expect(permissions).toContain('identifier = "foreground-segmentation"')
+    expect(desktopCapability.permissions).toContain('foreground-segmentation')
+  })
 })

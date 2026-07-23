@@ -6,6 +6,8 @@ import {
   composerRouteNotices,
   composerModelValue,
   fixedModelValue,
+  lockComposerChatRoute,
+  lockComposerImageRoute,
   lockComposerRoute,
   parseComposerModelValue,
   supportsWebSearch,
@@ -42,6 +44,27 @@ describe('composer execution adapter', () => {
     expect(route.chat).toEqual({ ...assignments.chat, effort: 'medium' })
     expect(route.image).toEqual(assignments.image)
     expect(route.imagePolicy.slot).toBe('image')
+  })
+
+  it('can classify a local material request without an image-provider assignment', () => {
+    const chatOnly = { chat: assignments.chat }
+    const route = lockComposerChatRoute({
+      model: { mode: 'auto' },
+      thinking: 'auto',
+      assignments: chatOnly,
+      providers,
+      hasReferenceImages: false,
+      modelCatalog: verifiedCatalog.filter((model) => model.slot === 'chat'),
+    })
+    expect(route.chat.providerId).toBe('claude')
+    expect(() => lockComposerImageRoute({
+      model: { mode: 'auto' },
+      thinking: 'auto',
+      assignments: chatOnly,
+      providers,
+      hasReferenceImages: false,
+      modelCatalog: verifiedCatalog.filter((model) => model.slot === 'chat'),
+    })).toThrow('Configure a image model')
   })
 
   it('keeps provider-default separate from auto thinking', () => {

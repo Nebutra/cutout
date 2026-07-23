@@ -15,6 +15,10 @@ import { conversationalReplyTool } from '@/prototype/conversational-reply-tool'
 import { askClarifyingQuestionTool } from '@/prototype/ask-clarifying-question-tool'
 import { configurePageTargetingTool } from '@/prototype/page-targeting-tool'
 import { proceedWithGenerationTool } from '@/prototype/generation-tool'
+import {
+  materialProcessingToolForSource,
+  processUploadedMaterialTool,
+} from '@/material-processing/process-uploaded-material-tool'
 
 export {
   astryxThemeTool,
@@ -23,6 +27,8 @@ export {
   askClarifyingQuestionTool,
   configurePageTargetingTool,
   proceedWithGenerationTool,
+  processUploadedMaterialTool,
+  materialProcessingToolForSource,
 }
 
 /**
@@ -33,4 +39,5 @@ export const NO_ARG_TOOL_FACTORIES = [
   configureRegenerationTool,
   conversationalReplyTool,
   proceedWithGenerationTool,
+  processUploadedMaterialTool,
 ] as const

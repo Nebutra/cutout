@@ -9,7 +9,12 @@ import { useCallback, useRef } from 'react'
 import { toast } from 'sonner'
 import { useLingui } from '@lingui/react/macro'
 import { useStore } from '@/store'
-import { decodeImage, isSupportedImage, baseName } from '@/lib/image'
+import {
+  baseName,
+  decodeImage,
+  isSupportedImage,
+  supportedImageMediaType,
+} from '@/lib/image'
 import {
   isDesignMarkdownFileName,
   normalizedDesignMarkdown,
@@ -72,8 +77,11 @@ export function useImageImport(): ImageImport {
         return
       }
       try {
-        const bitmap = await decodeImage(file)
-        loadImage({ bitmap, name: baseName(file.name) })
+        const encodedImage = file.type
+          ? file
+          : new Blob([file], { type: supportedImageMediaType(file) })
+        const bitmap = await decodeImage(encodedImage)
+        loadImage({ bitmap, encodedImage, name: baseName(file.name) })
       } catch (error) {
         toast.error(
           error instanceof Error

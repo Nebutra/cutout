@@ -153,6 +153,21 @@ export interface VectorizeSvgResult {
   svg: string
 }
 
+export interface ForegroundSegmentationCapabilities {
+  available: boolean
+  platform: string
+  backend: 'apple-vision' | 'unavailable'
+  reason: string | null
+}
+
+export interface ForegroundSegmentationNativeResult {
+  pngBytes: Uint8Array
+  width: number
+  height: number
+  instanceCount: number
+  backend: 'apple-vision'
+}
+
 export interface NativeBridge {
   /** Persist assets under a fresh native folder-picker grant. */
   saveAssets(assets: SaveAssetInput[]): Promise<SaveAssetsResult>
@@ -194,6 +209,8 @@ export interface NativeBridge {
     bytes: Uint8Array
     mode?: VectorizerAiMode
   }): Promise<VectorizeSvgResult>
+  foregroundSegmentationCapabilities?(): Promise<ForegroundSegmentationCapabilities>
+  foregroundSegment?(bytes: Uint8Array): Promise<ForegroundSegmentationNativeResult>
 }
 
 /**
@@ -278,4 +295,12 @@ export const tauriBridge: NativeBridge = {
       bytes: Array.from(bytes),
       mode: mode ?? null,
     }),
+  foregroundSegmentationCapabilities: () =>
+    invoke<ForegroundSegmentationCapabilities>('foreground_segmentation_capabilities'),
+  foregroundSegment: async (bytes) => {
+    const result = await invoke<
+      Omit<ForegroundSegmentationNativeResult, 'pngBytes'> & { pngBytes: number[] }
+    >('foreground_segment', { bytes: Array.from(bytes) })
+    return { ...result, pngBytes: Uint8Array.from(result.pngBytes) }
+  },
 }

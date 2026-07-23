@@ -75,6 +75,9 @@ const TOOL_EVENT_LABELS: Readonly<Record<string, string>> = {
   compile_astryx_theme: 'Compiling Astryx theme',
   configure_prototype_regeneration: 'Configuring regeneration',
   select_pages_to_regenerate: 'Selecting pages',
+  process_uploaded_material: 'Classifying loaded material',
+  cutout: 'Splitting isolated assets',
+  'semantic-cutout': 'Extracting foreground',
 }
 
 /** Tools that only produce conversation (or silence). They must not appear as ops log rows. */

@@ -222,6 +222,7 @@ function productionEvidenceForSlice(
         cutoutParams: state.evidence?.cutoutParams,
         boardDiagnostics: state.evidence?.boardDiagnostics,
         qaVerdict: state.evidence?.qaVerdict,
+        maskArtifactId: state.evidence?.maskArtifactId,
         providerRoute: state.evidence?.providerRoute,
         lineage: state.evidence?.lineage,
         issues: state.issues,

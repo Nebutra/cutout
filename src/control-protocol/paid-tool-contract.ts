@@ -9,7 +9,12 @@ const safeText = z.string().refine((value) => !CREDENTIAL_VALUE.test(value), 'Cr
 export const paidToolIntentMaxLength = 20_000
 export const paidToolPromptMaxLength = 200_000
 
-export const paidToolCapabilitySchema = z.enum(['generate-image', 'edit-image', 'cutout'])
+export const paidToolCapabilitySchema = z.enum([
+  'generate-image',
+  'edit-image',
+  'cutout',
+  'semantic-cutout',
+])
 export type PaidToolCapability = z.infer<typeof paidToolCapabilitySchema>
 
 export const moneyEstimateSchema = z.object({

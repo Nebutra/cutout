@@ -47,6 +47,8 @@ export interface CutoutResultSink {
     readonly execution: DesktopToolExecution
     readonly slices: readonly CutoutSlice[]
     readonly outputArtifactIds: readonly string[]
+    readonly maskArtifactId?: string
+    readonly providerRoute?: string
   }): void | Promise<void>
 }
 
@@ -64,6 +66,7 @@ export interface DesktopToolExecution {
   readonly cutoutParams?: CutoutParams
   readonly capabilityLeaseId?: string
   readonly requestDigest?: string
+  readonly expectedSourceImageId?: string
 }
 
 export type DesktopToolExecutionResult =
@@ -81,7 +84,10 @@ export interface ToolExecutorRegistry {
 }
 
 export interface DesktopToolExecutorDependencies {
-  readonly services: Pick<ServiceRegistry, 'providers' | 'generation' | 'cutout'>
+  readonly services: Pick<
+    ServiceRegistry,
+    'providers' | 'generation' | 'cutout' | 'foregroundSegmentation'
+  >
   readonly artifacts: DesktopToolArtifactStore
   readonly capabilities: () => Promise<readonly PaidToolExecutorCapability[]>
   readonly currentRevision: () => number
@@ -111,7 +117,7 @@ export function createDesktopToolExecutor(
         const authorization = dependencies.permissionBroker.authorize(input.capabilityLeaseId, {
           subject: input.runId,
           requestDigest: input.requestDigest,
-          requiredScopes: input.request.capability === 'cutout' ? ['paid'] : ['paid', 'credential'],
+          requiredScopes: isLocalCutout(input.request.capability) ? ['paid'] : ['paid', 'credential'],
         })
         if (authorization.decision !== 'allowed') {
           return failure(input, authorization.reason ?? 'Capability authorization failed.', startedAt)
@@ -131,7 +137,7 @@ export function createDesktopToolExecutor(
       if (capability.model !== (input.request.model ?? capability.model)) {
         return failure(input, 'The selected model does not match the approved route.', startedAt)
       }
-      if (input.request.capability !== 'cutout') {
+      if (!isLocalCutout(input.request.capability)) {
         const providers = await dependencies.services.providers.list()
         const provider = providers.find((item) => item.id === capability.providerId && item.enabled)
         if (!provider || (input.request.providerId && provider.id !== input.request.providerId)) {
@@ -153,24 +159,38 @@ export function createDesktopToolExecutor(
         if (dependencies.currentRevision() !== input.expectedRevision) {
           return failure(input, 'The project changed while the paid tool was running; its output was not published.', startedAt, [started], capability, now(), id())
         }
-        const outputRefs = await writeAssets(dependencies.artifacts, executionOutput.assets, input, input.request.capability)
+        const evidenceRefs = executionOutput.evidenceAssets
+          ? await writeAssets(dependencies.artifacts, executionOutput.evidenceAssets, input, 'cutout')
+          : []
+        const outputRefs = await writeAssets(
+          dependencies.artifacts,
+          executionOutput.assets,
+          input,
+          artifactSource(input.request.capability),
+        )
         if (input.signal?.aborted) return cancelled(input, capability, startedAt, now(), id(), [started])
         if (dependencies.currentRevision() !== input.expectedRevision) {
           return failure(input, 'The project changed while the tool output was being prepared; its result was not published.', startedAt, [started], capability, now(), id())
         }
         if (executionOutput.cutoutSlices && dependencies.cutoutResultSink) {
-          await dependencies.cutoutResultSink.commit({ execution: input, slices: executionOutput.cutoutSlices, outputArtifactIds: outputRefs })
+          await dependencies.cutoutResultSink.commit({
+            execution: input,
+            slices: executionOutput.cutoutSlices,
+            outputArtifactIds: outputRefs,
+            maskArtifactId: evidenceRefs[0],
+            providerRoute: executionOutput.providerRoute,
+          })
         }
         const receipt = receiptFor(input, capability, 'succeeded', capability.estimatedCost, outputRefs, startedAt, now(), id())
         const succeeded = createRunEvent(input.runId, {
           type: 'tool-succeeded', toolCallId: input.toolCallId, tool: input.request.capability,
           label: input.label, stepId: input.stepId, outputRefs, receipt,
         }, { eventId: `event:${input.requestId}:tool-succeeded`, at: receipt.completedAt })
-        const materialKind = input.request.capability === 'cutout' ? 'cutout-slice' as const : 'prototype-page' as const
+        const materialKind = isLocalCutout(input.request.capability) ? 'cutout-slice' as const : 'prototype-page' as const
         const materials = outputRefs.map((outputRef, index) => createRunEvent(input.runId, {
           type: 'material-recorded', material: {
             id: outputRef, kind: materialKind, label: `${input.label} ${index + 1}`,
-            source: input.request.capability === 'cutout' ? 'algorithm' as const : 'agent' as const,
+            source: isLocalCutout(input.request.capability) ? 'algorithm' as const : 'agent' as const,
             evidenceKey: input.toolCallId,
           },
         }, { eventId: `event:${input.requestId}:material:${index}`, at: receipt.completedAt }))
@@ -203,7 +223,12 @@ async function executeCapability(
   dependencies: DesktopToolExecutorDependencies,
   input: DesktopToolExecution,
   capability: PaidToolExecutorCapability,
-): Promise<{ readonly assets: readonly GeneratedAsset[]; readonly cutoutSlices?: readonly CutoutSlice[] }> {
+): Promise<{
+  readonly assets: readonly GeneratedAsset[]
+  readonly cutoutSlices?: readonly CutoutSlice[]
+  readonly evidenceAssets?: readonly GeneratedAsset[]
+  readonly providerRoute?: string
+}> {
   if (input.request.capability === 'generate-image') {
     const result = await dependencies.services.generation.generateImages({
       providerId: capability.providerId, model: capability.model, prompt: paidToolExecutionPrompt(input.request), signal: input.signal,
@@ -221,8 +246,29 @@ async function executeCapability(
     if (!result.ok) throw new Error(result.error)
     return { assets: result.data }
   }
+  let cutoutSource = source
+  let evidenceAssets: readonly GeneratedAsset[] | undefined
+  let providerRoute = 'local/cutout-v1'
+  if (input.request.capability === 'semantic-cutout') {
+    const segmentation = dependencies.services.foregroundSegmentation
+    if (!segmentation) {
+      throw new Error('capability-required: foreground segmentation is unavailable on this host.')
+    }
+    const capabilities = await segmentation.capabilities()
+    if (!capabilities.ok || !capabilities.data.available) {
+      throw new Error(capabilities.ok
+        ? capabilities.data.reason ?? 'capability-required: foreground segmentation is unavailable on this host.'
+        : capabilities.error)
+    }
+    const segmented = await segmentation.segment({ bytes: source.bytes, signal: input.signal })
+    if (!segmented.ok) throw new Error(segmented.error)
+    const bytes = new Uint8Array(await segmented.data.png.arrayBuffer())
+    cutoutSource = { id: `${source.id}:foreground`, mediaType: 'image/png', bytes }
+    evidenceAssets = [{ mediaType: 'image/png', bytes }]
+    providerRoute = 'local/apple-vision-foreground-v1'
+  }
   const decode = dependencies.decodeBitmap ?? defaultDecodeBitmap
-  const bitmap = await decode(source)
+  const bitmap = await decode(cutoutSource)
   const result = await dependencies.services.cutout.run({
     bitmap, params: input.cutoutParams ?? defaultCutoutParams(), signal: input.signal,
   })
@@ -230,7 +276,7 @@ async function executeCapability(
   const assets = await Promise.all(result.data.slices.map(async (slice) => ({
     mediaType: 'image/png', bytes: new Uint8Array(await slice.png.arrayBuffer()),
   })))
-  return { assets, cutoutSlices: result.data.slices }
+  return { assets, cutoutSlices: result.data.slices, evidenceAssets, providerRoute }
 }
 
 async function writeAssets(store: DesktopToolArtifactStore, assets: readonly GeneratedAsset[], input: DesktopToolExecution, source: 'generate-image' | 'edit-image' | 'cutout') {
@@ -279,3 +325,18 @@ function cancelled(input: DesktopToolExecution, capability: PaidToolExecutorCapa
 
 function isAbort(error: unknown): boolean { return error instanceof DOMException && error.name === 'AbortError' }
 function errorText(error: unknown): string { return error instanceof Error ? error.message : String(error) }
+function isLocalCutout(capability: PaidToolRequest['capability']): boolean {
+  return capability === 'cutout' || capability === 'semantic-cutout'
+}
+function artifactSource(
+  capability: PaidToolRequest['capability'],
+): 'generate-image' | 'edit-image' | 'cutout' {
+  switch (capability) {
+    case 'cutout':
+    case 'semantic-cutout':
+      return 'cutout'
+    case 'generate-image':
+    case 'edit-image':
+      return capability
+  }
+}

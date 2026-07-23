@@ -18,6 +18,8 @@ pub fn run() {
             commands::save_assets::save_assets,
             commands::save_bundle::save_bundle,
             commands::scan_repository::scan_repository,
+            commands::foreground_segmentation::foreground_segmentation_capabilities,
+            commands::foreground_segmentation::foreground_segment,
             commands::git::git_capability,
             commands::git::git_status,
             commands::git::git_log,

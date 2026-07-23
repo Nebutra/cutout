@@ -47,6 +47,13 @@ receipts. `.cutout` state and provenance remain authoritative.
 - Desktop paid-tool requests always require explicit approval. Their budget
   ceilings come from the matching host capability estimate, never a persisted
   user allowance, and the desktop host policy does not project a `maxCost`.
+- Desktop-local `cutout` and `semantic-cutout` require only the `paid` scope;
+  they never require or imply a provider credential. Semantic availability is
+  checked immediately before artifact writes and approval so unsupported hosts
+  return `capability-required` without presenting an unusable approval request.
+- Uploaded-material execution carries the owning Agent `AbortSignal` and
+  `expectedSourceImageId` through approval, execution, and result publication.
+  A cancelled run or replaced source cannot publish into the current project.
 - Lease reservation and the complete control request run under the same
   project-scoped external-control lock. Reserved leases are single-use even
   when the operation returns a denied or invalid response.
@@ -141,6 +148,8 @@ receipts. `.cutout` state and provenance remain authoritative.
 | Path/root is a symlink or changes identity | Reject without returning controlled file contents or launching a command |
 | Repository exceeds the depth budget or declares executable Git config | Reject before deeper scanning or Git execution |
 | Platform cannot enforce required process-tree semantics | Return `capability-required` |
+| Semantic foreground extraction is unavailable | Return `capability-required` before artifact writes or approval; do not enter generation |
+| Approved material run is cancelled or its source identity changes | Reject publication and leave the current source/production state unchanged |
 | Axe violation target is outside a scenario | Do not attach it to that scenario |
 | Receipt claims success with failed target or mismatched artifacts | Schema validation fails |
 | No coding backend/workspace is injected | Return `capability-required`, never simulated success |
@@ -208,6 +217,9 @@ receipts. `.cutout` state and provenance remain authoritative.
   deterministic ordered union, identical legacy deduplication, branch
   selection restoration, divergent-ID rejection, CAS conflict, credential
   rejection, local-state preservation, and sanitized in-product failure copy.
+- Uploaded material: semantic capability preflight before approval, paid-only
+  local scope, cancellation propagation, expected source identity binding, and
+  no prototype/image-generation fallthrough on capability failure.
 - Run `pnpm agent:validate` after every CLI, MCP, protocol, capability, Skill,
   manifest, or plugin-runtime change.
 

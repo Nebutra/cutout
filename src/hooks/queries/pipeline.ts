@@ -66,6 +66,7 @@ export interface DeconstructMockupParams {
 
 export interface DeconstructMockupResult {
   readonly bitmap: ImageBitmap
+  readonly encodedImage: Blob
   readonly name: string
 }
 
@@ -264,14 +265,15 @@ export async function runDeconstructMockup(
 
   // The board becomes the cutout source → auto-analysis follows (§7).
   const decodeStarted = markTime()
-  const bitmap = await decodeImage(bytesToBlob(asset.bytes, asset.mediaType))
+  const encodedImage = bytesToBlob(asset.bytes, asset.mediaType)
+  const bitmap = await decodeImage(encodedImage)
   if (signal?.aborted) {
     bitmap.close()
     signal.throwIfAborted()
   }
   logTiming('deconstruct.decode-load', decodeStarted)
   logTiming('deconstruct.total', totalStarted)
-  return { bitmap, name: 'generated-sheet' }
+  return { bitmap, encodedImage, name: 'generated-sheet' }
 }
 
 /**
@@ -318,7 +320,11 @@ export function useDeconstructMockup(
             signal,
           },
         )
-        loadImage({ bitmap: result.bitmap, name: result.name })
+        loadImage({
+          bitmap: result.bitmap,
+          encodedImage: result.encodedImage,
+          name: result.name,
+        })
         getStoreState().endGen()
       } catch (error) {
         if (signal?.aborted) throw error

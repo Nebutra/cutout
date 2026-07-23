@@ -16,7 +16,8 @@ import {
   migrateLegacySlicesToAssetProduction,
   type AssetProductionSnapshot,
 } from '@/asset-production'
-import { bitmapToBytes, bytesToBlob, decodeImage } from '@/lib/image'
+import { bytesToBlob, decodeImage } from '@/lib/image'
+import { resolveSourceMaterial } from '@/store/source-material'
 import { err, ok, type Result } from '@/services/types'
 import { ContentAddressedDesktopArtifactStore } from '@/services/content-addressed-desktop-artifacts'
 import {
@@ -314,12 +315,7 @@ export async function createProjectRecordFromStore(input: {
   const source = state.source.bitmap
     ? input.previous?.source && input.previous.sourceImageId === state.source.imageId
       ? input.previous.source
-      : {
-          name: state.source.name || 'source',
-          blob: bytesToBlob(await bitmapToBytes(state.source.bitmap)),
-          width: state.source.width,
-          height: state.source.height,
-        }
+      : await storedSourceFromState(state.source)
     : undefined
   const mockup = state.mockup
     ? {
@@ -433,9 +429,23 @@ async function restoreStoredSource(
 ): Promise<ProjectRestoreInput['source']> {
   if (!source) return undefined
   try {
-    return { name: source.name, bitmap: await decodeImage(source.blob) }
+    return {
+      name: source.name,
+      bitmap: await decodeImage(source.blob),
+      encodedImage: source.blob,
+    }
   } catch {
     return undefined
+  }
+}
+
+async function storedSourceFromState(source: Store['source']): Promise<StoredImage> {
+  const material = await resolveSourceMaterial(source)
+  return {
+    name: source.name || 'source',
+    blob: bytesToBlob(material.bytes, material.mediaType),
+    width: source.width,
+    height: source.height,
   }
 }
 

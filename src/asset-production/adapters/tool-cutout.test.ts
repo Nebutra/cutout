@@ -46,4 +46,33 @@ describe('tool cutout production adapter', () => {
       route: 'import-cutout',
     })
   })
+
+  it('binds a semantic mask artifact and Apple Vision route into every output', async () => {
+    const maskArtifactId = `artifact:sha256:${'c'.repeat(64)}`
+    const snapshot = await publishToolCutoutProduction({
+      snapshot: emptyAssetProductionSnapshot(),
+      projectRevisionId: 'revision:semantic',
+      sourceArtifactId: `artifact:sha256:${'a'.repeat(64)}`,
+      sourceSha256: 'a'.repeat(64),
+      maskArtifactId,
+      providerRoute: 'local/apple-vision-foreground-v1',
+      toolCallId: 'semantic:1',
+      runId: 'asset-production:semantic:1',
+      cutoutParams: { threshold: 246, minArea: 900, mergeGap: 18, padding: 10 },
+      outputs: [{
+        sliceId: 'subject-1',
+        box: { x: 2, y: 3, width: 8, height: 9 },
+        artifact: {
+          artifactId: `artifact:sha256:${'b'.repeat(64)}`,
+          sha256: 'b'.repeat(64),
+          mediaType: 'image/png',
+          width: 8,
+          height: 9,
+        },
+      }],
+      createdAt: 1,
+    })
+    expect(Object.values(snapshot.runs['asset-production:semantic:1']!.tasks)[0]?.evidence)
+      .toMatchObject({ maskArtifactId, providerRoute: 'local/apple-vision-foreground-v1' })
+  })
 })
