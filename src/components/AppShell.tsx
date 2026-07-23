@@ -86,7 +86,6 @@ import {
   projectWorkspaceSurface,
   returnFromDeliver,
   saveWorkspaceNavigation,
-  WORKSPACE_NAVIGATION_EVENT,
   type WorkspaceNavigation,
   type WorkspaceNavigationSession,
 } from "@/workspace/navigation";
@@ -388,15 +387,6 @@ export function AppShell() {
       /* optional local preference */
     }
   }, [workspaceNavigation]);
-  useEffect(() => {
-    const sync = (event: Event) =>
-      setWorkspaceNavigation(
-        (event as CustomEvent<WorkspaceNavigation>).detail ??
-          loadWorkspaceNavigation(),
-      );
-    window.addEventListener(WORKSPACE_NAVIGATION_EVENT, sync);
-    return () => window.removeEventListener(WORKSPACE_NAVIGATION_EVENT, sync);
-  }, []);
   const {
     projects,
     projectLoadState,
@@ -574,7 +564,6 @@ export function AppShell() {
   const [openHomeLibrary, setOpenHomeLibrary] = useState(false);
   const openLibrary = useCallback(() => setLibraryOpen(true), []);
 
-  const [advancedAuditOpen, setAdvancedAuditOpen] = useState(false);
   const [designOsOpen, setDesignOsOpen] = useState(false);
   const [sourceIngestOpen, setSourceIngestOpen] = useState(false);
   const [sourceIngestPreview, setSourceIngestPreview] = useState<
@@ -619,7 +608,7 @@ export function AppShell() {
   >(null);
   useEffect(() => {
     if (
-      (!designOsOpen && !advancedAuditOpen && workspaceSurface.surface !== "inline-main") ||
+      (!designOsOpen && workspaceSurface.surface !== "inline-main") ||
       !designDocument ||
       designOsModelFactory
     )
@@ -638,7 +627,6 @@ export function AppShell() {
     designDocument,
     designOsModelFactory,
     designOsOpen,
-    advancedAuditOpen,
     workspaceSurface.surface,
   ]);
   const designOsModel = useMemo(() => {
@@ -728,7 +716,7 @@ export function AppShell() {
         workspaceReturnToRef.current = session.returnTo;
         setWorkspaceNavigation(session.current);
       } else {
-        setWorkspaceNavigation({ version: 2, mode: "canvas", advanced: workspaceNavigation.advanced });
+        setWorkspaceNavigation({ version: 2, mode: "canvas" });
         setDesignOsDefaultTab(tab);
         setDesignOsOpen(true);
       }
@@ -2072,7 +2060,7 @@ export function AppShell() {
       );
       state.requestAgentRun("create-assets");
       workspaceReturnToRef.current = undefined;
-      setWorkspaceNavigation({ version: 2, mode: "agent", advanced: workspaceNavigation.advanced });
+      setWorkspaceNavigation({ version: 2, mode: "agent" });
     },
     onAddDeliveryDestination: () => openSettings({section:'integrations',anchor:'connections'}),
   };
@@ -2167,8 +2155,6 @@ export function AppShell() {
                     <PipelineCanvas
                       key={projectVersion}
                       onOpenDesignOs={openDesignOs}
-                      advanced={workspaceNavigation.advanced}
-                      onOpenAdvanced={() => setAdvancedAuditOpen(true)}
                     />
                   </Suspense>
                 </div>
@@ -2189,11 +2175,6 @@ export function AppShell() {
               />
             </Suspense>
           ) : null}
-          <DeveloperAuditDialog
-            open={advancedAuditOpen}
-            onOpenChange={setAdvancedAuditOpen}
-            model={designOsModel}
-          />
           {libraryOpen ? (
             <Suspense
               fallback={<OverlayLoading label="Loading asset library" />}
@@ -2548,133 +2529,4 @@ function workspaceAutosaveFingerprint(
     params,
     slices,
   ].join("|");
-}
-
-function DeveloperAuditDialog({
-  open,
-  onOpenChange,
-  model,
-}: {
-  readonly open: boolean;
-  readonly onOpenChange: (open: boolean) => void;
-  readonly model: DesignOsWorkbenchModel | null;
-}) {
-  const [section, setSection] = useState<"ir" | "receipts">("ir");
-  const report = model
-    ? {
-        protocol: "cutout.redacted-audit.v1",
-        document: {
-          id: model.summary.documentId,
-          revisionId: model.summary.revisionId,
-          revisionNumber: model.summary.revisionNumber,
-          counts: model.summary.counts,
-        },
-        receipts: {
-          governance: model.governance
-            ? {
-                id: model.governance.receipt.receiptId,
-                status: model.governance.receipt.status,
-                evidenceHash: model.governance.receipt.evidenceHash,
-                findingCount: model.governance.receipt.findings.length,
-              }
-            : null,
-          delivery: model.delivery?.receipt
-            ? {
-                id: model.delivery.receipt.id,
-                status: model.delivery.receipt.status,
-                targetCount: model.delivery.receipt.targets.length,
-              }
-            : null,
-        },
-      }
-    : null;
-  const href = report
-    ? `data:application/json;charset=utf-8,${encodeURIComponent(JSON.stringify(report, null, 2))}`
-    : undefined;
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[88vh] max-w-3xl overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Developer audit</DialogTitle>
-          <DialogDescription>
-            Read-only project structure and redacted evidence. Prompts, source
-            content, secrets and local paths are excluded.
-          </DialogDescription>
-          <details className="text-xs text-muted-foreground">
-            <summary className="cursor-pointer font-medium text-foreground">Host diagnostics</summary>
-            <p className="mt-2">Accessibility inspection: {typeof window !== "undefined" && (window as typeof window & { axe?: unknown }).axe ? "Axe host available" : "Axe host unavailable"}</p>
-          </details>
-        </DialogHeader>
-        {report ? (
-          <div className="space-y-4 text-sm">
-            <div
-              role="tablist"
-              aria-label="Developer audit sections"
-              className="flex gap-2"
-            >
-              {(
-                [
-                  ["ir", "Design IR"],
-                  ["receipts", "Receipts"],
-                ] as const
-              ).map(([id, label]) => (
-                <button
-                  key={id}
-                  type="button"
-                  role="tab"
-                  aria-selected={section === id}
-                  onClick={() => setSection(id)}
-                  className={cn(
-                    "rounded-md px-2 py-1",
-                    section === id && "bg-muted",
-                  )}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-            {section === "ir" ? (
-              <section role="tabpanel" aria-label="Design IR audit">
-                <h3 className="font-medium">Design IR</h3>
-                <dl className="mt-2 grid grid-cols-2 gap-2 text-xs">
-                  <dt>Revision</dt>
-                  <dd>{report.document.revisionNumber}</dd>
-                  {Object.entries(report.document.counts).map(
-                    ([key, value]) => (
-                      <>
-                        <dt key={`${key}-label`} className="capitalize">
-                          {key}
-                        </dt>
-                        <dd key={key}>{value}</dd>
-                      </>
-                    ),
-                  )}
-                </dl>
-              </section>
-            ) : null}
-            {section === "receipts" ? (
-              <section role="tabpanel" aria-label="Receipts audit">
-                <h3 className="font-medium">Receipts</h3>
-                <p className="text-xs text-muted-foreground">
-                  {report.receipts.governance ? 1 : 0} governance ·{" "}
-                  {report.receipts.delivery ? 1 : 0} delivery
-                </p>
-              </section>
-            ) : null}
-            <a
-              download="cutout-audit.redacted.json"
-              href={href}
-              className="inline-flex h-8 items-center rounded-md border border-border px-3 text-xs font-medium"
-            >
-              Export redacted report
-            </a>
-          </div>
-        ) : (
-          <p role="status" className="text-sm text-muted-foreground">
-            No canonical Design IR is available for this project yet.
-          </p>
-        )}
-      </DialogContent>
-    </Dialog>
-  );
 }

@@ -1047,11 +1047,6 @@ msgid "settings.integrations.desktop_not_installed"
 msgstr "デスクトッププロバイダーがインストールされていません。"
 
 #. js-lingui-explicit-id
-#: src/components/settings/sections/GeneralSection.tsx
-msgid "settings.developer_mode.title"
-msgstr "開発者モード"
-
-#. js-lingui-explicit-id
 #: src/components/settings/sections/RecoverySection.tsx
 msgid "settings.recovery.diagnostic_preview_aria"
 msgstr "診断バンドルのプレビュー"
@@ -2351,11 +2346,6 @@ msgstr "ショートカット"
 #: src/components/settings/VectorizerPanel.tsx
 msgid "settings.key_show"
 msgstr "表示"
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/GeneralSection.tsx
-msgid "settings.developer_mode.hint"
-msgstr "プロジェクト内に読み取り専用の DAG、Design IR、レシート監査ツールを表示します。"
 
 #. js-lingui-explicit-id
 #: src/components/inspector/SliceDimensions.tsx
