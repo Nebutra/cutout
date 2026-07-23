@@ -788,3 +788,36 @@ Removed the shadcn/MCP/Hono dependency graph by vendoring its exact Tailwind sup
 ### Next Steps
 
 - None - task complete
+
+
+## Session 24: Selectable Design System Variants
+
+**Date**: 2026-07-23
+**Task**: Selectable Design System Variants
+**Branch**: `chore/archive-design-system-variants`
+
+### Summary
+
+Added Agent-resolved Design System candidate generation, comparison and explicit selection; persisted candidate provenance through workspace and Design IR; projected only the selected DESIGN.md and tokens into prototypes and exports; preserved legacy single-system recovery; validated and merged the capability to github/main.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `f413a90` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
