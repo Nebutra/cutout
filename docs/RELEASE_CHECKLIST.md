@@ -26,8 +26,9 @@
 - Issue a `Developer ID Application` certificate from the reviewed CSR, install it with the matching private key, and record the certificate's team identifier in the release evidence. Export the identity as a password-protected PKCS#12 payload outside the repository.
 - Configure the protected GitHub `release` environment with `APPLE_CERTIFICATE` (base64 PKCS#12), `APPLE_CERTIFICATE_PASSWORD`, `APPLE_SIGNING_IDENTITY`, `APPLE_API_KEY` (App Store Connect key ID), `APPLE_API_ISSUER`, and `APPLE_API_PRIVATE_KEY` (complete `.p8` content). Do not store `APPLE_API_KEY_PATH`; the workflow creates it under `$RUNNER_TEMP` with mode `0600` and removes it after the macOS build.
 - Confirm Apple secrets appear only on the macOS credential-preparation, Tauri app notarization build, and explicit DMG notarization steps. Windows and Linux jobs receive no Apple certificate, identity, issuer, key ID, private-key content, or private-key path.
-- Store a password-protected code-signing PKCS#12 payload as `WINDOWS_CERTIFICATE` and its password as `WINDOWS_CERTIFICATE_PASSWORD` in the protected `release` environment. The Windows job must import it into the ephemeral current-user certificate store, inject only its thumbprint into the ignored Tauri release config, and remove both certificate and temporary payload even after failure.
-- Require exactly one NSIS installer and one MSI, a `Valid` `Get-AuthenticodeSignature` result, the expected signer thumbprint, and a trusted timestamp before Windows artifacts are uploaded.
+- Obtain SignPath Foundation approval and configure the protected `release` environment with `SIGNPATH_API_TOKEN`, `SIGNPATH_ORGANIZATION_ID`, `SIGNPATH_PROJECT_SLUG`, `SIGNPATH_SIGNING_POLICY_SLUG`, `SIGNPATH_ARTIFACT_CONFIGURATION_SLUG`, and `SIGNPATH_WINDOWS_CERTIFICATE_THUMBPRINT`. Do not store or import a Windows certificate or private key in GitHub.
+- Upload the fixed-name unsigned NSIS/MSI workflow artifact, sign it through the immutable pinned SignPath action, restore exactly one returned installer of each type, then regenerate and verify the Tauri updater sidecar for the final signed NSIS bytes.
+- Require a `Valid` `Get-AuthenticodeSignature` result, the configured signer thumbprint, code-signing EKU, and a trusted timestamp for both NSIS and MSI before Windows artifacts are uploaded.
 - Run `scripts/release-macos.sh --distribute`; missing signing or notarization prerequisites must hard fail.
 - Require the GitHub macOS build to wait for Tauri's app notarization and stapling, submit the subsequently created DMG separately with `xcrun notarytool submit --wait`, staple the accepted DMG ticket, then validate both the `.app` and `.dmg` with `codesign --verify --deep --strict --verbose=2`, Gatekeeper (`spctl`), and `xcrun stapler validate` before artifact upload.
 - Inspect release evidence with `codesign -dvvv --entitlements :-` and re-run Gatekeeper assessment on a clean machine.
@@ -67,7 +68,7 @@
 
 - A local gate proves compilation and tests only.
 - A signed build is not notarized until Apple accepts it and the ticket is stapled.
-- With no certificate, report `distribution-blocked`, never `released`.
+- Without active SignPath approval and protected configuration, report `distribution-blocked`, never `released`.
 - Without a protected updater key, published HTTPS manifest, platform signing evidence, and a GitHub attestation, report `updates-unavailable`, never `automatic updates enabled`.
 # Local recovery and supportability
 

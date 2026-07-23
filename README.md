@@ -24,6 +24,9 @@ Download the Apple Silicon DMG from [Cutout v0.1.5](https://github.com/Nebutra/c
 
 The public macOS build is Developer ID signed, Apple notarized, and stapled before publication.
 
+See the [code signing policy](docs/CODE_SIGNING_POLICY.md) for the macOS,
+Windows, updater-signature, reviewer, and privacy release gates.
+
 ## Install the Codex plugin
 
 Use Codex CLI `0.144.5` or a compatible plugin-enabled version.

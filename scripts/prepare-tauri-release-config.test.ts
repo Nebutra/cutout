@@ -38,32 +38,6 @@ describe('Tauri release config preparation', () => {
     })
   })
 
-  it('adds fail-closed Windows Authenticode configuration only when a certificate is imported', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'cutout-tauri-config-'))
-    const output = join(root, 'release.json')
-    const result = spawnSync(process.execPath, ['scripts/prepare-tauri-release-config.mjs', output], {
-      cwd: process.cwd(),
-      env: {
-        ...process.env,
-        CUTOUT_UPDATER_PUBKEY: validKey,
-        CUTOUT_WINDOWS_CERTIFICATE_THUMBPRINT: 'ab cd ef 01 23 45 67 89 ab cd ef 01 23 45 67 89 ab cd ef 01',
-      },
-      encoding: 'utf8',
-    })
-
-    expect(result.status, result.stderr).toBe(0)
-    expect(JSON.parse(await readFile(output, 'utf8'))).toEqual({
-      plugins: { updater: { pubkey: tauriPublicKey } },
-      bundle: {
-        windows: {
-          certificateThumbprint: 'ABCDEF0123456789ABCDEF0123456789ABCDEF01',
-          digestAlgorithm: 'sha256',
-          timestampUrl: 'https://timestamp.digicert.com/',
-        },
-      },
-    })
-  })
-
   it.each([
     ['', 'required'],
     ['RWT0123456789ABCDEFabcdefghijklmnopqrstuvwxyz0123456789AB=', 'complete two-line'],
@@ -73,26 +47,6 @@ describe('Tauri release config preparation', () => {
     const result = spawnSync(process.execPath, ['scripts/prepare-tauri-release-config.mjs'], {
       cwd: process.cwd(),
       env: { ...process.env, CUTOUT_UPDATER_PUBKEY: key },
-      encoding: 'utf8',
-    })
-
-    expect(result.status).not.toBe(0)
-    expect(result.stderr).toContain(message)
-  })
-
-  it.each([
-    ['short', undefined, '40-character'],
-    ['A'.repeat(40), 'http://timestamp.example.test', 'HTTPS URL'],
-    ['A'.repeat(40), 'https://user:secret@timestamp.example.test', 'without credentials'],
-  ])('fails closed for invalid Windows signing config', (thumbprint, timestampUrl, message) => {
-    const result = spawnSync(process.execPath, ['scripts/prepare-tauri-release-config.mjs'], {
-      cwd: process.cwd(),
-      env: {
-        ...process.env,
-        CUTOUT_UPDATER_PUBKEY: validKey,
-        CUTOUT_WINDOWS_CERTIFICATE_THUMBPRINT: thumbprint,
-        ...(timestampUrl ? { CUTOUT_WINDOWS_TIMESTAMP_URL: timestampUrl } : {}),
-      },
       encoding: 'utf8',
     })
 

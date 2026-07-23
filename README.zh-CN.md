@@ -24,6 +24,9 @@ Cutout 的权威数据不是聊天记录或截图，而是项目中的 `.cutout`
 
 公开的 macOS 构建会在发布前完成 Developer ID 签名、Apple 公证和票据装订。
 
+macOS、Windows、更新器签名、审查人与隐私发布门槛见
+[代码签名策略](docs/CODE_SIGNING_POLICY.md)。
+
 ## 安装 Codex 插件
 
 需要 Codex CLI `0.144.5` 或兼容的插件版本。
