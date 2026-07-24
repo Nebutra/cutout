@@ -920,3 +920,36 @@ Kept durable preparation events in the full audit projection while rendering pur
 ### Next Steps
 
 - None - task complete
+
+
+## Session 28: Release and install Cutout v0.1.7
+
+**Date**: 2026-07-24
+**Task**: Release and install Cutout v0.1.7
+**Branch**: `chore/archive-release-install-v0-1-7`
+
+### Summary
+
+Published the single-active-surface preparation fix as the atomic four-platform v0.1.7 release, verified checksums and notarization, replaced the local ad-hoc v0.1.6 bundle with the public Developer ID signed/notarized ARM64 build, and moved the old bundle to Trash.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `13d4eda` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
