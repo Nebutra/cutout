@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.8 - 2026-07-24
+
+- Simplify troubleshooting recovery by keeping Reset UI state primary, collapsing diagnostic tools, and hiding unavailable Agent Host actions until a workspace is authorized.
+
 ## 0.1.7 - 2026-07-24
 
 - Render unresolved Agent preparation on one active surface: keep a single compact activity bubble while substantive execution and approvals remain in the timeline.
