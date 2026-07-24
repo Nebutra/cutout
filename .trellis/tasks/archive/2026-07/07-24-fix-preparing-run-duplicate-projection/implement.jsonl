@@ -1,0 +1,3 @@
+{"file": ".trellis/spec/frontend/agent-control-safety.md", "reason": "Defines durable preparation evidence, transient chat projection, and required regression coverage."}
+{"file": ".trellis/spec/frontend/state-management.md", "reason": "Requires one canonical derived state and forbids component-local mirrors."}
+{"file": ".trellis/spec/frontend/component-guidelines.md", "reason": "Apply established component composition and accessibility conventions."}
