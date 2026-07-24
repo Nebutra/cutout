@@ -953,3 +953,36 @@ Published the single-active-surface preparation fix as the atomic four-platform 
 ### Next Steps
 
 - None - task complete
+
+
+## Session 29: Simplify troubleshooting recovery UX
+
+**Date**: 2026-07-24
+**Task**: Simplify troubleshooting recovery UX
+**Branch**: `fix/simplify-local-recovery-settings`
+
+### Summary
+
+Reduced Settings recovery cognitive load to one direct UI reset plus a lightweight diagnostics disclosure, hid unauthorized host actions, localized the new hierarchy, added component and desktop/mobile visual coverage, and captured the convention in frontend specs.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `cb459e9` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
