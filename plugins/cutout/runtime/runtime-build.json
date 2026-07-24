@@ -1,6 +1,6 @@
 {
   "protocol": "cutout.codex-plugin-runtime.v1",
-  "packageVersion": "0.1.6",
+  "packageVersion": "0.1.7",
   "sourceHashes": {
     "node_modules/.pnpm/js-sha256@0.10.1/node_modules/js-sha256/src/sha256.js": "10dbc92fbdb2ed3939c16ea9c726c7653f5ec7dfdb010c9904404268cb424a08",
     "node_modules/.pnpm/yaml@2.9.0/node_modules/yaml/dist/compose/compose-collection.js": "a7db11a1a7987d6412df8adbbb85ccd4370171f82265703b2b6af2d13c45d646",

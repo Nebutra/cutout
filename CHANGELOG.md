@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.7 - 2026-07-24
+
+- Render unresolved Agent preparation on one active surface: keep a single compact activity bubble while substantive execution and approvals remain in the timeline.
+
 ## 0.1.6 - 2026-07-23
 
 - Keep regenerate preparation activity transient: show only the current unresolved activity while work is active, replace it with the first streamed reply, and retain terminal evidence in the execution timeline.
