@@ -1052,6 +1052,11 @@ msgid "settings.recovery.diagnostic_preview_aria"
 msgstr "诊断包预览"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/RecoverySection.tsx
+msgid "settings.recovery.advanced"
+msgstr "诊断与恢复"
+
+#. js-lingui-explicit-id
 #: src/components/settings/sections/SpeechSection.tsx
 msgid "settings.speech.dictation"
 msgstr "听写"
@@ -1359,11 +1364,6 @@ msgid "settings.recovery.host_error"
 msgstr "无法完成主机恢复。"
 
 #. js-lingui-explicit-id
-#: src/components/settings/sections/RecoverySection.tsx
-msgid "settings.recovery.host_status"
-msgstr "主机恢复："
-
-#. js-lingui-explicit-id
 #: src/components/library/TeamGovernancePanel.tsx
 msgid "team.host_required"
 msgstr "需要主机"
@@ -1543,11 +1543,6 @@ msgstr "本地库存储不可用。"
 #: src/components/home/ProjectHome.tsx
 msgid "home.local_projects"
 msgstr "本地项目"
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/RecoverySection.tsx
-msgid "settings.recovery.title"
-msgstr "本地恢复"
 
 #. js-lingui-explicit-id
 #: src/components/library/TeamGovernancePanel.tsx
@@ -2582,6 +2577,11 @@ msgstr "已启用工具辅助记忆"
 #: src/components/settings/sections/SpeechSection.tsx
 msgid "settings.dimension_asr_description"
 msgstr "转录语音音频。"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/RecoverySection.tsx
+msgid "settings.recovery.title"
+msgstr "故障排查"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/SpeechSection.tsx

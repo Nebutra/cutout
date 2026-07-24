@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 28
+- **Total Sessions**: 29
 - **Last Active**: 2026-07-24
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~955 | Active |
+| `journal-1.md` | ~988 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 29 | 2026-07-24 | Simplify troubleshooting recovery UX | `cb459e9` | `fix/simplify-local-recovery-settings` |
 | 28 | 2026-07-24 | Release and install Cutout v0.1.7 | `13d4eda` | `chore/archive-release-install-v0-1-7` |
 | 27 | 2026-07-24 | Fix duplicate preparation projection | `2f84034` | `fix/preparing-run-duplicate-projection` |
 | 26 | 2026-07-23 | Release and install Cutout v0.1.6 | `ca28859b8a9a25e73fa9fb7c3cc703b4489f2091` | `chore/archive-release-install-v0-1-6` |

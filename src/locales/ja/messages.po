@@ -1052,6 +1052,11 @@ msgid "settings.recovery.diagnostic_preview_aria"
 msgstr "診断バンドルのプレビュー"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/RecoverySection.tsx
+msgid "settings.recovery.advanced"
+msgstr "診断と復旧"
+
+#. js-lingui-explicit-id
 #: src/components/settings/sections/SpeechSection.tsx
 msgid "settings.speech.dictation"
 msgstr "ディクテーション"
@@ -1359,11 +1364,6 @@ msgid "settings.recovery.host_error"
 msgstr "ホストの復元を完了できませんでした。"
 
 #. js-lingui-explicit-id
-#: src/components/settings/sections/RecoverySection.tsx
-msgid "settings.recovery.host_status"
-msgstr "ホストの復元:"
-
-#. js-lingui-explicit-id
 #: src/components/library/TeamGovernancePanel.tsx
 msgid "team.host_required"
 msgstr "ホストが必要です"
@@ -1543,11 +1543,6 @@ msgstr "ローカルライブラリのストレージを利用できません。
 #: src/components/home/ProjectHome.tsx
 msgid "home.local_projects"
 msgstr "ローカルプロジェクト"
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/RecoverySection.tsx
-msgid "settings.recovery.title"
-msgstr "ローカル復元"
 
 #. js-lingui-explicit-id
 #: src/components/library/TeamGovernancePanel.tsx
@@ -2582,6 +2577,11 @@ msgstr "ツール支援メモリを有効にしました"
 #: src/components/settings/sections/SpeechSection.tsx
 msgid "settings.dimension_asr_description"
 msgstr "音声を文字に書き起こします。"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/RecoverySection.tsx
+msgid "settings.recovery.title"
+msgstr "トラブルシューティング"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/SpeechSection.tsx
