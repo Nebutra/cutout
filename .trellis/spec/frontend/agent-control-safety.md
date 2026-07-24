@@ -114,7 +114,12 @@ receipts. `.cutout` state and provenance remain authoritative.
   current run's unresolved `step-started` event while work is active. An empty
   stream placeholder does not replace it; the first non-empty live Agent text
   does. `step-succeeded`, `step-failed`, and `step-cancelled` remain available
-  to the execution timeline and receipts but never become terminal chat rows.
+  to the full execution/audit projection and receipts but never become terminal
+  chat rows or active-dock timeline cards. The active dock suppresses the
+  preparation step itself; it shows a timeline only for substantive
+  non-preparation steps, non-chat tools, or explicit approvals. Tools and
+  approvals nested under preparation remain actionable without repeating the
+  preparation label.
 - User turns may link to the selected Agent response with `parentEventId`, and
   Agent responses may link to their source turn with `responseToEventId`.
   Legacy unlinked transcripts replay linearly. Branch selection remains
@@ -171,7 +176,9 @@ receipts. `.cutout` state and provenance remain authoritative.
 | Current run has an unresolved `step:prepare:*` start and no non-empty live Agent text | Show exactly one pending preparation activity bubble |
 | Live Agent label exists but streamed text is still empty | Keep the preparation activity visible; do not replace it with a blank pending bubble |
 | First non-empty live Agent text arrives | Replace the preparation activity with one live Agent message |
-| Preparation succeeds, fails, or is cancelled | Keep the terminal event in audit/timeline state and render zero preparation chat bubbles |
+| Pure preparation is unresolved | Keep the step in the full audit projection; render one chat activity bubble and zero active-dock timeline cards |
+| Preparation contains a non-chat tool or explicit approval | Render the tool or approval in the active timeline without repeating the preparation step |
+| Preparation succeeds, fails, or is cancelled | Keep the terminal event in full audit state and render zero preparation chat bubbles or active-dock timeline cards |
 
 ### 5. Good / Base / Bad Cases
 
@@ -233,8 +240,9 @@ receipts. `.cutout` state and provenance remain authoritative.
 - Preparation activity: historical and current runs, empty versus non-empty
   live stream state, succeeded/failed/cancelled terminals, repeated
   regeneration, both branch directions, exact DOM activity/message counts,
-  and proof that terminal preparation evidence remains persisted and visible
-  through the execution timeline.
+  pure-preparation active-timeline suppression, nested tool/approval
+  preservation, and proof that terminal preparation evidence remains persisted
+  and visible through the full execution/audit projection.
 - Repository history: authorization after mount, opaque-handle read/write,
   deterministic ordered union, identical legacy deduplication, branch
   selection restoration, divergent-ID rejection, CAS conflict, credential
