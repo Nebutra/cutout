@@ -56,6 +56,72 @@ describe('projectExecutionTimeline', () => {
     expect(activeExecutionTimeline(timeline)).toBeNull()
   })
 
+  it('keeps preparation in the full audit projection but omits a pure preparation card from the dock', () => {
+    const timeline = projectExecutionTimeline(store([
+      { eventId: 'prepare', runId: 'run', at: 2_000, type: 'step-started', stepId: 'step:prepare:run', label: 'Preparing the run', detail: 'Checking your request…' },
+    ]))!
+
+    expect(timeline.steps).toEqual([expect.objectContaining({
+      id: 'step:prepare:run',
+      status: 'running',
+    })])
+    expect(activeExecutionTimeline(timeline)).toBeNull()
+  })
+
+  it('removes preparation while retaining a substantive active step', () => {
+    const timeline = projectExecutionTimeline(store([
+      { eventId: 'prepare', runId: 'run', at: 2_000, type: 'step-started', stepId: 'step:prepare:run', label: 'Preparing the run' },
+      { eventId: 'build', runId: 'run', at: 3_000, type: 'step-started', stepId: 'step:build', label: 'Creating assets' },
+    ]))!
+
+    expect(activeExecutionTimeline(timeline)?.steps).toEqual([
+      expect.objectContaining({ id: 'step:build', label: 'Creating assets' }),
+    ])
+  })
+
+  it('keeps a real tool nested under preparation without repeating the preparation step', () => {
+    const timeline = projectExecutionTimeline(store([
+      { eventId: 'prepare', runId: 'run', at: 2_000, type: 'step-started', stepId: 'step:prepare:run', label: 'Preparing the run' },
+      { eventId: 'tool', runId: 'run', at: 2_100, type: 'tool-started', toolCallId: 'inspect', stepId: 'step:prepare:run', tool: 'inspect-material', label: 'Inspect material' },
+    ]))!
+    const active = activeExecutionTimeline(timeline)
+
+    expect(active?.steps).toEqual([expect.objectContaining({
+      id: 'step:prepare:run:tools',
+      label: 'Tools',
+      tools: [expect.objectContaining({ id: 'inspect', status: 'running' })],
+    })])
+    expect(JSON.stringify(active)).not.toContain('Preparing the run')
+  })
+
+  it('does not manufacture active Tools from terminal preparation tools', () => {
+    const timeline = projectExecutionTimeline(store([
+      { eventId: 'prepare', runId: 'run', at: 2_000, type: 'step-started', stepId: 'step:prepare:run', label: 'Preparing the run' },
+      { eventId: 'tool', runId: 'run', at: 2_100, type: 'tool-started', toolCallId: 'inspect', stepId: 'step:prepare:run', tool: 'inspect-material', label: 'Inspect material' },
+      { eventId: 'tool-done', runId: 'run', at: 2_200, type: 'tool-succeeded', toolCallId: 'inspect', stepId: 'step:prepare:run', tool: 'inspect-material', label: 'Inspect material', outputRefs: [] },
+    ]))!
+
+    expect(timeline.steps[0]?.tools).toEqual([expect.objectContaining({ id: 'inspect', status: 'succeeded' })])
+    expect(activeExecutionTimeline(timeline)).toBeNull()
+  })
+
+  it('keeps an explicit approval nested under preparation visible and actionable', () => {
+    const timeline = projectExecutionTimeline(store([
+      { eventId: 'prepare', runId: 'run', at: 2_000, type: 'step-started', stepId: 'step:prepare:run', label: 'Preparing the run' },
+      { eventId: 'approval', runId: 'run', at: 2_100, type: 'tool-approval-requested', toolCallId: 'generate', requestId: 'request', stepId: 'step:prepare:run', tool: 'image.generate', label: 'Generate hero', estimatedCost: { currency: 'USD', amount: 0.1 }, budgetCeiling: { currency: 'USD', amount: 1 }, approvalPolicy: 'explicit', reason: 'User approval required.' },
+    ]))!
+    const active = activeExecutionTimeline(timeline)
+
+    expect(active?.steps).toEqual([expect.objectContaining({
+      id: 'step:prepare:run:tools',
+      status: 'waiting',
+      tools: [expect.objectContaining({
+        id: 'generate',
+        approval: { toolCallId: 'generate', requestId: 'request' },
+      })],
+    })])
+  })
+
   it('keeps failed execution out of the conversational activity surface', () => {
     const timeline = projectExecutionTimeline(store([
       { eventId: 'step', runId: 'run', at: 2_000, type: 'step-started', stepId: 'visual', label: 'Generate visual' },

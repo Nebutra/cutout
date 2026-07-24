@@ -887,3 +887,36 @@ Prepared, reviewed, merged, tagged, signed, notarized, published, verified, and 
 ### Next Steps
 
 - None - task complete
+
+
+## Session 27: Fix duplicate preparation projection
+
+**Date**: 2026-07-24
+**Task**: Fix duplicate preparation projection
+**Branch**: `fix/preparing-run-duplicate-projection`
+
+### Summary
+
+Kept durable preparation events in the full audit projection while rendering pure preparation on only the compact Agent activity surface; preserved actionable tools and approvals and added composed DOM regressions.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `2f84034` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

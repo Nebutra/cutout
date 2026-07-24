@@ -1,8 +1,9 @@
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it, vi } from 'vitest'
+import { createRunEvent, replayRunEvents } from '@/agent-runtime/run-events'
 import { AgentComposer, AgentRunFeed, AgentWorkspaceDock, OutcomeChecklist } from './AgentWorkspaceDock'
-import type { AgentWorkspaceViewModel } from './agent-view-model'
+import { buildAgentViewModel, type AgentWorkspaceViewModel } from './agent-view-model'
 
 const stoppedModel: AgentWorkspaceViewModel = {
   summary: {
@@ -40,6 +41,27 @@ const draftModel: AgentWorkspaceViewModel = {
   },
   feed: [],
   checklist: [],
+}
+
+function preparingModel(
+  events: Parameters<typeof replayRunEvents>[0],
+  options: {
+    readonly working?: boolean
+    readonly liveAgentMessage?: { readonly id: string; readonly label: string; readonly text: string } | null
+  } = {},
+): AgentWorkspaceViewModel {
+  return buildAgentViewModel({
+    brief: 'hi',
+    workflowPhase: 'idle',
+    stages: [],
+    outcome: null,
+    working: options.working ?? true,
+    preparing: true,
+    elapsedSeconds: 1,
+    runError: null,
+    runEvents: replayRunEvents(events),
+    liveAgentMessage: options.liveAgentMessage,
+  })
 }
 
 describe('AgentWorkspaceDock', () => {
@@ -219,6 +241,100 @@ describe('AgentWorkspaceDock', () => {
     expect(html).toContain('Creating Plan')
     expect(html).toContain('Mapping deliverables.')
     expect(html).not.toContain('data-slot="agent-run-overview"')
+  })
+
+  it('renders one preparation bubble and no duplicate execution timeline', () => {
+    const model = preparingModel([
+      createRunEvent('run', { type: 'run-started', mode: 'create' }, { eventId: 'start', at: 1 }),
+      createRunEvent('run', { type: 'intent-recorded', intent: 'hi' }, { eventId: 'user', at: 2 }),
+      createRunEvent('run', { type: 'step-started', stepId: 'step:prepare:run', label: 'Preparing the run', detail: 'Checking your request…' }, { eventId: 'prepare', at: 3 }),
+    ])
+    const html = renderToStaticMarkup(createElement(AgentWorkspaceDock, {
+      viewModel: model,
+      composer: { value: '', busy: true, disabled: true, onChange: vi.fn(), onSubmit: vi.fn() },
+    }))
+
+    expect(model.execution?.steps).toContainEqual(expect.objectContaining({ id: 'step:prepare:run' }))
+    expect(html.match(/data-slot="agent-activity-bubble"/g)).toHaveLength(1)
+    expect(html).not.toContain('data-slot="execution-timeline"')
+    expect(html.match(/Preparing the run/g)).toHaveLength(1)
+  })
+
+  it('shows substantive execution beside preparation without repeating preparation', () => {
+    const model = preparingModel([
+      createRunEvent('run', { type: 'run-started', mode: 'create' }, { eventId: 'start', at: 1 }),
+      createRunEvent('run', { type: 'intent-recorded', intent: 'hi' }, { eventId: 'user', at: 2 }),
+      createRunEvent('run', { type: 'step-started', stepId: 'step:prepare:run', label: 'Preparing the run' }, { eventId: 'prepare', at: 3 }),
+      createRunEvent('run', { type: 'step-started', stepId: 'step:build', label: 'Creating assets' }, { eventId: 'build', at: 4 }),
+    ])
+    const html = renderToStaticMarkup(createElement(AgentWorkspaceDock, {
+      viewModel: model,
+      composer: { value: '', busy: true, disabled: true, onChange: vi.fn(), onSubmit: vi.fn() },
+    }))
+
+    expect(html.match(/data-slot="agent-activity-bubble"/g)).toHaveLength(1)
+    expect(html.match(/data-slot="execution-timeline"/g)).toHaveLength(1)
+    expect(html).toContain('Creating assets')
+    expect(html.match(/Preparing the run/g)).toHaveLength(1)
+  })
+
+  it('keeps a preparation approval in the timeline and actionable', () => {
+    const model = preparingModel([
+      createRunEvent('run', { type: 'run-started', mode: 'create' }, { eventId: 'start', at: 1 }),
+      createRunEvent('run', { type: 'intent-recorded', intent: 'hi' }, { eventId: 'user', at: 2 }),
+      createRunEvent('run', { type: 'step-started', stepId: 'step:prepare:run', label: 'Preparing the run' }, { eventId: 'prepare', at: 3 }),
+      createRunEvent('run', { type: 'tool-approval-requested', toolCallId: 'generate', requestId: 'request', stepId: 'step:prepare:run', tool: 'image.generate', label: 'Generate hero', estimatedCost: { currency: 'USD', amount: 0.1 }, budgetCeiling: { currency: 'USD', amount: 1 }, approvalPolicy: 'explicit', reason: 'User approval required.' }, { eventId: 'approval', at: 4 }),
+    ])
+    const html = renderToStaticMarkup(createElement(AgentWorkspaceDock, {
+      viewModel: model,
+      composer: { value: '', busy: true, disabled: true, onChange: vi.fn(), onSubmit: vi.fn() },
+      onApproveTool: vi.fn(),
+      onDenyTool: vi.fn(),
+    }))
+
+    expect(html).toContain('data-slot="execution-timeline"')
+    expect(html).toContain('>Tools<')
+    expect(html).toMatch(/>\s*Approve<\/button>/)
+    expect(html).toMatch(/>\s*Deny<\/button>/)
+    expect(html.match(/Preparing the run/g)).toHaveLength(1)
+  })
+
+  it('lets live text replace preparation without exposing its audit timeline', () => {
+    const model = preparingModel([
+      createRunEvent('run', { type: 'run-started', mode: 'create' }, { eventId: 'start', at: 1 }),
+      createRunEvent('run', { type: 'step-started', stepId: 'step:prepare:run', label: 'Preparing the run' }, { eventId: 'prepare', at: 2 }),
+    ], {
+      liveAgentMessage: { id: 'live', label: 'Agent is responding', text: 'Fresh response' },
+    })
+    const html = renderToStaticMarkup(createElement(AgentWorkspaceDock, {
+      viewModel: model,
+      composer: { value: '', busy: true, disabled: true, onChange: vi.fn(), onSubmit: vi.fn() },
+    }))
+
+    expect(html).toContain('Fresh response')
+    expect(html).not.toContain('data-slot="agent-activity-bubble"')
+    expect(html).not.toContain('data-slot="execution-timeline"')
+  })
+
+  it('keeps terminal preparation evidence in the model without rendering dock activity', () => {
+    const model = preparingModel([
+      createRunEvent('run', { type: 'run-started', mode: 'create' }, { eventId: 'start', at: 1 }),
+      createRunEvent('run', { type: 'intent-recorded', intent: 'hi' }, { eventId: 'user', at: 2 }),
+      createRunEvent('run', { type: 'step-started', stepId: 'step:prepare:run', label: 'Preparing the run' }, { eventId: 'prepare', at: 3 }),
+      createRunEvent('run', { type: 'step-succeeded', stepId: 'step:prepare:run', label: 'Preparing the run', detail: 'Request checked.' }, { eventId: 'prepared', at: 4 }),
+    ], { working: false })
+    const html = renderToStaticMarkup(createElement(AgentWorkspaceDock, {
+      viewModel: model,
+      composer: { value: '', onChange: vi.fn(), onSubmit: vi.fn() },
+    }))
+
+    expect(model.execution?.steps).toContainEqual(expect.objectContaining({
+      id: 'step:prepare:run',
+      status: 'succeeded',
+    }))
+    expect(html).not.toContain('data-slot="agent-activity-bubble"')
+    expect(html).not.toContain('data-slot="execution-timeline"')
+    expect(html).not.toContain('Preparing the run')
   })
 
   it('keeps one stop action when the composer owns cancellation', () => {
