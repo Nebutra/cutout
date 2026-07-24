@@ -46,6 +46,45 @@ Questions to answer:
 
 ## Accessibility
 
+### Progressive disclosure for troubleshooting controls
+
+Settings pages must not present routine preferences, diagnostic evidence, and
+host recovery as peer actions. Keep the common local action directly visible
+and place support-only controls in one native `<details>` disclosure.
+
+- The collapsed state exposes one common action plus one descriptive summary.
+- Diagnostic preview/export remain inside the disclosure.
+- Host check/recovery buttons render only when a workspace is authorized.
+  Before authorization, show the prerequisite as status text instead of
+  disabled controls.
+- Do not show an idle host status such as "not checked". Announce only active
+  checking, ready, or error results after the user requests them.
+- Preserve a light, unframed hierarchy. A divider and chevron are sufficient;
+  do not turn the advanced region into another card.
+- Cover collapsed desktop/mobile geometry and both authorization branches in
+  tests.
+
+Wrong:
+
+```tsx
+<Button>Reset UI</Button>
+<Button>Preview diagnostics</Button>
+<Button>Export diagnostics</Button>
+<Button disabled={!workspace}>Check host</Button>
+<Button disabled={!workspace}>Recover host</Button>
+```
+
+Correct:
+
+```tsx
+<Button>Reset UI</Button>
+<details>
+  <summary>Diagnostics and recovery</summary>
+  <DiagnosticActions />
+  {workspace ? <HostActions /> : <HostAuthorizationRequirement />}
+</details>
+```
+
 ### Identity icons that reveal a panel action
 
 When a dock header icon doubles as the affordance for collapsing that dock:

@@ -1052,6 +1052,11 @@ msgid "settings.recovery.diagnostic_preview_aria"
 msgstr "Diagnostic bundle preview"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/RecoverySection.tsx
+msgid "settings.recovery.advanced"
+msgstr "Diagnostics and recovery"
+
+#. js-lingui-explicit-id
 #: src/components/settings/sections/SpeechSection.tsx
 msgid "settings.speech.dictation"
 msgstr "Dictation"
@@ -1359,11 +1364,6 @@ msgid "settings.recovery.host_error"
 msgstr "Host recovery could not be completed."
 
 #. js-lingui-explicit-id
-#: src/components/settings/sections/RecoverySection.tsx
-msgid "settings.recovery.host_status"
-msgstr "Host recovery:"
-
-#. js-lingui-explicit-id
 #: src/components/library/TeamGovernancePanel.tsx
 msgid "team.host_required"
 msgstr "Host required"
@@ -1543,11 +1543,6 @@ msgstr "Local Library storage is unavailable."
 #: src/components/home/ProjectHome.tsx
 msgid "home.local_projects"
 msgstr "Local projects"
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/RecoverySection.tsx
-msgid "settings.recovery.title"
-msgstr "Local recovery"
 
 #. js-lingui-explicit-id
 #: src/components/library/TeamGovernancePanel.tsx
@@ -2582,6 +2577,11 @@ msgstr "Tool-assisted memory enabled"
 #: src/components/settings/sections/SpeechSection.tsx
 msgid "settings.dimension_asr_description"
 msgstr "Transcribe spoken audio."
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/RecoverySection.tsx
+msgid "settings.recovery.title"
+msgstr "Troubleshooting"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/SpeechSection.tsx
