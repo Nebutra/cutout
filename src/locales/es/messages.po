@@ -502,6 +502,7 @@ msgstr "URL base"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/UpdatesSection.tsx
+#: src/updater/update-notifications.ts
 msgid "settings.updates.beta"
 msgstr "Beta"
 
@@ -653,6 +654,11 @@ msgstr "Elige una dirección. Añade contexto opcional abajo y pulsa la flecha p
 #. js-lingui-explicit-id
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.clear_selection"
+msgstr "Borrar"
+
+#. js-lingui-explicit-id
+#: src/components/home/SidebarAccount.tsx
+msgid "home.notifications_clear"
 msgstr "Borrar"
 
 #. js-lingui-explicit-id
@@ -946,6 +952,12 @@ msgstr "Instrucciones personalizadas"
 #: src/components/settings/sections/PersonalizationSection.tsx
 msgid "settings.personalization.custom_requires_instructions"
 msgstr "La personalidad personalizada requiere instrucciones antes de poder guardarse."
+
+#. js-lingui-explicit-id
+#. placeholder {0}: release.version
+#: src/updater/update-notifications.ts
+msgid "updates.notification.available_detail"
+msgstr "Cutout {0} está disponible en el canal {channelLabel}."
 
 #. js-lingui-explicit-id
 #. placeholder {0}: state.preferences.channel
@@ -1769,6 +1781,22 @@ msgid "home.notifications"
 msgstr "Notificaciones"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/UpdatesSection.tsx
+msgid "settings.updates.system_notifications_aria"
+msgstr "Avisarme de las actualizaciones cuando Cutout esté en segundo plano"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/UpdatesSection.tsx
+msgid "settings.updates.system_notifications_hint"
+msgstr "Recibir una notificación cuando se encuentre una actualización mientras Cutout está en segundo plano."
+
+#. js-lingui-explicit-id
+#. placeholder {0}: notification.title
+#: src/components/home/SidebarAccount.tsx
+msgid "home.notification_open"
+msgstr "Abrir {0}"
+
+#. js-lingui-explicit-id
 #: src/components/library/TeamGovernancePanel.tsx
 msgid "team.open_project_to_review"
 msgstr "Abre un proyecto para iniciar una revisión."
@@ -2067,6 +2095,11 @@ msgstr "El host de escritorio del Registro requiere la aplicación de escritorio
 #: src/components/library/RegistryInstallPanel.tsx
 msgid "registry_install.section_aria"
 msgstr "Instalación del Registro"
+
+#. js-lingui-explicit-id
+#: src/components/home/SidebarAccount.tsx
+msgid "home.notification_remind_tomorrow"
+msgstr "Recordármelo mañana"
 
 #. js-lingui-explicit-id
 #: src/components/settings/ProviderRow.tsx
@@ -2413,6 +2446,7 @@ msgstr "Salida hablada"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/UpdatesSection.tsx
+#: src/updater/update-notifications.ts
 msgid "settings.updates.stable"
 msgstr "Estable"
 
@@ -2457,6 +2491,16 @@ msgstr "Exportación SVG"
 #: src/components/home/SidebarAccount.tsx
 msgid "home.theme_system"
 msgstr "Sistema"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/UpdatesSection.tsx
+msgid "settings.updates.system_notifications"
+msgstr "Notificaciones del sistema"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/UpdatesSection.tsx
+msgid "settings.updates.system_notifications_denied"
+msgstr "Las notificaciones del sistema siguen desactivadas porque no se concedió el permiso."
 
 #. js-lingui-explicit-id
 #: src/components/topbar/TabsMenu.tsx
@@ -2654,6 +2698,11 @@ msgstr "Archivo no compatible: {name}"
 #: src/components/source/SourceMeta.tsx
 msgid "source.meta_untitled"
 msgstr "sin título"
+
+#. js-lingui-explicit-id
+#: src/updater/update-notifications.ts
+msgid "updates.notification.available_title"
+msgstr "Actualización disponible"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/UpdatesSection.tsx

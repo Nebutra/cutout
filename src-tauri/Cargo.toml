@@ -47,6 +47,7 @@ image = "0.23.10"
 vtracer = { path = "vendor/vtracer", version = "0.6.5" }
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+tauri-plugin-notification = "2"
 tauri-plugin-updater = "2.10.1"
 tauri-plugin-process = "2"
 

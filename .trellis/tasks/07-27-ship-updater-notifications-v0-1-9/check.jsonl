@@ -1,0 +1,4 @@
+{"file":".trellis/spec/frontend/release-pipeline.md","reason":"Review updater behavior and release evidence against the signed desktop contract."}
+{"file":".trellis/spec/frontend/state-management.md","reason":"Verify controller ownership, persistence, concurrency, and lifecycle cleanup."}
+{"file":".trellis/spec/frontend/component-guidelines.md","reason":"Review update alerts, controls, focus, and accessible interaction states."}
+{"file":"docs/RELEASE_CHECKLIST.md","reason":"Verify feature, release, public asset, and local installation evidence."}

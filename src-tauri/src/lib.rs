@@ -118,6 +118,7 @@ pub fn run() {
             }
             #[cfg(desktop)]
             {
+                app.handle().plugin(tauri_plugin_notification::init())?;
                 app.handle()
                     .plugin(tauri_plugin_updater::Builder::new().build())?;
                 app.handle().plugin(tauri_plugin_process::init())?;

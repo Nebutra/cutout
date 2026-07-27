@@ -5,7 +5,7 @@
  * workspace rather than a signed-in account; theme and settings moved here
  * from the TopBar.
  */
-import { Bell, Check, CheckCircle2, ChevronDown, CircleAlert, Monitor, Moon, RefreshCw, Settings2, Sun, SwatchBook, TriangleAlert } from 'lucide-react'
+import { Bell, Check, CheckCircle2, ChevronDown, CircleAlert, Clock3, Monitor, Moon, RefreshCw, Settings2, Sun, SwatchBook, TriangleAlert } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useTheme } from 'next-themes'
 import { useLingui } from '@lingui/react/macro'
@@ -36,7 +36,7 @@ export function SidebarAccount({ updateController }: { readonly updateController
       <AccountMenu />
       <div className="ml-auto flex items-center gap-1">
         <HomeUpdateAction controller={updateController} />
-        <NotificationsMenu />
+        <NotificationsMenu controller={updateController} />
       </div>
     </div>
   )
@@ -142,7 +142,7 @@ function AccountMenu() {
   )
 }
 
-function NotificationsMenu() {
+function NotificationsMenu({ controller }: { readonly controller?: DesktopUpdateController }) {
   const { t } = useLingui()
   const label = t({ id: 'home.notifications', message: 'Notifications' })
   const [notifications, setNotifications] = useState<readonly LocalNotification[]>(loadLocalNotifications)
@@ -150,7 +150,11 @@ function NotificationsMenu() {
   const unread = notifications.filter((notification) => !notification.read).length
 
   return (
-    <DropdownMenu onOpenChange={(open) => { if (open && unread) setNotifications(markLocalNotificationsRead()) }}>
+    <DropdownMenu onOpenChange={(open) => {
+      if (!open) return
+      const current = loadLocalNotifications()
+      setNotifications(current.some((notification) => !notification.read) ? markLocalNotificationsRead() : current)
+    }}>
       <Tooltip>
         <TooltipTrigger asChild>
           <DropdownMenuTrigger asChild>
@@ -165,12 +169,14 @@ function NotificationsMenu() {
       <DropdownMenuContent align="end" className="w-80">
         <DropdownMenuLabel className="flex items-center justify-between gap-2">
           <span>{label}</span>
-          {notifications.length ? <button type="button" className="text-xs font-normal text-muted-foreground hover:text-foreground" onClick={() => { clearLocalNotifications(); setNotifications([]) }}>Clear</button> : null}
+          {notifications.length ? <button type="button" className="text-xs font-normal text-muted-foreground hover:text-foreground" onClick={() => { clearLocalNotifications(); setNotifications([]) }}>{t({ id: 'home.notifications_clear', message: 'Clear' })}</button> : null}
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         {notifications.length ? (
           <div className="max-h-80 overflow-y-auto p-1">
-            {notifications.map((notification) => <NotificationRow key={notification.id} notification={notification} />)}
+            {notifications.map((notification) => (
+              <NotificationRow key={notification.id} notification={notification} controller={controller} />
+            ))}
           </div>
         ) : (
           <div className="flex flex-col items-center gap-1 px-4 py-6 text-center">
@@ -183,16 +189,60 @@ function NotificationsMenu() {
   )
 }
 
-function NotificationRow({ notification }: { readonly notification: LocalNotification }) {
+export function NotificationRow({
+  notification,
+  controller,
+}: {
+  readonly notification: LocalNotification
+  readonly controller?: DesktopUpdateController
+}) {
+  const { t } = useLingui()
+  const { open: openSettings } = useSettingsUI()
+  const action = notification.action
   const Icon = notification.kind === 'success' ? CheckCircle2 : notification.kind === 'failure' ? TriangleAlert : CircleAlert
   const tone = notification.kind === 'success' ? 'text-emerald-600' : notification.kind === 'failure' ? 'text-destructive' : 'text-amber-600'
-  return (
-    <div className="flex gap-2 rounded-md px-2 py-2.5" data-notification-kind={notification.kind}>
+  const content = (
+    <>
       <Icon className={`mt-0.5 size-4 shrink-0 ${tone}`} />
       <div className="min-w-0">
         <p className="text-sm font-medium">{notification.title}</p>
         <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">{notification.detail}</p>
       </div>
+    </>
+  )
+  return (
+    <div className="rounded-md" data-notification-kind={notification.kind} data-notification-source={notification.source}>
+      {action?.type === 'open-settings' ? (
+        <button
+          type="button"
+          className="flex w-full gap-2 rounded-md px-2 py-2.5 text-left outline-none hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-ring"
+          aria-label={t({
+            id: 'home.notification_open',
+            message: `Open ${notification.title}`,
+          })}
+          onClick={() => openSettings({
+            section: action.section,
+            anchor: action.anchor,
+          })}
+        >
+          {content}
+        </button>
+      ) : (
+        <div className="flex gap-2 px-2 py-2.5">{content}</div>
+      )}
+      {notification.source === 'update' && controller ? (
+        <button
+          type="button"
+          className="mb-1 ml-8 inline-flex items-center gap-1 rounded px-1.5 py-1 text-xs text-muted-foreground outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+          onClick={() => controller.deferUpdateNotification(notification.id)}
+        >
+          <Clock3 className="size-3" />
+          {t({
+            id: 'home.notification_remind_tomorrow',
+            message: 'Remind tomorrow',
+          })}
+        </button>
+      ) : null}
     </div>
   )
 }

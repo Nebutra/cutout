@@ -502,6 +502,7 @@ msgstr "URL de base"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/UpdatesSection.tsx
+#: src/updater/update-notifications.ts
 msgid "settings.updates.beta"
 msgstr "Bêta"
 
@@ -653,6 +654,11 @@ msgstr "Choisissez une direction. Ajoutez du contexte facultatif ci-dessous, pui
 #. js-lingui-explicit-id
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.clear_selection"
+msgstr "Effacer"
+
+#. js-lingui-explicit-id
+#: src/components/home/SidebarAccount.tsx
+msgid "home.notifications_clear"
 msgstr "Effacer"
 
 #. js-lingui-explicit-id
@@ -946,6 +952,12 @@ msgstr "Instructions personnalisées"
 #: src/components/settings/sections/PersonalizationSection.tsx
 msgid "settings.personalization.custom_requires_instructions"
 msgstr "La personnalité personnalisée nécessite des instructions avant d’être enregistrée."
+
+#. js-lingui-explicit-id
+#. placeholder {0}: release.version
+#: src/updater/update-notifications.ts
+msgid "updates.notification.available_detail"
+msgstr "Cutout {0} est disponible sur le canal {channelLabel}."
 
 #. js-lingui-explicit-id
 #. placeholder {0}: state.preferences.channel
@@ -1769,6 +1781,22 @@ msgid "home.notifications"
 msgstr "Notifications"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/UpdatesSection.tsx
+msgid "settings.updates.system_notifications_aria"
+msgstr "M’avertir des mises à jour lorsque Cutout est en arrière-plan"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/UpdatesSection.tsx
+msgid "settings.updates.system_notifications_hint"
+msgstr "Recevoir une notification lorsqu’une mise à jour est détectée pendant que Cutout est en arrière-plan."
+
+#. js-lingui-explicit-id
+#. placeholder {0}: notification.title
+#: src/components/home/SidebarAccount.tsx
+msgid "home.notification_open"
+msgstr "Ouvrir {0}"
+
+#. js-lingui-explicit-id
 #: src/components/library/TeamGovernancePanel.tsx
 msgid "team.open_project_to_review"
 msgstr "Ouvrez un projet pour démarrer une relecture."
@@ -2067,6 +2095,11 @@ msgstr "L'hôte Registry de bureau nécessite l'application de bureau Cutout."
 #: src/components/library/RegistryInstallPanel.tsx
 msgid "registry_install.section_aria"
 msgstr "Installation Registry"
+
+#. js-lingui-explicit-id
+#: src/components/home/SidebarAccount.tsx
+msgid "home.notification_remind_tomorrow"
+msgstr "Me le rappeler demain"
 
 #. js-lingui-explicit-id
 #: src/components/settings/ProviderRow.tsx
@@ -2413,6 +2446,7 @@ msgstr "Sortie vocale"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/UpdatesSection.tsx
+#: src/updater/update-notifications.ts
 msgid "settings.updates.stable"
 msgstr "Stable"
 
@@ -2457,6 +2491,16 @@ msgstr "Export SVG"
 #: src/components/home/SidebarAccount.tsx
 msgid "home.theme_system"
 msgstr "Système"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/UpdatesSection.tsx
+msgid "settings.updates.system_notifications"
+msgstr "Notifications système"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/UpdatesSection.tsx
+msgid "settings.updates.system_notifications_denied"
+msgstr "Les notifications système restent désactivées, car l’autorisation n’a pas été accordée."
 
 #. js-lingui-explicit-id
 #: src/components/topbar/TabsMenu.tsx
@@ -2654,6 +2698,11 @@ msgstr "Fichier non pris en charge : {name}"
 #: src/components/source/SourceMeta.tsx
 msgid "source.meta_untitled"
 msgstr "sans titre"
+
+#. js-lingui-explicit-id
+#: src/updater/update-notifications.ts
+msgid "updates.notification.available_title"
+msgstr "Mise à jour disponible"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/UpdatesSection.tsx

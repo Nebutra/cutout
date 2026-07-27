@@ -129,9 +129,10 @@ installer version differs from their release version.
   global timeout, or skip a platform to hide normal process startup variance.
   Screenshot baselines run on macOS Chrome, while platform-neutral contract
   tests remain matrixed across macOS, Linux, and Windows.
-- AppShell initializes once, delays automatic checking for 8 seconds, and uses
-  the persisted 24-hour preference gate. The Home action subscribes to this
-  state; it does not call GitHub or the native updater directly.
+- AppShell initializes once, delays automatic checking for 8 seconds, and starts
+  the shared lifecycle scheduler. Successful automatic checks are gated for six
+  hours; periodic scheduling adds 0-30 minutes of jitter and focus, visible,
+  and online recovery triggers may retry eligible checks.
 - The Home action exists only when `state.release` is present and phase is one
   of `available`, `downloading`, `ready`, `installing`, or `error`. An error
   without a known release remains hidden.
@@ -219,9 +220,11 @@ installer version differs from their release version.
   fail-closed), and generated-manifest validation.
 - `src/components/home/SidebarAccount.test.tsx`: hidden idle/checking/error
   states, visible actionable phases, version label, and Settings target.
-- `src/updater/{runtime,service,orchestrator}.test.ts`: narrow Tauri commands,
-  current package version, auto-check interval, progress, cancellation, recovery
-  gates, and install/restart ordering.
+- `src/updater/{runtime,service,orchestrator,auto-check-scheduler,update-notifications}.test.ts`:
+  narrow Tauri commands, current package version, six-hour eligibility,
+  single-flight checks, lifecycle scheduling, notification dedupe/deferral,
+  permission opt-in, progress, cancellation, recovery gates, and
+  install/restart ordering.
 
 ### 7. Wrong vs Correct
 
@@ -280,3 +283,122 @@ A Tauri updater signature proves updater artifact authenticity. It does not
 prove Apple notarization, Windows Authenticode, Linux repository publication,
 or clean-machine installation. Those claims require separate credentials and
 verification evidence under `docs/RELEASE_CHECKLIST.md`.
+
+## Scenario: Lifecycle-aware update discovery and notifications
+
+### 1. Scope / Trigger
+
+Apply whenever the updater controller, automatic-check scheduling, persisted
+update preferences, notification bell projection, native notification plugin,
+or update Settings/Home UI changes.
+
+### 2. Signatures
+
+```ts
+startUpdateAutoCheckScheduler(
+  controller: { autoCheck(delayElapsed: boolean): Promise<void> },
+  options?: UpdateAutoCheckSchedulerOptions,
+): () => void
+
+createDesktopUpdateOrchestrator(input: {
+  prepareRecoverySnapshot(): Promise<boolean>
+  storage?: Pick<Storage, "getItem" | "setItem">
+  getAppVersion?: () => Promise<string>
+}): DesktopUpdateController
+
+DesktopUpdateController.setSystemNotificationsEnabled(
+  enabled: boolean,
+): Promise<boolean>
+
+DesktopUpdateController.deferUpdateNotification(
+  notificationId: string,
+): readonly LocalNotification[]
+```
+
+### 3. Contracts
+
+- `createUpdateOrchestrator` owns updater state, the successful-check timestamp,
+  and one shared in-flight check promise for manual and automatic callers.
+- `startUpdateAutoCheckScheduler` waits 8 seconds before any trigger can check,
+  then schedules 6 hours plus 0-30 minutes of jitter. Focus, `online`, and
+  visible-document recovery call only `controller.autoCheck(true)`.
+- Failed checks do not write `lastCheckedAt`; successful checks do. Cleanup
+  removes the startup/periodic timers and every lifecycle listener.
+- Release identity is `update:<channel>:<version>`. The separate
+  `cutout.updates.notifications.v1` ledger survives bell clearing, replaces an
+  older update row, and records a 24-hour `deferredUntil` reminder.
+- The Home update action remains visible from updater state while bell clearing
+  or deferral affects only the projected notification row.
+- Native notifications are opt-in. Only the Settings toggle may request OS
+  permission, denial leaves the preference off, and delivery occurs only while
+  the app is not both visible and focused.
+- JavaScript receives only `notification:allow-is-permission-granted`,
+  `notification:allow-request-permission`, and `notification:allow-notify`.
+  Release discovery/download/install remains behind Cutout's Rust updater
+  commands and signature/allowlist policy.
+- Every new visible updater string, notification body, action label, status,
+  and accessibility label must have a Lingui ID and non-empty translation in
+  all shipped catalogs. Before locale activation, notification text falls back
+  to English instead of blocking update projection.
+
+### 4. Validation & Error Matrix
+
+| Condition | Required behavior |
+| --- | --- |
+| Startup delay has not elapsed | Ignore timer and lifecycle triggers |
+| Successful check is less than six hours old | Skip the automatic backend check |
+| Manual and automatic checks overlap | Reuse one in-flight operation |
+| Backend check fails | Publish retryable error; do not advance eligibility |
+| Same channel/version is rediscovered | Do not add or resend a notification |
+| Newer channel/version is discovered | Replace the prior update notification |
+| Reminder is less than 24 hours old | Keep the bell row hidden |
+| Reminder has expired and check is eligible | Recreate one unread row and re-alert |
+| Permission is denied or revoked | Keep bell alert; disable native preference |
+| App is visible and focused | Suppress native delivery; keep bell alert |
+| Lingui locale is not active yet | Use English notification fallback |
+
+### 5. Good / Base / Bad Cases
+
+- Good: a long-running background app regains network after six hours, finds a
+  signed release, creates one localized bell row, and sends one opted-in native
+  notification.
+- Base: the app checks at startup, remains current, and lifecycle triggers inside
+  six hours cause no backend request.
+- Bad: each component owns a timer or fetch, clearing the bell resets dedupe, or
+  enabling automatic checks implicitly requests native notification permission.
+
+### 6. Tests Required
+
+- Scheduler tests assert startup gating, both jitter bounds, periodic recursion,
+  focus/visibility/online triggers, rejected checks, and complete cleanup.
+- Orchestrator tests assert six-hour boundary, invalid timestamp recovery,
+  manual/automatic single-flight behavior, and failure timestamp semantics.
+- Notification tests assert per-version dedupe, stale replacement, clear-safe
+  ledger persistence, exact 24-hour deferral, expired re-alert, permission
+  grant/denial/revocation, foreground suppression, and English fallback.
+- UI tests assert Settings navigation, explicit permission-backed toggle,
+  localized clear/reminder actions, and persistent Home update visibility.
+- `pnpm i18n:ci`, catalog parity tests, TypeScript/build, Rust tests, Agent/plugin
+  validation, and updater release-contract tests are release blocking.
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```ts
+window.setInterval(() => fetch("https://github.com/.../latest.json"), 60_000)
+clearLocalNotifications() // also clears update-version dedupe
+requestPermission() // during startup
+```
+
+#### Correct
+
+```ts
+const stop = startUpdateAutoCheckScheduler(appShellUpdateController)
+controller.subscribe(projectAvailableReleaseOnce)
+await controller.setSystemNotificationsEnabled(true) // explicit user toggle
+```
+
+The scheduler coordinates eligibility through the existing controller, the
+notification ledger is independent from bell history, and the Rust updater
+remains the only release trust boundary.

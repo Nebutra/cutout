@@ -170,13 +170,49 @@ describe("update orchestration", () => {
     orchestrator.setChannel("beta");
     expect(orchestrator.getState().preferences.channel).toBe("stable");
   });
+
+  it("deduplicates concurrent manual and automatic checks", async () => {
+    let resolveCheck!: (value: typeof release | undefined) => void;
+    const check = vi.fn(() => new Promise<typeof release | undefined>((resolve) => {
+      resolveCheck = resolve;
+    }));
+    const { orchestrator } = fixture({ check });
+    await orchestrator.initialize();
+
+    const manual = orchestrator.check();
+    const automatic = orchestrator.autoCheck(true);
+    const duplicateManual = orchestrator.check();
+    expect(check).toHaveBeenCalledOnce();
+
+    resolveCheck(release);
+    await Promise.all([manual, automatic, duplicateManual]);
+    expect(orchestrator.getState().preferences.lastCheckedAt).toBe("2026-07-15T00:00:00.000Z");
+
+    check.mockResolvedValueOnce(release);
+    await orchestrator.check();
+    expect(check).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not advance successful-check eligibility when checks fail", async () => {
+    const check = vi.fn(async () => { throw new Error("offline"); });
+    const { orchestrator } = fixture({ check });
+    await orchestrator.initialize();
+
+    await orchestrator.autoCheck(true);
+    await orchestrator.autoCheck(true);
+
+    expect(check).toHaveBeenCalledTimes(2);
+    expect(orchestrator.getState()).toMatchObject({ phase: "error", error: "offline" });
+    expect(orchestrator.getState().preferences.lastCheckedAt).toBeUndefined();
+  });
 });
 
-it("auto-check requires opt-in, startup delay, and a 24 hour interval", () => {
+it("auto-check requires opt-in, startup delay, and a six hour interval", () => {
   const now = Date.parse("2026-07-15T00:00:00.000Z");
   expect(shouldAutoCheck({ channel: "stable", autoCheck: true }, now, true)).toBe(true);
   expect(shouldAutoCheck({ channel: "stable", autoCheck: false }, now, true)).toBe(false);
   expect(shouldAutoCheck({ channel: "stable", autoCheck: true }, now, false)).toBe(false);
-  expect(shouldAutoCheck({ channel: "stable", autoCheck: true, lastCheckedAt: "2026-07-14T01:00:00.000Z" }, now, true)).toBe(false);
-  expect(shouldAutoCheck({ channel: "stable", autoCheck: true, lastCheckedAt: "2026-07-13T23:00:00.000Z" }, now, true)).toBe(true);
+  expect(shouldAutoCheck({ channel: "stable", autoCheck: true, lastCheckedAt: "2026-07-14T18:00:01.000Z" }, now, true)).toBe(false);
+  expect(shouldAutoCheck({ channel: "stable", autoCheck: true, lastCheckedAt: "2026-07-14T18:00:00.000Z" }, now, true)).toBe(true);
+  expect(shouldAutoCheck({ channel: "stable", autoCheck: true, lastCheckedAt: "invalid" }, now, true)).toBe(true);
 });

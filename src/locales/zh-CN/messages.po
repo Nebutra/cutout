@@ -502,6 +502,7 @@ msgstr "Base URL"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/UpdatesSection.tsx
+#: src/updater/update-notifications.ts
 msgid "settings.updates.beta"
 msgstr "测试版"
 
@@ -653,6 +654,11 @@ msgstr "选择一个方向。你也可以在下方补充说明，然后点击箭
 #. js-lingui-explicit-id
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.clear_selection"
+msgstr "清除"
+
+#. js-lingui-explicit-id
+#: src/components/home/SidebarAccount.tsx
+msgid "home.notifications_clear"
 msgstr "清除"
 
 #. js-lingui-explicit-id
@@ -946,6 +952,12 @@ msgstr "自定义指令"
 #: src/components/settings/sections/PersonalizationSection.tsx
 msgid "settings.personalization.custom_requires_instructions"
 msgstr "自定义个性需要先填写指令才能保存。"
+
+#. js-lingui-explicit-id
+#. placeholder {0}: release.version
+#: src/updater/update-notifications.ts
+msgid "updates.notification.available_detail"
+msgstr "Cutout {0} 已在{channelLabel}渠道推出。"
 
 #. js-lingui-explicit-id
 #. placeholder {0}: state.preferences.channel
@@ -1769,6 +1781,22 @@ msgid "home.notifications"
 msgstr "通知"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/UpdatesSection.tsx
+msgid "settings.updates.system_notifications_aria"
+msgstr "Cutout 在后台运行时通知我有可用更新"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/UpdatesSection.tsx
+msgid "settings.updates.system_notifications_hint"
+msgstr "当 Cutout 在后台发现更新时通知我。"
+
+#. js-lingui-explicit-id
+#. placeholder {0}: notification.title
+#: src/components/home/SidebarAccount.tsx
+msgid "home.notification_open"
+msgstr "打开{0}"
+
+#. js-lingui-explicit-id
 #: src/components/library/TeamGovernancePanel.tsx
 msgid "team.open_project_to_review"
 msgstr "打开一个项目以开始评审。"
@@ -2067,6 +2095,11 @@ msgstr "注册表桌面主机需要 Cutout 桌面应用。"
 #: src/components/library/RegistryInstallPanel.tsx
 msgid "registry_install.section_aria"
 msgstr "注册表安装"
+
+#. js-lingui-explicit-id
+#: src/components/home/SidebarAccount.tsx
+msgid "home.notification_remind_tomorrow"
+msgstr "明天提醒我"
 
 #. js-lingui-explicit-id
 #: src/components/settings/ProviderRow.tsx
@@ -2413,6 +2446,7 @@ msgstr "语音输出"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/UpdatesSection.tsx
+#: src/updater/update-notifications.ts
 msgid "settings.updates.stable"
 msgstr "稳定版"
 
@@ -2457,6 +2491,16 @@ msgstr "SVG 导出"
 #: src/components/home/SidebarAccount.tsx
 msgid "home.theme_system"
 msgstr "跟随系统"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/UpdatesSection.tsx
+msgid "settings.updates.system_notifications"
+msgstr "系统通知"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/UpdatesSection.tsx
+msgid "settings.updates.system_notifications_denied"
+msgstr "由于未授予权限，系统通知仍处于关闭状态。"
 
 #. js-lingui-explicit-id
 #: src/components/topbar/TabsMenu.tsx
@@ -2654,6 +2698,11 @@ msgstr "不支持的文件：{name}"
 #: src/components/source/SourceMeta.tsx
 msgid "source.meta_untitled"
 msgstr "未命名"
+
+#. js-lingui-explicit-id
+#: src/updater/update-notifications.ts
+msgid "updates.notification.available_title"
+msgstr "有可用更新"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/UpdatesSection.tsx
