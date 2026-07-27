@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 31
+- **Total Sessions**: 32
 - **Last Active**: 2026-07-27
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~1056 | Active |
+| `journal-1.md` | ~1089 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 32 | 2026-07-27 | Stabilize secret visibility toggles | `f73f251` | `fix/key-visibility-icon-jitter` |
 | 31 | 2026-07-27 | Pen identity and Codex credential reuse | `bf03bfe` | `fix/pen-local-credentials` |
 | 30 | 2026-07-25 | Publish and install Cutout v0.1.8 | `cb459e9`, `30e8617`, `25dbdb6` | `chore/archive-release-v0.1.8` |
 | 29 | 2026-07-24 | Simplify troubleshooting recovery UX | `cb459e9` | `fix/simplify-local-recovery-settings` |
