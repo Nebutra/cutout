@@ -196,6 +196,37 @@ pub(super) fn candidate_id(parts: &[&str]) -> String {
     format!("provider-candidate:{:x}", digest.finalize())
 }
 
+#[cfg(windows)]
+fn supported_windows_prefix(component: std::path::Component<'_>) -> bool {
+    use std::path::{Component, Prefix};
+
+    match component {
+        Component::Prefix(prefix) => matches!(
+            prefix.kind(),
+            Prefix::Disk(_)
+                | Prefix::UNC(_, _)
+                | Prefix::VerbatimDisk(_)
+                | Prefix::VerbatimUNC(_, _)
+        ),
+        _ => true,
+    }
+}
+
+fn metadata_is_link_or_reparse(metadata: &std::fs::Metadata) -> bool {
+    if metadata.file_type().is_symlink() {
+        return true;
+    }
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::MetadataExt;
+        use windows_sys::Win32::Storage::FileSystem::FILE_ATTRIBUTE_REPARSE_POINT;
+
+        return metadata.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0;
+    }
+    #[cfg(not(windows))]
+    false
+}
+
 fn exact_path_metadata(path: &Path) -> Result<Option<std::fs::Metadata>, DiscoveryError> {
     if !path.is_absolute()
         || path.components().any(|part| {
@@ -214,9 +245,17 @@ fn exact_path_metadata(path: &Path) -> Result<Option<std::fs::Metadata>, Discove
     let mut cursor = PathBuf::new();
     let mut latest = None;
     for component in path.components() {
+        #[cfg(windows)]
+        if !supported_windows_prefix(component) {
+            return Err(DiscoveryError::Read("invalid exact config path".into()));
+        }
         cursor.push(component.as_os_str());
+        #[cfg(windows)]
+        if matches!(component, std::path::Component::Prefix(_)) {
+            continue;
+        }
         match std::fs::symlink_metadata(&cursor) {
-            Ok(metadata) if metadata.file_type().is_symlink() => {
+            Ok(metadata) if metadata_is_link_or_reparse(&metadata) => {
                 return Err(DiscoveryError::Symlink(label.into()))
             }
             Ok(metadata) => latest = Some(metadata),
@@ -921,6 +960,7 @@ fn validate_sanitized_text(value: &str, maximum: usize) -> Result<(), DiscoveryE
         || value.len() > maximum
         || value.chars().any(char::is_control)
         || Path::new(value).is_absolute()
+        || value.starts_with(['/', '\\'])
         || (value.len() >= 3
             && value.as_bytes()[0].is_ascii_alphabetic()
             && value.as_bytes()[1] == b':'
@@ -1297,6 +1337,30 @@ mod tests {
 
     fn tempdir() -> std::io::Result<TempDir> {
         tempfile::tempdir_in(std::env::temp_dir().canonicalize()?)
+    }
+
+    #[test]
+    fn exact_config_reader_accepts_platform_absolute_temp_paths() {
+        let directory = tempdir().unwrap();
+        let path = directory.path().join("config.json");
+        std::fs::write(&path, r#"{"model":"test"}"#).unwrap();
+
+        assert_eq!(
+            read_exact_config(&path).unwrap().as_deref(),
+            Some(r#"{"model":"test"}"#)
+        );
+    }
+
+    #[test]
+    fn sanitized_text_rejects_absolute_path_labels_on_every_platform() {
+        for value in [
+            "/Users/example/.codex/auth.json",
+            r"C:\Users\example\.codex\auth.json",
+            "C:/Users/example/.codex/auth.json",
+            r"\\server\share\.codex\auth.json",
+        ] {
+            assert!(validate_sanitized_text(value, 160).is_err(), "{value}");
+        }
     }
 
     #[test]
