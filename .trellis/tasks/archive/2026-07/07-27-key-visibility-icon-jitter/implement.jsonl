@@ -1,0 +1,2 @@
+{"file":".trellis/spec/frontend/component-guidelines.md","reason":"Defines stable icon-button dimensions and interaction-state expectations."}
+{"file":".trellis/spec/frontend/type-safety.md","reason":"Preserves typed component props and test access without unsafe casts."}

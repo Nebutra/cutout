@@ -46,6 +46,26 @@ Questions to answer:
 
 ## Accessibility
 
+### Absolute icon buttons inside inputs
+
+The shared `Button` applies a one-pixel Y translation while pressed. An icon
+button positioned inside an input must opt out of that movement so its target
+and glyph remain centered for idle, hover, focus, active, and disabled states.
+
+- Use a fixed icon-button size and a fixed SVG size.
+- Prefer transform-free absolute centering such as `inset-y-0 my-auto`.
+- Override the shared press translation with
+  `active:not-aria-[haspopup]:translate-y-0` on the embedded control.
+- Keep the shared press treatment unchanged for normal buttons.
+- Cover the merged active-state class in a component test and verify pointer-
+  down geometry in a browser regression test when the bug is visual.
+
+Wrong: `top-1/2 -translate-y-1/2` on a shared `Button`; its active translation
+replaces the centering transform while pressed.
+
+Correct: a fixed-size shared `Button` centered with `inset-y-0 my-auto` and an
+explicit active `translate-y-0` override.
+
 ### Progressive disclosure for troubleshooting controls
 
 Settings pages must not present routine preferences, diagnostic evidence, and

@@ -1054,3 +1054,36 @@ Renamed the Pencil integration to Pen with legacy surface aliases, restored nati
 ### Next Steps
 
 - None - task complete
+
+
+## Session 32: Stabilize secret visibility toggles
+
+**Date**: 2026-07-27
+**Task**: Stabilize secret visibility toggles
+**Branch**: `fix/key-visibility-icon-jitter`
+
+### Summary
+
+Removed active-state vertical jitter from provider and Vectorizer secret visibility buttons, added component and desktop/mobile pointer geometry regressions, and documented the embedded icon-button positioning rule.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `f73f251` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
