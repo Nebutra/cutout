@@ -83,6 +83,13 @@ msgid "kit_library.confirmed_rejected_summary"
 msgstr "已确认 {0} · 已拒绝 {1}"
 
 #. js-lingui-explicit-id
+#. placeholder {0}: summary.installed
+#. placeholder {1}: summary.configured
+#: src/components/settings/LocalAgentInventoryPanel.tsx
+msgid "settings.local_agents_summary"
+msgstr "{0} 个已安装 · {1} 个发现配置"
+
+#. js-lingui-explicit-id
 #. placeholder {0}: preview.name
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.kit_editor_title"
@@ -285,6 +292,11 @@ msgid "global_library.all_quality"
 msgstr "全部质量"
 
 #. js-lingui-explicit-id
+#: src/components/settings/LocalAgentInventoryPanel.tsx
+msgid "settings.local_agents_permission_hint"
+msgstr "如果系统请求访问权限，请允许后重新扫描。"
+
+#. js-lingui-explicit-id
 #: src/components/settings/sections/PersonalizationSection.tsx
 msgid "settings.personalization.memory_description"
 msgstr "让有用的偏好在本地工作中延续。"
@@ -318,6 +330,11 @@ msgstr "API ID 已保存"
 #: src/components/settings/KeyField.tsx
 msgid "settings.key_label"
 msgstr "API Key"
+
+#. js-lingui-explicit-id
+#: src/components/settings/LocalAgentInventoryPanel.tsx
+msgid "settings.local_agents_api_key_supported"
+msgstr "支持导入 API Key"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
@@ -723,6 +740,11 @@ msgid "settings.personalization.personality_concise"
 msgstr "简洁"
 
 #. js-lingui-explicit-id
+#: src/components/settings/LocalAgentInventoryPanel.tsx
+msgid "settings.local_agents_configuration_found"
+msgstr "发现配置"
+
+#. js-lingui-explicit-id
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.discover_references_title"
 msgstr "配置一个已授权的参考发现服务主机以启用此操作。"
@@ -887,6 +909,11 @@ msgid "settings.speech.save_failed_toast"
 msgstr "无法保存语音偏好"
 
 #. js-lingui-explicit-id
+#: src/components/settings/LocalAgentInventoryPanel.tsx
+msgid "settings.local_agents_scan_error"
+msgstr "无法扫描本地 Agent 位置。"
+
+#. js-lingui-explicit-id
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.toast_update_failed"
 msgstr "无法更新素材"
@@ -958,6 +985,11 @@ msgstr "自定义个性需要先填写指令才能保存。"
 #: src/updater/update-notifications.ts
 msgid "updates.notification.available_detail"
 msgstr "Cutout {0} 已在{channelLabel}渠道推出。"
+
+#. js-lingui-explicit-id
+#: src/components/settings/LocalAgentInventoryPanel.tsx
+msgid "settings.local_agents_description"
+msgstr "Cutout 会检查 39 个经审核的编程 Agent 及其已注册的命令和配置位置。"
 
 #. js-lingui-explicit-id
 #. placeholder {0}: state.preferences.channel
@@ -1095,8 +1127,8 @@ msgstr "发现参考资料"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
-msgid "settings.discovered_on_mac"
-msgstr "在这台 Mac 上发现"
+msgid "settings.discovered_on_device"
+msgstr "在此设备上发现"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
@@ -1456,6 +1488,11 @@ msgid "settings.updates.install_restart"
 msgstr "安装并重启"
 
 #. js-lingui-explicit-id
+#: src/components/settings/LocalAgentInventoryPanel.tsx
+msgid "settings.local_agents_installed"
+msgstr "已安装"
+
+#. js-lingui-explicit-id
 #: src/components/settings/sections/PersonalizationSection.tsx
 msgid "settings.personalization.instructions_saved_toast"
 msgstr "指令已保存"
@@ -1545,6 +1582,11 @@ msgstr "正在加载语音设置…"
 #: src/components/settings/ProviderDirectory.tsx
 msgid "settings.provider_category_local"
 msgstr "本地"
+
+#. js-lingui-explicit-id
+#: src/components/settings/LocalAgentInventoryPanel.tsx
+msgid "settings.local_agents_title"
+msgstr "本地编程 Agent"
 
 #. js-lingui-explicit-id
 #: src/components/library/GlobalLibraryView.tsx
@@ -1743,6 +1785,16 @@ msgid "slices.empty_no_regions_automatic_hint"
 msgstr "未找到可复用区域。请尝试其他素材图。"
 
 #. js-lingui-explicit-id
+#: src/components/settings/LocalAgentInventoryPanel.tsx
+msgid "settings.local_agents_api_key_unsupported"
+msgstr "不支持经审核的 API Key 导入"
+
+#. js-lingui-explicit-id
+#: src/components/settings/LocalAgentInventoryPanel.tsx
+msgid "settings.local_agents_no_config"
+msgstr "未发现经审核的配置"
+
+#. js-lingui-explicit-id
 #: src/components/settings/ProviderRow.tsx
 #: src/components/settings/VectorizerPanel.tsx
 msgid "settings.status_unconfigured"
@@ -1752,6 +1804,11 @@ msgstr "未配置"
 #: src/components/settings/sections/IntegrationsSection.tsx
 msgid "settings.integrations.not_connected"
 msgstr "未连接。"
+
+#. js-lingui-explicit-id
+#: src/components/settings/LocalAgentInventoryPanel.tsx
+msgid "settings.local_agents_not_installed"
+msgstr "未安装"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/SpeechSection.tsx
@@ -1830,6 +1887,11 @@ msgstr "或点击浏览 · PNG、JPEG、WebP"
 #: src/components/library/KitLibraryInspector.tsx
 msgid "kit_library.parser_host_not_configured"
 msgstr "此界面尚未配置解析器主机。请导入其签名的 JSON 结果以查看候选项。"
+
+#. js-lingui-explicit-id
+#: src/components/settings/LocalAgentInventoryPanel.tsx
+msgid "settings.local_agents_permission_required"
+msgstr "需要权限"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/PersonalizationSection.tsx
@@ -2291,6 +2353,21 @@ msgstr "保存更改"
 #: src/components/settings/VectorizerPanel.tsx
 msgid "settings.save_failed_toast"
 msgstr "保存失败"
+
+#. js-lingui-explicit-id
+#: src/components/settings/LocalAgentInventoryPanel.tsx
+msgid "settings.local_agents_scan_again"
+msgstr "重新扫描"
+
+#. js-lingui-explicit-id
+#: src/components/settings/LocalAgentInventoryPanel.tsx
+msgid "settings.local_agents_scan_failed"
+msgstr "扫描失败"
+
+#. js-lingui-explicit-id
+#: src/components/settings/LocalAgentInventoryPanel.tsx
+msgid "settings.local_agents_scanning"
+msgstr "正在扫描经审核的 Agent 位置..."
 
 #. js-lingui-explicit-id
 #: src/components/library/GlobalLibraryView.tsx
@@ -2837,6 +2914,11 @@ msgstr "尚未配置视频执行与参考资料提供方主机。"
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.media_filter_videos"
 msgstr "视频"
+
+#. js-lingui-explicit-id
+#: src/components/settings/LocalAgentInventoryPanel.tsx
+msgid "settings.local_agents_view_all"
+msgstr "查看全部 39 个 Agent"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx

@@ -35,6 +35,8 @@ import type { ProviderDefinition } from "@/services/ai/provider-registry";
 import { modelRoutingCoverage } from "../model-routing-summary";
 import { useQuery } from "@tanstack/react-query";
 import { discoverProviderCandidates, type ProviderDiscoveryCandidate } from "@/services/ai/provider-discovery";
+import { discoveredProviderSourceLabel } from "../discovered-provider-source";
+import { LocalAgentInventoryPanel } from "../LocalAgentInventoryPanel";
 
 type View =
   | { readonly mode: "list" }
@@ -150,6 +152,8 @@ export function AiSection() {
 
       <DiscoveredProviders onSelect={(discovered) => setView({ mode: "add", discovered })} />
 
+      <LocalAgentInventoryPanel />
+
       <Button
         variant="outline"
         className="w-full"
@@ -168,16 +172,23 @@ function DiscoveredProviders({ onSelect }: { readonly onSelect: (candidate: Prov
   const { t } = useLingui()
   const query = useQuery({ queryKey: ['provider-discovery'], queryFn: discoverProviderCandidates, retry: false })
   if (!query.data?.length) return null
-  const sourceLabel = (source: string) => source === 'codex' ? 'Codex' : source === 'claude' ? 'Claude Code' : source === 'environment'
-    ? t({ id: 'settings.provider_source_environment', message: 'Process environment' })
-    : t({ id: 'settings.provider_source_keychain', message: 'Cutout local credentials' })
+  const sourceLabel = (candidate: ProviderDiscoveryCandidate) => {
+    const source = discoveredProviderSourceLabel(candidate)
+    if (source.kind === 'environment') {
+      return t({ id: 'settings.provider_source_environment', message: 'Process environment' })
+    }
+    if (source.kind === 'cutout-keychain') {
+      return t({ id: 'settings.provider_source_keychain', message: 'Cutout local credentials' })
+    }
+    return source.label
+  }
   return <section className="flex flex-col gap-2" aria-label={t({ id: 'settings.discovered_providers', message: 'Discovered providers' })}>
-    <div className="flex items-center gap-2 text-xs font-medium"><WandSparkles className="size-3.5" /><Trans id="settings.discovered_on_mac">Discovered on this Mac</Trans></div>
+    <div className="flex items-center gap-2 text-xs font-medium"><WandSparkles className="size-3.5" /><Trans id="settings.discovered_on_device">Discovered on this device</Trans></div>
     {query.data.map((candidate) => <button key={candidate.id} type="button" disabled={!candidate.credential.importable}
       onClick={() => onSelect(candidate)}
       className="flex items-center justify-between gap-3 rounded-md border border-border px-3 py-2 text-left hover:bg-muted/50 disabled:opacity-50">
       <span className="min-w-0"><span className="block truncate text-sm font-medium">{candidate.label}</span>
-        <span className="block truncate text-[11px] text-muted-foreground">{sourceLabel(candidate.source)} · {candidate.credential.reference ?? t({ id: 'settings.no_reusable_credential', message: 'No reusable credential' })}</span></span>
+        <span className="block truncate text-[11px] text-muted-foreground">{sourceLabel(candidate)} · {candidate.credential.reference ?? t({ id: 'settings.no_reusable_credential', message: 'No reusable credential' })}</span></span>
       <span className="shrink-0 text-[11px] text-muted-foreground">{candidate.wireProtocol ?? candidate.kind}</span>
     </button>)}
   </section>

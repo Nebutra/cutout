@@ -21,6 +21,19 @@ versions do not change.
 5. Let the tag-triggered workflow build, sign, notarize, attest, and publish.
 6. Verify public assets and install the published Apple Silicon DMG locally.
 
+## Inventory Projection
+
+The native fixed registry remains the scan authority. The TypeScript service
+validates the complete 39-row payload once, React Query owns the ephemeral scan
+state, and Settings renders a bounded all-Agent list with sanitized locations,
+permission recovery, and reviewed API-key-adapter capability. Provider source
+labels use native sanitized Agent names; only environment and Cutout-owned
+credential labels are localized categories.
+
+On Windows, exact credential reads compare the opened handle's volume serial
+and file index against re-opened path handles before and after the bounded read.
+Reparse points fail closed.
+
 ## Failure Boundary
 
 Do not bypass protected checks. Before tagging, fix failures on the release

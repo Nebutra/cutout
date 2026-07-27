@@ -1,8 +1,10 @@
 # Implementation Plan
 
-- [ ] Update changelog and every synchronized `0.1.11` version surface.
-- [ ] Regenerate and validate the Codex plugin runtime.
-- [ ] Run local release, Agent, frontend, native, and diff gates.
+- [x] Update changelog and every synchronized `0.1.11` version surface.
+- [x] Regenerate and validate the Codex plugin runtime.
+- [x] Run local release, Agent, frontend, native, and diff gates.
+- [x] Project the complete native Agent inventory into localized Settings UI.
+- [x] Replace Windows metadata-only credential identity with stable handle IDs.
 - [ ] Commit and push `release/v0.1.11`.
 - [ ] Merge PR #43, rebase the release branch, and merge the release PR.
 - [ ] Create and push annotated tag `v0.1.11` from the merge commit.

@@ -2,7 +2,7 @@
 
 ## 0.1.11 - 2026-07-27
 
-- Discover a fixed reviewed inventory of 39 local coding Agents without recursively scanning the home folder or executing installed tools.
+- Scan and display a fixed reviewed inventory of 39 local coding Agents without recursively scanning the home folder or executing installed tools.
 - Detect and import API keys from nine exact Agent configuration schemas while keeping OAuth, session, bearer, helper, and keyring material non-importable.
 - Harden the native Agent Host with descriptor-relative checkpoints, lease-aware recovery, sanitized durable errors, and owned POSIX child-process custody.
 

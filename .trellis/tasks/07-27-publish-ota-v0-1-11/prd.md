@@ -21,6 +21,10 @@ native Agent Host hardening as the next immutable stable Cutout OTA release.
   runtime, README, lockfile, and changelog version surfaces.
 - Describe only the 39-Agent inventory, nine reviewed API-key adapters, and
   Agent Host security hardening in release notes.
+- Surface all 39 reviewed Agents in Settings with localized installation,
+  configuration, permission, and API-key-adapter status.
+- Keep Windows credential reads bound to stable handle-backed file identity;
+  mutable length and timestamp metadata is not sufficient.
 - Keep OAuth/session/bearer material non-importable and keep local Agent session
   execution capability-blocked.
 - Validate Agent contract, version identity, release workflow contracts, lint,
@@ -33,6 +37,8 @@ native Agent Host hardening as the next immutable stable Cutout OTA release.
 
 - [ ] All repository version surfaces validate as `0.1.11`.
 - [ ] Local release checks and native/frontend quality gates pass.
+- [ ] Settings displays the complete 39-Agent inventory and keeps every new
+      status and permission message localized across all shipped languages.
 - [ ] PR #43 and the release PR merge through required protected checks.
 - [ ] Annotated tag `v0.1.11` is reachable from `github/main` and matches the
       synchronized source version.
