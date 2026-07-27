@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.10 - 2026-07-27
+
+- Stabilize provider and Vectorizer secret visibility toggles so their icons stay centered instead of jumping vertically while pressed.
+
 ## 0.1.9 - 2026-07-27
 
 - Keep long-running apps current with six-hour lifecycle-aware checks, bounded jitter, and shared single-flight coordination.
