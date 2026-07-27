@@ -38,14 +38,14 @@ next immutable stable Cutout OTA release.
 - [x] All version-bearing release surfaces validate as `0.1.10`.
 - [x] Local release checks, Agent validation, lint, tests, build, and native
   checks pass.
-- [ ] The release PR passes protected GitHub checks and merges into `main`.
-- [ ] Annotated tag `v0.1.10` points to that merge commit and is reachable from
+- [x] The release PR passes protected GitHub checks and merges into `main`.
+- [x] Annotated tag `v0.1.10` points to that merge commit and is reachable from
   `main`.
-- [ ] The protected release workflow completes successfully.
-- [ ] Public `v0.1.10` is non-draft, non-prerelease, and marked Latest.
-- [ ] `latest.json` advertises `0.1.10` for macOS ARM/Intel, Windows x64, and
+- [x] The protected release workflow completes successfully.
+- [x] Public `v0.1.10` is non-draft, non-prerelease, and marked Latest.
+- [x] `latest.json` advertises `0.1.10` for macOS ARM/Intel, Windows x64, and
   Linux x64 with valid updater signature sidecars.
-- [ ] macOS application and DMG assets are Developer ID signed, notarized, and
+- [x] macOS application and DMG assets are Developer ID signed, notarized, and
   stapled before publication.
 
 ## Out Of Scope
