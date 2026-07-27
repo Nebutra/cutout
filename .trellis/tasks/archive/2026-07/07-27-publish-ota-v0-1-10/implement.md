@@ -4,14 +4,14 @@
 - [x] Regenerate the repository-owned Codex plugin runtime.
 - [x] Run release-version validation, Agent validation, focused release tests,
   lint, type-check, production build, native checks, and diff validation.
-- [ ] Commit only the release candidate and Trellis planning records.
-- [ ] Push `release/v0.1.10`, open a PR, and wait for protected checks.
-- [ ] Merge the PR and verify the merge commit on `github/main`.
-- [ ] Create and push annotated tag `v0.1.10` from the merge commit.
-- [ ] Monitor `.github/workflows/release-update.yml` to completion.
-- [ ] Verify release state, asset set, checksums, updater manifest/platforms,
+- [x] Commit only the release candidate and Trellis planning records.
+- [x] Push `release/v0.1.10`, open a PR, and wait for protected checks.
+- [x] Merge the PR and verify the merge commit on `github/main`.
+- [x] Create and push annotated tag `v0.1.10` from the merge commit.
+- [x] Monitor `.github/workflows/release-update.yml` to completion.
+- [x] Verify release state, asset set, checksums, updater manifest/platforms,
   signature sidecars, provenance, and macOS notarization evidence.
-- [ ] Archive the Trellis task and record the session.
+- [x] Archive the Trellis task and record the session.
 
 ## Validation Commands
 

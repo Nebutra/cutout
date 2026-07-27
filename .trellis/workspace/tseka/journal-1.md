@@ -1087,3 +1087,36 @@ Removed active-state vertical jitter from provider and Vectorizer secret visibil
 ### Next Steps
 
 - None - task complete
+
+
+## Session 33: Publish Cutout OTA v0.1.10
+
+**Date**: 2026-07-27
+**Task**: Publish Cutout OTA v0.1.10
+**Branch**: `chore/archive-publish-ota-v0-1-10`
+
+### Summary
+
+Published Cutout v0.1.10 through the protected atomic four-platform OTA workflow and verified public checksums, updater signatures, provenance, and macOS notarization.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `15702bc` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
