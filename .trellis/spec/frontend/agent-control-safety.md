@@ -66,6 +66,16 @@ receipts. `.cutout` state and provenance remain authoritative.
 - Every durable-host mutation reloads state and commits under the store's
   cross-instance exclusive transaction. Starting a second host preserves live
   leases; recovery requeues only leases expired at the shared clock boundary.
+- Native Agent Host checkpoints use descriptor-relative file operations on
+  POSIX: the authorized root and `.cutout` directory stay open while the exact
+  bounded regular file is read or atomically replaced. Path identity is
+  revalidated before and after the rename, so directory replacement cannot
+  redirect a temporary file or commit.
+- Native POSIX process custody retains an owned child handle together with its
+  process-group identity. Cancellation verifies that the original child is
+  still live and still leads that group before signaling; a stale registration
+  never signals a numeric PGID that may have been reused. Persisted state never
+  restores signal authority.
 - Controlled reads reject absolute paths, traversal, symlink roots/components,
   non-regular files, identity changes, and size/count limit violations.
 - External controllers never fall back to a hidden desktop/WebView queue when
@@ -224,6 +234,10 @@ receipts. `.cutout` state and provenance remain authoritative.
   replacement/identity drift, over-depth trees, executable Git configuration,
   least-privilege capability drift, absence of legacy GUI Queue handlers and
   permissions, and unsupported platform behavior.
+- Native Agent Host: checkpoint directory swap-out/swap-back during write,
+  opened-file replacement during read, live-versus-expired lease recovery,
+  stale heartbeat grants, owned-child process-group cancellation, stale PGID
+  reuse resistance, repeated cancellation, and shutdown cleanup.
 - Governance: Document roots, multiple scenarios, unrelated axe targets, and
   explicit ambiguous/non-color evidence.
 - Delivery/coding: exact artifact index, unique target ids, failed/cancelled

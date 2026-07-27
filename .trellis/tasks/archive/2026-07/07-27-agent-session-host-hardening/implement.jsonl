@@ -1,0 +1,4 @@
+{"path":".trellis/spec/frontend/agent-control-safety.md","reason":"Agent Host, workspace, lease, process, and durable event authority."}
+{"path":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Host state crosses native persistence, IPC, renderer lifecycle, and later executor layers."}
+{"path":".trellis/tasks/07-27-agent-session-delegation/research/runtime-contracts.md","reason":"Host gaps and runtime custody requirements discovered during research."}
+{"path":".trellis/tasks/07-27-agent-session-host-hardening/design.md","reason":"Reviewed child-specific architecture and compatibility constraints."}

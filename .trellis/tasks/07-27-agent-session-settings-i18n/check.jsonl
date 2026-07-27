@@ -1,0 +1,7 @@
+{"file":".trellis/spec/frontend/agent-control-safety.md","reason":"Review that Phase A cannot mint execution authority, expose secrets/paths, or overstate probe facts as desktop/headless execution."}
+{"file":".trellis/spec/frontend/byok-provider-protocols.md","reason":"Review that provider drafts, imported keys, model routing, and local session delegation remain distinct."}
+{"file":".trellis/spec/frontend/byok-user-copy.md","reason":"Review allowance/auth copy for billing estimates, false credential custody, and misleading provider charges."}
+{"file":".trellis/spec/frontend/component-guidelines.md","reason":"Review Settings information architecture, keyboard focus, stable dimensions, responsive overflow, and visual coverage."}
+{"file":".trellis/spec/frontend/release-pipeline.md","reason":"Review shipped-locale completeness, Settings UI regression coverage, and release-quality validation gates."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Review end-to-end probe decoder ownership and prove the Phase A data flow has no composer/run/result continuation."}
+{"file":".trellis/tasks/07-27-agent-session-settings-i18n/research/phase-a-boundary.md","reason":"Review that the superseding filesystem/no-tools blocker is enforced and no Phase B execution UI or authority leaked into Phase A."}
