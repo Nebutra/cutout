@@ -229,9 +229,9 @@ export function VectorizerPanel() {
                 : t({ id: 'settings.key_show', message: 'Show' })
             }
             onClick={() => setReveal((v) => !v)}
-            className="absolute top-1/2 right-1 -translate-y-1/2 text-muted-foreground"
+            className="absolute inset-y-0 right-1 my-auto text-muted-foreground active:not-aria-[haspopup]:translate-y-0"
           >
-            {reveal ? <EyeOff /> : <Eye />}
+            {reveal ? <EyeOff className="size-3" /> : <Eye className="size-3" />}
           </Button>
         </div>
         <div className="flex justify-end gap-2">

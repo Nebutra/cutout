@@ -1,0 +1,2 @@
+{"file":".trellis/spec/frontend/component-guidelines.md","reason":"Check stable geometry, accessibility, and interaction states."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Check focused regression coverage and repository quality gates."}
