@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.9 - 2026-07-27
+
+- Keep long-running apps current with six-hour lifecycle-aware checks, bounded jitter, and shared single-flight coordination.
+- Add deduplicated in-app update alerts, 24-hour reminders, and opt-in background system notifications.
+- Localize the new updater experience across all five shipped languages and polish the Settings About footer.
+
 ## 0.1.8 - 2026-07-24
 
 - Simplify troubleshooting recovery by keeping Reset UI state primary, collapsing diagnostic tools, and hiding unavailable Agent Host actions until a workspace is authorized.
