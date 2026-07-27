@@ -60,7 +60,7 @@
 - Require `scripts/validate-release-authority.mjs` to prove that only the final `publish` job can mutate Releases or receive `contents: write`.
 - Attest every collected release asset with `actions/attest-build-provenance` after checksums are finalized and before the draft Release is created.
 - The generated updater manifest must include and verify the signed updater artifact for Apple Silicon macOS, Intel macOS, Windows x64, and Linux x64 before publication. Native installer availability alone is not update evidence.
-- The packaged desktop app checks after an 8-second startup delay and at most once per 24 hours by default. Home shows the Update action only after a newer signed release is discovered; the action opens Updates & Support for download and verified install/restart.
+- The packaged desktop app checks after an 8-second startup delay, retries on a six-hour schedule with bounded jitter and lifecycle/network recovery triggers, and shares one in-flight check across manual and automatic callers. Home shows the Update action only after a newer signed release is discovered; the action opens Updates & Support for download and verified install/restart. The notification bell deduplicates by channel/version, supports a 24-hour reminder, and native system notifications remain explicit opt-in.
 - The Tauri updater signature is not Apple notarization or Windows Authenticode. Do not represent the intentionally unsigned Windows installers as Authenticode-signed or as a trusted Windows publisher.
 
 ## Truthful status
