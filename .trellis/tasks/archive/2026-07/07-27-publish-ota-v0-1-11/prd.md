@@ -35,17 +35,17 @@ native Agent Host hardening as the next immutable stable Cutout OTA release.
 
 ## Acceptance Criteria
 
-- [ ] All repository version surfaces validate as `0.1.11`.
-- [ ] Local release checks and native/frontend quality gates pass.
-- [ ] Settings displays the complete 39-Agent inventory and keeps every new
+- [x] All repository version surfaces validate as `0.1.11`.
+- [x] Local release checks and native/frontend quality gates pass.
+- [x] Settings displays the complete 39-Agent inventory and keeps every new
       status and permission message localized across all shipped languages.
-- [ ] PR #43 and the release PR merge through required protected checks.
-- [ ] Annotated tag `v0.1.11` is reachable from `github/main` and matches the
+- [x] PR #43 and the release PR merge through required protected checks.
+- [x] Annotated tag `v0.1.11` is reachable from `github/main` and matches the
       synchronized source version.
-- [ ] The protected release workflow publishes a stable, non-draft Release with
+- [x] The protected release workflow publishes a stable, non-draft Release with
       all four updater platforms, signatures, checksums, provenance, and macOS
       notarization evidence.
-- [ ] The old local Cutout installation is removed and the published Apple
+- [x] The old local Cutout installation is removed and the published Apple
       Silicon `v0.1.11` package is installed and reports version `0.1.11`.
 
 ## Out Of Scope
