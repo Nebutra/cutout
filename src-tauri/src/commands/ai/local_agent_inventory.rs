@@ -289,7 +289,7 @@ const LOCAL_AGENT_REGISTRY: &[LocalAgentDefinition] = &[
         "OpenCode",
         ["opencode"],
         OPENCODE_ROOTS,
-        Unsupported
+        Supported
     ),
     agent!(
         "copilot",
@@ -298,19 +298,13 @@ const LOCAL_AGENT_REGISTRY: &[LocalAgentDefinition] = &[
         NO_ROOTS,
         Unsupported
     ),
-    agent!("omp", "OMP (Oh My Pi)", ["omp"], OMP_ROOTS, Unsupported),
-    agent!("pi", "Pi Agent", ["pi"], PI_ROOTS, Unsupported),
+    agent!("omp", "OMP (Oh My Pi)", ["omp"], OMP_ROOTS, Supported),
+    agent!("pi", "Pi Agent", ["pi"], PI_ROOTS, Supported),
     agent!("cursor", "Cursor", ["cursor-agent"], NO_ROOTS, Unsupported),
-    agent!(
-        "gemini",
-        "Gemini CLI",
-        ["gemini"],
-        GEMINI_ROOTS,
-        Unsupported
-    ),
+    agent!("gemini", "Gemini CLI", ["gemini"], GEMINI_ROOTS, Supported),
     agent!("hermes", "Hermes Agent", ["hermes"], NO_ROOTS, Unsupported),
-    agent!("qwen-code", "Qwen Code", ["qwen"], QWEN_ROOTS, Unsupported),
-    agent!("kimi", "Kimi Code CLI", ["kimi"], KIMI_ROOTS, Unsupported),
+    agent!("qwen-code", "Qwen Code", ["qwen"], QWEN_ROOTS, Supported),
+    agent!("kimi", "Kimi Code CLI", ["kimi"], KIMI_ROOTS, Supported),
     agent!("amp", "Amp", ["amp", "amp-acp"], NO_ROOTS, Unsupported),
     agent!("auggie", "Auggie CLI", ["auggie"], NO_ROOTS, Unsupported),
     agent!("cline", "Cline", ["cline"], NO_ROOTS, Unsupported),
@@ -388,7 +382,7 @@ const LOCAL_AGENT_REGISTRY: &[LocalAgentDefinition] = &[
         "Mistral Vibe",
         ["vibe", "vibe-acp"],
         VIBE_ROOTS,
-        Unsupported
+        Supported
     ),
     agent!("nova", "Nova", ["nova"], NO_ROOTS, Unsupported),
     agent!("poolside", "Poolside", ["pool"], NO_ROOTS, Unsupported),

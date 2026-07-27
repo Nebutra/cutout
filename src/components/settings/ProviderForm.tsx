@@ -183,9 +183,13 @@ export function ProviderForm({ initial, initialKind, discovered, onDone }: Provi
       if (nativeDraftId) await cancelProviderDraft(nativeDraftId)
       const draftId = await createProviderDraft({
         kind, baseUrl: resolvedBaseUrl, wireProtocol,
-        ...(discovered ? { candidateId: discovered.id } : {}),
-        ...(initial?.id ? { providerId: initial.id } : {}),
-        ...(secret ? { secret } : {}),
+        ...(discovered
+          ? { candidateId: discovered.id }
+          : secret
+            ? { secret }
+            : initial?.id
+              ? { providerId: initial.id }
+              : {}),
       })
       setNativeDraftId(draftId)
       const models = await checkProviderDraft(draftId)

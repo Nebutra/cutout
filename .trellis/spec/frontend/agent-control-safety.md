@@ -356,6 +356,14 @@ permission, not by the provider secret/network permission.
   or credential-shaped fields.
 - Discovery never launches an Agent, installer, package manager, shell, login
   flow, helper, or version command and never recursively scans the home folder.
+- Credential adapters are a separate native provider surface. They may parse
+  only the nine reviewed exact schemas, return sanitized candidate metadata,
+  and import an API key only through a checked native draft. The webview never
+  supplies an Agent path, field selector, or Agent-source secret.
+- OAuth, subscription, bearer, helper, keyring, and session material remains
+  display-only or unsupported. Inventory support must not be represented as
+  session delegation, a bundled coding runtime, or permission to invoke an
+  owning Agent.
 
 ### 4. Validation & Error Matrix
 

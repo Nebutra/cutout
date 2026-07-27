@@ -350,3 +350,121 @@ let credential = CredentialPreview {
 
 The candidate remains sanitized; the actual auth-file value is re-read only by
 the native draft resolver.
+
+## Scenario: Import A Reviewed Local Agent API Key
+
+### 1. Scope / Trigger
+
+Use this contract for credential adapters owned by Claude Code, Codex,
+OpenCode, Pi, OMP, Gemini CLI, Qwen Code, Kimi Code CLI, and Mistral Vibe.
+This is API-key discovery/import only. OAuth, subscription, bearer, helper,
+keyring, and session reuse require a separate controlled Agent runtime and are
+not provider credentials.
+
+### 2. Signatures
+
+```rust
+discover_provider_candidates(app: AppHandle) -> Result<Vec<ProviderCandidate>, DiscoveryError>
+create_provider_draft(app: AppHandle, input: CreateDraftInput) -> Result<DraftSummary, DiscoveryError>
+check_provider_draft(app: AppHandle, draft_id: String) -> Result<ProviderProbeResult, DiscoveryError>
+import_provider_draft(app: AppHandle, input: ImportDraftInput) -> Result<ProviderConfig, DiscoveryError>
+```
+
+`ProviderCandidate` adds optional sanitized `agentId` and `schemaId` fields.
+`CreateDraftInput` accepts exactly one of `candidateId`, `providerId`, or
+`secret`, except that local no-key providers accept none.
+
+### 3. Contracts
+
+- Every adapter reads only registry-owned roots and exact filenames through the
+  shared no-symlink, regular-file, 1 MiB-bounded reader. Every path component
+  is inspected before opening, and opened-file identity is checked before and
+  after the bounded read.
+- JSON, JSONC, TOML, YAML, and dotenv are parsed natively. JSONC uses a real
+  parser. OMP YAML rejects tags, anchors, aliases, merge keys, duplicate keys,
+  and command-backed values. No parser executes helpers or expands variables.
+- Candidate IDs bind the Agent, schema, original source entry, provider kind,
+  exact endpoint, wire protocol, credential class, and sanitized reference.
+  Provider aliases are never normalized into a selector for a different entry.
+- Draft creation accepts exactly one credential authority: `candidateId`, an
+  existing Cutout `providerId`, or a transient manual `secret`. Local no-key
+  providers are the only zero-source exception. Candidate drafts never carry
+  Agent-source secret bytes or caller-selected paths.
+- Check re-discovers the candidate, revalidates its binding, resolves the
+  secret natively, and records the secret revision only after the authenticated
+  catalog check succeeds. Import re-discovers and re-reads again; candidate,
+  binding, or secret drift invalidates the draft before persistence.
+- Config-derived labels, model hints, references, locations, warnings, and
+  endpoints are sanitized before IPC. Absolute host paths, controls,
+  credential-shaped text, URL userinfo/query/fragment, and disallowed hosts
+  fail closed.
+- The official Kimi for Coding binding is exactly
+  `https://api.kimi.com/coding/v1`, Chat Completions, under the closed Moonshot
+  family host policy. `KIMI_API_KEY` overrides a config literal. Other Kimi or
+  custom origins remain non-importable.
+- Gemini imports `GEMINI_API_KEY` before `GOOGLE_API_KEY`; OAuth/Vertex/ADC
+  presence is display-only. Claude helpers and credential-session files are
+  presence-only. Pi/OMP model credentials require reviewed provider, API,
+  endpoint, and environment/literal semantics.
+
+### 4. Validation & Error Matrix
+
+| Condition | Required behavior |
+| --- | --- |
+| Missing, malformed, non-file, oversized, symlinked, or identity-changing source | Fail with sanitized config error before parsing or importing |
+| Unknown schema, provider, API, endpoint, or credential variant | Omit or display as non-importable; never guess an OpenAI-compatible binding |
+| OAuth, bearer, helper, keyring, session, or subscription material | Display-only or unsupported; never enter the API-key proxy |
+| Candidate kind, protocol, endpoint, source entry, or secret changes after check | Invalidate the draft before provider/key persistence |
+| Draft supplies multiple credential authorities | Reject as `draft-invalid` |
+| Existing `providerId` metadata differs from persisted provider metadata | Reject before reading the stored key |
+| Candidate IPC contains a host path, secret-shaped text, unsafe URL, controls, or unknown field | Reject at native and TypeScript boundaries |
+| Provider save fails after key storage | Restore the prior key or remove the newly written key |
+
+### 5. Good / Base / Bad Cases
+
+- Good: a reviewed Kimi config binds `KIMI_API_KEY` to
+  `https://api.kimi.com/coding/v1`; check succeeds, then import re-reads the
+  same candidate and secret revision before atomic persistence.
+- Base: an unsupported Agent remains visible in the 39-Agent inventory with
+  `credentialAdapter: unsupported` and produces no parse attempt.
+- Bad: a webview supplies `candidateId` plus a different `secret`, edits the
+  endpoint after checking, or asks Rust to scan a caller-selected path.
+
+### 6. Tests Required
+
+- Shared reader: missing, permission failure, non-file, oversized file,
+  symlinked root/component/file, malformed UTF-8, and identity drift.
+- Every adapter family: absent, malformed/unknown schema, positive import,
+  serialized redaction, native re-read, and closed provider binding.
+- Cross-source negatives: OAuth/session/helper exclusion, original alias
+  selector binding, candidate/binding revision changes, post-check secret
+  changes, ambiguous draft sources, conflict, and provider-save key rollback.
+- Format-specific negatives: OpenCode JSONC, OMP YAML hazards, Gemini/Kimi env
+  precedence, Qwen unknown providers, Kimi current-over-legacy precedence, and
+  Vibe dotenv export/duplicate/interpolation/command rejection.
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```rust
+let secret = request.secret.or_else(|| read_path(request.path, request.field));
+save_provider(request.kind, request.base_url, secret);
+```
+
+This lets the webview choose the filesystem authority, field selector, secret,
+and destination independently.
+
+#### Correct
+
+```rust
+let candidate = rediscover_registered_candidate(&draft.candidate_id)?;
+verify_candidate_binding(&candidate, &draft)?;
+let secret = resolve_registered_source(&candidate)?;
+verify_checked_secret_revision(&secret, &draft)?;
+persist_provider_and_key_with_rollback(provider, secret)?;
+```
+
+The native registry owns the path, schema, selector, provider binding, and
+secret re-read. The webview receives only sanitized metadata and an opaque
+draft ID.
