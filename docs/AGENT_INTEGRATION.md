@@ -5,7 +5,7 @@
 > They keep their own repository, tools, permissions and coding sandbox while
 > Cutout exposes a product control plane through standard MCP and CLI.
 
-Figma, Notion, GitHub, Obsidian, Pencil, Paper, Framer and Canva belong to a
+Figma, Notion, GitHub, Obsidian, Pen, Paper, Framer and Canva belong to a
 different capability class: **integrations** implemented against each
 product's documented API or SDK. A Figma node connector must never be described
 as the mechanism by which Codex or Claude controls Cutout.

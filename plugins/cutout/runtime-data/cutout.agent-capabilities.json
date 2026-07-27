@@ -34,9 +34,9 @@
   "integrations": {
     "role": "Product, knowledge, design and prototype apps connected through their documented APIs or SDKs; integrations are not external controllers.",
     "available": ["figma-authorized-snapshot"],
-    "hostRequired": ["figma-foreground-plugin", "obsidian-vault-plugin", "pencil-mcp-cli", "paper-desktop-mcp", "framer-editor-plugin", "canva-apps-sdk"],
+    "hostRequired": ["figma-foreground-plugin", "obsidian-vault-plugin", "pen-mcp-cli", "paper-desktop-mcp", "framer-editor-plugin", "canva-apps-sdk"],
     "authorizationRequired": ["notion-p1-adapter", "github-p1-adapter", "canva-connect-api"],
-    "planned": ["figma-node", "obsidian", "pencil", "paper", "framer", "canva"],
+    "planned": ["figma-node", "obsidian", "pen", "paper", "framer", "canva"],
     "liveSync": false
   },
   "operations": [
@@ -75,7 +75,7 @@
     "defaultMode": "dry-run",
     "applyRequires": ["operation enabled by .cutout policy", "host-issued short-lived single-use approval lease bound to operation, preview digest, and expected revision"],
     "paidActions": "Budget and approval are declared by cutout.control.v1; the desktop executor can require a short-lived capability lease, while the current headless host has no paid-tool executor.",
-    "secrets": "Control requests, manifests and receipts reject or redact credential-shaped values; provider credentials stay in the host keychain, auth headers are assembled in Rust, and credentials are never part of this manifest.",
+    "secrets": "Control requests, manifests and receipts reject or redact credential-shaped values; provider credentials stay in the native local credential store, auth headers are assembled in Rust, and credentials are never part of this manifest.",
     "filesystemBoundary": "Controlled paths resolve below the canonical selected project root and reject absolute paths, parent traversal and symlink components; generated writes stay below .cutout/exports and use no caller-selected destination.",
     "permissionBroker": "Host-issued cutout.capability-lease.v1 leases bind subject, request digest, approval id, scopes, paths, commands, hosts, budgets and expiry. Durable approval-lease state is HMAC-authenticated with a host key outside the workspace, and desktop writes require native confirmation rather than a caller-authored approval string; revocation, expiry, tampering and replay fail closed and authorization produces an immutable receipt.",
     "toolSandbox": "The Node host maps a fixed command enum to argv with shell disabled, copies only allowlisted non-secret environment variables, and enforces wall-clock/output budgets plus POSIX process-group cancellation. It is not an arbitrary shell.",

@@ -80,7 +80,7 @@ Do not fetch URLs, scan arbitrary paths or contact remote services implicitly.
 
 ## External Products
 
-GitHub, Notion, Figma, Obsidian, Pencil, Paper, Framer and Canva require their
+GitHub, Notion, Figma, Obsidian, Pen, Paper, Framer and Canva require their
 documented authorized hosts, APIs or SDKs.
 Treat unavailable OAuth, cloud collaboration and live sync as roadmap only.
 Never report a planned integration node as connected or executed.
