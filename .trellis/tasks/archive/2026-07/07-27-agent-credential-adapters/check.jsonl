@@ -1,0 +1,5 @@
+{"file":".trellis/tasks/07-27-agent-credential-adapters/prd.md","reason":"Verify all nine adapters, compatibility, negative cases, and child boundaries"}
+{"file":".trellis/tasks/07-27-agent-credential-adapters/research/tier-a-adapter-contract.md","reason":"Check every enabled source against pinned schema evidence"}
+{"file":".trellis/spec/frontend/byok-provider-protocols.md","reason":"Verify kind/protocol/endpoint binding and non-generation checks"}
+{"file":".trellis/spec/frontend/agent-control-safety.md","reason":"Verify exact paths, symlink rejection, no execution, and secret-free IPC"}
+{"file":"cutout.agent-capabilities.json","reason":"Verify delegation/provider-executor claims remain unsupported"}
