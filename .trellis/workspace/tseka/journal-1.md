@@ -1021,3 +1021,36 @@ Merged troubleshooting recovery UX, stabilized Windows release asset fixture tim
 ### Next Steps
 
 - None - task complete
+
+
+## Session 31: Pen identity and Codex credential reuse
+
+**Date**: 2026-07-27
+**Task**: Pen identity and Codex credential reuse
+**Branch**: `fix/pen-local-credentials`
+
+### Summary
+
+Renamed the Pencil integration to Pen with legacy surface aliases, restored native Codex auth.json API-key discovery without exposing secrets, synchronized Agent contracts and docs, and passed full TypeScript, Rust, build, and validation gates.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `bf03bfe` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
