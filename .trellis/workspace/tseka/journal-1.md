@@ -1120,3 +1120,39 @@ Published Cutout v0.1.10 through the protected atomic four-platform OTA workflow
 ### Next Steps
 
 - None - task complete
+
+
+## Session 34: Publish and install Cutout v0.1.11
+
+**Date**: 2026-07-27
+**Task**: Publish and install Cutout v0.1.11
+**Branch**: `release/v0.1.11`
+
+### Summary
+
+Published the reviewed 39-Agent inventory, nine API-key adapters, and Agent Host hardening as the protected four-platform v0.1.11 release; verified updater signatures, checksums, SBOM, provenance, Developer ID signing, notarization, and stapling; replaced local v0.1.9 with the verified Apple Silicon package while preserving the old bundle in Trash.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `36bd3d5` | (see git log) |
+| `eca2ddf` | (see git log) |
+| `6f78f26` | (see git log) |
+| `f596be9` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
