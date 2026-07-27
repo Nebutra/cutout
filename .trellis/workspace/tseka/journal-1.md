@@ -587,3 +587,36 @@ Implemented immutable sibling Agent responses with previous/next selection, dura
 ### Next Steps
 
 - None - task complete
+
+
+## Session 18: Common local Agent inventory
+
+**Date**: 2026-07-27
+**Task**: Common local Agent inventory
+**Branch**: `main`
+
+### Summary
+
+Added a pinned offline registry and sanitized metadata-only installation inventory for all 39 reviewed coding Agents, with strict native IPC validation and least-privilege Tauri permissioning.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `f7654b1` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
