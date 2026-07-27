@@ -83,6 +83,13 @@ msgid "kit_library.confirmed_rejected_summary"
 msgstr "承認 {0} 件 · 却下 {1} 件"
 
 #. js-lingui-explicit-id
+#. placeholder {0}: summary.installed
+#. placeholder {1}: summary.configured
+#: src/components/settings/LocalAgentInventoryPanel.tsx
+msgid "settings.local_agents_summary"
+msgstr "{0} 件インストール済み · {1} 件の設定を検出"
+
+#. js-lingui-explicit-id
 #. placeholder {0}: preview.name
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.kit_editor_title"
@@ -285,6 +292,11 @@ msgid "global_library.all_quality"
 msgstr "すべての品質"
 
 #. js-lingui-explicit-id
+#: src/components/settings/LocalAgentInventoryPanel.tsx
+msgid "settings.local_agents_permission_hint"
+msgstr "システムからアクセスを求められた場合は許可して、もう一度スキャンしてください。"
+
+#. js-lingui-explicit-id
 #: src/components/settings/sections/PersonalizationSection.tsx
 msgid "settings.personalization.memory_description"
 msgstr "有用な設定をローカル作業全体で引き継ぎます。"
@@ -318,6 +330,11 @@ msgstr "API IDを保存しました"
 #: src/components/settings/KeyField.tsx
 msgid "settings.key_label"
 msgstr "APIキー"
+
+#. js-lingui-explicit-id
+#: src/components/settings/LocalAgentInventoryPanel.tsx
+msgid "settings.local_agents_api_key_supported"
+msgstr "API キーのインポートに対応"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
@@ -723,6 +740,11 @@ msgid "settings.personalization.personality_concise"
 msgstr "簡潔"
 
 #. js-lingui-explicit-id
+#: src/components/settings/LocalAgentInventoryPanel.tsx
+msgid "settings.local_agents_configuration_found"
+msgstr "設定を検出"
+
+#. js-lingui-explicit-id
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.discover_references_title"
 msgstr "この操作を有効にするには、認可済みの参照検出プロバイダーホストを設定してください。"
@@ -887,6 +909,11 @@ msgid "settings.speech.save_failed_toast"
 msgstr "音声設定を保存できませんでした"
 
 #. js-lingui-explicit-id
+#: src/components/settings/LocalAgentInventoryPanel.tsx
+msgid "settings.local_agents_scan_error"
+msgstr "ローカル Agent の場所をスキャンできませんでした。"
+
+#. js-lingui-explicit-id
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.toast_update_failed"
 msgstr "アセットを更新できませんでした"
@@ -958,6 +985,11 @@ msgstr "カスタムパーソナリティを保存するには、先に指示が
 #: src/updater/update-notifications.ts
 msgid "updates.notification.available_detail"
 msgstr "Cutout {0} が{channelLabel}チャンネルで利用可能です。"
+
+#. js-lingui-explicit-id
+#: src/components/settings/LocalAgentInventoryPanel.tsx
+msgid "settings.local_agents_description"
+msgstr "Cutout は、審査済みの 39 個のコーディング Agent と登録済みのコマンドおよび設定場所を確認します。"
 
 #. js-lingui-explicit-id
 #. placeholder {0}: state.preferences.channel
@@ -1095,8 +1127,8 @@ msgstr "参照を検出"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
-msgid "settings.discovered_on_mac"
-msgstr "Discovered on this Mac"
+msgid "settings.discovered_on_device"
+msgstr "このデバイスで検出"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
@@ -1456,6 +1488,11 @@ msgid "settings.updates.install_restart"
 msgstr "インストールして再起動"
 
 #. js-lingui-explicit-id
+#: src/components/settings/LocalAgentInventoryPanel.tsx
+msgid "settings.local_agents_installed"
+msgstr "インストール済み"
+
+#. js-lingui-explicit-id
 #: src/components/settings/sections/PersonalizationSection.tsx
 msgid "settings.personalization.instructions_saved_toast"
 msgstr "指示を保存しました"
@@ -1545,6 +1582,11 @@ msgstr "音声設定を読み込み中…"
 #: src/components/settings/ProviderDirectory.tsx
 msgid "settings.provider_category_local"
 msgstr "ローカル"
+
+#. js-lingui-explicit-id
+#: src/components/settings/LocalAgentInventoryPanel.tsx
+msgid "settings.local_agents_title"
+msgstr "ローカルコーディング Agent"
 
 #. js-lingui-explicit-id
 #: src/components/library/GlobalLibraryView.tsx
@@ -1743,6 +1785,16 @@ msgid "slices.empty_no_regions_automatic_hint"
 msgstr "再利用可能な領域が見つかりませんでした。別の素材シートをお試しください。"
 
 #. js-lingui-explicit-id
+#: src/components/settings/LocalAgentInventoryPanel.tsx
+msgid "settings.local_agents_api_key_unsupported"
+msgstr "審査済み API キーのインポートなし"
+
+#. js-lingui-explicit-id
+#: src/components/settings/LocalAgentInventoryPanel.tsx
+msgid "settings.local_agents_no_config"
+msgstr "審査済み設定は見つかりませんでした"
+
+#. js-lingui-explicit-id
 #: src/components/settings/ProviderRow.tsx
 #: src/components/settings/VectorizerPanel.tsx
 msgid "settings.status_unconfigured"
@@ -1752,6 +1804,11 @@ msgstr "未設定"
 #: src/components/settings/sections/IntegrationsSection.tsx
 msgid "settings.integrations.not_connected"
 msgstr "未接続。"
+
+#. js-lingui-explicit-id
+#: src/components/settings/LocalAgentInventoryPanel.tsx
+msgid "settings.local_agents_not_installed"
+msgstr "未インストール"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/SpeechSection.tsx
@@ -1830,6 +1887,11 @@ msgstr "またはクリックして参照 · PNG、JPEG、WebP"
 #: src/components/library/KitLibraryInspector.tsx
 msgid "kit_library.parser_host_not_configured"
 msgstr "このサーフェスではパーサーホストが設定されていません。署名済みのJSON結果をインポートして候補を確認してください。"
+
+#. js-lingui-explicit-id
+#: src/components/settings/LocalAgentInventoryPanel.tsx
+msgid "settings.local_agents_permission_required"
+msgstr "権限が必要"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/PersonalizationSection.tsx
@@ -2291,6 +2353,21 @@ msgstr "変更を保存"
 #: src/components/settings/VectorizerPanel.tsx
 msgid "settings.save_failed_toast"
 msgstr "保存に失敗しました"
+
+#. js-lingui-explicit-id
+#: src/components/settings/LocalAgentInventoryPanel.tsx
+msgid "settings.local_agents_scan_again"
+msgstr "再スキャン"
+
+#. js-lingui-explicit-id
+#: src/components/settings/LocalAgentInventoryPanel.tsx
+msgid "settings.local_agents_scan_failed"
+msgstr "スキャン失敗"
+
+#. js-lingui-explicit-id
+#: src/components/settings/LocalAgentInventoryPanel.tsx
+msgid "settings.local_agents_scanning"
+msgstr "審査済み Agent の場所をスキャンしています..."
 
 #. js-lingui-explicit-id
 #: src/components/library/GlobalLibraryView.tsx
@@ -2837,6 +2914,11 @@ msgstr "動画実行ホストおよび参照プロバイダーホストが設定
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.media_filter_videos"
 msgstr "動画"
+
+#. js-lingui-explicit-id
+#: src/components/settings/LocalAgentInventoryPanel.tsx
+msgid "settings.local_agents_view_all"
+msgstr "39 個の Agent をすべて表示"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx

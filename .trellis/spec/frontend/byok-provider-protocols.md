@@ -380,6 +380,10 @@ import_provider_draft(app: AppHandle, input: ImportDraftInput) -> Result<Provide
   shared no-symlink, regular-file, 1 MiB-bounded reader. Every path component
   is inspected before opening, and opened-file identity is checked before and
   after the bounded read.
+- Windows identity checks use the opened handle's volume serial and file index,
+  and reopen the exact path with reparse-point traversal disabled before and
+  after the read. Length, timestamps, attributes, or file type alone are not a
+  stable identity.
 - JSON, JSONC, TOML, YAML, and dotenv are parsed natively. JSONC uses a real
   parser. OMP YAML rejects tags, anchors, aliases, merge keys, duplicate keys,
   and command-backed values. No parser executes helpers or expands variables.
@@ -398,6 +402,15 @@ import_provider_draft(app: AppHandle, input: ImportDraftInput) -> Result<Provide
   endpoints are sanitized before IPC. Absolute host paths, controls,
   credential-shaped text, URL userinfo/query/fragment, and disallowed hosts
   fail closed.
+- Settings projects every row in the fixed 39-Agent inventory, including
+  unsupported and not-installed Agents. The list shows only sanitized root
+  labels, installation/configuration/permission state, and reviewed API-key
+  adapter support. Permission failures remain retryable and never expose the
+  native error or a host-absolute path.
+- Discovered provider source labels preserve the sanitized Agent-owned label.
+  Only the process environment and Cutout-owned local credential store use
+  translated category labels; Agent configs must never be mislabeled as
+  Cutout-owned credentials.
 - The official Kimi for Coding binding is exactly
   `https://api.kimi.com/coding/v1`, Chat Completions, under the closed Moonshot
   family host policy. `KIMI_API_KEY` overrides a config literal. Other Kimi or
@@ -434,6 +447,8 @@ import_provider_draft(app: AppHandle, input: ImportDraftInput) -> Result<Provide
 
 - Shared reader: missing, permission failure, non-file, oversized file,
   symlinked root/component/file, malformed UTF-8, and identity drift.
+- Windows shared reader: two same-length files with the same mutable timestamp
+  still have distinct handle identities; reparse-point opens fail closed.
 - Every adapter family: absent, malformed/unknown schema, positive import,
   serialized redaction, native re-read, and closed provider binding.
 - Cross-source negatives: OAuth/session/helper exclusion, original alias
@@ -442,6 +457,9 @@ import_provider_draft(app: AppHandle, input: ImportDraftInput) -> Result<Provide
 - Format-specific negatives: OpenCode JSONC, OMP YAML hazards, Gemini/Kimi env
   precedence, Qwen unknown providers, Kimi current-over-legacy precedence, and
   Vibe dotenv export/duplicate/interpolation/command rejection.
+- Settings inventory: loading/error/retry, installed/configuration-only,
+  permission-required, unsupported adapter, bounded all-39 rendering, source
+  label ownership, and five-locale catalog parity.
 
 ### 7. Wrong vs Correct
 

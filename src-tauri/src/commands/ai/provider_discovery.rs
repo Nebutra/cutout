@@ -271,17 +271,119 @@ fn exact_path_metadata(path: &Path) -> Result<Option<std::fs::Metadata>, Discove
     Ok(latest)
 }
 
-#[cfg(unix)]
-fn same_file_identity(left: &std::fs::Metadata, right: &std::fs::Metadata) -> bool {
-    use std::os::unix::fs::MetadataExt;
-    left.dev() == right.dev() && left.ino() == right.ino()
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct FileIdentity {
+    #[cfg(unix)]
+    device: u64,
+    #[cfg(unix)]
+    inode: u64,
+    #[cfg(windows)]
+    volume: u64,
+    #[cfg(windows)]
+    index: u64,
+    #[cfg(not(any(unix, windows)))]
+    length: u64,
+    #[cfg(not(any(unix, windows)))]
+    modified: Option<std::time::SystemTime>,
 }
 
-#[cfg(not(unix))]
-fn same_file_identity(left: &std::fs::Metadata, right: &std::fs::Metadata) -> bool {
-    left.len() == right.len()
-        && left.modified().ok() == right.modified().ok()
-        && left.file_type() == right.file_type()
+#[cfg(unix)]
+fn file_identity(file: &std::fs::File) -> Result<FileIdentity, DiscoveryError> {
+    use std::os::unix::fs::MetadataExt;
+    let metadata = file
+        .metadata()
+        .map_err(|_| DiscoveryError::Read("failed to inspect opened config".into()))?;
+    Ok(FileIdentity {
+        device: metadata.dev(),
+        inode: metadata.ino(),
+    })
+}
+
+#[cfg(windows)]
+fn windows_file_information(file: &std::fs::File) -> Result<(FileIdentity, u32), DiscoveryError> {
+    use std::mem::MaybeUninit;
+    use std::os::windows::io::AsRawHandle;
+    use windows_sys::Win32::Storage::FileSystem::{
+        GetFileInformationByHandle, BY_HANDLE_FILE_INFORMATION,
+    };
+
+    let mut information = MaybeUninit::<BY_HANDLE_FILE_INFORMATION>::uninit();
+    // SAFETY: `file` owns a valid handle and the output pointer refers to
+    // writable storage for the documented Windows structure.
+    let succeeded =
+        unsafe { GetFileInformationByHandle(file.as_raw_handle() as _, information.as_mut_ptr()) };
+    if succeeded == 0 {
+        return Err(DiscoveryError::Read(
+            "failed to inspect opened config".into(),
+        ));
+    }
+    // SAFETY: GetFileInformationByHandle initialized the structure on success.
+    let information = unsafe { information.assume_init() };
+    Ok((
+        FileIdentity {
+            volume: u64::from(information.dwVolumeSerialNumber),
+            index: (u64::from(information.nFileIndexHigh) << 32)
+                | u64::from(information.nFileIndexLow),
+        },
+        information.dwFileAttributes,
+    ))
+}
+
+#[cfg(windows)]
+fn file_identity(file: &std::fs::File) -> Result<FileIdentity, DiscoveryError> {
+    Ok(windows_file_information(file)?.0)
+}
+
+#[cfg(not(any(unix, windows)))]
+fn file_identity(file: &std::fs::File) -> Result<FileIdentity, DiscoveryError> {
+    let metadata = file
+        .metadata()
+        .map_err(|_| DiscoveryError::Read("failed to inspect opened config".into()))?;
+    Ok(FileIdentity {
+        length: metadata.len(),
+        modified: metadata.modified().ok(),
+    })
+}
+
+fn open_exact_config(path: &Path) -> Result<std::fs::File, DiscoveryError> {
+    let mut options = std::fs::OpenOptions::new();
+    options.read(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.custom_flags(libc::O_CLOEXEC | libc::O_NOFOLLOW);
+    }
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::OpenOptionsExt;
+        use windows_sys::Win32::Storage::FileSystem::FILE_FLAG_OPEN_REPARSE_POINT;
+        options.custom_flags(FILE_FLAG_OPEN_REPARSE_POINT);
+    }
+    let file = options
+        .open(path)
+        .map_err(|_| DiscoveryError::Read("failed to open config".into()))?;
+    #[cfg(windows)]
+    {
+        use windows_sys::Win32::Storage::FileSystem::FILE_ATTRIBUTE_REPARSE_POINT;
+        if windows_file_information(&file)?.1 & FILE_ATTRIBUTE_REPARSE_POINT != 0 {
+            let label = path
+                .file_name()
+                .and_then(|value| value.to_str())
+                .unwrap_or("config");
+            return Err(DiscoveryError::Symlink(label.into()));
+        }
+    }
+    Ok(file)
+}
+
+fn exact_path_file_identity(path: &Path) -> Result<Option<FileIdentity>, DiscoveryError> {
+    let Some(metadata) = exact_path_metadata(path)? else {
+        return Ok(None);
+    };
+    if !metadata.is_file() {
+        return Err(DiscoveryError::Read("config is not a regular file".into()));
+    }
+    open_exact_config(path).and_then(|file| file_identity(&file).map(Some))
 }
 
 pub(super) fn exact_regular_file_present(path: &Path) -> Result<bool, DiscoveryError> {
@@ -308,12 +410,12 @@ pub(super) fn read_exact_config(path: &Path) -> Result<Option<String>, Discovery
     if before.len() > MAX_CONFIG_BYTES {
         return Err(DiscoveryError::TooLarge(label.into()));
     }
-    let mut file = std::fs::File::open(path)
-        .map_err(|_| DiscoveryError::Read("failed to open config".into()))?;
+    let mut file = open_exact_config(path)?;
     let opened = file
         .metadata()
         .map_err(|_| DiscoveryError::Read("failed to inspect opened config".into()))?;
-    if !opened.is_file() || !same_file_identity(&before, &opened) {
+    let opened_identity = file_identity(&file)?;
+    if !opened.is_file() || exact_path_file_identity(path)? != Some(opened_identity) {
         return Err(DiscoveryError::Read(
             "config identity changed before read".into(),
         ));
@@ -326,9 +428,7 @@ pub(super) fn read_exact_config(path: &Path) -> Result<Option<String>, Discovery
     if bytes.len() as u64 > MAX_CONFIG_BYTES {
         return Err(DiscoveryError::TooLarge(label.into()));
     }
-    let after = exact_path_metadata(path)?
-        .ok_or_else(|| DiscoveryError::Read("config disappeared during read".into()))?;
-    if !same_file_identity(&opened, &after) {
+    if exact_path_file_identity(path)? != Some(opened_identity) {
         return Err(DiscoveryError::Read(
             "config identity changed during read".into(),
         ));
@@ -1348,6 +1448,44 @@ mod tests {
         assert_eq!(
             read_exact_config(&path).unwrap().as_deref(),
             Some(r#"{"model":"test"}"#)
+        );
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_config_identity_uses_the_file_index_not_mutable_metadata() {
+        let directory = tempdir().unwrap();
+        let left_path = directory.path().join("left.json");
+        let right_path = directory.path().join("right.json");
+        std::fs::write(&left_path, "{}").unwrap();
+        std::fs::write(&right_path, "{}").unwrap();
+        let timestamp = std::time::UNIX_EPOCH + Duration::from_secs(1_700_000_000);
+        std::fs::OpenOptions::new()
+            .write(true)
+            .open(&left_path)
+            .unwrap()
+            .set_times(std::fs::FileTimes::new().set_modified(timestamp))
+            .unwrap();
+        std::fs::OpenOptions::new()
+            .write(true)
+            .open(&right_path)
+            .unwrap()
+            .set_times(std::fs::FileTimes::new().set_modified(timestamp))
+            .unwrap();
+
+        let left = open_exact_config(&left_path).unwrap();
+        let right = open_exact_config(&right_path).unwrap();
+        assert_eq!(
+            left.metadata().unwrap().len(),
+            right.metadata().unwrap().len()
+        );
+        assert_eq!(
+            left.metadata().unwrap().modified().unwrap(),
+            right.metadata().unwrap().modified().unwrap()
+        );
+        assert_ne!(
+            file_identity(&left).unwrap(),
+            file_identity(&right).unwrap()
         );
     }
 
