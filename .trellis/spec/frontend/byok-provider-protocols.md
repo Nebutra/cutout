@@ -224,3 +224,129 @@ switch (protocol) {
 Do not derive a new schema with `.extend()` from a Zod schema that contains
 refinements. Use the shared refined draft schema or `.safeExtend()` so the app
 does not fail during module initialization.
+
+## Scenario: Discover A Reusable Local Provider Credential
+
+### 1. Scope / Trigger
+
+Use this contract when changing native provider discovery, candidate metadata,
+provider-draft secret resolution, or support for credentials owned by Codex,
+Claude Code, the process environment, or Cutout's local credential store.
+
+Finder-launched desktop apps commonly do not inherit shell environment
+variables. A provider being present in a local tool config therefore does not
+prove that its `env_key` is reusable by Cutout.
+
+### 2. Signatures
+
+```rust
+discover_provider_candidates(app: AppHandle) -> Result<Vec<ProviderCandidate>, DiscoveryError>
+
+struct ProviderCandidate {
+    id: String,
+    source: String,
+    source_label: String,
+    config_location: Option<String>,
+    kind: String,
+    label: String,
+    base_url: Option<String>,
+    wire_protocol: Option<String>,
+    model_hint: Option<String>,
+    credential: CredentialPreview,
+    warnings: Vec<String>,
+}
+
+struct CredentialPreview {
+    source_type: String,
+    reference: Option<String>,
+    available: bool,
+    importable: bool,
+}
+```
+
+Provider drafts carry only `candidateId`; connection checks and imports resolve
+the current secret again inside Rust.
+
+### 3. Contracts
+
+- Resolve Codex from `CODEX_HOME` when present, otherwise exactly
+  `<home>/.codex`.
+- Read only exact supported files with the shared no-symlink, regular-file,
+  1 MiB-bounded reader.
+- Codex `auth.json` is reusable only when top-level `OPENAI_API_KEY` is a
+  non-empty string. OAuth/session tokens and other fields are not API keys.
+- A valid Codex auth-file key produces an OpenAI Responses candidate even when
+  `config.toml` has no explicit OpenAI provider table.
+- If an explicit Codex OpenAI provider names an unavailable `env_key`, a valid
+  auth-file API key is the native fallback. An available environment value
+  remains authoritative for that candidate.
+- Candidate and IPC serialization may expose the stable reference name
+  `OPENAI_API_KEY`, but never its value.
+- Imported secrets are persisted through Cutout's owner-only native local
+  credential store. User-facing copy must not claim macOS Keychain custody.
+
+### 4. Validation & Error Matrix
+
+| Condition | Required behavior |
+| --- | --- |
+| Missing Codex config and auth | Return no Codex candidate |
+| Valid auth-file `OPENAI_API_KEY` only | Return available/importable OpenAI candidate |
+| Empty API key | Return no auth-file candidate |
+| OAuth/session token only | Do not import or reinterpret it |
+| Malformed supported config/auth file | Return sanitized `config-invalid` error |
+| Symlinked parent/file | Return `config-rejected` before reading |
+| File larger than 1 MiB | Return `config-rejected` before parsing |
+| Candidate disappears before draft check/import | Return `credential-missing` |
+| Secret-store read/import fails | Return opaque `credential-unavailable` |
+
+### 5. Good / Base / Bad Cases
+
+- Good: Codex `auth.json` contains an API key; Settings shows an enabled OpenAI
+  candidate and Rust resolves it only when checking/importing the draft.
+- Base: a custom Codex provider has a live `env_key`; discovery keeps using the
+  environment reference without reading a different credential.
+- Bad: serialize `auth.json`, an API-key prefix, or a masked key into the
+  candidate to make the frontend perform secret selection.
+- Bad: import Codex access/refresh tokens as OpenAI API keys.
+
+### 6. Tests Required
+
+- Auth-only discovery yields OpenAI + Responses + importable metadata.
+- A sentinel API key is absent from serialized candidate JSON but returned by
+  the internal native resolver.
+- Explicit OpenAI config with a missing environment variable falls back to the
+  auth-file API key.
+- OAuth-only and empty auth files yield no importable auth candidate.
+- Symlinked and oversized auth files fail before parsing.
+- Existing custom-provider environment discovery remains covered.
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```rust
+let available = env_key.and_then(std::env::var_os).is_some();
+```
+
+This treats a shell-only environment variable as the only possible Codex
+credential and fails for normal desktop launches.
+
+#### Correct
+
+```rust
+let use_auth_file = is_openai && auth_key_available && !env_available;
+let (source_type, reference) = if use_auth_file {
+    ("config-literal", Some("OPENAI_API_KEY".to_owned()))
+} else {
+    ("environment", env_key.map(str::to_owned))
+};
+let credential = CredentialPreview {
+    source_type: source_type.into(),
+    reference,
+    available: env_available || use_auth_file,
+    importable: env_available || use_auth_file,
+};
+```
+
+The candidate remains sanitized; the actual auth-file value is re-read only by
+the native draft resolver.

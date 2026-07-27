@@ -34,7 +34,7 @@ export const adapterRequiredIntegrations = [
   ['obsidian', 'Obsidian', ['documents', 'pages'], ['host-session']],
   ['framer', 'Framer', ['design-files', 'components', 'assets'], ['oauth2']],
   ['canva', 'Canva', ['design-files', 'assets'], ['oauth2']],
-  ['pencil', 'Pencil', ['design-files', 'components'], ['host-session']],
+  ['pen', 'Pen', ['design-files', 'components'], ['host-session']],
   ['paper', 'Paper', ['documents', 'design-files'], ['oauth2']],
 ] as const satisfies readonly (readonly [string, string, readonly IntegrationDataDomain[], readonly ('oauth2' | 'host-session')[]])[]
 

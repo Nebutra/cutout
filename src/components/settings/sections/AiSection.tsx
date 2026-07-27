@@ -170,7 +170,7 @@ function DiscoveredProviders({ onSelect }: { readonly onSelect: (candidate: Prov
   if (!query.data?.length) return null
   const sourceLabel = (source: string) => source === 'codex' ? 'Codex' : source === 'claude' ? 'Claude Code' : source === 'environment'
     ? t({ id: 'settings.provider_source_environment', message: 'Process environment' })
-    : t({ id: 'settings.provider_source_keychain', message: 'Cutout Keychain' })
+    : t({ id: 'settings.provider_source_keychain', message: 'Cutout local credentials' })
   return <section className="flex flex-col gap-2" aria-label={t({ id: 'settings.discovered_providers', message: 'Discovered providers' })}>
     <div className="flex items-center gap-2 text-xs font-medium"><WandSparkles className="size-3.5" /><Trans id="settings.discovered_on_mac">Discovered on this Mac</Trans></div>
     {query.data.map((candidate) => <button key={candidate.id} type="button" disabled={!candidate.credential.importable}

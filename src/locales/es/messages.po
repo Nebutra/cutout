@@ -968,7 +968,7 @@ msgstr "Cutout está actualizado en el canal {0}."
 #. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
 msgid "settings.provider_source_keychain"
-msgstr "Cutout Keychain"
+msgstr "Credenciales locales de Cutout"
 
 #. js-lingui-explicit-id
 #: src/components/home/SidebarAccount.tsx

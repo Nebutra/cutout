@@ -128,7 +128,7 @@ pub enum DiscoveryError {
     NotImportable,
     #[error("provider config uses an unsupported wire protocol: {0}")]
     UnsupportedWireProtocol(String),
-    #[error("keychain import failed: {0}")]
+    #[error("local credential import failed: {0}")]
     Keychain(String),
     #[error("provider endpoint returned HTTP {0}")]
     Http(u16),
@@ -230,83 +230,148 @@ fn normalized_draft_wire_protocol(
         .map_err(DiscoveryError::UnsupportedWireProtocol)
 }
 
-fn discover_codex(home: &Path) -> Result<Vec<ProviderCandidate>, DiscoveryError> {
-    let codex_home = std::env::var_os("CODEX_HOME").map(PathBuf::from);
-    let config_location = if codex_home.is_some() {
-        "$CODEX_HOME/config.toml"
-    } else {
-        "~/.codex/config.toml"
+fn codex_location(home: &Path) -> (PathBuf, &'static str) {
+    match std::env::var_os("CODEX_HOME") {
+        Some(path) => (PathBuf::from(path), "$CODEX_HOME"),
+        None => (home.join(".codex"), "~/.codex"),
+    }
+}
+
+fn codex_api_key(codex_home: &Path) -> Result<Option<String>, DiscoveryError> {
+    let Some(raw) = read_exact_config(&codex_home.join("auth.json"))? else {
+        return Ok(None);
     };
-    let path = codex_home
-        .unwrap_or_else(|| home.join(".codex"))
-        .join("config.toml");
-    let Some(raw) = read_exact_config(&path)? else {
-        return Ok(vec![]);
+    let value: serde_json::Value = serde_json::from_str(&raw)
+        .map_err(|error| DiscoveryError::Parse(format!("Codex auth: {error}")))?;
+    Ok(value
+        .get("OPENAI_API_KEY")
+        .and_then(serde_json::Value::as_str)
+        .filter(|value| !value.is_empty())
+        .map(str::to_owned))
+}
+
+fn discover_codex_at(
+    codex_home: &Path,
+    display_root: &str,
+) -> Result<Vec<ProviderCandidate>, DiscoveryError> {
+    let config_location = format!("{display_root}/config.toml");
+    let auth_location = format!("{display_root}/auth.json");
+    let config = match read_exact_config(&codex_home.join("config.toml"))? {
+        Some(raw) => Some(
+            toml::from_str::<toml::Value>(&raw)
+                .map_err(|error| DiscoveryError::Parse(format!("Codex config: {error}")))?,
+        ),
+        None => None,
     };
-    let value: toml::Value = toml::from_str(&raw)
-        .map_err(|error| DiscoveryError::Parse(format!("Codex config: {error}")))?;
-    let model_hint = value
-        .get("model")
+    let auth_key_available = codex_api_key(codex_home)?.is_some();
+    let model_hint = config
+        .as_ref()
+        .and_then(|value| value.get("model"))
         .and_then(toml::Value::as_str)
         .map(str::to_owned);
-    let selected = value.get("model_provider").and_then(toml::Value::as_str);
-    let Some(table) = value.get("model_providers").and_then(toml::Value::as_table) else {
-        return Ok(vec![]);
-    };
+    let selected = config
+        .as_ref()
+        .and_then(|value| value.get("model_provider"))
+        .and_then(toml::Value::as_str);
+    let table = config
+        .as_ref()
+        .and_then(|value| value.get("model_providers"))
+        .and_then(toml::Value::as_table);
     let mut out = Vec::new();
-    for (provider_id, entry) in table {
-        let Some(provider) = entry.as_table() else {
-            continue;
-        };
-        let env_key = provider.get("env_key").and_then(toml::Value::as_str);
-        let base_url = provider
-            .get("base_url")
-            .and_then(toml::Value::as_str)
-            .map(str::to_owned);
-        let wire_protocol = normalize_wire(provider.get("wire_api").and_then(toml::Value::as_str))?;
-        let mut warnings = Vec::new();
-        if provider.contains_key("experimental_bearer_token") || provider.contains_key("auth") {
-            warnings.push("Command-backed or session authentication is not importable.".into());
+    let mut has_openai_provider = false;
+    if let Some(table) = table {
+        for (provider_id, entry) in table {
+            let Some(provider) = entry.as_table() else {
+                continue;
+            };
+            let is_openai = provider_id == "openai";
+            has_openai_provider |= is_openai;
+            let env_key = provider.get("env_key").and_then(toml::Value::as_str);
+            let env_available = env_key.and_then(std::env::var_os).is_some();
+            let use_auth_file = is_openai && auth_key_available && !env_available;
+            let base_url = provider
+                .get("base_url")
+                .and_then(toml::Value::as_str)
+                .map(str::to_owned);
+            let wire_protocol =
+                normalize_wire(provider.get("wire_api").and_then(toml::Value::as_str))?;
+            let mut warnings = Vec::new();
+            if provider.contains_key("experimental_bearer_token") || provider.contains_key("auth") {
+                warnings.push("Command-backed or session authentication is not importable.".into());
+            }
+            let label = provider
+                .get("name")
+                .and_then(toml::Value::as_str)
+                .unwrap_or(provider_id);
+            out.push(ProviderCandidate {
+                id: candidate_id(&["codex", provider_id, base_url.as_deref().unwrap_or("")]),
+                source: "codex".into(),
+                source_label: "Codex".into(),
+                config_location: Some(if use_auth_file {
+                    auth_location.clone()
+                } else {
+                    config_location.clone()
+                }),
+                kind: if is_openai {
+                    "openai".into()
+                } else {
+                    "openai-compatible".into()
+                },
+                label: label.into(),
+                base_url,
+                wire_protocol,
+                model_hint: if selected == Some(provider_id.as_str()) {
+                    model_hint.clone()
+                } else {
+                    None
+                },
+                credential: CredentialPreview {
+                    source_type: if env_available {
+                        "environment"
+                    } else if use_auth_file {
+                        "config-literal"
+                    } else {
+                        "none"
+                    }
+                    .into(),
+                    reference: if use_auth_file {
+                        Some("OPENAI_API_KEY".into())
+                    } else {
+                        env_key.map(str::to_owned)
+                    },
+                    available: env_available || use_auth_file,
+                    importable: env_available || use_auth_file,
+                },
+                warnings,
+            });
         }
-        let label = provider
-            .get("name")
-            .and_then(toml::Value::as_str)
-            .unwrap_or(provider_id);
-        let reference = env_key.map(str::to_owned);
-        let available = env_key.and_then(std::env::var_os).is_some();
+    }
+    if auth_key_available && !has_openai_provider {
         out.push(ProviderCandidate {
-            id: candidate_id(&["codex", provider_id, base_url.as_deref().unwrap_or("")]),
+            id: candidate_id(&["codex", "openai", "https://api.openai.com/v1"]),
             source: "codex".into(),
             source_label: "Codex".into(),
-            config_location: Some(config_location.into()),
-            kind: if provider_id == "openai" {
-                "openai".into()
-            } else {
-                "openai-compatible".into()
-            },
-            label: label.into(),
-            base_url,
-            wire_protocol,
-            model_hint: if selected == Some(provider_id.as_str()) {
-                model_hint.clone()
-            } else {
-                None
-            },
+            config_location: Some(auth_location),
+            kind: "openai".into(),
+            label: "OpenAI".into(),
+            base_url: Some("https://api.openai.com/v1".into()),
+            wire_protocol: Some("responses".into()),
+            model_hint,
             credential: CredentialPreview {
-                source_type: if env_key.is_some() {
-                    "environment"
-                } else {
-                    "none"
-                }
-                .into(),
-                reference,
-                available,
-                importable: available,
+                source_type: "config-literal".into(),
+                reference: Some("OPENAI_API_KEY".into()),
+                available: true,
+                importable: true,
             },
-            warnings,
+            warnings: vec![],
         });
     }
     Ok(out)
+}
+
+fn discover_codex(home: &Path) -> Result<Vec<ProviderCandidate>, DiscoveryError> {
+    let (codex_home, display_root) = codex_location(home);
+    discover_codex_at(&codex_home, display_root)
 }
 
 fn discover_claude(home: &Path) -> Result<Vec<ProviderCandidate>, DiscoveryError> {
@@ -453,7 +518,7 @@ fn discover_cutout_keychain<R: Runtime>(app: &AppHandle<R>) -> Vec<ProviderCandi
             Some(ProviderCandidate {
                 id: candidate_id(&["cutout-keychain", id]),
                 source: "cutout-keychain".into(),
-                source_label: "Cutout Keychain".into(),
+                source_label: "Cutout local credentials".into(),
                 config_location: None,
                 kind: row.get("kind")?.as_str()?.into(),
                 label: row.get("label")?.as_str()?.into(),
@@ -471,7 +536,7 @@ fn discover_cutout_keychain<R: Runtime>(app: &AppHandle<R>) -> Vec<ProviderCandi
                     .map(str::to_owned),
                 credential: CredentialPreview {
                     source_type: "keychain".into(),
-                    reference: Some("Cutout provider credential".into()),
+                    reference: Some("Cutout local provider credential".into()),
                     available: true,
                     importable: true,
                 },
@@ -518,13 +583,25 @@ pub async fn discover_provider_candidates<R: Runtime>(
     Ok(candidates)
 }
 
-fn candidate_secret(candidate: &ProviderCandidate, home: &Path) -> Result<String, DiscoveryError> {
+fn candidate_secret_at(
+    candidate: &ProviderCandidate,
+    home: &Path,
+    codex_home: &Path,
+) -> Result<String, DiscoveryError> {
     match (
         candidate.source.as_str(),
         candidate.credential.reference.as_deref(),
     ) {
-        ("environment" | "codex", Some(name)) => {
+        ("environment", Some(name)) => {
             std::env::var(name).map_err(|_| DiscoveryError::CandidateMissing)
+        }
+        ("codex", Some(name)) if candidate.credential.source_type == "environment" => {
+            std::env::var(name).map_err(|_| DiscoveryError::CandidateMissing)
+        }
+        ("codex", Some("OPENAI_API_KEY"))
+            if candidate.credential.source_type == "config-literal" =>
+        {
+            codex_api_key(codex_home)?.ok_or(DiscoveryError::CandidateMissing)
         }
         ("claude", Some(name)) if candidate.credential.source_type == "environment" => {
             std::env::var(name).map_err(|_| DiscoveryError::CandidateMissing)
@@ -544,6 +621,11 @@ fn candidate_secret(candidate: &ProviderCandidate, home: &Path) -> Result<String
         }
         _ => Err(DiscoveryError::NotImportable),
     }
+}
+
+fn candidate_secret(candidate: &ProviderCandidate, home: &Path) -> Result<String, DiscoveryError> {
+    let (codex_home, _) = codex_location(home);
+    candidate_secret_at(candidate, home, &codex_home)
 }
 
 fn model_ids(body: &str) -> Result<Vec<String>, DiscoveryError> {
@@ -786,12 +868,99 @@ wire_api = "responses"
 "#,
         )
         .unwrap();
-        let rows = discover_codex(home.path()).unwrap();
+        let rows = discover_codex_at(&home.path().join(".codex"), "~/.codex").unwrap();
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0].wire_protocol.as_deref(), Some("responses"));
         let json = serde_json::to_string(&rows).unwrap();
         assert!(json.contains("CUTOUT_TEST_NEVER_SET"));
         assert!(!json.contains("apiKey"));
+    }
+
+    #[test]
+    fn codex_auth_only_candidate_is_importable_and_secret_stays_native() {
+        let home = tempdir().unwrap();
+        let codex_home = home.path().join(".codex");
+        std::fs::create_dir(&codex_home).unwrap();
+        std::fs::write(
+            codex_home.join("auth.json"),
+            r#"{"OPENAI_API_KEY":"sentinel-secret-must-not-cross-ipc"}"#,
+        )
+        .unwrap();
+
+        let rows = discover_codex_at(&codex_home, "~/.codex").unwrap();
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].kind, "openai");
+        assert_eq!(rows[0].wire_protocol.as_deref(), Some("responses"));
+        assert_eq!(rows[0].credential.source_type, "config-literal");
+        assert_eq!(
+            rows[0].credential.reference.as_deref(),
+            Some("OPENAI_API_KEY")
+        );
+        assert!(rows[0].credential.available);
+        assert!(rows[0].credential.importable);
+        assert_eq!(
+            candidate_secret_at(&rows[0], home.path(), &codex_home).unwrap(),
+            "sentinel-secret-must-not-cross-ipc"
+        );
+        let json = serde_json::to_string(&rows).unwrap();
+        assert!(!json.contains("sentinel-secret-must-not-cross-ipc"));
+    }
+
+    #[test]
+    fn codex_openai_config_falls_back_to_auth_file_when_env_is_unavailable() {
+        let home = tempdir().unwrap();
+        let codex_home = home.path().join(".codex");
+        std::fs::create_dir(&codex_home).unwrap();
+        std::fs::write(
+            codex_home.join("config.toml"),
+            r#"
+model = "gpt-test"
+model_provider = "openai"
+[model_providers.openai]
+name = "OpenAI from Codex"
+env_key = "CUTOUT_TEST_NEVER_SET"
+wire_api = "responses"
+"#,
+        )
+        .unwrap();
+        std::fs::write(
+            codex_home.join("auth.json"),
+            r#"{"OPENAI_API_KEY":"native-auth-secret"}"#,
+        )
+        .unwrap();
+
+        let rows = discover_codex_at(&codex_home, "~/.codex").unwrap();
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].label, "OpenAI from Codex");
+        assert_eq!(rows[0].model_hint.as_deref(), Some("gpt-test"));
+        assert_eq!(rows[0].credential.source_type, "config-literal");
+        assert_eq!(
+            candidate_secret_at(&rows[0], home.path(), &codex_home).unwrap(),
+            "native-auth-secret"
+        );
+        assert!(!serde_json::to_string(&rows)
+            .unwrap()
+            .contains("native-auth-secret"));
+    }
+
+    #[test]
+    fn codex_oauth_or_empty_auth_is_not_imported_as_an_api_key() {
+        let home = tempdir().unwrap();
+        let codex_home = home.path().join(".codex");
+        std::fs::create_dir(&codex_home).unwrap();
+        std::fs::write(
+            codex_home.join("auth.json"),
+            r#"{"tokens":{"access_token":"oauth-session-must-not-import"}}"#,
+        )
+        .unwrap();
+        assert!(discover_codex_at(&codex_home, "~/.codex")
+            .unwrap()
+            .is_empty());
+
+        std::fs::write(codex_home.join("auth.json"), r#"{"OPENAI_API_KEY":""}"#).unwrap();
+        assert!(discover_codex_at(&codex_home, "~/.codex")
+            .unwrap()
+            .is_empty());
     }
 
     #[test]
@@ -837,7 +1006,23 @@ wire_api = "responses"
         std::fs::write(&target, "model='x'").unwrap();
         symlink(&target, home.path().join(".codex/config.toml")).unwrap();
         assert!(matches!(
-            discover_codex(home.path()),
+            discover_codex_at(&home.path().join(".codex"), "~/.codex"),
+            Err(DiscoveryError::Symlink(_))
+        ));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn rejects_symlinked_codex_auth() {
+        use std::os::unix::fs::symlink;
+        let home = tempdir().unwrap();
+        let codex_home = home.path().join(".codex");
+        std::fs::create_dir(&codex_home).unwrap();
+        let target = home.path().join("actual-auth.json");
+        std::fs::write(&target, r#"{"OPENAI_API_KEY":"secret"}"#).unwrap();
+        symlink(&target, codex_home.join("auth.json")).unwrap();
+        assert!(matches!(
+            discover_codex_at(&codex_home, "~/.codex"),
             Err(DiscoveryError::Symlink(_))
         ));
     }
@@ -851,6 +1036,19 @@ wire_api = "responses"
         file.set_len(MAX_CONFIG_BYTES + 1).unwrap();
         assert!(matches!(
             read_exact_config(&path),
+            Err(DiscoveryError::TooLarge(_))
+        ));
+    }
+
+    #[test]
+    fn rejects_oversized_codex_auth_before_parsing() {
+        let home = tempdir().unwrap();
+        let codex_home = home.path().join(".codex");
+        std::fs::create_dir(&codex_home).unwrap();
+        let file = std::fs::File::create(codex_home.join("auth.json")).unwrap();
+        file.set_len(MAX_CONFIG_BYTES + 1).unwrap();
+        assert!(matches!(
+            discover_codex_at(&codex_home, "~/.codex"),
             Err(DiscoveryError::TooLarge(_))
         ));
     }
@@ -871,7 +1069,7 @@ wire_api = "legacy-completions"
         .unwrap();
 
         assert!(matches!(
-            discover_codex(home.path()),
+            discover_codex_at(&home.path().join(".codex"), "~/.codex"),
             Err(DiscoveryError::UnsupportedWireProtocol(value)) if value == "legacy-completions"
         ));
     }

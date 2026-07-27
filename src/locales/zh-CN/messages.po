@@ -968,7 +968,7 @@ msgstr "Cutout 在 {0} 通道上已是最新。"
 #. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
 msgid "settings.provider_source_keychain"
-msgstr "Cutout 钥匙串"
+msgstr "Cutout 本地凭据"
 
 #. js-lingui-explicit-id
 #: src/components/home/SidebarAccount.tsx
