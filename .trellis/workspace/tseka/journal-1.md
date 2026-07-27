@@ -986,3 +986,38 @@ Reduced Settings recovery cognitive load to one direct UI reset plus a lightweig
 ### Next Steps
 
 - None - task complete
+
+
+## Session 30: Publish and install Cutout v0.1.8
+
+**Date**: 2026-07-25
+**Task**: Publish and install Cutout v0.1.8
+**Branch**: `chore/archive-release-v0.1.8`
+
+### Summary
+
+Merged troubleshooting recovery UX, stabilized Windows release asset fixture timeouts, published signed/notarized four-platform v0.1.8 with updater metadata and provenance, and replaced local v0.1.7 with verified ARM64 v0.1.8 while preserving user data.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `cb459e9` | (see git log) |
+| `30e8617` | (see git log) |
+| `25dbdb6` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
