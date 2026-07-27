@@ -1,0 +1,3 @@
+{"file":".trellis/spec/frontend/release-pipeline.md","reason":"Notify only after native signed release discovery and preserve install safety."}
+{"file":".trellis/spec/frontend/state-management.md","reason":"Own persisted per-version notification and preference state deterministically."}
+{"file":".trellis/spec/frontend/component-guidelines.md","reason":"Build accessible notification rows and opt-in controls."}

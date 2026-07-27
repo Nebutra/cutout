@@ -1,0 +1,2 @@
+{"file":".trellis/spec/frontend/release-pipeline.md","reason":"Verify request cadence and updater trust boundaries."}
+{"file":".trellis/spec/frontend/state-management.md","reason":"Verify concurrency, persistence, and cleanup behavior."}

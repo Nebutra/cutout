@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "desktop-updater",
-  "description": "Grants only Cutout's policy-checked updater commands; raw updater and process plugin commands remain unavailable to JavaScript.",
+  "description": "Grants Cutout's policy-checked updater commands and only the notification commands needed for opt-in release alerts; raw updater and process commands remain unavailable to JavaScript.",
   "windows": ["main"],
   "platforms": ["macOS", "windows", "linux"],
   "permissions": [
@@ -12,6 +12,9 @@
     "git-version-control",
     "registry-and-agent-host",
     "speech-host",
-    "foreground-segmentation"
+    "foreground-segmentation",
+    "notification:allow-is-permission-granted",
+    "notification:allow-request-permission",
+    "notification:allow-notify"
   ]
 }

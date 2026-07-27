@@ -110,6 +110,7 @@ import { bindTauriAgentHostLifecycle, createTauriAgentHostService } from "@/agen
 import { projectDurableHostEvents } from "@/agent-host/run-event-projection";
 import { createRunEventStore } from "@/agent-runtime/run-events";
 import { createDesktopUpdateOrchestrator } from "@/updater/service";
+import { startUpdateAutoCheckScheduler } from "@/updater/auto-check-scheduler";
 import {
   Dialog,
   DialogContent,
@@ -426,12 +427,15 @@ export function AppShell() {
     },
   }), [projectRepository, recoveryBackend, recoveryService]);
   useEffect(() => {
-    let timer: number | undefined;
     let disposed = false;
+    let stopAutoCheckScheduler: (() => void) | undefined;
     void updateController.initialize().then(() => {
-      if (!disposed) timer = window.setTimeout(() => void updateController.autoCheck(true), 8_000);
+      if (!disposed) stopAutoCheckScheduler = startUpdateAutoCheckScheduler(updateController);
     });
-    return () => { disposed = true; if (timer !== undefined) window.clearTimeout(timer); };
+    return () => {
+      disposed = true;
+      stopAutoCheckScheduler?.();
+    };
   }, [updateController]);
 
   useEffect(() => {

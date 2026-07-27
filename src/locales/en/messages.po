@@ -502,6 +502,7 @@ msgstr "Base URL"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/UpdatesSection.tsx
+#: src/updater/update-notifications.ts
 msgid "settings.updates.beta"
 msgstr "Beta"
 
@@ -653,6 +654,11 @@ msgstr "Choose one direction. Add optional context below, then press the arrow."
 #. js-lingui-explicit-id
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.clear_selection"
+msgstr "Clear"
+
+#. js-lingui-explicit-id
+#: src/components/home/SidebarAccount.tsx
+msgid "home.notifications_clear"
 msgstr "Clear"
 
 #. js-lingui-explicit-id
@@ -946,6 +952,12 @@ msgstr "Custom instructions"
 #: src/components/settings/sections/PersonalizationSection.tsx
 msgid "settings.personalization.custom_requires_instructions"
 msgstr "Custom personality requires instructions before it can be saved."
+
+#. js-lingui-explicit-id
+#. placeholder {0}: release.version
+#: src/updater/update-notifications.ts
+msgid "updates.notification.available_detail"
+msgstr "Cutout {0} is available on the {channelLabel} channel."
 
 #. js-lingui-explicit-id
 #. placeholder {0}: state.preferences.channel
@@ -1769,6 +1781,22 @@ msgid "home.notifications"
 msgstr "Notifications"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/UpdatesSection.tsx
+msgid "settings.updates.system_notifications_aria"
+msgstr "Notify me about updates while Cutout is in the background"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/UpdatesSection.tsx
+msgid "settings.updates.system_notifications_hint"
+msgstr "Notify when an update is found while Cutout is in the background."
+
+#. js-lingui-explicit-id
+#. placeholder {0}: notification.title
+#: src/components/home/SidebarAccount.tsx
+msgid "home.notification_open"
+msgstr "Open {0}"
+
+#. js-lingui-explicit-id
 #: src/components/library/TeamGovernancePanel.tsx
 msgid "team.open_project_to_review"
 msgstr "Open a project to start a review."
@@ -2067,6 +2095,11 @@ msgstr "Registry desktop host requires the Cutout desktop app."
 #: src/components/library/RegistryInstallPanel.tsx
 msgid "registry_install.section_aria"
 msgstr "Registry install"
+
+#. js-lingui-explicit-id
+#: src/components/home/SidebarAccount.tsx
+msgid "home.notification_remind_tomorrow"
+msgstr "Remind tomorrow"
 
 #. js-lingui-explicit-id
 #: src/components/settings/ProviderRow.tsx
@@ -2413,6 +2446,7 @@ msgstr "Spoken output"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/UpdatesSection.tsx
+#: src/updater/update-notifications.ts
 msgid "settings.updates.stable"
 msgstr "Stable"
 
@@ -2457,6 +2491,16 @@ msgstr "SVG export"
 #: src/components/home/SidebarAccount.tsx
 msgid "home.theme_system"
 msgstr "System"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/UpdatesSection.tsx
+msgid "settings.updates.system_notifications"
+msgstr "System notifications"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/UpdatesSection.tsx
+msgid "settings.updates.system_notifications_denied"
+msgstr "System notifications remain off because permission was not granted."
 
 #. js-lingui-explicit-id
 #: src/components/topbar/TabsMenu.tsx
@@ -2654,6 +2698,11 @@ msgstr "Unsupported file: {name}"
 #: src/components/source/SourceMeta.tsx
 msgid "source.meta_untitled"
 msgstr "untitled"
+
+#. js-lingui-explicit-id
+#: src/updater/update-notifications.ts
+msgid "updates.notification.available_title"
+msgstr "Update available"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/UpdatesSection.tsx

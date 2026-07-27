@@ -21,4 +21,17 @@ describe("Updates settings contract", () => {
     expect(source).toContain("visibleChannels.map((channel)");
     expect(source).not.toContain('(["stable", "beta"] as const).map');
   });
+
+  it("keeps system notifications an explicit permission-backed opt-in", () => {
+    expect(source).toContain("controller.getSystemNotificationsEnabled()");
+    expect(source).toContain("controller.setSystemNotificationsEnabled(enabled)");
+    expect(source).toContain("System notifications remain off because permission was not granted.");
+    expect(source).toContain("Notify when an update is found while Cutout is in the background.");
+    expect(source).not.toContain("requestPermission");
+  });
+
+  it("uses the shared lifecycle scheduler for the fallback controller", () => {
+    expect(source).toContain("startUpdateAutoCheckScheduler(controller)");
+    expect(source).not.toContain("window.setTimeout");
+  });
 });

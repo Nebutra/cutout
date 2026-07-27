@@ -502,6 +502,7 @@ msgstr "ベースURL"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/UpdatesSection.tsx
+#: src/updater/update-notifications.ts
 msgid "settings.updates.beta"
 msgstr "ベータ"
 
@@ -653,6 +654,11 @@ msgstr "方向を1つ選んでください。必要に応じて下に補足を�
 #. js-lingui-explicit-id
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.clear_selection"
+msgstr "クリア"
+
+#. js-lingui-explicit-id
+#: src/components/home/SidebarAccount.tsx
+msgid "home.notifications_clear"
 msgstr "クリア"
 
 #. js-lingui-explicit-id
@@ -946,6 +952,12 @@ msgstr "カスタム指示"
 #: src/components/settings/sections/PersonalizationSection.tsx
 msgid "settings.personalization.custom_requires_instructions"
 msgstr "カスタムパーソナリティを保存するには、先に指示が必要です。"
+
+#. js-lingui-explicit-id
+#. placeholder {0}: release.version
+#: src/updater/update-notifications.ts
+msgid "updates.notification.available_detail"
+msgstr "Cutout {0} が{channelLabel}チャンネルで利用可能です。"
 
 #. js-lingui-explicit-id
 #. placeholder {0}: state.preferences.channel
@@ -1769,6 +1781,22 @@ msgid "home.notifications"
 msgstr "通知"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/UpdatesSection.tsx
+msgid "settings.updates.system_notifications_aria"
+msgstr "Cutout がバックグラウンドのときに更新を通知する"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/UpdatesSection.tsx
+msgid "settings.updates.system_notifications_hint"
+msgstr "Cutout がバックグラウンドで更新を検出したときに通知します。"
+
+#. js-lingui-explicit-id
+#. placeholder {0}: notification.title
+#: src/components/home/SidebarAccount.tsx
+msgid "home.notification_open"
+msgstr "{0}を開く"
+
+#. js-lingui-explicit-id
 #: src/components/library/TeamGovernancePanel.tsx
 msgid "team.open_project_to_review"
 msgstr "レビューを開始するにはプロジェクトを開いてください。"
@@ -2067,6 +2095,11 @@ msgstr "レジストリデスクトップホストにはCutoutデスクトップ
 #: src/components/library/RegistryInstallPanel.tsx
 msgid "registry_install.section_aria"
 msgstr "レジストリのインストール"
+
+#. js-lingui-explicit-id
+#: src/components/home/SidebarAccount.tsx
+msgid "home.notification_remind_tomorrow"
+msgstr "明日通知"
 
 #. js-lingui-explicit-id
 #: src/components/settings/ProviderRow.tsx
@@ -2413,6 +2446,7 @@ msgstr "音声出力"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/UpdatesSection.tsx
+#: src/updater/update-notifications.ts
 msgid "settings.updates.stable"
 msgstr "安定版"
 
@@ -2457,6 +2491,16 @@ msgstr "SVGエクスポート"
 #: src/components/home/SidebarAccount.tsx
 msgid "home.theme_system"
 msgstr "システム"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/UpdatesSection.tsx
+msgid "settings.updates.system_notifications"
+msgstr "システム通知"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/UpdatesSection.tsx
+msgid "settings.updates.system_notifications_denied"
+msgstr "権限が付与されなかったため、システム通知はオフのままです。"
 
 #. js-lingui-explicit-id
 #: src/components/topbar/TabsMenu.tsx
@@ -2654,6 +2698,11 @@ msgstr "サポートされていないファイル: {name}"
 #: src/components/source/SourceMeta.tsx
 msgid "source.meta_untitled"
 msgstr "無題"
+
+#. js-lingui-explicit-id
+#: src/updater/update-notifications.ts
+msgid "updates.notification.available_title"
+msgstr "アップデートがあります"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/UpdatesSection.tsx

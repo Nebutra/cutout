@@ -6,14 +6,22 @@ const STORAGE_KEY = 'cutout.notifications.v1'
 const CHANGE_EVENT = 'cutout:notifications-changed'
 const MAX_ITEMS = 50
 
+const notificationActionSchema = z.object({
+  type: z.literal('open-settings'),
+  section: z.literal('updates-support'),
+  anchor: z.literal('updates'),
+}).strict()
+
 const notificationSchema = z.object({
   id: z.string().min(1).max(200),
-  source: z.enum(['agent', 'delivery']),
+  source: z.enum(['agent', 'delivery', 'update']),
   kind: z.enum(['success', 'attention', 'failure']),
   title: z.string().min(1).max(160),
   detail: z.string().min(1).max(500),
   createdAt: z.number().int().nonnegative(),
   read: z.boolean(),
+  action: notificationActionSchema.optional(),
+  deferredUntil: z.number().int().nonnegative().optional(),
 }).strict()
 
 const notificationListSchema = z.array(notificationSchema).max(MAX_ITEMS)
@@ -52,43 +60,93 @@ function collapseOutcomeHistory(items: readonly LocalNotification[]): readonly L
     })
 }
 
-export function loadLocalNotifications(storage?: Pick<Storage, 'getItem'>): readonly LocalNotification[] {
+function loadStoredLocalNotifications(storage?: Pick<Storage, 'getItem'>): readonly LocalNotification[] {
   try {
-    return collapseOutcomeHistory(
-      notificationListSchema.parse(JSON.parse((storage ?? host())?.getItem(STORAGE_KEY) ?? '[]')),
-    )
+    return notificationListSchema.parse(JSON.parse((storage ?? host())?.getItem(STORAGE_KEY) ?? '[]'))
   } catch {
     return []
   }
+}
+
+function visibleNotifications(items: readonly LocalNotification[], now: number): readonly LocalNotification[] {
+  return collapseOutcomeHistory(items.filter((item) => !item.deferredUntil || item.deferredUntil <= now))
+}
+
+function notifyChanged(storage?: NotificationStorage): void {
+  if (!storage && typeof globalThis.dispatchEvent === 'function') globalThis.dispatchEvent(new Event(CHANGE_EVENT))
+}
+
+export function loadLocalNotifications(
+  storage?: Pick<Storage, 'getItem'>,
+  now = Date.now(),
+): readonly LocalNotification[] {
+  return visibleNotifications(loadStoredLocalNotifications(storage), now)
 }
 
 export function appendLocalNotification(notification: LocalNotification, storage?: NotificationStorage): readonly LocalNotification[] {
   const target = host(storage)
   if (!target) return []
   const parsed = notificationSchema.parse(notification)
-  const current = loadLocalNotifications(target)
+  const current = loadStoredLocalNotifications(target)
   const next = [parsed, ...current.filter((item) => item.id !== parsed.id)]
     .sort((a, b) => b.createdAt - a.createdAt)
     .slice(0, MAX_ITEMS)
   target.setItem(STORAGE_KEY, JSON.stringify(next))
-  if (!storage && typeof globalThis.dispatchEvent === 'function') globalThis.dispatchEvent(new Event(CHANGE_EVENT))
-  return next
+  notifyChanged(storage)
+  return visibleNotifications(next, Date.now())
+}
+
+export function replaceLocalNotificationSource(
+  notification: LocalNotification,
+  storage?: NotificationStorage,
+  options?: { readonly force?: boolean },
+): { readonly notifications: readonly LocalNotification[]; readonly inserted: boolean } {
+  const target = host(storage)
+  if (!target) return { notifications: [], inserted: false }
+  const parsed = notificationSchema.parse(notification)
+  const current = loadStoredLocalNotifications(target)
+  if (!options?.force && current.some((item) => item.id === parsed.id)) {
+    return { notifications: visibleNotifications(current, Date.now()), inserted: false }
+  }
+  const next = [parsed, ...current.filter((item) => item.source !== parsed.source)]
+    .sort((a, b) => b.createdAt - a.createdAt)
+    .slice(0, MAX_ITEMS)
+  target.setItem(STORAGE_KEY, JSON.stringify(next))
+  notifyChanged(storage)
+  return { notifications: visibleNotifications(next, Date.now()), inserted: true }
+}
+
+export function deferLocalNotification(
+  id: string,
+  deferredUntil: number,
+  storage?: NotificationStorage,
+): readonly LocalNotification[] {
+  const target = host(storage)
+  if (!target) return []
+  const next = loadStoredLocalNotifications(target).map((item) =>
+    item.id === id && item.source === 'update'
+      ? { ...item, read: false, deferredUntil: Math.max(0, Math.trunc(deferredUntil)) }
+      : item,
+  )
+  target.setItem(STORAGE_KEY, JSON.stringify(next))
+  notifyChanged(storage)
+  return visibleNotifications(next, Date.now())
 }
 
 export function markLocalNotificationsRead(storage?: NotificationStorage): readonly LocalNotification[] {
   const target = host(storage)
   if (!target) return []
-  const next = loadLocalNotifications(target).map((item) => item.read ? item : { ...item, read: true })
+  const next = loadStoredLocalNotifications(target).map((item) => item.read ? item : { ...item, read: true })
   target.setItem(STORAGE_KEY, JSON.stringify(next))
-  if (!storage && typeof globalThis.dispatchEvent === 'function') globalThis.dispatchEvent(new Event(CHANGE_EVENT))
-  return next
+  notifyChanged(storage)
+  return visibleNotifications(next, Date.now())
 }
 
 export function clearLocalNotifications(storage?: NotificationStorage): void {
   const target = host(storage)
   if (!target) return
   target.setItem(STORAGE_KEY, '[]')
-  if (!storage && typeof globalThis.dispatchEvent === 'function') globalThis.dispatchEvent(new Event(CHANGE_EVENT))
+  notifyChanged(storage)
 }
 
 export function subscribeLocalNotifications(listener: () => void): () => void {

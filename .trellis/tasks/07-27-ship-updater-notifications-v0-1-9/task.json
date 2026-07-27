@@ -1,0 +1,29 @@
+{
+  "id": "ship-updater-notifications-v0-1-9",
+  "name": "ship-updater-notifications-v0-1-9",
+  "title": "Ship updater notification best practices v0.1.9",
+  "description": "Integrate the pending About footer polish, add resilient periodic update checks and deduplicated user notifications, merge through review, publish signed/notarized v0.1.9, and verify local update behavior.",
+  "status": "in_progress",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P1",
+  "creator": "tseka",
+  "assignee": "tseka",
+  "createdAt": "2026-07-27",
+  "completedAt": null,
+  "branch": null,
+  "base_branch": "feat/updater-notification-best-practice",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [
+    "07-27-updater-periodic-checks",
+    "07-27-updater-user-notifications"
+  ],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {}
+}
