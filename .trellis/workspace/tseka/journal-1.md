@@ -1054,3 +1054,40 @@ Renamed the Pencil integration to Pen with legacy surface aliases, restored nati
 ### Next Steps
 
 - None - task complete
+
+
+## Session 32: Ship updater notifications and Cutout v0.1.9
+
+**Date**: 2026-07-27
+**Task**: Ship updater notifications and Cutout v0.1.9
+**Branch**: `chore/archive-updater-v0.1.9`
+
+### Summary
+
+Implemented resilient updater scheduling and deduplicated localized notifications, completed five-locale i18n, merged PRs #38 and #39, published signed/notarized v0.1.9 with four-platform updater assets, verified checksums/signatures/provenance, and installed the public ARM64 app locally.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `ab0aaf0` | (see git log) |
+| `af94100` | (see git log) |
+| `19239d7` | (see git log) |
+| `4276b09` | (see git log) |
+| `6132474` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
