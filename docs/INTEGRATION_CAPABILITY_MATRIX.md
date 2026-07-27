@@ -34,7 +34,7 @@ access to the third-party product.
 | Notion | Public API, OAuth, webhooks | Host-injected import and approved page publish | Authorization required |
 | GitHub | REST, GraphQL, GitHub Apps, OAuth Apps, webhooks, Checks/Actions | Host-injected repository context and review-PR publish | Authorization required |
 | Obsidian | Local vault files, Plugin API, URI scheme | Local Markdown knowledge adapter and optional vault plugin | P2 |
-| Pencil (`pencil.dev`) | `.pen` JSON format, local MCP, CLI | File/MCP design interchange; no assumed cloud connector | P2 |
+| Pen (`pen.dev`) | `.pen` JSON format, local MCP, CLI | File/MCP design interchange; no assumed cloud connector | P2 |
 | Paper (`paper.design`) | Desktop-local MCP, paste/snapshot workflows | Local MCP read/write bridge; no assumed cloud connector | P2 experimental |
 | Framer | Plugin API, Server API, code components/overrides, OAuth, publishing | Site/CMS import and approved staging/publish workflow | P2 |
 | Canva | Apps SDK, Connect APIs, OAuth 2, webhooks, Design/Export/Asset APIs | In-editor Cutout app plus external asset/design/export connector | P2-P3 |
@@ -202,19 +202,17 @@ selection-aware import and backlink/status views.
 **Do not claim.** No Obsidian cloud account API, remote vault sync, guaranteed
 Markdown semantic parity, or write access without explicit local vault choice.
 
-## Pencil (`pencil.dev`)
+## Pen (`pen.dev`)
 
-The name is ambiguous. This row refers specifically to the current design
-product at [pencil.dev](https://www.pencil.dev/) and its first-party
-[documentation](https://docs.pencil.dev/), not Pencil Project, Apple Pencil,
-or other similarly named products.
+This row refers to the design product at [pen.dev](https://www.pen.dev/) and
+its first-party [documentation](https://docs.pen.dev/).
 
-**Official surface.** Pencil documents a JSON-based, portable, Git-friendly
-[` .pen` file](https://docs.pencil.dev/core-concepts/pen-files), a local
-[MCP integration](https://docs.pencil.dev/getting-started/ai-integration), a
-[documented file format](https://docs.pencil.dev/for-developers/the-pen-format),
-and [Pencil CLI](https://docs.pencil.dev/for-developers/pencil-cli). Its MCP
-server runs locally while Pencil is running and allows supported agents to read
+**Official surface.** Pen documents a JSON-based, portable, Git-friendly
+[` .pen` file](https://docs.pen.dev/core-concepts/pen-files), a local
+[MCP integration](https://docs.pen.dev/getting-started/ai-integration), a
+[documented file format](https://docs.pen.dev/for-developers/the-pen-format),
+and [Pen CLI](https://docs.pen.dev/for-developers/pen-cli). Its MCP server runs
+locally while Pen is running and allows supported agents to read
 and modify open design files. The official docs describe Claude Code, Codex,
 Cursor and other MCP clients.
 
@@ -224,15 +222,15 @@ state that `.pen` is JSON-based, but Cutout must still validate format/version
 and preserve unknown fields. MCP tool availability is runtime-discovered, not
 hard-coded from marketing examples.
 
-**Auth, rates and events.** Pencil activation and local MCP availability are
+**Auth, rates and events.** Pen activation and local MCP availability are
 separate from AI-provider authentication; current docs describe Claude Code
-authentication for Pencil AI features. Local MCP is the access boundary. No
+authentication for Pen AI features. Local MCP is the access boundary. No
 official public cloud OAuth, webhook, or rate-limit contract was confirmed, so
 none should be invented.
 
 **Cutout use.** Import/export `.pen` through staged files with schema/version
-checks, or let an external agent coordinate Cutout MCP and Pencil MCP as two
-independent local servers. Use Pencil as a structured design target, not as a
+checks, or let an external agent coordinate Cutout MCP and Pen MCP as two
+independent local servers. Use Pen as a structured design target, not as a
 hidden rendering backend.
 
 **Do not claim.** No cloud synchronization API, remote unattended access,
@@ -355,7 +353,7 @@ synchronous export completion, or silent publishing.
 
 - Figma and Framer plugins for editor-context writes.
 - Obsidian local vault adapter/plugin.
-- Pencil `.pen` adapter plus runtime-discovered local MCP bridge.
+- Pen `.pen` adapter plus runtime-discovered local MCP bridge.
 - Paper local MCP bridge, explicitly experimental until its public contract is
   versioned sufficiently for compatibility tests.
 
@@ -390,6 +388,6 @@ connect / select source
   revision guards or approval for an external write.
 - Unsupported properties remain explicit opaque evidence or produce a gap;
   adapters must not invent equivalence.
-- Local MCP servers (Pencil/Paper) and Cutout MCP remain independent principals.
+- Local MCP servers (Pen/Paper) and Cutout MCP remain independent principals.
   An external agent may orchestrate both, while Cutout preserves its own policy
   and approval boundary.

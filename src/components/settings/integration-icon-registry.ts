@@ -1,6 +1,6 @@
 import canva from '@/assets/integration-brands/canva.svg?raw'
 import paper from '@/assets/integration-brands/paper.png'
-import pencil from '@/assets/integration-brands/pencil.png'
+import pen from '@/assets/integration-brands/pencil.png'
 import figma from 'simple-icons/icons/figma.svg?raw'
 import framer from 'simple-icons/icons/framer.svg?raw'
 import github from 'simple-icons/icons/github.svg?raw'
@@ -48,12 +48,12 @@ export const integrationIconRegistry = {
     sourceUrl: 'https://api.iconify.design/bxl:canva.svg',
     license: 'MIT',
   },
-  'cutout.pencil': {
+  'cutout.pen': {
     kind: 'image',
-    src: pencil,
+    src: pen,
     source: 'pen.dev',
     sourceUrl: 'https://pen.dev/apple-touch-icon.png',
-    license: 'Pencil trademark and brand terms',
+    license: 'Pen trademark and brand terms',
   },
   'cutout.paper': {
     kind: 'image',

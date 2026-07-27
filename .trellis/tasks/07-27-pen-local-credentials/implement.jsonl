@@ -1,0 +1,6 @@
+{"file":".trellis/spec/frontend/byok-provider-protocols.md","reason":"Defines Rust-owned provider credentials, protocol validation, connection checks, and required tests."}
+{"file":".trellis/spec/frontend/byok-user-copy.md","reason":"Defines truthful local-first BYOK user-facing copy boundaries."}
+{"file":".trellis/spec/frontend/integration-brand-icons.md","reason":"Defines canonical integration asset provenance, registry, accessibility, and visual-test requirements."}
+{"file":".trellis/spec/frontend/agent-control-safety.md","reason":"Preserves approval and host capability safety while changing external surface identifiers."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Coordinates Rust, TypeScript, manifests, plugin mirrors, docs, and tests as one contract change."}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"Guides shared normalization helpers instead of duplicated legacy-kind branches."}

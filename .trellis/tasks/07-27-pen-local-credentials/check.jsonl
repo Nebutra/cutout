@@ -1,0 +1,5 @@
+{"file":".trellis/spec/frontend/byok-provider-protocols.md","reason":"Check native credential isolation, provider protocol behavior, and required Rust/TypeScript gates."}
+{"file":".trellis/spec/frontend/integration-brand-icons.md","reason":"Check registry identity, provenance, accessibility, and integration UI tests after the Pen rename."}
+{"file":".trellis/spec/frontend/agent-control-safety.md","reason":"Check that legacy compatibility does not weaken approval, migration, or host-session contracts."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Check repository-wide validation, regression coverage, and change quality."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Check synchronized contracts and runtime mirrors across all affected layers."}
