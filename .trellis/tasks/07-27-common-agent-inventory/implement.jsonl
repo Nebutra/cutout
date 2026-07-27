@@ -1,0 +1,4 @@
+{"file": ".trellis/tasks/07-27-local-agent-credential-discovery/research/paseo-agent-catalog-2026-07-27.md", "reason": "Pinned 39-Agent catalog and local probe constraints"}
+{"file": ".trellis/spec/frontend/byok-provider-protocols.md", "reason": "Preserve provider candidate and secret-boundary compatibility"}
+{"file": ".trellis/spec/frontend/agent-control-safety.md", "reason": "Controlled path and process probe safety"}
+{"file": ".trellis/tasks/07-27-local-agent-credential-discovery/research/paseo-39-agent-discovery-matrix.md", "reason": "Per-Agent binary, root, and capability evidence"}

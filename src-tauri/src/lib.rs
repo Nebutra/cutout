@@ -43,6 +43,7 @@ pub fn run() {
             // BYOK: non-secret provider-config persistence
             commands::ai::providers::load_providers,
             commands::ai::providers::save_providers,
+            commands::ai::local_agent_inventory::discover_local_agent_inventory,
             commands::ai::provider_discovery::discover_provider_candidates,
             commands::ai::provider_discovery::create_provider_draft,
             commands::ai::provider_discovery::check_provider_draft,
