@@ -160,28 +160,58 @@ struct FileIdentity {
     #[cfg(unix)]
     inode: u64,
     #[cfg(windows)]
-    volume: Option<u32>,
+    volume: u64,
     #[cfg(windows)]
-    index: Option<u64>,
+    index: u64,
 }
 
+#[cfg(unix)]
 fn file_identity(metadata: &std::fs::Metadata) -> FileIdentity {
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::MetadataExt;
-        FileIdentity {
-            device: metadata.dev(),
-            inode: metadata.ino(),
-        }
+    use std::os::unix::fs::MetadataExt;
+    FileIdentity {
+        device: metadata.dev(),
+        inode: metadata.ino(),
     }
-    #[cfg(windows)]
-    {
-        use std::os::windows::fs::MetadataExt;
-        FileIdentity {
-            volume: metadata.volume_serial_number(),
-            index: metadata.file_index(),
-        }
+}
+
+#[cfg(windows)]
+#[derive(Clone, Copy, Debug)]
+struct WindowsFileInformation {
+    identity: FileIdentity,
+    attributes: u32,
+}
+
+#[cfg(windows)]
+fn windows_file_information(file: &File) -> Result<WindowsFileInformation, String> {
+    use std::mem::MaybeUninit;
+    use std::os::windows::io::AsRawHandle;
+    use windows_sys::Win32::Storage::FileSystem::{
+        GetFileInformationByHandle, BY_HANDLE_FILE_INFORMATION,
+    };
+
+    let mut information = MaybeUninit::<BY_HANDLE_FILE_INFORMATION>::uninit();
+    // SAFETY: `file` owns a valid handle for this call and the output pointer
+    // refers to writable storage for the documented structure.
+    let succeeded =
+        unsafe { GetFileInformationByHandle(file.as_raw_handle() as _, information.as_mut_ptr()) };
+    if succeeded == 0 {
+        return Err(io_error(&std::io::Error::last_os_error()));
     }
+    // SAFETY: GetFileInformationByHandle initialized the structure on success.
+    let information = unsafe { information.assume_init() };
+    Ok(WindowsFileInformation {
+        identity: FileIdentity {
+            volume: u64::from(information.dwVolumeSerialNumber),
+            index: (u64::from(information.nFileIndexHigh) << 32)
+                | u64::from(information.nFileIndexLow),
+        },
+        attributes: information.dwFileAttributes,
+    })
+}
+
+#[cfg(windows)]
+fn file_identity(file: &File) -> Result<FileIdentity, String> {
+    Ok(windows_file_information(file)?.identity)
 }
 
 fn checkpoint_error(code: &str, message: &str) -> String {
@@ -210,7 +240,32 @@ fn validate_directory(path: &Path) -> Result<FileIdentity, String> {
             "Agent Host checkpoint directory is not a real directory.",
         ));
     }
-    Ok(file_identity(&metadata))
+    #[cfg(unix)]
+    {
+        Ok(file_identity(&metadata))
+    }
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::OpenOptionsExt;
+        use windows_sys::Win32::Storage::FileSystem::{
+            FILE_ATTRIBUTE_REPARSE_POINT, FILE_FLAG_BACKUP_SEMANTICS, FILE_FLAG_OPEN_REPARSE_POINT,
+        };
+
+        let directory = OpenOptions::new()
+            .read(true)
+            .custom_flags(FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT)
+            .open(path)
+            .map_err(|error| io_error(&error))?;
+        let opened_metadata = directory.metadata().map_err(|error| io_error(&error))?;
+        let information = windows_file_information(&directory)?;
+        if !opened_metadata.is_dir() || information.attributes & FILE_ATTRIBUTE_REPARSE_POINT != 0 {
+            return Err(checkpoint_error(
+                "agent-host-checkpoint-path",
+                "Agent Host checkpoint directory is not a real directory.",
+            ));
+        }
+        Ok(information.identity)
+    }
 }
 
 fn validate_root_components(root: &Path) -> Result<(), String> {
@@ -251,7 +306,15 @@ fn checked_existing_checkpoint(target: &Path) -> Result<Option<FileIdentity>, St
                     "Agent Host checkpoint exceeds the size limit.",
                 ));
             }
-            Ok(Some(file_identity(&metadata)))
+            let file = open_checkpoint(target)?;
+            let opened_metadata = file.metadata().map_err(|error| io_error(&error))?;
+            if !opened_metadata.is_file() || opened_metadata.len() > MAX_CHECKPOINT_BYTES {
+                return Err(checkpoint_error(
+                    "agent-host-checkpoint-identity",
+                    "Agent Host checkpoint identity changed.",
+                ));
+            }
+            Ok(Some(file_identity(&file)?))
         }
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
         Err(error) => Err(io_error(&error)),
@@ -260,14 +323,25 @@ fn checked_existing_checkpoint(target: &Path) -> Result<Option<FileIdentity>, St
 
 #[cfg(not(unix))]
 fn open_checkpoint(target: &Path) -> Result<File, String> {
+    use std::os::windows::fs::OpenOptionsExt;
+    use windows_sys::Win32::Storage::FileSystem::{
+        FILE_ATTRIBUTE_REPARSE_POINT, FILE_FLAG_OPEN_REPARSE_POINT,
+    };
+
     let mut options = OpenOptions::new();
-    options.read(true);
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::OpenOptionsExt;
-        options.custom_flags(libc::O_CLOEXEC | libc::O_NOFOLLOW);
+    options
+        .read(true)
+        .custom_flags(FILE_FLAG_OPEN_REPARSE_POINT);
+    let file = options.open(target).map_err(|error| io_error(&error))?;
+    let metadata = file.metadata().map_err(|error| io_error(&error))?;
+    let information = windows_file_information(&file)?;
+    if !metadata.is_file() || information.attributes & FILE_ATTRIBUTE_REPARSE_POINT != 0 {
+        return Err(checkpoint_error(
+            "agent-host-checkpoint-type",
+            "Agent Host checkpoint must be a regular file.",
+        ));
     }
-    options.open(target).map_err(|error| io_error(&error))
+    Ok(file)
 }
 
 fn read_checkpoint(root: &Path) -> Result<HostFile, String> {
@@ -303,7 +377,7 @@ where
                     "Agent Host checkpoint directory is not a real directory.",
                 ));
             }
-            file_identity(&metadata)
+            validate_directory(&directory)?
         }
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(empty()),
         Err(error) => return Err(io_error(&error)),
@@ -316,7 +390,7 @@ where
     let opened_metadata = file.metadata().map_err(|error| io_error(&error))?;
     if !opened_metadata.is_file()
         || opened_metadata.len() > MAX_CHECKPOINT_BYTES
-        || file_identity(&opened_metadata) != path_identity
+        || file_identity(&file)? != path_identity
     {
         return Err(checkpoint_error(
             "agent-host-checkpoint-identity",
@@ -335,7 +409,7 @@ where
             "Agent Host checkpoint exceeds the size limit.",
         ));
     }
-    let final_opened_identity = file_identity(&file.metadata().map_err(|error| io_error(&error))?);
+    let final_opened_identity = file_identity(&file)?;
     let final_path_identity = checked_existing_checkpoint(&target)?.ok_or_else(|| {
         checkpoint_error(
             "agent-host-checkpoint-identity",
@@ -433,7 +507,7 @@ where
                 "Agent Host checkpoint temporary file changed identity.",
             ));
         }
-        let temporary_identity = file_identity(&metadata);
+        let temporary_identity = file_identity(&file)?;
         if checked_existing_checkpoint(&temporary)? != Some(temporary_identity) {
             return Err(checkpoint_error(
                 "agent-host-checkpoint-identity",
@@ -805,13 +879,7 @@ where
 }
 
 #[cfg(not(unix))]
-fn sync_directory(directory: &Path) -> Result<(), String> {
-    #[cfg(unix)]
-    {
-        File::open(directory)
-            .and_then(|file| file.sync_all())
-            .map_err(|error| io_error(&error))?;
-    }
+fn sync_directory(_directory: &Path) -> Result<(), String> {
     Ok(())
 }
 fn empty() -> HostFile {
