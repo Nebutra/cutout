@@ -1,0 +1,4 @@
+{"file": ".trellis/tasks/07-27-local-agent-credential-discovery/research/paseo-agent-catalog-2026-07-27.md", "reason": "Verify exactly 39 entries and installer-safe detection"}
+{"file": ".trellis/spec/frontend/agent-control-safety.md", "reason": "Verify path, command, and secret output boundaries"}
+{"file": "cutout.agent-capabilities.json", "reason": "Verify inventory does not overclaim provider execution"}
+{"file": ".trellis/tasks/07-27-local-agent-credential-discovery/research/paseo-39-agent-discovery-matrix.md", "reason": "Verify all 39 states match evidence"}

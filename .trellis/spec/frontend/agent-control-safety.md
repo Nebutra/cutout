@@ -311,3 +311,103 @@ const showPreparation = working && activePreparation && !liveAgentText.trim()
 The first form confuses append-only audit durability with conversation lifetime
 and retains one row per regeneration. The second derives one ephemeral display
 state from the authoritative active-run lifecycle without deleting evidence.
+
+## Scenario: Inventory reviewed local coding Agents
+
+### 1. Scope / Trigger
+
+Use this contract when adding or changing local Agent installation discovery,
+reviewed configuration roots, capability projection, or the native-to-webview
+inventory payload. This layer discovers metadata only; credential parsing and
+authorized CLI/session delegation are separate adapters.
+
+### 2. Signatures
+
+```rust
+discover_local_agent_inventory(
+    app: AppHandle,
+) -> Result<Vec<LocalAgentInventoryRow>, String>
+```
+
+```ts
+discoverLocalAgentInventory(): Promise<LocalAgentInventoryRow[]>
+```
+
+The command is granted by the dedicated `local-agent-inventory` Tauri
+permission, not by the provider secret/network permission.
+
+### 3. Contracts
+
+- The offline registry contains exactly the pinned 39 Paseo Agent IDs in the
+  reviewed order, and `provenance.slug` equals the row `id`.
+- Executable discovery checks at most 128 absolute `PATH` entries for fixed
+  bare aliases. It may resolve an executable symlink to a regular executable,
+  but never returns the resolved path.
+- Root discovery checks only registered directories and marker filenames.
+  Every root and marker path component rejects symlinks, traversal, and
+  non-regular marker files.
+- Reviewed root overrides are host environment only and must be absolute:
+  `CODEX_HOME`, `CLAUDE_CONFIG_DIR`, `OPENCODE_CONFIG_DIR`,
+  `XDG_CONFIG_HOME`, `XDG_DATA_HOME`, `PI_CONFIG_DIR`,
+  `PI_CODING_AGENT_DIR`, `GEMINI_CLI_HOME`, `QWEN_HOME`, and `VIBE_HOME`.
+- IPC returns static `~/...` or `$ENV/...` labels, statuses, marker labels,
+  aliases, provenance, and supported/unsupported capability flags. It never
+  returns absolute host paths, file contents, API keys, OAuth/session values,
+  or credential-shaped fields.
+- Discovery never launches an Agent, installer, package manager, shell, login
+  flow, helper, or version command and never recursively scans the home folder.
+
+### 4. Validation & Error Matrix
+
+| Condition | Required behavior |
+| --- | --- |
+| Missing executable/root/marker | Return `not-installed` or `not-found` |
+| Permission denied during metadata inspection | Return `permission-required` without a host path |
+| Relative override, traversal, symlinked root/marker, or invalid file type | Return `probe-failed` without reading contents |
+| Valid executable symlink with regular executable target | Return `installed` and the registered alias only |
+| Unknown, reordered, duplicate, or incomplete Agent rows | Frontend Zod boundary rejects the payload |
+| Provenance slug, executable alias, root status, or marker label conflicts with its parent row | Frontend Zod boundary rejects the payload |
+
+### 5. Good / Base / Bad Cases
+
+- Good: Homebrew/Bun symlinks resolve to executable files, exact Codex,
+  Claude, OpenCode, Pi/OMP, Gemini, Qwen, Kimi, and Vibe roots are inspected,
+  and the UI receives sanitized metadata for all 39 rows.
+- Base: no reviewed Agents are installed; the command still returns 39 stable
+  rows with `not-installed`, `not-found`, and truthful unsupported flags.
+- Bad: run `npx -y`, `uvx`, `--version`, or a login helper; recursively search
+  `~`; copy OAuth/session tokens; accept a webview-selected filesystem path; or
+  serialize a canonical executable path.
+
+### 6. Tests Required
+
+- Rust registry invariant: exactly 39 unique IDs in the pinned order and only
+  fixed bare aliases.
+- Rust metadata probes: direct executable, safe executable symlink, missing
+  binary, permission failure, root-component symlink, legacy Codex root,
+  reviewed override precedence, OMP `PI_CODING_AGENT_DIR`, and no secret/path
+  leakage after serialization.
+- TypeScript boundary: exact ordered catalog, duplicate/incomplete rows,
+  unknown fields, secret/path-shaped fields, provenance mismatch, unregistered
+  executable aliases, and marker/root relationship mismatch.
+- Run focused Vitest, `cargo test commands::ai::`, TypeScript, lint,
+  `cargo fmt --check`, `pnpm agent:validate`, build, and `git diff --check`.
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```ts
+await invoke('discover_agents', { roots: userSelectedPaths, runVersion: true })
+```
+
+#### Correct
+
+```ts
+const rows = await invoke<unknown>('discover_local_agent_inventory')
+return pinnedLocalAgentInventorySchema.parse(rows)
+```
+
+The wrong form accepts arbitrary authority and executes installed software.
+The correct form uses a fixed native registry and revalidates its sanitized IPC
+projection before any UI consumes it.
