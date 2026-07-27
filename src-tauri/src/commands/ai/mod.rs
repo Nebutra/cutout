@@ -11,9 +11,11 @@
 //! The secret lives only in Rust: keychain → request scope → provider. It never
 //! enters the webview, disk (except the keychain), or logs.
 
+mod agent_credentials;
 pub mod ai_proxy;
 pub mod auth_header;
 pub mod image_edit;
 pub mod keys;
+pub mod local_agent_inventory;
 pub mod provider_discovery;
 pub mod providers;

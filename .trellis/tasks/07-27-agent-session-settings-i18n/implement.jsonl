@@ -1,0 +1,6 @@
+{"file":".trellis/spec/frontend/agent-control-safety.md","reason":"Owns sanitized inventory/probe authority and requires execution to stay blocked without reviewed workspace-only filesystem confinement."}
+{"file":".trellis/spec/frontend/byok-provider-protocols.md","reason":"Requires API-key import to stay separate from OAuth/session delegation and documents credential-safe Settings behavior."}
+{"file":".trellis/spec/frontend/byok-user-copy.md","reason":"Forbids user-visible billing estimates and misleading BYOK cost or credential-custody copy."}
+{"file":".trellis/spec/frontend/component-guidelines.md","reason":"Defines Settings hierarchy, stable controls, accessibility, responsive geometry, and visual-test expectations."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Probe facts cross native/IPC/React boundaries and must terminate in Settings without growing an execution path."}
+{"file":".trellis/tasks/07-27-agent-session-settings-i18n/research/phase-a-boundary.md","reason":"Records the superseding release blocker: read-only is not workspace-only, no reviewed no-tools mode exists, and Phase A is probe-only."}

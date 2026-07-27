@@ -136,7 +136,7 @@ pub(crate) fn enforce_host(kind: &str, url: &str) -> Result<(), ProxyError> {
         "dashscope" => is_https && suffix_ok("aliyuncs.com"),
         "deepseek" => is_https && suffix_ok("deepseek.com"),
         "zhipu" => is_https && suffix_ok("bigmodel.cn"),
-        "moonshot" => is_https && suffix_ok("moonshot.cn"),
+        "moonshot" => is_https && (suffix_ok("moonshot.cn") || host == "api.kimi.com"),
         "volcengine" => is_https && suffix_ok("volces.com"),
         "siliconflow" => is_https && suffix_ok("siliconflow.cn"),
         "openrouter" => is_https && suffix_ok("openrouter.ai"),
@@ -398,7 +398,7 @@ pub(crate) fn build_client_for_target(
         .map_err(|_| ProxyError::Request("could not construct secure HTTP client".into()))
 }
 
-fn default_base_url(kind: ProviderKind) -> Option<&'static str> {
+pub(crate) fn default_base_url(kind: ProviderKind) -> Option<&'static str> {
     Some(match kind {
         ProviderKind::Openai => "https://api.openai.com/v1",
         ProviderKind::Anthropic => "https://api.anthropic.com/v1",
@@ -685,6 +685,7 @@ mod tests {
         assert!(enforce_host("openai", "https://api.openai.com/v1/chat/completions").is_ok());
         assert!(enforce_host("google", "https://generativelanguage.googleapis.com/v1beta").is_ok());
         assert!(enforce_host("gateway", "https://ai-gateway.vercel.sh/v1/chat").is_ok());
+        assert!(enforce_host("moonshot", "https://api.kimi.com/coding/v1/models").is_ok());
     }
 
     #[test]

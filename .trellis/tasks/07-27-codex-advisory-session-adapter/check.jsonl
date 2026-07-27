@@ -1,0 +1,6 @@
+{"path":".trellis/spec/frontend/agent-control-safety.md","reason":"Independently verify authority boundaries, explicit probing, and absence of a hidden execution path."}
+{"path":".trellis/spec/frontend/byok-provider-protocols.md","reason":"Verify Codex auth metadata does not become imported provider credentials or an API fallback."}
+{"path":".trellis/spec/frontend/byok-user-copy.md","reason":"Verify localized capability and auth copy is truthful and makes no quota or billing claims."}
+{"path":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Trace the sanitized result from native process handling through IPC, inventory, and Settings."}
+{"path":".trellis/tasks/07-27-agent-session-delegation/research/runtime-contracts.md","reason":"Check exact version/identity evidence and the unresolved workspace-read confinement risk."}
+{"path":".trellis/tasks/07-27-codex-advisory-session-adapter/design.md","reason":"Review Phase A implementation against the closed probe boundary and deferred Phase B."}

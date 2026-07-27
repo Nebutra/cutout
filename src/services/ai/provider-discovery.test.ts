@@ -14,7 +14,7 @@ describe('provider discovery native contract', () => {
 
   it('accepts sanitized candidates and rejects credential-shaped output', async () => {
     const candidate = {
-      id: 'provider-candidate:opaque',
+      id: `provider-candidate:${'a'.repeat(64)}`,
       source: 'environment',
       sourceLabel: 'Process environment',
       kind: 'openai',
@@ -33,6 +33,23 @@ describe('provider discovery native contract', () => {
 
     invokeMock.mockResolvedValueOnce([{ ...candidate, apiKey: 'must-not-cross-ipc' }])
     await expect(discoverProviderCandidates()).rejects.toThrow()
+
+    invokeMock.mockResolvedValueOnce([{ ...candidate, configLocation: '/Users/person/.codex/auth.json' }])
+    await expect(discoverProviderCandidates()).rejects.toThrow('Host paths')
+
+    invokeMock.mockResolvedValueOnce([{ ...candidate, credential: { ...candidate.credential, sourceType: 'session', importable: true } }])
+    await expect(discoverProviderCandidates()).rejects.toThrow('Only available API-key sources')
+
+    for (const unsafe of [
+      { ...candidate, baseUrl: 'https://user:secret@relay.example/v1' },
+      { ...candidate, baseUrl: 'https://relay.example/v1?api_key=secret' },
+      { ...candidate, modelHint: 'sk-secret-model' },
+      { ...candidate, label: '/Users/person/.codex/auth.json' },
+      { ...candidate, credential: { ...candidate.credential, reference: 'NOT-A-VAR' } },
+    ]) {
+      invokeMock.mockResolvedValueOnce([unsafe])
+      await expect(discoverProviderCandidates()).rejects.toThrow()
+    }
   })
 
   it('binds wire protocol when creating the checked draft', async () => {
@@ -58,15 +75,25 @@ describe('provider discovery native contract', () => {
     })
   })
 
+  it('rejects ambiguous credential sources but preserves no-key local drafts', async () => {
+    await expect(createProviderDraft({
+      kind: 'openai', baseUrl: 'https://api.openai.com/v1', candidateId: `provider-candidate:${'d'.repeat(64)}`, secret: 'ambiguous',
+    })).rejects.toThrow('Select exactly one credential source')
+    expect(invokeMock).not.toHaveBeenCalled()
+
+    invokeMock.mockResolvedValueOnce({ draftId: 'provider-draft:local', expiresInSeconds: 600 })
+    await expect(createProviderDraft({ kind: 'ollama', baseUrl: 'http://127.0.0.1:11434/v1' })).resolves.toBe('provider-draft:local')
+  })
+
   it('accepts native Anthropic and Google protocol candidates', async () => {
     const candidates = [
       {
-        id: 'anthropic:opaque', source: 'claude', sourceLabel: 'Claude Code',
+        id: `provider-candidate:${'b'.repeat(64)}`, source: 'claude', sourceLabel: 'Claude Code',
         kind: 'anthropic', label: 'Anthropic', wireProtocol: 'anthropic-messages',
         credential: { sourceType: 'environment', available: true, importable: true }, warnings: [],
       },
       {
-        id: 'google:opaque', source: 'environment', sourceLabel: 'Environment',
+        id: `provider-candidate:${'c'.repeat(64)}`, source: 'environment', sourceLabel: 'Environment',
         kind: 'google', label: 'Google', wireProtocol: 'google-generate-content',
         credential: { sourceType: 'environment', available: true, importable: true }, warnings: [],
       },

@@ -1,0 +1,6 @@
+{"path":".trellis/spec/frontend/agent-control-safety.md","reason":"Desktop Agent authority, executable probing, capability truth, and no hidden execution surface."}
+{"path":".trellis/spec/frontend/byok-provider-protocols.md","reason":"Keep Codex auth classification separate from API-key import and BYOK providers."}
+{"path":".trellis/spec/frontend/byok-user-copy.md","reason":"Require truthful localized copy for sign-in, API-key/access-token auth, and blocked execution."}
+{"path":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Probe state crosses native process, IPC, inventory, and Settings boundaries."}
+{"path":".trellis/tasks/07-27-agent-session-delegation/research/runtime-contracts.md","reason":"Pinned Codex identity/auth evidence and the execution confinement blocker."}
+{"path":".trellis/tasks/07-27-codex-advisory-session-adapter/design.md","reason":"Child-specific Phase A probe architecture and Phase B release block."}

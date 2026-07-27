@@ -1,0 +1,4 @@
+{"file":".trellis/tasks/07-27-agent-credential-adapters/research/tier-a-adapter-contract.md","reason":"Exact nine-Agent roots, schema discriminants, provider bindings, and negative tests"}
+{"file":".trellis/spec/frontend/byok-provider-protocols.md","reason":"Closed provider kind/protocol mapping, Rust-owned credentials, and connection checks"}
+{"file":".trellis/spec/frontend/agent-control-safety.md","reason":"Exact-path, no-helper, secret-redaction, and local Agent inventory contracts"}
+{"file":"cutout.agent-capabilities.json","reason":"Do not overclaim session delegation or a bundled provider executor"}
