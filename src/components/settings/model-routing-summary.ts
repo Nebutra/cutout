@@ -13,8 +13,9 @@ import { MODEL_DIMENSIONS } from './model-dimensions'
  */
 export function modelRoutingCoverage(providers:readonly ProviderConfig[],bindings?:CapabilityBindings){
   const registry=createBuiltinProviderRegistry()
-  const capabilities=new Set(providers.flatMap(provider=>registry.adaptersFor(provider.kind).flatMap(adapter=>adapter.capabilities)))
-  const enabledProviderIds=new Set(providers.filter(provider=>provider.enabled).map(provider=>provider.id))
+  const enabledProviders=providers.filter(provider=>provider.enabled)
+  const capabilities=new Set(enabledProviders.flatMap(provider=>registry.adaptersFor(provider.kind).flatMap(adapter=>adapter.capabilities)))
+  const enabledProviderIds=new Set(enabledProviders.map(provider=>provider.id))
   const boundTasks=new Set(Object.entries(bindings?.bindings??{}).filter(([,assignment])=>assignment?.model.trim()&&enabledProviderIds.has(assignment.providerId)).map(([task])=>task))
   const covered=MODEL_DIMENSIONS.filter(item=>boundTasks.has(item.task)||modelTaskProfile(item.task).required.every(value=>capabilities.has(value)))
   const missing=MODEL_DIMENSIONS.filter(item=>!covered.includes(item))

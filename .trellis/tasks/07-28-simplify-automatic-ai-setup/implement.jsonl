@@ -1,0 +1,3 @@
+{"file":".trellis/spec/frontend/byok-provider-protocols.md","reason":"Preserve native-only credential discovery/import and revise the obsolete all-39 Settings projection requirement."}
+{"file":".trellis/spec/frontend/agent-control-safety.md","reason":"Preserve the closed sanitized local Agent inventory backend while removing its default UI consumer."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Keep discovery, verification, routing coverage, and UI projection under explicit owners."}

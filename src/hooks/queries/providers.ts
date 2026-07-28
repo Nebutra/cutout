@@ -8,10 +8,15 @@
  * unwrapped (throw on error) so a mutation's `isError`/`onError` drives the
  * Settings toast, while raw-array/void calls surface invoke rejections directly.
  */
+import { useSyncExternalStore } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useServices } from '@/services/context'
 import { isErr } from '@/services/types'
 import type { ProviderConfig, ProviderDraft } from '@/services/ai/provider-types'
+import {
+  providerVerificationsSnapshot,
+  subscribeProviderVerifications,
+} from '@/services/ai/provider-verification'
 
 /** Query keys for provider list + per-provider key status. */
 export const providerKeys = {
@@ -27,6 +32,15 @@ export function useProviders() {
     queryKey: providerKeys.list(),
     queryFn: (): Promise<ProviderConfig[]> => providers.list(),
   })
+}
+
+/** Persisted verification receipts, observable after checks/imports in this window. */
+export function useProviderVerifications() {
+  return useSyncExternalStore(
+    subscribeProviderVerifications,
+    providerVerificationsSnapshot,
+    providerVerificationsSnapshot,
+  )
 }
 
 /** Whether a keychain secret exists for one provider (status only). */

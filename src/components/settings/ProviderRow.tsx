@@ -2,16 +2,14 @@
  * ProviderRow (spec §7) — one configured provider in the list.
  *
  * Shows the kind (Badge), label, endpoint host, and a status dot derived from
- * keychain state + this session's test result:
+ * local credential state plus the persisted verification receipt:
  *   未配置 (no key) · 已配置 (key present) · 校验通过 / 校验失败 (last test).
- * The test outcome is intentionally session-local (not persisted) — it reflects
- * "did the key just work", not a stored claim.
+ * A verified status requires the persisted model and check timestamp evidence.
  *
  * Actions: Test (round-trips through the Rust proxy → toast), Edit (re-opens the
  * form), Remove (AlertDialog confirm → deletes config **and** the keychain
  * secret). No secret is ever read or shown here.
  */
-import { useState } from 'react'
 import { toast } from 'sonner'
 import { Loader2, Pencil, Trash2, Wifi } from 'lucide-react'
 import { Trans, useLingui } from '@lingui/react/macro'
@@ -19,12 +17,16 @@ import { cn } from '@/lib/utils'
 import type { ProviderConfig } from '@/services/ai/provider-types'
 import {
   useProviderStatus,
+  useProviderVerifications,
   useTestKey,
   useRemoveProvider,
 } from '@/hooks/queries/providers'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { loadProviderVerifications, setProviderVerification } from '@/services/ai/provider-verification'
+import {
+  providerVerificationIsVerified,
+  setProviderVerification,
+} from '@/services/ai/provider-verification'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -36,8 +38,6 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
-
-type TestState = 'idle' | 'ok' | 'fail'
 
 type StatusKind = 'unconfigured' | 'configured' | 'ok' | 'fail'
 
@@ -56,10 +56,10 @@ function hostOf(baseUrl?: string): string | undefined {
 }
 
 /** Pure status derivation; text is resolved via the catalog in the component. */
-function statusKind(hasKey: boolean, test: TestState): StatusKind {
+function statusKind(hasKey: boolean, test: 'unverified' | 'verified' | 'failed'): StatusKind {
   if (!hasKey) return 'unconfigured'
-  if (test === 'ok') return 'ok'
-  if (test === 'fail') return 'fail'
+  if (test === 'verified') return 'ok'
+  if (test === 'failed') return 'fail'
   return 'configured'
 }
 
@@ -77,13 +77,19 @@ interface ProviderRowProps {
 
 export function ProviderRow({ provider, onEdit }: ProviderRowProps) {
   const { t } = useLingui()
-  const [test, setTest] = useState<TestState>(()=>{const status=loadProviderVerifications()[provider.id]?.status;return status==='verified'?'ok':status==='failed'?'fail':'idle'})
+  const verifications = useProviderVerifications()
   const status = useProviderStatus(provider.id)
   const testKey = useTestKey()
   const removeProvider = useRemoveProvider()
 
   const hasKey = status.data === true
-  const kind = statusKind(hasKey, test)
+  const verification = verifications[provider.id]
+  const verificationStatus = verification?.status === 'failed'
+    ? 'failed'
+    : providerVerificationIsVerified(verification)
+      ? 'verified'
+      : 'unverified'
+  const kind = statusKind(hasKey, verificationStatus)
   const statusText: Record<StatusKind, string> = {
     unconfigured: t({ id: 'settings.status_unconfigured', message: 'Not configured' }),
     configured: t({ id: 'settings.status_configured', message: 'Configured' }),
@@ -94,13 +100,11 @@ export function ProviderRow({ provider, onEdit }: ProviderRowProps) {
   async function onTest() {
     try {
       const { model } = await testKey.mutateAsync(provider.id)
-      setTest('ok')
       setProviderVerification(provider.id,{status:'verified',model,checkedAt:new Date().toISOString()})
       toast.success(t({ id: 'settings.status_verified', message: 'Verified' }), {
         description: `${provider.label} · ${model}`,
       })
     } catch (error) {
-      setTest('fail')
       setProviderVerification(provider.id,{status:'failed',checkedAt:new Date().toISOString(),detail:error instanceof Error?error.message:String(error)})
       toast.error(
         t({ id: 'settings.status_failed', message: 'Verification failed' }),

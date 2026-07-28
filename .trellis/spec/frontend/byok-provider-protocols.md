@@ -402,11 +402,18 @@ import_provider_draft(app: AppHandle, input: ImportDraftInput) -> Result<Provide
   endpoints are sanitized before IPC. Absolute host paths, controls,
   credential-shaped text, URL userinfo/query/fragment, and disallowed hosts
   fail closed.
-- Settings projects every row in the fixed 39-Agent inventory, including
-  unsupported and not-installed Agents. The list shows only sanitized root
-  labels, installation/configuration/permission state, and reviewed API-key
-  adapter support. Permission failures remain retryable and never expose the
-  native error or a host-absolute path.
+- The fixed 39-Agent inventory is a native diagnostic/provenance capability,
+  not a second AI setup workflow. Default Settings must not invoke or render
+  all 39 rows. It projects configured Providers, persisted verification
+  receipts, capability coverage, and only reviewed importable provider
+  candidates into one outcome-led setup state.
+- Settings claims ready only when at least one enabled Provider has a complete
+  verified receipt (`status`, `model`, and `checkedAt`) and verified Providers
+  cover every required task dimension. Config existence alone is never a ready
+  claim.
+- Importable candidates that match an existing Provider's kind, effective wire
+  protocol, and normalized base URL are omitted from setup suggestions. Repair
+  the existing connection instead of adding a duplicate Provider.
 - Discovered provider source labels preserve the sanitized Agent-owned label.
   Only the process environment and Cutout-owned local credential store use
   translated category labels; Agent configs must never be mislabeled as
@@ -432,14 +439,21 @@ import_provider_draft(app: AppHandle, input: ImportDraftInput) -> Result<Provide
 | Existing `providerId` metadata differs from persisted provider metadata | Reject before reading the stored key |
 | Candidate IPC contains a host path, secret-shaped text, unsafe URL, controls, or unknown field | Reject at native and TypeScript boundaries |
 | Provider save fails after key storage | Restore the prior key or remove the newly written key |
+| Provider exists without complete verification evidence | Show action required; do not count it toward ready coverage |
+| Candidate resolves to an already configured connection | Omit the duplicate import action and expose Provider management |
+| Discovery fails after a verified full-coverage setup is ready | Keep the ready outcome; discovery is not required for continued use |
 
 ### 5. Good / Base / Bad Cases
 
 - Good: a reviewed Kimi config binds `KIMI_API_KEY` to
   `https://api.kimi.com/coding/v1`; check succeeds, then import re-reads the
   same candidate and secret revision before atomic persistence.
-- Base: an unsupported Agent remains visible in the 39-Agent inventory with
-  `credentialAdapter: unsupported` and produces no parse attempt.
+- Base: an unsupported Agent remains truthful in the native 39-Agent inventory,
+  produces no parse attempt, and adds no noise to default AI setup.
+- Good: a verified full-coverage Provider produces one `AI is ready` outcome;
+  successful routing coverage and the local Agent inventory are not repeated.
+- Bad: show both a configured MOX Provider and its Cutout-owned credential as a
+  new reusable connection, or claim ready from an unverified Provider.
 - Bad: a webview supplies `candidateId` plus a different `secret`, edits the
   endpoint after checking, or asks Rust to scan a caller-selected path.
 
@@ -457,9 +471,11 @@ import_provider_draft(app: AppHandle, input: ImportDraftInput) -> Result<Provide
 - Format-specific negatives: OpenCode JSONC, OMP YAML hazards, Gemini/Kimi env
   precedence, Qwen unknown providers, Kimi current-over-legacy precedence, and
   Vibe dotenv export/duplicate/interpolation/command rejection.
-- Settings inventory: loading/error/retry, installed/configuration-only,
-  permission-required, unsupported adapter, bounded all-39 rendering, source
-  label ownership, and five-locale catalog parity.
+- Settings setup projection: loading, configuration failure, discovery failure,
+  complete and incomplete verification evidence, disabled Providers, verified
+  capability gaps, ready state, importable candidate actions, existing-
+  connection deduplication, source-label ownership, advanced-management
+  disclosure, and five-locale catalog parity.
 
 ### 7. Wrong vs Correct
 
