@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 34
-- **Last Active**: 2026-07-27
+- **Total Sessions**: 35
+- **Last Active**: 2026-07-28
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~1158 | Active |
+| `journal-1.md` | ~1191 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 35 | 2026-07-28 | Simplify automatic AI setup | `b0ae583` | `chore/archive-simplify-automatic-ai-setup` |
 | 34 | 2026-07-27 | Publish and install Cutout v0.1.11 | `36bd3d5`, `eca2ddf`, `6f78f26`, `f596be9` | `release/v0.1.11` |
 | 33 | 2026-07-27 | Publish Cutout OTA v0.1.10 | `15702bc` | `chore/archive-publish-ota-v0-1-10` |
 | 32 | 2026-07-27 | Stabilize secret visibility toggles | `f73f251` | `fix/key-visibility-icon-jitter` |
