@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.12 - 2026-07-28
+
+- Replace the crowded AI settings default view with one outcome-led setup status that reports checking, ready, action required, or unavailable.
+- Base readiness on verified enabled Providers and complete model-capability coverage, with direct actions for reviewed credential imports or missing capabilities.
+- Keep Provider management, manual model bindings, and Vectorizer configuration available under one advanced disclosure while preserving explicit credential-import approval and native-only secrets.
+
 ## 0.1.11 - 2026-07-27
 
 - Scan and display a fixed reviewed inventory of 39 local coding Agents without recursively scanning the home folder or executing installed tools.
