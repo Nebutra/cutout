@@ -26,12 +26,6 @@ msgid "global_library.toast_assets_updated"
 msgstr "{0, plural, one {# élément mis à jour} other {# éléments mis à jour}}"
 
 #. js-lingui-explicit-id
-#. placeholder {0}: coverage.missing.length
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.capability_gaps_count"
-msgstr "{0, plural, one {# écart de capacité} other {# écarts de capacité}}"
-
-#. js-lingui-explicit-id
 #. placeholder {0}: plan.files.length
 #. placeholder {1}: plan.conflicts.length
 #: src/components/library/RegistryInstallPanel.tsx
@@ -83,13 +77,6 @@ msgid "kit_library.confirmed_rejected_summary"
 msgstr "{0} confirmé(s) · {1} rejeté(s)"
 
 #. js-lingui-explicit-id
-#. placeholder {0}: summary.installed
-#. placeholder {1}: summary.configured
-#: src/components/settings/LocalAgentInventoryPanel.tsx
-msgid "settings.local_agents_summary"
-msgstr "{0} installés · {1} avec une configuration"
-
-#. js-lingui-explicit-id
 #. placeholder {0}: preview.name
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.kit_editor_title"
@@ -106,13 +93,6 @@ msgstr "Éditeur de kit {0}"
 #: src/components/settings/ModelSlot.tsx
 msgid "settings.models_discovered_from_endpoint"
 msgstr "{0} modèles découverts depuis le point de terminaison"
-
-#. js-lingui-explicit-id
-#. placeholder {0}: coverage.covered.length
-#. placeholder {1}: coverage.total
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.task_dimensions_covered"
-msgstr "{0} dimension(s) de tâche sur {1} couverte(s)"
 
 #. js-lingui-explicit-id
 #: src/components/preview/PreviewMeta.tsx
@@ -212,11 +192,6 @@ msgstr "Ajoutez une contrainte ou décrivez une autre direction…"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
-msgid "settings.empty_desc"
-msgstr "Ajoutez un fournisseur et saisissez une clé API pour commencer à utiliser les fonctionnalités IA."
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
 msgid "settings.add_provider"
 msgstr "Ajouter un fournisseur"
 
@@ -231,10 +206,14 @@ msgid "global_library.add_tag_placeholder"
 msgstr "Ajouter une étiquette"
 
 #. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
 #: src/components/settings/sections/SpeechSection.tsx
 msgid "settings.advanced"
 msgstr "Avancé"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.advanced_ai_management"
+msgstr "Gestion avancée de l'IA"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
@@ -250,6 +229,16 @@ msgstr "Personnalité de l’Agent"
 #: src/components/settings/SettingsSidebar.tsx
 msgid "settings.section_ai"
 msgstr "IA"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.ai_setup_ready"
+msgstr "L'IA est prête"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.ai_setup_action_required"
+msgstr "La configuration de l'IA nécessite votre attention"
 
 #. js-lingui-explicit-id
 #: src/components/settings/AboutFooter.tsx
@@ -277,11 +266,6 @@ msgid "global_library.all_collections"
 msgstr "Toutes les collections"
 
 #. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.all_dimensions_covered"
-msgstr "Toutes les dimensions configurées disposent d’une couverture par adaptateur. Les preuves au niveau du modèle sont vérifiées au moment de la sélection."
-
-#. js-lingui-explicit-id
 #: src/components/home/ProjectHome.tsx
 msgid "home.all_projects"
 msgstr "Tous les projets"
@@ -290,11 +274,6 @@ msgstr "Tous les projets"
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.all_quality"
 msgstr "Toute qualité"
-
-#. js-lingui-explicit-id
-#: src/components/settings/LocalAgentInventoryPanel.tsx
-msgid "settings.local_agents_permission_hint"
-msgstr "Autorisez l’accès si votre système le demande, puis relancez l’analyse."
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/PersonalizationSection.tsx
@@ -330,11 +309,6 @@ msgstr "Identifiant API enregistré"
 #: src/components/settings/KeyField.tsx
 msgid "settings.key_label"
 msgstr "Clé API"
-
-#. js-lingui-explicit-id
-#: src/components/settings/LocalAgentInventoryPanel.tsx
-msgid "settings.local_agents_api_key_supported"
-msgstr "Import de clé API pris en charge"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
@@ -483,11 +457,6 @@ msgid "global_library.policy_auto_compatible"
 msgstr "Auto-compatible"
 
 #. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.model_routing_description"
-msgstr "Le routage automatique dirige chaque tâche uniquement vers un adaptateur disponible possédant la capacité requise."
-
-#. js-lingui-explicit-id
 #: src/components/settings/sections/SpeechSection.tsx
 msgid "settings.speech.models_description"
 msgstr "Le routage automatique est utilisé par défaut. L’ASR et le TTS restent soumis aux capacités requises tant qu’aucun adaptateur compatible n’est connecté."
@@ -506,6 +475,11 @@ msgstr "Lire les réponses automatiquement"
 #: src/components/settings/sections/SpeechSection.tsx
 msgid "settings.speech.auto_play_aria"
 msgstr "Lire automatiquement les réponses TTS"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.ai_setup_unavailable"
+msgstr "La configuration automatique de l'IA est indisponible"
 
 #. js-lingui-explicit-id
 #: src/components/home/ProjectHome.tsx
@@ -542,6 +516,11 @@ msgstr "Kit de marque"
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.tab_brand_kits"
 msgstr "Kits de marque"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.browse_providers"
+msgstr "Parcourir les fournisseurs"
 
 #. js-lingui-explicit-id
 #: src/components/library/GlobalLibraryView.tsx
@@ -629,6 +608,11 @@ msgid "settings.updates.check_now"
 msgstr "Vérifier maintenant"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.ai_setup_checking"
+msgstr "Vérification de la configuration de l'IA"
+
+#. js-lingui-explicit-id
 #: src/components/settings/sections/UpdatesSection.tsx
 msgid "settings.updates.checking"
 msgstr "Recherche de mises à jour..."
@@ -662,6 +646,11 @@ msgstr "Choisissez un nom clair pour ce projet local."
 #: src/components/workspace/IntentWorkspace.tsx
 msgid "workspace.human_loop_choose_direction"
 msgstr "Choisir une direction"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.ai_setup_connect_description"
+msgstr "Choisissez un fournisseur et vérifiez ses identifiants."
 
 #. js-lingui-explicit-id
 #: src/components/workspace/IntentWorkspace.tsx
@@ -740,11 +729,6 @@ msgid "settings.personalization.personality_concise"
 msgstr "Concis"
 
 #. js-lingui-explicit-id
-#: src/components/settings/LocalAgentInventoryPanel.tsx
-msgid "settings.local_agents_configuration_found"
-msgstr "Configuration détectée"
-
-#. js-lingui-explicit-id
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.discover_references_title"
 msgstr "Configurez un hôte fournisseur de découverte de références autorisé pour activer cette action."
@@ -777,6 +761,16 @@ msgid "settings.key_placeholder_replace"
 msgstr "Configuré — saisir pour remplacer"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.configured_providers"
+msgstr "Fournisseurs configurés"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.ai_setup_verification_description"
+msgstr "Les fournisseurs configurés doivent être activés et vérifiés avant que Cutout puisse les utiliser."
+
+#. js-lingui-explicit-id
 #: src/components/library/KitLibraryInspector.tsx
 msgid "kit_library.audit_conflicts"
 msgstr "Conflits"
@@ -799,18 +793,8 @@ msgstr "Connecter un fournisseur"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
-msgid "settings.connect_provider_with_capabilities"
-msgstr "Connecter un fournisseur disposant de ces capacités"
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.connect_ai_capabilities"
-msgstr "Connecter des capacités IA"
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.connect_ai_capabilities_description"
-msgstr "Connectez d’abord un fournisseur. Cutout acheminera ensuite automatiquement les tâches de texte, vision, parole, code et image."
+msgid "settings.ai_setup_connect_title"
+msgstr "Connectez l'IA pour commencer"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
@@ -909,11 +893,6 @@ msgid "settings.speech.save_failed_toast"
 msgstr "Impossible d’enregistrer les préférences vocales"
 
 #. js-lingui-explicit-id
-#: src/components/settings/LocalAgentInventoryPanel.tsx
-msgid "settings.local_agents_scan_error"
-msgstr "Impossible d’analyser les emplacements des Agents locaux."
-
-#. js-lingui-explicit-id
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.toast_update_failed"
 msgstr "Impossible de mettre à jour les éléments"
@@ -934,7 +913,6 @@ msgid "home.create_from_brief"
 msgstr "Créer à partir d'un brief"
 
 #. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
 #: src/components/settings/sections/SpeechSection.tsx
 msgid "settings.dimension_tts_description"
 msgstr "Créer un contenu audio parlé."
@@ -987,9 +965,14 @@ msgid "updates.notification.available_detail"
 msgstr "Cutout {0} est disponible sur le canal {channelLabel}."
 
 #. js-lingui-explicit-id
-#: src/components/settings/LocalAgentInventoryPanel.tsx
-msgid "settings.local_agents_description"
-msgstr "Cutout vérifie 39 Agents de programmation validés et leurs emplacements de commandes et de configuration enregistrés."
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.ai_setup_discovery_unavailable_description"
+msgstr "Cutout n'a pas pu rechercher les identifiants réutilisables sur cet appareil. Réessayez ou connectez un fournisseur manuellement."
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.ai_setup_configuration_unavailable_description"
+msgstr "Cutout n'a pas pu charger la configuration actuelle de l'IA. Réessayez."
 
 #. js-lingui-explicit-id
 #. placeholder {0}: state.preferences.channel
@@ -1124,16 +1107,6 @@ msgstr "Déconnecter"
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.discover_references"
 msgstr "Découvrir des références"
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.discovered_on_device"
-msgstr "Détectés sur cet appareil"
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.discovered_providers"
-msgstr "Discovered providers"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/PersonalizationSection.tsx
@@ -1488,11 +1461,6 @@ msgid "settings.updates.install_restart"
 msgstr "Installer et redémarrer"
 
 #. js-lingui-explicit-id
-#: src/components/settings/LocalAgentInventoryPanel.tsx
-msgid "settings.local_agents_installed"
-msgstr "Installé"
-
-#. js-lingui-explicit-id
 #: src/components/settings/sections/PersonalizationSection.tsx
 msgid "settings.personalization.instructions_saved_toast"
 msgstr "Instructions enregistrées"
@@ -1584,11 +1552,6 @@ msgid "settings.provider_category_local"
 msgstr "Local"
 
 #. js-lingui-explicit-id
-#: src/components/settings/LocalAgentInventoryPanel.tsx
-msgid "settings.local_agents_title"
-msgstr "Agents de programmation locaux"
-
-#. js-lingui-explicit-id
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.error_storage_unavailable"
 msgstr "Le stockage de la bibliothèque locale n'est pas disponible."
@@ -1629,9 +1592,19 @@ msgid "global_library.reference_locked"
 msgstr "Verrouillé"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.manage_providers"
+msgstr "Gérer les fournisseurs"
+
+#. js-lingui-explicit-id
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.kit_editor_description"
 msgstr "Gérez la projection de kit approuvée et adressée par contenu."
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.manual_model_bindings"
+msgstr "Affectations manuelles des modèles"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/PersonalizationSection.tsx
@@ -1679,15 +1652,15 @@ msgid "settings.model_or_blank_placeholder"
 msgstr "Modèle ou laisser vide pour Auto"
 
 #. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.model_routing"
-msgstr "Routage des modèles"
-
-#. js-lingui-explicit-id
 #. placeholder {0}: project.name
 #: src/components/home/ProjectHome.tsx
 msgid "home.more_actions_named"
 msgstr "Plus d'actions pour {0}"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.ai_setup_capabilities_title"
+msgstr "Des capacités d'IA supplémentaires sont nécessaires"
 
 #. js-lingui-explicit-id
 #: src/components/library/GlobalLibraryView.tsx
@@ -1775,24 +1748,9 @@ msgid "slices.empty_no_regions_title"
 msgstr "Aucune région trouvée"
 
 #. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.no_reusable_credential"
-msgstr "No reusable credential"
-
-#. js-lingui-explicit-id
 #: src/components/slices/SliceGridEmpty.tsx
 msgid "slices.empty_no_regions_automatic_hint"
 msgstr "Aucune zone réutilisable n’a été trouvée. Essayez une autre planche de ressources."
-
-#. js-lingui-explicit-id
-#: src/components/settings/LocalAgentInventoryPanel.tsx
-msgid "settings.local_agents_api_key_unsupported"
-msgstr "Aucun import de clé API validé"
-
-#. js-lingui-explicit-id
-#: src/components/settings/LocalAgentInventoryPanel.tsx
-msgid "settings.local_agents_no_config"
-msgstr "Aucune configuration validée détectée"
 
 #. js-lingui-explicit-id
 #: src/components/settings/ProviderRow.tsx
@@ -1804,11 +1762,6 @@ msgstr "Non configuré"
 #: src/components/settings/sections/IntegrationsSection.tsx
 msgid "settings.integrations.not_connected"
 msgstr "Non connecté."
-
-#. js-lingui-explicit-id
-#: src/components/settings/LocalAgentInventoryPanel.tsx
-msgid "settings.local_agents_not_installed"
-msgstr "Non installé"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/SpeechSection.tsx
@@ -1884,14 +1837,14 @@ msgid "source.dropzone_hint"
 msgstr "ou cliquez pour parcourir · PNG, JPEG, WebP"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.manual_model_bindings_description"
+msgstr "Remplacez le routage automatique pour une tâche spécifique."
+
+#. js-lingui-explicit-id
 #: src/components/library/KitLibraryInspector.tsx
 msgid "kit_library.parser_host_not_configured"
 msgstr "Hôte d'analyseur non configuré dans cette surface. Importez son résultat JSON signé pour examiner les candidats."
-
-#. js-lingui-explicit-id
-#: src/components/settings/LocalAgentInventoryPanel.tsx
-msgid "settings.local_agents_permission_required"
-msgstr "Autorisation requise"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/PersonalizationSection.tsx
@@ -2075,6 +2028,11 @@ msgstr "Fournisseur supprimé"
 #: src/components/settings/ProviderForm.tsx
 msgid "settings.provider_updated_toast"
 msgstr "Fournisseur mis à jour"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.advanced_ai_management_description"
+msgstr "Fournisseurs, affectations manuelles des modèles et export SVG."
 
 #. js-lingui-explicit-id
 #: src/components/library/KitLibraryInspector.tsx
@@ -2283,6 +2241,11 @@ msgid "home.restore"
 msgstr "Restaurer"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.retry"
+msgstr "Réessayer"
+
+#. js-lingui-explicit-id
 #: src/components/settings/sections/PersonalizationSection.tsx
 msgid "settings.personalization.retry"
 msgstr "Réessayer"
@@ -2303,9 +2266,24 @@ msgid "home.retry"
 msgstr "Réessayer"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.ai_setup_credentials_found"
+msgstr "Identifiants réutilisables trouvés"
+
+#. js-lingui-explicit-id
 #: src/components/settings/sections/PersonalizationSection.tsx
 msgid "settings.personalization.use_memory_desc"
 msgstr "Réutilise les préférences approuvées dans les sessions futures."
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.review_and_connect"
+msgstr "Vérifier et connecter"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.ai_setup_credentials_found_description"
+msgstr "Vérifiez et connectez un identifiant pour terminer la configuration."
 
 #. js-lingui-explicit-id
 #: src/components/library/ReviewBranchEditor.tsx
@@ -2321,6 +2299,11 @@ msgstr "Branche de révision"
 #: src/components/library/ReviewBranchEditor.tsx
 msgid "review_branch.comment_aria"
 msgstr "Commentaire de révision"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.ai_setup_checking_description"
+msgstr "Vérification des fournisseurs configurés et des identifiants réutilisables sur cet appareil."
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/IntegrationsSection.tsx
@@ -2353,21 +2336,6 @@ msgstr "Enregistrer les modifications"
 #: src/components/settings/VectorizerPanel.tsx
 msgid "settings.save_failed_toast"
 msgstr "Échec de l'enregistrement"
-
-#. js-lingui-explicit-id
-#: src/components/settings/LocalAgentInventoryPanel.tsx
-msgid "settings.local_agents_scan_again"
-msgstr "Analyser à nouveau"
-
-#. js-lingui-explicit-id
-#: src/components/settings/LocalAgentInventoryPanel.tsx
-msgid "settings.local_agents_scan_failed"
-msgstr "Échec de l’analyse"
-
-#. js-lingui-explicit-id
-#: src/components/settings/LocalAgentInventoryPanel.tsx
-msgid "settings.local_agents_scanning"
-msgstr "Analyse des emplacements d’Agents validés..."
 
 #. js-lingui-explicit-id
 #: src/components/library/GlobalLibraryView.tsx
@@ -2511,7 +2479,6 @@ msgid "settings.speech.shortcut_aria"
 msgstr "Raccourci vocal"
 
 #. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
 #: src/components/settings/sections/SpeechSection.tsx
 msgid "settings.dimension_asr_label"
 msgstr "Reconnaissance vocale"
@@ -2610,7 +2577,6 @@ msgid "vectorizer.mode_test"
 msgstr "Tester"
 
 #. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
 #: src/components/settings/sections/SpeechSection.tsx
 msgid "settings.dimension_tts_label"
 msgstr "Synthèse vocale"
@@ -2694,7 +2660,6 @@ msgid "settings.personalization.tool_memory_enabled_toast"
 msgstr "Mémoire assistée par outils activée"
 
 #. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
 #: src/components/settings/sections/SpeechSection.tsx
 msgid "settings.dimension_asr_description"
 msgstr "Transcrire de l’audio parlé."
@@ -2880,6 +2845,11 @@ msgid "global_library.asset_preview_description"
 msgstr "Aperçu local vérifié, provenance et actions sur l'élément selon ses capacités."
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.ai_setup_ready_description"
+msgstr "Les fournisseurs vérifiés couvrent toutes les capacités d'IA requises."
+
+#. js-lingui-explicit-id
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.verifying_component_blobs"
 msgstr "Vérification des blobs sources des composants…"
@@ -2914,11 +2884,6 @@ msgstr "Les hôtes exécuteur vidéo et fournisseur de références ne sont pas 
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.media_filter_videos"
 msgstr "Vidéos"
-
-#. js-lingui-explicit-id
-#: src/components/settings/LocalAgentInventoryPanel.tsx
-msgid "settings.local_agents_view_all"
-msgstr "Afficher les 39 Agents"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
@@ -2994,3 +2959,8 @@ msgstr "Vos onglets ouverts et récemment fermés apparaîtront ici"
 #: src/components/home/ProjectHome.tsx
 msgid "home.your_projects"
 msgstr "Vos projets"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.ai_setup_capabilities_description"
+msgstr "Vos fournisseurs vérifiés ne couvrent pas encore toutes les tâches requises."

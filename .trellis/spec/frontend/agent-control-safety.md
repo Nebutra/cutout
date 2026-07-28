@@ -394,7 +394,8 @@ permission, not by the provider secret/network permission.
 
 - Good: Homebrew/Bun symlinks resolve to executable files, exact Codex,
   Claude, OpenCode, Pi/OMP, Gemini, Qwen, Kimi, and Vibe roots are inspected,
-  and the UI receives sanitized metadata for all 39 rows.
+  and the frontend boundary accepts sanitized metadata for all 39 rows without
+  requiring the default AI settings page to render the inventory.
 - Base: no reviewed Agents are installed; the command still returns 39 stable
   rows with `not-installed`, `not-found`, and truthful unsupported flags.
 - Bad: run `npx -y`, `uvx`, `--version`, or a login helper; recursively search
