@@ -1156,3 +1156,36 @@ Published the reviewed 39-Agent inventory, nine API-key adapters, and Agent Host
 ### Next Steps
 
 - None - task complete
+
+
+## Session 35: Simplify automatic AI setup
+
+**Date**: 2026-07-28
+**Task**: Simplify automatic AI setup
+**Branch**: `chore/archive-simplify-automatic-ai-setup`
+
+### Summary
+
+Reframed AI settings around one automatic setup outcome, moved provider controls and routing details into advanced settings, removed the default local Agent inventory, and added verified setup projection coverage.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `b0ae583` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
