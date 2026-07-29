@@ -40,12 +40,14 @@ test.describe('production cutout effect benchmark', () => {
       const sourceCanvas = new OffscreenCanvas(width, height)
       const sourceContext = sourceCanvas.getContext('2d', { willReadFrequently: true })!
       sourceContext.drawImage(sourceBitmap, 0, 0)
+      const pipelineStartedAt = performance.now()
       const cut = await sliceRegionBoardBitmap(
         sourceBitmap,
         { threshold: 246, minArea: 900, mergeGap: 18, padding: 10 },
         'effect-board',
         'effect-page',
       )
+      const pipelineRuntimeMs = performance.now() - pipelineStartedAt
 
       const slots = Array.from({ length: 6 }, (_, index) => ({
         taskId: `slot-${index + 1}`,
@@ -224,6 +226,7 @@ test.describe('production cutout effect benchmark', () => {
       return {
         source: { width, height },
         diagnostics: cut.diagnostics,
+        pipelineRuntimeMs,
         sliceCount: cut.slices.length,
         assignedTaskIds: [...assignment.byTaskId.keys()],
         assignments: [...assignment.byTaskId.entries()].map(([taskId, candidate]) => ({
@@ -250,6 +253,7 @@ test.describe('production cutout effect benchmark', () => {
       source: result.source,
       params: { threshold: 246, minArea: 900, mergeGap: 18, padding: 10 },
       diagnostics: result.diagnostics,
+      pipelineRuntimeMs: result.pipelineRuntimeMs,
       sliceCount: result.sliceCount,
       assignedTaskIds: result.assignedTaskIds,
       assignments: result.assignments,

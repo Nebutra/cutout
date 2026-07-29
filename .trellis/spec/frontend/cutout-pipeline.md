@@ -125,6 +125,19 @@ evaluated and deferred — adaptive keying only after `diagnosticsByRegion`
 data shows material non-compliance frequency; vision bounds only as a
 CV-suspect fallback, never unconditionally (cost/latency negative otherwise).
 
+**ImageMagick evaluation (2026-07-29)**: do not add ImageMagick as the default
+white-board slicer or Alpha post-processor based on the current evidence. On
+the six-item effect fixture, border-connected fuzzy-white flood plus connected
+components preserved 6/6 spatial slots but produced binary Alpha, increased
+bright neutral opacity around the bottle shadow, and increased common-canvas
+white-recomposition error. Applying `Smooth Diamond:1` only to Cutout's Alpha
+reduced PNG bytes but did not improve visual quality and also increased
+recomposition error. Revisit only with a new failing fixture and a targeted
+operation that beats the existing pipeline on semantic coverage and the same-
+canvas Alpha/recomposition gates. Reproduce with
+`scripts/benchmark-imagemagick-slicing.mjs`; ImageMagick remains a developer
+benchmark dependency, not a bundled or declared runtime capability.
+
 ## Scenario: Asset Production Authority
 
 ### 1. Scope / Trigger
