@@ -620,3 +620,36 @@ Added a pinned offline registry and sanitized metadata-only installation invento
 ### Next Steps
 
 - None - task complete
+
+
+## Session 19: Evaluate ImageMagick slicing quality
+
+**Date**: 2026-07-29
+**Task**: Evaluate ImageMagick slicing quality
+**Branch**: `main`
+
+### Summary
+
+Benchmarked Cutout against ImageMagick-only and hybrid slicing on the six-asset effect fixture; kept the current pipeline after ImageMagick regressed soft alpha and recomposition quality.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `1eee32c` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
