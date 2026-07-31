@@ -40,6 +40,13 @@ export interface AiSetupProjectionInput {
   readonly candidates?: readonly ProviderDiscoveryCandidate[]
 }
 
+export function setupDuringAutomaticRefresh(
+  setup: AiSetupProjection,
+  automaticBusy: boolean,
+): AiSetupProjection {
+  return automaticBusy && setup.status === 'ready' ? { status: 'checking' } : setup
+}
+
 function normalizedBaseUrl(value: string | undefined): string {
   if (!value) return ''
   try {
@@ -79,7 +86,7 @@ export function projectAiSetup(input: AiSetupProjectionInput): AiSetupProjection
   )
 
   if (verifiedProviders.length > 0) {
-    const coverage = modelRoutingCoverage(verifiedProviders, input.bindings)
+    const coverage = modelRoutingCoverage(verifiedProviders, input.bindings, input.verifications)
     if (coverage.missing.length === 0) {
       return { status: 'ready', verifiedProviders }
     }

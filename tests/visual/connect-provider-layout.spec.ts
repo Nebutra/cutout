@@ -7,7 +7,8 @@ async function open(page: Page) {
   await page.getByRole("menuitem", { name: /Settings|设置/ }).click();
   if (target) await page.setViewportSize(target);
   await page.getByText("AI", { exact: true }).click();
-  await page.getByRole("button", { name: "Connect provider" }).click();
+  await page.getByText("Advanced AI management", { exact: true }).click();
+  await page.getByRole("button", { name: "Add provider" }).click();
 }
 test("Connect Provider remains bounded and every category is reachable", async ({
   page,

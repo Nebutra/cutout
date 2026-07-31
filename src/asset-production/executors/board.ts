@@ -11,6 +11,19 @@ export interface BoardCandidate {
   readonly artifact: ProductionArtifactRef
 }
 
+export interface BoardCandidateMergePlacement {
+  readonly candidate: BoardCandidate
+  readonly offset: Pick<Box, 'x' | 'y'>
+}
+
+export interface BoardCandidateMergeRequest {
+  readonly kind: 'merge'
+  readonly box: Box
+  readonly placements: readonly BoardCandidateMergePlacement[]
+}
+
+export type BoardCandidateAssignmentInput = BoardCandidate | BoardCandidateMergeRequest
+
 export interface BoardGroupResult {
   readonly width: number
   readonly height: number
@@ -20,7 +33,7 @@ export interface BoardGroupResult {
 }
 
 export interface BoardCandidateAssignment {
-  readonly byTaskId: ReadonlyMap<string, BoardCandidate>
+  readonly byTaskId: ReadonlyMap<string, BoardCandidateAssignmentInput>
   readonly issues: readonly ProductionIssue[]
 }
 
@@ -29,7 +42,7 @@ export function assignBoardCandidates(
   result: Pick<BoardGroupResult, 'width' | 'height' | 'candidates'>,
   at = Date.now(),
 ): BoardCandidateAssignment {
-  const byTaskId = new Map<string, BoardCandidate>()
+  const byTaskId = new Map<string, BoardCandidateAssignmentInput>()
   const issues: ProductionIssue[] = []
   const unassigned = new Set(result.candidates)
 
@@ -46,6 +59,11 @@ export function assignBoardCandidates(
       continue
     }
     if (matches.length > 1) {
+      if (layout.slots.length === 1 && matches.length === result.candidates.length) {
+        byTaskId.set(slot.taskId, createBoardCandidateMergeRequest(matches))
+        for (const candidate of matches) unassigned.delete(candidate)
+        continue
+      }
       issues.push(integrityIssue('board-slot-ambiguous', `Board slot for ${slot.taskId} contains ${matches.length} assets.`, at))
       continue
     }
@@ -71,6 +89,33 @@ export function assignBoardCandidates(
   }
 
   return { byTaskId, issues }
+}
+
+export function isBoardCandidateMergeRequest(
+  input: BoardCandidateAssignmentInput,
+): input is BoardCandidateMergeRequest {
+  return 'kind' in input && input.kind === 'merge'
+}
+
+function createBoardCandidateMergeRequest(
+  candidates: readonly BoardCandidate[],
+): BoardCandidateMergeRequest {
+  const left = Math.min(...candidates.map((candidate) => candidate.box.x))
+  const top = Math.min(...candidates.map((candidate) => candidate.box.y))
+  const right = Math.max(...candidates.map((candidate) => candidate.box.x + candidate.box.width))
+  const bottom = Math.max(...candidates.map((candidate) => candidate.box.y + candidate.box.height))
+  const box = { x: left, y: top, width: right - left, height: bottom - top }
+  return {
+    kind: 'merge',
+    box,
+    placements: candidates.map((candidate) => ({
+      candidate,
+      offset: {
+        x: candidate.box.x - box.x,
+        y: candidate.box.y - box.y,
+      },
+    })),
+  }
 }
 
 function containedBy(box: Box, container: Box): boolean {

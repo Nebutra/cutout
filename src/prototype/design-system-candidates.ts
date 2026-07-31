@@ -13,6 +13,12 @@ import type { PrototypeDesignSystemArtifact } from './prototype-artifact-recover
 import type { PrototypePlan } from './prototype-plan'
 import type { DesignDocument } from '@/design-ir'
 import type { WorkspaceSnapshot } from '@/workspace/workspace-snapshot'
+import {
+  candidateMaterialId,
+  migratePersistedPrototypeDesignSystemCandidateSet,
+} from './design-system-candidate-persistence'
+
+export { candidateMaterialId } from './design-system-candidate-persistence'
 
 export interface PrototypeDesignSystemCandidateSet {
   readonly set: CandidateSet
@@ -186,10 +192,11 @@ export function recoverPrototypeDesignSystemCandidateSet(
   legacySelected?: PersistedPrototypeDesignSystem | null,
 ): PrototypeDesignSystemCandidateSet | null {
   if (persisted) {
-    const parsed = candidateSetSchema.safeParse(persisted.set)
+    const migrated = migratePersistedPrototypeDesignSystemCandidateSet(persisted)
+    const parsed = candidateSetSchema.safeParse(migrated.set)
     if (!parsed.success) return null
     const artifacts = Object.fromEntries(
-      Object.entries(persisted.artifacts ?? {}).map(([id, artifact]) => [id, restoreArtifact(artifact)]),
+      Object.entries(migrated.artifacts ?? {}).map(([id, artifact]) => [id, restoreArtifact(artifact)]),
     )
     return { set: parsed.data, artifacts }
   }
@@ -220,8 +227,8 @@ export function recoverPrototypeDesignSystemCandidateSet(
         directionId: 'direction:legacy-selected',
         status: 'ready',
         outputs: [
-          { role: 'design-system', materialId: 'material:design-system' },
-          { role: 'design-markdown', materialId: 'material:design-markdown' },
+          { role: 'design-system', materialId: candidateMaterialId(candidateId, 'visual') },
+          { role: 'design-markdown', materialId: candidateMaterialId(candidateId, 'markdown') },
         ],
         provenanceIds: ['provenance:workspace-legacy'],
       }],
@@ -249,10 +256,6 @@ export function directionForCandidate(
 
 function candidateId(direction: CandidateDirection): string {
   return `candidate:${direction.id}`
-}
-
-export function candidateMaterialId(candidateId: string, role: 'visual' | 'markdown'): string {
-  return `material:design-system-candidate:${candidateId}:${role}`
 }
 
 export function candidateProvenanceId(candidateId: string): string {

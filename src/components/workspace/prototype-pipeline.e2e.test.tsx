@@ -123,7 +123,7 @@ function fakeRegistry(key: string, base: string): ServiceRegistry {
       setKey: notUsed,
       status: async () => ({ hasKey: true }),
       statuses: async (ids) => Object.fromEntries(ids.map((id) => [id, true])),
-      test: async () => ok({ model: GATEWAY_CHAT_MODEL }),
+      test: async () => ok({ model: GATEWAY_CHAT_MODEL, models: [GATEWAY_CHAT_MODEL, GATEWAY_IMAGE_MODEL] }),
     },
     generation: createGatewayGenerationService(key, base),
     prompts: {

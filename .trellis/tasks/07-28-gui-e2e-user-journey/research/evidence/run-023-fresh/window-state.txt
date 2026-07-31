@@ -1,0 +1,2 @@
+frontmost=Finder
+cutout=false, false, 1, false, 0, 30, 1040, 720

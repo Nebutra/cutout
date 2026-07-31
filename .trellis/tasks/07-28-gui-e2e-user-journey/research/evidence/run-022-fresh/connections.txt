@@ -1,0 +1,2 @@
+The Cutout process owned two established HTTPS connections when evidence was
+captured. Remote addresses and local ports are intentionally omitted.

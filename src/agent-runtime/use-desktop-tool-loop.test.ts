@@ -1,5 +1,10 @@
-import { describe, expect, it } from 'vitest'
-import { createExplicitDesktopPaidToolRequest, createExplicitDesktopVisualBudget } from './use-desktop-tool-loop'
+import { describe, expect, it, vi } from 'vitest'
+import { ok, type ForegroundSegmentationService } from '@/services/types'
+import {
+  createExplicitDesktopPaidToolRequest,
+  createExplicitDesktopVisualBudget,
+  probeForegroundSegmentationCapability,
+} from './use-desktop-tool-loop'
 
 describe('desktop paid tool request', () => {
   it('requires explicit approval and uses the matching host estimate as its ceiling', () => {
@@ -44,5 +49,25 @@ describe('desktop paid tool request', () => {
     expect(createExplicitDesktopVisualBudget([
       { capability: 'generate-image', providerId: 'provider', model: 'image-model', available: true, estimatedCost: { currency: 'USD', amount: 0.08 } },
     ])).toEqual({ ceiling: { currency: 'USD', amount: 0 } })
+  })
+
+  it('fails malformed and rejected foreground capability probes closed', async () => {
+    const malformed = {
+      capabilities: vi.fn(async () => ok(null)),
+    } as unknown as ForegroundSegmentationService
+    const rejected = {
+      capabilities: vi.fn(async () => {
+        throw new Error('native capability probe failed')
+      }),
+    } as unknown as ForegroundSegmentationService
+
+    await expect(probeForegroundSegmentationCapability(malformed)).resolves.toEqual({
+      available: false,
+      reason: 'capability-required: foreground segmentation is unavailable on this host.',
+    })
+    await expect(probeForegroundSegmentationCapability(rejected)).resolves.toEqual({
+      available: false,
+      reason: 'native capability probe failed',
+    })
   })
 })

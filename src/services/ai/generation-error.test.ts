@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { classifyGenerationError } from "./generation-error";
+import {
+  classifyGenerationError,
+  isRouteWideGenerationFailure,
+} from "./generation-error";
 
 describe("classifyGenerationError", () => {
   it.each([
@@ -50,4 +53,24 @@ describe("classifyGenerationError", () => {
       });
     },
   );
+});
+
+describe("isRouteWideGenerationFailure", () => {
+  it.each([
+    "HTTP 401 unauthorized",
+    "Request failed: model endpoint returned HTTP 404",
+    "Provider deadline exceeded.",
+    "HTTP 429 from provider",
+  ])("stops launching sibling requests after a route-wide failure: %s", (message) => {
+    expect(isRouteWideGenerationFailure(message)).toBe(true);
+  });
+
+  it.each([
+    "Operation aborted",
+    "The selected material is no longer available.",
+    "Request denied by policy",
+    "One candidate returned no image.",
+  ])("keeps candidate-local failures isolated: %s", (message) => {
+    expect(isRouteWideGenerationFailure(message)).toBe(false);
+  });
 });

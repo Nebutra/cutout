@@ -72,7 +72,7 @@ export function useTestKey() {
   const { providers } = useServices()
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (id: string): Promise<{ model: string }> => {
+    mutationFn: async (id: string): Promise<{ model: string; models: readonly string[] }> => {
       const result = await providers.test(id)
       if (isErr(result)) throw new Error(result.error)
       return result.data

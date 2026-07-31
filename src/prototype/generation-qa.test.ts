@@ -177,6 +177,19 @@ describe('generateWithQa', () => {
     expect(result.verdict.pass).toBe(false)
   })
 
+  it('defaults to one observational attempt', async () => {
+    let generations = 0
+    const result = await generateWithQa({
+      basePrompt: 'base',
+      generate: async () => new Uint8Array([++generations]),
+      review: async () => fail,
+    })
+
+    expect(generations).toBe(1)
+    expect(result.attempts).toBe(1)
+    expect(result.verdict.pass).toBe(false)
+  })
+
   it('does not spend regeneration attempts when the reviewer is unavailable', async () => {
     let generations = 0
     const result = await generateWithQa({

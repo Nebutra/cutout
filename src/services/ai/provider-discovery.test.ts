@@ -4,6 +4,7 @@ const { invokeMock } = vi.hoisted(() => ({ invokeMock: vi.fn() }))
 vi.mock('@tauri-apps/api/core', () => ({ invoke: invokeMock }))
 
 import {
+  autoConfigureProviderCandidate,
   createProviderDraft,
   discoverProviderCandidates,
   importProviderDraft,
@@ -11,6 +12,24 @@ import {
 
 describe('provider discovery native contract', () => {
   beforeEach(() => invokeMock.mockReset())
+
+  it('auto-configures an opaque candidate without accepting a secret', async () => {
+    const candidateId = `provider-candidate:${'e'.repeat(64)}`
+    invokeMock.mockResolvedValueOnce({
+      provider: {
+        id: 'local-import-e', kind: 'openai', label: 'OpenAI',
+        defaultModel: 'gpt-5', enabled: true,
+      },
+      models: ['gpt-5'],
+    })
+    await expect(autoConfigureProviderCandidate(candidateId)).resolves.toMatchObject({
+      provider: { id: 'local-import-e' }, models: ['gpt-5'],
+    })
+    expect(invokeMock).toHaveBeenCalledWith('auto_configure_provider_candidate', {
+      input: { candidateId },
+    })
+    await expect(autoConfigureProviderCandidate('sk-not-a-candidate')).rejects.toThrow()
+  })
 
   it('accepts sanitized candidates and rejects credential-shaped output', async () => {
     const candidate = {
@@ -50,6 +69,37 @@ describe('provider discovery native contract', () => {
       invokeMock.mockResolvedValueOnce([unsafe])
       await expect(discoverProviderCandidates()).rejects.toThrow()
     }
+  })
+
+  it('accepts only sanitized CC Switch database candidate metadata', async () => {
+    const candidate = {
+      id: `provider-candidate:${'f'.repeat(64)}`,
+      source: 'cc-switch',
+      sourceLabel: 'CC Switch',
+      agentId: 'codex',
+      schemaId: 'cc-switch-db-codex-v1',
+      configLocation: '~/.cc-switch/cc-switch.db',
+      kind: 'openai-compatible',
+      label: 'CC Switch current Codex upstream',
+      baseUrl: 'https://relay.example/v1',
+      wireProtocol: 'responses',
+      modelHint: 'gpt-observed',
+      credential: {
+        sourceType: 'cc-switch-db',
+        reference: 'OPENAI_API_KEY',
+        available: true,
+        importable: true,
+      },
+      warnings: [],
+    }
+    invokeMock.mockResolvedValueOnce([candidate])
+    await expect(discoverProviderCandidates()).resolves.toEqual([candidate])
+
+    invokeMock.mockResolvedValueOnce([{
+      ...candidate,
+      credential: { ...candidate.credential, secret: 'must-not-cross-ipc' },
+    }])
+    await expect(discoverProviderCandidates()).rejects.toThrow()
   })
 
   it('binds wire protocol when creating the checked draft', async () => {

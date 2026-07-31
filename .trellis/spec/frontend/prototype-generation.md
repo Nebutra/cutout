@@ -55,6 +55,29 @@ function selectPrototypeDesignSystemCandidate(
   naming, grouping, and navigation model are derived from product intent,
   content, platform conventions, and user workflows. Production code must not
   prescribe a Home/Pricing/About or other fixed route tree.
+- Every alternative suite authors its own complete topology for its direction.
+  A shared seed plan supplies product intent, not a page-count quota; sibling
+  suites may and should differ in route count when their content model and user
+  journeys require it.
+- Every Agent-authored planning-seed route declares an explicit `materials`
+  array with zero or more reusable non-UI visuals. Each material chooses
+  `board-cutout` or `direct-generate` from its actual production needs. Zero is
+  valid; production code must not infer or repair toward a per-page count.
+- Local fallback and clarification projections never invent material
+  opportunities. They remain zero-material UI structure until an Agent-authored
+  plan identifies reusable, non-code-reproducible visuals from the real
+  business context.
+- New `board-cutout` materials declare a stable route-local `boardGroupId`.
+  Materials share a board only when the Agent determines they are a coherent,
+  legible atomic family; one route may have zero, one, or multiple board
+  groups. The Agent generation boundary rejects a missing group id, while the
+  persisted compatibility decoder accepts historical seeds without group ids
+  and projects them into their former single compatibility group.
+- The conversational generation decision owns an output-token ceiling large
+  enough for its complete multi-suite route/material seed. That ceiling is a
+  transport guard, never a suite, page, or per-route material quota. Truncation
+  must not silently turn one authoritative planning pass into a second generic
+  Planner pass.
 - Each `PrototypePage.route` is a unique stable logical destination. Web plans
   normally use URL/path identities; other platforms may use appropriate named
   screen or destination identities.
@@ -88,11 +111,57 @@ function selectPrototypeDesignSystemCandidate(
   the persisted plan and exact selected artifact, does not append a duplicate
   user intent, and sends only the selected bytes plus selected `DESIGN.md` to
   page generation and Asset Production.
+- A retry after a transient prototype-suite failure is also a bounded
+  continuation. It bypasses the already-settled intent gate, ignores any
+  incidental material selection left by completed siblings, retains ready
+  suite artifacts, and resumes only the failed suite's missing pages before
+  continuing cancelled/unstarted alternatives. Generic outcome repair must not
+  collapse this retry into one legacy singular suite.
+- A material-production retry resolves the latest same-plan run by `planHash`,
+  derives target regions only from its failed tasks, and carries consumable
+  tasks through `carryAssetProductionTask`. Starting the new run supersedes the
+  old `partial` run to `cancelled`; do not rewrite it back to a non-authoritative
+  nonterminal status. Pages and successful board/direct nodes are not replayed.
+- Packaged request evidence uses stable logical node ids across attempts. The
+  planned count is the compiled resolved baseline plus observed repeat attempts,
+  and must equal the actual Provider call count. A retry budget is evidence of
+  work that occurred, not permission for an automatic QA re-roll.
+- Retry ownership begins synchronously with the visible Retry action. The
+  workspace clears the settled failure and enters a busy state before any
+  asynchronous Provider/route preflight, so the control cannot be clicked
+  twice and the UI cannot keep presenting a stale terminal failure while the
+  continuation is being prepared. Packaged evidence records a distinct retry
+  acknowledgement; a DOM click alone is not proof that recovery started.
+- A long packaged journey must not spend one journey-global Retry allowance on
+  the first transient failure. The fixed driver keys its bounded Retry budget
+  by the failed candidate and its completed page/resource frontier, waits for
+  product-owned acknowledgement after every click, and also enforces a total
+  journey ceiling. A later suite may therefore recover without permitting an
+  unbounded Provider loop or replaying already completed nodes.
+- Product candidate identities and sanitized packaged evidence identities are
+  separate domains. The driver uses the runtime candidate id only to observe
+  selection acknowledgement, then resolves the bounded `suite-N` projection
+  before matching resource counts or emitting terminal evidence. It must never
+  compare a runtime candidate id directly with a sanitized suite id.
+- Selecting or auto-restoring a completed prototype suite must also select the
+  completed Asset Production run named by its `resource-pack:<run-id>` binding.
+  Page, material-status, slice, export-readiness, and packaged evidence
+  projections must share that run authority; the last generated sibling is not
+  implicit authority for the selected suite.
+- A background packaged driver treats a comparison dialog as closed when it is
+  no longer visible or interactive. It must not wait for exit-animation DOM
+  unmount, because background WebKit may retain a closed transition node.
 - If the artifact's `designMarkdown` is invalid, page generation may fall back
   to the earlier text context, while retaining the design-system image
   reference. Invalid companion documentation must not erase valid visual media.
 - Downstream asset production and slicing may start only after the exact scoped
   page set has been produced. A partial suite is not success.
+- Visual QA and board-background quality checks are observational after the
+  single baseline generation call. When deterministic assignment, decoding,
+  persistence, and required-output checks succeed, retain those findings as
+  review warnings without blocking the resource pack. Missing, ambiguous,
+  cross-slot, undecodable, or unavailable required outputs remain integrity
+  failures and fail the pack closed.
 - Keep the default scope in `src/prototype/scope.ts`. Persistence code must not
   import `generate-suite.ts`, because that pulls DESIGN.md/YAML machinery into
   the frontend entry chunk.
@@ -116,6 +185,9 @@ function selectPrototypeDesignSystemCandidate(
 | Multiple-direction proposal has no selection | persist candidate results and stop before page generation |
 | Selection references failed/missing candidate | reject without changing the singular selected projection |
 | Candidate base revision differs from current revision | reject as stale and require regeneration |
+| One board region fails with a retryable Provider error | expose Retry, retain ready pages/tasks, and retry only that logical region |
+| Retry starts a new same-plan production run | supersede the prior `partial` authority to `cancelled`, then carry only consumable matching tasks |
+| Planned and actual packaged image-call counts differ | fail the terminal E2E outcome; do not hide replay or retry amplification |
 
 ## 5. Good / Base / Bad Cases
 
@@ -142,6 +214,10 @@ function selectPrototypeDesignSystemCandidate(
 
 - Planner prompt test: asserts dynamic IA ownership, platform-native route meta
   rules, complete route coverage, and no fixed template instruction.
+- Planning-seed tests: explicit zero materials, multiple board groups on one
+  route, historical missing-group compatibility, standalone direct materials,
+  and duplicate route-local material ids; no benchmark count becomes a
+  production default.
 - Plan validation test: duplicate route identities fail while arbitrary Agent
   route names remain valid.
 - Page-set unit test: all pages are generated, progress stays in plan order,
@@ -160,6 +236,31 @@ function selectPrototypeDesignSystemCandidate(
   selected token projection survive workspace -> Design IR -> workspace.
 - Rendered comparison test: cards have stable media dimensions, failed siblings
   remain visible, details open, and pages do not start before selection.
+- Asset-production regression: a valid assigned output with an observational QA
+  rejection remains ready with its warning visible; missing or invalid required
+  output still leaves the production run incomplete.
+- Rendered retry regression: fail one selected-suite page with a transient
+  Provider error, retry through the visible Agent control, require immediate
+  busy/failure acknowledgement before asynchronous preflight, require all
+  suite candidates to become ready, and prove page calls equal the resolved
+  baseline plus only the failed request rather than a full-suite replay.
+- Packaged-driver retry regression: recover one failed suite frontier, then
+  fail a different suite frontier and require a second visible Retry while
+  proving duplicate pre-acknowledgement clicks, per-frontier loops, and total
+  journey retry amplification remain bounded.
+- Packaged selection regression: acknowledge selection with the runtime
+  candidate id, then require resource-pack and terminal matching to use only
+  the validated `suite-N` projection; a runtime id must be rejected as
+  sanitized evidence.
+- Suite-switch regression: selecting a ready alternative restores exactly its
+  resource artifacts and activates the completed production run named by that
+  resource pack, while a hidden exit-transition dialog cannot block packaged
+  progress.
+- Material retry regression: fail one board call after its suite pages are
+  ready, assert the pre-retry run is `partial`, retry through the visible
+  control, then assert the old run is `cancelled`, three suite runs complete,
+  page call ids are unchanged, exactly one board logical node has a second
+  attempt, and dynamically compiled planned calls equal actual calls.
 
 ## 7. Wrong vs Correct
 
@@ -204,4 +305,25 @@ if (candidateSet.proposal.count > 1) {
 }
 const selected = selectPrototypeDesignSystemCandidate(candidateSet, readyId, agent)
 await generatePages(selectedPrototypeDesignSystem(selected))
+```
+
+```ts
+// Wrong: restart every page/board and repair the expected count with a constant.
+const expectedCalls = 39
+await generatePrototypeSuite(plan)
+
+// Correct: carry same-plan successes and budget the one observed repeated node.
+const baseline = compilePrototypeImageRequestBudget({ designSystemCalls, suites })
+const targetRegionIds = productionPlan.tasks.flatMap((task) =>
+  previousRun.tasks[task.taskId]?.status === 'failed' ? [task.regionId] : [],
+)
+let retry = beginPrototypeProduction({ snapshot, plan: productionPlan, runId, at })
+for (const task of productionPlan.tasks) {
+  if (!targetRegionIds.includes(task.regionId)) {
+    retry = carryPrototypeTaskPublication({
+      snapshot: retry, fromRunId: previousRun.runId, toRunId: runId, taskId: task.taskId, at,
+    })
+  }
+}
+expect(actualCalls).toBe(baseline.totalCalls + repeatedLogicalNodeAttempts)
 ```

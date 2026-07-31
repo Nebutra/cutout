@@ -99,8 +99,8 @@ export function ProviderRow({ provider, onEdit }: ProviderRowProps) {
 
   async function onTest() {
     try {
-      const { model } = await testKey.mutateAsync(provider.id)
-      setProviderVerification(provider.id,{status:'verified',model,checkedAt:new Date().toISOString()})
+      const { model, models } = await testKey.mutateAsync(provider.id)
+      setProviderVerification(provider.id,{status:'verified',model,models:[...models],checkedAt:new Date().toISOString()})
       toast.success(t({ id: 'settings.status_verified', message: 'Verified' }), {
         description: `${provider.label} · ${model}`,
       })

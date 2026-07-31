@@ -94,7 +94,10 @@ import {
   type WorkspaceNavigationSession,
 } from "@/workspace/navigation";
 import { cn } from "@/lib/utils";
-import { withViewTransition } from "@/lib/view-transition";
+import {
+  withViewTransition,
+  withViewTransitionApplied,
+} from "@/lib/view-transition";
 import {
   checkpointProjectForRecovery,
   createIndexedDbRecoveryBackend,
@@ -1685,10 +1688,10 @@ export function AppShell() {
         activeRecordRef.current = loaded.data;
         lastSavedFingerprintRef.current = "";
         const restoreInput = await createRestoreInputFromProject(loaded.data);
-        restoreProject(restoreInput);
-        withViewTransition(() =>
-          dispatchProjectShell({ type: "open-project", id }),
-        );
+        await withViewTransitionApplied(() => {
+          restoreProject(restoreInput);
+          dispatchProjectShell({ type: "open-project", id });
+        });
       } catch (error) {
         toast.error("Could not restore project", {
           description: error instanceof Error ? error.message : String(error),
@@ -1745,10 +1748,10 @@ export function AppShell() {
     restoringRef.current = true;
     activeRecordRef.current = project;
     lastSavedFingerprintRef.current = "";
-    resetProject();
-    withViewTransition(() =>
-      dispatchProjectShell({ type: "create-project", project }),
-    );
+    await withViewTransitionApplied(() => {
+      resetProject();
+      dispatchProjectShell({ type: "create-project", project });
+    });
     queueMicrotask(() => {
       restoringRef.current = false;
     });
@@ -2165,7 +2168,17 @@ export function AppShell() {
                 ) : <DeferredSurfaceFallback label="Loading delivery workspace" />
               ) : null}
               {view === "project" ? (
-                <div className={cn("min-h-0 flex-1 flex-col", inlineDeliveryTab ? "hidden" : "flex")} aria-hidden={Boolean(inlineDeliveryTab)} inert={Boolean(inlineDeliveryTab)} data-slot="project-workspace-surface">
+                <div
+                  className={cn(
+                    "min-h-0 flex-1 flex-col",
+                    inlineDeliveryTab
+                      ? "pointer-events-none invisible absolute inset-0 flex"
+                      : "flex",
+                  )}
+                  aria-hidden={Boolean(inlineDeliveryTab)}
+                  inert={Boolean(inlineDeliveryTab)}
+                  data-slot="project-workspace-surface"
+                >
                   <Suspense fallback={<DeferredSurfaceFallback label="Loading project workspace" />}>
                     <PipelineCanvas
                       key={projectVersion}

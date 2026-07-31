@@ -13,6 +13,8 @@ function boxesOverlap(
 }
 
 test.beforeEach(async ({ page }) => {
+  const pageErrors: Error[] = []
+  page.on('pageerror', (error) => pageErrors.push(error))
   await page.addInitScript(({ commitOid }) => {
     const status = { repositoryId: 'repo.fixture', snapshotToken: 'snapshot.fixture', branch: 'main', upstream: 'origin/main', ahead: 1, behind: 0, detached: false, files: [{ path: 'src/app.tsx', originalPath: null, indexStatus: ' ', worktreeStatus: 'M', conflicted: false }] }
     let runEventStore: unknown = { version: 'agent-run-events.v1', activeRunId: null, events: [], activeRun: null }
@@ -41,6 +43,7 @@ test.beforeEach(async ({ page }) => {
   }, { commitOid: oid })
   await page.setViewportSize({ width: 1200, height: 800 })
   await page.goto('/')
+  expect(pageErrors).toEqual([])
   await page.getByRole('textbox', { name: 'Describe what you want to design...' }).fill('Git workspace fixture')
   await page.getByRole('button', { name: 'Create from brief' }).click()
   const workspaceRail = page.getByRole('navigation', { name: 'Workspace panels' })

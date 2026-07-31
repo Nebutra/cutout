@@ -96,6 +96,15 @@ receipts. `.cutout` state and provenance remain authoritative.
   allowlisted environment, bounded duration/output, and POSIX process-group
   cancellation. Unsupported Windows process-tree control fails as
   `capability-required`; this is not a general-purpose shell or kernel sandbox.
+- Controlled Coding workspace revisions hash every task-scoped allowed root
+  together with package/type-check configuration. Initial validation,
+  pre-promotion CAS, and the result receipt use the same scoped snapshot; a
+  reviewed path outside `src` must never disappear from revision authority.
+- Desktop Coding promotion requires native confirmation only after the exact
+  staged patch digest and scoped snapshot have been revalidated. The opaque
+  approval id is retained in the applied receipt and the stage is consumed
+  after promotion. The fixed packaged-E2E build may issue this approval inside
+  native code after the same checks; no renderer-supplied approval has authority.
 - Governance facts attach axe nodes only to the scenario element that contains
   their target. Non-color cues require explicit state-bound evidence.
 - A successful composite receipt has unique targets and an artifact index that
@@ -170,6 +179,7 @@ receipts. `.cutout` state and provenance remain authoritative.
 | Path/root is a symlink or changes identity | Reject without returning controlled file contents or launching a command |
 | Repository exceeds the depth budget or declares executable Git config | Reject before deeper scanning or Git execution |
 | Platform cannot enforce required process-tree semantics | Return `capability-required` |
+| A task-scoped file changes after Coding patch preview, including below an allowed root outside `src` | Reject promotion with `revision-conflict` and preserve the external change |
 | Semantic foreground extraction is unavailable | Return `capability-required` before artifact writes or approval; do not enter generation |
 | Approved material run is cancelled or its source identity changes | Reject publication and leave the current source/production state unchanged |
 | Axe violation target is outside a scenario | Do not attach it to that scenario |

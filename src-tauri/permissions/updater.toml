@@ -11,11 +11,20 @@ commands.allow = [
 
 [[permission]]
 identifier = "workspace-revision-bridge"
-description = "Allows conflict-checked Design IR revision exchange and bounded Agent run-event persistence for an authorized workspace."
+description = "Allows conflict-checked Design IR exchange, bounded Agent event persistence, and controlled CodingTask staging for an authorized workspace."
 commands.allow = [
+  "coding_workspace_create_managed",
+  "coding_workspace_seed_managed_assets",
   "workspace_revision_read",
   "workspace_revision_preview_export",
   "workspace_revision_apply_export",
   "workspace_run_events_read",
   "workspace_run_events_write",
+  "coding_workspace_snapshot",
+  "coding_workspace_read_allowed",
+  "coding_workspace_preview",
+  "coding_workspace_stage",
+  "coding_workspace_run_checks",
+  "coding_workspace_promote",
+  "coding_workspace_rollback",
 ]

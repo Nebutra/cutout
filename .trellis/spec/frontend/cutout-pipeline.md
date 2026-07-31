@@ -107,9 +107,11 @@ this BEFORE `runPipeline` mutates the frame:
 - Wiring: `sliceRegionBoardBitmap` returns `{ slices, diagnostics }`;
   `runRegionBreakdown` fires optional `onRegionDiagnostics` (before
   `onRegionSliced`) and returns `diagnosticsByRegion` (succeeded regions only).
-  Diagnostics are persisted in production task evidence. Non-compliant boards
-  may still produce candidates, but those tasks become `needs-review` and are
-  not consumable until an explicit revision-bound quality decision exists.
+  Diagnostics are persisted in production task evidence. In the prototype
+  production baseline, non-compliance is observational: a deterministically
+  assigned, decoded, persisted, and verified output remains consumable with a
+  warning. A workflow may classify a quality concern as blocking only through
+  its explicit quality policy; integrity failures are never downgraded.
 - `regionBoardPrompt` forbids model-added text labels/captions/numbering/
   watermarks (redrawn text becomes garbled pixel "assets").
 
@@ -167,6 +169,12 @@ the Zustand store carries `assetProduction: AssetProductionSnapshot`.
 - Only `ready`, revision-bound `waived`, and grandfathered `legacy-ready`
   publications are consumable. A new plan/source revision supersedes current
   authority without deleting immutable historical runs.
+- A board layout with exactly one planned task may represent that one logical
+  material as several disconnected CV foreground crops. Assignment must retain
+  their board-relative positions, render one transparent union-bounds PNG, and
+  publish only that composite for the task. Zero crops remain an integrity
+  failure, and layouts with multiple tasks keep strict one-candidate-per-slot
+  ambiguity and crossing checks.
 - Review is a projection of authoritative `needs-review` and `failed` tasks,
   not only of slices with image blobs. A task that fails before producing an
   artifact remains visible with its evidence and a retry path.
@@ -183,7 +191,8 @@ the Zustand store carries `assetProduction: AssetProductionSnapshot`.
 | Condition | Required behavior |
 |---|---|
 | Source/plan/run mismatch, stale callback, invalid hash, missing output, invalid bounds, ambiguous/missing board slot | Integrity failure; never waive or export |
-| QA rejects or is unavailable, board is non-compliant, visual edge/alpha concern | `needs-review`; preserve evidence; explicit approval required |
+| Applicable policy classifies an issue as blocking quality | `needs-review`; preserve evidence; explicit revision-bound approval required |
+| Prototype visual QA rejects/is unavailable or board diagnostics are non-compliant after deterministic validity succeeds | Preserve a warning on the `ready` task; do not block consumption or start paid work |
 | Task fails before an image artifact exists | Show an authoritative Review blocker and retry action; do not disappear because no `Slice` exists |
 | Output changes after approval | Invalidate the old decision receipt |
 | Run is cancelled or superseded | Late results cannot publish or mark the run complete |
@@ -193,14 +202,17 @@ the Zustand store carries `assetProduction: AssetProductionSnapshot`.
 | Restore lacks projected blob but has a valid artifact id | Materialize from content-addressed storage |
 | Restore lacks both blob and recoverable artifact | Fail recovery explicitly; do not invent pixels or readiness |
 | Legacy project lacks production metadata | Add an idempotent `legacy-unverified` snapshot; do not invent QA or manifest evidence |
+| One planned board material produces several contained foreground crops | Composite them at their original relative offsets into one transparent artifact |
+| Multiple planned board materials produce ambiguous crops | Fail slot assignment; never guess or merge across task slots |
 
 ### 5. Good / Base / Bad Cases
 
 - Good: all required task publications verify and the current run projects to
   Files, Canvas, Assets, Review, Outcome, Design IR, and Export consistently.
-- Base: a quality issue publishes evidence as `needs-review`; UI can inspect it,
-  but consumers stay blocked until a receipt bound to that exact revision is
-  recorded.
+- Base: an explicitly blocking quality issue publishes evidence as
+  `needs-review`; UI can inspect it, but consumers stay blocked until a receipt
+  bound to that exact revision is recorded. An observational prototype QA or
+  board warning remains visible on a consumable `ready` task.
 - Bad: a component appends a Blob to `analysis.slices` and treats
   `slices.length > 0` as production completion.
 
@@ -249,6 +261,10 @@ of paid work.
 
 ```typescript
 explicitPrototypePageCount(brief: string): number | null
+compilePrototypeImageRequestBudget(input: {
+  designSystemCalls: number,
+  suites: readonly Pick<PrototypePlan, 'pages'>[],
+}): PrototypeImageRequestBudget
 forEachConcurrent<T>(
   items: readonly T[],
   concurrency: number,
@@ -262,15 +278,49 @@ Real gateway benchmarks are opt-in with
 
 ### 3. Contracts
 
-- Explicit page/screen counts in a brief override planner minimality. A
-  mismatched first plan gets one structured repair; a second mismatch fails
-  before any image call.
+- Route topology is an Agent planning result derived from the user's outcome,
+  business domain, content model, platform conventions, and complete user
+  journeys. A page/screen count mentioned in the brief is evidence or a budget
+  preference, not an automatic override. The Agent may clarify or explain a
+  different complete topology; deterministic validation checks graph integrity,
+  not equality to a parsed number.
 - One-page suites may use previous-page serial conditioning. Two or more pages
   use bounded concurrency 2 against the shared design-system reference.
-- Direct assets and region boards use bounded concurrency 2. Task ids, CAS
+- Direct assets use bounded concurrency 3. Task ids, CAS
   publication, and per-region failure isolation remain unchanged.
-- Production visual QA permits one paid re-roll after the first attempt. QA
-  unavailable stops automatic re-rolls and records `needs-review` evidence.
+- Each Agent-authored route seed declares zero or more reusable non-UI visual
+  materials based on genuine reuse value and non-code-reproducibility. Zero is
+  valid. Each new `board-cutout` material declares a route-local
+  `boardGroupId`; deterministic closure creates one exact-layout region per
+  authored group, creates one `direct-generate` region per art-directed
+  standalone material, and keeps ordinary layout regions `ignore-code-ui`.
+  Historical seeds without group ids retain their former single-group
+  projection. Closure never pads a route to a requested or benchmark count.
+- Compile the logical prototype graph into an explicit paid-request budget.
+  Heterogeneous fixtures include pages with zero, one, and several useful
+  materials and compute their expectation as Design Systems + actual pages +
+  actual board regions + actual direct assets. Mandatory hidden refine,
+  text-free prepass, or automatic QA re-roll nodes must not inflate that
+  resolved baseline. No fixture quantity becomes a production target.
+- Route and asset counts are never production constants. They resolve from the
+  Agent-authored business topology and useful material plan. The general baseline is
+  `Design System calls + actual pages + actual board-cutout regions + explicit
+  direct-generate assets`, compiled from the resolved plans.
+- One page attempt uses one paid image invocation. OpenAI-shaped routes consume
+  the selected Design System and stable anchor through one `edit-image` call;
+  the desktop executor preserves every bounded ordered reference or fails
+  closed when one is unavailable.
+- QA is evidence by default. It records a verdict and review issues with zero
+  automatic paid re-rolls; regeneration requires a later explicit user/Agent
+  decision and a new bounded attempt identity.
+- Compact board groups use the page, Design System, and at most one stable
+  anchor as visual context. They do not generate a text-free page prepass, and
+  independent page/group work runs with a combined concurrency ceiling of 3.
+  The outer page pool owns that budget; groups within one active page run
+  serially so nested pools cannot amplify Provider traffic to 9.
+- Production visual QA is observational after the first attempt. Rejection or
+  unavailability records a warning on a deterministically valid output and
+  never starts an automatic paid re-roll.
 - Concurrent pools stop claiming new work after the first uncaught failure,
   wait for already in-flight work to settle, then reject. They never return
   while callbacks can still publish late state.
@@ -278,39 +328,73 @@ Real gateway benchmarks are opt-in with
   They must not subscribe directly to a selector that allocates an array.
 - Real pipeline E2E succeeds only when every planned page is committed. The
   first concurrently completed page is not delivery.
+- The packaged business-scenario E2E accepts 1-12 Agent-authored routes per
+  suite, validates useful attributable assets from each resolved material plan,
+  and derives its expected image-call count from the actual page, board, and
+  standalone-asset graph. It owns no per-page asset-count constant.
+- The packaged benchmark requires exactly 3/3 complete suites. Once a suite
+  failure makes that strict outcome impossible, cancel unstarted sibling suites
+  instead of spending further paid calls. Normal product generation continues
+  preserving partial candidates because it does not inherit this benchmark-only
+  fail-fast policy.
+- Packaged E2E failure evidence uses a closed credential-free vocabulary that
+  distinguishes Provider transport/output from board decode, zero-slice,
+  slot-assignment, and artifact-persistence failures. Raw Provider ids,
+  responses, paths, and credentials never enter the result bundle.
 
 ### 4. Validation & Error Matrix
 
 | Condition | Required behavior |
 |---|---|
-| Explicit N pages, first plan has another count | Run one planner repair before paid image work |
-| Repair still violates N | Fail with explicit-scope error; generate no images |
-| Provider fails and local fallback violates N | Fail closed; do not silently use a one-page fallback |
+| User mentions N pages but the complete business topology differs | Agent explains or clarifies the resolved graph; do not mechanically pad, merge, repair, or fail on count equality |
+| Provider cannot author a valid business topology | Fail closed; do not silently use a generic one-page fallback |
+| Route has no reusable non-UI visual material | Preserve zero materials and create no board/direct material region |
+| Route has several coherent atomic material families | Preserve Agent-authored `boardGroupId` boundaries as separate board regions; do not collapse them by page |
+| Route has art-directed standalone materials | Preserve each as its own `direct-generate` region |
 | One concurrent task fails | Stop new claims, settle in-flight work, then surface the first error |
-| QA reviewer unavailable | Preserve candidate as `needs-review`; no paid re-roll loop |
+| Prototype QA reviewer unavailable after deterministic validity succeeds | Preserve candidate as `ready` with a warning; no paid re-roll loop |
+| Packaged 3/3 suite benchmark has one failed suite | Cancel unstarted benchmark siblings and fail with retained partial evidence |
 | Selector allocates a new collection each store read | Use `useShallow` or project a stable primitive |
 | Benchmark has fewer committed pages than its plan | E2E failure |
 
 ### 5. Good / Base / Bad Cases
 
-- Good: a two-page brief plans exactly two pages, generates them concurrently,
-  and the benchmark waits for both.
+- Good: a brief mentions two pages, the Agent derives a complete three-route
+  restaurant journey and explains the additional order-status destination;
+  generation then waits for all three planned routes.
 - Base: a provider outage fails during planning or marks generated candidates
   for review without expanding paid retries.
-- Bad: one `core` page satisfies a two-page brief, or the test unmounts when the
-  first page arrives and aborts the second task.
+- Bad: a failed Agent planner silently becomes a generic `core` page, or the
+  test unmounts when the first planned page arrives and aborts its siblings.
 
 ### 6. Tests Required
 
 - Hook mount regression proving empty slice projection does not trigger React
   `getSnapshot` / maximum-depth errors.
-- Planner unit tests for Arabic, Chinese, and English explicit counts, one
-  successful repair, and one fail-closed repair.
+- Planner unit tests proving count mentions are parsed only as planning evidence,
+  do not force repair/failure, and cannot authorize a generic local topology.
 - Async-pool tests for maximum concurrency, complete visitation, invalid limit,
   and failure convergence without late work.
 - Region tests proving concurrency 2, per-region isolation, diagnostics-before-
   slice ordering within each region, and bitmap cleanup.
-- Real planner benchmark asserts the explicit page count.
+- Planning-seed closure tests proving zero-material routes stay zero, multiple
+  authored `boardGroupId` values become multiple board regions, legacy missing
+  group ids remain compatible, and `direct-generate` materials stay standalone
+  without any per-page quota.
+- Component coverage proving every logical page in the resolved fixture issues
+  exactly one baseline page call, with one Design System reference for anchors
+  and Design System + anchor for the remaining pages.
+- Desktop executor coverage proving multi-reference edits preserve input order
+  and do not silently drop later references.
+- Production wiring coverage proving multiple board groups on one page and
+  boards across pages run concurrently, keep bounded reference context, and do
+  not enable a text-free paid prepass.
+- Packaged benchmark coverage proving a failed suite cancels only unstarted
+  benchmark siblings while ordinary product candidate behavior remains partial.
+- Budget compiler coverage with non-six-page route graphs, proving counts derive
+  from resolved Agent/user scope rather than the benchmark fixture.
+- Real planner benchmark asserts the benchmark fixture's resolved route count;
+  production validation does not generalize that fixture count into policy.
 - Real pipeline benchmark asserts design system plus every planned page; the
   deterministic browser E2E covers CV, content-addressed persistence, restore,
   and Outcome.
@@ -332,6 +416,50 @@ if (generated.length > 0) delivered = true
 await forEachConcurrent(pages, 2, generate)
 delivered = generated.length === plan.pages.length
 ```
+
+## Scenario: Packaged macOS Background Journey Liveness
+
+### 1. Scope / Trigger
+
+Apply when the packaged-E2E build runs the real WKWebView journey in a macOS
+guest without activating or focusing Cutout.
+
+### 2. Contracts
+
+- The dedicated E2E process uses an Accessory activation policy, a visible
+  non-focusable WebView window, and `NSApplication::unhideWithoutActivation()`.
+  The guest's foreground application must remain unchanged.
+- Tauri window visibility is necessary but not sufficient. The harness must
+  also verify macOS application visibility because a hidden application can
+  suspend WebContent even while `WebviewWindow::is_visible()` returns true.
+- Retain an `NSProcessInfo` user-initiated activity for the complete packaged
+  journey. Renderer timers and stream-finalization callbacks must continue
+  after a long native Provider await and after the native socket closes.
+- The lifecycle branch exists only in the dedicated packaged-E2E build/mode.
+  Normal production startup, activation, focus, and window behavior remain
+  unchanged.
+- `webview-renderable` means the lifecycle prerequisites were applied; it does
+  not by itself prove liveness. Closed VM evidence must include macOS process
+  visibility, foreground ownership, and a later renderer checkpoint.
+
+### 3. Validation Matrix
+
+| Condition | Required behavior |
+| --- | --- |
+| Accessory app projects `visible=false` through System Events | Record it as platform evidence; require retained activity, normal process scheduling, and a later renderer checkpoint |
+| Cutout becomes frontmost or focused | Fail the silent-E2E safety gate |
+| Native Provider socket closes | Renderer timeout or stream completion continues and advances to a terminal checkpoint |
+| Ordinary production launch | No forced unhide, activity token, or E2E focus policy is applied |
+
+### 4. Tests Required
+
+- Source regression proving unhide, process activity, non-focusable window, and
+  visibility/focus checks remain inside the packaged-E2E lifecycle branch.
+- Fresh no-graphics Tart run proving Cutout stays non-frontmost, the prior
+  foreground application remains frontmost, the process avoids low-priority
+  App Nap state, and renderer checkpoints continue.
+- A post-native-await checkpoint proving WebContent timers and orchestration
+  continue after the native TCP connection has closed.
 
 ## Scenario: Exterior White-Haze Recovery
 

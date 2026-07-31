@@ -7,17 +7,18 @@
 //! return the base64 image(s) the model produced (`data[].b64_json`). The secret
 //! exists only in Rust and never enters the webview, disk, or an error string.
 //!
-//! Only OpenAI-shaped kinds (`openai` / `openai-compatible`) are accepted — the
+//! Only reviewed OpenAI-shaped kinds are accepted — the
 //! edits endpoint is an OpenAI shape; other kinds have no `/images/edits`.
 
 use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
 use reqwest::multipart::{Form, Part};
 use serde::Serialize;
-use tauri::AppHandle;
+use tauri::{AppHandle, State};
 
 use super::ai_proxy::{
     buffered_timeout_for_url, build_client_for_target, enforce_host, enforce_resolved_host,
-    request_error_message, resolve_provider_request, ProxyError,
+    request_error_message, resolve_provider_request, run_cancellable_proxy_request,
+    AiProxyCancellationState, ProxyError,
 };
 use super::auth_header::auth_headers;
 use super::keys::read_secret;
@@ -34,7 +35,7 @@ pub struct ImageEditResult {
 
 /// Whether the provider `kind`'s `/images/edits` endpoint is OpenAI-shaped.
 fn is_openai_shaped(kind: &str) -> bool {
-    matches!(kind, "openai" | "openai-compatible")
+    matches!(kind, "openai" | "openai-compatible" | "cc-switch")
 }
 
 /// Build the multipart form for an edits request: `model`, `prompt`, optional
@@ -134,6 +135,8 @@ fn build_auth_headers(
 #[tauri::command]
 pub async fn ai_image_edit(
     app: AppHandle,
+    cancellations: State<'_, AiProxyCancellationState>,
+    request_id: Option<String>,
     provider_id: String,
     kind: String,
     wire_protocol: Option<ProviderWireProtocol>,
@@ -144,55 +147,58 @@ pub async fn ai_image_edit(
     size: Option<String>,
     input_fidelity: Option<String>,
 ) -> Result<ImageEditResult, ProxyError> {
-    // The edits endpoint is OpenAI-shaped only (defensive; the webview already
-    // gates the call on an OpenAI-compatible provider).
-    if !is_openai_shaped(&kind) {
-        return Err(ProxyError::UnknownKind);
-    }
-    if images.is_empty() {
-        return Err(ProxyError::Request(
-            "at least one reference image is required".to_string(),
-        ));
-    }
+    run_cancellable_proxy_request(&cancellations, request_id, async move {
+        // The edits endpoint is OpenAI-shaped only (defensive; the webview already
+        // gates the call on an OpenAI-compatible provider).
+        if !is_openai_shaped(&kind) {
+            return Err(ProxyError::UnknownKind);
+        }
+        if images.is_empty() {
+            return Err(ProxyError::Request(
+                "at least one reference image is required".to_string(),
+            ));
+        }
 
-    let url = format!("{}/images/edits", base_url.trim_end_matches('/'));
-    let (provider, effective_protocol) =
-        resolve_provider_request(&app, &provider_id, &kind, wire_protocol, &url)?;
-    enforce_host(provider.kind.as_str(), &url)?;
-    let target = enforce_resolved_host(provider.kind.as_str(), &url).await?;
-    let secret = read_secret(&provider_id).map_err(ProxyError::from)?;
-    let header_map = build_auth_headers(provider.kind, Some(effective_protocol), &secret)?;
+        let url = format!("{}/images/edits", base_url.trim_end_matches('/'));
+        let (provider, effective_protocol) =
+            resolve_provider_request(&app, &provider_id, &kind, wire_protocol, &url)?;
+        enforce_host(provider.kind.as_str(), &url)?;
+        let target = enforce_resolved_host(provider.kind.as_str(), &url).await?;
+        let secret = read_secret(&provider_id).map_err(ProxyError::from)?;
+        let header_map = build_auth_headers(provider.kind, Some(effective_protocol), &secret)?;
 
-    let fidelity = input_fidelity.as_deref().unwrap_or("high");
-    let form = build_edit_form(&model, &prompt, images, size.as_deref(), fidelity);
+        let fidelity = input_fidelity.as_deref().unwrap_or("high");
+        let form = build_edit_form(&model, &prompt, images, size.as_deref(), fidelity);
 
-    // Image edits can take several minutes on production models; use the image
-    // endpoint timeout instead of the shorter text/probe cap.
-    let client = build_client_for_target(Some(buffered_timeout_for_url(&url)), &target)?;
-    let resp = client
-        .post(&url)
-        .headers(header_map)
-        .multipart(form)
-        .send()
-        .await
-        .map_err(|e| ProxyError::Request(request_error_message(&e)))?;
+        // Image edits can take several minutes on production models; use the image
+        // endpoint timeout instead of the shorter text/probe cap.
+        let client = build_client_for_target(Some(buffered_timeout_for_url(&url)), &target)?;
+        let resp = client
+            .post(&url)
+            .headers(header_map)
+            .multipart(form)
+            .send()
+            .await
+            .map_err(|e| ProxyError::Request(request_error_message(&e)))?;
 
-    let status = resp.status();
-    let body = resp
-        .text()
-        .await
-        .map_err(|e| ProxyError::Request(request_error_message(&e)))?;
-    if !status.is_success() {
-        // Surface the status (never the secret) like `ai_proxy_request`.
-        return Err(ProxyError::Request(format!(
-            "images/edits failed: HTTP {}",
-            status.as_u16()
-        )));
-    }
+        let status = resp.status();
+        let body = resp
+            .text()
+            .await
+            .map_err(|e| ProxyError::Request(request_error_message(&e)))?;
+        if !status.is_success() {
+            // Surface the status (never the secret) like `ai_proxy_request`.
+            return Err(ProxyError::Request(format!(
+                "images/edits failed: HTTP {}",
+                status.as_u16()
+            )));
+        }
 
-    Ok(ImageEditResult {
-        images: parse_edit_response(&body)?,
+        Ok(ImageEditResult {
+            images: parse_edit_response(&body)?,
+        })
     })
+    .await
 }
 
 #[cfg(test)]
@@ -200,9 +206,10 @@ mod tests {
     use super::*;
 
     #[test]
-    fn openai_shaped_accepts_openai_kinds_only() {
+    fn openai_shaped_accepts_reviewed_openai_kinds_only() {
         assert!(is_openai_shaped("openai"));
         assert!(is_openai_shaped("openai-compatible"));
+        assert!(is_openai_shaped("cc-switch"));
         assert!(!is_openai_shaped("anthropic"));
         assert!(!is_openai_shaped("google"));
         assert!(!is_openai_shaped("gateway"));

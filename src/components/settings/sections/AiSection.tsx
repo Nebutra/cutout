@@ -1,4 +1,4 @@
-import { memo, useState } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   CheckCircle2,
   ChevronDown,
@@ -12,18 +12,25 @@ import {
   WandSparkles,
 } from 'lucide-react'
 import { Trans, useLingui } from '@lingui/react/macro'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import type { ProviderConfig } from '@/services/ai/provider-types'
 import type { ProviderDefinition } from '@/services/ai/provider-registry'
 import {
   discoverProviderCandidates,
   type ProviderDiscoveryCandidate,
 } from '@/services/ai/provider-discovery'
+import { configureAutomaticAi } from '@/services/ai/automatic-ai-setup'
+import {
+  ensureProviderVerification,
+  providerVerificationIsVerified,
+} from '@/services/ai/provider-verification'
+import { useServices } from '@/services/context'
+import { isErr } from '@/services/types'
 import {
   useProviderVerifications,
   useProviders,
 } from '@/hooks/queries/providers'
-import { useCapabilityBindings } from '@/hooks/queries/ai-settings'
+import { aiSettingsKeys, useCapabilityBindings } from '@/hooks/queries/ai-settings'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ProviderRow } from '../ProviderRow'
@@ -35,6 +42,7 @@ import { ProviderDirectory } from '../ProviderDirectory'
 import { discoveredProviderSourceLabel } from '../discovered-provider-source'
 import {
   projectAiSetup,
+  setupDuringAutomaticRefresh,
   type AiSetupProjection,
   type AiSetupQueryState,
 } from '../ai-setup-projection'
@@ -56,6 +64,12 @@ function queryState(query: { readonly isPending: boolean; readonly isError: bool
 export function AiSection() {
   const [view, setView] = useState<View>({ mode: 'list' })
   const [advanced, setAdvanced] = useState(false)
+  const [automaticBusy, setAutomaticBusy] = useState(false)
+  const [automaticError, setAutomaticError] = useState<string>()
+  const automaticAttempt = useRef('')
+  const verificationAttempt = useRef('')
+  const queryClient = useQueryClient()
+  const { providers: providerService } = useServices()
   const providers = useProviders()
   const bindings = useCapabilityBindings()
   const discovery = useQuery({
@@ -64,7 +78,7 @@ export function AiSection() {
     retry: false,
   })
   const verifications = useProviderVerifications()
-  const list = providers.data ?? []
+  const list = useMemo(() => providers.data ?? [], [providers.data])
   const setup = projectAiSetup({
     providersState: queryState(providers),
     providers: providers.data,
@@ -74,6 +88,71 @@ export function AiSection() {
     discoveryState: queryState(discovery),
     candidates: discovery.data,
   })
+
+  const runAutomaticSetup = useCallback(async (
+    candidates: readonly ProviderDiscoveryCandidate[],
+  ) => {
+    if (automaticBusy) return
+    setAutomaticBusy(true)
+    setAutomaticError(undefined)
+    try {
+      await configureAutomaticAi(candidates)
+      await Promise.all([
+        providers.refetch(),
+        discovery.refetch(),
+        queryClient.refetchQueries({
+          queryKey: aiSettingsKeys.capabilityBindings(),
+          exact: true,
+          type: 'all',
+        }),
+        queryClient.refetchQueries({
+          queryKey: aiSettingsKeys.assignments(),
+          exact: true,
+          type: 'all',
+        }),
+      ])
+    } catch (error) {
+      setAutomaticError(error instanceof Error ? error.message : String(error))
+    } finally {
+      setAutomaticBusy(false)
+    }
+  }, [automaticBusy, discovery, providers, queryClient])
+
+  useEffect(() => {
+    if (setup.status !== 'discovered-credentials') return
+    const key = setup.candidates.map((candidate) => candidate.id).sort().join(':')
+    if (!key || automaticAttempt.current === key) return
+    automaticAttempt.current = key
+    void runAutomaticSetup(setup.candidates)
+  }, [runAutomaticSetup, setup])
+
+  useEffect(() => {
+    const enabled = new Set(list.filter((provider) => provider.enabled).map((provider) => provider.id))
+    const unresolved = [...new Map(
+      Object.values(bindings.data?.bindings ?? {})
+        .filter((assignment) => assignment && enabled.has(assignment.providerId))
+        .map((assignment) => [`${assignment!.providerId}:${assignment!.model}`, assignment!] as const),
+    ).values()].filter((assignment) =>
+      !providerVerificationIsVerified(verifications[assignment.providerId], assignment.model),
+    )
+    const key = unresolved.map((assignment) => `${assignment.providerId}:${assignment.model}`).sort().join('|')
+    if (!key || verificationAttempt.current === key) return
+    verificationAttempt.current = key
+    setAutomaticBusy(true)
+    setAutomaticError(undefined)
+    void Promise.all(unresolved.map(async (assignment) => {
+      const status = await ensureProviderVerification(assignment.providerId, async () => {
+        const result = await providerService.test(assignment.providerId)
+        if (isErr(result)) throw new Error(result.error)
+        return result.data
+      }, undefined, assignment.model)
+      if (status !== 'verified') {
+        throw new Error(`The authenticated provider catalog does not include ${assignment.model}.`)
+      }
+    })).catch((error: unknown) => {
+      setAutomaticError(error instanceof Error ? error.message : String(error))
+    }).finally(() => setAutomaticBusy(false))
+  }, [bindings.data?.bindings, list, providerService, verifications])
 
   if (view.mode !== 'list') {
     if (view.mode === 'add' && !view.definition && !view.discovered) {
@@ -125,6 +204,7 @@ export function AiSection() {
   }
 
   const retry = () => {
+    verificationAttempt.current = ''
     void providers.refetch()
     void bindings.refetch()
     void discovery.refetch()
@@ -133,11 +213,13 @@ export function AiSection() {
   return (
     <div className="flex min-w-0 flex-col gap-5">
       <AiSetupOverview
-        setup={setup}
+        setup={setupDuringAutomaticRefresh(setup, automaticBusy)}
         onConnect={() => setView({ mode: 'add' })}
         onManage={() => setAdvanced(true)}
         onRetry={retry}
-        onSelectCandidate={(discovered) => setView({ mode: 'add', discovered })}
+        onSelectCandidate={(candidate) => void runAutomaticSetup([candidate])}
+        automaticBusy={automaticBusy}
+        automaticError={automaticError}
       />
 
       <details
@@ -213,12 +295,16 @@ export function AiSetupOverview({
   onManage,
   onRetry,
   onSelectCandidate,
+  automaticBusy = false,
+  automaticError,
 }: {
   readonly setup: AiSetupProjection
   readonly onConnect: () => void
   readonly onManage: () => void
   readonly onRetry: () => void
   readonly onSelectCandidate: (candidate: ProviderDiscoveryCandidate) => void
+  readonly automaticBusy?: boolean
+  readonly automaticError?: string
 }) {
   const { t } = useLingui()
   const dimensionLabels: Readonly<Record<string, string>> = {
@@ -257,10 +343,10 @@ export function AiSetupOverview({
       break
     case 'ready':
       icon = <CheckCircle2 className="size-5 text-emerald-600" />
-      title = t({ id: 'settings.ai_setup_ready', message: 'AI is ready' })
+      title = t({ id: 'settings.ai_setup_ready', message: 'AI routes are configured' })
       description = t({
         id: 'settings.ai_setup_ready_description',
-        message: 'Verified providers cover every required AI capability.',
+        message: 'Credentials and catalog routes are configured. Image generation is verified when the first image completes.',
       })
       break
     case 'needs-verification':
@@ -282,12 +368,15 @@ export function AiSetupOverview({
         message: 'Your verified providers do not cover every required task.',
       })
       detail = (
-        <div className="flex flex-wrap gap-1.5">
-          {setup.missing.map((item) => (
-            <span key={item.task} className="border border-amber-500/30 px-2 py-1 text-[11px] text-amber-700 dark:text-amber-300">
-              {dimensionLabels[item.task] ?? item.label}
-            </span>
-          ))}
+        <div>
+          {automaticError ? <p className="mb-2 text-xs text-destructive" role="alert">{automaticError}</p> : null}
+          <div className="flex flex-wrap gap-1.5">
+            {setup.missing.map((item) => (
+              <span key={item.task} className="border border-amber-500/30 px-2 py-1 text-[11px] text-amber-700 dark:text-amber-300">
+                {dimensionLabels[item.task] ?? item.label}
+              </span>
+            ))}
+          </div>
         </div>
       )
       action = (
@@ -300,28 +389,43 @@ export function AiSetupOverview({
     case 'discovered-credentials':
       icon = <WandSparkles className="size-5 text-emerald-600" />
       title = t({ id: 'settings.ai_setup_credentials_found', message: 'Reusable credentials found' })
-      description = t({
-        id: 'settings.ai_setup_credentials_found_description',
-        message: 'Review and connect a credential to finish setup.',
-      })
+      description = automaticBusy
+        ? t({
+            id: 'settings.ai_setup_configuring_description',
+            message: 'Verifying local credentials and configuring the required model routes.',
+          })
+        : t({
+            id: 'settings.ai_setup_credentials_auto_description',
+            message: 'Cutout can verify and configure these local credentials automatically.',
+          })
       detail = (
-        <div className="divide-y divide-border border-y border-border">
+        <div>
+          {automaticError ? (
+            <p className="mb-2 text-xs text-destructive" role="alert">{automaticError}</p>
+          ) : null}
+          <div className="divide-y divide-border border-y border-border">
           {setup.candidates.map((candidate) => (
             <button
               key={candidate.id}
               type="button"
               className="flex w-full items-center justify-between gap-3 py-2.5 text-left hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               onClick={() => onSelectCandidate(candidate)}
+              disabled={automaticBusy}
             >
               <span className="min-w-0">
                 <span className="block truncate text-sm font-medium">{candidate.label}</span>
                 <span className="block truncate text-[11px] text-muted-foreground">{sourceLabel(candidate)}</span>
               </span>
               <span className="shrink-0 text-xs font-medium">
-                <Trans id="settings.review_and_connect">Review and connect</Trans>
+                {automaticBusy ? (
+                  <Trans id="settings.configuring">Configuring</Trans>
+                ) : (
+                  <Trans id="settings.setup_automatically">Set up automatically</Trans>
+                )}
               </span>
             </button>
           ))}
+          </div>
         </div>
       )
       break
@@ -368,7 +472,14 @@ export function AiSetupOverview({
   }
 
   return (
-    <section className="border-y border-border py-4" aria-live="polite" data-ai-setup-status={setup.status}>
+    <section
+      className="border-y border-border py-4"
+      aria-live="polite"
+      data-ai-setup-status={setup.status}
+      data-ai-verified-provider-count={setup.status === 'ready' ? setup.verifiedProviders.length : 0}
+      data-ai-automatic-busy={automaticBusy ? 'true' : 'false'}
+      data-ai-missing-capability-count={setup.status === 'needs-capabilities' ? setup.missing.length : 0}
+    >
       <div className="flex items-start gap-3">
         <span className="mt-0.5 shrink-0" aria-hidden>{icon}</span>
         <div className="min-w-0 flex-1">

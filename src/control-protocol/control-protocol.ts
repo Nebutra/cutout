@@ -466,7 +466,13 @@ function defaultEffectsFor(operation: ControlOperation): ControlEffects {
   // later implements it as a local download. Hosts can require an approval.
   return {
     paid: operation.type === 'tool.invoke',
-    external: operation.type === 'source.ingest' || operation.type === 'export.design-kit' || operation.type === 'export.brand-kit' || operation.type === 'export.starter',
+    external: operation.type === 'source.ingest'
+      || operation.type === 'export.design-kit'
+      || operation.type === 'export.brand-kit'
+      || operation.type === 'export.starter'
+      || operation.type === 'coding.execute'
+      || operation.type === 'coding.review'
+      || operation.type === 'coding.repair',
   }
 }
 

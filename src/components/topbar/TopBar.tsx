@@ -49,6 +49,7 @@ export function TopBar({
             active={view === 'home'}
             label="Home"
             icon={<Home className="size-3.5" />}
+            agentAction="open-home"
             onClick={onOpenHome}
           />
           {projectTabOpen ? (
@@ -97,12 +98,14 @@ function TopTab({
   active,
   label,
   icon,
+  agentAction,
   onClick,
   onClose,
 }: {
   readonly active: boolean
   readonly label: string
   readonly icon: React.ReactNode
+  readonly agentAction?: string
   readonly onClick: () => void
   readonly onClose?: () => void
 }) {
@@ -117,6 +120,7 @@ function TopTab({
     >
       <button
         type="button"
+        data-agent-action={agentAction}
         aria-current={active ? 'page' : undefined}
         className="flex min-w-0 flex-1 items-center gap-2 rounded-l-md py-1.5 pl-3 pr-2 text-left"
         onClick={onClick}

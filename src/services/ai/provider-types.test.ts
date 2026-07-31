@@ -3,12 +3,14 @@ import {
   defaultProviderWireProtocol,
   isProviderWireProtocolSupported,
   providerConfigSchema,
+  supportsOpenAIImageEndpoints,
   supportedProviderWireProtocols,
 } from './provider-types'
 
 describe('provider wire protocol', () => {
   it('uses Responses for OpenAI and preserves compatible-provider chat behavior', () => {
     expect(defaultProviderWireProtocol('openai')).toBe('responses')
+    expect(defaultProviderWireProtocol('cc-switch')).toBe('responses')
     expect(defaultProviderWireProtocol('openai-compatible')).toBe('chat-completions')
     expect(defaultProviderWireProtocol('deepseek')).toBe('chat-completions')
     expect(defaultProviderWireProtocol('anthropic')).toBe('anthropic-messages')
@@ -26,6 +28,7 @@ describe('provider wire protocol', () => {
 
   it('defines the supported kind/protocol matrix explicitly', () => {
     expect(supportedProviderWireProtocols('openai')).toEqual(['responses', 'chat-completions'])
+    expect(supportedProviderWireProtocols('cc-switch')).toEqual(['responses', 'chat-completions'])
     expect(supportedProviderWireProtocols('anthropic')).toEqual(['anthropic-messages'])
     expect(supportedProviderWireProtocols('google')).toEqual(['google-generate-content'])
     expect(supportedProviderWireProtocols('openai-compatible')).toEqual([
@@ -37,6 +40,13 @@ describe('provider wire protocol', () => {
     expect(supportedProviderWireProtocols('deepseek')).toEqual(['chat-completions'])
     expect(isProviderWireProtocolSupported('deepseek', 'responses')).toBe(false)
     expect(isProviderWireProtocolSupported('gateway', undefined)).toBe(true)
+  })
+
+  it('keeps native OpenAI image endpoint support aligned with CC Switch', () => {
+    expect(supportsOpenAIImageEndpoints('openai')).toBe(true)
+    expect(supportsOpenAIImageEndpoints('openai-compatible')).toBe(true)
+    expect(supportsOpenAIImageEndpoints('cc-switch')).toBe(true)
+    expect(supportsOpenAIImageEndpoints('google')).toBe(false)
   })
 
   it('rejects unsupported combinations at the TypeScript config boundary', () => {

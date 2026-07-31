@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { createPrototypeAssetManifest } from '@/prototype/asset-manifest'
 import type { PrototypePlan } from '@/prototype/prototype-plan'
 import { emptyAssetProductionSnapshot } from '../contracts'
-import { qualityIssue } from '../quality-policy'
+import { observationalIssue, qualityIssue } from '../quality-policy'
 import {
   beginPrototypeProduction,
   cancelPrototypeProduction,
@@ -70,6 +70,53 @@ describe('prototype production adapter', () => {
     expect(state.runs['run:1']?.tasks[direct.taskId]?.status).toBe('ready')
     expect(state.runs['run:1']?.tasks[board.taskId]?.status).toBe('needs-review')
     expect(state.runs['run:1']?.status).toBe('needs-review')
+  })
+
+  it('publishes deterministically valid output with retained observational QA warnings', async () => {
+    const manifest = createPrototypeAssetManifest(prototypePlan, prototypePlan.pages)
+    const plan = await compilePrototypeProductionPlan({
+      projectRevisionId: 'revision:1', manifest,
+      pages: [{ page: prototypePlan.pages[0]!, artifactId: 'artifact:home', bytes: new Uint8Array([1]) }],
+      createdAt: 1,
+    })
+    let state = beginPrototypeProduction({
+      snapshot: emptyAssetProductionSnapshot(), plan, runId: 'run:observed', at: 2,
+    })
+    const artifact = {
+      artifactId: 'artifact:observed',
+      sha256: 'b'.repeat(64),
+      mediaType: 'image/png',
+      width: 20,
+      height: 20,
+    }
+    const warning = observationalIssue(
+      'board-qa-rejected',
+      'The board has minor visual inconsistencies.',
+      'model-review',
+      3,
+    )
+    for (const task of plan.tasks) {
+      state = publishPrototypeTaskArtifact({
+        snapshot: state,
+        runId: 'run:observed',
+        taskId: task.taskId,
+        artifact: { ...artifact, artifactId: `${artifact.artifactId}:${task.taskId}` },
+        reviewIssues: [warning],
+        verificationIssues: [warning],
+        at: 3,
+      })
+    }
+    state = finalizePrototypeProduction(state, 'run:observed', 4)
+
+    expect(state.runs['run:observed']?.status).toBe('completed')
+    expect(Object.values(state.runs['run:observed']!.tasks)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          status: 'ready',
+          issues: [expect.objectContaining({ code: 'board-qa-rejected', kind: 'warning' })],
+        }),
+      ]),
+    )
   })
 
   it('records task failure and cancellation without manufacturing success', async () => {

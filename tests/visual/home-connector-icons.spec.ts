@@ -96,7 +96,7 @@ test("Home connector popover renders nine stable icons across themes and scroll"
         expect(facts.gradient).toBe("");
         expect(facts.fill).toBe("currentColor");
         expect(facts.pathFill).toBe(facts.color);
-      } else if (facts.id === "cutout.pencil") {
+      } else if (facts.id === "cutout.pen") {
         expect(facts.source).toBe("pen.dev");
       } else if (facts.id === "cutout.paper") {
         expect(facts.source).toBe("paper.design");

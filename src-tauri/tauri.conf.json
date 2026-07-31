@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "Cutout",
-  "version": "0.1.12",
+  "version": "0.1.13",
   "identifier": "com.nebutra.cutout",
   "build": {
     "frontendDist": "../dist",
@@ -19,7 +19,8 @@
         "minHeight": 720,
         "resizable": true,
         "fullscreen": false,
-        "backgroundColor": "#f6f8fb"
+        "backgroundColor": "#f6f8fb",
+        "visible": false
       }
     ],
     "security": {

@@ -35,6 +35,7 @@ async function createEmptyProject(page: Page) {
   if (viewport && viewport.width < 768) await page.setViewportSize(viewport)
   await expect(page.getByRole('complementary', { name: 'Agent workspace' })).toBeVisible()
   await expect(page.getByPlaceholder(/Describe a result, correction, or next step/)).toBeVisible()
+  await expect(page.locator('[data-slot="user-message"]')).toContainText('Components UX regression')
   await documentFontsReady(page)
 }
 
@@ -161,6 +162,12 @@ test('Canvas production plan is navigable and approval-gated', async ({ page }, 
 })
 
 test('Unified Delivery Center exposes only real host capabilities', async ({ page }, testInfo) => {
+  const invalidSvgWarnings: string[] = []
+  page.on('console', (message) => {
+    if (message.type() === 'error' && message.text().includes('Received NaN for the')) {
+      invalidSvgWarnings.push(message.text())
+    }
+  })
   await createEmptyProject(page)
   const viewport = page.viewportSize()!
   if (viewport.width < 768) await page.setViewportSize({ width: 1024, height: viewport.height })
@@ -176,6 +183,7 @@ test('Unified Delivery Center exposes only real host capabilities', async ({ pag
     await expect(center).toBeVisible()
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true)
   }
+  expect(invalidSvgWarnings).toEqual([])
 })
 
 test('project actions are keyboard reachable and rename persists', async ({ page }) => {

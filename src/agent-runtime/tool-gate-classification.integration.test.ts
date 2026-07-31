@@ -9,7 +9,7 @@
  * one. Skipped unless CUTOUT_RUN_TOOL_GATE_BENCHMARK=1 is set (having
  * MOX_API_KEY alone does not opt in — matches the existing convention).
  */
-import { generateText as aiGenerateText, stepCountIs, tool as aiTool } from 'ai'
+import { generateText as aiGenerateText, hasToolCall, stepCountIs, tool as aiTool } from 'ai'
 import { describe, expect, it } from 'vitest'
 import { runToolLoop } from './tool-loop'
 import { astryxThemeTool, askClarifyingQuestionTool, configurePageTargetingTool, configureRegenerationTool, conversationalReplyTool, proceedWithGenerationTool } from './tool-registry'
@@ -55,8 +55,12 @@ function gatewayGeneration(key: string, base: string): Pick<GenerationService, '
           model: provider(input.model ?? MODEL),
           prompt: input.prompt,
           tools,
-          stopWhen: stepCountIs(input.maxSteps),
+          stopWhen: [
+            stepCountIs(input.maxSteps),
+            ...(input.terminalToolNames ?? []).map((toolName) => hasToolCall(toolName)),
+          ],
           abortSignal: input.signal,
+          maxOutputTokens: input.maxOutputTokens,
         })
         const toolCalls: GenerateWithToolsCall[] = []
         for (const step of result.steps) {

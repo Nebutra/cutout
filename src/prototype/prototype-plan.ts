@@ -1,5 +1,8 @@
 import { z } from 'zod'
-import { candidateExplorationDecisionSchema } from '@/candidate-selection/contracts'
+import {
+  candidateDirectionSchema,
+  candidateExplorationDecisionSchema,
+} from '@/candidate-selection/contracts'
 import type { Result } from '@/services/types'
 import { err, ok } from '@/services/types'
 
@@ -128,6 +131,150 @@ export const prototypeDesignSystemSchema = z.object({
   exploration: candidateExplorationDecisionSchema.optional(),
 })
 
+const prototypePlanningMaterialIdentityShape = {
+  id: z.string().min(1),
+  name: z.string().min(1),
+  description: z.string().min(1),
+} as const
+
+const prototypePlanningBoardGroupIdSchema = z.string().trim().min(1).max(80)
+
+export const prototypePlanningMaterialSchema = z.object({
+  ...prototypePlanningMaterialIdentityShape,
+  production: z.enum(['board-cutout', 'direct-generate']),
+  boardGroupId: prototypePlanningBoardGroupIdSchema.optional().describe(
+    'Stable route-local group for board-cutout materials that belong on one coherent board. '
+      + 'Omitted only by historical planning seeds.',
+  ),
+}).strict().superRefine((material, context) => {
+  if (material.production === 'direct-generate' && material.boardGroupId) {
+    context.addIssue({
+      code: 'custom',
+      path: ['boardGroupId'],
+      message: 'direct-generate materials cannot declare a boardGroupId.',
+    })
+  }
+})
+
+/** The generated shape is structural so Provider tool schemas expose the
+ * conditional requirement before execution, rather than only rejecting it in
+ * an invisible post-call refinement. */
+export const generatedPrototypePlanningMaterialSchema = z.discriminatedUnion(
+  'production',
+  [
+    z.object({
+      ...prototypePlanningMaterialIdentityShape,
+      production: z.literal('board-cutout'),
+      boardGroupId: prototypePlanningBoardGroupIdSchema.describe(
+        'Required route-local id for the coherent atomic family sharing this board.',
+      ),
+    }).strict(),
+    z.object({
+      ...prototypePlanningMaterialIdentityShape,
+      production: z.literal('direct-generate'),
+    }).strict(),
+  ],
+)
+
+export const prototypePlanningRouteSchema = prototypePageSchema.pick({
+  id: true,
+  name: true,
+  route: true,
+  purpose: true,
+  viewport: true,
+}).extend({
+  materials: z.array(prototypePlanningMaterialSchema).describe(
+    'Zero or more non-UI visual materials genuinely worth reusing on this route. '
+      + 'Do not include cards, forms, navigation, buttons, tables, or other code-reproducible UI.',
+  ),
+}).superRefine((route, context) => {
+  const materialIds = new Set<string>()
+  for (const [materialIndex, material] of route.materials.entries()) {
+    if (materialIds.has(material.id)) {
+      context.addIssue({
+        code: 'custom',
+        path: ['materials', materialIndex, 'id'],
+        message: `Duplicate material id "${material.id}" on route "${route.route}".`,
+      })
+    }
+    materialIds.add(material.id)
+  }
+})
+
+const generatedPrototypePlanningRouteSchema = prototypePlanningRouteSchema.safeExtend({
+  materials: z.array(generatedPrototypePlanningMaterialSchema).describe(
+    'Zero or more non-UI visual materials genuinely worth reusing on this route. '
+      + 'Do not include cards, forms, navigation, buttons, tables, or other code-reproducible UI.',
+  ),
+})
+
+export const prototypePlanningSeedSchema = z.object({
+  product: z.object({
+    name: z.string().min(1),
+    projectName: z.string().min(1).max(32).optional(),
+    summary: z.string().min(1),
+    audience: z.string().min(1),
+    primaryGoal: z.string().min(1),
+    platform: z.string().min(1),
+  }),
+  rationale: z.string().trim().min(1).max(2_000),
+  suites: z.array(z.object({
+    direction: candidateDirectionSchema,
+    pages: z.array(prototypePlanningRouteSchema).min(1).max(12),
+  }).strict()).min(1).max(8),
+}).strict().superRefine((seed, context) => {
+  const directionIds = new Set<string>()
+  const routeGraphs = new Set<string>()
+  for (const [suiteIndex, suite] of seed.suites.entries()) {
+    if (directionIds.has(suite.direction.id)) {
+      context.addIssue({
+        code: 'custom',
+        path: ['suites', suiteIndex, 'direction', 'id'],
+        message: `Duplicate direction id "${suite.direction.id}".`,
+      })
+    }
+    directionIds.add(suite.direction.id)
+    const ids = new Set<string>()
+    const routes = new Set<string>()
+    for (const [pageIndex, page] of suite.pages.entries()) {
+      if (ids.has(page.id)) {
+        context.addIssue({
+          code: 'custom',
+          path: ['suites', suiteIndex, 'pages', pageIndex, 'id'],
+          message: `Duplicate page id "${page.id}".`,
+        })
+      }
+      if (routes.has(page.route)) {
+        context.addIssue({
+          code: 'custom',
+          path: ['suites', suiteIndex, 'pages', pageIndex, 'route'],
+          message: `Duplicate route "${page.route}".`,
+        })
+      }
+      ids.add(page.id)
+      routes.add(page.route)
+    }
+    const graph = JSON.stringify(suite.pages.map(({ route }) => route))
+    if (routeGraphs.has(graph)) {
+      context.addIssue({
+        code: 'custom',
+        path: ['suites', suiteIndex, 'pages'],
+        message: 'Every suite must use a distinct route graph.',
+      })
+    }
+    routeGraphs.add(graph)
+  }
+})
+
+/** Historical persisted seeds may omit boardGroupId and retain their former
+ * single-board projection. New Agent output authors grouping structurally. */
+export const generatedPrototypePlanningSeedSchema = prototypePlanningSeedSchema.safeExtend({
+  suites: z.array(z.object({
+    direction: candidateDirectionSchema,
+    pages: z.array(generatedPrototypePlanningRouteSchema).min(1).max(12),
+  }).strict()).min(1).max(8),
+})
+
 export const prototypePlanSchema = z.object({
   version: z.literal('prototype-plan.v0'),
   product: z.object({
@@ -142,6 +289,8 @@ export const prototypePlanSchema = z.object({
   pages: z.array(prototypePageSchema).min(1).max(12),
   flows: z.array(prototypeFlowSchema).min(1),
   reviewDocument: prototypeReviewDocumentSchema.optional(),
+  /** Agent-authored compact input used to derive corresponding suite alternatives. */
+  planningSeed: prototypePlanningSeedSchema.optional(),
   humanLoop: prototypeHumanLoopSchema.default({
     mode: 'continue',
     rationale: 'The requirement is clear enough to proceed.',
@@ -164,6 +313,8 @@ export type PrototypePage = z.infer<typeof prototypePageSchema>
 export type PrototypeFlow = z.infer<typeof prototypeFlowSchema>
 export type PrototypeHumanLoop = z.infer<typeof prototypeHumanLoopSchema>
 export type PrototypeReviewDocument = z.infer<typeof prototypeReviewDocumentSchema>
+export type PrototypePlanningMaterial = z.infer<typeof prototypePlanningMaterialSchema>
+export type PrototypePlanningSeed = z.infer<typeof prototypePlanningSeedSchema>
 export type PrototypeHumanLoopAsk = Extract<PrototypeHumanLoop, { mode: 'ask' }>
 export type PrototypePlan = z.infer<typeof prototypePlanSchema>
 

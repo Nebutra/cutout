@@ -31,14 +31,18 @@ import {
 import { dagRunCoordinator, type DagRunLease } from "@/dag/run-coordinator";
 import { nameSlices, type SliceBox } from "@/services/ai/naming";
 import type { ModelAssignment } from "@/services/ai/model-assignment-types";
+import {
+  supportsOpenAIImageEndpoints,
+  type ProviderKind,
+} from "@/services/ai/provider-types";
 import { getStoreState } from "@/store";
 import type { DagNodeOutput } from "@/store/types";
 import { decodeImage, bytesToBlob } from "@/lib/image";
 import { useModelAssignments } from "./ai-settings";
 
 /** Whether a provider kind is served by the OpenAI-shaped `/images/edits`. */
-function isOpenAiShaped(kind: string | undefined): boolean {
-  return kind === "openai" || kind === "openai-compatible";
+function isOpenAiShaped(kind: ProviderKind | undefined): boolean {
+  return supportsOpenAIImageEndpoints(kind);
 }
 
 /** Pull the first image-kind output out of a node's upstream inputs. */
@@ -83,7 +87,7 @@ function createNodeRunner(
   services: ServiceRegistry,
   image: ModelAssignment,
   chat: ModelAssignment,
-  imageKind: string | undefined,
+  imageKind: ProviderKind | undefined,
 ) {
   const { generation, prompts, cutout } = services;
 

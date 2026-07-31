@@ -16,7 +16,9 @@ test("Deliver always returns to the same stateful project workspace", async ({ p
   await page.getByRole("button", { name: "Create from brief" }).click();
   await expect(page.getByText("No result yet", { exact: true })).toBeVisible();
   const composer = page.getByRole("textbox", { name: "Message the Agent" });
-  await expect(composer).toHaveValue(brief);
+  const submittedMessage = page.locator('[data-slot="user-message"]');
+  await expect(submittedMessage).toContainText(brief);
+  await expect(composer).toHaveValue("");
   const workspace = page.locator('[data-slot="project-workspace-surface"]');
   await workspace.evaluate((element) => { (element as HTMLElement).dataset.persistenceProbe = "same-node"; });
 
@@ -43,7 +45,8 @@ test("Deliver always returns to the same stateful project workspace", async ({ p
     await back.click();
     await expect(deliver).toHaveCount(0);
     await expect(page.getByText("No result yet", { exact: true })).toBeVisible();
-    await expect(composer).toHaveValue(brief);
+    await expect(submittedMessage).toContainText(brief);
+    await expect(composer).toHaveValue("");
     await expect(workspace).toHaveAttribute("data-persistence-probe", "same-node");
     await expect(workspace).toHaveAttribute("aria-hidden", "false");
     await expect(page.getByRole("tablist", { name: "Deliver sections" })).toHaveCount(0);

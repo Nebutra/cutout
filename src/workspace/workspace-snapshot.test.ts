@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { OutcomeRuntimeState } from '@/agent-runtime/outcome-runtime'
-import { replayRunEvents } from '@/agent-runtime/run-events'
+import { createRunEventStore, replayRunEvents } from '@/agent-runtime/run-events'
 import {
   createEmptyWorkspaceSnapshot,
   isWorkspaceSnapshotEmpty,
@@ -12,6 +12,12 @@ import {
 describe('workspace snapshot helpers', () => {
   it('defaults new workspaces to the complete planned route suite', () => {
     expect(createEmptyWorkspaceSnapshot().prototypeScope).toBe('full-plan')
+  })
+
+  it('does not treat an empty Agent event store as project content', () => {
+    expect(isWorkspaceSnapshotEmpty(createEmptyWorkspaceSnapshot({
+      agentRunEvents: createRunEventStore(),
+    }))).toBe(true)
   })
 
   it('fingerprints same-length text changes', () => {
@@ -178,6 +184,40 @@ describe('workspace snapshot helpers', () => {
 
     expect(isWorkspaceSnapshotEmpty(annotated)).toBe(false)
     expect(workspaceSnapshotFingerprint(annotated)).not.toBe(
+      workspaceSnapshotFingerprint(base),
+    )
+  })
+
+  it('fingerprints controlled Coding receipts so applied output survives restart', () => {
+    const base = snapshot(outcome('running', []))
+    const coded = {
+      ...base,
+      codingReceipts: [{
+        version: 'cutout.coding-receipt.v1',
+        receiptId: 'coding-receipt:one',
+        taskId: 'coding:handoff:one',
+        status: 'applied',
+        baseSnapshotId: 'snapshot:before',
+        resultSnapshotId: 'snapshot:after',
+        changedFiles: [{
+          path: 'site/pages/index.html',
+          operation: 'create',
+          sha256: 'a'.repeat(64),
+        }],
+        checks: [],
+        screenshots: [],
+        provenance: {
+          backend: 'provider:verified',
+          inputRefs: ['design-ir:revision:1'],
+          patchSha256: 'b'.repeat(64),
+        },
+        startedAt: 1,
+        completedAt: 2,
+      }],
+    } satisfies WorkspaceSnapshot
+
+    expect(isWorkspaceSnapshotEmpty(coded)).toBe(false)
+    expect(workspaceSnapshotFingerprint(coded)).not.toBe(
       workspaceSnapshotFingerprint(base),
     )
   })

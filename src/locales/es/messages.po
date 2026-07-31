@@ -233,7 +233,7 @@ msgstr "IA"
 #. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
 msgid "settings.ai_setup_ready"
-msgstr "La IA está lista"
+msgstr "Las rutas de IA están configuradas"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
@@ -771,6 +771,11 @@ msgid "settings.ai_setup_verification_description"
 msgstr "Los proveedores configurados deben estar activados y verificados antes de que Cutout pueda usarlos."
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.configuring"
+msgstr "Configurando"
+
+#. js-lingui-explicit-id
 #: src/components/library/KitLibraryInspector.tsx
 msgid "kit_library.audit_conflicts"
 msgstr "Conflictos"
@@ -918,6 +923,11 @@ msgid "settings.dimension_tts_description"
 msgstr "Crear audio hablado."
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.ai_setup_ready_description"
+msgstr "Las credenciales y rutas del catálogo están configuradas. La generación de imágenes se verifica al completar la primera imagen."
+
+#. js-lingui-explicit-id
 #: src/components/settings/sections/IntegrationsSection.tsx
 msgid "settings.integrations.description"
 msgstr "Las credenciales permanecen en el host de escritorio. Cutout solo almacena identificadores de sesión opacos y revocables."
@@ -963,6 +973,11 @@ msgstr "La personalidad personalizada requiere instrucciones antes de poder guar
 #: src/updater/update-notifications.ts
 msgid "updates.notification.available_detail"
 msgstr "Cutout {0} está disponible en el canal {channelLabel}."
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.ai_setup_credentials_auto_description"
+msgstr "Cutout puede verificar y configurar estas credenciales locales automáticamente."
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
@@ -2276,16 +2291,6 @@ msgid "settings.personalization.use_memory_desc"
 msgstr "Reutiliza preferencias aprobadas en sesiones futuras."
 
 #. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.review_and_connect"
-msgstr "Revisar y conectar"
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.ai_setup_credentials_found_description"
-msgstr "Revisa y conecta una credencial para completar la configuración."
-
-#. js-lingui-explicit-id
 #: src/components/library/ReviewBranchEditor.tsx
 msgid "review_branch.section_aria"
 msgstr "Rama de revisión"
@@ -2387,6 +2392,11 @@ msgstr "Selecciona un fragmento para cambiarle el nombre, inspeccionarlo y expor
 #: src/components/settings/sections/IntegrationsSection.tsx
 msgid "settings.integrations.expired"
 msgstr "La sesión caducó. Actualiza o vuelve a conectar."
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.setup_automatically"
+msgstr "Configurar automáticamente"
 
 #. js-lingui-explicit-id
 #: src/components/home/SidebarAccount.tsx
@@ -2845,14 +2855,14 @@ msgid "global_library.asset_preview_description"
 msgstr "Vista previa local verificada, procedencia y acciones de recurso según sus capacidades."
 
 #. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.ai_setup_ready_description"
-msgstr "Los proveedores verificados cubren todas las capacidades de IA necesarias."
-
-#. js-lingui-explicit-id
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.verifying_component_blobs"
 msgstr "Verificando blobs de componentes de origen…"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.ai_setup_configuring_description"
+msgstr "Verificando las credenciales locales y configurando las rutas de modelos necesarias."
 
 #. js-lingui-explicit-id
 #: src/components/library/GlobalLibraryView.tsx

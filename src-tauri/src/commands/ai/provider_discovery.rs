@@ -14,11 +14,38 @@ use tauri::{AppHandle, Manager, Runtime};
 use super::agent_credentials;
 use super::ai_proxy;
 use super::keys;
-use super::providers::{self, ProviderConfig, ProviderKind, ProviderWireProtocol};
+use super::providers::{
+    self, ProviderConfig, ProviderKind, ProviderWireProtocol, CC_SWITCH_BASE_URL,
+};
 
 const MAX_CONFIG_BYTES: u64 = 1024 * 1024;
+const MAX_CC_SWITCH_DB_BYTES: u64 = 256 * 1024 * 1024;
 const MAX_DRAFTS: usize = 32;
 const DRAFT_TTL: Duration = Duration::from_secs(10 * 60);
+const CODEX_CC_SWITCH_PROVIDER_ID: &str = "ccswitch";
+const CC_SWITCH_DB_LOCATION: &str = "~/.cc-switch/cc-switch.db";
+const CC_SWITCH_DB_SCHEMA_ID: &str = "cc-switch-db-codex-v1";
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct CcSwitchSettings {
+    auth: CcSwitchAuth,
+    config: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct CcSwitchAuth {
+    #[serde(rename = "OPENAI_API_KEY")]
+    api_key: String,
+}
+
+struct CcSwitchProviderRecord {
+    provider_id: String,
+    base_url: String,
+    model_hint: Option<String>,
+    secret: String,
+}
 
 struct ProviderDraftSession {
     created_at: Instant,
@@ -116,6 +143,19 @@ pub struct ProviderCandidate {
 #[serde(rename_all = "camelCase")]
 pub struct ProviderProbeResult {
     pub models: Vec<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AutoConfigureCandidateInput {
+    candidate_id: String,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AutoConfiguredProvider {
+    provider: ProviderConfig,
+    models: Vec<String>,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -538,10 +578,15 @@ fn discover_codex_at_with_legacy(
                 continue;
             };
             let is_openai = provider_id == "openai";
-            has_openai_provider |= is_openai;
+            let is_cc_switch = provider_id == CODEX_CC_SWITCH_PROVIDER_ID
+                && provider.get("base_url").and_then(toml::Value::as_str)
+                    == Some(CC_SWITCH_BASE_URL);
+            // A reviewed CC Switch profile owns the Codex auth-file credential.
+            // Do not also project that same secret as a public OpenAI candidate.
+            has_openai_provider |= is_openai || is_cc_switch;
             let env_key = provider.get("env_key").and_then(toml::Value::as_str);
             let env_available = env_key.and_then(std::env::var_os).is_some();
-            let use_auth_file = is_openai && auth_key_available && !env_available;
+            let use_auth_file = (is_openai || is_cc_switch) && auth_key_available && !env_available;
             let base_url = provider
                 .get("base_url")
                 .and_then(toml::Value::as_str)
@@ -551,7 +596,7 @@ fn discover_codex_at_with_legacy(
             )?
             .or_else(|| {
                 Some(
-                    if is_openai {
+                    if is_openai || is_cc_switch {
                         "responses"
                     } else {
                         "chat-completions"
@@ -587,6 +632,8 @@ fn discover_codex_at_with_legacy(
                 }),
                 kind: if is_openai {
                     "openai".into()
+                } else if is_cc_switch {
+                    "cc-switch".into()
                 } else {
                     "openai-compatible".into()
                 },
@@ -657,6 +704,256 @@ fn discover_codex(home: &Path) -> Result<Vec<ProviderCandidate>, DiscoveryError>
         &codex_home,
         display_root,
         Some(&home.join(".config/codex/auth.json")),
+    )
+}
+
+fn cc_switch_db_error() -> DiscoveryError {
+    DiscoveryError::Read("CC Switch database is unavailable".into())
+}
+
+fn validate_cc_switch_provider_schema(
+    connection: &rusqlite::Connection,
+) -> Result<(), DiscoveryError> {
+    let mut statement = connection
+        .prepare("SELECT name, type, \"notnull\", pk FROM pragma_table_info('providers')")
+        .map_err(|_| cc_switch_db_error())?;
+    let columns = statement
+        .query_map([], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                (
+                    row.get::<_, String>(1)?,
+                    row.get::<_, i64>(2)?,
+                    row.get::<_, i64>(3)?,
+                ),
+            ))
+        })
+        .map_err(|_| cc_switch_db_error())?
+        .collect::<Result<HashMap<_, _>, _>>()
+        .map_err(|_| cc_switch_db_error())?;
+    for (name, expected_type, expected_not_null, expected_primary_key) in [
+        ("id", "TEXT", 1, 1),
+        ("app_type", "TEXT", 1, 2),
+        ("settings_config", "TEXT", 1, 0),
+        ("is_current", "BOOLEAN", 1, 0),
+    ] {
+        let Some((actual_type, actual_not_null, actual_primary_key)) = columns.get(name) else {
+            return Err(DiscoveryError::Parse(
+                "CC Switch database schema is unsupported".into(),
+            ));
+        };
+        if !actual_type.eq_ignore_ascii_case(expected_type)
+            || *actual_not_null != expected_not_null
+            || *actual_primary_key != expected_primary_key
+        {
+            return Err(DiscoveryError::Parse(
+                "CC Switch database schema is unsupported".into(),
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn normalize_cc_switch_upstream_base_url(value: &str) -> Result<String, DiscoveryError> {
+    let mut parsed = reqwest::Url::parse(value)
+        .map_err(|_| DiscoveryError::Parse("CC Switch upstream endpoint is invalid".into()))?;
+    if parsed.scheme() != "https"
+        || !parsed.username().is_empty()
+        || parsed.password().is_some()
+        || parsed.query().is_some()
+        || parsed.fragment().is_some()
+    {
+        return Err(DiscoveryError::Parse(
+            "CC Switch upstream endpoint is not importable".into(),
+        ));
+    }
+    if matches!(parsed.path(), "" | "/") {
+        parsed.set_path("/v1");
+    } else {
+        let normalized_path = parsed.path().trim_end_matches('/').to_owned();
+        parsed.set_path(&normalized_path);
+    }
+    let normalized = parsed.to_string();
+    ai_proxy::enforce_host("openai-compatible", &normalized).map_err(|_| {
+        DiscoveryError::Parse("CC Switch upstream endpoint is not importable".into())
+    })?;
+    Ok(normalized)
+}
+
+fn parse_cc_switch_settings(raw: &str) -> Result<(String, Option<String>, String), DiscoveryError> {
+    if raw.len() > MAX_CONFIG_BYTES as usize {
+        return Err(DiscoveryError::TooLarge(
+            "CC Switch provider settings".into(),
+        ));
+    }
+    let settings: CcSwitchSettings = serde_json::from_str(raw)
+        .map_err(|_| DiscoveryError::Parse("CC Switch provider settings are invalid".into()))?;
+    if settings.auth.api_key.is_empty()
+        || settings.auth.api_key.len() > 16 * 1024
+        || settings.auth.api_key.chars().any(char::is_whitespace)
+        || settings.auth.api_key.chars().any(char::is_control)
+    {
+        return Err(DiscoveryError::NotImportable);
+    }
+    let config: toml::Value = toml::from_str(&settings.config)
+        .map_err(|_| DiscoveryError::Parse("CC Switch Codex config is invalid".into()))?;
+    let table = config
+        .as_table()
+        .ok_or_else(|| DiscoveryError::Parse("CC Switch Codex config is invalid".into()))?;
+    if table.contains_key("model_provider") || table.contains_key("model_providers") {
+        return Err(DiscoveryError::Parse(
+            "CC Switch Codex config has an ambiguous upstream".into(),
+        ));
+    }
+    let base_url = table
+        .get("base_url")
+        .and_then(toml::Value::as_str)
+        .ok_or_else(|| DiscoveryError::Parse("CC Switch upstream endpoint is missing".into()))?;
+    if table.get("wire_api").and_then(toml::Value::as_str) != Some("responses") {
+        return Err(DiscoveryError::UnsupportedWireProtocol(
+            "CC Switch upstream must use Responses".into(),
+        ));
+    }
+    let model_hint = match table.get("model") {
+        Some(value) => {
+            let model = value.as_str().ok_or_else(|| {
+                DiscoveryError::Parse("CC Switch selected model is invalid".into())
+            })?;
+            validate_sanitized_text(model, 160)?;
+            Some(model.to_owned())
+        }
+        None => None,
+    };
+    Ok((
+        normalize_cc_switch_upstream_base_url(base_url)?,
+        model_hint,
+        settings.auth.api_key,
+    ))
+}
+
+fn cc_switch_current_provider_at(
+    database_path: &Path,
+) -> Result<Option<CcSwitchProviderRecord>, DiscoveryError> {
+    fn database_identity(path: &Path) -> Result<Option<FileIdentity>, DiscoveryError> {
+        let Some(metadata) = exact_path_metadata(path)? else {
+            return Ok(None);
+        };
+        if !metadata.is_file() {
+            return Err(DiscoveryError::Read(
+                "CC Switch database is not a regular file".into(),
+            ));
+        }
+        if metadata.len() > MAX_CC_SWITCH_DB_BYTES {
+            return Err(DiscoveryError::TooLarge("CC Switch database".into()));
+        }
+        exact_path_file_identity(path)
+    }
+
+    let Some(before_identity) = database_identity(database_path)? else {
+        return Ok(None);
+    };
+    let result = (|| {
+        let connection = rusqlite::Connection::open_with_flags(
+            database_path,
+            rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX,
+        )
+        .map_err(|_| cc_switch_db_error())?;
+        connection
+            .busy_timeout(Duration::from_secs(2))
+            .map_err(|_| cc_switch_db_error())?;
+        connection
+            .pragma_update(None, "query_only", "ON")
+            .map_err(|_| cc_switch_db_error())?;
+        validate_cc_switch_provider_schema(&connection)?;
+
+        let mut statement = connection
+            .prepare(
+                "SELECT id, length(settings_config), \
+                        CASE WHEN length(settings_config) <= ?1 THEN settings_config END \
+                 FROM providers \
+                 WHERE app_type = 'codex' AND is_current = 1 LIMIT 2",
+            )
+            .map_err(|_| cc_switch_db_error())?;
+        let mut rows = statement
+            .query([MAX_CONFIG_BYTES as i64])
+            .map_err(|_| cc_switch_db_error())?;
+        let Some(row) = rows.next().map_err(|_| cc_switch_db_error())? else {
+            return Ok(None);
+        };
+        let provider_id: String = row.get(0).map_err(|_| cc_switch_db_error())?;
+        let settings_length: i64 = row.get(1).map_err(|_| cc_switch_db_error())?;
+        if settings_length < 0 || settings_length as u64 > MAX_CONFIG_BYTES {
+            return Err(DiscoveryError::TooLarge(
+                "CC Switch provider settings".into(),
+            ));
+        }
+        let settings: String = row.get(2).map_err(|_| cc_switch_db_error())?;
+        if rows.next().map_err(|_| cc_switch_db_error())?.is_some() {
+            return Err(DiscoveryError::Parse(
+                "CC Switch has multiple current Codex providers".into(),
+            ));
+        }
+        Ok(Some((provider_id, settings)))
+    })();
+    if database_identity(database_path)? != Some(before_identity) {
+        return Err(DiscoveryError::Read(
+            "CC Switch database identity changed during read".into(),
+        ));
+    };
+    let Some((provider_id, settings)) = result? else {
+        return Ok(None);
+    };
+    if provider_id.is_empty()
+        || provider_id.len() > 160
+        || provider_id.chars().any(char::is_control)
+    {
+        return Err(DiscoveryError::Parse(
+            "CC Switch current provider identity is invalid".into(),
+        ));
+    }
+    let (base_url, model_hint, secret) = parse_cc_switch_settings(&settings)?;
+    Ok(Some(CcSwitchProviderRecord {
+        provider_id,
+        base_url,
+        model_hint,
+        secret,
+    }))
+}
+
+fn cc_switch_candidate(record: &CcSwitchProviderRecord) -> ProviderCandidate {
+    ProviderCandidate {
+        id: candidate_id(&[
+            "cc-switch-db",
+            &record.provider_id,
+            record.base_url.as_str(),
+        ]),
+        source: "cc-switch".into(),
+        source_label: "CC Switch".into(),
+        agent_id: Some("codex".into()),
+        schema_id: Some(CC_SWITCH_DB_SCHEMA_ID.into()),
+        config_location: Some(CC_SWITCH_DB_LOCATION.into()),
+        kind: "openai-compatible".into(),
+        label: "CC Switch current Codex upstream".into(),
+        base_url: Some(record.base_url.clone()),
+        wire_protocol: Some("responses".into()),
+        model_hint: record.model_hint.clone(),
+        credential: CredentialPreview {
+            source_type: "cc-switch-db".into(),
+            reference: Some("OPENAI_API_KEY".into()),
+            available: true,
+            importable: true,
+        },
+        warnings: vec![],
+    }
+}
+
+fn discover_cc_switch(home: &Path) -> Result<Vec<ProviderCandidate>, DiscoveryError> {
+    Ok(
+        cc_switch_current_provider_at(&home.join(".cc-switch/cc-switch.db"))?
+            .as_ref()
+            .map(cc_switch_candidate)
+            .into_iter()
+            .collect(),
     )
 }
 
@@ -927,13 +1224,41 @@ pub async fn discover_provider_candidates<R: Runtime>(
     app: AppHandle<R>,
 ) -> Result<Vec<ProviderCandidate>, DiscoveryError> {
     let home = app.path().home_dir().map_err(|_| DiscoveryError::Home)?;
-    let mut candidates = discover_codex(&home)?;
-    candidates.extend(discover_claude(&home)?);
-    candidates.extend(agent_credentials::discover(&home)?);
+    let mut candidates = Vec::new();
+    let mut first_error = None;
+    for result in [
+        discover_cc_switch(&home),
+        discover_codex(&home),
+        discover_claude(&home),
+        agent_credentials::discover(&home),
+    ] {
+        match result {
+            Ok(rows) => candidates.extend(rows),
+            Err(error) => {
+                first_error.get_or_insert(error);
+            }
+        }
+    }
     candidates.extend(discover_environment());
     candidates.extend(discover_cutout_keychain(&app));
-    for candidate in &candidates {
-        validate_candidate(candidate)?;
+    finalize_candidates(candidates, first_error)
+}
+
+fn finalize_candidates(
+    mut candidates: Vec<ProviderCandidate>,
+    mut first_error: Option<DiscoveryError>,
+) -> Result<Vec<ProviderCandidate>, DiscoveryError> {
+    candidates.retain(|candidate| match validate_candidate(candidate) {
+        Ok(()) => true,
+        Err(error) => {
+            first_error.get_or_insert(error);
+            false
+        }
+    });
+    if candidates.is_empty() {
+        if let Some(error) = first_error {
+            return Err(error);
+        }
     }
     let mut seen = HashSet::new();
     candidates.retain(|candidate| seen.insert(candidate.id.clone()));
@@ -973,6 +1298,18 @@ fn candidate_secret_at(
                 &primary
             };
             codex_api_key_from(source)?.ok_or(DiscoveryError::CandidateMissing)
+        }
+        ("cc-switch", Some("OPENAI_API_KEY"))
+            if candidate.credential.source_type == "cc-switch-db"
+                && candidate.schema_id.as_deref() == Some(CC_SWITCH_DB_SCHEMA_ID) =>
+        {
+            let record = cc_switch_current_provider_at(&home.join(".cc-switch/cc-switch.db"))?
+                .ok_or(DiscoveryError::CandidateMissing)?;
+            let current = cc_switch_candidate(&record);
+            if candidate_fingerprint(&current)? != candidate_fingerprint(candidate)? {
+                return Err(DiscoveryError::CandidateMissing);
+            }
+            Ok(record.secret)
         }
         ("claude", Some(name)) if candidate.credential.source_type == "environment" => {
             std::env::var(name).map_err(|_| DiscoveryError::CandidateMissing)
@@ -1430,13 +1767,409 @@ pub async fn import_provider_draft<R: Runtime>(
     Ok(provider)
 }
 
+fn automatic_provider_id(candidate_id: &str) -> Result<String, DiscoveryError> {
+    let digest = candidate_id
+        .strip_prefix("provider-candidate:")
+        .filter(|value| value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit()))
+        .ok_or(DiscoveryError::CandidateMissing)?;
+    Ok(format!("local-import-{}", &digest[..24]))
+}
+
+fn automatic_default_model(
+    candidate: &ProviderCandidate,
+    models: &[String],
+) -> Result<String, DiscoveryError> {
+    candidate
+        .model_hint
+        .as_ref()
+        .filter(|hint| models.iter().any(|model| model == *hint))
+        .cloned()
+        .or_else(|| models.first().cloned())
+        .ok_or(DiscoveryError::CatalogMalformed)
+}
+
+fn checkpoint_automatic_error(error: &DiscoveryError) {
+    let phase = match error {
+        DiscoveryError::Http(401 | 403) => "ai-native-catalog-unauthorized",
+        DiscoveryError::Http(_) => "ai-native-catalog-http-failed",
+        DiscoveryError::CatalogMalformed | DiscoveryError::CatalogUnsupported => {
+            "ai-native-catalog-invalid"
+        }
+        DiscoveryError::Request(_) => "ai-native-catalog-request-failed",
+        DiscoveryError::CandidateMissing | DiscoveryError::NotImportable => {
+            "ai-native-credential-missing"
+        }
+        DiscoveryError::Keychain(_) => "ai-native-credential-vault-failed",
+        _ => "ai-native-configuration-failed",
+    };
+    crate::commands::packaged_e2e::native_checkpoint(phase);
+}
+
+async fn checked_automatic_draft<R: Runtime>(
+    app: &AppHandle<R>,
+    draft: &ProviderDraftSession,
+) -> Result<Vec<String>, DiscoveryError> {
+    match check_draft(app, draft).await {
+        Ok((models, _)) => {
+            crate::commands::packaged_e2e::native_checkpoint("ai-native-catalog-checked");
+            Ok(models)
+        }
+        Err(error) => {
+            checkpoint_automatic_error(&error);
+            Err(error)
+        }
+    }
+}
+
+/// Atomically turns one reviewed local credential into a verified Cutout
+/// Provider. The secret is resolved, checked, and stored entirely in Rust.
+#[tauri::command]
+pub async fn auto_configure_provider_candidate<R: Runtime>(
+    app: AppHandle<R>,
+    input: AutoConfigureCandidateInput,
+) -> Result<AutoConfiguredProvider, DiscoveryError> {
+    let candidate = discover_provider_candidates(app.clone())
+        .await?
+        .into_iter()
+        .find(|candidate| candidate.id == input.candidate_id)
+        .ok_or(DiscoveryError::CandidateMissing)?;
+    if !candidate.credential.available || !candidate.credential.importable {
+        return Err(DiscoveryError::NotImportable);
+    }
+    crate::commands::packaged_e2e::native_checkpoint("ai-native-candidate-resolved");
+    let base_url = candidate_effective_base_url(&candidate)
+        .map(str::to_owned)
+        .ok_or_else(|| DiscoveryError::Parse("provider endpoint is unavailable".into()))?;
+    let kind: ProviderKind =
+        serde_json::from_value(serde_json::Value::String(candidate.kind.clone()))
+            .map_err(|error| DiscoveryError::Parse(error.to_string()))?;
+    let wire_protocol = normalized_draft_wire_protocol(
+        kind,
+        candidate
+            .wire_protocol
+            .as_deref()
+            .map(|protocol| {
+                serde_json::from_value(serde_json::Value::String(protocol.to_owned()))
+                    .map_err(|error| DiscoveryError::UnsupportedWireProtocol(error.to_string()))
+            })
+            .transpose()?,
+    )?;
+    crate::commands::packaged_e2e::native_checkpoint("ai-native-binding-normalized");
+    let provider_id = automatic_provider_id(&candidate.id)?;
+    let configured = providers::load_providers_sync(&app)
+        .map_err(|error| DiscoveryError::Persistence(error.to_string()))?;
+    crate::commands::packaged_e2e::native_checkpoint("ai-native-config-loaded");
+
+    if let Some(existing) = configured
+        .iter()
+        .find(|provider| provider.id == provider_id)
+    {
+        validate_existing_provider_binding(
+            &app,
+            &provider_id,
+            &candidate.kind,
+            &base_url,
+            wire_protocol,
+        )?;
+        let draft = ProviderDraftSession {
+            created_at: Instant::now(),
+            kind: candidate.kind,
+            base_url,
+            wire_protocol,
+            candidate_id: None,
+            provider_id: Some(provider_id),
+            secret: None,
+            candidate_fingerprint: None,
+            candidate_secret_revision: None,
+            checked_models: None,
+        };
+        let models = checked_automatic_draft(&app, &draft).await?;
+        return Ok(AutoConfiguredProvider {
+            provider: existing.clone(),
+            models,
+        });
+    }
+
+    let home = app.path().home_dir().map_err(|_| DiscoveryError::Home)?;
+    let secret = candidate_secret(&candidate, &home)?;
+    crate::commands::packaged_e2e::native_checkpoint("ai-native-secret-resolved");
+    let draft = ProviderDraftSession {
+        created_at: Instant::now(),
+        kind: candidate.kind.clone(),
+        base_url: base_url.clone(),
+        wire_protocol,
+        candidate_id: Some(candidate.id.clone()),
+        provider_id: None,
+        secret: Some(secret.clone()),
+        candidate_fingerprint: Some(candidate_fingerprint(&candidate)?),
+        candidate_secret_revision: None,
+        checked_models: None,
+    };
+    let models = checked_automatic_draft(&app, &draft).await?;
+    let provider = ProviderConfig {
+        id: provider_id.clone(),
+        kind,
+        label: candidate.label.clone(),
+        base_url: Some(base_url),
+        wire_protocol,
+        default_model: automatic_default_model(&candidate, &models)?,
+        enabled: true,
+    };
+    keys::store_imported_key(&provider_id, &secret)
+        .map_err(|_| DiscoveryError::Keychain("credential vault write failed".into()))?;
+    crate::commands::packaged_e2e::native_checkpoint("ai-native-key-stored");
+    let mut next = configured;
+    next.push(provider.clone());
+    if let Err(error) = providers::save_providers_atomic(&app, &next) {
+        let _ = keys::delete_imported_key(&provider_id);
+        return Err(DiscoveryError::Persistence(error.to_string()));
+    }
+    crate::commands::packaged_e2e::native_checkpoint("ai-native-provider-saved");
+    Ok(AutoConfiguredProvider { provider, models })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn automatic_ids_are_stable_and_opaque() {
+        let candidate = format!("provider-candidate:{}", "a".repeat(64));
+        assert_eq!(
+            automatic_provider_id(&candidate).unwrap(),
+            format!("local-import-{}", "a".repeat(24))
+        );
+        assert!(automatic_provider_id("candidate:/local/path").is_err());
+    }
     use tempfile::TempDir;
 
     fn tempdir() -> std::io::Result<TempDir> {
         tempfile::tempdir_in(std::env::temp_dir().canonicalize()?)
+    }
+
+    fn create_cc_switch_database(home: &Path, settings: &str) -> PathBuf {
+        let root = home.join(".cc-switch");
+        std::fs::create_dir_all(&root).unwrap();
+        let path = root.join("cc-switch.db");
+        let connection = rusqlite::Connection::open(&path).unwrap();
+        connection
+            .execute_batch(
+                "CREATE TABLE providers (
+                    id TEXT NOT NULL,
+                    app_type TEXT NOT NULL,
+                    name TEXT NOT NULL,
+                    settings_config TEXT NOT NULL,
+                    is_current BOOLEAN NOT NULL DEFAULT 0,
+                    PRIMARY KEY (id, app_type)
+                );",
+            )
+            .unwrap();
+        connection
+            .execute(
+                "INSERT INTO providers (id, app_type, name, settings_config, is_current)
+                 VALUES (?1, 'codex', 'Current upstream', ?2, 1)",
+                rusqlite::params!["current", settings],
+            )
+            .unwrap();
+        path
+    }
+
+    fn cc_switch_settings(base_url: &str, model: &str, secret: &str) -> String {
+        serde_json::json!({
+            "auth": { "OPENAI_API_KEY": secret },
+            "config": format!(
+                "base_url = {base_url:?}\nwire_api = \"responses\"\nmodel = {model:?}\n[features]\njs_repl = true\n"
+            ),
+        })
+        .to_string()
+    }
+
+    #[test]
+    fn cc_switch_current_upstream_is_importable_without_exposing_its_secret() {
+        let home = tempdir().unwrap();
+        let secret = "cc-switch-db-secret-must-stay-native";
+        create_cc_switch_database(
+            home.path(),
+            &cc_switch_settings("https://relay.example/", "gpt-observed", secret),
+        );
+
+        let rows = discover_cc_switch(home.path()).unwrap();
+        assert_eq!(rows.len(), 1);
+        let candidate = &rows[0];
+        assert_eq!(candidate.source, "cc-switch");
+        assert_eq!(candidate.schema_id.as_deref(), Some(CC_SWITCH_DB_SCHEMA_ID));
+        assert_eq!(candidate.kind, "openai-compatible");
+        assert_eq!(
+            candidate.base_url.as_deref(),
+            Some("https://relay.example/v1")
+        );
+        assert_eq!(candidate.wire_protocol.as_deref(), Some("responses"));
+        assert_eq!(candidate.model_hint.as_deref(), Some("gpt-observed"));
+        assert!(candidate.credential.available);
+        assert!(candidate.credential.importable);
+        assert_eq!(candidate_secret(candidate, home.path()).unwrap(), secret);
+        assert!(!serde_json::to_string(candidate).unwrap().contains(secret));
+        assert!(matches!(
+            automatic_default_model(candidate, &[]),
+            Err(DiscoveryError::CatalogMalformed)
+        ));
+    }
+
+    #[test]
+    fn cc_switch_database_is_optional_and_never_created_by_discovery() {
+        let home = tempdir().unwrap();
+        let path = home.path().join(".cc-switch/cc-switch.db");
+        assert!(discover_cc_switch(home.path()).unwrap().is_empty());
+        assert!(!path.exists());
+    }
+
+    #[test]
+    fn cc_switch_database_adapter_rejects_oversized_database_before_opening() {
+        let home = tempdir().unwrap();
+        let root = home.path().join(".cc-switch");
+        std::fs::create_dir(&root).unwrap();
+        let file = std::fs::File::create(root.join("cc-switch.db")).unwrap();
+        file.set_len(MAX_CC_SWITCH_DB_BYTES + 1).unwrap();
+        assert!(matches!(
+            discover_cc_switch(home.path()),
+            Err(DiscoveryError::TooLarge(_))
+        ));
+    }
+
+    #[test]
+    fn cc_switch_database_adapter_does_not_materialize_oversized_settings() {
+        let home = tempdir().unwrap();
+        create_cc_switch_database(home.path(), &"x".repeat(MAX_CONFIG_BYTES as usize + 1));
+        assert!(matches!(
+            discover_cc_switch(home.path()),
+            Err(DiscoveryError::TooLarge(_))
+        ));
+    }
+
+    #[test]
+    fn cc_switch_database_adapter_rejects_schema_and_binding_ambiguity() {
+        let home = tempdir().unwrap();
+        let root = home.path().join(".cc-switch");
+        std::fs::create_dir(&root).unwrap();
+        let path = root.join("cc-switch.db");
+        let connection = rusqlite::Connection::open(&path).unwrap();
+        connection
+            .execute_batch(
+                "CREATE TABLE providers (
+                    id TEXT NOT NULL,
+                    app_type TEXT NOT NULL,
+                    settings_config TEXT NOT NULL,
+                    PRIMARY KEY (id, app_type)
+                );",
+            )
+            .unwrap();
+        drop(connection);
+        assert!(matches!(
+            discover_cc_switch(home.path()),
+            Err(DiscoveryError::Parse(_))
+        ));
+
+        std::fs::remove_file(&path).unwrap();
+        let settings = cc_switch_settings("https://relay.example/v1", "model", "secret");
+        create_cc_switch_database(home.path(), &settings);
+        let connection = rusqlite::Connection::open(&path).unwrap();
+        connection
+            .execute(
+                "INSERT INTO providers (id, app_type, name, settings_config, is_current)
+                 VALUES ('other', 'codex', 'Other', ?1, 1)",
+                [settings],
+            )
+            .unwrap();
+        drop(connection);
+        assert!(matches!(
+            discover_cc_switch(home.path()),
+            Err(DiscoveryError::Parse(_))
+        ));
+    }
+
+    #[test]
+    fn cc_switch_database_adapter_rejects_unreviewed_settings_shapes() {
+        for settings in [
+            serde_json::json!({
+                "auth": { "OPENAI_API_KEY": "secret" },
+                "config": "base_url = \"https://relay.example/v1\"\nwire_api = \"responses\"",
+                "unexpected": true,
+            })
+            .to_string(),
+            serde_json::json!({
+                "auth": { "OPENAI_API_KEY": "secret", "access_token": "not-importable" },
+                "config": "base_url = \"https://relay.example/v1\"\nwire_api = \"responses\"",
+            })
+            .to_string(),
+            cc_switch_settings("http://127.0.0.1:9999/v1", "model", "secret"),
+            cc_switch_settings(
+                "https://user:password@relay.example/v1",
+                "model",
+                "secret",
+            ),
+            cc_switch_settings(
+                "https://relay.example/v1?token=not-allowed",
+                "model",
+                "secret",
+            ),
+            serde_json::json!({
+                "auth": { "OPENAI_API_KEY": "secret" },
+                "config": "base_url = \"https://relay.example/v1\"\nwire_api = \"chat-completions\"",
+            })
+            .to_string(),
+            serde_json::json!({
+                "auth": { "OPENAI_API_KEY": "secret" },
+                "config": "base_url = \"https://relay.example/v1\"\nwire_api = \"responses\"\nmodel_provider = \"other\"",
+            })
+            .to_string(),
+        ] {
+            let home = tempdir().unwrap();
+            create_cc_switch_database(home.path(), &settings);
+            assert!(discover_cc_switch(home.path()).is_err());
+        }
+    }
+
+    #[test]
+    fn cc_switch_candidate_is_reread_and_rejects_binding_drift() {
+        let home = tempdir().unwrap();
+        let path = create_cc_switch_database(
+            home.path(),
+            &cc_switch_settings("https://first.example/v1", "model-a", "first-secret"),
+        );
+        let candidate = discover_cc_switch(home.path()).unwrap().remove(0);
+        let changed = cc_switch_settings("https://second.example/v1", "model-b", "second-secret");
+        let connection = rusqlite::Connection::open(path).unwrap();
+        connection
+            .execute(
+                "UPDATE providers SET settings_config = ?1 WHERE app_type = 'codex' AND is_current = 1",
+                [changed],
+            )
+            .unwrap();
+        drop(connection);
+
+        assert!(matches!(
+            candidate_secret(&candidate, home.path()),
+            Err(DiscoveryError::CandidateMissing)
+        ));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn cc_switch_database_adapter_rejects_symlinked_database() {
+        use std::os::unix::fs::symlink;
+
+        let source_home = tempdir().unwrap();
+        let path = create_cc_switch_database(
+            source_home.path(),
+            &cc_switch_settings("https://relay.example/v1", "model", "secret"),
+        );
+        let linked_home = tempdir().unwrap();
+        std::fs::create_dir(linked_home.path().join(".cc-switch")).unwrap();
+        symlink(&path, linked_home.path().join(".cc-switch/cc-switch.db")).unwrap();
+        assert!(matches!(
+            discover_cc_switch(linked_home.path()),
+            Err(DiscoveryError::Symlink(_))
+        ));
     }
 
     #[test]
@@ -1591,6 +2324,82 @@ wire_api = "responses"
         assert!(!serde_json::to_string(&rows)
             .unwrap()
             .contains("native-auth-secret"));
+    }
+
+    #[test]
+    fn codex_cc_switch_profile_reuses_auth_file_without_exposing_it() {
+        let home = tempdir().unwrap();
+        let codex_home = home.path().join(".codex");
+        std::fs::create_dir(&codex_home).unwrap();
+        std::fs::write(
+            codex_home.join("config.toml"),
+            r#"
+model = "gpt-5.6-sol"
+model_provider = "ccswitch"
+[model_providers.ccswitch]
+name = "CC Switch"
+base_url = "http://127.0.0.1:15721/v1"
+wire_api = "responses"
+"#,
+        )
+        .unwrap();
+        std::fs::write(
+            codex_home.join("auth.json"),
+            r#"{"OPENAI_API_KEY":"cc-switch-native-secret"}"#,
+        )
+        .unwrap();
+
+        let rows = discover_codex_at(&codex_home, "~/.codex").unwrap();
+        assert_eq!(rows.len(), 1);
+        let candidate = &rows[0];
+        assert_eq!(candidate.kind, "cc-switch");
+        assert_eq!(candidate.base_url.as_deref(), Some(CC_SWITCH_BASE_URL));
+        assert_eq!(candidate.wire_protocol.as_deref(), Some("responses"));
+        assert_eq!(candidate.model_hint.as_deref(), Some("gpt-5.6-sol"));
+        assert_eq!(candidate.credential.source_type, "config-literal");
+        assert!(candidate.credential.available);
+        assert!(candidate.credential.importable);
+        assert_eq!(
+            candidate_secret_at(candidate, home.path(), &codex_home).unwrap(),
+            "cc-switch-native-secret"
+        );
+        assert!(!serde_json::to_string(&rows)
+            .unwrap()
+            .contains("cc-switch-native-secret"));
+    }
+
+    #[test]
+    fn codex_cc_switch_name_does_not_authorize_an_unreviewed_endpoint() {
+        let home = tempdir().unwrap();
+        let codex_home = home.path().join(".codex");
+        std::fs::create_dir(&codex_home).unwrap();
+        std::fs::write(
+            codex_home.join("config.toml"),
+            r#"
+model_provider = "ccswitch"
+[model_providers.ccswitch]
+name = "CC Switch"
+base_url = "http://192.168.1.20:15721/v1"
+wire_api = "responses"
+"#,
+        )
+        .unwrap();
+        std::fs::write(
+            codex_home.join("auth.json"),
+            r#"{"OPENAI_API_KEY":"must-not-bind-to-lan"}"#,
+        )
+        .unwrap();
+
+        let rows = discover_codex_at(&codex_home, "~/.codex").unwrap();
+        assert_eq!(rows.len(), 2);
+        let configured = rows
+            .iter()
+            .find(|candidate| candidate.label == "CC Switch")
+            .unwrap();
+        assert_eq!(configured.kind, "openai-compatible");
+        assert!(!configured.credential.available);
+        assert!(!configured.credential.importable);
+        assert!(rows.iter().any(|candidate| candidate.kind == "openai"));
     }
 
     #[test]
@@ -1853,6 +2662,16 @@ wire_api = "legacy-completions"
         ] {
             assert!(validate_candidate(&invalid).is_err());
         }
+
+        let unsupported_source = ProviderCandidate {
+            id: candidate_id(&["unsupported-source"]),
+            base_url: Some("http://192.168.1.20:15721/v1".into()),
+            ..base.clone()
+        };
+        let isolated = finalize_candidates(vec![unsupported_source.clone(), base], None).unwrap();
+        assert_eq!(isolated.len(), 1);
+        assert_eq!(isolated[0].label, "Reviewed relay");
+        assert!(finalize_candidates(vec![unsupported_source], None).is_err());
     }
 
     #[test]

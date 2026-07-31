@@ -67,6 +67,8 @@ export interface DesktopToolExecution {
   readonly capabilityLeaseId?: string
   readonly requestDigest?: string
   readonly expectedSourceImageId?: string
+  /** Publishes the executor-owned start event at the native execution boundary. */
+  readonly onStarted?: (event: Extract<AgentRunEvent, { readonly type: 'tool-started' }>) => void
 }
 
 export type DesktopToolExecutionResult =
@@ -151,13 +153,18 @@ export function createDesktopToolExecutor(
         type: 'tool-started', toolCallId: input.toolCallId, tool: input.request.capability,
         label: input.label, stepId: input.stepId,
         model: { providerId: capability.providerId, model: capability.model },
-      }, { eventId: `event:${input.requestId}:tool-started`, at: startedAt })
+      }, { eventId: `event:${input.requestId}:tool-started`, at: startedAt }) as Extract<
+        AgentRunEvent,
+        { readonly type: 'tool-started' }
+      >
+      input.onStarted?.(started)
+      const preceding = input.onStarted ? [] : [started]
 
       try {
         const executionOutput = await executeCapability(dependencies, input, capability)
-        if (input.signal?.aborted) return cancelled(input, capability, startedAt, now(), id(), [started])
+        if (input.signal?.aborted) return cancelled(input, capability, startedAt, now(), id(), preceding)
         if (dependencies.currentRevision() !== input.expectedRevision) {
-          return failure(input, 'The project changed while the paid tool was running; its output was not published.', startedAt, [started], capability, now(), id())
+          return failure(input, 'The project changed while the paid tool was running; its output was not published.', startedAt, preceding, capability, now(), id())
         }
         const evidenceRefs = executionOutput.evidenceAssets
           ? await writeAssets(dependencies.artifacts, executionOutput.evidenceAssets, input, 'cutout')
@@ -168,9 +175,9 @@ export function createDesktopToolExecutor(
           input,
           artifactSource(input.request.capability),
         )
-        if (input.signal?.aborted) return cancelled(input, capability, startedAt, now(), id(), [started])
+        if (input.signal?.aborted) return cancelled(input, capability, startedAt, now(), id(), preceding)
         if (dependencies.currentRevision() !== input.expectedRevision) {
-          return failure(input, 'The project changed while the tool output was being prepared; its result was not published.', startedAt, [started], capability, now(), id())
+          return failure(input, 'The project changed while the tool output was being prepared; its result was not published.', startedAt, preceding, capability, now(), id())
         }
         if (executionOutput.cutoutSlices && dependencies.cutoutResultSink) {
           await dependencies.cutoutResultSink.commit({
@@ -194,10 +201,10 @@ export function createDesktopToolExecutor(
             evidenceKey: input.toolCallId,
           },
         }, { eventId: `event:${input.requestId}:material:${index}`, at: receipt.completedAt }))
-        return { ok: true, receipt, events: [started, succeeded, ...materials] }
+        return { ok: true, receipt, events: [...preceding, succeeded, ...materials] }
       } catch (error) {
-        if (input.signal?.aborted || isAbort(error)) return cancelled(input, capability, startedAt, now(), id(), [started])
-        return failure(input, errorText(error), startedAt, [started], capability, now(), id())
+        if (input.signal?.aborted || isAbort(error)) return cancelled(input, capability, startedAt, now(), id(), preceding)
+        return failure(input, errorText(error), startedAt, preceding, capability, now(), id())
       }
     },
   }
@@ -236,16 +243,23 @@ async function executeCapability(
     if (!result.ok) throw new Error(result.error)
     return { assets: result.data }
   }
-  const source = await firstArtifact(dependencies.artifacts, input.request.inputArtifactIds)
-  if (!source) throw new Error('The paid tool requires an input image artifact.')
   if (input.request.capability === 'edit-image') {
+    const sources = await requiredArtifacts(
+      dependencies.artifacts,
+      input.request.inputArtifactIds,
+    )
+    if (sources.length === 0) {
+      throw new Error('The paid tool requires an input image artifact.')
+    }
     const result = await dependencies.services.generation.editImage({
       providerId: capability.providerId, model: capability.model, prompt: paidToolExecutionPrompt(input.request),
-      images: [source.bytes], signal: input.signal,
+      images: sources.map((source) => source.bytes), signal: input.signal,
     })
     if (!result.ok) throw new Error(result.error)
     return { assets: result.data }
   }
+  const source = await firstArtifact(dependencies.artifacts, input.request.inputArtifactIds)
+  if (!source) throw new Error('The paid tool requires an input image artifact.')
   let cutoutSource = source
   let evidenceAssets: readonly GeneratedAsset[] | undefined
   let providerRoute = 'local/cutout-v1'
@@ -296,6 +310,19 @@ async function firstArtifact(store: DesktopToolArtifactStore, ids: readonly stri
     if (artifact) return artifact
   }
   return null
+}
+
+async function requiredArtifacts(
+  store: DesktopToolArtifactStore,
+  ids: readonly string[],
+): Promise<DesktopToolArtifact[]> {
+  const artifacts: DesktopToolArtifact[] = []
+  for (const id of ids) {
+    const artifact = await store.read(id)
+    if (!artifact) throw new Error('A required input image artifact is unavailable.')
+    artifacts.push(artifact)
+  }
+  return artifacts
 }
 
 async function defaultDecodeBitmap(artifact: DesktopToolArtifact): Promise<ImageBitmap> {

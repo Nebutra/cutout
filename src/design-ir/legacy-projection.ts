@@ -9,14 +9,64 @@ import { validateDesignDocument } from './validate'
 import { err, isOk, ok, type Result } from '@/services/types'
 import type {
   PersistedPrototypeDesignSystem,
+  PersistedPrototypeSuiteCandidate,
+  PersistedPrototypeSuiteCandidateSet,
   WorkspaceSnapshot,
 } from '@/workspace/workspace-snapshot'
 import type { LocalProjectRecord } from '@/services/local/project-repository.local'
 import { readRasterDimensions } from '@/lib/raster-dimensions'
 import { parseEditableDesignMarkdown } from '@/prototype/design-md'
 import { projectDesignMarkdownTokens } from '@/prototype/design-md-export'
+import { migratePersistedPrototypeDesignSystemCandidateSet } from '@/prototype/design-system-candidate-persistence'
+import { validatePrototypeSuiteCandidateSet } from '@/prototype/prototype-suite-candidates'
+import { codingReceiptSchema, type CodingReceipt } from '@/coding-runtime/contracts'
+import { prototypePlanSchema } from '@/prototype/prototype-plan'
+import { z } from 'zod'
 
 const LEGACY_ACTOR_ID = 'cutout-legacy-workspace'
+const PROTOTYPE_SUITE_MATERIAL_VERSION = 'cutout.prototype-suite-material.v1' as const
+const RESOURCE_PACK_MATERIAL_VERSION = 'cutout.resource-pack-material.v1' as const
+const RESOURCE_ASSET_MATERIAL_VERSION = 'cutout.resource-asset-material.v1' as const
+
+const prototypeSuiteMaterialSchema = z.object({
+  version: z.literal(PROTOTYPE_SUITE_MATERIAL_VERSION),
+  candidateId: z.string().min(1),
+  designSystem: z.object({
+    candidateSetId: z.string().min(1),
+    candidateId: z.string().min(1),
+    directionId: z.string().min(1),
+    baseRevisionId: z.string().min(1),
+    provenanceIds: z.array(z.string().min(1)).min(1),
+    visualMaterialId: z.string().min(1),
+    markdownMaterialId: z.string().min(1),
+  }).strict(),
+  plan: prototypePlanSchema,
+  pages: z.array(z.object({
+    pageId: z.string().min(1),
+    materialId: z.string().min(1),
+  }).strict()),
+  resourcePackMaterialId: z.string().min(1),
+  provenanceIds: z.array(z.string().min(1)).min(1),
+  codingReceiptMaterialId: z.string().min(1).optional(),
+}).strict()
+
+const resourcePackMaterialSchema = z.object({
+  version: z.literal(RESOURCE_PACK_MATERIAL_VERSION),
+  id: z.string().min(1),
+  manifest: z.unknown(),
+  manifestProvenanceId: z.string().min(1),
+  assets: z.array(z.object({
+    manifestItemId: z.string().min(1),
+    materialId: z.string().min(1),
+  }).strict()),
+}).strict()
+
+const resourceAssetMaterialSchema = z.object({
+  version: z.literal(RESOURCE_ASSET_MATERIAL_VERSION),
+  manifestItemId: z.string().min(1),
+  artifactId: z.string().min(1),
+  provenanceIds: z.array(z.string().min(1)).min(1),
+}).strict()
 
 export interface LegacyProjectIdentity {
   readonly id: string
@@ -82,6 +132,35 @@ export interface DesignDocumentToWorkspaceProjection {
  * manufacturing runtime activity. Calling this twice produces the same value.
  */
 export function migrateWorkspaceV1(input: LegacyWorkspaceV1Input): WorkspaceSnapshot {
+  const prototypeDesignSystem = input.prototypeDesignSystem
+    ? normalizeDesignSystemBytes(input.prototypeDesignSystem)
+    : null
+  const prototypeDesignSystemCandidates = input.prototypeDesignSystemCandidates
+    ? migratePersistedPrototypeDesignSystemCandidateSet({
+        ...input.prototypeDesignSystemCandidates,
+        artifacts: Object.fromEntries(
+          Object.entries(input.prototypeDesignSystemCandidates.artifacts).map(([id, artifact]) => [
+            id,
+            normalizeDesignSystemBytes(artifact),
+          ]),
+        ),
+      })
+    : null
+  const prototypeSuiteCandidates = input.prototypeSuiteCandidates
+    ? {
+        ...input.prototypeSuiteCandidates,
+        artifacts: Object.fromEntries(
+          Object.entries(input.prototypeSuiteCandidates.artifacts).map(([id, artifact]) => [id, {
+            ...artifact,
+            designSystem: {
+              ...artifact.designSystem,
+              artifact: normalizeDesignSystemBytes(artifact.designSystem.artifact),
+            },
+            pages: artifact.pages.map(normalizePrototypePageBytes),
+          }]),
+        ),
+      }
+    : null
   const optional = {
     ...('composerModelPolicy' in input && input.composerModelPolicy !== undefined
       ? { composerModelPolicy: input.composerModelPolicy }
@@ -101,6 +180,9 @@ export function migrateWorkspaceV1(input: LegacyWorkspaceV1Input): WorkspaceSnap
     ...('deliveryRequest' in input && input.deliveryRequest !== undefined ? { deliveryRequest: input.deliveryRequest } : {}),
     ...('deliveryPlan' in input && input.deliveryPlan !== undefined ? { deliveryPlan: input.deliveryPlan } : {}),
     ...('deliveryReceipt' in input && input.deliveryReceipt !== undefined ? { deliveryReceipt: input.deliveryReceipt } : {}),
+    ...('codingReceipts' in input && input.codingReceipts !== undefined
+      ? { codingReceipts: input.codingReceipts }
+      : {}),
   }
 
   return {
@@ -110,17 +192,104 @@ export function migrateWorkspaceV1(input: LegacyWorkspaceV1Input): WorkspaceSnap
     prototypeScope: input.prototypeScope ?? 'primary-flow',
     humanLoopChoiceId: input.humanLoopChoiceId ?? null,
     humanLoopCustomAnswer: input.humanLoopCustomAnswer ?? '',
-    prototypeDesignSystem: input.prototypeDesignSystem ?? null,
-    prototypeDesignSystemCandidates: input.prototypeDesignSystemCandidates ?? null,
-    prototypePages: input.prototypePages ?? [],
+    prototypeDesignSystem,
+    prototypeDesignSystemCandidates,
+    prototypeSuiteCandidates,
+    prototypePages: (input.prototypePages ?? []).map(normalizePrototypePageBytes),
     selectedPrototypePageId: input.selectedPrototypePageId ?? null,
     runError: input.runError ?? null,
     namingStatus: input.namingStatus ?? 'idle',
     liveAgentOutput: input.liveAgentOutput ?? '',
-    attachments: input.attachments ?? [],
+    attachments: (input.attachments ?? []).map((attachment) => ({
+      ...attachment,
+      bytes: localBytes(attachment.bytes),
+    })),
     webSearchEnabled: input.webSearchEnabled ?? false,
     ...optional,
   }
+}
+
+/** Rebuilds content bytes for structured suite/Coding references stored inside workspace.v1. */
+export function legacyWorkspaceSupplementalContent(
+  projectId: string,
+  input: WorkspaceSnapshot | LegacyWorkspaceV1Input,
+): ReadonlyMap<string, Uint8Array> {
+  const workspace = migrateWorkspaceV1(input)
+  const designCandidates = workspace.prototypeDesignSystemCandidates
+  const suiteState = validatedPrototypeSuiteState(
+    workspace.prototypeSuiteCandidates,
+    designCandidates,
+  )
+  const codingReceipts = validatedCodingReceipts(workspace.codingReceipts, suiteState)
+  const content = new Map<string, Uint8Array>()
+  const add = (path: string, bytes: Uint8Array) => {
+    content.set(legacyUri(projectId, path), bytes)
+  }
+  for (const candidate of suiteState?.set.candidates ?? []) {
+    const artifact = suiteState?.artifacts[candidate.id]
+    if (!artifact || candidate.status !== 'ready') continue
+    const resourcePackMaterialId = candidate.outputs.find(
+      (output) => output.role === 'resource-pack',
+    )?.materialId
+    const designCandidate = designCandidates?.set.candidates.find(
+      (item) => item.id === artifact.designSystem.candidateId,
+    )
+    const visualMaterialId = designCandidate?.outputs.find(
+      (output) => output.role === 'design-system',
+    )?.materialId
+    const markdownMaterialId = designCandidate?.outputs.find(
+      (output) => output.role === 'design-markdown',
+    )?.materialId
+    if (!resourcePackMaterialId || !visualMaterialId || !markdownMaterialId) {
+      throw new Error(`Prototype suite candidate "${candidate.id}" has incomplete material outputs.`)
+    }
+    const projection = prototypeSuiteContentProjection({
+      candidateId: candidate.id,
+      artifact,
+      resourcePackMaterialId,
+      visualMaterialId,
+      markdownMaterialId,
+    })
+    artifact.pages.forEach((page, index) => {
+      add(suiteLegacyPath(candidate.id, `pages/${index + 1}`), page.bytes)
+    })
+    projection.assets.forEach((asset, index) => {
+      add(
+        suiteLegacyPath(candidate.id, `resource-pack/assets/${index + 1}.json`),
+        jsonBytes(asset),
+      )
+    })
+    add(
+      suiteLegacyPath(candidate.id, 'resource-pack/manifest.json'),
+      jsonBytes(projection.resourcePack),
+    )
+    add(
+      suiteLegacyPath(candidate.id, 'suite.json'),
+      jsonBytes(projection.suite),
+    )
+  }
+  for (const receipt of codingReceipts) {
+    add(codingReceiptLegacyPath(receipt.receiptId), jsonBytes(receipt))
+  }
+  return content
+}
+
+function normalizeDesignSystemBytes(
+  artifact: PersistedPrototypeDesignSystem,
+): PersistedPrototypeDesignSystem {
+  const bytes = localBytes(artifact.bytes)
+  return bytes === artifact.bytes ? artifact : { ...artifact, bytes }
+}
+
+function normalizePrototypePageBytes(
+  artifact: WorkspaceSnapshot['prototypePages'][number],
+): WorkspaceSnapshot['prototypePages'][number] {
+  const bytes = localBytes(artifact.bytes)
+  return bytes === artifact.bytes ? artifact : { ...artifact, bytes }
+}
+
+function localBytes(bytes: Uint8Array): Uint8Array {
+  return bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes)
 }
 
 /**
@@ -321,9 +490,17 @@ export async function projectWorkspaceSnapshotToDesignDocument(
     })),
   )
 
+  const candidateState = workspace.prototypeDesignSystemCandidates
+  const suiteState = validatedPrototypeSuiteState(
+    workspace.prototypeSuiteCandidates,
+    candidateState,
+  )
+  const codingReceipts = validatedCodingReceipts(workspace.codingReceipts, suiteState)
   const materials = await legacyMaterials({
     projectId: project.id,
     workspace,
+    suiteState,
+    codingReceipts,
     slices: input.slices ?? [],
     designMarkdown: input.designMarkdown,
     provenanceId,
@@ -341,7 +518,6 @@ export async function projectWorkspaceSnapshotToDesignDocument(
         tool: `asset-production.v1:${slice.production!.evidence.runId}:${slice.production!.evidence.taskId}`,
       }]),
   ).values()]
-  const candidateState = workspace.prototypeDesignSystemCandidates
   const candidateProvenance = candidateState
     ? candidateState.set.candidates.flatMap((candidate) => candidate.provenanceIds.map((id) => ({
         id,
@@ -362,6 +538,55 @@ export async function projectWorkspaceSnapshotToDesignDocument(
         tool: 'cutout.candidate-selection.v1',
       }]
     : []
+  const suiteProvenance = suiteState
+    ? suiteState.set.candidates.flatMap((candidate) => {
+        const artifact = suiteState.artifacts[candidate.id]
+        if (!artifact) return []
+        return [
+          ...artifact.provenanceIds.map((id) => derivationProvenance(
+            id,
+            projectSourceId,
+            project.updatedAt,
+            'cutout.prototype-suite-candidates.v1',
+            'cutout.prototype-orchestrator',
+          )),
+          derivationProvenance(
+            artifact.resourcePack.manifestProvenanceId,
+            projectSourceId,
+            project.updatedAt,
+            'cutout.resource-pack.v1',
+            'asset-production-runtime',
+          ),
+          ...artifact.resourcePack.assets.flatMap((asset) => asset.provenanceIds.map((id) =>
+            derivationProvenance(
+              id,
+              projectSourceId,
+              project.updatedAt,
+              'cutout.resource-asset-binding.v1',
+              'asset-production-runtime',
+            ),
+          )),
+        ]
+      })
+    : []
+  const suiteSelectionProvenance = suiteState?.set.selection
+    ? [{
+        id: suiteState.set.selection.provenanceId,
+        operation: suiteState.set.selection.actor.kind === 'human' ? 'manual' as const : 'derive' as const,
+        sourceIds: [projectSourceId],
+        actor: suiteState.set.selection.actor,
+        recordedAt: suiteState.set.selection.selectedAt,
+        tool: 'cutout.candidate-selection.v1',
+      }]
+    : []
+  const codingProvenance = codingReceipts.map((receipt) => ({
+    id: codingReceiptProvenanceId(receipt.receiptId),
+    operation: 'generate' as const,
+    sourceIds: [projectSourceId],
+    actor: { kind: 'agent' as const, id: receipt.provenance.backend },
+    recordedAt: toIso(receipt.completedAt),
+    tool: `cutout.controlled-coding.v1:${receipt.taskId}`,
+  }))
   const projectedTokens = selectedCandidateTokens(candidateState)
   const document: DesignDocument = {
     version: 'design-ir.v1',
@@ -396,13 +621,18 @@ export async function projectWorkspaceSnapshotToDesignDocument(
         }
       : undefined,
     materials,
-    candidateSets: candidateState ? [candidateState.set] : [],
-    provenance: [
+    candidateSets: [candidateState?.set, suiteState?.set].filter(
+      (set): set is NonNullable<typeof set> => Boolean(set),
+    ),
+    provenance: uniqueById([
       provenance,
       ...productionProvenance,
       ...candidateProvenance,
       ...selectionProvenance,
-    ],
+      ...suiteProvenance,
+      ...suiteSelectionProvenance,
+      ...codingProvenance,
+    ]),
     brands: [],
     tokens: projectedTokens,
     components: [],
@@ -504,6 +734,27 @@ export async function designDocumentToWorkspaceSnapshot(
       }
     }
   }
+  const persistedCandidateState = candidateSet
+    ? migratePersistedPrototypeDesignSystemCandidateSet({
+        set: candidateSet,
+        artifacts: candidateArtifacts,
+      })
+    : null
+  const codingReceipts = await recoverCodingReceipts(valid.materials, resolver)
+  if (!codingReceipts.ok) return codingReceipts
+  const suiteCandidateSet = valid.candidateSets.find(
+    (candidate) => candidate.kind === 'prototype-suite',
+  )
+  const suiteState = suiteCandidateSet
+    ? await recoverPrototypeSuiteState({
+        candidateSet: suiteCandidateSet,
+        designSystemCandidates: persistedCandidateState,
+        materials: valid.materials,
+        codingReceipts: codingReceipts.data,
+        resolver,
+      })
+    : ok(null)
+  if (!suiteState.ok) return suiteState
 
   const snapshot: WorkspaceSnapshot = {
     ...emptyWorkspace(),
@@ -518,11 +769,11 @@ export async function designDocumentToWorkspaceSnapshot(
           height: designImageSize?.height ?? 1,
         }
       : null,
-    prototypeDesignSystemCandidates: candidateSet
-      ? { set: candidateSet, artifacts: candidateArtifacts }
-      : null,
+    prototypeDesignSystemCandidates: persistedCandidateState,
+    prototypeSuiteCandidates: suiteState.data,
     prototypePages: pageArtifacts,
     attachments,
+    ...(codingReceipts.data.length > 0 ? { codingReceipts: codingReceipts.data } : {}),
   }
   return ok({
     snapshot,
@@ -542,6 +793,7 @@ function emptyWorkspace(): WorkspaceSnapshot {
     humanLoopCustomAnswer: '',
     prototypeDesignSystem: null,
     prototypeDesignSystemCandidates: null,
+    prototypeSuiteCandidates: null,
     prototypePages: [],
     selectedPrototypePageId: null,
     runError: null,
@@ -552,9 +804,218 @@ function emptyWorkspace(): WorkspaceSnapshot {
   }
 }
 
+async function recoverCodingReceipts(
+  materials: readonly Material[],
+  resolver: ContentResolver,
+): Promise<Result<readonly CodingReceipt[]>> {
+  const receipts: CodingReceipt[] = []
+  const ids = new Set<string>()
+  for (const material of materials.filter((item) =>
+    item.id.startsWith('material:coding-receipt:'),
+  )) {
+    const content = await resolveJson(material, resolver)
+    if (!content.ok) return err(content.error)
+    const parsed = codingReceiptSchema.safeParse(content.data)
+    if (!parsed.success) {
+      return err(
+        `Invalid Coding receipt material "${material.id}": ${parsed.error.issues[0]?.message ?? 'Invalid receipt.'}`,
+      )
+    }
+    if (codingReceiptMaterialId(parsed.data.receiptId) !== material.id) {
+      return err(`Coding receipt material "${material.id}" does not match its receipt id.`)
+    }
+    if (ids.has(parsed.data.receiptId)) {
+      return err(`Duplicate Coding receipt id "${parsed.data.receiptId}".`)
+    }
+    ids.add(parsed.data.receiptId)
+    receipts.push(parsed.data)
+  }
+  return ok(receipts)
+}
+
+async function recoverPrototypeSuiteState(input: {
+  readonly candidateSet: NonNullable<DesignDocument['candidateSets']>[number]
+  readonly designSystemCandidates: WorkspaceSnapshot['prototypeDesignSystemCandidates']
+  readonly materials: readonly Material[]
+  readonly codingReceipts: readonly CodingReceipt[]
+  readonly resolver: ContentResolver
+}): Promise<Result<PersistedPrototypeSuiteCandidateSet | null>> {
+  if (!input.designSystemCandidates) {
+    return err('Prototype suite candidates require their Design System candidate set.')
+  }
+  const materials = new Map(input.materials.map((material) => [material.id, material]))
+  const artifacts: Record<string, PersistedPrototypeSuiteCandidate> = {}
+  for (const candidate of input.candidateSet.candidates) {
+    if (candidate.status !== 'ready') continue
+    const suiteMaterialId = candidate.outputs.find(
+      (output) => output.role === 'prototype-suite',
+    )?.materialId
+    const resourcePackMaterialId = candidate.outputs.find(
+      (output) => output.role === 'resource-pack',
+    )?.materialId
+    if (!suiteMaterialId || !resourcePackMaterialId) {
+      return err(`Ready prototype suite candidate "${candidate.id}" has incomplete outputs.`)
+    }
+    const suiteMaterial = materials.get(suiteMaterialId)
+    if (!suiteMaterial) {
+      return err(`Missing prototype suite material "${suiteMaterialId}".`)
+    }
+    const suiteContent = await resolveJson(suiteMaterial, input.resolver)
+    if (!suiteContent.ok) return suiteContent
+    const descriptor = prototypeSuiteMaterialSchema.safeParse(suiteContent.data)
+    if (!descriptor.success) {
+      return err(
+        `Invalid prototype suite material "${suiteMaterialId}": ${descriptor.error.issues[0]?.message ?? 'Invalid descriptor.'}`,
+      )
+    }
+    if (
+      descriptor.data.candidateId !== candidate.id
+      || descriptor.data.resourcePackMaterialId !== resourcePackMaterialId
+    ) {
+      return err(`Prototype suite material "${suiteMaterialId}" does not match its candidate outputs.`)
+    }
+    const boundDesignCandidate = input.designSystemCandidates.set.candidates.find(
+      (item) => item.id === descriptor.data.designSystem.candidateId,
+    )
+    const expectedVisualId = boundDesignCandidate?.outputs.find(
+      (output) => output.role === 'design-system',
+    )?.materialId
+    const expectedMarkdownId = boundDesignCandidate?.outputs.find(
+      (output) => output.role === 'design-markdown',
+    )?.materialId
+    if (
+      !boundDesignCandidate
+      || descriptor.data.designSystem.visualMaterialId !== expectedVisualId
+      || descriptor.data.designSystem.markdownMaterialId !== expectedMarkdownId
+    ) {
+      return err(`Prototype suite candidate "${candidate.id}" has mismatched Design System outputs.`)
+    }
+
+    const designVisual = materials.get(descriptor.data.designSystem.visualMaterialId)
+    const designMarkdown = materials.get(descriptor.data.designSystem.markdownMaterialId)
+    if (!designVisual || !designMarkdown) {
+      return err(`Prototype suite candidate "${candidate.id}" is missing Design System materials.`)
+    }
+    const [designBytes, markdown] = await Promise.all([
+      resolveBytes(designVisual, input.resolver),
+      resolveText(designMarkdown, input.resolver),
+    ])
+    if (!designBytes || markdown === null) {
+      return err(`Prototype suite candidate "${candidate.id}" has invalid Design System content.`)
+    }
+    const designSize = currentContent(designVisual).pixelSize ?? readRasterDimensions(designBytes)
+    if (!designSize) {
+      return err(`Prototype suite candidate "${candidate.id}" has no Design System dimensions.`)
+    }
+
+    const pages = []
+    for (const pageReference of descriptor.data.pages) {
+      const page = descriptor.data.plan.pages.find((item) => item.id === pageReference.pageId)
+      const pageMaterial = materials.get(pageReference.materialId)
+      if (!page || !pageMaterial) {
+        return err(
+          `Prototype suite candidate "${candidate.id}" is missing page material "${pageReference.materialId}".`,
+        )
+      }
+      const bytes = await resolveBytes(pageMaterial, input.resolver)
+      if (!bytes) {
+        return err(`Missing or invalid content for material "${pageReference.materialId}".`)
+      }
+      const size = currentContent(pageMaterial).pixelSize ?? readRasterDimensions(bytes)
+      if (!size) {
+        return err(`Missing intrinsic dimensions for material "${pageReference.materialId}".`)
+      }
+      pages.push({
+        page,
+        bytes,
+        mediaType: currentContent(pageMaterial).mediaType ?? 'application/octet-stream',
+        width: size.width,
+        height: size.height,
+      })
+    }
+
+    const resourceMaterial = materials.get(resourcePackMaterialId)
+    if (!resourceMaterial) return err(`Missing resource pack material "${resourcePackMaterialId}".`)
+    const resourceContent = await resolveJson(resourceMaterial, input.resolver)
+    if (!resourceContent.ok) return resourceContent
+    const resourceDescriptor = resourcePackMaterialSchema.safeParse(resourceContent.data)
+    if (!resourceDescriptor.success) {
+      return err(
+        `Invalid resource pack material "${resourcePackMaterialId}": ${resourceDescriptor.error.issues[0]?.message ?? 'Invalid descriptor.'}`,
+      )
+    }
+    const resourceAssets = []
+    for (const assetReference of resourceDescriptor.data.assets) {
+      const assetMaterial = materials.get(assetReference.materialId)
+      if (!assetMaterial) return err(`Missing resource asset material "${assetReference.materialId}".`)
+      const assetContent = await resolveJson(assetMaterial, input.resolver)
+      if (!assetContent.ok) return assetContent
+      const asset = resourceAssetMaterialSchema.safeParse(assetContent.data)
+      if (!asset.success) {
+        return err(
+          `Invalid resource asset material "${assetReference.materialId}": ${asset.error.issues[0]?.message ?? 'Invalid binding.'}`,
+        )
+      }
+      if (asset.data.manifestItemId !== assetReference.manifestItemId) {
+        return err(`Resource asset material "${assetReference.materialId}" does not match its manifest item.`)
+      }
+      resourceAssets.push({
+        manifestItemId: asset.data.manifestItemId,
+        artifactId: asset.data.artifactId,
+        provenanceIds: asset.data.provenanceIds,
+      })
+    }
+
+    const codingReceipt = descriptor.data.codingReceiptMaterialId
+      ? input.codingReceipts.find(
+          (receipt) => codingReceiptMaterialId(receipt.receiptId) === descriptor.data.codingReceiptMaterialId,
+        )
+      : undefined
+    if (descriptor.data.codingReceiptMaterialId && !codingReceipt) {
+      return err(
+        `Prototype suite candidate "${candidate.id}" is missing Coding receipt material `
+        + `"${descriptor.data.codingReceiptMaterialId}".`,
+      )
+    }
+    artifacts[candidate.id] = {
+      designSystem: {
+        candidateSetId: descriptor.data.designSystem.candidateSetId,
+        candidateId: descriptor.data.designSystem.candidateId,
+        directionId: descriptor.data.designSystem.directionId,
+        baseRevisionId: descriptor.data.designSystem.baseRevisionId,
+        provenanceIds: descriptor.data.designSystem.provenanceIds,
+        artifact: {
+          name: designVisual.name,
+          designMarkdown: markdown,
+          bytes: designBytes,
+          mediaType: currentContent(designVisual).mediaType ?? 'application/octet-stream',
+          width: designSize.width,
+          height: designSize.height,
+        },
+      },
+      plan: descriptor.data.plan,
+      pages,
+      resourcePack: {
+        id: resourceDescriptor.data.id,
+        manifest: resourceDescriptor.data.manifest as PersistedPrototypeSuiteCandidate['resourcePack']['manifest'],
+        manifestProvenanceId: resourceDescriptor.data.manifestProvenanceId,
+        assets: resourceAssets,
+      },
+      provenanceIds: descriptor.data.provenanceIds,
+      ...(codingReceipt ? { codingReceipt } : {}),
+    }
+  }
+  const state = { set: input.candidateSet, artifacts }
+  const validation = validatePrototypeSuiteCandidateSet(state, input.designSystemCandidates)
+  if (!validation.ok) return err(`Invalid prototype suite candidate state: ${validation.error}`)
+  return ok(validation.data)
+}
+
 async function legacyMaterials(input: {
   readonly projectId: string
   readonly workspace: WorkspaceSnapshot
+  readonly suiteState: PersistedPrototypeSuiteCandidateSet | null
+  readonly codingReceipts: readonly CodingReceipt[]
   readonly slices: readonly LegacySliceArtifact[]
   readonly designMarkdown?: { readonly name: string; readonly content: string } | null
   readonly provenanceId: string
@@ -629,6 +1090,112 @@ async function legacyMaterials(input: {
       }))
     }
   }
+  if (input.suiteState) {
+    for (const candidate of input.suiteState.set.candidates) {
+      const artifact = input.suiteState.artifacts[candidate.id]
+      if (!artifact || candidate.status !== 'ready') continue
+      const suiteOutputId = candidate.outputs.find(
+        (output) => output.role === 'prototype-suite',
+      )?.materialId
+      const resourcePackOutputId = candidate.outputs.find(
+        (output) => output.role === 'resource-pack',
+      )?.materialId
+      if (!suiteOutputId || !resourcePackOutputId) {
+        throw new Error(`Ready prototype suite candidate "${candidate.id}" has incomplete outputs.`)
+      }
+      const designCandidate = candidateState?.set.candidates.find(
+        (item) => item.id === artifact.designSystem.candidateId,
+      )
+      const visualMaterialId = designCandidate?.outputs.find(
+        (output) => output.role === 'design-system',
+      )?.materialId
+      const markdownMaterialId = designCandidate?.outputs.find(
+        (output) => output.role === 'design-markdown',
+      )?.materialId
+      if (!visualMaterialId || !markdownMaterialId) {
+        throw new Error(
+          `Prototype suite candidate "${candidate.id}" has no complete Design System material binding.`,
+        )
+      }
+      const projection = prototypeSuiteContentProjection({
+        candidateId: candidate.id,
+        artifact,
+        resourcePackMaterialId: resourcePackOutputId,
+        visualMaterialId,
+        markdownMaterialId,
+      })
+      const pageMaterials = projection.suite.pages
+      for (const [index, page] of artifact.pages.entries()) {
+        const pageMaterial = pageMaterials[index]!
+        materials.push(await material({
+          id: pageMaterial.materialId,
+          kind: 'prototype-page',
+          name: `${page.page.name} (${candidate.id})`,
+          referenceId: suiteContentReferenceId(candidate.id, `page:${index + 1}`),
+          uri: legacyUri(
+            input.projectId,
+            suiteLegacyPath(candidate.id, `pages/${index + 1}`),
+          ),
+          mediaType: page.mediaType,
+          bytes: page.bytes,
+          pixelSize: intrinsicSize(page.width, page.height, page.bytes),
+          provenanceId: artifact.provenanceIds[0]!,
+          createdAt: input.createdAt,
+        }))
+      }
+      const assetMaterials = projection.resourcePack.assets
+      for (const [index, asset] of artifact.resourcePack.assets.entries()) {
+        const binding = assetMaterials[index]!
+        materials.push(await jsonMaterial({
+          id: binding.materialId,
+          name: `Resource asset binding ${index + 1} (${candidate.id})`,
+          value: projection.assets[index],
+          uri: legacyUri(
+            input.projectId,
+            suiteLegacyPath(candidate.id, `resource-pack/assets/${index + 1}.json`),
+          ),
+          provenanceId: asset.provenanceIds[0]!,
+          createdAt: input.createdAt,
+        }))
+      }
+      materials.push(await jsonMaterial({
+        id: resourcePackOutputId,
+        name: `Resource pack (${candidate.id})`,
+        value: projection.resourcePack,
+        uri: legacyUri(
+          input.projectId,
+          suiteLegacyPath(candidate.id, 'resource-pack/manifest.json'),
+        ),
+        provenanceId: artifact.resourcePack.manifestProvenanceId,
+        createdAt: input.createdAt,
+      }))
+      materials.push(await jsonMaterial({
+        id: suiteOutputId,
+        name: `Prototype suite (${candidate.id})`,
+        value: projection.suite,
+        uri: legacyUri(
+          input.projectId,
+          suiteLegacyPath(candidate.id, 'suite.json'),
+        ),
+        provenanceId: artifact.provenanceIds[0]!,
+        createdAt: input.createdAt,
+      }))
+    }
+  }
+  for (const receipt of input.codingReceipts) {
+    materials.push(await jsonMaterial({
+      id: codingReceiptMaterialId(receipt.receiptId),
+      kind: 'code',
+      name: `Coding receipt ${receipt.receiptId}`,
+      value: receipt,
+      uri: legacyUri(
+        input.projectId,
+        codingReceiptLegacyPath(receipt.receiptId),
+      ),
+      provenanceId: codingReceiptProvenanceId(receipt.receiptId),
+      createdAt: input.createdAt,
+    }))
+  }
   for (const artifact of input.workspace.prototypePages) {
     materials.push(await material({
       id: `material:prototype-page:${artifact.page.id}`,
@@ -675,6 +1242,192 @@ function selectedCandidateTokens(
   } catch {
     return []
   }
+}
+
+function validatedPrototypeSuiteState(
+  suiteState: WorkspaceSnapshot['prototypeSuiteCandidates'],
+  designSystemState: WorkspaceSnapshot['prototypeDesignSystemCandidates'],
+): PersistedPrototypeSuiteCandidateSet | null {
+  if (!suiteState) return null
+  const validation = validatePrototypeSuiteCandidateSet(
+    suiteState,
+    designSystemState ?? undefined,
+  )
+  if (!validation.ok) {
+    throw new Error(`Prototype suite Design IR projection failed: ${validation.error}`)
+  }
+  return validation.data
+}
+
+function prototypeSuiteContentProjection(input: {
+  readonly candidateId: string
+  readonly artifact: PersistedPrototypeSuiteCandidate
+  readonly resourcePackMaterialId: string
+  readonly visualMaterialId: string
+  readonly markdownMaterialId: string
+}) {
+  const pages = input.artifact.pages.map((page, index) => ({
+    pageId: page.page.id,
+    materialId: suiteSupportMaterialId(input.candidateId, `page:${index + 1}`),
+  }))
+  const assets = input.artifact.resourcePack.assets.map((asset, index) => ({
+    manifestItemId: asset.manifestItemId,
+    materialId: suiteSupportMaterialId(input.candidateId, `resource-asset:${index + 1}`),
+  }))
+  return {
+    suite: {
+      version: PROTOTYPE_SUITE_MATERIAL_VERSION,
+      candidateId: input.candidateId,
+      designSystem: {
+        candidateSetId: input.artifact.designSystem.candidateSetId,
+        candidateId: input.artifact.designSystem.candidateId,
+        directionId: input.artifact.designSystem.directionId,
+        baseRevisionId: input.artifact.designSystem.baseRevisionId,
+        provenanceIds: input.artifact.designSystem.provenanceIds,
+        visualMaterialId: input.visualMaterialId,
+        markdownMaterialId: input.markdownMaterialId,
+      },
+      plan: input.artifact.plan,
+      pages,
+      resourcePackMaterialId: input.resourcePackMaterialId,
+      provenanceIds: input.artifact.provenanceIds,
+      ...(input.artifact.codingReceipt
+        ? { codingReceiptMaterialId: codingReceiptMaterialId(input.artifact.codingReceipt.receiptId) }
+        : {}),
+    },
+    resourcePack: {
+      version: RESOURCE_PACK_MATERIAL_VERSION,
+      id: input.artifact.resourcePack.id,
+      manifest: input.artifact.resourcePack.manifest,
+      manifestProvenanceId: input.artifact.resourcePack.manifestProvenanceId,
+      assets,
+    },
+    assets: input.artifact.resourcePack.assets.map((asset) => ({
+      version: RESOURCE_ASSET_MATERIAL_VERSION,
+      manifestItemId: asset.manifestItemId,
+      artifactId: asset.artifactId,
+      provenanceIds: asset.provenanceIds,
+    })),
+  }
+}
+
+function validatedCodingReceipts(
+  receipts: readonly CodingReceipt[] | undefined,
+  suiteState: PersistedPrototypeSuiteCandidateSet | null,
+): readonly CodingReceipt[] {
+  const byId = new Map<string, CodingReceipt>()
+  const add = (input: unknown) => {
+    const parsed = codingReceiptSchema.safeParse(input)
+    if (!parsed.success) {
+      throw new Error(
+        `Coding receipt Design IR projection failed: ${parsed.error.issues[0]?.message ?? 'Invalid receipt.'}`,
+      )
+    }
+    const prior = byId.get(parsed.data.receiptId)
+    if (prior && JSON.stringify(prior) !== JSON.stringify(parsed.data)) {
+      throw new Error(`Conflicting Coding receipts share id "${parsed.data.receiptId}".`)
+    }
+    byId.set(parsed.data.receiptId, parsed.data)
+  }
+  for (const receipt of receipts ?? []) add(receipt)
+  for (const artifact of Object.values(suiteState?.artifacts ?? {})) {
+    if (artifact.codingReceipt) add(artifact.codingReceipt)
+  }
+  return [...byId.values()]
+}
+
+function derivationProvenance(
+  id: string,
+  sourceId: string,
+  recordedAt: number,
+  tool: string,
+  actorId: string,
+): DesignDocument['provenance'][number] {
+  return {
+    id,
+    operation: 'derive',
+    sourceIds: [sourceId],
+    actor: { kind: 'agent', id: actorId },
+    recordedAt: toIso(recordedAt),
+    tool,
+  }
+}
+
+function uniqueById<T extends { readonly id: string }>(values: readonly T[]): T[] {
+  const unique = new Map<string, T>()
+  for (const value of values) {
+    const prior = unique.get(value.id)
+    if (prior && JSON.stringify(prior) !== JSON.stringify(value)) {
+      throw new Error(`Conflicting Design IR records share id "${value.id}".`)
+    }
+    unique.set(value.id, value)
+  }
+  return [...unique.values()]
+}
+
+async function jsonMaterial(input: {
+  readonly id: string
+  readonly kind?: Material['kind']
+  readonly name: string
+  readonly value: unknown
+  readonly uri: string
+  readonly provenanceId: string
+  readonly createdAt: string
+}): Promise<Material> {
+  return material({
+    id: input.id,
+    kind: input.kind ?? 'other',
+    name: input.name,
+    referenceId: relatedDesignIrId('content:', input.id),
+    uri: input.uri,
+    mediaType: 'application/json',
+    bytes: jsonBytes(input.value),
+    provenanceId: input.provenanceId,
+    createdAt: input.createdAt,
+  })
+}
+
+function suiteSupportMaterialId(candidateId: string, role: string): string {
+  return relatedDesignIrId('material:prototype-suite-support:', `${candidateId}:${role}`)
+}
+
+function suiteContentReferenceId(candidateId: string, role: string): string {
+  return relatedDesignIrId('content:prototype-suite:', `${candidateId}:${role}`)
+}
+
+function codingReceiptMaterialId(receiptId: string): string {
+  return relatedDesignIrId('material:coding-receipt:', receiptId)
+}
+
+function codingReceiptProvenanceId(receiptId: string): string {
+  return relatedDesignIrId('provenance:coding-receipt:', receiptId)
+}
+
+function relatedDesignIrId(prefix: string, value: string): string {
+  const direct = `${prefix}${value}`
+  if (direct.length <= 160) return direct
+  const suffix = stableTextId(direct)
+  return `${direct.slice(0, 160 - suffix.length - 1)}:${suffix}`
+}
+
+function stableTextId(value: string): string {
+  let hash = 2166136261
+  for (const character of value) {
+    hash = Math.imul(hash ^ character.charCodeAt(0), 16777619)
+  }
+  return (hash >>> 0).toString(16).padStart(8, '0')
+}
+
+function jsonBytes(value: unknown): Uint8Array {
+  return textBytes(JSON.stringify(value))
+}
+
+function suiteLegacyPath(candidateId: string, suffix: string): string {
+  return `workspace/prototype-suite-candidates/${encodeURIComponent(candidateId)}/${suffix}`
+}
+
+function codingReceiptLegacyPath(receiptId: string): string {
+  return `workspace/coding-receipts/${encodeURIComponent(receiptId)}.json`
 }
 
 async function material(input: {
@@ -756,6 +1509,19 @@ async function resolveBytes(
 async function resolveText(material: Material, resolver: ContentResolver): Promise<string | null> {
   const bytes = await resolveBytes(material, resolver)
   return bytes ? new TextDecoder().decode(bytes) : null
+}
+
+async function resolveJson(
+  material: Material,
+  resolver: ContentResolver,
+): Promise<Result<unknown>> {
+  const text = await resolveText(material, resolver)
+  if (text === null) return err(`Missing or invalid content for material "${material.id}".`)
+  try {
+    return ok(JSON.parse(text) as unknown)
+  } catch {
+    return err(`Invalid JSON content for material "${material.id}".`)
+  }
 }
 
 async function resolveReference(

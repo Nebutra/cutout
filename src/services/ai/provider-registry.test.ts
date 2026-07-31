@@ -11,6 +11,7 @@ describe("provider definition registry", () => {
       "anthropic",
       "google",
       "openai-compatible",
+      "cc-switch",
       "gateway",
       "dashscope",
       "deepseek",
@@ -51,6 +52,20 @@ describe("provider definition registry", () => {
       expect.objectContaining({
         wireProtocols: ["chat-completions"],
         capabilities: ["text", "vision", "tools"],
+      }),
+    ]);
+    expect(registry.definition("cc-switch")).toMatchObject({
+      label: "CC Switch",
+      category: "local",
+      defaultBaseUrl: "http://127.0.0.1:15721/v1",
+      configurableBaseUrl: false,
+      authMethods: ["api-key"],
+      wireProtocols: ["responses", "chat-completions"],
+    });
+    expect(registry.adaptersFor("cc-switch")).toEqual([
+      expect.objectContaining({
+        wireProtocols: ["responses", "chat-completions"],
+        capabilities: expect.arrayContaining(["text", "image-generation", "image-edit"]),
       }),
     ]);
     for (const blocked of [

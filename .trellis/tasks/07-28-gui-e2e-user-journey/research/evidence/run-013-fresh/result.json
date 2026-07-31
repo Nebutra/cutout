@@ -1,0 +1,122 @@
+{
+  "protocol": "cutout.packaged-e2e-result.v1",
+  "status": "failed",
+  "phases": [
+    {
+      "id": "native-boot",
+      "status": "passed"
+    },
+    {
+      "id": "webview-loaded",
+      "status": "passed"
+    },
+    {
+      "id": "bootstrap",
+      "status": "passed"
+    },
+    {
+      "id": "settings-opened",
+      "status": "passed"
+    },
+    {
+      "id": "ai-native-candidate-resolved",
+      "status": "passed"
+    },
+    {
+      "id": "ai-native-binding-normalized",
+      "status": "passed"
+    },
+    {
+      "id": "ai-native-config-loaded",
+      "status": "passed"
+    },
+    {
+      "id": "ai-native-secret-resolved",
+      "status": "passed"
+    },
+    {
+      "id": "ai-native-catalog-checked",
+      "status": "passed"
+    },
+    {
+      "id": "ai-native-key-stored",
+      "status": "passed"
+    },
+    {
+      "id": "ai-native-provider-saved",
+      "status": "passed"
+    },
+    {
+      "id": "ai-configured",
+      "status": "passed"
+    },
+    {
+      "id": "settings-closed",
+      "status": "passed"
+    },
+    {
+      "id": "home-ready",
+      "status": "passed"
+    },
+    {
+      "id": "casual-chat-submitted",
+      "status": "passed"
+    },
+    {
+      "id": "pipeline-stage-tool-gate",
+      "status": "passed"
+    },
+    {
+      "id": "provider-response",
+      "status": "passed"
+    },
+    {
+      "id": "creative-brief-submitted",
+      "status": "passed"
+    },
+    {
+      "id": "pipeline-stage-image-execution-started",
+      "status": "passed"
+    },
+    {
+      "id": "planner-stage-complete",
+      "status": "passed"
+    },
+    {
+      "id": "design-candidate-1-generating",
+      "status": "passed"
+    },
+    {
+      "id": "design-candidate-2-generating",
+      "status": "passed"
+    },
+    {
+      "id": "design-candidate-2-failed",
+      "status": "failed"
+    },
+    {
+      "id": "pipeline-stage-image-execution-proven",
+      "status": "passed"
+    },
+    {
+      "id": "design-candidate-1-ready",
+      "status": "passed"
+    },
+    {
+      "id": "design-candidates-ready",
+      "status": "failed"
+    }
+  ],
+  "failure": {
+    "phase": "design-candidates-ready",
+    "code": "candidate-failed",
+    "diagnostic": "unknown",
+    "plannerProgress": {
+      "stage": "complete",
+      "completedPages": 6,
+      "totalPages": 6
+    }
+  },
+  "outcome": null,
+  "completedAt": 1785315367539
+}

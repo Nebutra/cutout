@@ -1,0 +1,4 @@
+{"type":"spec","path":".trellis/spec/frontend/prototype-generation.md","reason":"Review route completeness, candidate selection, and provenance compliance."}
+{"type":"spec","path":".trellis/spec/frontend/agent-control-safety.md","reason":"Review approvals, controlled Coding sessions, secrets, and tool boundaries."}
+{"type":"test","path":"src/components/workspace/prototype-pipeline.e2e.test.tsx","reason":"Existing rendered orchestration regression boundary."}
+{"type":"test","path":"tests/visual/outcome-first.spec.ts","reason":"Release-critical visible workspace behavior."}

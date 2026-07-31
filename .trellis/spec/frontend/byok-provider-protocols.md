@@ -57,6 +57,8 @@ Both Rust proxy commands receive the same protocol discriminator:
 ```rust
 ai_proxy_request(
     app: AppHandle,
+    cancellations: State<AiProxyCancellationState>,
+    request_id: Option<String>,
     provider_id: String,
     kind: String,
     wire_protocol: Option<ProviderWireProtocol>,
@@ -68,6 +70,8 @@ ai_proxy_request(
 
 ai_proxy_stream(
     app: AppHandle,
+    cancellations: State<AiProxyCancellationState>,
+    request_id: Option<String>,
     provider_id: String,
     kind: String,
     wire_protocol: Option<ProviderWireProtocol>,
@@ -77,6 +81,11 @@ ai_proxy_stream(
     body: Option<String>,
     on_chunk: Channel<InvokeResponseBody>,
 ) -> Result<(), ProxyError>
+
+ai_proxy_cancel(
+    cancellations: State<AiProxyCancellationState>,
+    request_id: String,
+) -> Result<bool, ProxyError>
 ```
 
 ### 3. Contracts
@@ -137,6 +146,17 @@ Connection checks prove credential and catalog access only. They must never
 issue a generation POST because there is no standardized cross-family no-cost
 generation probe.
 
+An authenticated catalog image id is a candidate route, not proof that image
+generation is usable. The packaged journey records catalog routing separately
+from the first completed image execution and never calls the former success.
+
+Every renderer-owned generation `AbortSignal` propagates through the desktop
+tool loop and `GenerationService` into an opaque UUID-bound native proxy
+request. Cancellation calls `ai_proxy_cancel`, which drops the matching
+`reqwest` future; discarding a late renderer result alone is not cancellation.
+Buffered generation and native image-edit requests share the desktop 300-second
+deadline. Catalog/health probes retain their shorter bound.
+
 The application entry must not statically load provider catalog definitions or
 provider SDK runtime solely to support connection testing. When a configured
 provider has no explicit `baseUrl`, `ProviderService.test()` dynamically loads
@@ -183,7 +203,8 @@ import.
   provider id/kind/protocol/origin/path binding, protocol auth headers,
   stripped inbound auth headers, mapped/reserved address rejection,
   resolve-to-connect pinning, draft catalog checks, and buffered/stream proxy
-  parity.
+  parity; UUID-only request registration, duplicate rejection, native
+  cancellation, and the aligned generation deadline.
 - UI: protocol options and explicit labels for each supported kind; visible
   action copy must say credential/catalog check rather than generation proof.
 - Visual: desktop/mobile provider directory and custom endpoint form coverage.
@@ -231,7 +252,7 @@ does not fail during module initialization.
 
 Use this contract when changing native provider discovery, candidate metadata,
 provider-draft secret resolution, or support for credentials owned by Codex,
-Claude Code, the process environment, or Cutout's local credential store.
+Claude Code, the process environment, or Cutout's OS credential vault.
 
 Finder-launched desktop apps commonly do not inherit shell environment
 variables. A provider being present in a local tool config therefore does not
@@ -282,8 +303,30 @@ the current secret again inside Rust.
   remains authoritative for that candidate.
 - Candidate and IPC serialization may expose the stable reference name
   `OPENAI_API_KEY`, but never its value.
-- Imported secrets are persisted through Cutout's owner-only native local
-  credential store. User-facing copy must not claim macOS Keychain custody.
+- Imported secrets are persisted through Cutout's native OS credential vault;
+  on macOS this is Keychain. The renderer receives only key status and may use
+  platform-neutral visible copy such as `Cutout local credentials`.
+- A reviewed CC Switch installation may contribute its current Codex upstream
+  as a direct `cc-switch` + Responses candidate. `cc-switch` is an explicit
+  OpenAI-shaped Provider kind: the persisted wire contract, renderer model
+  descriptors, DAG/pipeline conditioning, and native image generation/editing
+  endpoint selection must all include it through the shared
+  `supportsOpenAIImageEndpoints` predicate. A native executor capability alone
+  is not renderer routing evidence. Cutout reads only the
+  exact `<home>/.cc-switch/cc-switch.db` path with SQLite read-only/no-create
+  flags, a 256 MiB bound, before/after file-identity checks, and the expected
+  `providers` schema. Exactly one `codex` row may have `is_current = 1`.
+- The CC Switch row is importable only when `settings_config` has exactly the
+  `auth` and `config` fields, `auth` has exactly one non-empty
+  `OPENAI_API_KEY`, and the embedded Codex TOML has one unambiguous public HTTPS
+  `base_url` with `wire_api = "responses"`. A pathless upstream is normalized
+  to `/v1`; an explicit path is preserved. The database provider id and secret
+  remain native and are never serialized.
+- The CC Switch selected `model` is only a default-model hint. Readiness still
+  requires the normal authenticated `GET <direct-upstream>/models` check and
+  uses only model ids returned by that response. An empty CC Switch loopback
+  catalog, the hint alone, pricing rows, or historical request logs are not
+  catalog evidence, and no generation request may be used as a fallback.
 
 ### 4. Validation & Error Matrix
 
@@ -296,6 +339,10 @@ the current secret again inside Rust.
 | Malformed supported config/auth file | Return sanitized `config-invalid` error |
 | Symlinked parent/file | Return `config-rejected` before reading |
 | File larger than 1 MiB | Return `config-rejected` before parsing |
+| Missing CC Switch database or no current Codex row | Return no CC Switch upstream candidate |
+| CC Switch database over 256 MiB, symlinked, replaced during read, schema-drifted, or writable-only | Reject before exposing a candidate |
+| Multiple current CC Switch Codex rows, unknown settings/auth fields, ambiguous Codex provider tables, non-Responses wire API, or unsafe upstream URL | Reject the CC Switch source without weakening other valid discovery sources |
+| Imported `cc-switch` route is absent from renderer text/image capability or OpenAI image-endpoint selection | Treat as a contract bug; keep the shared Provider-kind predicate, runtime descriptors, DAG/pipeline routing, and generation/editing transports aligned |
 | Candidate disappears before draft check/import | Return `credential-missing` |
 | Secret-store read/import fails | Return opaque `credential-unavailable` |
 
@@ -318,6 +365,16 @@ the current secret again inside Rust.
   auth-file API key.
 - OAuth-only and empty auth files yield no importable auth candidate.
 - Symlinked and oversized auth files fail before parsing.
+- CC Switch current-upstream discovery uses the exact read-only database,
+  normalizes a pathless HTTPS endpoint to `/v1`, re-resolves the secret, and
+  serializes no database credential or settings payload.
+- Provider-kind tests require `cc-switch` to default to Responses, remain
+  eligible for reviewed text and image assignments, and use the same native
+  generation, edit, and reference-conditioning path as OpenAI-shaped routes.
+- Missing database, schema drift, symlinks, multiple-current rows, unknown
+  settings/auth fields, unsafe or ambiguous upstreams, and candidate binding
+  drift fail closed. A model hint with an empty checked catalog remains an
+  error.
 - Existing custom-provider environment discovery remains covered.
 
 ### 7. Wrong vs Correct
@@ -407,15 +464,25 @@ import_provider_draft(app: AppHandle, input: ImportDraftInput) -> Result<Provide
   all 39 rows. It projects configured Providers, persisted verification
   receipts, capability coverage, and only reviewed importable provider
   candidates into one outcome-led setup state.
-- Settings claims ready only when at least one enabled Provider has a complete
+- Settings claims routing is configured only when at least one enabled Provider has a complete
   verified receipt (`status`, `model`, and `checkedAt`) and verified Providers
   cover every required task dimension. Config existence alone is never a ready
-  claim.
+  claim. Catalog evidence may nominate an image route, but visible copy and E2E
+  evidence must not call image generation usable until a real image completes.
+- Automatic setup prefers each authenticated Provider's checked default model
+  for text/Coding instead of taking the first alphabetically sorted catalog
+  id. Image routing uses the first available product-preferred image model,
+  currently led by `gpt-image-2`, before falling back to another checked image
+  id.
+- Automatic setup stops importing candidates as soon as the configured results
+  cover every required task dimension. It must continue after a failed or
+  partial candidate, but it must not probe unrelated credentials after a
+  complete route exists.
 - Importable candidates that match an existing Provider's kind, effective wire
   protocol, and normalized base URL are omitted from setup suggestions. Repair
   the existing connection instead of adding a duplicate Provider.
 - Discovered provider source labels preserve the sanitized Agent-owned label.
-  Only the process environment and Cutout-owned local credential store use
+  Only the process environment and Cutout-owned OS credential vault use
   translated category labels; Agent configs must never be mislabeled as
   Cutout-owned credentials.
 - The official Kimi for Coding binding is exactly
