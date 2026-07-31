@@ -27,6 +27,17 @@ export interface PrototypeAssetManifest {
   readonly assets: readonly PrototypeAssetManifestItem[]
 }
 
+/** Mirrors manifest expansion without allocating ids or names. This is useful
+ * for reporting and fixture assertions; it does not define production scope. */
+export function prototypePageAssetCount(page: PrototypePage): number {
+  return page.regions
+    .filter((region) => region.assetRoute !== 'ignore-code-ui')
+    .reduce(
+      (count, region) => count + Math.max(1, region.assetOpportunities.length),
+      0,
+    )
+}
+
 export function createPrototypeAssetManifest(
   plan: PrototypePlan,
   pages: readonly PrototypePage[],

@@ -31,7 +31,7 @@ export interface ProviderService {
   /** Batch has-key lookup (maps to Rust `list_key_status`). */
   statuses(ids: readonly string[]): Promise<Record<string, boolean>>
   /** Cheap round-trip through the proxy to validate the key works. */
-  test(id: string): Promise<Result<{ model: string }>>
+  test(id: string): Promise<Result<{ model: string; models: readonly string[] }>>
 }
 
 /**
@@ -44,6 +44,8 @@ export interface GenerateInput {
   readonly providerId: string
   readonly model?: string
   readonly signal?: AbortSignal
+  /** Caller-owned upper bound for bounded text/structured generation stages. */
+  readonly maxOutputTokens?: number
   /** Raw single-string prompt (back-compat, text-only path). */
   readonly prompt?: string
   /** Explicit system instruction (paired with `input` for multimodal). */
@@ -92,7 +94,13 @@ export interface GenerateWithToolsInput {
   readonly tools: readonly GenerationTool[]
   /** Steps the model gets to decide-then-observe-then-decide-again. */
   readonly maxSteps: number
+  /** Caller-owned output bound for each model step in the tool loop. */
+  readonly maxOutputTokens?: number
+  /** Stop as soon as one of these tools has executed; no unused summary step. */
+  readonly terminalToolNames?: readonly string[]
   readonly signal?: AbortSignal
+  readonly reasoningEffort?: ReasoningEffort
+  readonly reasoningProtocol?: 'openai' | 'anthropic' | 'google'
   readonly systemContext?: string
   readonly personalizationReceipt?:PersonalizationReceiptFlags
 }
@@ -146,7 +154,8 @@ export interface GenerationService {
    * 垫图 / reference-conditioned image edit (spec §2/§A). Sends the reference
    * image(s) + prompt to the OpenAI-shaped `/images/edits` endpoint via the Rust
    * `ai_image_edit` command (multipart — the AI SDK's `generateImage` can't do
-   * edits). Only openai / openai-compatible providers; returns PNG assets. Never
+   * edits). Only the reviewed openai / openai-compatible / cc-switch providers;
+   * returns PNG assets. Never
    * throws across the seam — returns a `Result`.
    */
   editImage(input: EditImageInput): Promise<Result<GeneratedAsset[]>>

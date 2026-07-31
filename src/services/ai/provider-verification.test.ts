@@ -1,7 +1,9 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
   ensureProviderVerification,
+  loadProviderVerifications,
   providerEligibleForAuto,
+  providerVerificationIsVerified,
   providerVerificationsSnapshot,
   providerVerified,
   setProviderVerification,
@@ -75,6 +77,35 @@ describe('ensureProviderVerification (legacy lazy migration)', () => {
     setProviderVerification('p', { status: 'verified' }, store)
     expect(await ensureProviderVerification('p', async () => ({ model: 'm' }), store)).toBe('verified')
     expect(providerVerified('p', store)).toBe(true)
+  })
+
+  it('requires authenticated catalog evidence for the assigned model', async () => {
+    const store = memory()
+    setProviderVerification('p', {
+      status: 'verified',
+      model: 'chat-model',
+      checkedAt: '2026-07-15T00:00:00.000Z',
+    }, store)
+    let probes = 0
+    expect(await ensureProviderVerification('p', async () => {
+      probes += 1
+      return { model: 'chat-model', models: ['chat-model', 'image-model'] }
+    }, store, 'image-model')).toBe('verified')
+    expect(probes).toBe(1)
+    expect(providerVerificationIsVerified(
+      loadProviderVerifications(store).p,
+      'image-model',
+    )).toBe(true)
+
+    expect(await ensureProviderVerification('p', async () => {
+      probes += 1
+      return { model: 'chat-model', models: ['chat-model'] }
+    }, store, 'missing-model')).toBe('failed')
+    expect(probes).toBe(2)
+    expect(providerVerificationIsVerified(
+      loadProviderVerifications(store).p,
+      'missing-model',
+    )).toBe(false)
   })
 
   it('persists failed on probe error and never re-probes conclusive records', async () => {

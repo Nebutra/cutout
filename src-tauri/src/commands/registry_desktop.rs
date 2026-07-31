@@ -98,11 +98,23 @@ pub async fn registry_authorize_workspace<R: Runtime>(
     };
     let path = folder.into_path().map_err(|e| e.to_string())?;
     let root = fs::canonicalize(&path).await.map_err(|e| e.to_string())?;
+    let (handle, label) = authorize_host_root(&state, root).await?;
+    Ok(WorkspaceAuthorization {
+        canceled: false,
+        handle: Some(handle),
+        label,
+    })
+}
+
+pub(crate) async fn authorize_host_root(
+    state: &RegistryDesktopState,
+    root: PathBuf,
+) -> Result<(String, Option<String>), String> {
     let metadata = fs::symlink_metadata(&root)
         .await
         .map_err(|e| e.to_string())?;
     if !metadata.is_dir() || metadata.file_type().is_symlink() {
-        return Err("Registry workspace must be a real directory.".into());
+        return Err("Authorized workspace must be a real directory.".into());
     }
     let handle = format!(
         "workspace.{}",
@@ -122,11 +134,10 @@ pub async fn registry_authorize_workspace<R: Runtime>(
             .map_err(lock)?
             .insert(receipt.plan_id.clone(), receipt);
     }
-    Ok(WorkspaceAuthorization {
-        canceled: false,
-        handle: Some(handle),
-        label: root.file_name().map(|v| v.to_string_lossy().into_owned()),
-    })
+    Ok((
+        handle,
+        root.file_name().map(|v| v.to_string_lossy().into_owned()),
+    ))
 }
 
 #[tauri::command]

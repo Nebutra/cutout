@@ -179,3 +179,9 @@ export function classifyGenerationError(
 export function userFacingGenerationError(message: string): string {
   return classifyGenerationError(message).displayMessage;
 }
+
+/** Failures that apply to the selected Provider route, not one candidate prompt. */
+export function isRouteWideGenerationFailure(message: string): boolean {
+  const kind = classifyGenerationError(message).kind;
+  return kind === "credential" || kind === "configuration" || kind === "transient";
+}

@@ -60,7 +60,7 @@ describe('LocalProviderService.test', () => {
 
     const result = await createLocalProviderService().test('p1')
 
-    expect(result).toEqual(ok({ model: 'chat-model' }))
+    expect(result).toEqual(ok({ model: 'chat-model', models: ['chat-model'] }))
     expect(invokeMock).toHaveBeenCalledWith(
       'ai_proxy_request',
       expect.objectContaining({ wireProtocol: 'chat-completions' }),
@@ -105,7 +105,10 @@ describe('LocalProviderService.test', () => {
       return Promise.resolve(undefined)
     })
 
-    await expect(createLocalProviderService().test('p1')).resolves.toEqual(ok({ model: 'chat-model' }))
+    await expect(createLocalProviderService().test('p1')).resolves.toEqual(ok({
+      model: 'chat-model',
+      models: ['gemini-2.5-pro'],
+    }))
     expect(invokeMock).toHaveBeenCalledWith(
       'ai_proxy_request',
       expect.objectContaining({ wireProtocol: 'google-generate-content' }),
@@ -132,7 +135,10 @@ describe('LocalProviderService.test', () => {
       cfg({ kind: 'openai', baseUrl: undefined, wireProtocol: undefined, defaultModel: 'gpt-5.4' }),
     )
 
-    await expect(createLocalProviderService().test('p1')).resolves.toEqual(ok({ model: 'gpt-5.4' }))
+    await expect(createLocalProviderService().test('p1')).resolves.toEqual(ok({
+      model: 'gpt-5.4',
+      models: ['gpt-5.4'],
+    }))
     expect(invokeMock).toHaveBeenCalledWith(
       'ai_proxy_request',
       expect.objectContaining({

@@ -1,0 +1,6 @@
+Captured at 2026-07-30T02:55:57Z after the progress file had not changed since 2026-07-30T02:47:14Z.
+
+PID 742 had been running for 09:38 at 3.3% CPU and 0.9% memory:
+/Applications/Cutout.app/Contents/MacOS/app
+
+No established TCP connection owned by the Cutout process remained. The sanitized progress file still ended at planner-stage-outline and no result.json existed. The app was terminated after evidence capture and the disposable VM was stopped.

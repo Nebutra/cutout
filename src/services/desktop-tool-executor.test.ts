@@ -40,7 +40,11 @@ function harness(overrides: {
 } = {}) {
   const written: string[] = []
   const artifacts: DesktopToolArtifactStore = {
-    read: vi.fn(async () => ({ id: 'artifact:input', mediaType: 'image/png', bytes: new Uint8Array([7]) })),
+    read: vi.fn(async (id: string) => ({
+      id,
+      mediaType: 'image/png',
+      bytes: new Uint8Array([id.endsWith(':second') ? 8 : 7]),
+    })),
     write: vi.fn(async ({ source }) => {
       const id = `artifact:${source}:${written.length + 1}`
       written.push(id)
@@ -124,6 +128,29 @@ describe('desktop paid tool executor', () => {
     expect(JSON.stringify(result)).not.toContain('secret')
   })
 
+  it('publishes tool-started immediately at execution while returning no duplicate event', async () => {
+    let finish!: () => void
+    const pending = new Promise<void>((resolve) => { finish = resolve })
+    const { executor } = harness({
+      generate: async () => {
+        await pending
+        return { ok: true, data: [{ mediaType: 'image/png', bytes: new Uint8Array([1]) }] }
+      },
+    })
+    const onStarted = vi.fn()
+    const run = executor.execute({ ...execution(), onStarted })
+
+    await vi.waitFor(() => expect(onStarted).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'tool-started', tool: 'generate-image' }),
+    ))
+    finish()
+    const result = await run
+    expect(result.events.map((event) => event.type)).toEqual([
+      'tool-succeeded',
+      'material-recorded',
+    ])
+  })
+
   it('uses the complete execution prompt for generation and editing while retaining legacy fallback', async () => {
     const generated = harness()
     await generated.executor.execute(execution(request('generate-image', 'Complete generated page prompt')))
@@ -175,9 +202,15 @@ describe('desktop paid tool executor', () => {
 
   it('routes edit and local cutout through the existing services without requiring a provider key for cutout', async () => {
     const edit = harness({ capability: { ...imageCapability, capability: 'edit-image' } })
-    const editResult = await edit.executor.execute(execution(request('edit-image')))
+    const editRequest = {
+      ...request('edit-image'),
+      inputArtifactIds: ['artifact:input', 'artifact:second'],
+    }
+    const editResult = await edit.executor.execute(execution(editRequest))
     expect(editResult.ok).toBe(true)
-    expect(edit.generation.editImage).toHaveBeenCalledWith(expect.objectContaining({ images: [new Uint8Array([7])] }))
+    expect(edit.generation.editImage).toHaveBeenCalledWith(expect.objectContaining({
+      images: [new Uint8Array([7]), new Uint8Array([8])],
+    }))
 
     const cutoutCapability: PaidToolExecutorCapability = { capability: 'cutout', providerId: 'local', model: 'cutout-v1', available: true, estimatedCost: { currency: 'USD', amount: 0 } }
     const cutout = harness({ capability: cutoutCapability, hasKey: false })

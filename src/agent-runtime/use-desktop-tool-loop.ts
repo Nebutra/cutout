@@ -12,7 +12,10 @@ import {
 import { createDesktopToolExecutor, createToolExecutorRegistry, type CutoutResultSink, type DesktopToolArtifact } from '@/services/desktop-tool-executor'
 import type { ModelAssignment, ModelAssignments } from '@/services/ai/model-assignment-types'
 import type { ProviderConfig } from '@/services/ai/provider-types'
-import type { ServiceRegistry } from '@/services/types'
+import type {
+  ForegroundSegmentationService,
+  ServiceRegistry,
+} from '@/services/types'
 import type { AgentRunEvent } from './run-events'
 import { ContentAddressedDesktopArtifactStore, parseArtifactId } from '@/services/content-addressed-desktop-artifacts'
 import { approveFirstVisualCandidate, createDesktopVisualToolInvoker, createStorageVisualExecutionStore, createVisualTaskRuntime } from '@/visual-generation'
@@ -24,6 +27,40 @@ import { runDurableHostEffect } from '@/agent-host/durable-effect'
 const DESKTOP_TOOL_TIMEOUT_MS = 300_000
 const ZERO_USD_ESTIMATE: MoneyEstimate = { currency: 'USD', amount: 0 }
 const DESKTOP_PAID_TOOL_POLICY: PaidToolPolicy = { allowPaid: true }
+const FOREGROUND_SEGMENTATION_UNAVAILABLE =
+  'capability-required: foreground segmentation is unavailable on this host.'
+
+export async function probeForegroundSegmentationCapability(
+  service: ForegroundSegmentationService | undefined,
+): Promise<{ readonly available: boolean; readonly reason: string }> {
+  if (!service) {
+    return { available: false, reason: FOREGROUND_SEGMENTATION_UNAVAILABLE }
+  }
+  try {
+    const result = await service.capabilities()
+    if (!result?.ok) {
+      return {
+        available: false,
+        reason: result?.error ?? FOREGROUND_SEGMENTATION_UNAVAILABLE,
+      }
+    }
+    const capability = result.data
+    if (!capability || capability.available !== true) {
+      return {
+        available: false,
+        reason: capability?.reason ?? FOREGROUND_SEGMENTATION_UNAVAILABLE,
+      }
+    }
+    return { available: true, reason: '' }
+  } catch (error) {
+    return {
+      available: false,
+      reason: error instanceof Error
+        ? error.message
+        : FOREGROUND_SEGMENTATION_UNAVAILABLE,
+    }
+  }
+}
 
 function capabilityEstimate(
   capabilities: readonly PaidToolExecutorCapability[],
@@ -117,8 +154,10 @@ export function useDesktopToolLoop(input: {
   const semanticCutoutAvailable = useRef(false)
   useEffect(() => {
     let current = true
-    void input.services.foregroundSegmentation?.capabilities().then((result) => {
-      if (current) semanticCutoutAvailable.current = result.ok && result.data.available
+    void probeForegroundSegmentationCapability(
+      input.services.foregroundSegmentation,
+    ).then((result) => {
+      if (current) semanticCutoutAvailable.current = result.available
     })
     return () => { current = false }
   }, [input.services.foregroundSegmentation])
@@ -171,12 +210,12 @@ export function useDesktopToolLoop(input: {
   async function invoke(invocation: DesktopToolInvocation): Promise<readonly DesktopToolArtifact[]> {
     invocation.signal?.throwIfAborted()
     if (invocation.capability === 'semantic-cutout') {
-      const availability = await state.current.services.foregroundSegmentation?.capabilities()
-      semanticCutoutAvailable.current = Boolean(availability?.ok && availability.data.available)
-      if (!availability?.ok || !availability.data.available) {
-        throw new Error(availability?.ok
-          ? availability.data.reason ?? 'capability-required: foreground segmentation is unavailable on this host.'
-          : availability?.error ?? 'capability-required: foreground segmentation is unavailable on this host.')
+      const availability = await probeForegroundSegmentationCapability(
+        state.current.services.foregroundSegmentation,
+      )
+      semanticCutoutAvailable.current = availability.available
+      if (!availability.available) {
+        throw new Error(availability.reason)
       }
     }
     invocation.signal?.throwIfAborted()

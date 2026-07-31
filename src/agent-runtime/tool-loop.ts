@@ -18,6 +18,7 @@
 import { createRunEvent, type AgentRunEvent } from './run-events'
 import type { GenerationService, GenerationTool } from '@/services/ai/types'
 import type { PersonalizationReceiptFlags } from '@/services/ai/types'
+import type { ReasoningEffort } from '@/services/ai/reasoning'
 import { isErr, type Result } from '@/services/types'
 
 /** Re-exported under this module's own name — the vocabulary tool authors reach for. */
@@ -36,7 +37,13 @@ export interface ToolLoopInput {
   readonly tools: readonly AgentToolDefinition[]
   /** Steps the model gets to decide-then-observe. 2 covers "call once (or several), then summarize". */
   readonly maxSteps?: number
+  /** Caller-owned output bound for each model step. */
+  readonly maxOutputTokens?: number
+  /** Tool calls that complete this decision without another model summary step. */
+  readonly terminalToolNames?: readonly string[]
   readonly signal?: AbortSignal
+  readonly reasoningEffort?: ReasoningEffort
+  readonly reasoningProtocol?: 'openai' | 'anthropic' | 'google'
 }
 
 export interface ToolLoopCall {
@@ -100,7 +107,11 @@ export async function runToolLoop(
     prompt: input.prompt,
     tools: input.tools,
     maxSteps: input.maxSteps ?? DEFAULT_MAX_STEPS,
+    maxOutputTokens: input.maxOutputTokens,
+    terminalToolNames: input.terminalToolNames,
     signal: input.signal,
+    reasoningEffort: input.reasoningEffort,
+    reasoningProtocol: input.reasoningProtocol,
   })
   if (isErr(result)) return result
 

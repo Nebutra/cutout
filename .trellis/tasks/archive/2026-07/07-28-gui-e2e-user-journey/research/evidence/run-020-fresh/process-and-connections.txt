@@ -1,0 +1,6 @@
+Captured at 2026-07-30T03:06:42Z after planner-stage-outline had not changed since 2026-07-30T03:03:32Z.
+
+PID 746 had been running for 04:12 at 3.9% CPU and 0.9% memory:
+/Applications/Cutout.app/Contents/MacOS/app
+
+No established TCP connection owned by the Cutout process remained. The native-invoke stream terminal repair was present, but the sanitized progress file and renderer-owned timeout still did not advance. This distinguishes a suspended hidden WKWebView from an open Provider transport. The app was terminated after evidence capture and the disposable VM was stopped.

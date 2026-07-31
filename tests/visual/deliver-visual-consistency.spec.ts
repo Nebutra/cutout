@@ -4,6 +4,7 @@ test("Deliver tabs share the product visual language without becoming forms", as
   await page.goto("/");
   await page.getByRole("textbox", { name: "Describe what you want to design..." }).fill("Deliver visual consistency");
   await page.getByRole("button", { name: "Create from brief" }).click();
+  await expect(page.getByRole("complementary", { name: "Agent workspace" })).toBeVisible();
   if (testInfo.project.name === "mobile-chrome") await page.setViewportSize({ width: 1024, height: 915 });
   await page.getByRole("button", { name: "Deliver", exact: true }).click();
   if (testInfo.project.name === "mobile-chrome") await page.setViewportSize({ width: 412, height: 915 });

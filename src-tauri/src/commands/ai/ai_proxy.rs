@@ -26,22 +26,35 @@
 
 use std::collections::HashMap;
 use std::error::Error as StdError;
+use std::future::Future;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
+use std::sync::Mutex;
 
+use futures_util::future::{AbortHandle, Abortable};
 use futures_util::StreamExt;
 use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
 use reqwest::Method;
 use serde::Serialize;
 use serde_json::json;
 use tauri::ipc::{Channel, InvokeResponseBody};
-use tauri::AppHandle;
+use tauri::{AppHandle, State};
 
 use super::auth_header::{auth_headers, STRIPPED_INBOUND_HEADERS};
 use super::keys::{read_secret, KeyError};
-use super::providers::{load_providers_sync, ProviderConfig, ProviderKind, ProviderWireProtocol};
+use super::providers::{
+    load_providers_sync, ProviderConfig, ProviderKind, ProviderWireProtocol, CC_SWITCH_BASE_URL,
+};
 
 const DEFAULT_BUFFERED_TIMEOUT_SECS: u64 = 120;
-const GENERATION_BUFFERED_TIMEOUT_SECS: u64 = 600;
+const GENERATION_BUFFERED_TIMEOUT_SECS: u64 = 300;
+
+/// Active native proxy requests keyed by a renderer-created opaque UUID. The
+/// renderer never receives a handle to the request or its credentials; it can
+/// only cancel the exact in-flight request id it created.
+#[derive(Default)]
+pub struct AiProxyCancellationState {
+    requests: Mutex<HashMap<String, AbortHandle>>,
+}
 
 /// Buffered proxy response returned to JS.
 #[derive(Debug, Serialize)]
@@ -83,6 +96,14 @@ pub enum ProxyError {
     ProviderDisabled,
     #[error("request does not match the configured provider binding")]
     ProviderBinding,
+    #[error("invalid proxy request id")]
+    InvalidRequestId,
+    #[error("proxy request id is already active")]
+    DuplicateRequestId,
+    #[error("proxy request was cancelled")]
+    Cancelled,
+    #[error("proxy cancellation state is unavailable")]
+    CancellationState,
 }
 
 impl Serialize for ProxyError {
@@ -103,6 +124,76 @@ impl From<KeyError> for ProxyError {
             _ => ProxyError::Keychain,
         }
     }
+}
+
+impl AiProxyCancellationState {
+    fn register(
+        &self,
+        request_id: &str,
+    ) -> Result<futures_util::future::AbortRegistration, ProxyError> {
+        uuid::Uuid::parse_str(request_id).map_err(|_| ProxyError::InvalidRequestId)?;
+        let (handle, registration) = AbortHandle::new_pair();
+        let mut requests = self
+            .requests
+            .lock()
+            .map_err(|_| ProxyError::CancellationState)?;
+        if requests.contains_key(request_id) {
+            return Err(ProxyError::DuplicateRequestId);
+        }
+        requests.insert(request_id.to_string(), handle);
+        Ok(registration)
+    }
+
+    fn finish(&self, request_id: &str) -> Result<(), ProxyError> {
+        self.requests
+            .lock()
+            .map_err(|_| ProxyError::CancellationState)?
+            .remove(request_id);
+        Ok(())
+    }
+
+    fn cancel(&self, request_id: &str) -> Result<bool, ProxyError> {
+        uuid::Uuid::parse_str(request_id).map_err(|_| ProxyError::InvalidRequestId)?;
+        let handle = self
+            .requests
+            .lock()
+            .map_err(|_| ProxyError::CancellationState)?
+            .remove(request_id);
+        if let Some(handle) = handle {
+            handle.abort();
+            Ok(true)
+        } else {
+            Ok(false)
+        }
+    }
+}
+
+pub(crate) async fn run_cancellable_proxy_request<T, F>(
+    state: &AiProxyCancellationState,
+    request_id: Option<String>,
+    future: F,
+) -> Result<T, ProxyError>
+where
+    F: Future<Output = Result<T, ProxyError>>,
+{
+    let Some(request_id) = request_id else {
+        return future.await;
+    };
+    let registration = state.register(&request_id)?;
+    let result = Abortable::new(future, registration).await;
+    state.finish(&request_id)?;
+    match result {
+        Ok(result) => result,
+        Err(_) => Err(ProxyError::Cancelled),
+    }
+}
+
+#[tauri::command]
+pub async fn ai_proxy_cancel(
+    state: State<'_, AiProxyCancellationState>,
+    request_id: String,
+) -> Result<bool, ProxyError> {
+    state.cancel(&request_id)
 }
 
 /// SSRF guard: enforce that `url`'s host is acceptable for the provider `kind`.
@@ -133,6 +224,9 @@ pub(crate) fn enforce_host(kind: &str, url: &str) -> Result<(), ProxyError> {
         "google" => is_https && suffix_ok("googleapis.com"),
         "gateway" => is_https && (suffix_ok("vercel.sh") || suffix_ok("vercel.app")),
         "openai-compatible" => is_https && !is_forbidden_remote_host(&host),
+        "cc-switch" => {
+            parsed.scheme() == "http" && host == "127.0.0.1" && parsed.port() == Some(15721)
+        }
         "dashscope" => is_https && suffix_ok("aliyuncs.com"),
         "deepseek" => is_https && suffix_ok("deepseek.com"),
         "zhipu" => is_https && suffix_ok("bigmodel.cn"),
@@ -243,7 +337,7 @@ pub(crate) async fn enforce_resolved_host(
 ) -> Result<ResolvedTarget, ProxyError> {
     let parsed = reqwest::Url::parse(url).map_err(|_| ProxyError::BadUrl)?;
     let host = parsed.host_str().ok_or(ProxyError::BadUrl)?;
-    let local = matches!(kind, "ollama" | "vllm" | "lm-studio");
+    let local = matches!(kind, "cc-switch" | "ollama" | "vllm" | "lm-studio");
     if let Ok(ip) = host
         .trim_start_matches('[')
         .trim_end_matches(']')
@@ -418,6 +512,7 @@ pub(crate) fn default_base_url(kind: ProviderKind) -> Option<&'static str> {
         ProviderKind::Ollama => "http://127.0.0.1:11434/v1",
         ProviderKind::Vllm => "http://127.0.0.1:8000/v1",
         ProviderKind::LmStudio => "http://127.0.0.1:1234/v1",
+        ProviderKind::CcSwitch => CC_SWITCH_BASE_URL,
         ProviderKind::Gateway | ProviderKind::OpenaiCompatible => return None,
     })
 }
@@ -521,6 +616,8 @@ pub(crate) fn request_error_message(error: &reqwest::Error) -> String {
 #[tauri::command]
 pub async fn ai_proxy_request(
     app: AppHandle,
+    cancellations: State<'_, AiProxyCancellationState>,
+    request_id: Option<String>,
     provider_id: String,
     kind: String,
     wire_protocol: Option<ProviderWireProtocol>,
@@ -529,22 +626,25 @@ pub async fn ai_proxy_request(
     headers: HashMap<String, String>,
     body: Option<String>,
 ) -> Result<ProxyResponse, ProxyError> {
-    let (provider, effective_protocol) =
-        resolve_provider_request(&app, &provider_id, &kind, wire_protocol, &url)?;
-    let secret = if requires_secret(&kind) {
-        read_secret(&provider_id).map_err(ProxyError::from)?
-    } else {
-        String::new()
-    };
-    request_with_secret(
-        provider.kind.as_str(),
-        Some(effective_protocol),
-        &url,
-        &method,
-        headers,
-        body,
-        &secret,
-    )
+    run_cancellable_proxy_request(&cancellations, request_id, async move {
+        let (provider, effective_protocol) =
+            resolve_provider_request(&app, &provider_id, &kind, wire_protocol, &url)?;
+        let secret = if requires_secret(&kind) {
+            read_secret(&provider_id).map_err(ProxyError::from)?
+        } else {
+            String::new()
+        };
+        request_with_secret(
+            provider.kind.as_str(),
+            Some(effective_protocol),
+            &url,
+            &method,
+            headers,
+            body,
+            &secret,
+        )
+        .await
+    })
     .await
 }
 
@@ -596,6 +696,8 @@ pub(crate) async fn request_with_secret(
 #[tauri::command]
 pub async fn ai_proxy_stream(
     app: AppHandle,
+    cancellations: State<'_, AiProxyCancellationState>,
+    request_id: Option<String>,
     provider_id: String,
     kind: String,
     wire_protocol: Option<ProviderWireProtocol>,
@@ -605,74 +707,77 @@ pub async fn ai_proxy_stream(
     body: Option<String>,
     on_chunk: Channel<InvokeResponseBody>,
 ) -> Result<(), ProxyError> {
-    // --- Pre-flight: failures here reject the command (no head frame yet). ---
-    let (provider, effective_protocol) =
-        resolve_provider_request(&app, &provider_id, &kind, wire_protocol, &url)?;
-    let bound_kind = provider.kind.as_str();
-    enforce_host(bound_kind, &url)?;
-    let target = enforce_resolved_host(bound_kind, &url).await?;
-    let secret = if requires_secret(&kind) {
-        read_secret(&provider_id).map_err(ProxyError::from)?
-    } else {
-        String::new()
-    };
-    let provider_kind = provider.kind;
-    let (method, header_map) = build_method_and_headers(
-        provider_kind,
-        Some(effective_protocol),
-        &method,
-        headers,
-        &secret,
-    )?;
+    run_cancellable_proxy_request(&cancellations, request_id, async move {
+        // --- Pre-flight: failures here reject the command (no head frame yet). ---
+        let (provider, effective_protocol) =
+            resolve_provider_request(&app, &provider_id, &kind, wire_protocol, &url)?;
+        let bound_kind = provider.kind.as_str();
+        enforce_host(bound_kind, &url)?;
+        let target = enforce_resolved_host(bound_kind, &url).await?;
+        let secret = if requires_secret(&kind) {
+            read_secret(&provider_id).map_err(ProxyError::from)?
+        } else {
+            String::new()
+        };
+        let provider_kind = provider.kind;
+        let (method, header_map) = build_method_and_headers(
+            provider_kind,
+            Some(effective_protocol),
+            &method,
+            headers,
+            &secret,
+        )?;
 
-    // Streaming: only a connect timeout (no overall cap — a long token stream is
-    // expected to outlive any fixed request timeout).
-    let client = build_client_for_target(None, &target)?;
-    let mut req = client.request(method, &url).headers(header_map);
-    if let Some(body) = body {
-        req = req.body(body);
-    }
-    let resp = req
-        .send()
-        .await
-        .map_err(|e| ProxyError::Request(request_error_message(&e)))?;
+        // Streaming: only a connect timeout (no overall cap — a long token stream is
+        // expected to outlive any fixed request timeout).
+        let client = build_client_for_target(None, &target)?;
+        let mut req = client.request(method, &url).headers(header_map);
+        if let Some(body) = body {
+            req = req.body(body);
+        }
+        let resp = req
+            .send()
+            .await
+            .map_err(|e| ProxyError::Request(request_error_message(&e)))?;
 
-    // --- Head frame: status + headers, sent before any body bytes. ---
-    let status = resp.status().as_u16();
-    let resp_headers = collect_headers(&resp);
-    let head = json!({ "type": "head", "status": status, "headers": resp_headers });
-    on_chunk
-        .send(InvokeResponseBody::Json(head.to_string()))
-        .map_err(|_| ProxyError::Channel)?;
+        // --- Head frame: status + headers, sent before any body bytes. ---
+        let status = resp.status().as_u16();
+        let resp_headers = collect_headers(&resp);
+        let head = json!({ "type": "head", "status": status, "headers": resp_headers });
+        on_chunk
+            .send(InvokeResponseBody::Json(head.to_string()))
+            .map_err(|_| ProxyError::Channel)?;
 
-    // --- Body: stream raw chunks; post-head errors are delivered in-band. ---
-    let mut stream = resp.bytes_stream();
-    while let Some(item) = stream.next().await {
-        match item {
-            Ok(bytes) => {
-                if bytes.is_empty() {
-                    continue;
+        // --- Body: stream raw chunks; post-head errors are delivered in-band. ---
+        let mut stream = resp.bytes_stream();
+        while let Some(item) = stream.next().await {
+            match item {
+                Ok(bytes) => {
+                    if bytes.is_empty() {
+                        continue;
+                    }
+                    if on_chunk
+                        .send(InvokeResponseBody::Raw(bytes.to_vec()))
+                        .is_err()
+                    {
+                        // Consumer went away; stop quietly.
+                        return Ok(());
+                    }
                 }
-                if on_chunk
-                    .send(InvokeResponseBody::Raw(bytes.to_vec()))
-                    .is_err()
-                {
-                    // Consumer went away; stop quietly.
+                Err(e) => {
+                    let frame = json!({ "type": "error", "message": request_error_message(&e) });
+                    let _ = on_chunk.send(InvokeResponseBody::Json(frame.to_string()));
                     return Ok(());
                 }
             }
-            Err(e) => {
-                let frame = json!({ "type": "error", "message": request_error_message(&e) });
-                let _ = on_chunk.send(InvokeResponseBody::Json(frame.to_string()));
-                return Ok(());
-            }
         }
-    }
 
-    // --- End frame: terminal success marker. ---
-    let end = json!({ "type": "end" });
-    let _ = on_chunk.send(InvokeResponseBody::Json(end.to_string()));
-    Ok(())
+        // --- End frame: terminal success marker. ---
+        let end = json!({ "type": "end" });
+        let _ = on_chunk.send(InvokeResponseBody::Json(end.to_string()));
+        Ok(())
+    })
+    .await
 }
 
 #[cfg(test)]
@@ -829,6 +934,24 @@ mod tests {
     }
 
     #[test]
+    fn cc_switch_allows_only_the_reviewed_loopback_origin() {
+        assert!(enforce_host("cc-switch", "http://127.0.0.1:15721/v1/models").is_ok());
+        for url in [
+            "http://localhost:15721/v1/models",
+            "http://[::1]:15721/v1/models",
+            "https://127.0.0.1:15721/v1/models",
+            "http://127.0.0.1:15722/v1/models",
+            "http://192.168.1.20:15721/v1/models",
+            "https://remote.example/v1/models",
+        ] {
+            assert!(matches!(
+                enforce_host("cc-switch", url),
+                Err(ProxyError::DisallowedHost)
+            ));
+        }
+    }
+
+    #[test]
     fn unknown_kind_rejected_and_bad_url_rejected() {
         assert!(matches!(
             enforce_host("unknown-provider", "https://example.com/v1"),
@@ -890,6 +1013,7 @@ mod tests {
 
     #[test]
     fn generation_endpoints_get_longer_buffered_timeout() {
+        assert_eq!(GENERATION_BUFFERED_TIMEOUT_SECS, 300);
         assert_eq!(
             buffered_timeout_for_url("https://api.example.com/v1/images/generations"),
             GENERATION_BUFFERED_TIMEOUT_SECS
@@ -932,5 +1056,22 @@ mod tests {
             serde_json::to_string(&ProxyError::DisallowedHost).unwrap(),
             "\"host not allowed for this provider kind\""
         );
+    }
+
+    #[test]
+    fn cancellation_registry_accepts_only_unique_uuid_requests() {
+        let state = AiProxyCancellationState::default();
+        let request_id = uuid::Uuid::new_v4().to_string();
+        let _registration = state.register(&request_id).unwrap();
+        assert!(matches!(
+            state.register(&request_id),
+            Err(ProxyError::DuplicateRequestId)
+        ));
+        assert!(state.cancel(&request_id).unwrap());
+        assert!(!state.cancel(&request_id).unwrap());
+        assert!(matches!(
+            state.register("provider:secret"),
+            Err(ProxyError::InvalidRequestId)
+        ));
     }
 }

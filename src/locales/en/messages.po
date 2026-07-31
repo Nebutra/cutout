@@ -233,7 +233,7 @@ msgstr "AI"
 #. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
 msgid "settings.ai_setup_ready"
-msgstr "AI is ready"
+msgstr "AI routes are configured"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
@@ -771,6 +771,11 @@ msgid "settings.ai_setup_verification_description"
 msgstr "Configured providers must be enabled and verified before Cutout can use them."
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.configuring"
+msgstr "Configuring"
+
+#. js-lingui-explicit-id
 #: src/components/library/KitLibraryInspector.tsx
 msgid "kit_library.audit_conflicts"
 msgstr "Conflicts"
@@ -918,6 +923,11 @@ msgid "settings.dimension_tts_description"
 msgstr "Create spoken audio."
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.ai_setup_ready_description"
+msgstr "Credentials and catalog routes are configured. Image generation is verified when the first image completes."
+
+#. js-lingui-explicit-id
 #: src/components/settings/sections/IntegrationsSection.tsx
 msgid "settings.integrations.description"
 msgstr "Credentials remain in the desktop host. Cutout stores only opaque, revocable session handles."
@@ -963,6 +973,11 @@ msgstr "Custom personality requires instructions before it can be saved."
 #: src/updater/update-notifications.ts
 msgid "updates.notification.available_detail"
 msgstr "Cutout {0} is available on the {channelLabel} channel."
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.ai_setup_credentials_auto_description"
+msgstr "Cutout can verify and configure these local credentials automatically."
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
@@ -2276,16 +2291,6 @@ msgid "settings.personalization.use_memory_desc"
 msgstr "Reuse approved preferences in future sessions."
 
 #. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.review_and_connect"
-msgstr "Review and connect"
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.ai_setup_credentials_found_description"
-msgstr "Review and connect a credential to finish setup."
-
-#. js-lingui-explicit-id
 #: src/components/library/ReviewBranchEditor.tsx
 msgid "review_branch.section_aria"
 msgstr "Review branch"
@@ -2387,6 +2392,11 @@ msgstr "Select a slice to rename, inspect, and export it."
 #: src/components/settings/sections/IntegrationsSection.tsx
 msgid "settings.integrations.expired"
 msgstr "Session expired. Refresh or reconnect."
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.setup_automatically"
+msgstr "Set up automatically"
 
 #. js-lingui-explicit-id
 #: src/components/home/SidebarAccount.tsx
@@ -2845,14 +2855,14 @@ msgid "global_library.asset_preview_description"
 msgstr "Verified local preview, provenance, and capability-aware asset actions."
 
 #. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.ai_setup_ready_description"
-msgstr "Verified providers cover every required AI capability."
-
-#. js-lingui-explicit-id
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.verifying_component_blobs"
 msgstr "Verifying component source blobs…"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.ai_setup_configuring_description"
+msgstr "Verifying local credentials and configuring the required model routes."
 
 #. js-lingui-explicit-id
 #: src/components/library/GlobalLibraryView.tsx

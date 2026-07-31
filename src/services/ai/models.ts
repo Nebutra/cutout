@@ -17,6 +17,7 @@ export const DEFAULT_MODEL: Record<string, string> = {
   google: 'gemini-2.5-flash',
   gateway: 'anthropic/claude-sonnet-4.6',
   'openai-compatible': 'gpt-4o-mini',
+  'cc-switch': 'gpt-5.6-sol',
   dashscope:'qwen-plus',deepseek:'deepseek-chat',zhipu:'glm-4.5',moonshot:'kimi-k2',volcengine:'doubao-seed-1-6',siliconflow:'Qwen/Qwen3-8B',openrouter:'openai/gpt-4o-mini',together:'meta-llama/Llama-3.3-70B-Instruct-Turbo',groq:'llama-3.3-70b-versatile',fireworks:'accounts/fireworks/models/llama-v3p3-70b-instruct',xai:'grok-4',mistral:'mistral-large-latest',ollama:'qwen3',vllm:'default','lm-studio':'local-model',
 }
 
@@ -31,6 +32,7 @@ export const SUGGESTED_MODELS: Record<string, readonly string[]> = {
     'google/gemini-2.5-flash',
   ],
   'openai-compatible': [],
+  'cc-switch': ['gpt-5.6-sol', 'gpt-image-2'],
 }
 
 /**

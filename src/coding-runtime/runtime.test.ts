@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  applyPreparedCodingTask,
   executeCodingTask,
+  prepareCodingTask,
   type CodingBackend,
   type CodingPatch,
   type CodingTask,
@@ -71,6 +73,7 @@ function fixture() {
     })),
     promote: vi.fn(async () => ({
       snapshotId: "snapshot-2",
+      approvalId: "native-approval.reviewed-patch",
       changedFiles: [
         {
           path: "src/Home.tsx",
@@ -116,6 +119,7 @@ describe("controlled coding runtime", () => {
     expect(receipt).toMatchObject({
       status: "applied",
       resultSnapshotId: "snapshot-2",
+      approvalId: "native-approval.reviewed-patch",
       checks: [
         { name: "typecheck", status: "passed" },
         { name: "build", status: "passed" },
@@ -131,6 +135,36 @@ describe("controlled coding runtime", () => {
         ],
       },
     });
+  });
+  it("applies the exact previewed patch without asking the provider twice", async () => {
+    const { backend, workspace } = fixture();
+    const prepared = await prepareCodingTask(task, { backend, workspace });
+    expect(backend.propose).toHaveBeenCalledOnce();
+
+    const receipt = await applyPreparedCodingTask(prepared, { workspace });
+
+    expect(receipt.status).toBe("applied");
+    expect(backend.propose).toHaveBeenCalledOnce();
+    expect(workspace.stage).toHaveBeenCalledWith(task, patch);
+  });
+  it("rejects a patch changed after preview before staging", async () => {
+    const { backend, workspace } = fixture();
+    const prepared = await prepareCodingTask(task, { backend, workspace });
+    const changed = {
+      ...prepared,
+      patch: {
+        ...prepared.patch,
+        files: prepared.patch.files.map((file) => ({
+          ...file,
+          contents: `${file.contents}\nchanged after review`,
+        })),
+      },
+    };
+
+    await expect(applyPreparedCodingTask(changed, { workspace })).rejects.toThrow(
+      "changed after preview",
+    );
+    expect(workspace.stage).not.toHaveBeenCalled();
   });
   it("rejects traversal, secret paths, stale snapshots, out-of-scope patches and budgets", async () => {
     const { backend, workspace } = fixture();
@@ -161,6 +195,22 @@ describe("controlled coding runtime", () => {
     await expect(executeCodingTask(task, { apply: true })).rejects.toThrow(
       "capability-required",
     );
+  });
+  it("rejects credential-shaped patch contents before preview or staging", async () => {
+    const value = fixture();
+    value.backend.propose = vi.fn(async () => ({
+      ...patch,
+      files: [{
+        path: "src/Home.tsx",
+        operation: "create" as const,
+        contents: 'const key = "sk-1234567890abcdef"',
+      }],
+    }));
+    await expect(
+      executeCodingTask(task, { ...value, apply: true }),
+    ).rejects.toThrow("credential-shaped");
+    expect(value.workspace.preview).not.toHaveBeenCalled();
+    expect(value.workspace.stage).not.toHaveBeenCalled();
   });
   it("enforces the declared time budget after backend work", async () => {
     const fixtureValue = fixture();
@@ -220,6 +270,7 @@ describe("controlled coding runtime", () => {
     const stale = fixture();
     stale.workspace.snapshotId = vi
       .fn()
+      .mockResolvedValueOnce("snapshot-1")
       .mockResolvedValueOnce("snapshot-1")
       .mockResolvedValueOnce("snapshot-external-change");
     await expect(

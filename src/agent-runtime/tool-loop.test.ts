@@ -166,4 +166,32 @@ describe('runToolLoop', () => {
     await runToolLoop(generation, { runId: 'run:1', providerId: 'p1', prompt: 'hello', tools: [echoTool] })
     expect(seenMaxSteps).toBe(2)
   })
+
+  it('forwards bounded reasoning and terminal-tool controls', async () => {
+    let seen: GenerateWithToolsInput | undefined
+    const generation = fakeGeneration((input) => {
+      seen = input
+      return ok({ text: '', toolCalls: [] })
+    })
+
+    await runToolLoop(generation, {
+      runId: 'run:bounded',
+      providerId: 'p1',
+      prompt: 'classify this request',
+      tools: [echoTool],
+      maxSteps: 4,
+      maxOutputTokens: 1_200,
+      terminalToolNames: ['echo'],
+      reasoningEffort: 'low',
+      reasoningProtocol: 'openai',
+    })
+
+    expect(seen).toMatchObject({
+      maxSteps: 4,
+      maxOutputTokens: 1_200,
+      terminalToolNames: ['echo'],
+      reasoningEffort: 'low',
+      reasoningProtocol: 'openai',
+    })
+  })
 })

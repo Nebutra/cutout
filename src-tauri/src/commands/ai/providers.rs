@@ -11,6 +11,7 @@ use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Manager, Runtime};
 
 const CONFIG_FILE: &str = "providers.json";
+pub const CC_SWITCH_BASE_URL: &str = "http://127.0.0.1:15721/v1";
 
 /// Provider kinds. Serializes as the kebab-cased tag the TS layer uses
 /// Native providers plus the audited OpenAI-compatible profiles exposed by the
@@ -24,6 +25,7 @@ pub enum ProviderKind {
     Google,
     Gateway,
     OpenaiCompatible,
+    CcSwitch,
     Dashscope,
     Deepseek,
     Zhipu,
@@ -69,6 +71,7 @@ impl ProviderKind {
             Self::Google => "google",
             Self::Gateway => "gateway",
             Self::OpenaiCompatible => "openai-compatible",
+            Self::CcSwitch => "cc-switch",
             Self::Dashscope => "dashscope",
             Self::Deepseek => "deepseek",
             Self::Zhipu => "zhipu",
@@ -89,7 +92,7 @@ impl ProviderKind {
 
     pub fn default_wire_protocol(self) -> Option<ProviderWireProtocol> {
         match self {
-            Self::Openai => Some(ProviderWireProtocol::Responses),
+            Self::Openai | Self::CcSwitch => Some(ProviderWireProtocol::Responses),
             Self::Anthropic => Some(ProviderWireProtocol::AnthropicMessages),
             Self::Google => Some(ProviderWireProtocol::GoogleGenerateContent),
             Self::Gateway => None,
@@ -100,7 +103,7 @@ impl ProviderKind {
     pub fn supports_wire_protocol(self, protocol: ProviderWireProtocol) -> bool {
         use ProviderWireProtocol::*;
         match self {
-            Self::Openai => matches!(protocol, Responses | ChatCompletions),
+            Self::Openai | Self::CcSwitch => matches!(protocol, Responses | ChatCompletions),
             Self::Anthropic => protocol == AnthropicMessages,
             Self::Google => protocol == GoogleGenerateContent,
             Self::OpenaiCompatible => true,
@@ -277,6 +280,10 @@ mod tests {
             serde_json::to_string(&ProviderKind::Gateway).unwrap(),
             "\"gateway\""
         );
+        assert_eq!(
+            serde_json::to_string(&ProviderKind::CcSwitch).unwrap(),
+            "\"cc-switch\""
+        );
     }
 
     #[test]
@@ -339,6 +346,18 @@ mod tests {
             ProviderKind::Openai.effective_wire_protocol(None).unwrap(),
             Some(ProviderWireProtocol::Responses)
         );
+        assert_eq!(
+            ProviderKind::CcSwitch
+                .effective_wire_protocol(None)
+                .unwrap(),
+            Some(ProviderWireProtocol::Responses)
+        );
+        assert!(ProviderKind::CcSwitch
+            .effective_wire_protocol(Some(ProviderWireProtocol::ChatCompletions))
+            .is_ok());
+        assert!(ProviderKind::CcSwitch
+            .effective_wire_protocol(Some(ProviderWireProtocol::AnthropicMessages))
+            .is_err());
         assert_eq!(
             ProviderKind::OpenaiCompatible
                 .effective_wire_protocol(None)

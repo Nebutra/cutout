@@ -116,7 +116,7 @@ function registry(
       setKey: notUsed,
       status: async () => ({ hasKey: true }),
       statuses: async (ids) => Object.fromEntries(ids.map((id) => [id, true])),
-      test: async () => ok({ model: MODEL }),
+      test: async () => ok({ model: MODEL, models: [MODEL] }),
     },
     generation: {
       generateText: notUsed,

@@ -145,6 +145,7 @@ export const codingReceiptSchema = z
     status: z.enum(["previewed", "applied", "failed", "cancelled"]),
     baseSnapshotId: z.string().min(1),
     resultSnapshotId: z.string().min(1).optional(),
+    approvalId: z.string().min(1).max(160).optional(),
     changedFiles: z.array(
       z
         .object({

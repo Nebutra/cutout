@@ -151,6 +151,7 @@ export function createDesktopToolLoop(
           approvalGranted,
           policy: dependencies.policy(),
           signal: call.controller.signal,
+          onStarted: (event) => append([event]),
         }),
         call.controller,
         dependencies.timeoutMs ?? 600_000,
@@ -196,6 +197,20 @@ export function createDesktopToolLoop(
     async request(input) {
       if (requestIds.has(input.requestId)) return;
       requestIds.add(input.requestId);
+      const activeCall = calls.get(input.toolCallId);
+      if (
+        activeCall &&
+        activeCall.state !== "settled" &&
+        activeCall.input.requestId !== input.requestId
+      ) {
+        const failure = loopFailure(
+          input,
+          `Tool call ${input.toolCallId} is already bound to another request.`,
+          now(),
+        );
+        append(failure.events);
+        return;
+      }
       if (dependencies.durability) {
         await dependencies.durability.recover()
         const durable = await dependencies.durability.plan({ requestId: input.requestId, runId: input.runId, toolCallId: input.toolCallId, capability: input.request.capability, at: now() })

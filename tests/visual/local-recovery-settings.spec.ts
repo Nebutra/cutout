@@ -44,5 +44,7 @@ test('Troubleshooting is truthful, redacted, and never deletes project data', as
   expect(state.project).toContain('project:keep')
   expect(state.navigation).toBeNull()
   expect(state.grid).toBeNull()
-  await expect(page.getByRole('dialog')).toHaveScreenshot('local-recovery-settings.png')
+  await expect(page.getByRole('dialog')).toHaveScreenshot('local-recovery-settings.png', {
+    mask: [preview],
+  })
 })

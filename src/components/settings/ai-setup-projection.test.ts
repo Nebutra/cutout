@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { ProviderDiscoveryCandidate } from '@/services/ai/provider-discovery'
 import type { ProviderConfig } from '@/services/ai/provider-types'
+import { capabilityBindingsSchema } from '@/services/ai/model-capabilities'
 import {
   discoveredCandidateMatchesProvider,
   projectAiSetup,
@@ -25,9 +26,20 @@ const deepseek: ProviderConfig = {
 
 const verified = {
   status: 'verified' as const,
-  model: 'verified-model',
+  model: 'gpt-5',
+  models: ['gpt-5'],
   checkedAt: '2026-07-28T00:00:00.000Z',
 }
+
+const fullOpenAiBindings = capabilityBindingsSchema.parse({
+  version: 'model-assignments.v2',
+  bindings: {
+    text: { providerId: 'openai', model: 'gpt-5' },
+    vision: { providerId: 'openai', model: 'gpt-5' },
+    'image-generation': { providerId: 'openai', model: 'gpt-5' },
+    'image-edit': { providerId: 'openai', model: 'gpt-5' },
+  },
+})
 
 const candidate: ProviderDiscoveryCandidate = {
   id: `provider-candidate:${'a'.repeat(64)}`,
@@ -68,17 +80,20 @@ describe('AI setup projection', () => {
     expect(projectAiSetup(input({
       providers: [openai],
       verifications: { openai: verified },
+      bindings: fullOpenAiBindings,
       discoveryState: 'error',
     }))).toMatchObject({ status: 'ready', verifiedProviders: [openai] })
 
     expect(projectAiSetup(input({
       providers: [{ ...openai, enabled: false }],
       verifications: { openai: verified },
+      bindings: fullOpenAiBindings,
     })).status).toBe('needs-verification')
 
     expect(projectAiSetup(input({
       providers: [openai],
       verifications: { openai: { status: 'verified' } },
+      bindings: fullOpenAiBindings,
     })).status).toBe('needs-verification')
   })
 
@@ -101,7 +116,9 @@ describe('AI setup projection', () => {
     expect(result.status).toBe('needs-capabilities')
     if (result.status !== 'needs-capabilities') return
     expect(result.missing.map((item) => item.task)).toEqual([
+      'text',
       'vision',
+      'webdev',
       'image-to-webdev',
       'image-generation',
       'image-edit',
@@ -148,6 +165,7 @@ describe('AI setup projection', () => {
     expect(projectAiSetup(input({
       providers: [openai],
       verifications: { openai: verified },
+      bindings: fullOpenAiBindings,
       discoveryState: 'error',
     })).status).toBe('ready')
   })

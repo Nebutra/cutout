@@ -5,7 +5,7 @@
  * buttons drive a controlled `section` state — no router (the app is a single
  * workspace view; Settings is an overlay).
  */
-import type { ReactNode } from 'react'
+import { useLayoutEffect, useRef, type ReactNode } from 'react'
 import { Settings2, KeyRound, Layers, Archive, Sparkles, Mic, LifeBuoy } from 'lucide-react'
 import { Trans } from '@lingui/react/macro'
 import { cn } from '@/lib/utils'
@@ -26,6 +26,7 @@ interface SettingsSidebarProps {
 }
 
 export function SettingsSidebar({ value, onChange, archivedCount = 0 }: SettingsSidebarProps) {
+  const navigationRef = useRef<HTMLElement>(null)
   const items: readonly SidebarItem[] = [
     {
       id: 'general',
@@ -53,12 +54,22 @@ export function SettingsSidebar({ value, onChange, archivedCount = 0 }: Settings
     },
   ]
 
+  useLayoutEffect(() => {
+    const navigation = navigationRef.current
+    const selected = navigation?.querySelector<HTMLElement>(
+      `[data-settings-section="${value}"]`,
+    )
+    if (!navigation || !selected || navigation.scrollWidth <= navigation.clientWidth) return
+    navigation.scrollLeft = Math.max(0, selected.offsetLeft - navigation.offsetLeft)
+  }, [value])
+
   return (
-    <nav className="flex gap-0.5 overflow-x-auto sm:flex-col sm:overflow-visible">
+    <nav ref={navigationRef} className="flex gap-0.5 overflow-x-auto sm:flex-col sm:overflow-visible">
       {items.map(({ id, icon: Icon, label, badge }) => (
         <button
           key={id}
           type="button"
+          data-settings-section={id}
           onClick={() => onChange(id)}
           aria-current={value === id}
           className={cn(

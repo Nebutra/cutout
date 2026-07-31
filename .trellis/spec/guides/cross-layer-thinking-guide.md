@@ -318,6 +318,47 @@ client store into React and then exercised by an integration benchmark.
       starting paid downstream work?
 - [ ] On concurrent failure, does the orchestrator stop claiming new work and
       settle already in-flight callbacks before returning an error?
+- [ ] For Retry/Resume, does the product acknowledge ownership synchronously
+      before asynchronous preflight, and does E2E observe that product-owned
+      acknowledgement rather than treating `element.click()` as execution?
+
+## Cancellation Ownership Checklist
+
+Use this checklist when browser or renderer code starts a native or remote side
+effect, especially a paid Provider request.
+
+- [ ] Does one opaque request id bind the UI owner, IPC command, native future,
+      receipt, and sanitized E2E checkpoint?
+- [ ] Does abort reach the innermost side effect, or does it only reject an
+      outer promise and discard late output?
+- [ ] Are renderer, desktop policy, IPC, HTTP client, and approval-lease
+      deadlines ordered and documented instead of independently chosen?
+- [ ] Can a cancelled or timed-out request continue billing, hold a socket, or
+      publish a late artifact after the owner run has settled?
+- [ ] Is discovery/catalog evidence named separately from the first successful
+      execution of an advertised capability?
+- [ ] After a route-wide authentication, configuration, rate-limit, transport,
+      or timeout failure, does concurrency stop claiming unstarted sibling work?
+
+## macOS Renderer Liveness Checklist
+
+Use this checklist when a packaged macOS WebView must continue asynchronous work
+without activating or focusing the application.
+
+- [ ] Are Tauri window state and macOS application projection both recorded
+      without treating either one as a complete liveness proof? Accessory apps
+      may project `visible=false` through System Events while remaining live.
+- [ ] Does the dedicated background-test process unhide the application with
+      `unhideWithoutActivation()` while retaining an Accessory activation
+      policy and a non-focusable window?
+- [ ] Does the process retain an appropriate `NSProcessInfo` activity token for
+      the complete WebView workload instead of relying on window visibility to
+      prevent App Nap or timer suspension?
+- [ ] Does evidence assert `frontmost=false`, the unchanged foreground
+      application, normal process priority/activity, and continued renderer
+      progress after the native Provider connection closes?
+- [ ] Are these lifecycle changes compiled behind the dedicated packaged-E2E
+      mode so ordinary production startup and focus behavior remain unchanged?
 
 **Real-world example**: Asset production changed `selectSlices` from returning
 the store array to allocating a filtered projection. One legacy hook subscribed
@@ -350,6 +391,27 @@ user notification with a unique event ID. Normal progress appeared as repeated
 failure, and eventual success could not replace the stale alerts. The fix was
 to emit terminal evaluation only after work settled and key outcome
 notifications by run rather than event.
+
+### Retry Budgets Must Match Workflow Topology
+
+For long DAGs, a single process-wide retry counter is rarely the correct
+authority. It couples independent nodes and makes an early transient failure
+consume recovery for every later stage.
+
+- [ ] Key retry history by a stable logical node or monotonic completion
+      frontier, not merely by the process or top-level run id.
+- [ ] Wait for the product to acknowledge Retry ownership before another click.
+- [ ] Preserve completed outputs and resume only the failed/missing frontier.
+- [ ] Enforce both a per-frontier ceiling and a total journey ceiling so
+      topology-aware recovery cannot become an unbounded paid loop.
+- [ ] Count every repeated paid attempt in both planned and actual execution
+      evidence.
+
+**Real-world example**: A packaged three-suite journey allowed only one Retry
+for the entire process. Suite 2 recovered without replay, but a later transient
+failure in Suite 3 terminated the benchmark even though the visible product
+offered a valid resumable Retry. The driver now budgets acknowledged retries by
+candidate page/resource frontier under a separate journey-wide ceiling.
 
 ---
 

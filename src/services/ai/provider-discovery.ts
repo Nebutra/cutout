@@ -17,7 +17,7 @@ const sanitizedBaseUrl = z.string().max(2048).refine((value) => {
 }, 'Unsafe provider endpoint is not allowed.')
 
 const credentialPreviewSchema = z.object({
-  sourceType: z.enum(['environment', 'keychain', 'config-literal', 'none', 'session', 'helper', 'dotenv']),
+  sourceType: z.enum(['environment', 'keychain', 'config-literal', 'cc-switch-db', 'none', 'session', 'helper', 'dotenv']),
   reference: sanitizedText(128).optional(),
   available: z.boolean(),
   importable: z.boolean(),
@@ -44,6 +44,25 @@ export type ProviderDiscoveryCandidate = z.infer<typeof providerDiscoveryCandida
 export async function discoverProviderCandidates(): Promise<ProviderDiscoveryCandidate[]> {
   const raw = await invoke<unknown>('discover_provider_candidates')
   return z.array(providerDiscoveryCandidateSchema).parse(raw)
+}
+
+const autoConfiguredProviderSchema = z.object({
+  provider: providerConfigSchema,
+  models: z.array(sanitizedText(300)).min(1),
+}).strict()
+
+export type AutoConfiguredProvider = z.infer<typeof autoConfiguredProviderSchema>
+
+export async function autoConfigureProviderCandidate(
+  candidateId: string,
+): Promise<AutoConfiguredProvider> {
+  const input = z.object({
+    candidateId: z.string().regex(/^provider-candidate:[a-f0-9]{64}$/),
+  }).strict().parse({ candidateId })
+  return autoConfiguredProviderSchema.parse(await invoke<unknown>(
+    'auto_configure_provider_candidate',
+    { input },
+  ))
 }
 
 export async function createProviderDraft(input: {

@@ -182,6 +182,36 @@ describe('control request execution guard', () => {
     expect(apply.response.error?.code).toBe('approval-required')
   })
 
+  it.each(['coding.execute', 'coding.review', 'coding.repair'] as const)(
+    'classifies %s apply as an approval-gated external effect',
+    (type) => {
+      const kind = type.slice('coding.'.length) as 'execute' | 'review' | 'repair'
+      const task = {
+        version: 'cutout.coding-task.v1' as const,
+        taskId: `coding:control-${kind}`,
+        kind,
+        goal: 'Apply the reviewed coding task.',
+        acceptanceCriteria: ['The controlled check passes.'],
+        repo: { snapshotId: 'snapshot:base' },
+        inputs: {
+          designDocumentRef: 'design-ir:selected',
+          brandKitRefs: [], designKitRefs: [], prototypeRefs: [], imageAssetRefs: [],
+        },
+        target: { stack: 'vite-react' as const, packageManager: 'pnpm' as const },
+        constraints: { allowedPaths: ['app'], allowedCommands: ['typecheck' as const] },
+        expectedRevision: 4,
+        budget: { maxChangedFiles: 2, maxBytes: 10_000, maxDurationMs: 10_000 },
+      }
+      const guarded = applyControlRequest(
+        createControlLedger(4),
+        controlRequestSchema.parse(request({ operation: { type, task } })),
+        { policy: { allowPaid: false, allowExternal: true, requireApprovalForExternal: true } },
+      )
+      expect(guarded.decision).toBe('denied')
+      expect(guarded.response.error?.code).toBe('approval-required')
+    },
+  )
+
   it('requires explicit approval for guarded paid or external effects', () => {
     const paid = guardControlAction({}, {
       effects: { paid: true, external: false },

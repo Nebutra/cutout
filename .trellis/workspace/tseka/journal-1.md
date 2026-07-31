@@ -1189,3 +1189,36 @@ Reframed AI settings around one automatic setup outcome, moved provider controls
 ### Next Steps
 
 - None - task complete
+
+
+## Session 36: Complete packaged UI asset journey
+
+**Date**: 2026-07-31
+**Task**: Complete packaged UI asset journey
+**Branch**: `test/e2e-complete-user-journey`
+
+### Summary
+
+Validated a fresh-VM packaged GUI journey from reviewed local credential discovery through three dynamic Design Systems, distinct prototype suites, real non-UI asset production, slicing, selection, and terminal resource-pack delivery; hardened Provider routing, retry, authority, throughput, provenance, background lifecycle, release contracts, and prepared v0.1.13.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `daf895c` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

@@ -108,6 +108,13 @@ unless an embedding host injects both a controlled coding backend and workspace.
 This prevents a generated patch or fake build result from being represented as
 a completed coding delivery.
 
+The packaged desktop app is a separate embedding host. It binds a verified
+local Provider assignment to a model-only Coding backend, seeds approved design
+and visual context into an opaque native-managed workspace, previews the exact
+structured patch, and applies that same patch only after review. This desktop
+binding does not make the default CLI/MCP host Provider-capable and does not
+execute arbitrary model-authored commands.
+
 ## MCP
 
 Use the stdio server from the project root:
@@ -172,5 +179,7 @@ credential-shaped values.
 The current headless host intentionally has no provider executor. Its dry-run
 therefore returns a truthful `capability-required` plan, and apply returns a
 `capability-required` error without advancing the revision or recording a fake
-success. Desktop BYOK assignments map to the same non-secret capability shape;
-real provider execution remains outside this phase.
+success. The packaged desktop host does execute assigned image Providers through
+the native credential/origin boundary, approval lease, budget, paid-tool receipt,
+and content-addressed artifact store. That executor is not exported by the
+default headless CLI/MCP process.

@@ -5,6 +5,7 @@ const record = z.object({
   status: z.enum(['unverified', 'verified', 'failed']),
   checkedAt: z.string().datetime().optional(),
   model: z.string().min(1).optional(),
+  models: z.array(z.string().min(1)).min(1).optional(),
   detail: z.string().max(500).optional(),
 }).strict()
 
@@ -64,8 +65,11 @@ export function setProviderVerification(
 
 export function providerVerificationIsVerified(
   value: ProviderVerification | undefined,
+  requiredModel?: string,
 ): boolean {
-  return value?.status === 'verified' && Boolean(value.checkedAt && value.model)
+  if (value?.status !== 'verified' || !value.checkedAt || !value.model) return false
+  if (!requiredModel) return true
+  return (value.models ?? [value.model]).includes(requiredModel)
 }
 
 export function providerVerified(
@@ -90,21 +94,24 @@ export function providerEligibleForAuto(
  */
 export async function ensureProviderVerification(
   providerId: string,
-  probe: () => Promise<{ model: string }>,
+  probe: () => Promise<{ model: string; models?: readonly string[] }>,
   storage?: WriteStorage,
+  requiredModel?: string,
 ): Promise<ProviderVerification['status']> {
   const existing = loadProviderVerifications(storage)[providerId]
-  if (existing?.status === 'failed' || providerVerificationIsVerified(existing)) {
+  if (existing?.status === 'failed' || providerVerificationIsVerified(existing, requiredModel)) {
     return existing.status
   }
   try {
-    const { model } = await probe()
+    const { model, models: probedModels } = await probe()
+    const models = [...new Set(probedModels ?? [model])]
     setProviderVerification(providerId, {
       status: 'verified',
       model,
+      models,
       checkedAt: new Date().toISOString(),
     }, storage)
-    return 'verified'
+    return !requiredModel || models.includes(requiredModel) ? 'verified' : 'failed'
   } catch (error) {
     setProviderVerification(providerId, {
       status: 'failed',

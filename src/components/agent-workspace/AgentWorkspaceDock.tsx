@@ -447,7 +447,11 @@ function FeedRow({ item, detailsLabel, onApproveTool, onDenyTool, onCancelTool, 
                 ) : null}
                 <div className="mt-2 flex flex-wrap items-center gap-1.5">
                   {tool.actions?.includes('approve') && tool.requestId && onApproveTool ? (
-                    <Button size="sm" onClick={() => onApproveTool(tool.toolCallId, tool.requestId!)}>
+                    <Button
+                      size="sm"
+                      data-agent-action="approve-tool"
+                      onClick={() => onApproveTool(tool.toolCallId, tool.requestId!)}
+                    >
                       <Check /> Approve
                     </Button>
                   ) : null}
@@ -620,13 +624,20 @@ function FeedRow({ item, detailsLabel, onApproveTool, onDenyTool, onCancelTool, 
             ) : null}
           </details>
           {isError && onRetry ? (
-            <Button type="button" size="sm" variant="outline" className="mt-2" onClick={onRetry}>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="mt-2"
+              data-agent-action="retry-run"
+              onClick={onRetry}
+            >
               <RefreshCw /> {retryLabel ?? 'Retry'}
             </Button>
           ) : null}
           {tool?.actions?.length ? (
             <div className="mt-2 flex flex-wrap items-center gap-1.5">
-              {tool.actions.includes('approve') && tool.requestId && onApproveTool ? <Button size="sm" onClick={() => onApproveTool(tool.toolCallId, tool.requestId!)}><Check /> Approve</Button> : null}
+              {tool.actions.includes('approve') && tool.requestId && onApproveTool ? <Button size="sm" data-agent-action="approve-tool" onClick={() => onApproveTool(tool.toolCallId, tool.requestId!)}><Check /> Approve</Button> : null}
               {tool.actions.includes('deny') && tool.requestId && onDenyTool ? <Button size="sm" variant="outline" onClick={() => onDenyTool(tool.toolCallId, tool.requestId!)}><Ban /> Deny</Button> : null}
               {tool.actions.includes('cancel') && onCancelTool ? <Button size="sm" variant="outline" onClick={() => onCancelTool(tool.toolCallId, tool.requestId)}><CircleStop /> Cancel</Button> : null}
               {tool.actions.includes('retry') && onRetryTool ? <Button size="sm" variant="outline" onClick={() => onRetryTool(tool.toolCallId, tool.requestId)}><RefreshCw /> Retry</Button> : null}

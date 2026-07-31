@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.13 - 2026-07-31
+
+- Deliver three complete, comparable Design System and prototype-suite directions with Agent-authored route topology, useful non-UI material scope, and independently attributable resource packs.
+- Remove the unfinished Coding handoff from the visible asset-production journey and make exact selected resource-pack completion the packaged end-to-end result.
+- Reduce image-call amplification with one reference-conditioned page attempt, observational QA, grouped board cutouts, bounded concurrency, resumable failure frontiers, and no fixed page or per-page material quota.
+- Automatically import reviewed local Agent credentials through the native boundary while keeping Provider secrets in Keychain and the background packaged journey non-frontmost.
+
 ## 0.1.12 - 2026-07-28
 
 - Replace the crowded AI settings default view with one outcome-led setup status that reports checking, ready, action required, or unavailable.

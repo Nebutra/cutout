@@ -23,6 +23,7 @@ import { ContentAddressedDesktopArtifactStore } from '@/services/content-address
 import {
   designDocumentToWorkspaceSnapshot,
   fingerprint,
+  legacyWorkspaceSupplementalContent,
   migrateWorkspaceV1,
   projectRecordToDesignDocument,
   validateDesignDocument,
@@ -659,6 +660,7 @@ function workspaceWasMigrated(workspace: WorkspaceSnapshot | null): boolean {
     || workspace.humanLoopCustomAnswer === undefined
     || workspace.prototypeDesignSystem === undefined
     || workspace.prototypeDesignSystemCandidates === undefined
+    || workspace.prototypeSuiteCandidates === undefined
     || workspace.prototypePages === undefined
     || workspace.selectedPrototypePageId === undefined
     || workspace.runError === undefined
@@ -679,8 +681,10 @@ function mergeWorkspaceProjection(
     prototypePlan: projected.prototypePlan,
     prototypeDesignSystem: projected.prototypeDesignSystem,
     prototypeDesignSystemCandidates: projected.prototypeDesignSystemCandidates,
+    prototypeSuiteCandidates: projected.prototypeSuiteCandidates,
     prototypePages: projected.prototypePages,
     attachments: projected.attachments,
+    codingReceipts: projected.codingReceipts,
   }
 }
 
@@ -721,6 +725,34 @@ function sameRepresentableWorkspace(
               ),
             }
           : null,
+        prototypeSuiteCandidates: workspace.prototypeSuiteCandidates
+          ? {
+              set: workspace.prototypeSuiteCandidates.set,
+              artifacts: Object.fromEntries(
+                Object.entries(workspace.prototypeSuiteCandidates.artifacts).map(([id, artifact]) => [id, {
+                  designSystem: {
+                    ...artifact.designSystem,
+                    artifact: {
+                      ...artifact.designSystem.artifact,
+                      bytes: artifact.designSystem.artifact.bytes.byteLength,
+                    },
+                  },
+                  plan: artifact.plan,
+                  pages: artifact.pages.map((page) => ({
+                    page: page.page,
+                    mediaType: page.mediaType,
+                    width: page.width,
+                    height: page.height,
+                    bytes: page.bytes.byteLength,
+                  })),
+                  resourcePack: artifact.resourcePack,
+                  provenanceIds: artifact.provenanceIds,
+                  codingReceipt: artifact.codingReceipt,
+                }]),
+              ),
+            }
+          : null,
+        codingReceipts: workspace.codingReceipts ?? [],
         pages: workspace.prototypePages.map((page) => ({
           page: page.page,
           mediaType: page.mediaType,
@@ -777,6 +809,11 @@ async function createLegacyContentResolver(
   }
   for (const page of record.workspace?.prototypePages ?? []) {
     add(`workspace/pages/${page.page.id}`, page.bytes)
+  }
+  if (record.workspace) {
+    for (const [uri, bytes] of legacyWorkspaceSupplementalContent(record.id, record.workspace)) {
+      content.set(uri, bytes)
+    }
   }
   for (const attachment of record.workspace?.attachments ?? []) {
     add(`attachments/${attachment.id}`, attachment.bytes)

@@ -233,7 +233,7 @@ msgstr "AI"
 #. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
 msgid "settings.ai_setup_ready"
-msgstr "AI 已就绪"
+msgstr "AI 路由已配置"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
@@ -771,6 +771,11 @@ msgid "settings.ai_setup_verification_description"
 msgstr "配置的提供商必须启用并通过验证，Cutout 才能使用。"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.configuring"
+msgstr "正在配置"
+
+#. js-lingui-explicit-id
 #: src/components/library/KitLibraryInspector.tsx
 msgid "kit_library.audit_conflicts"
 msgstr "冲突"
@@ -918,6 +923,11 @@ msgid "settings.dimension_tts_description"
 msgstr "生成语音音频。"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.ai_setup_ready_description"
+msgstr "凭据和目录路由已配置。图片生成会在首张图片实际完成后得到验证。"
+
+#. js-lingui-explicit-id
 #: src/components/settings/sections/IntegrationsSection.tsx
 msgid "settings.integrations.description"
 msgstr "凭证保留在桌面主机中。Cutout 仅存储不透明、可撤销的会话句柄。"
@@ -963,6 +973,11 @@ msgstr "自定义个性需要先填写指令才能保存。"
 #: src/updater/update-notifications.ts
 msgid "updates.notification.available_detail"
 msgstr "Cutout {0} 已在{channelLabel}渠道推出。"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.ai_setup_credentials_auto_description"
+msgstr "Cutout 可以自动验证并配置这些本地凭据。"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
@@ -2276,16 +2291,6 @@ msgid "settings.personalization.use_memory_desc"
 msgstr "在后续会话中复用已批准的偏好。"
 
 #. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.review_and_connect"
-msgstr "审核并连接"
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.ai_setup_credentials_found_description"
-msgstr "审核并连接凭据以完成设置。"
-
-#. js-lingui-explicit-id
 #: src/components/library/ReviewBranchEditor.tsx
 msgid "review_branch.section_aria"
 msgstr "评审分支"
@@ -2387,6 +2392,11 @@ msgstr "选择一个切片以重命名、检视并导出。"
 #: src/components/settings/sections/IntegrationsSection.tsx
 msgid "settings.integrations.expired"
 msgstr "会话已过期。请刷新或重新连接。"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.setup_automatically"
+msgstr "自动设置"
 
 #. js-lingui-explicit-id
 #: src/components/home/SidebarAccount.tsx
@@ -2845,14 +2855,14 @@ msgid "global_library.asset_preview_description"
 msgstr "经过验证的本地预览、来源信息，以及具备能力感知的素材操作。"
 
 #. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.ai_setup_ready_description"
-msgstr "已验证的提供商涵盖所有必需的 AI 能力。"
-
-#. js-lingui-explicit-id
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.verifying_component_blobs"
 msgstr "正在验证组件源文件…"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.ai_setup_configuring_description"
+msgstr "正在验证本地凭据并配置所需的模型路由。"
 
 #. js-lingui-explicit-id
 #: src/components/library/GlobalLibraryView.tsx

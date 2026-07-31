@@ -8,6 +8,7 @@
     "updater-runtime",
     "workspace-revision-bridge",
     "project-files",
+    "packaged-e2e",
     "provider-secrets-network",
     "local-agent-inventory",
     "git-version-control",

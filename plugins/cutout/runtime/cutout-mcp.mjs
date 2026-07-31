@@ -3,8 +3,8 @@ import process$1 from "node:process";
 import { constants, readFileSync } from "node:fs";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import { createHash, createHmac, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
-import { lstat, mkdir, open, readFile, readdir, realpath, rename, rm, rmdir, stat, unlink, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
+import { lstat, mkdir, open, readFile, readdir, realpath, rename, rm, rmdir, stat, unlink, writeFile } from "node:fs/promises";
 //#region \0rolldown/runtime.js
 var __defProp = Object.defineProperty;
 var __commonJSMin = (cb, mod) => () => (mod || (cb((mod = { exports: {} }).exports, mod), cb = null), mod.exports);
@@ -4705,6 +4705,130 @@ var prototypeDesignSystemSchema = object({
 	/** Historical plans omit this; every newly generated plan must resolve it. */
 	exploration: candidateExplorationDecisionSchema.optional()
 });
+var prototypePlanningMaterialIdentityShape = {
+	id: string().min(1),
+	name: string().min(1),
+	description: string().min(1)
+};
+var prototypePlanningBoardGroupIdSchema = string().trim().min(1).max(80);
+var prototypePlanningMaterialSchema = object({
+	...prototypePlanningMaterialIdentityShape,
+	production: _enum(["board-cutout", "direct-generate"]),
+	boardGroupId: prototypePlanningBoardGroupIdSchema.optional().describe("Stable route-local group for board-cutout materials that belong on one coherent board. Omitted only by historical planning seeds.")
+}).strict().superRefine((material, context) => {
+	if (material.production === "direct-generate" && material.boardGroupId) context.addIssue({
+		code: "custom",
+		path: ["boardGroupId"],
+		message: "direct-generate materials cannot declare a boardGroupId."
+	});
+});
+/** The generated shape is structural so Provider tool schemas expose the
+* conditional requirement before execution, rather than only rejecting it in
+* an invisible post-call refinement. */
+var generatedPrototypePlanningMaterialSchema = discriminatedUnion("production", [object({
+	...prototypePlanningMaterialIdentityShape,
+	production: literal("board-cutout"),
+	boardGroupId: prototypePlanningBoardGroupIdSchema.describe("Required route-local id for the coherent atomic family sharing this board.")
+}).strict(), object({
+	...prototypePlanningMaterialIdentityShape,
+	production: literal("direct-generate")
+}).strict()]);
+var prototypePlanningRouteSchema = prototypePageSchema.pick({
+	id: true,
+	name: true,
+	route: true,
+	purpose: true,
+	viewport: true
+}).extend({ materials: array(prototypePlanningMaterialSchema).describe("Zero or more non-UI visual materials genuinely worth reusing on this route. Do not include cards, forms, navigation, buttons, tables, or other code-reproducible UI.") }).superRefine((route, context) => {
+	const materialIds = /* @__PURE__ */ new Set();
+	for (const [materialIndex, material] of route.materials.entries()) {
+		if (materialIds.has(material.id)) context.addIssue({
+			code: "custom",
+			path: [
+				"materials",
+				materialIndex,
+				"id"
+			],
+			message: `Duplicate material id "${material.id}" on route "${route.route}".`
+		});
+		materialIds.add(material.id);
+	}
+});
+var generatedPrototypePlanningRouteSchema = prototypePlanningRouteSchema.safeExtend({ materials: array(generatedPrototypePlanningMaterialSchema).describe("Zero or more non-UI visual materials genuinely worth reusing on this route. Do not include cards, forms, navigation, buttons, tables, or other code-reproducible UI.") });
+var prototypePlanningSeedSchema = object({
+	product: object({
+		name: string().min(1),
+		projectName: string().min(1).max(32).optional(),
+		summary: string().min(1),
+		audience: string().min(1),
+		primaryGoal: string().min(1),
+		platform: string().min(1)
+	}),
+	rationale: string().trim().min(1).max(2e3),
+	suites: array(object({
+		direction: candidateDirectionSchema,
+		pages: array(prototypePlanningRouteSchema).min(1).max(12)
+	}).strict()).min(1).max(8)
+}).strict().superRefine((seed, context) => {
+	const directionIds = /* @__PURE__ */ new Set();
+	const routeGraphs = /* @__PURE__ */ new Set();
+	for (const [suiteIndex, suite] of seed.suites.entries()) {
+		if (directionIds.has(suite.direction.id)) context.addIssue({
+			code: "custom",
+			path: [
+				"suites",
+				suiteIndex,
+				"direction",
+				"id"
+			],
+			message: `Duplicate direction id "${suite.direction.id}".`
+		});
+		directionIds.add(suite.direction.id);
+		const ids = /* @__PURE__ */ new Set();
+		const routes = /* @__PURE__ */ new Set();
+		for (const [pageIndex, page] of suite.pages.entries()) {
+			if (ids.has(page.id)) context.addIssue({
+				code: "custom",
+				path: [
+					"suites",
+					suiteIndex,
+					"pages",
+					pageIndex,
+					"id"
+				],
+				message: `Duplicate page id "${page.id}".`
+			});
+			if (routes.has(page.route)) context.addIssue({
+				code: "custom",
+				path: [
+					"suites",
+					suiteIndex,
+					"pages",
+					pageIndex,
+					"route"
+				],
+				message: `Duplicate route "${page.route}".`
+			});
+			ids.add(page.id);
+			routes.add(page.route);
+		}
+		const graph = JSON.stringify(suite.pages.map(({ route }) => route));
+		if (routeGraphs.has(graph)) context.addIssue({
+			code: "custom",
+			path: [
+				"suites",
+				suiteIndex,
+				"pages"
+			],
+			message: "Every suite must use a distinct route graph."
+		});
+		routeGraphs.add(graph);
+	}
+});
+prototypePlanningSeedSchema.safeExtend({ suites: array(object({
+	direction: candidateDirectionSchema,
+	pages: array(generatedPrototypePlanningRouteSchema).min(1).max(12)
+}).strict()).min(1).max(8) });
 var prototypePlanSchema = object({
 	version: literal("prototype-plan.v0"),
 	product: object({
@@ -4719,6 +4843,8 @@ var prototypePlanSchema = object({
 	pages: array(prototypePageSchema).min(1).max(12),
 	flows: array(prototypeFlowSchema).min(1),
 	reviewDocument: prototypeReviewDocumentSchema.optional(),
+	/** Agent-authored compact input used to derive corresponding suite alternatives. */
+	planningSeed: prototypePlanningSeedSchema.optional(),
 	humanLoop: prototypeHumanLoopSchema.default({
 		mode: "continue",
 		rationale: "The requirement is clear enough to proceed."
@@ -12403,6 +12529,196 @@ function hasExportableTokens(model) {
 	return model.controls.some((control) => control.kind !== "text");
 }
 //#endregion
+//#region src/coding-runtime/contracts.ts
+var CODING_TASK_VERSION = "cutout.coding-task.v1";
+var safeText$1 = string().min(1).max(1e5).refine((value) => !/(?:\b(?:sk|rk)-[A-Za-z0-9_-]{8,}\b|\bBearer\s+[A-Za-z0-9._~+/-]+\b)/i.test(value), "Credential-shaped values are not accepted.");
+var codingRelativePathSchema = string().min(1).max(500).refine((value) => {
+	if (value.includes("\0") || value.startsWith("/") || value.startsWith("\\") || /^[A-Za-z]:[\\/]/.test(value)) return false;
+	return value.replaceAll("\\", "/").split("/").every((part) => part.length > 0 && part !== "." && part !== "..");
+}, "Expected a controlled relative path.").refine((value) => !/(^|\/)(?:\.env(?:\.|$)|[^/]*(?:secret|credential|api[-_]?key|private[-_]?key|token)[^/]*)(?:\/|$)/i.test(value), "Credential-shaped paths are not accepted.");
+var codingTaskSchema = object({
+	version: literal(CODING_TASK_VERSION),
+	taskId: string().regex(/^coding:[a-z0-9:._-]+$/),
+	kind: _enum([
+		"execute",
+		"review",
+		"repair"
+	]),
+	goal: safeText$1.max(2e4),
+	acceptanceCriteria: array(safeText$1.max(4e3)).min(1).max(100),
+	repo: object({
+		snapshotId: safeText$1.max(160),
+		ref: safeText$1.max(300).optional()
+	}).strict(),
+	inputs: object({
+		designDocumentRef: safeText$1.max(300),
+		brandKitRefs: array(safeText$1.max(300)).max(100),
+		designKitRefs: array(safeText$1.max(300)).max(100),
+		prototypeRefs: array(safeText$1.max(300)).max(100),
+		imageAssetRefs: array(safeText$1.max(300)).max(1e3)
+	}).strict(),
+	target: object({
+		stack: _enum([
+			"next-app-router",
+			"vite-react",
+			"existing-repository"
+		]),
+		packageManager: _enum([
+			"pnpm",
+			"npm",
+			"yarn",
+			"bun"
+		])
+	}).strict(),
+	constraints: object({
+		allowedPaths: array(codingRelativePathSchema).min(1).max(100),
+		allowedCommands: array(_enum([
+			"typecheck",
+			"test",
+			"build",
+			"lint",
+			"visual-test"
+		])).max(5)
+	}).strict(),
+	expectedRevision: number().int().nonnegative(),
+	budget: object({
+		maxChangedFiles: number().int().min(1).max(2e3),
+		maxBytes: number().int().min(1).max(2e7),
+		maxDurationMs: number().int().min(1).max(36e5)
+	}).strict()
+}).strict();
+var codingFilePatchSchema = object({
+	path: codingRelativePathSchema,
+	operation: _enum([
+		"create",
+		"replace",
+		"delete"
+	]),
+	contents: string().max(2e6).optional(),
+	previousSha256: string().regex(/^[a-f0-9]{64}$/).optional()
+}).strict().superRefine((patch, context) => {
+	if (patch.operation !== "delete" && patch.contents === void 0) context.addIssue({
+		code: "custom",
+		path: ["contents"],
+		message: "File contents are required."
+	});
+	if (patch.operation === "delete" && patch.contents !== void 0) context.addIssue({
+		code: "custom",
+		path: ["contents"],
+		message: "Delete patches cannot include contents."
+	});
+});
+var codingPatchSchema = object({
+	version: literal("cutout.coding-patch.v1"),
+	taskId: string().min(1),
+	baseSnapshotId: string().min(1),
+	files: array(codingFilePatchSchema).min(1).max(2e3),
+	rationale: safeText$1.max(2e4),
+	provenance: object({
+		backend: safeText$1.max(160),
+		inputRefs: array(safeText$1.max(300)).max(2e3)
+	}).strict()
+}).strict();
+var evidenceSchema = object({
+	name: string().min(1),
+	status: _enum([
+		"passed",
+		"failed",
+		"skipped"
+	]),
+	detail: string().max(1e4).optional()
+}).strict();
+var codingReceiptSchema = object({
+	version: literal("cutout.coding-receipt.v1"),
+	receiptId: string().min(1),
+	taskId: string().min(1),
+	status: _enum([
+		"previewed",
+		"applied",
+		"failed",
+		"cancelled"
+	]),
+	baseSnapshotId: string().min(1),
+	resultSnapshotId: string().min(1).optional(),
+	approvalId: string().min(1).max(160).optional(),
+	changedFiles: array(object({
+		path: codingRelativePathSchema,
+		sha256: string().regex(/^[a-f0-9]{64}$/).optional(),
+		operation: _enum([
+			"create",
+			"replace",
+			"delete"
+		])
+	}).strict()),
+	checks: array(evidenceSchema),
+	screenshots: array(object({
+		artifactRef: string().min(1),
+		viewport: string().min(1),
+		sha256: string().regex(/^[a-f0-9]{64}$/)
+	}).strict()),
+	provenance: object({
+		backend: string().min(1),
+		inputRefs: array(string()),
+		patchSha256: string().regex(/^[a-f0-9]{64}$/)
+	}).strict(),
+	startedAt: number().int().nonnegative(),
+	completedAt: number().int().nonnegative(),
+	detail: string().optional()
+}).strict();
+//#endregion
+//#region src/prototype/design-system-validation.ts
+function designSystemMarkdownValidationError(designMarkdown) {
+	const markdown = designMarkdown.trim();
+	if (!markdown.startsWith("---")) return "Design system documentation is missing YAML frontmatter.";
+	const model = parseEditableDesignMarkdown(markdown);
+	if (model.frontmatterError) return "Design system documentation has invalid YAML frontmatter.";
+	if (!hasExportableTokens(model)) return "Design system documentation has no exportable design tokens.";
+	if (!model.controls.some((control) => control.kind === "color")) return "Design system documentation has no color tokens.";
+	return null;
+}
+//#endregion
+//#region src/design-ir/legacy-projection.ts
+var PROTOTYPE_SUITE_MATERIAL_VERSION = "cutout.prototype-suite-material.v1";
+var RESOURCE_PACK_MATERIAL_VERSION = "cutout.resource-pack-material.v1";
+var RESOURCE_ASSET_MATERIAL_VERSION = "cutout.resource-asset-material.v1";
+object({
+	version: literal(PROTOTYPE_SUITE_MATERIAL_VERSION),
+	candidateId: string().min(1),
+	designSystem: object({
+		candidateSetId: string().min(1),
+		candidateId: string().min(1),
+		directionId: string().min(1),
+		baseRevisionId: string().min(1),
+		provenanceIds: array(string().min(1)).min(1),
+		visualMaterialId: string().min(1),
+		markdownMaterialId: string().min(1)
+	}).strict(),
+	plan: prototypePlanSchema,
+	pages: array(object({
+		pageId: string().min(1),
+		materialId: string().min(1)
+	}).strict()),
+	resourcePackMaterialId: string().min(1),
+	provenanceIds: array(string().min(1)).min(1),
+	codingReceiptMaterialId: string().min(1).optional()
+}).strict();
+object({
+	version: literal(RESOURCE_PACK_MATERIAL_VERSION),
+	id: string().min(1),
+	manifest: unknown(),
+	manifestProvenanceId: string().min(1),
+	assets: array(object({
+		manifestItemId: string().min(1),
+		materialId: string().min(1)
+	}).strict())
+}).strict();
+object({
+	version: literal(RESOURCE_ASSET_MATERIAL_VERSION),
+	manifestItemId: string().min(1),
+	artifactId: string().min(1),
+	provenanceIds: array(string().min(1)).min(1)
+}).strict();
+//#endregion
 //#region src/design-ir/candidate-selection.ts
 var selectionIdSchema = string().min(1).max(160);
 object({
@@ -13812,142 +14128,6 @@ brandViCatalogSchema.parse({
 	items: allSeeds.flatMap(([section, values]) => values.map((seed) => section.startsWith("A") ? foundationItem(section, seed) : applicationItem(section, seed)))
 });
 //#endregion
-//#region src/coding-runtime/contracts.ts
-var CODING_TASK_VERSION = "cutout.coding-task.v1";
-var safeText$1 = string().min(1).max(1e5).refine((value) => !/(?:\b(?:sk|rk)-[A-Za-z0-9_-]{8,}\b|\bBearer\s+[A-Za-z0-9._~+/-]+\b)/i.test(value), "Credential-shaped values are not accepted.");
-var codingRelativePathSchema = string().min(1).max(500).refine((value) => {
-	if (value.includes("\0") || value.startsWith("/") || value.startsWith("\\") || /^[A-Za-z]:[\\/]/.test(value)) return false;
-	return value.replaceAll("\\", "/").split("/").every((part) => part.length > 0 && part !== "." && part !== "..");
-}, "Expected a controlled relative path.").refine((value) => !/(^|\/)(?:\.env(?:\.|$)|[^/]*(?:secret|credential|api[-_]?key|private[-_]?key|token)[^/]*)(?:\/|$)/i.test(value), "Credential-shaped paths are not accepted.");
-var codingTaskSchema = object({
-	version: literal(CODING_TASK_VERSION),
-	taskId: string().regex(/^coding:[a-z0-9:._-]+$/),
-	kind: _enum([
-		"execute",
-		"review",
-		"repair"
-	]),
-	goal: safeText$1.max(2e4),
-	acceptanceCriteria: array(safeText$1.max(4e3)).min(1).max(100),
-	repo: object({
-		snapshotId: safeText$1.max(160),
-		ref: safeText$1.max(300).optional()
-	}).strict(),
-	inputs: object({
-		designDocumentRef: safeText$1.max(300),
-		brandKitRefs: array(safeText$1.max(300)).max(100),
-		designKitRefs: array(safeText$1.max(300)).max(100),
-		prototypeRefs: array(safeText$1.max(300)).max(100),
-		imageAssetRefs: array(safeText$1.max(300)).max(1e3)
-	}).strict(),
-	target: object({
-		stack: _enum([
-			"next-app-router",
-			"vite-react",
-			"existing-repository"
-		]),
-		packageManager: _enum([
-			"pnpm",
-			"npm",
-			"yarn",
-			"bun"
-		])
-	}).strict(),
-	constraints: object({
-		allowedPaths: array(codingRelativePathSchema).min(1).max(100),
-		allowedCommands: array(_enum([
-			"typecheck",
-			"test",
-			"build",
-			"lint",
-			"visual-test"
-		])).max(5)
-	}).strict(),
-	expectedRevision: number().int().nonnegative(),
-	budget: object({
-		maxChangedFiles: number().int().min(1).max(2e3),
-		maxBytes: number().int().min(1).max(2e7),
-		maxDurationMs: number().int().min(1).max(36e5)
-	}).strict()
-}).strict();
-var codingFilePatchSchema = object({
-	path: codingRelativePathSchema,
-	operation: _enum([
-		"create",
-		"replace",
-		"delete"
-	]),
-	contents: string().max(2e6).optional(),
-	previousSha256: string().regex(/^[a-f0-9]{64}$/).optional()
-}).strict().superRefine((patch, context) => {
-	if (patch.operation !== "delete" && patch.contents === void 0) context.addIssue({
-		code: "custom",
-		path: ["contents"],
-		message: "File contents are required."
-	});
-	if (patch.operation === "delete" && patch.contents !== void 0) context.addIssue({
-		code: "custom",
-		path: ["contents"],
-		message: "Delete patches cannot include contents."
-	});
-});
-var codingPatchSchema = object({
-	version: literal("cutout.coding-patch.v1"),
-	taskId: string().min(1),
-	baseSnapshotId: string().min(1),
-	files: array(codingFilePatchSchema).min(1).max(2e3),
-	rationale: safeText$1.max(2e4),
-	provenance: object({
-		backend: safeText$1.max(160),
-		inputRefs: array(safeText$1.max(300)).max(2e3)
-	}).strict()
-}).strict();
-var evidenceSchema = object({
-	name: string().min(1),
-	status: _enum([
-		"passed",
-		"failed",
-		"skipped"
-	]),
-	detail: string().max(1e4).optional()
-}).strict();
-var codingReceiptSchema = object({
-	version: literal("cutout.coding-receipt.v1"),
-	receiptId: string().min(1),
-	taskId: string().min(1),
-	status: _enum([
-		"previewed",
-		"applied",
-		"failed",
-		"cancelled"
-	]),
-	baseSnapshotId: string().min(1),
-	resultSnapshotId: string().min(1).optional(),
-	changedFiles: array(object({
-		path: codingRelativePathSchema,
-		sha256: string().regex(/^[a-f0-9]{64}$/).optional(),
-		operation: _enum([
-			"create",
-			"replace",
-			"delete"
-		])
-	}).strict()),
-	checks: array(evidenceSchema),
-	screenshots: array(object({
-		artifactRef: string().min(1),
-		viewport: string().min(1),
-		sha256: string().regex(/^[a-f0-9]{64}$/)
-	}).strict()),
-	provenance: object({
-		backend: string().min(1),
-		inputRefs: array(string()),
-		patchSha256: string().regex(/^[a-f0-9]{64}$/)
-	}).strict(),
-	startedAt: number().int().nonnegative(),
-	completedAt: number().int().nonnegative(),
-	detail: string().optional()
-}).strict();
-//#endregion
 //#region src/control-protocol/control-protocol.ts
 /**
 * The intentionally small, transport-neutral control surface for coding agents.
@@ -14316,7 +14496,7 @@ function response$1(request, revision, status, error) {
 function defaultEffectsFor(operation) {
 	return {
 		paid: operation.type === "tool.invoke",
-		external: operation.type === "source.ingest" || operation.type === "export.design-kit" || operation.type === "export.brand-kit" || operation.type === "export.starter"
+		external: operation.type === "source.ingest" || operation.type === "export.design-kit" || operation.type === "export.brand-kit" || operation.type === "export.starter" || operation.type === "coding.execute" || operation.type === "coding.review" || operation.type === "coding.repair"
 	};
 }
 function mergeEffects(base, override) {
@@ -14481,17 +14661,6 @@ var headlessProjectStateSchema = object({
 		message: "Manifest and Design IR project ids must match."
 	});
 });
-//#endregion
-//#region src/prototype/design-system-validation.ts
-function designSystemMarkdownValidationError(designMarkdown) {
-	const markdown = designMarkdown.trim();
-	if (!markdown.startsWith("---")) return "Design system documentation is missing YAML frontmatter.";
-	const model = parseEditableDesignMarkdown(markdown);
-	if (model.frontmatterError) return "Design system documentation has invalid YAML frontmatter.";
-	if (!hasExportableTokens(model)) return "Design system documentation has no exportable design tokens.";
-	if (!model.controls.some((control) => control.kind === "color")) return "Design system documentation has no color tokens.";
-	return null;
-}
 //#endregion
 //#region src/design-kit/compiler.ts
 /**
@@ -17800,20 +17969,31 @@ function isAlreadyExists(error) {
 //#endregion
 //#region src/coding-runtime/runtime.ts
 async function executeCodingTask(input, options) {
+	if (options.signal?.aborted) {
+		const task = codingTaskSchema.parse(input);
+		if (!options.backend || !options.workspace) throw new Error("capability-required: A controlled coding backend and workspace are required.");
+		const startedAt = (options.now ?? Date.now)();
+		return cancelled(task, options.backend.id, startedAt, options.now);
+	}
+	const prepared = await prepareCodingTask(input, options);
+	if (!options.apply) return prepared.receipt;
+	return applyPreparedCodingTask(prepared, options);
+}
+async function prepareCodingTask(input, options) {
 	const task = codingTaskSchema.parse(input);
 	if (!options.backend || !options.workspace) throw new Error("capability-required: A controlled coding backend and workspace are required.");
 	const startedAt = (options.now ?? Date.now)();
-	if (options.signal?.aborted) return cancelled(task, options.backend.id, startedAt, options.now);
-	const snapshotId = await options.workspace.snapshotId();
+	if (options.signal?.aborted) throw new Error("coding-cancelled: Coding task was cancelled before preview.");
+	const snapshotId = await options.workspace.snapshotId(task.constraints.allowedPaths);
 	if (snapshotId !== task.repo.snapshotId) throw new Error("revision-conflict: Repository snapshot does not match CodingTask.repo.snapshotId.");
 	const context = await options.workspace.readAllowed(task.constraints.allowedPaths);
 	const patch = codingPatchSchema.parse(await options.backend.propose(task, context, options.signal));
 	enforceTimeBudget(task, startedAt, options.now);
 	if (patch.taskId !== task.taskId || patch.baseSnapshotId !== snapshotId) throw new Error("revision-conflict: Coding patch targets a different task or repository snapshot.");
 	enforceBudgetAndPaths(task, patch);
-	const patchSha256 = digest(JSON.stringify(patch));
+	const patchSha256 = await digest(JSON.stringify(patch));
 	const changedFiles = await options.workspace.preview(task, patch);
-	if (!options.apply) return codingReceiptSchema.parse({
+	const receipt = codingReceiptSchema.parse({
 		version: "cutout.coding-receipt.v1",
 		receiptId: `coding-receipt:${patchSha256.slice(0, 24)}`,
 		taskId: task.taskId,
@@ -17830,16 +18010,37 @@ async function executeCodingTask(input, options) {
 		startedAt,
 		completedAt: (options.now ?? Date.now)()
 	});
-	if (options.signal?.aborted) return cancelled(task, options.backend.id, startedAt, options.now, patchSha256);
+	return {
+		task,
+		patch,
+		backendId: options.backend.id,
+		patchSha256,
+		changedFiles: receipt.changedFiles,
+		startedAt,
+		receipt
+	};
+}
+async function applyPreparedCodingTask(input, options) {
+	if (!options.workspace) throw new Error("capability-required: A controlled coding workspace is required.");
+	const task = codingTaskSchema.parse(input.task);
+	const patch = codingPatchSchema.parse(input.patch);
+	const snapshotId = task.repo.snapshotId;
+	const currentDigest = await digest(JSON.stringify(patch));
+	if (currentDigest !== input.patchSha256 || input.receipt.provenance.patchSha256 !== currentDigest) throw new Error("revision-conflict: Coding patch changed after preview.");
+	if (patch.taskId !== task.taskId || patch.baseSnapshotId !== task.repo.snapshotId) throw new Error("revision-conflict: Prepared coding patch no longer matches its task.");
+	if (await options.workspace.snapshotId(task.constraints.allowedPaths) !== task.repo.snapshotId) throw new Error("revision-conflict: Repository changed after coding preview.");
+	enforceBudgetAndPaths(task, patch);
+	enforceTimeBudget(task, input.startedAt, options.now);
+	if (options.signal?.aborted) return cancelled(task, input.backendId, input.startedAt, options.now, input.patchSha256);
 	const stage = await options.workspace.stage(task, patch);
 	try {
-		if (options.signal?.aborted) return cancelled(task, options.backend.id, startedAt, options.now, patchSha256);
+		if (options.signal?.aborted) return cancelled(task, input.backendId, input.startedAt, options.now, input.patchSha256);
 		const checks = await options.workspace.runChecks(task.constraints.allowedCommands, options.signal, stage.id);
-		enforceTimeBudget(task, startedAt, options.now);
-		if (options.signal?.aborted) return cancelled(task, options.backend.id, startedAt, options.now, patchSha256);
+		enforceTimeBudget(task, input.startedAt, options.now);
+		if (options.signal?.aborted) return cancelled(task, input.backendId, input.startedAt, options.now, input.patchSha256);
 		if (checks.some((check) => check.status !== "passed")) return codingReceiptSchema.parse({
 			version: "cutout.coding-receipt.v1",
-			receiptId: `coding-receipt:${patchSha256.slice(0, 24)}`,
+			receiptId: `coding-receipt:${input.patchSha256.slice(0, 24)}`,
 			taskId: task.taskId,
 			status: "failed",
 			baseSnapshotId: snapshotId,
@@ -17847,32 +18048,33 @@ async function executeCodingTask(input, options) {
 			checks,
 			screenshots: [],
 			provenance: {
-				backend: options.backend.id,
+				backend: input.backendId,
 				inputRefs: inputRefs(task),
-				patchSha256
+				patchSha256: input.patchSha256
 			},
-			startedAt,
+			startedAt: input.startedAt,
 			completedAt: (options.now ?? Date.now)(),
 			detail: "Staged changes were rolled back because one or more controlled quality checks did not pass."
 		});
-		if (await options.workspace.snapshotId() !== snapshotId) throw new Error("revision-conflict: Repository changed before staged promotion.");
+		if (await options.workspace.snapshotId(task.constraints.allowedPaths) !== snapshotId) throw new Error("revision-conflict: Repository changed before staged promotion.");
 		const applied = await options.workspace.promote(task, patch, stage.id, snapshotId);
 		return codingReceiptSchema.parse({
 			version: "cutout.coding-receipt.v1",
-			receiptId: `coding-receipt:${patchSha256.slice(0, 24)}`,
+			receiptId: `coding-receipt:${input.patchSha256.slice(0, 24)}`,
 			taskId: task.taskId,
 			status: "applied",
 			baseSnapshotId: snapshotId,
 			resultSnapshotId: applied.snapshotId,
+			...applied.approvalId ? { approvalId: applied.approvalId } : {},
 			changedFiles: applied.changedFiles,
 			checks,
 			screenshots: [],
 			provenance: {
-				backend: options.backend.id,
+				backend: input.backendId,
 				inputRefs: inputRefs(task),
-				patchSha256
+				patchSha256: input.patchSha256
 			},
-			startedAt,
+			startedAt: input.startedAt,
 			completedAt: (options.now ?? Date.now)()
 		});
 	} finally {
@@ -17881,7 +18083,9 @@ async function executeCodingTask(input, options) {
 }
 function enforceBudgetAndPaths(task, patch) {
 	if (patch.files.length > task.budget.maxChangedFiles) throw new Error("budget-exceeded: Coding patch changes too many files.");
-	if (patch.files.reduce((sum, file) => sum + Buffer.byteLength(file.contents ?? ""), 0) > task.budget.maxBytes) throw new Error("budget-exceeded: Coding patch exceeds the byte budget.");
+	const encoder = new TextEncoder();
+	if (patch.files.reduce((sum, file) => sum + encoder.encode(file.contents ?? "").byteLength, 0) > task.budget.maxBytes) throw new Error("budget-exceeded: Coding patch exceeds the byte budget.");
+	if (patch.files.some((file) => /(?:\b(?:sk|rk|pk)-[A-Za-z0-9_-]{8,}\b|\bBearer\s+[A-Za-z0-9._~+/-]+\b)/i.test(file.contents ?? ""))) throw new Error("policy-denied: Coding patch contains credential-shaped data.");
 	const allowed = task.constraints.allowedPaths.map((path) => path.replace(/\/$/, ""));
 	for (const file of patch.files) if (!allowed.some((root) => file.path === root || file.path.startsWith(`${root}/`))) throw new Error(`policy-denied: Patch path is outside CodingTask.constraints.allowedPaths: ${file.path}`);
 }
@@ -17897,8 +18101,9 @@ function inputRefs(task) {
 		...task.inputs.imageAssetRefs
 	];
 }
-function digest(value) {
-	return createHash("sha256").update(value).digest("hex");
+async function digest(value) {
+	const bytes = new TextEncoder().encode(value);
+	return [...new Uint8Array(await crypto.subtle.digest("SHA-256", bytes))].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 function cancelled(task, backend, startedAt, now = Date.now, patchSha256 = "0".repeat(64)) {
 	return codingReceiptSchema.parse({
@@ -17919,6 +18124,10 @@ function cancelled(task, backend, startedAt, now = Date.now, patchSha256 = "0".r
 		completedAt: now()
 	});
 }
+object({
+	files: array(codingFilePatchSchema).min(1).max(2e3),
+	rationale: string().min(1).max(2e4)
+}).strict();
 //#endregion
 //#region src/headless/runtime.ts
 /**

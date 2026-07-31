@@ -6,7 +6,8 @@ async function openProviderDirectory(page: Page) {
   await page.getByRole("button", { name: /Workspace menu|工作区菜单/ }).click();
   await page.getByRole("menuitem", { name: /Settings|设置/ }).click();
   await page.getByText("AI", { exact: true }).click();
-  await page.getByRole("button", { name: "Connect provider" }).click();
+  await page.getByText("Advanced AI management", { exact: true }).click();
+  await page.getByRole("button", { name: "Add provider" }).click();
   await page.getByRole("tab", { name: "All", exact: true }).click();
 }
 
@@ -168,7 +169,7 @@ test("all integrations have nonempty non-Plug icons in light/dark after scrollin
         expect(facts.gradient).toBe("");
         expect(facts.fill).toBe("currentColor");
         expect(facts.pathFill).toBe(facts.color);
-      } else if (facts.id === "cutout.pencil") {
+      } else if (facts.id === "cutout.pen") {
         expect(facts.source).toBe("pen.dev");
       } else if (facts.id === "cutout.paper") {
         expect(facts.source).toBe("paper.design");

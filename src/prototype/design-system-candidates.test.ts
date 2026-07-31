@@ -9,6 +9,7 @@ import {
   persistPrototypeDesignSystemCandidateSet,
   updatePrototypeDesignSystemCandidate,
 } from './design-system-candidates'
+import { migratePersistedPrototypeDesignSystemCandidateSet } from './design-system-candidate-persistence'
 import { createEmptyWorkspaceSnapshot } from '@/workspace/workspace-snapshot'
 import type { DesignDocument } from '@/design-ir'
 
@@ -116,6 +117,64 @@ describe('Design System candidate runtime', () => {
     expect(recovered?.set.proposal.count).toBe(1)
     expect(recovered?.set.selection?.actor.kind).toBe('agent')
     expect(selectedPrototypeDesignSystem(recovered)?.name).toBe('Quiet editorial')
+    expect(recovered?.set.candidates[0]?.outputs).toEqual([
+      {
+        role: 'design-system',
+        materialId: 'material:design-system-candidate:candidate:legacy-selected:visual',
+      },
+      {
+        role: 'design-markdown',
+        materialId: 'material:design-system-candidate:candidate:legacy-selected:markdown',
+      },
+    ])
+  })
+
+  it('migrates the early persisted legacy candidate away from canonical material aliases', () => {
+    const recovered = recoverPrototypeDesignSystemCandidateSet(null, artifact)
+    expect(recovered).not.toBeNull()
+    if (!recovered) return
+    const persisted = persistPrototypeDesignSystemCandidateSet(recovered)
+    const historical = {
+      ...persisted,
+      set: {
+        ...persisted.set,
+        candidates: persisted.set.candidates.map((candidate) => ({
+          ...candidate,
+          outputs: [
+            { role: 'design-system' as const, materialId: 'material:design-system' },
+            { role: 'design-markdown' as const, materialId: 'material:design-markdown' },
+          ],
+        })),
+      },
+    }
+
+    expect(recoverPrototypeDesignSystemCandidateSet(historical)?.set.candidates[0]?.outputs)
+      .toEqual(persisted.set.candidates[0]?.outputs)
+  })
+
+  it('does not rewrite a canonical-looking candidate with additional outputs', () => {
+    const recovered = recoverPrototypeDesignSystemCandidateSet(null, artifact)
+    expect(recovered).not.toBeNull()
+    if (!recovered) return
+    const persisted = persistPrototypeDesignSystemCandidateSet(recovered)
+    const outputs = [
+      { role: 'design-system', materialId: 'material:design-system' },
+      { role: 'design-markdown', materialId: 'material:design-markdown' },
+      { role: 'audit', materialId: 'material:design-system-audit' },
+    ]
+    const candidate = persisted.set.candidates[0]
+    expect(candidate).toBeDefined()
+    if (!candidate) return
+    const unrelated = {
+      ...persisted,
+      set: {
+        ...persisted.set,
+        candidates: [{ ...candidate, outputs }],
+      },
+    }
+
+    expect(migratePersistedPrototypeDesignSystemCandidateSet(unrelated).set.candidates[0]?.outputs)
+      .toEqual(outputs)
   })
 
   it('retains completed siblings when another candidate is cancelled', () => {

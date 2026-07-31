@@ -10,6 +10,7 @@ import {
   lockComposerImageRoute,
   lockComposerRoute,
   parseComposerModelValue,
+  runtimeModelDescriptors,
   supportsWebSearch,
 } from './composer-execution'
 
@@ -82,6 +83,34 @@ describe('composer execution adapter', () => {
       { providerId: 'gateway', model: 'vendor/model' },
       [{ id: 'gateway', kind: 'gateway', label: 'Gateway', defaultModel: 'vendor/model', enabled: true }],
     )).toBe(false)
+  })
+
+  it('keeps reviewed CC Switch routes eligible for text and image execution', () => {
+    const ccAssignments: ModelAssignments = {
+      chat: { providerId: 'cc', model: 'gpt-5.6-sol' },
+      image: { providerId: 'cc', model: 'gpt-image-2' },
+    }
+    const ccProviders: ProviderConfig[] = [{
+      id: 'cc',
+      kind: 'cc-switch',
+      label: 'CC Switch',
+      defaultModel: 'gpt-5.6-sol',
+      enabled: true,
+    }]
+    const descriptors = runtimeModelDescriptors(ccAssignments, ccProviders, () => true)
+
+    expect(descriptors.find((model) => model.slot === 'chat')?.capabilities)
+      .toEqual(expect.arrayContaining(['text', 'vision', 'reasoning', 'tools']))
+    expect(descriptors.find((model) => model.slot === 'image')?.capabilities)
+      .toEqual(expect.arrayContaining(['image-generation', 'image-edit']))
+    expect(() => lockComposerRoute({
+      model: { mode: 'auto' },
+      thinking: 'auto',
+      assignments: ccAssignments,
+      providers: ccProviders,
+      hasReferenceImages: true,
+      modelCatalog: descriptors,
+    })).not.toThrow()
   })
 
   it('turns capability degradation into factual user-visible notices', () => {

@@ -36,16 +36,10 @@ async function openStableHome(page: Page) {
 
 async function startProject(page: Page, brief: string) {
   await page.getByRole('button', { name: /New (task|project)/ }).click()
-  const homeComposer = page.getByRole('textbox', { name: 'Describe what you want to design...' })
   const workspaceComposer = page.getByRole('textbox', { name: 'Message the Agent' })
-  await expect(homeComposer.or(workspaceComposer)).toBeVisible()
-  if (await homeComposer.isVisible()) {
-    await homeComposer.fill(brief)
-    await page.getByRole('button', { name: 'Create from brief' }).click()
-  } else {
-    await workspaceComposer.fill(brief)
-    await page.getByRole('button', { name: 'Send' }).click()
-  }
+  await expect(workspaceComposer).toBeVisible()
+  await workspaceComposer.fill(brief)
+  await page.getByRole('button', { name: 'Send' }).click()
   await expect(page.getByRole('complementary', { name: 'Agent workspace' })).toBeVisible()
 }
 
@@ -53,6 +47,7 @@ async function createProjectWithWorkspace(
   page: Page,
   workspace: Record<string, unknown>,
   projectName: string,
+  expectAgent = true,
 ) {
   const composer = page.getByRole('textbox', { name: 'Describe what you want to design...' })
   await expect(composer).toBeVisible()
@@ -175,7 +170,11 @@ async function createProjectWithWorkspace(
   const projectDirectory = page.getByRole('main')
   await expect(projectDirectory).toBeVisible()
   await projectDirectory.getByRole('button', { name: `Open ${project.name}` }).last().click()
-  await expect(page.getByRole('complementary', { name: 'Agent workspace' })).toBeVisible()
+  if (expectAgent) {
+    await expect(page.getByRole('complementary', { name: 'Agent workspace' })).toBeVisible()
+  } else {
+    await expect(page.getByRole('main')).toBeVisible()
+  }
   return project
 }
 
@@ -309,12 +308,12 @@ function designSystemCandidateWorkspace() {
   })
 }
 
-function overBudgetWorkspace() {
+function interruptedApprovalWorkspace() {
   const events = [
     { eventId: 'run', runId: 'run-1', at: 1, type: 'run-started', mode: 'create' },
     { eventId: 'intent', runId: 'run-1', at: 2, type: 'intent-recorded', intent: 'Produce a launch campaign.' },
     { eventId: 'tool', runId: 'run-1', at: 3, type: 'tool-started', toolCallId: 'image-1', tool: 'image.generate', label: 'Create launch visuals' },
-    { eventId: 'approval', runId: 'run-1', at: 4, type: 'tool-approval-requested', toolCallId: 'image-1', requestId: 'request-1', tool: 'image.generate', label: 'Create launch visuals', estimatedCost: { currency: 'USD', amount: 0.8 }, budgetCeiling: { currency: 'USD', amount: 0.25 }, approvalPolicy: 'auto-within-budget', reason: 'This exceeds the approved budget.' },
+    { eventId: 'approval', runId: 'run-1', at: 4, type: 'tool-approval-requested', toolCallId: 'image-1', requestId: 'request-1', tool: 'image.generate', label: 'Create launch visuals', estimatedCost: { currency: 'USD', amount: 0.8 }, budgetCeiling: { currency: 'USD', amount: 0.25 }, approvalPolicy: 'explicit', pendingApproval: true, reason: 'This action requires approval before it can run.' },
   ]
   return baseWorkspace({
     agentRunEvents: { version: 'agent-run-events.v1', activeRunId: 'run-1', activeRun: null, events },
@@ -395,13 +394,20 @@ test('Home has one primary need entry and recent work remains reachable', async 
   await expect(page.getByRole('complementary', { name: 'Agent workspace' })).toBeVisible()
 })
 
-test('Design System candidates pause downstream work and remain comparable', async ({ page }) => {
-  await createProjectWithWorkspace(page, designSystemCandidateWorkspace(), 'Candidate comparison')
+test('Design System candidates pause downstream work and remain comparable', async ({ page }, testInfo) => {
+  await createProjectWithWorkspace(page, designSystemCandidateWorkspace(), 'Candidate comparison', false)
   const heading = page.getByRole('heading', { name: 'Choose a Design System direction' })
   await expect(heading).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Quiet editorial' })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Expressive studio' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Use this direction' })).toHaveCount(2)
+  await expect(page.getByRole('complementary', { name: 'Agent workspace' })).toHaveCount(0)
+  if (testInfo.project.name === 'desktop-chrome') {
+    await expect(page.getByRole('button', { name: 'Agent', exact: true })).toBeDisabled()
+    await expect(page.getByRole('button', { name: 'Files', exact: true })).toBeDisabled()
+    await expect(page.getByRole('button', { name: 'Git', exact: true })).toBeDisabled()
+    await expect(page.getByRole('button', { name: 'Design', exact: true })).toBeDisabled()
+  }
   await expect(page.getByText('Generating prototype pages')).toHaveCount(0)
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true)
 
@@ -450,12 +456,16 @@ test('conversational Agent replies stay in the panel and never cover the canvas'
   expect(contained).toBe(true)
 })
 
-test('design details open in the left workspace drawer and do not leak internals by default', async ({ page }) => {
+test('design details open in the left workspace drawer and do not leak internals by default', async ({ page }, testInfo) => {
   await createProjectWithWorkspace(page, completedWorkspace(), 'Inspect the result details')
   const workspace = page.getByRole('main')
 
   await expectNoInternalVocabulary(workspace)
   await expect(page.getByRole('complementary', { name: 'Design system' })).toHaveCount(0)
+  if (testInfo.project.name === 'mobile-chrome') {
+    await expect(page.getByRole('button', { name: 'Design', exact: true })).toHaveCount(0)
+    return
+  }
 
   const design = page.getByRole('button', { name: 'Design', exact: true })
   await expect(design).toBeVisible(); await design.click()
@@ -500,6 +510,7 @@ test('Canvas keeps a responsive safe area while workspace panels change', async 
 
   const canvas = page.locator('.react-flow').first()
   await expect(canvas).toBeVisible()
+  await expect(page.getByLabel('Coding handoff')).toHaveCount(0)
   const zoom = page.getByRole('button', { name: 'Zoom to 100%' })
   const fit = page.getByRole('button', { name: 'Fit view' })
   await expect(zoom).toBeVisible()
@@ -595,14 +606,14 @@ test('Canvas keeps a responsive safe area while workspace panels change', async 
   }
 })
 
-test('provider estimate stays attached to the action that requires approval', async ({ page }) => {
-  await createProjectWithWorkspace(page, overBudgetWorkspace(), 'Budget decision fixture')
+test('an interrupted provider approval does not expose stale actions or billing copy', async ({ page }) => {
+  await createProjectWithWorkspace(page, interruptedApprovalWorkspace(), 'Interrupted approval fixture')
 
-  const budgetGate = page.getByRole('region', { name: 'Decision needed' })
-  await expect(budgetGate).toBeVisible()
-  await expect(budgetGate.locator('[data-slot="tool-cost-estimate"]').getByText(/USD 0\.80/)).toBeVisible()
-  await expect(budgetGate.getByRole('button', { name: /approve/i })).toBeVisible()
-  await expect(budgetGate.getByRole('button', { name: /deny/i })).toBeVisible()
+  const approval = page.locator('[data-slot="agent-decision-bubble"]')
+  await expect(approval).toHaveCount(0)
+  await expect(page.getByRole('button', { name: /approve/i })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: /deny/i })).toHaveCount(0)
+  await expect(page.getByText(/USD|credits?|\$|¥/i)).toHaveCount(0)
   await expect(page.locator('[data-slot="agent-cost-summary"]')).toHaveCount(0)
   await expect(page.getByText(/Charged USD/)).toHaveCount(0)
 })
