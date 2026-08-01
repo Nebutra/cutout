@@ -1222,3 +1222,39 @@ Validated a fresh-VM packaged GUI journey from reviewed local credential discove
 ### Next Steps
 
 - None - task complete
+
+
+## Session 37: Converge UI asset production and release v0.1.14
+
+**Date**: 2026-08-02
+**Task**: Converge UI asset production and release v0.1.14
+**Branch**: `chore/archive-converge-production-delivery`
+
+### Summary
+
+Closed complete multi-candidate UI asset delivery, proved the real packaged VM outcome, fixed Windows-portable terminal evidence tests, merged through the protected quality gate, published signed and notarized v0.1.14 artifacts, and replaced the local v0.1.13 app with verified v0.1.14.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `cd74948` | (see git log) |
+| `a4f8055` | (see git log) |
+| `ce3d950` | (see git log) |
+| `40274e5` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
