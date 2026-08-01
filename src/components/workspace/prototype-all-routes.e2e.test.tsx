@@ -39,7 +39,9 @@ const desktopHarness = vi.hoisted(() => ({
   sliceSequence: 0,
   sequence: 0,
   plannerCalls: 0,
+  successfulAlternativePlannerCalls: 0,
   plannerPrompts: [] as string[],
+  plannerFailure: null as null | ((call: number, prompt: string) => string | null),
 }))
 
 function artifactId(sequence: number): string {
@@ -157,6 +159,14 @@ vi.mock('@/prototype/region-deconstruct', async (importOriginal) => ({
       slices: Array.from({ length: materialCount }, (_, index) => {
         desktopHarness.sliceSequence += 1
         const sequence = desktopHarness.sliceSequence
+        const bytes = new Uint8Array([
+          Math.floor(sequence / 256),
+          sequence % 256,
+        ])
+        const blob = new Blob([bytes], { type: 'image/png' })
+        Object.defineProperty(blob, 'arrayBuffer', {
+          value: async () => bytes.slice().buffer,
+        })
         const column = index % columns
         const row = Math.floor(index / columns)
         const x = Math.floor(column * cellWidth) + 10
@@ -167,9 +177,7 @@ vi.mock('@/prototype/region-deconstruct', async (importOriginal) => ({
           id: `slice:${pageId}:${regionId}:${index}`,
           index,
           box: { x, y, width, height },
-          blob: new Blob([
-            new Uint8Array([Math.floor(sequence / 256), sequence % 256]),
-          ], { type: 'image/png' }),
+          blob,
           width,
           height,
           regionId,
@@ -455,11 +463,15 @@ const SUITE_PLANS = [
 
 async function generateObject<T>(input: GenerateInput): Promise<Result<T>> {
   if (input.promptRef?.id === 'ui-prototype-planner') {
-    desktopHarness.plannerPrompts.push(input.input?.flatMap((part) =>
+    const prompt = input.input?.flatMap((part) =>
       part.type === 'text' ? [part.text] : [],
-    ).join('\n') ?? '')
+    ).join('\n') ?? ''
+    desktopHarness.plannerPrompts.push(prompt)
     const call = desktopHarness.plannerCalls++
-    return ok((call === 0 ? AGENT_PLAN : SUITE_PLANS[call - 1]) as T)
+    const failure = desktopHarness.plannerFailure?.(call, prompt)
+    if (failure) return err(failure)
+    if (call === 0) return ok(AGENT_PLAN as T)
+    return ok(SUITE_PLANS[desktopHarness.successfulAlternativePlannerCalls++] as T)
   }
   if (input.promptRef?.id === 'ui-generation-qa') {
     const checklist = input.input?.flatMap((part) =>
@@ -612,7 +624,9 @@ describe('brief → every planned route — rendered IntentWorkspace', () => {
     desktopHarness.sliceSequence = 0
     desktopHarness.sequence = 0
     desktopHarness.plannerCalls = 0
+    desktopHarness.successfulAlternativePlannerCalls = 0
     desktopHarness.plannerPrompts.length = 0
+    desktopHarness.plannerFailure = null
     if (!i18n.locale) await activateLocale('en')
   })
 
@@ -750,10 +764,10 @@ describe('brief → every planned route — rendered IntentWorkspace', () => {
     expect(snapshot!.runError).toBeNull()
     expect(snapshot!.prototypeScope).toBe('full-plan')
     expect(snapshot!.prototypePlan?.pages.map((item) => item.route)).toEqual(
-      SUITE_PLANS[2].pages.map((item) => item.route),
+      SUITE_PLANS[0].pages.map((item) => item.route),
     )
     expect(snapshot!.prototypePages.map((item) => item.page.id)).toEqual(
-      SUITE_PLANS[2].pages.map((item) => item.id),
+      SUITE_PLANS[0].pages.map((item) => item.id),
     )
     expect(snapshot!.prototypeDesignSystemCandidates?.set.selection).toMatchObject({
       candidateId: 'candidate:editorial-ledger',
@@ -956,7 +970,7 @@ describe('brief → every planned route — rendered IntentWorkspace', () => {
       if (
         !failedOnce &&
         toolCallId.includes('candidate:prototype-suite:2:prototype-page:') &&
-        !toolCallId.includes(':journal:')
+        !toolCallId.includes(':overview:')
       ) {
         failedOnce = true
         return new Error('HTTP 503 service unavailable')
@@ -978,6 +992,9 @@ describe('brief → every planned route — rendered IntentWorkspace', () => {
     }, 30_000)
     expect(failedOnce).toBe(true)
     expect(failed!.prototypePages.length).toBeGreaterThan(0)
+    expect(failed!.prototypeSuiteCandidates?.set.candidates.map(({ status }) => status))
+      .toEqual(['ready', 'failed', 'ready'])
+    expect(Object.values(failed!.prototypeSuiteCandidates!.artifacts)).toHaveLength(2)
     desktopHarness.imageToolFailure = null
 
     const retry = await waitFor(() =>
@@ -1011,6 +1028,14 @@ describe('brief → every planned route — rendered IntentWorkspace', () => {
       ),
       artifactIds: Object.keys(finalState?.prototypeSuiteCandidates?.artifacts ?? {}),
       pageCount: finalState?.prototypePages.length,
+      productionRuns: Object.values(getStoreState().assetProduction.runs).map((run) => ({
+        id: run.runId,
+        status: run.status,
+        tasks: Object.values(run.tasks).map((task) => ({
+          status: task.status,
+          issues: task.issues.map((issue) => issue.message),
+        })),
+      })),
     })).toBeTruthy()
     expect(recovered!.prototypeSuiteCandidates?.set.candidates).toHaveLength(3)
     expect(Object.values(recovered!.prototypeSuiteCandidates!.artifacts)).toHaveLength(3)
@@ -1021,6 +1046,82 @@ describe('brief → every planned route — rendered IntentWorkspace', () => {
       id.includes(':design-system:'))
     expect(pageCalls).toHaveLength(19)
     expect(designSystemCalls).toHaveLength(3)
+  }, 60_000)
+
+  it('replans a failed candidate when no reusable suite frontier exists yet', async () => {
+    const node = mount()
+    const textarea = await waitFor(
+      () => node.querySelector<HTMLTextAreaElement>('[aria-label="Message the Agent"]'),
+    )
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 50))
+    })
+    act(() => {
+      const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!
+      setter.call(textarea, 'Design a complete retail operations web app with three directions. Generate it now.')
+      textarea!.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    await act(async () => {
+      node.querySelector<HTMLButtonElement>('[aria-label="Send"]')!.click()
+    })
+
+    await waitFor(() => {
+      const candidates = getStoreState().workspaceSnapshot?.prototypeDesignSystemCandidates
+      return candidates?.set.candidates.every(({ status }) => status === 'ready')
+        ? candidates
+        : null
+    })
+    let failedPlanningOnce = false
+    desktopHarness.plannerFailure = (call) => {
+      if (call === 0 || failedPlanningOnce) return null
+      failedPlanningOnce = true
+      return 'HTTP 503 service unavailable'
+    }
+    const selectionButtons = [...node.querySelectorAll<HTMLButtonElement>(
+      '[data-design-candidate-action="select"]',
+    )]
+    await act(async () => {
+      selectionButtons[1]!.click()
+    })
+
+    const failed = await waitFor(() => {
+      const current = getStoreState().workspaceSnapshot
+      return current?.runError && current.prototypeSuiteCandidates?.set.candidates.some(
+        ({ status }) => status === 'failed',
+      ) ? current : null
+    }, 30_000)
+    expect(failedPlanningOnce).toBe(true)
+    expect(failed!.prototypeSuiteCandidates?.set.candidates.map(({ status }) => status))
+      .toEqual(['ready', 'failed', 'ready'])
+    expect(Object.values(failed!.prototypeSuiteCandidates!.artifacts)).toHaveLength(2)
+    expect(desktopHarness.plannerPrompts).toHaveLength(4)
+    desktopHarness.plannerFailure = null
+
+    const retry = await waitFor(() =>
+      node.querySelector<HTMLButtonElement>('[data-agent-action="retry-run"]:not(:disabled)'))
+    act(() => {
+      retry!.click()
+    })
+    const recovered = await waitFor(() => {
+      const current = getStoreState().workspaceSnapshot
+      return current?.prototypeSuiteCandidates?.set.candidates.every(
+        ({ status }) => status === 'ready',
+      ) && current.prototypeSuiteCandidates.set.selection && !current.runError
+        ? current
+        : null
+    }, 30_000)
+
+    expect(recovered).toBeTruthy()
+    expect(desktopHarness.plannerPrompts).toHaveLength(5)
+    expect(Object.values(recovered!.prototypeSuiteCandidates!.artifacts)).toHaveLength(3)
+    expect(new Set(Object.values(recovered!.prototypeSuiteCandidates!.artifacts).map(
+      (artifact) => artifact.plan.pages.map((page) => page.route).join('|'),
+    )).size).toBe(3)
+    expect(recovered!.prototypePlan?.pages.map((page) => page.route)).toEqual(
+      SUITE_PLANS[2].pages.map((page) => page.route),
+    )
+    expect(desktopHarness.imageToolCallIds.filter((id) => id.includes(':prototype-page:')))
+      .toHaveLength(18)
   }, 60_000)
 
   it('retries only a failed material board while carrying ready pages and materials', async () => {
@@ -1075,15 +1176,17 @@ describe('brief → every planned route — rendered IntentWorkspace', () => {
     expect(failedOnce).toBe(true)
     expect(failed.prototypePages).toHaveLength(6)
     expect(desktopHarness.imageToolCallIds.filter((id) =>
-      id.includes(':prototype-page:'))).toHaveLength(12)
-    expect(desktopHarness.boardPrompts).toHaveLength(BOARD_GROUPS_PER_SUITE * 2)
-    expect(Object.values(failed.prototypeSuiteCandidates!.artifacts)).toHaveLength(1)
+      id.includes(':prototype-page:'))).toHaveLength(18)
+    expect(desktopHarness.boardPrompts).toHaveLength(BOARD_GROUPS_PER_SUITE * 3)
+    expect(Object.values(failed.prototypeSuiteCandidates!.artifacts)).toHaveLength(2)
     const pageCallIdsBeforeRetry = desktopHarness.imageToolCallIds.filter((id) =>
       id.includes(':prototype-page:'))
     const boardAttemptsBeforeRetry = desktopHarness.boardPrompts.length
     expect(failedBoardPrompt).toBeTruthy()
     expect(Object.values(getStoreState().assetProduction.runs).filter(
-      ({ status }) => status === 'partial',
+      ({ status, tasks }) => status === 'cancelled' && Object.values(tasks).some(
+        (task) => task.status === 'failed',
+      ),
     )).toHaveLength(1)
     desktopHarness.boardFailure = null
 
@@ -1119,7 +1222,7 @@ describe('brief → every planned route — rendered IntentWorkspace', () => {
     expect(pageCallIdsAfterRetry.every((id) => id.endsWith(':attempt-1'))).toBe(true)
     expect(desktopHarness.boardPrompts).toHaveLength(resolvedBudget.boardCalls + 1)
     expect(desktopHarness.boardPrompts.length - boardAttemptsBeforeRetry).toBe(
-      resolvedBudget.boardCalls - (BOARD_GROUPS_PER_SUITE * 2) + 1,
+      1,
     )
     expect(desktopHarness.boardPrompts.filter((prompt) => prompt === failedBoardPrompt))
       .toHaveLength(2)

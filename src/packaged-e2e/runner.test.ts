@@ -10,6 +10,7 @@ import {
   approvePendingTools,
   collectPackagedE2eOutcome,
   createPackagedE2eRetryTracker,
+  hasCompleteDeliveryEvidence,
   hasRetryRunStarted,
   hasFreshAgentMessage,
   hasSettledFreshAgentResponse,
@@ -47,16 +48,38 @@ function completeOutcomeWorkspace(): HTMLElement {
       status: 'ready',
     })),
   )
-  workspace.dataset.packagedE2ePrototypeSuites = JSON.stringify(
+  const digest = 'a'.repeat(64)
+  workspace.dataset.packagedE2eDeliveryEvidence = JSON.stringify(
     routeCounts.map((routeCount, suiteIndex) => ({
       candidateId: `suite-${suiteIndex + 1}`,
       designSystemId: `design-${suiteIndex + 1}`,
+      resourcePackId: `resource-pack-${suiteIndex + 1}`,
       status: 'ready',
       routes: Array.from(
         { length: routeCount },
         (_, routeIndex) => `/suite-${suiteIndex + 1}/route-${routeIndex + 1}`,
       ),
+      routeCount,
+      pageCount: routeCount,
       resourceAssetCount: resourceCounts[suiteIndex],
+      artifactCount: resourceCounts[suiteIndex],
+      qualityReviewStatus: 'recorded',
+      digests: {
+        designSystemImage: digest,
+        designMarkdown: digest,
+        cssVariables: digest,
+        tailwindTheme: digest,
+        tokensJson: digest,
+        designIrTokens: digest,
+        routeGraph: digest,
+        pageMedia: digest,
+        manifest: digest,
+        bindings: digest,
+        resourcePack: digest,
+        resourceArtifacts: digest,
+        provenance: digest,
+        reviewDocument: digest,
+      },
     })),
   )
   workspace.dataset.packagedE2eSelectedSuiteId = 'suite-2'
@@ -568,6 +591,16 @@ describe('packaged E2E failure diagnostics', () => {
 })
 
 describe('packaged E2E outcome evidence', () => {
+  it('waits for asynchronous delivery evidence instead of treating ready counts as proof', () => {
+    const workspace = completeOutcomeWorkspace()
+    workspace.dataset.prototypeSuiteCount = '3'
+    const evidence = workspace.dataset.packagedE2eDeliveryEvidence
+    delete workspace.dataset.packagedE2eDeliveryEvidence
+    expect(hasCompleteDeliveryEvidence(workspace)).toBe(false)
+    workspace.dataset.packagedE2eDeliveryEvidence = evidence
+    expect(hasCompleteDeliveryEvidence(workspace)).toBe(true)
+  })
+
   it('collects only bounded quantities and opaque identities for the completed graph', () => {
     const outcome = collectPackagedE2eOutcome(completeOutcomeWorkspace())
 
@@ -608,32 +641,52 @@ describe('packaged E2E outcome evidence', () => {
 
   it('rejects duplicate route graphs and incomplete resource quantities', () => {
     const duplicate = completeOutcomeWorkspace()
-    const suites = JSON.parse(duplicate.dataset.packagedE2ePrototypeSuites!) as Array<{
+    const suites = JSON.parse(duplicate.dataset.packagedE2eDeliveryEvidence!) as Array<{
       routes: string[]
       resourceAssetCount: number
     }>
     suites[2]!.routes = [...suites[0]!.routes]
-    duplicate.dataset.packagedE2ePrototypeSuites = JSON.stringify(suites)
+    duplicate.dataset.packagedE2eDeliveryEvidence = JSON.stringify(suites)
     expect(() => collectPackagedE2eOutcome(duplicate)).toThrow(JourneyFailure)
 
     const incomplete = completeOutcomeWorkspace()
     const incompleteSuites = JSON.parse(
-      incomplete.dataset.packagedE2ePrototypeSuites!,
+      incomplete.dataset.packagedE2eDeliveryEvidence!,
     ) as Array<{ resourceAssetCount: number }>
     incompleteSuites[1]!.resourceAssetCount = 0
-    incomplete.dataset.packagedE2ePrototypeSuites = JSON.stringify(incompleteSuites)
+    incomplete.dataset.packagedE2eDeliveryEvidence = JSON.stringify(incompleteSuites)
     expect(() => collectPackagedE2eOutcome(incomplete)).toThrow(JourneyFailure)
   })
 
   it('rejects prototype suites that do not bind one-to-one to ready Design Systems', () => {
     const workspace = completeOutcomeWorkspace()
-    const suites = JSON.parse(workspace.dataset.packagedE2ePrototypeSuites!) as Array<{
+    const suites = JSON.parse(workspace.dataset.packagedE2eDeliveryEvidence!) as Array<{
       designSystemId: string
     }>
     suites[2]!.designSystemId = suites[0]!.designSystemId
-    workspace.dataset.packagedE2ePrototypeSuites = JSON.stringify(suites)
+    workspace.dataset.packagedE2eDeliveryEvidence = JSON.stringify(suites)
 
     expect(() => collectPackagedE2eOutcome(workspace)).toThrow(JourneyFailure)
+  })
+
+  it('rejects duplicate resource-pack identities and malformed digests', () => {
+    const duplicate = completeOutcomeWorkspace()
+    const duplicateSuites = JSON.parse(duplicate.dataset.packagedE2eDeliveryEvidence!) as Array<{
+      resourcePackId: string
+    }>
+    duplicateSuites[2]!.resourcePackId = duplicateSuites[0]!.resourcePackId
+    duplicate.dataset.packagedE2eDeliveryEvidence = JSON.stringify(duplicateSuites)
+    expect(() => collectPackagedE2eOutcome(duplicate)).toThrow(JourneyFailure)
+
+    for (const digest of ['A'.repeat(64), 'g'.repeat(64), 'a'.repeat(63)]) {
+      const workspace = completeOutcomeWorkspace()
+      const suites = JSON.parse(workspace.dataset.packagedE2eDeliveryEvidence!) as Array<{
+        digests: { designSystemImage: string }
+      }>
+      suites[0]!.digests.designSystemImage = digest
+      workspace.dataset.packagedE2eDeliveryEvidence = JSON.stringify(suites)
+      expect(() => collectPackagedE2eOutcome(workspace)).toThrow(JourneyFailure)
+    }
   })
 
   it('rejects a visible consumable count that differs from selected production authority', () => {
@@ -651,5 +704,24 @@ describe('packaged E2E outcome evidence', () => {
     workspace.dataset.packagedE2eDesignCandidates = JSON.stringify(designs)
 
     expect(() => collectPackagedE2eOutcome(workspace)).toThrow(JourneyFailure)
+  })
+
+  it('rejects missing review, token, provenance, binding, or pack digests', () => {
+    for (const key of [
+      'reviewDocument',
+      'designIrTokens',
+      'provenance',
+      'bindings',
+      'resourcePack',
+      'resourceArtifacts',
+    ]) {
+      const workspace = completeOutcomeWorkspace()
+      const suites = JSON.parse(workspace.dataset.packagedE2eDeliveryEvidence!) as Array<{
+        digests: Record<string, string>
+      }>
+      delete suites[0]!.digests[key]
+      workspace.dataset.packagedE2eDeliveryEvidence = JSON.stringify(suites)
+      expect(() => collectPackagedE2eOutcome(workspace)).toThrow(JourneyFailure)
+    }
   })
 })

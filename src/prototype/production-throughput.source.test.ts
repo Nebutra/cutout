@@ -32,9 +32,11 @@ describe('prototype production throughput wiring', () => {
     expect(boardProduction).not.toContain('textFreeSource')
   })
 
-  it('does not truncate Agent-authored routes and scopes strict suite fail-fast to packaged E2E', () => {
+  it('does not truncate Agent-authored routes or cancel independent suite siblings', () => {
     expect(workspaceSource).not.toContain('pages.slice(0, 6)')
-    expect(workspaceSource).toContain('import.meta.env.VITE_CUTOUT_PACKAGED_E2E === "1"')
-    expect(workspaceSource).toContain('cancelUnstartedPrototypeSuiteCandidates(')
+    expect(workspaceSource).not.toContain('cancelUnstartedPrototypeSuiteCandidates(')
+    expect(workspaceSource).toContain('if (left.directionId === selectedDirectionId) return -1')
+    expect(workspaceSource).toContain('nameRegion: (boardBytes, slices, context, signal) =>')
+    expect(workspaceSource).not.toContain('nameRegion: options.resumePrototypeSuiteCandidates')
   })
 })

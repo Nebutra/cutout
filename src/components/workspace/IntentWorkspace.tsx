@@ -160,7 +160,6 @@ import {
   type PrototypeDesignSystemCandidateSet,
 } from "@/prototype/design-system-candidates";
 import {
-  cancelUnstartedPrototypeSuiteCandidates,
   createPrototypeSuiteCandidateSet,
   prototypeRouteGraphFingerprint,
   recoverPrototypeSuiteCandidateSet,
@@ -170,8 +169,18 @@ import {
   type PrototypeSuiteCandidateSet,
 } from "@/prototype/prototype-suite-candidates";
 import {
+  projectPrototypeDeliveryEvidence,
+  type PrototypeDeliveryEvidence,
+} from "@/prototype/delivery-evidence";
+import {
+  projectPrototypeDeliveryProgress,
+  updatePrototypeDeliveryObservation,
+  type PrototypeDeliveryObservation,
+} from "@/prototype/delivery-progress";
+import {
   resolveResourcePackProductionRun,
   selectResourcePackProductionAuthority,
+  verifyResourcePackProductionArtifacts,
 } from "@/prototype/resource-pack-production";
 import type { CandidateDirection } from "@/candidate-selection/contracts";
 import { runCandidateGenerationWaves } from "@/prototype/candidate-generation-waves";
@@ -392,13 +401,11 @@ interface GeneratedPrototypeSuite {
   readonly pages: readonly PrototypePageArtifact[];
   readonly resourcePack: PersistedPrototypeResourcePack;
 }
-interface PackagedE2ePrototypeSuiteProgress {
-  readonly completedPages: number;
-  readonly totalPages: number;
-  readonly completedResources: number;
-  readonly totalResources: number;
+interface PrototypeSuiteRetryFrontier {
+  readonly plan: PrototypePlan;
+  readonly designSystem: PrototypeDesignSystemArtifact;
+  readonly pages: readonly PrototypePageArtifact[];
 }
-
 export function IntentWorkspace({
   onOpenDesignOs = () => {},
 }: {
@@ -513,32 +520,66 @@ export function IntentWorkspace({
     prototypeDesignSystemCandidates,
     prototypeSuiteCandidates,
   ]);
-  const [packagedE2ePrototypeSuiteProgress, setPackagedE2ePrototypeSuiteProgress] =
-    useState<Readonly<Record<string, PackagedE2ePrototypeSuiteProgress>>>({});
-  const recordPackagedE2ePrototypeSuiteProgress = (
+  const [prototypeSuiteDeliveryObservations, setPrototypeSuiteDeliveryObservations] =
+    useState<Readonly<Record<string, PrototypeDeliveryObservation>>>({});
+  const resolveDeliveryArtifactRef = useRef<((artifactId: string) => Promise<{
+    readonly id: string;
+    readonly mediaType: string;
+    readonly bytes: Uint8Array;
+  } | null>) | null>(null);
+  const prototypeSuiteRetryFrontiersRef = useRef<
+    Readonly<Record<string, PrototypeSuiteRetryFrontier>>
+  >({});
+  const recordPrototypeSuiteDeliveryProgress = (
     candidateId: string,
-    update: Partial<PackagedE2ePrototypeSuiteProgress>,
+    update: Parameters<typeof updatePrototypeDeliveryObservation>[0]["update"],
   ) => {
-    if (import.meta.env.VITE_CUTOUT_PACKAGED_E2E !== "1") return;
-    setPackagedE2ePrototypeSuiteProgress((current) => {
-      const previous = current[candidateId] ?? {
-        completedPages: 0,
-        totalPages: 0,
-        completedResources: 0,
-        totalResources: 0,
-      };
-      const next = { ...previous, ...update };
-      if (
-        next.completedPages === previous.completedPages &&
-        next.totalPages === previous.totalPages &&
-        next.completedResources === previous.completedResources &&
-        next.totalResources === previous.totalResources
-      ) {
-        return current;
-      }
+    setPrototypeSuiteDeliveryObservations((current) => {
+      const previous = current[candidateId];
+      const next = updatePrototypeDeliveryObservation({ previous, update, at: Date.now() });
       return { ...current, [candidateId]: next };
     });
   };
+  const [packagedE2eDeliveryEvidence, setPackagedE2eDeliveryEvidence] =
+    useState<readonly PrototypeDeliveryEvidence[]>([]);
+  useEffect(() => {
+    if (import.meta.env.VITE_CUTOUT_PACKAGED_E2E !== "1" || !prototypeSuiteCandidates) {
+      setPackagedE2eDeliveryEvidence([]);
+      return;
+    }
+    let active = true;
+    const productionSnapshot = getStoreState().assetProduction;
+    const resolveArtifact = resolveDeliveryArtifactRef.current;
+    if (!resolveArtifact) {
+      setPackagedE2eDeliveryEvidence([]);
+      return;
+    }
+    void Promise.all(
+      prototypeSuiteCandidates.set.candidates.flatMap((candidate) => {
+        const artifact = prototypeSuiteCandidates.artifacts[candidate.id];
+        return candidate.status === "ready" && artifact
+          ? [verifyResourcePackProductionArtifacts({
+              snapshot: productionSnapshot,
+              resourcePack: artifact.resourcePack,
+              resolveArtifact,
+            }).then((verified) => [candidate.id, verified] as const)]
+          : [];
+      }),
+    )
+      .then((entries) => projectPrototypeDeliveryEvidence(
+        prototypeSuiteCandidates,
+        Object.fromEntries(entries),
+      ))
+      .then((evidence) => {
+        if (active) setPackagedE2eDeliveryEvidence(evidence);
+      })
+      .catch(() => {
+        if (active) setPackagedE2eDeliveryEvidence([]);
+      });
+    return () => {
+      active = false;
+    };
+  }, [prototypeSuiteCandidates]);
   const prototypeArtifacts = useMemo(
     () =>
       projectPrototypeArtifacts({
@@ -777,6 +818,7 @@ export function IntentWorkspace({
     append: emitRunEvents,
     cutoutResultSink: createCutoutResultSink(getStoreState),
   });
+  resolveDeliveryArtifactRef.current = desktopTools.resolveArtifact;
   const emitRunEventsRef = useRef(emitRunEvents);
   emitRunEventsRef.current = emitRunEvents;
   const clarificationBridge = useMemo(
@@ -1139,6 +1181,7 @@ export function IntentWorkspace({
         : prototypeDesignSystem;
       return createAssets(mode, {
         ...options,
+        ...(prototypeSuiteCandidates ? { ignoreSelectedMaterial: true } : {}),
         ...(mode === "create" && prototypeSuiteCandidates &&
             resumableDesignSystem && prototypeDesignSystemCandidates
           ? {
@@ -2861,17 +2904,20 @@ export function IntentWorkspace({
       return;
     }
 
+    // Multi-suite orchestration owns the active lease until every candidate is
+    // settled. The single-suite naming effect observes global slices and would
+    // otherwise finish whichever sibling lease is active when old slices land.
+    autoNamePendingRef.current = false;
+    setNamingStatus("idle");
     const persistedDesignCandidates = persistPrototypeDesignSystemCandidateSet(designCandidates);
     let suites = options.resumePrototypeSuiteCandidates ??
       createPrototypeSuiteCandidateSet({
         designSystemCandidates: persistedDesignCandidates,
         baseRevisionId: designDocument?.revision.id ?? "workspace.v1:unprojected",
       });
-    if (
-      import.meta.env.VITE_CUTOUT_PACKAGED_E2E === "1" &&
-      !options.resumePrototypeSuiteCandidates
-    ) {
-      setPackagedE2ePrototypeSuiteProgress({});
+    if (!options.resumePrototypeSuiteCandidates) {
+      setPrototypeSuiteDeliveryObservations({});
+      prototypeSuiteRetryFrontiersRef.current = {};
     }
     const publish = (next: PrototypeSuiteCandidateSet) => {
       suites = next;
@@ -2886,8 +2932,8 @@ export function IntentWorkspace({
       (candidate) => candidate.id === selectedDesignCandidateId,
     )?.directionId;
     const ordered = [...suites.set.candidates].sort((left, right) => {
-      if (left.directionId === selectedDirectionId) return 1;
-      if (right.directionId === selectedDirectionId) return -1;
+      if (left.directionId === selectedDirectionId) return -1;
+      if (right.directionId === selectedDirectionId) return 1;
       return 0;
     });
     const priorRouteGraphs = Object.values(suites.artifacts).map((artifact) =>
@@ -2922,16 +2968,17 @@ export function IntentWorkspace({
         if (!designCandidate || !designArtifact || !direction) {
           throw new Error("The matching Design System direction is unavailable.");
         }
-        const resumeFailedPlan = Boolean(
+        const retryFrontier =
           options.resumePrototypeSuiteCandidates &&
           suiteCandidate.status === "failed" &&
-          options.selectedDesignSystem === designArtifact,
-        );
+          options.selectedDesignSystem === designArtifact
+          ? prototypeSuiteRetryFrontiersRef.current[suiteCandidate.id]
+          : undefined;
         const seededPlan = plan.planningSeed
           ? createPrototypePlanFromSeed(plan.planningSeed, direction.id)
           : null;
-        const planned = resumeFailedPlan
-          ? { ok: true as const, data: plan }
+        const planned = retryFrontier
+          ? { ok: true as const, data: retryFrontier.plan }
           : seededPlan
           ? { ok: true as const, data: seededPlan }
           : await planPrototype(personalizedGenerationRef.current, {
@@ -2952,9 +2999,9 @@ export function IntentWorkspace({
           throw new Error("The Agent returned an unresolved question for this prototype alternative.");
         }
         const resumeCurrentSuite = Boolean(
-          resumeFailedPlan &&
-          prototypePages.length > 0 &&
-          prototypeRouteGraphFingerprint(plan) ===
+          retryFrontier &&
+          retryFrontier.pages.length > 0 &&
+          prototypeRouteGraphFingerprint(retryFrontier.plan) ===
             prototypeRouteGraphFingerprint(planned.data),
         );
         setPrototypePlan(planned.data);
@@ -2970,6 +3017,7 @@ export function IntentWorkspace({
             selectedDesignSystem: designArtifact,
             preserveCandidateSets: true,
             suiteRunId: suiteCandidate.id,
+            resumePages: retryFrontier?.pages,
             repair: undefined,
             targetPageIds: undefined,
           },
@@ -2998,6 +3046,9 @@ export function IntentWorkspace({
           { status: "ready", artifact: persistedArtifact },
           persistedDesignCandidates,
         ));
+        const remainingFrontiers = { ...prototypeSuiteRetryFrontiersRef.current };
+        delete remainingFrontiers[suiteCandidate.id];
+        prototypeSuiteRetryFrontiersRef.current = remainingFrontiers;
         priorRouteGraphs.push(JSON.stringify({
           routes: generated.plan.pages.map((page) => page.route),
           flows: generated.plan.flows,
@@ -3011,13 +3062,6 @@ export function IntentWorkspace({
           { status: "failed", error: errorMessage(error) },
           persistedDesignCandidates,
         ));
-        if (import.meta.env.VITE_CUTOUT_PACKAGED_E2E === "1") {
-          publish(cancelUnstartedPrototypeSuiteCandidates(
-            suites,
-            persistedDesignCandidates,
-          ));
-          break;
-        }
       }
     }
 
@@ -3084,6 +3128,8 @@ export function IntentWorkspace({
       readonly resumePrototypeSuiteCandidates?: PrototypeSuiteCandidateSet;
       /** Distinguishes idempotency keys across sibling suite alternatives. */
       readonly suiteRunId?: string;
+      /** Candidate-local settled pages retained while independent siblings continue. */
+      readonly resumePages?: readonly PrototypePageArtifact[];
     },
     lease: AgentRunLease,
   ): Promise<GeneratedPrototypeSuite | null> {
@@ -3096,11 +3142,12 @@ export function IntentWorkspace({
     if (pages.length === 0) throw new Error("The prototype plan has no pages.");
     const pageIds = new Set(pages.map((page) => page.id));
     const targetPageIds = new Set(options.targetPageIds ?? []);
+    const reusablePageSource = options.resumePages ?? prototypePages;
     const reusablePages =
       options.startFresh && targetPageIds.size === 0
         ? []
         : sortPrototypePages(
-            prototypePages.filter(
+            reusablePageSource.filter(
               (artifact) =>
                 pageIds.has(artifact.page.id) &&
                 !targetPageIds.has(artifact.page.id),
@@ -3117,11 +3164,14 @@ export function IntentWorkspace({
       suites: [{ pages }],
     });
     if (options.suiteRunId) {
-      recordPackagedE2ePrototypeSuiteProgress(options.suiteRunId, {
+      recordPrototypeSuiteDeliveryProgress(options.suiteRunId, {
         completedPages: reusablePages.length,
         totalPages: pages.length,
         completedResources: 0,
         totalResources: assetManifest.assets.length,
+        retryPreservedNodes: options.resumePrototypeSuiteCandidates
+          ? reusablePages.length
+          : 0,
       });
     }
     recordRuntimeDiagnostic({
@@ -3236,6 +3286,13 @@ export function IntentWorkspace({
         ? designSystem.designMarkdown
         : generationContext;
 
+    if (options.suiteRunId) {
+      prototypeSuiteRetryFrontiersRef.current = {
+        ...prototypeSuiteRetryFrontiersRef.current,
+        [options.suiteRunId]: { plan, designSystem, pages: reusablePages },
+      };
+    }
+
     const runSerial =
       options.forceParallel === undefined
         ? pages.length <= SERIAL_REFERENCE_PAGE_LIMIT
@@ -3316,7 +3373,9 @@ export function IntentWorkspace({
         (run) =>
           run.runId !== productionRunId &&
           run.planHash === productionPlan.planHash &&
-          run.status !== "cancelled",
+          (run.status !== "cancelled" || Object.values(run.tasks).some(
+            (task) => task.status === "failed",
+          )),
       )
       .sort((left, right) => right.startedAt - left.startedAt)[0];
     const inferredResumeRegions =
@@ -3344,7 +3403,7 @@ export function IntentWorkspace({
       productionSnapshot = next;
       if (options.suiteRunId) {
         const run = next.runs[productionRunId];
-        recordPackagedE2ePrototypeSuiteProgress(options.suiteRunId, {
+        recordPrototypeSuiteDeliveryProgress(options.suiteRunId, {
           completedResources: run
             ? Object.values(run.tasks).filter((task) =>
                 task.status === "ready" || task.status === "waived",
@@ -3411,6 +3470,11 @@ export function IntentWorkspace({
         productionRunId,
         carriedBindings,
       );
+      if (options.suiteRunId) {
+        recordPrototypeSuiteDeliveryProgress(options.suiteRunId, {
+          retryPreservedNodes: reusablePages.length + carriedBindings.length,
+        });
+      }
     }
     autoNamePendingRef.current = false;
     let hasRetryableProductionFailure = false;
@@ -4379,7 +4443,14 @@ export function IntentWorkspace({
       onProgress: (artifacts) => {
         setPrototypePages(artifacts);
         if (suiteRunId) {
-          recordPackagedE2ePrototypeSuiteProgress(suiteRunId, {
+          const frontier = prototypeSuiteRetryFrontiersRef.current[suiteRunId];
+          if (frontier) {
+            prototypeSuiteRetryFrontiersRef.current = {
+              ...prototypeSuiteRetryFrontiersRef.current,
+              [suiteRunId]: { ...frontier, pages: artifacts },
+            };
+          }
+          recordPrototypeSuiteDeliveryProgress(suiteRunId, {
             completedPages: artifacts.length,
             totalPages: pages.length,
           });
@@ -4427,7 +4498,14 @@ export function IntentWorkspace({
       onProgress: (artifacts) => {
         setPrototypePages(artifacts);
         if (suiteRunId) {
-          recordPackagedE2ePrototypeSuiteProgress(suiteRunId, {
+          const frontier = prototypeSuiteRetryFrontiersRef.current[suiteRunId];
+          if (frontier) {
+            prototypeSuiteRetryFrontiersRef.current = {
+              ...prototypeSuiteRetryFrontiersRef.current,
+              [suiteRunId]: { ...frontier, pages: artifacts },
+            };
+          }
+          recordPrototypeSuiteDeliveryProgress(suiteRunId, {
             completedPages: artifacts.length,
             totalPages: pages.length,
           });
@@ -4698,12 +4776,17 @@ export function IntentWorkspace({
             )
           : undefined
       }
+      data-packaged-e2e-delivery-evidence={
+        import.meta.env.VITE_CUTOUT_PACKAGED_E2E === "1"
+          ? JSON.stringify(packagedE2eDeliveryEvidence)
+          : undefined
+      }
       data-packaged-e2e-prototype-suite-progress={
         import.meta.env.VITE_CUTOUT_PACKAGED_E2E === "1"
           ? JSON.stringify(
               prototypeSuiteCandidates?.set.candidates.map((candidate, index) => {
                 const artifact = prototypeSuiteCandidates.artifacts[candidate.id];
-                const progress = packagedE2ePrototypeSuiteProgress[candidate.id];
+                const progress = prototypeSuiteDeliveryObservations[candidate.id];
                 return {
                   candidateId: `suite-${index + 1}`,
                   status: candidate.status === "planned" ? "proposed" : candidate.status,
@@ -5315,6 +5398,7 @@ export function IntentWorkspace({
             prototypeDesignSystemCandidates={prototypeDesignSystemCandidates}
             onSelectDesignSystemCandidate={chooseDesignSystemCandidate}
             prototypeSuiteCandidates={prototypeSuiteCandidates}
+            prototypeSuiteDeliveryObservations={prototypeSuiteDeliveryObservations}
             onSelectPrototypeSuiteCandidate={(candidateId) =>
               void choosePrototypeSuiteCandidate(candidateId)
             }
@@ -6873,6 +6957,7 @@ function OutputSurface({
   prototypeDesignSystemCandidates,
   onSelectDesignSystemCandidate,
   prototypeSuiteCandidates,
+  prototypeSuiteDeliveryObservations,
   onSelectPrototypeSuiteCandidate,
   selectedPrototypePageId,
   onPrototypePageSelect,
@@ -6919,6 +7004,9 @@ function OutputSurface({
   readonly prototypeDesignSystemCandidates: PrototypeDesignSystemCandidateSet | null;
   readonly onSelectDesignSystemCandidate: (candidateId: string) => void;
   readonly prototypeSuiteCandidates: PrototypeSuiteCandidateSet | null;
+  readonly prototypeSuiteDeliveryObservations: Readonly<
+    Record<string, PrototypeDeliveryObservation>
+  >;
   readonly onSelectPrototypeSuiteCandidate: (candidateId: string) => void;
   readonly selectedPrototypePageId: string | null;
   readonly onPrototypePageSelect: (pageId: string) => void;
@@ -7234,6 +7322,7 @@ function OutputSurface({
                 <DialogTitle className="sr-only">Prototype suite alternatives</DialogTitle>
                 <PrototypeSuiteCandidateComparison
                   candidateSet={prototypeSuiteCandidates}
+                  observations={prototypeSuiteDeliveryObservations}
                   onSelect={onSelectPrototypeSuiteCandidate}
                 />
               </DialogContent>
@@ -7679,9 +7768,11 @@ function DesignSystemCandidateCard({
 
 function PrototypeSuiteCandidateComparison({
   candidateSet,
+  observations,
   onSelect,
 }: {
   readonly candidateSet: PrototypeSuiteCandidateSet;
+  readonly observations: Readonly<Record<string, PrototypeDeliveryObservation>>;
   readonly onSelect: (candidateId: string) => void;
 }) {
   return (
@@ -7706,6 +7797,7 @@ function PrototypeSuiteCandidateComparison({
                 (direction) => direction.id === candidate.directionId,
               )}
               artifact={candidateSet.artifacts[candidate.id]}
+              observation={observations[candidate.id]}
               selected={candidateSet.set.selection?.candidateId === candidate.id}
               onSelect={onSelect}
             />
@@ -7720,16 +7812,23 @@ function PrototypeSuiteCandidateCard({
   candidate,
   direction,
   artifact,
+  observation,
   selected,
   onSelect,
 }: {
   readonly candidate: PrototypeSuiteCandidateSet["set"]["candidates"][number];
   readonly direction?: CandidateDirection;
   readonly artifact?: PersistedPrototypeSuiteCandidate;
+  readonly observation?: PrototypeDeliveryObservation;
   readonly selected: boolean;
   readonly onSelect: (candidateId: string) => void;
 }) {
   const [url, setUrl] = useState<string | null>(null);
+  const progress = projectPrototypeDeliveryProgress({
+    status: candidate.status,
+    observation,
+    now: Date.now(),
+  });
   useEffect(() => {
     const page = artifact?.pages[0];
     if (!page) {
@@ -7777,6 +7876,30 @@ function PrototypeSuiteCandidateCard({
             </div>
           </>
         ) : null}
+        {progress.totalNodes > 0 ? (
+          <div className="mt-3 border-t border-border pt-2 text-[11px] text-muted-foreground">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <span>{progress.completedNodes}/{progress.totalNodes} items</span>
+              {progress.active > 0 ? <span>{progress.active} in progress</span> : null}
+              {progress.queued > 0 ? <span>{progress.queued} waiting</span> : null}
+              {progress.failed > 0 ? <span className="text-destructive">{progress.failed} failed</span> : null}
+              {progress.retryPreserved > 0 ? <span>{progress.retryPreserved} kept for Retry</span> : null}
+            </div>
+            <p className="mt-1">
+              {candidate.status === "ready"
+                ? "Complete"
+                : candidate.status === "failed"
+                  ? "Retry to continue"
+                  : candidate.status === "planned"
+                    ? "Waiting to start"
+                    : progress.estimate.state === "bounded"
+                ? `About ${formatDeliveryDuration(progress.estimate.lowerMs)}-${formatDeliveryDuration(progress.estimate.upperMs)} remaining`
+                : progress.estimate.state === "collecting"
+                  ? "Estimating after more completed work"
+                  : "Remaining time unavailable"}
+            </p>
+          </div>
+        ) : null}
         {candidate.error ? <p className="mt-3 text-xs text-destructive">{candidate.error}</p> : null}
         <div className="mt-auto flex justify-end pt-3">
           <Button
@@ -7793,6 +7916,14 @@ function PrototypeSuiteCandidateCard({
       </div>
     </article>
   );
+}
+
+function formatDeliveryDuration(milliseconds: number): string {
+  const minutes = Math.max(1, Math.ceil(milliseconds / 60_000));
+  if (minutes < 60) return `${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  const remainder = minutes % 60;
+  return remainder === 0 ? `${hours} hr` : `${hours} hr ${remainder} min`;
 }
 
 function designMarkdownSwatches(markdown: string): readonly string[] {

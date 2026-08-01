@@ -1,0 +1,375 @@
+{
+  "protocol": "cutout.packaged-e2e-result.v1",
+  "status": "passed",
+  "phases": [
+    {
+      "id": "native-boot",
+      "status": "passed"
+    },
+    {
+      "id": "webview-renderable",
+      "status": "passed"
+    },
+    {
+      "id": "webview-loaded",
+      "status": "passed"
+    },
+    {
+      "id": "bootstrap",
+      "status": "passed"
+    },
+    {
+      "id": "settings-opened",
+      "status": "passed"
+    },
+    {
+      "id": "ai-native-candidate-resolved",
+      "status": "passed"
+    },
+    {
+      "id": "ai-native-binding-normalized",
+      "status": "passed"
+    },
+    {
+      "id": "ai-native-config-loaded",
+      "status": "passed"
+    },
+    {
+      "id": "ai-native-secret-resolved",
+      "status": "passed"
+    },
+    {
+      "id": "ai-native-catalog-checked",
+      "status": "passed"
+    },
+    {
+      "id": "ai-native-key-stored",
+      "status": "passed"
+    },
+    {
+      "id": "ai-native-provider-saved",
+      "status": "passed"
+    },
+    {
+      "id": "ai-configured",
+      "status": "passed"
+    },
+    {
+      "id": "settings-closed",
+      "status": "passed"
+    },
+    {
+      "id": "home-ready",
+      "status": "passed"
+    },
+    {
+      "id": "casual-chat-submitted",
+      "status": "passed"
+    },
+    {
+      "id": "pipeline-stage-tool-gate",
+      "status": "passed"
+    },
+    {
+      "id": "provider-response",
+      "status": "passed"
+    },
+    {
+      "id": "creative-brief-submitted",
+      "status": "passed"
+    },
+    {
+      "id": "pipeline-stage-image-route-catalogued",
+      "status": "passed"
+    },
+    {
+      "id": "pipeline-stage-research-brief",
+      "status": "passed"
+    },
+    {
+      "id": "pipeline-stage-planner",
+      "status": "passed"
+    },
+    {
+      "id": "planner-stage-complete",
+      "status": "passed"
+    },
+    {
+      "id": "design-candidate-1-generating",
+      "status": "passed"
+    },
+    {
+      "id": "design-candidate-2-generating",
+      "status": "passed"
+    },
+    {
+      "id": "pipeline-stage-image-execution-started",
+      "status": "passed"
+    },
+    {
+      "id": "pipeline-stage-image-execution-proven",
+      "status": "passed"
+    },
+    {
+      "id": "design-candidate-1-ready",
+      "status": "passed"
+    },
+    {
+      "id": "design-candidate-2-ready",
+      "status": "passed"
+    },
+    {
+      "id": "design-candidate-3-generating",
+      "status": "passed"
+    },
+    {
+      "id": "design-candidate-3-ready",
+      "status": "passed"
+    },
+    {
+      "id": "design-candidates-ready",
+      "status": "passed"
+    },
+    {
+      "id": "design-candidate-selected",
+      "status": "passed"
+    },
+    {
+      "id": "prototype-suite-1-generating-pages-0-of-7-resources-0-of-8",
+      "status": "passed"
+    },
+    {
+      "id": "prototype-suite-1-generating-pages-first-1-of-7-resources-0-of-8",
+      "status": "passed"
+    },
+    {
+      "id": "prototype-suite-1-generating-pages-half-4-of-7-resources-0-of-8",
+      "status": "passed"
+    },
+    {
+      "id": "prototype-suite-1-generating-pages-complete-7-of-7-resources-0-of-8",
+      "status": "passed"
+    },
+    {
+      "id": "prototype-suite-1-generating-pages-7-of-7-resources-first-1-of-8",
+      "status": "passed"
+    },
+    {
+      "id": "prototype-suite-1-generating-pages-7-of-7-resources-half-4-of-8",
+      "status": "passed"
+    },
+    {
+      "id": "prototype-suite-1-ready-pages-7-of-7-resources-8-of-8",
+      "status": "passed"
+    },
+    {
+      "id": "prototype-suite-2-generating-pages-0-of-8-resources-0-of-8",
+      "status": "passed"
+    },
+    {
+      "id": "prototype-suite-2-generating-pages-first-1-of-8-resources-0-of-8",
+      "status": "passed"
+    },
+    {
+      "id": "prototype-suite-2-generating-pages-half-4-of-8-resources-0-of-8",
+      "status": "passed"
+    },
+    {
+      "id": "prototype-suite-2-generating-pages-complete-8-of-8-resources-0-of-8",
+      "status": "passed"
+    },
+    {
+      "id": "prototype-suite-2-generating-pages-8-of-8-resources-first-1-of-8",
+      "status": "passed"
+    },
+    {
+      "id": "prototype-suite-2-generating-pages-8-of-8-resources-half-4-of-8",
+      "status": "passed"
+    },
+    {
+      "id": "prototype-suite-2-ready-pages-8-of-8-resources-8-of-8",
+      "status": "passed"
+    },
+    {
+      "id": "prototype-suite-3-generating-pages-0-of-7-resources-0-of-8",
+      "status": "passed"
+    },
+    {
+      "id": "prototype-suite-3-generating-pages-first-1-of-7-resources-0-of-8",
+      "status": "passed"
+    },
+    {
+      "id": "prototype-suite-3-failed-pages-3-of-7-resources-0-of-8",
+      "status": "failed"
+    },
+    {
+      "id": "run-retried",
+      "status": "passed"
+    },
+    {
+      "id": "prototype-suite-3-generating-pages-half-4-of-7-resources-0-of-8",
+      "status": "passed"
+    },
+    {
+      "id": "prototype-suite-3-generating-pages-complete-7-of-7-resources-0-of-8",
+      "status": "passed"
+    },
+    {
+      "id": "prototype-suite-3-generating-pages-7-of-7-resources-first-1-of-8",
+      "status": "passed"
+    },
+    {
+      "id": "prototype-suite-3-generating-pages-7-of-7-resources-half-4-of-8",
+      "status": "passed"
+    },
+    {
+      "id": "prototype-suite-3-ready-pages-7-of-7-resources-8-of-8",
+      "status": "passed"
+    },
+    {
+      "id": "prototype-suite-ready",
+      "status": "passed"
+    },
+    {
+      "id": "prototype-suite-selected",
+      "status": "passed"
+    },
+    {
+      "id": "resource-pack-ready",
+      "status": "passed"
+    }
+  ],
+  "failure": null,
+  "outcome": {
+    "designSystems": [
+      {
+        "candidateId": "design-1",
+        "status": "ready"
+      },
+      {
+        "candidateId": "design-2",
+        "status": "ready"
+      },
+      {
+        "candidateId": "design-3",
+        "status": "ready"
+      }
+    ],
+    "prototypeSuites": [
+      {
+        "candidateId": "suite-1",
+        "designSystemId": "design-1",
+        "resourcePackId": "resource-pack-1",
+        "status": "ready",
+        "routes": [
+          "/",
+          "/trips/:tripId",
+          "/trips/:tripId/itinerary",
+          "/trips/:tripId/map",
+          "/trips/:tripId/budget",
+          "/trips/:tripId/share",
+          "/trips/:tripId/checklist"
+        ],
+        "routeCount": 7,
+        "pageCount": 7,
+        "resourceAssetCount": 8,
+        "artifactCount": 8,
+        "qualityReviewStatus": "recorded",
+        "digests": {
+          "designSystemImage": "cc422137ba17fca3ae7d831d0c5c0927142c49f161a9fe6115507d28fc8c123b",
+          "designMarkdown": "6bc8af5c8bc1e268d51401189d5f0150161bfc3f0a9cb63be4e38946368afdc9",
+          "cssVariables": "d7ce7afd5ecc9491635141cf2c7958a959bbe91347710bdaed37dd66f5c52204",
+          "tailwindTheme": "3878461cdd2a87101bb06667ce76d76573547bab25a699c7b2729afe25e3eaf8",
+          "tokensJson": "ebbac4d1076fea974963dd5689b0c727add475e7934f3affc6fc04748cd38cb2",
+          "designIrTokens": "e63f743ca2ee2f61a099768170b043a8a1997ba885d5bcb54a28686149fa83cb",
+          "routeGraph": "08854ed18a65ae40e2935fe473f087538ba0b278abd34689bf80a190dfb793ae",
+          "pageMedia": "d88ceb3b4438cea0ec884ac77f3a1dd582a43528c3925ef7bc63af2736f775c9",
+          "manifest": "c496f1860a86846a5d58c0a7ebb9866ed93808b40279dd75a05bbd7bfbc285b6",
+          "bindings": "b2c839855c8c94b46347cccfb75a12c3849a44cefd9e2958097e14a2105f966d",
+          "resourcePack": "9851fec5cab3640f0844193a97cc42343ce8ab05ac90c292877c48b7d447b805",
+          "resourceArtifacts": "e6d01666bec8c89b3aa584e82b216cb18758c8017c9d706f66598f70687dece5",
+          "provenance": "e3e92e634e97d749daf73cbc607f77960cf10c7dd0c5413af832a1ac9be23de6",
+          "reviewDocument": "11c7b4d18db421f91fe24dbe8776acc586b9bfa09dc565772d5cbf37262a3de5"
+        }
+      },
+      {
+        "candidateId": "suite-2",
+        "designSystemId": "design-2",
+        "resourcePackId": "resource-pack-2",
+        "status": "ready",
+        "routes": [
+          "/",
+          "/destinations/:slug",
+          "/collections/:collectionId",
+          "/trips/:tripId/plan",
+          "/trips/:tripId/map",
+          "/trips/:tripId/costs",
+          "/trips/:tripId/share",
+          "/trips/:tripId/departure"
+        ],
+        "routeCount": 8,
+        "pageCount": 8,
+        "resourceAssetCount": 8,
+        "artifactCount": 8,
+        "qualityReviewStatus": "recorded",
+        "digests": {
+          "designSystemImage": "505391a5ed0259f4e339960fa01c233f0383609df42164f0f7408be72619fe0a",
+          "designMarkdown": "f11f003b810f087b3d6fa20af8b5b54c8ba3ef63d733928ef1fea016df7e0778",
+          "cssVariables": "c9973480a6364fbda0a73851c6df43850882cdb88c99972bd5f4320c7ccce119",
+          "tailwindTheme": "692f09de8c9144a00a982946870d83b40827601d5ab40132c6671b6bfcc5fab0",
+          "tokensJson": "d5432a20905d94db74d78be0ad7ffadb4db049f8cecd0e000df95f2e97408ee8",
+          "designIrTokens": "43959972b7aec88d82c3ce7cd45e25ac615b40d18ad2218ea0a97fad5a3fc768",
+          "routeGraph": "c48c23afce94b1809e9cd55f28e44cc00b2053afd6eac286f1c8de7422c87524",
+          "pageMedia": "3b1bc8f514e80c1fb35271aef0d51f7db302e9bdafe1a8f86b04ac59cf9467c4",
+          "manifest": "a1a759f9dbcc6c167ea0083d96dbe894f02f66dc7517831f373365c44552a58e",
+          "bindings": "f742baa5a852a02b5d6fbc4248c7e06d7d7392b15f9a4c1eae9a3291acf9d91f",
+          "resourcePack": "3c403717eb622a2c6b639fb17a872775ab78f7703c39a9360557473a0c088280",
+          "resourceArtifacts": "07728a3e07dbc0ab32cddaf9de6bc43e717787373aed42ca63989ccdcd270398",
+          "provenance": "6202180bc4a83002424011eff9465c45665e85f85262b5d706bec9ac07bed478",
+          "reviewDocument": "820fbfa8d93b92d841afb30158cd68195d9a3c8a53eee186239af4ef3554cd38"
+        }
+      },
+      {
+        "candidateId": "suite-3",
+        "designSystemId": "design-3",
+        "resourcePackId": "resource-pack-3",
+        "status": "ready",
+        "routes": [
+          "/",
+          "/trips/:tripId/decisions",
+          "/trips/:tripId/itinerary",
+          "/trips/:tripId/map",
+          "/trips/:tripId/budget",
+          "/trips/:tripId/tasks",
+          "/trips/:tripId/confirm"
+        ],
+        "routeCount": 7,
+        "pageCount": 7,
+        "resourceAssetCount": 8,
+        "artifactCount": 8,
+        "qualityReviewStatus": "recorded",
+        "digests": {
+          "designSystemImage": "f52d75d2988bdba6e1e4305b0b7805eaa78c23ae313b014b3badd98548543568",
+          "designMarkdown": "cc52e41955e59ef53307c1d4908def41a0fa66fd990dcc65548e84b2ce08d3be",
+          "cssVariables": "d7ce7afd5ecc9491635141cf2c7958a959bbe91347710bdaed37dd66f5c52204",
+          "tailwindTheme": "3878461cdd2a87101bb06667ce76d76573547bab25a699c7b2729afe25e3eaf8",
+          "tokensJson": "ebbac4d1076fea974963dd5689b0c727add475e7934f3affc6fc04748cd38cb2",
+          "designIrTokens": "4925e3e83c8e78b8ca707b743f7f7bb591e536c304baf2cb4a78cdcaed7774a1",
+          "routeGraph": "1682d24763c16db4b54ce2aad1f80c1562e4c57c8f0bc13c39afea7b69103822",
+          "pageMedia": "7f5cb39c3c8078e7cc740c5358c89c68dda19b0a3cb60ea57b29032f9c9d61aa",
+          "manifest": "68342e4f7136bbac47c7c96c31ceb011e723e123330dfdb0480ba800d05f3b39",
+          "bindings": "8d4e728b596c3837c44f0d73d34975706230e3c1e2db07c928a3965284fe98ef",
+          "resourcePack": "7710659b44116ba4fd89de7e66aca3efd864a8b6fe84b3bae8c44c8260060bd5",
+          "resourceArtifacts": "cbae2e1190c23a9c53f98d5efe98a9bb6aaa181cb2c75da59aaa73422f638a97",
+          "provenance": "71096d0414ad7e7f1e5ff44c328adc0d58a62f59b2fb6eb0e4ce2cbea3b0cccc",
+          "reviewDocument": "2f5631ec6804aefcb18864b172a8296ba286b4f300445fa4136cce2f1e433959"
+        }
+      }
+    ],
+    "selectedSuiteId": "suite-2",
+    "selectedVisibleSliceCount": 8,
+    "plannedImageCallCount": 50,
+    "imageCallCount": 50
+  },
+  "completedAt": 1785613790643
+}

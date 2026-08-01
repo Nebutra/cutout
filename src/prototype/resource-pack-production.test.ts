@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   emptyAssetProductionSnapshot,
   reduceAssetProduction,
+  sha256Bytes,
   type AssetProductionSnapshot,
 } from '@/asset-production'
 import { compileAssetProductionPlan } from '@/asset-production/planner'
@@ -9,6 +10,7 @@ import type { PersistedPrototypeResourcePack } from '@/workspace/workspace-snaps
 import {
   resolveResourcePackProductionRun,
   selectResourcePackProductionAuthority,
+  verifyResourcePackProductionArtifacts,
 } from './resource-pack-production'
 
 describe('prototype resource-pack production authority', () => {
@@ -54,6 +56,45 @@ describe('prototype resource-pack production authority', () => {
     expect(selectResourcePackProductionAuthority(second, legacyPack).activeRunId)
       .toBe('run:second')
   })
+
+  it('verifies every bound artifact against its completed task and stored bytes', async () => {
+    const bytes = new Uint8Array([1, 2, 3, 4])
+    const digest = await sha256Bytes(bytes)
+    const snapshot = await completedRun(
+      'run:first',
+      'artifact:first',
+      1,
+      emptyAssetProductionSnapshot(),
+      digest,
+    )
+    const pack = resourcePack('run:first', 'artifact:first', 'asset:run:first')
+    const verified = await verifyResourcePackProductionArtifacts({
+      snapshot,
+      resourcePack: pack,
+      resolveArtifact: async (id) => ({ id, mediaType: 'image/png', bytes }),
+    })
+
+    expect(verified).toEqual([expect.objectContaining({
+      manifestItemId: 'asset:run:first',
+      artifactId: 'artifact:first',
+      sha256: digest,
+      byteLength: 4,
+    })])
+    await expect(verifyResourcePackProductionArtifacts({
+      snapshot,
+      resourcePack: pack,
+      resolveArtifact: async (id) => ({
+        id,
+        mediaType: 'image/png',
+        bytes: new Uint8Array([9]),
+      }),
+    })).rejects.toThrow(/digest verification/i)
+    await expect(verifyResourcePackProductionArtifacts({
+      snapshot,
+      resourcePack: pack,
+      resolveArtifact: async () => null,
+    })).rejects.toThrow(/bytes are unavailable/i)
+  })
 })
 
 async function completedRun(
@@ -61,6 +102,7 @@ async function completedRun(
   artifactId: string,
   at: number,
   initial: AssetProductionSnapshot = emptyAssetProductionSnapshot(),
+  sha256Override?: string,
 ): Promise<AssetProductionSnapshot> {
   const plan = await compileAssetProductionPlan({
     sourceRevision: { projectRevisionId: `revision:${runId}`, pageArtifacts: [] },
@@ -76,7 +118,7 @@ async function completedRun(
   const taskId = plan.tasks[0]!.taskId
   const artifact = {
     artifactId,
-    sha256: (artifactId.endsWith('first') ? 'a' : 'b').repeat(64),
+    sha256: sha256Override ?? (artifactId.endsWith('first') ? 'a' : 'b').repeat(64),
     mediaType: 'image/png',
     width: 100,
     height: 80,
@@ -106,13 +148,17 @@ async function completedRun(
   return reduceAssetProduction(snapshot, { type: 'run-finalized', runId, at: at + 8 })
 }
 
-function resourcePack(runId: string, artifactId: string): PersistedPrototypeResourcePack {
+function resourcePack(
+  runId: string,
+  artifactId: string,
+  manifestItemId = 'asset:hero',
+): PersistedPrototypeResourcePack {
   return {
     id: `resource-pack:${runId}`,
     manifest: { version: 'asset-manifest.v0', product: 'Test', pages: [], assets: [] },
     manifestProvenanceId: 'provenance:manifest',
     assets: [{
-      manifestItemId: 'asset:hero',
+      manifestItemId,
       artifactId,
       provenanceIds: ['provenance:artifact'],
     }],

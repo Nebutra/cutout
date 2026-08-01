@@ -1,0 +1,4 @@
+{"file":".trellis/spec/frontend/prototype-generation.md","reason":"Verify full-candidate delivery, missing-frontier retry, dynamic counts, paid-call parity, and selected-suite authority."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Apply repository quality gates and require evidence-backed completion rather than count-only success."}
+{"file":".trellis/spec/frontend/type-safety.md","reason":"Check strict bounded protocol types, exhaustive estimate states, and fail-closed parsing."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Audit the complete data flow from persisted artifact through DOM evidence and Rust terminal files."}
