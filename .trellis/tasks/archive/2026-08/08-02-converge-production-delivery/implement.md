@@ -102,12 +102,13 @@ git diff --check
 
 ## 7. Integrate and release
 
-- [ ] Update the executable prototype-generation spec with the new delivery,
+- [x] Update the executable prototype-generation spec with the new delivery,
       progress, scheduling, and terminal-state contracts.
-- [ ] Commit the clean worktree, merge directly to `main`, push, publish the
+- [x] Commit the clean worktree, merge to protected `main` through the required
+      PR quality gate, push, publish the
       next signed/notarized updater release, uninstall the previous local app,
       install the new app, and verify its version/signature/notarization.
-- [ ] Preserve the dirty primary worktree and do not include unrelated files.
+- [x] Preserve the dirty primary worktree and do not include unrelated files.
 
 Rollback point: do not merge or publish until Step 6 proves the full real
 outcome. A packaged failure remains a release blocker, not a test waiver.
