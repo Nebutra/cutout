@@ -47,6 +47,41 @@ function selectPrototypeDesignSystemCandidate(
   candidateId: string,
   actor: { readonly kind: 'human' | 'agent'; readonly id: string },
 ): PrototypeDesignSystemCandidateSet
+
+function verifyResourcePackProductionArtifacts(input: {
+  readonly snapshot: AssetProductionSnapshot
+  readonly resourcePack: PersistedPrototypeResourcePack
+  readonly resolveArtifact: (artifactId: string) => Promise<{
+    readonly id: string
+    readonly mediaType: string
+    readonly bytes: Uint8Array
+  } | null>
+}): Promise<readonly VerifiedResourcePackArtifact[]>
+
+function projectPrototypeDeliveryEvidence(
+  candidateSet: PersistedPrototypeSuiteCandidateSet,
+  verifiedResourceArtifacts: Readonly<
+    Record<string, readonly VerifiedResourcePackArtifact[]>
+  >,
+): Promise<readonly PrototypeDeliveryEvidence[]>
+
+function updatePrototypeDeliveryObservation(input: {
+  readonly previous?: PrototypeDeliveryObservation
+  readonly update: Partial<Pick<PrototypeDeliveryObservation,
+    | 'completedPages'
+    | 'totalPages'
+    | 'completedResources'
+    | 'totalResources'
+    | 'retryPreservedNodes'
+  >>
+  readonly at: number
+}): PrototypeDeliveryObservation
+
+function projectPrototypeDeliveryProgress(input: {
+  readonly status: 'planned' | 'generating' | 'ready' | 'failed' | 'cancelled'
+  readonly observation?: PrototypeDeliveryObservation
+  readonly now: number
+}): PrototypeDeliveryProgress
 ```
 
 ## 3. Contracts
@@ -111,6 +146,10 @@ function selectPrototypeDesignSystemCandidate(
   the persisted plan and exact selected artifact, does not append a duplicate
   user intent, and sends only the selected bytes plus selected `DESIGN.md` to
   page generation and Asset Production.
+- Complete-suite production schedules the selected Design System direction
+  first, then continues every sibling to final fidelity. A failed candidate is
+  isolated: it records its candidate-local page/resource frontier while later
+  siblings continue, and it never cancels independent promised deliveries.
 - A retry after a transient prototype-suite failure is also a bounded
   continuation. It bypasses the already-settled intent gate, ignores any
   incidental material selection left by completed siblings, retains ready
@@ -143,6 +182,27 @@ function selectPrototypeDesignSystemCandidate(
   selection acknowledgement, then resolves the bounded `suite-N` projection
   before matching resource counts or emitting terminal evidence. It must never
   compare a runtime candidate id directly with a sanitized suite id.
+- Terminal packaged success requires one sanitized delivery record for every
+  promised suite. Each record uses bounded ordinal Design System, suite, and
+  distinct resource-pack IDs; exact route/page/artifact counts; explicit
+  `recorded` review status; and lowercase SHA-256 digests for Design System
+  media/Markdown, deterministic token projections, route/page media, manifest,
+  exact bindings, resource-pack identity, verified bound resource media,
+  provenance, and review document. Bound resource media is re-read from the
+  local content-addressed store and checked against its completed production
+  task digest; binding ids alone are not delivery proof.
+  Missing or malformed evidence rejects success without exposing runtime IDs,
+  prompts, Provider payloads, credentials, paths, or image bytes.
+- Production progress is a derived, non-persisted projection of monotonic
+  page/resource observations. It distinguishes completed, active, queued,
+  failed, and retry-preserved nodes. Remaining time is `unavailable` until the
+  graph is measurable, `collecting` until at least two real completions span a
+  positive interval, then a conservative bounded range; ready and failed
+  candidates never show a precise ETA.
+- Packaged `progress.json` is terminal state, not a running-only heartbeat.
+  Completion validates first, installs terminal progress before the matching
+  result, and returns only when status and merged phases agree. Late native or
+  WebKit checkpoints cannot reopen `passed` or `failed` progress.
 - Selecting or auto-restoring a completed prototype suite must also select the
   completed Asset Production run named by its `resource-pack:<run-id>` binding.
   Page, material-status, slice, export-readiness, and packaged evidence
@@ -188,6 +248,11 @@ function selectPrototypeDesignSystemCandidate(
 | One board region fails with a retryable Provider error | expose Retry, retain ready pages/tasks, and retry only that logical region |
 | Retry starts a new same-plan production run | supersede the prior `partial` authority to `cancelled`, then carry only consumable matching tasks |
 | Planned and actual packaged image-call counts differ | fail the terminal E2E outcome; do not hide replay or retry amplification |
+| One complete-suite candidate fails | retain its local frontier and continue every independent sibling |
+| Delivery proof omits a review/token/topology/binding/resource-media/provenance digest | reject packaged terminal success |
+| Delivery records reuse a resource-pack identity | reject packaged terminal success |
+| Fewer than two timed logical completions exist | show `collecting`, never a precise ETA |
+| A checkpoint arrives after terminal completion | preserve terminal progress status and phases |
 
 ## 5. Good / Base / Bad Cases
 
@@ -209,6 +274,18 @@ function selectPrototypeDesignSystemCandidate(
   unnecessary comparison step.
 - Bad: three provider calls reuse the same prompt and random seed variance is
   presented as three authored directions.
+- Good: the selected direction completes first, a later suite fails after three
+  pages, independent siblings remain ready, and Retry resumes at the fourth
+  page before producing that suite's remaining resource artifacts.
+- Base: every candidate completes without Retry; the same evidence verifier
+  still re-reads each bound resource artifact and closes all candidates before
+  terminal success.
+- Bad: a resource pack contains plausible binding IDs, but its local object was
+  deleted or changed; counts still match, yet delivery is reported as complete
+  without reading or hashing the bytes.
+- Bad: progress computes a single completion timestamp from the first node or
+  regresses after Retry, giving users false precision about a graph that is not
+  yet measurable.
 
 ## 6. Tests Required
 
@@ -261,6 +338,17 @@ function selectPrototypeDesignSystemCandidate(
   control, then assert the old run is `cancelled`, three suite runs complete,
   page call ids are unchanged, exactly one board logical node has a second
   attempt, and dynamically compiled planned calls equal actual calls.
+- Delivery-evidence regressions: require every candidate's Design System/token,
+  route/page, manifest/binding, resource-pack, verified resource-media,
+  provenance, and review digests;
+  reject missing fields, malformed digests, duplicate pack identities, and
+  private/generated keys in both driver and native validators.
+- Progress regressions: require monotonic logical counts, retry-preserved
+  frontiers, every estimate state, conservative ordered ranges, and terminal
+  estimates that are unavailable rather than falsely precise.
+- Terminal packaged regressions: result and progress close with identical
+  terminal status/phases, late checkpoints remain ignored, and a failed result
+  install restores prior progress or removes newly installed progress.
 
 ## 7. Wrong vs Correct
 
@@ -291,6 +379,22 @@ await generatePrototypePageSet({
 const pageDesignContext = isValidDesignMarkdown(designSystem.designMarkdown)
   ? designSystem.designMarkdown
   : preSynthesisContext
+```
+
+```ts
+// Wrong: binding identity and matching counts are treated as byte delivery.
+const evidence = projectPrototypeDeliveryEvidence(candidateSet, {})
+
+// Correct: bind the completed production run, re-read every local object, and
+// verify media type plus SHA-256 before projecting sanitized evidence.
+const verified = await verifyResourcePackProductionArtifacts({
+  snapshot,
+  resourcePack,
+  resolveArtifact,
+})
+const evidence = await projectPrototypeDeliveryEvidence(candidateSet, {
+  [candidateId]: verified,
+})
 ```
 
 ```ts

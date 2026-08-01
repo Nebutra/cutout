@@ -28,8 +28,31 @@ export interface PackagedE2eCandidateOutcome {
 
 export interface PackagedE2eSuiteOutcome extends PackagedE2eCandidateOutcome {
   readonly designSystemId: string
+  readonly resourcePackId: string
   readonly routes: readonly string[]
+  readonly routeCount: number
+  readonly pageCount: number
   readonly resourceAssetCount: number
+  readonly artifactCount: number
+  readonly qualityReviewStatus: 'recorded'
+  readonly digests: PackagedE2eDeliveryDigests
+}
+
+export interface PackagedE2eDeliveryDigests {
+  readonly designSystemImage: string
+  readonly designMarkdown: string
+  readonly cssVariables: string
+  readonly tailwindTheme: string
+  readonly tokensJson: string
+  readonly designIrTokens: string
+  readonly routeGraph: string
+  readonly pageMedia: string
+  readonly manifest: string
+  readonly bindings: string
+  readonly resourcePack: string
+  readonly resourceArtifacts: string
+  readonly provenance: string
+  readonly reviewDocument: string
 }
 
 export interface PackagedE2eOutcome {
@@ -268,6 +291,7 @@ export async function runPackagedE2e(): Promise<void> {
       return numberData(workspace, 'prototypeSuiteCount') === 3
         && numberData(workspace, 'prototypeSuiteReadyCount') === 3
         && numberData(workspace, 'resourcePackCount') === 3
+        && hasCompleteDeliveryEvidence(workspace)
         && workspace.dataset.agentWorking === 'false'
     }, PACKAGED_E2E_ALL_SUITES_TIMEOUT_MS)
     await pass('prototype-suite-ready')
@@ -509,10 +533,12 @@ export function collectPackagedE2eOutcome(workspace: HTMLElement): PackagedE2eOu
   const prototypeSuites = readSuites(workspace)
   const designSystemIds = new Set(designSystems.map(({ candidateId }) => candidateId))
   const boundDesignSystemIds = new Set(prototypeSuites.map(({ designSystemId }) => designSystemId))
+  const resourcePackIds = new Set(prototypeSuites.map(({ resourcePackId }) => resourcePackId))
   const routeGraphs = new Set(prototypeSuites.map((suite) => JSON.stringify(suite.routes)))
   if (
     routeGraphs.size !== 3
     || boundDesignSystemIds.size !== 3
+    || resourcePackIds.size !== 3
     || ![...boundDesignSystemIds].every((id) => designSystemIds.has(id))
   ) {
     throw outcomeFailure()
@@ -553,6 +579,14 @@ export function collectPackagedE2eOutcome(workspace: HTMLElement): PackagedE2eOu
   }
 }
 
+export function hasCompleteDeliveryEvidence(workspace: HTMLElement): boolean {
+  try {
+    return readSuites(workspace).length === numberData(workspace, 'prototypeSuiteCount')
+  } catch {
+    return false
+  }
+}
+
 export function readWorkspaceSelectedSuiteId(
   workspace: HTMLElement | null,
 ): string | undefined {
@@ -588,7 +622,7 @@ function readCandidates(
 }
 
 function readSuites(workspace: HTMLElement): readonly PackagedE2eSuiteOutcome[] {
-  const parsed = readJsonArray(workspace, 'packagedE2ePrototypeSuites')
+  const parsed = readJsonArray(workspace, 'packagedE2eDeliveryEvidence', 32_768)
   if (parsed.length !== 3) throw outcomeFailure()
   const suites = parsed.map((value) => {
     if (
@@ -596,31 +630,55 @@ function readSuites(workspace: HTMLElement): readonly PackagedE2eSuiteOutcome[] 
       || !hasOnlyKeys(value, [
         'candidateId',
         'designSystemId',
+        'resourcePackId',
         'status',
         'routes',
+        'routeCount',
+        'pageCount',
         'resourceAssetCount',
+        'artifactCount',
+        'qualityReviewStatus',
+        'digests',
       ])
       || !isOpaqueCandidateId(value.candidateId, 'suite')
       || !isOpaqueCandidateId(value.designSystemId, 'design')
+      || !isOpaqueResourcePackId(value.resourcePackId)
       || value.status !== 'ready'
+      || value.qualityReviewStatus !== 'recorded'
       || typeof value.resourceAssetCount !== 'number'
       || !Number.isSafeInteger(value.resourceAssetCount)
+      || typeof value.artifactCount !== 'number'
+      || !Number.isSafeInteger(value.artifactCount)
+      || typeof value.routeCount !== 'number'
+      || !Number.isSafeInteger(value.routeCount)
+      || typeof value.pageCount !== 'number'
+      || !Number.isSafeInteger(value.pageCount)
       || !Array.isArray(value.routes)
       || value.routes.length < 1
       || value.routes.length > 12
       || value.resourceAssetCount < 1
       || value.resourceAssetCount > 4096
+      || value.artifactCount !== value.resourceAssetCount
+      || value.routeCount !== value.routes.length
+      || value.pageCount !== value.routes.length
       || !value.routes.every(isBoundedRoute)
       || new Set(value.routes).size !== value.routes.length
+      || !isDeliveryDigests(value.digests)
     ) {
       throw outcomeFailure()
     }
     return {
       candidateId: value.candidateId,
       designSystemId: value.designSystemId,
+      resourcePackId: value.resourcePackId,
       status: 'ready' as const,
       routes: value.routes,
+      routeCount: value.routeCount,
+      pageCount: value.pageCount,
       resourceAssetCount: value.resourceAssetCount,
+      artifactCount: value.artifactCount,
+      qualityReviewStatus: 'recorded' as const,
+      digests: value.digests,
     }
   })
   if (new Set(suites.map(({ candidateId }) => candidateId)).size !== 3) {
@@ -629,9 +687,13 @@ function readSuites(workspace: HTMLElement): readonly PackagedE2eSuiteOutcome[] 
   return suites
 }
 
-function readJsonArray(workspace: HTMLElement, key: keyof DOMStringMap): readonly unknown[] {
+function readJsonArray(
+  workspace: HTMLElement,
+  key: keyof DOMStringMap,
+  maximumLength = 8192,
+): readonly unknown[] {
   const encoded = workspace.dataset[key]
-  if (!encoded || encoded.length > 8192) throw outcomeFailure()
+  if (!encoded || encoded.length > maximumLength) throw outcomeFailure()
   try {
     const parsed: unknown = JSON.parse(encoded)
     if (!Array.isArray(parsed)) throw outcomeFailure()
@@ -656,6 +718,32 @@ function readCount(
 
 function isOpaqueCandidateId(value: unknown, prefix: 'design' | 'suite'): value is string {
   return typeof value === 'string' && new RegExp(`^${prefix}-[1-3]$`).test(value)
+}
+
+function isOpaqueResourcePackId(value: unknown): value is string {
+  return typeof value === 'string' && /^resource-pack-[1-3]$/.test(value)
+}
+
+function isDeliveryDigests(value: unknown): value is PackagedE2eDeliveryDigests {
+  const keys = [
+    'designSystemImage',
+    'designMarkdown',
+    'cssVariables',
+    'tailwindTheme',
+    'tokensJson',
+    'designIrTokens',
+    'routeGraph',
+    'pageMedia',
+    'manifest',
+    'bindings',
+    'resourcePack',
+    'resourceArtifacts',
+    'provenance',
+    'reviewDocument',
+  ] as const
+  return isRecord(value)
+    && hasOnlyKeys(value, keys)
+    && keys.every((key) => typeof value[key] === 'string' && /^[a-f0-9]{64}$/.test(value[key]))
 }
 
 function isBoundedRoute(value: unknown): value is string {

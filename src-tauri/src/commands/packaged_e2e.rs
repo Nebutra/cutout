@@ -1,4 +1,8 @@
-use std::{collections::HashSet, path::PathBuf};
+use std::{
+    collections::HashSet,
+    path::{Path, PathBuf},
+    sync::{Mutex, OnceLock},
+};
 
 use serde::{Deserialize, Serialize};
 
@@ -109,21 +113,46 @@ pub struct PackagedE2eCandidateOutcome {
 pub struct PackagedE2eSuiteOutcome {
     candidate_id: String,
     design_system_id: String,
+    resource_pack_id: String,
     status: String,
     routes: Vec<String>,
+    route_count: u32,
+    page_count: u32,
     resource_asset_count: u32,
+    artifact_count: u32,
+    quality_review_status: String,
+    digests: PackagedE2eDeliveryDigests,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct PackagedE2eDeliveryDigests {
+    design_system_image: String,
+    design_markdown: String,
+    css_variables: String,
+    tailwind_theme: String,
+    tokens_json: String,
+    design_ir_tokens: String,
+    route_graph: String,
+    page_media: String,
+    manifest: String,
+    bindings: String,
+    resource_pack: String,
+    resource_artifacts: String,
+    provenance: String,
+    review_document: String,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct PackagedE2eProgress {
+    protocol: String,
+    status: String,
+    phases: Vec<PackagedE2ePhase>,
 }
 
 pub fn enabled() -> bool {
     cfg!(feature = "packaged-e2e") && std::env::var("CUTOUT_PACKAGED_E2E").as_deref() == Ok("1")
-}
-
-fn result_path() -> PathBuf {
-    result_root().join("result.json")
-}
-
-fn progress_path() -> PathBuf {
-    result_root().join("progress.json")
 }
 
 fn result_root() -> PathBuf {
@@ -152,25 +181,32 @@ fn merge_phases(
     merged
 }
 
-fn read_progress_phases() -> Vec<PackagedE2ePhase> {
-    let Ok(bytes) = std::fs::read(progress_path()) else {
-        return Vec::new();
-    };
-    let Ok(value) = serde_json::from_slice::<serde_json::Value>(&bytes) else {
-        return Vec::new();
-    };
-    serde_json::from_value(value.get("phases").cloned().unwrap_or_default()).unwrap_or_default()
+fn read_progress_at(root: &Path) -> Option<PackagedE2eProgress> {
+    let bytes = std::fs::read(root.join("progress.json")).ok()?;
+    serde_json::from_slice(&bytes).ok()
 }
 
-fn write_progress(phases: &[PackagedE2ePhase]) -> Result<(), String> {
+fn read_progress() -> Option<PackagedE2eProgress> {
+    read_progress_at(&result_root())
+}
+
+fn progress_lock() -> &'static Mutex<()> {
+    static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+    LOCK.get_or_init(|| Mutex::new(()))
+}
+
+fn write_progress_at(root: &Path, status: &str, phases: &[PackagedE2ePhase]) -> Result<(), String> {
+    if !matches!(status, "running" | "passed" | "failed") {
+        return Err("packaged-e2e-result-invalid".into());
+    }
     validate_phases(phases)?;
-    let path = progress_path();
+    let path = root.join("progress.json");
     let parent = path.parent().ok_or("packaged-e2e-result-invalid")?;
     std::fs::create_dir_all(parent).map_err(|_| "packaged-e2e-write-failed")?;
     let temporary = path.with_extension(format!("json.{}.tmp", std::process::id()));
     let bytes = serde_json::to_vec_pretty(&serde_json::json!({
         "protocol": RESULT_PROTOCOL,
-        "status": "running",
+        "status": status,
         "phases": phases,
     }))
     .map_err(|_| "packaged-e2e-result-invalid")?;
@@ -179,18 +215,38 @@ fn write_progress(phases: &[PackagedE2ePhase]) -> Result<(), String> {
     Ok(())
 }
 
+fn write_checkpoint_at(root: &Path, phases: Vec<PackagedE2ePhase>) -> Result<(), String> {
+    let _guard = progress_lock()
+        .lock()
+        .map_err(|_| "packaged-e2e-write-failed")?;
+    let progress = read_progress_at(root);
+    if progress
+        .as_ref()
+        .is_some_and(|value| value.status != "running")
+    {
+        return Ok(());
+    }
+    write_progress_at(
+        root,
+        "running",
+        &merge_phases(
+            progress.map(|value| value.phases).unwrap_or_default(),
+            phases,
+        ),
+    )
+}
+
 pub fn native_checkpoint(id: &str) {
     if !enabled() {
         return;
     }
-    let phases = merge_phases(
-        read_progress_phases(),
+    let _ = write_checkpoint_at(
+        &result_root(),
         vec![PackagedE2ePhase {
             id: id.into(),
             status: "passed".into(),
         }],
     );
-    let _ = write_progress(&phases);
 }
 
 fn validate_phases(phases: &[PackagedE2ePhase]) -> Result<(), String> {
@@ -276,16 +332,24 @@ fn validate_outcome(outcome: &PackagedE2eOutcome) -> Result<(), String> {
 
     let mut suite_ids = HashSet::new();
     let mut bound_design_ids = HashSet::new();
+    let mut resource_pack_ids = HashSet::new();
     let mut route_graphs = HashSet::new();
     for suite in &outcome.prototype_suites {
         if suite.status != "ready"
             || !is_opaque_candidate_id(&suite.candidate_id, "suite")
             || !is_opaque_candidate_id(&suite.design_system_id, "design")
+            || !is_opaque_resource_pack_id(&suite.resource_pack_id)
             || !suite_ids.insert(suite.candidate_id.as_str())
             || !design_ids.contains(suite.design_system_id.as_str())
             || !bound_design_ids.insert(suite.design_system_id.as_str())
+            || !resource_pack_ids.insert(suite.resource_pack_id.as_str())
             || !(1..=12).contains(&suite.routes.len())
             || !(1..=4096).contains(&suite.resource_asset_count)
+            || suite.route_count as usize != suite.routes.len()
+            || suite.page_count as usize != suite.routes.len()
+            || suite.artifact_count != suite.resource_asset_count
+            || suite.quality_review_status != "recorded"
+            || !valid_delivery_digests(&suite.digests)
         {
             return Err("packaged-e2e-outcome-invalid".into());
         }
@@ -325,6 +389,39 @@ fn is_opaque_candidate_id(value: &str, prefix: &str) -> bool {
         .is_some_and(|ordinal| matches!(ordinal, "1" | "2" | "3"))
 }
 
+fn is_opaque_resource_pack_id(value: &str) -> bool {
+    matches!(
+        value,
+        "resource-pack-1" | "resource-pack-2" | "resource-pack-3"
+    )
+}
+
+fn valid_delivery_digests(digests: &PackagedE2eDeliveryDigests) -> bool {
+    [
+        &digests.design_system_image,
+        &digests.design_markdown,
+        &digests.css_variables,
+        &digests.tailwind_theme,
+        &digests.tokens_json,
+        &digests.design_ir_tokens,
+        &digests.route_graph,
+        &digests.page_media,
+        &digests.manifest,
+        &digests.bindings,
+        &digests.resource_pack,
+        &digests.resource_artifacts,
+        &digests.provenance,
+        &digests.review_document,
+    ]
+    .into_iter()
+    .all(|value| {
+        value.len() == 64
+            && value
+                .bytes()
+                .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
+    })
+}
+
 fn is_bounded_route(value: &str) -> bool {
     !value.is_empty()
         && value.len() <= 256
@@ -353,7 +450,7 @@ pub async fn packaged_e2e_checkpoint(phases: Vec<PackagedE2ePhase>) -> Result<()
     if !enabled() {
         return Err("packaged-e2e-disabled".into());
     }
-    write_progress(&merge_phases(read_progress_phases(), phases))
+    write_checkpoint_at(&result_root(), phases)
 }
 
 #[tauri::command]
@@ -361,21 +458,76 @@ pub async fn packaged_e2e_complete(mut result: PackagedE2eResult) -> Result<(), 
     if !enabled() {
         return Err("packaged-e2e-disabled".into());
     }
-    result.phases = merge_phases(read_progress_phases(), result.phases);
+    let _guard = progress_lock()
+        .lock()
+        .map_err(|_| "packaged-e2e-write-failed")?;
+    result.phases = merge_phases(
+        read_progress()
+            .map(|value| value.phases)
+            .unwrap_or_default(),
+        result.phases,
+    );
     validate(&result)?;
-    let path = result_path();
-    let parent = path.parent().ok_or("packaged-e2e-result-invalid")?;
-    std::fs::create_dir_all(parent).map_err(|_| "packaged-e2e-write-failed")?;
-    let temporary = path.with_extension(format!("json.{}.tmp", std::process::id()));
-    let bytes = serde_json::to_vec_pretty(&result).map_err(|_| "packaged-e2e-result-invalid")?;
-    std::fs::write(&temporary, bytes).map_err(|_| "packaged-e2e-write-failed")?;
-    std::fs::rename(&temporary, path).map_err(|_| "packaged-e2e-write-failed")?;
+    write_terminal_result_at(&result_root(), &result)
+}
+
+fn write_terminal_result_at(root: &Path, result: &PackagedE2eResult) -> Result<(), String> {
+    validate(result)?;
+    std::fs::create_dir_all(root).map_err(|_| "packaged-e2e-write-failed")?;
+    let result_path = root.join("result.json");
+    let progress_path = root.join("progress.json");
+    let result_temporary = root.join(format!("result.json.{}.tmp", std::process::id()));
+    let progress_temporary = root.join(format!("progress.json.{}.tmp", std::process::id()));
+    let prior_progress = std::fs::read(&progress_path).ok();
+    let result_bytes =
+        serde_json::to_vec_pretty(result).map_err(|_| "packaged-e2e-result-invalid")?;
+    let progress_bytes = serde_json::to_vec_pretty(&PackagedE2eProgress {
+        protocol: RESULT_PROTOCOL.into(),
+        status: result.status.clone(),
+        phases: result.phases.clone(),
+    })
+    .map_err(|_| "packaged-e2e-result-invalid")?;
+    std::fs::write(&result_temporary, result_bytes).map_err(|_| "packaged-e2e-write-failed")?;
+    std::fs::write(&progress_temporary, progress_bytes).map_err(|_| "packaged-e2e-write-failed")?;
+    std::fs::rename(&progress_temporary, &progress_path)
+        .map_err(|_| "packaged-e2e-write-failed")?;
+    if std::fs::rename(&result_temporary, &result_path).is_err() {
+        if let Some(bytes) = prior_progress {
+            let restore = root.join(format!("progress.json.{}.restore", std::process::id()));
+            let _ = std::fs::write(&restore, bytes);
+            let _ = std::fs::rename(restore, progress_path);
+        } else {
+            let _ = std::fs::remove_file(progress_path);
+        }
+        let _ = std::fs::remove_file(result_temporary);
+        return Err("packaged-e2e-write-failed".into());
+    }
     Ok(())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn valid_digests() -> PackagedE2eDeliveryDigests {
+        let digest = "a".repeat(64);
+        PackagedE2eDeliveryDigests {
+            design_system_image: digest.clone(),
+            design_markdown: digest.clone(),
+            css_variables: digest.clone(),
+            tailwind_theme: digest.clone(),
+            tokens_json: digest.clone(),
+            design_ir_tokens: digest.clone(),
+            route_graph: digest.clone(),
+            page_media: digest.clone(),
+            manifest: digest.clone(),
+            bindings: digest.clone(),
+            resource_pack: digest.clone(),
+            resource_artifacts: digest.clone(),
+            provenance: digest.clone(),
+            review_document: digest,
+        }
+    }
 
     fn valid_outcome() -> PackagedE2eOutcome {
         PackagedE2eOutcome {
@@ -392,11 +544,17 @@ mod tests {
                     |(suite_index, (route_count, resource_count))| PackagedE2eSuiteOutcome {
                         candidate_id: format!("suite-{}", suite_index + 1),
                         design_system_id: format!("design-{}", suite_index + 1),
+                        resource_pack_id: format!("resource-pack-{}", suite_index + 1),
                         status: "ready".into(),
                         routes: (1..=route_count)
                             .map(|route| format!("/suite-{}/route-{route}", suite_index + 1))
                             .collect(),
+                        route_count,
+                        page_count: route_count,
                         resource_asset_count: resource_count,
+                        artifact_count: resource_count,
+                        quality_review_status: "recorded".into(),
+                        digests: valid_digests(),
                     },
                 )
                 .collect(),
@@ -478,6 +636,22 @@ mod tests {
     }
 
     #[test]
+    fn rejects_duplicate_resource_pack_identities_and_malformed_digests() {
+        let mut duplicate = valid_result();
+        duplicate.outcome.as_mut().unwrap().prototype_suites[2].resource_pack_id =
+            "resource-pack-1".into();
+        assert!(validate(&duplicate).is_err());
+
+        for digest in ["A".repeat(64), "g".repeat(64), "a".repeat(63)] {
+            let mut malformed = valid_result();
+            malformed.outcome.as_mut().unwrap().prototype_suites[0]
+                .digests
+                .design_system_image = digest;
+            assert!(validate(&malformed).is_err());
+        }
+    }
+
+    #[test]
     fn rejects_unbounded_identity_slice_and_image_call_evidence() {
         let mut identity = valid_result();
         identity.outcome.as_mut().unwrap().design_systems[0].candidate_id =
@@ -522,6 +696,78 @@ mod tests {
         });
         failed.outcome = None;
         assert!(validate(&failed).is_ok());
+    }
+
+    #[test]
+    fn terminal_write_closes_result_and_progress_with_identical_status_and_phases() {
+        let root = tempfile::tempdir().unwrap();
+        write_progress_at(
+            root.path(),
+            "running",
+            &[PackagedE2ePhase {
+                id: "bootstrap".into(),
+                status: "passed".into(),
+            }],
+        )
+        .unwrap();
+
+        let mut result = valid_result();
+        result.phases = merge_phases(read_progress_at(root.path()).unwrap().phases, result.phases);
+        write_terminal_result_at(root.path(), &result).unwrap();
+
+        let result_value: serde_json::Value =
+            serde_json::from_slice(&std::fs::read(root.path().join("result.json")).unwrap())
+                .unwrap();
+        let progress_value: serde_json::Value =
+            serde_json::from_slice(&std::fs::read(root.path().join("progress.json")).unwrap())
+                .unwrap();
+        assert_eq!(result_value["status"], progress_value["status"]);
+        assert_eq!(result_value["phases"], progress_value["phases"]);
+        assert_eq!(progress_value["status"], "passed");
+    }
+
+    #[test]
+    fn terminal_progress_is_not_reopened_by_late_checkpoints() {
+        let root = tempfile::tempdir().unwrap();
+        let result = valid_result();
+        write_terminal_result_at(root.path(), &result).unwrap();
+        write_checkpoint_at(
+            root.path(),
+            vec![PackagedE2ePhase {
+                id: "late-webkit-callback".into(),
+                status: "passed".into(),
+            }],
+        )
+        .unwrap();
+        let progress = read_progress_at(root.path()).unwrap();
+        assert_eq!(progress.status, "passed");
+        assert_ne!(progress.status, "running");
+        assert!(!progress
+            .phases
+            .iter()
+            .any(|phase| phase.id == "late-webkit-callback"));
+    }
+
+    #[test]
+    fn failed_result_install_restores_or_removes_terminal_progress() {
+        let root = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(root.path().join("result.json")).unwrap();
+        write_progress_at(
+            root.path(),
+            "running",
+            &[PackagedE2ePhase {
+                id: "bootstrap".into(),
+                status: "passed".into(),
+            }],
+        )
+        .unwrap();
+
+        assert!(write_terminal_result_at(root.path(), &valid_result()).is_err());
+        assert_eq!(read_progress_at(root.path()).unwrap().status, "running");
+
+        std::fs::remove_file(root.path().join("progress.json")).unwrap();
+        assert!(write_terminal_result_at(root.path(), &valid_result()).is_err());
+        assert!(!root.path().join("progress.json").exists());
     }
 
     #[test]
