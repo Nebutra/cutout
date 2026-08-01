@@ -700,15 +700,9 @@ mod tests {
 
     #[test]
     fn terminal_write_closes_result_and_progress_with_identical_status_and_phases() {
-        let root = std::env::temp_dir().join(format!(
-            "cutout-packaged-e2e-terminal-{}-{}",
-            std::process::id(),
-            std::thread::current().name().unwrap_or("test"),
-        ));
-        let _ = std::fs::remove_dir_all(&root);
-        std::fs::create_dir_all(&root).unwrap();
+        let root = tempfile::tempdir().unwrap();
         write_progress_at(
-            &root,
+            root.path(),
             "running",
             &[PackagedE2ePhase {
                 id: "bootstrap".into(),
@@ -718,56 +712,48 @@ mod tests {
         .unwrap();
 
         let mut result = valid_result();
-        result.phases = merge_phases(read_progress_at(&root).unwrap().phases, result.phases);
-        write_terminal_result_at(&root, &result).unwrap();
+        result.phases = merge_phases(read_progress_at(root.path()).unwrap().phases, result.phases);
+        write_terminal_result_at(root.path(), &result).unwrap();
 
         let result_value: serde_json::Value =
-            serde_json::from_slice(&std::fs::read(root.join("result.json")).unwrap()).unwrap();
+            serde_json::from_slice(&std::fs::read(root.path().join("result.json")).unwrap())
+                .unwrap();
         let progress_value: serde_json::Value =
-            serde_json::from_slice(&std::fs::read(root.join("progress.json")).unwrap()).unwrap();
+            serde_json::from_slice(&std::fs::read(root.path().join("progress.json")).unwrap())
+                .unwrap();
         assert_eq!(result_value["status"], progress_value["status"]);
         assert_eq!(result_value["phases"], progress_value["phases"]);
         assert_eq!(progress_value["status"], "passed");
-        let _ = std::fs::remove_dir_all(root);
     }
 
     #[test]
     fn terminal_progress_is_not_reopened_by_late_checkpoints() {
-        let root = std::env::temp_dir()
-            .join(format!("cutout-packaged-e2e-sticky-{}", std::process::id(),));
-        let _ = std::fs::remove_dir_all(&root);
-        std::fs::create_dir_all(&root).unwrap();
+        let root = tempfile::tempdir().unwrap();
         let result = valid_result();
-        write_terminal_result_at(&root, &result).unwrap();
+        write_terminal_result_at(root.path(), &result).unwrap();
         write_checkpoint_at(
-            &root,
+            root.path(),
             vec![PackagedE2ePhase {
                 id: "late-webkit-callback".into(),
                 status: "passed".into(),
             }],
         )
         .unwrap();
-        let progress = read_progress_at(&root).unwrap();
+        let progress = read_progress_at(root.path()).unwrap();
         assert_eq!(progress.status, "passed");
         assert_ne!(progress.status, "running");
         assert!(!progress
             .phases
             .iter()
             .any(|phase| phase.id == "late-webkit-callback"));
-        let _ = std::fs::remove_dir_all(root);
     }
 
     #[test]
     fn failed_result_install_restores_or_removes_terminal_progress() {
-        let root = std::env::temp_dir().join(format!(
-            "cutout-packaged-e2e-terminal-rollback-{}-{}",
-            std::process::id(),
-            std::thread::current().name().unwrap_or("test"),
-        ));
-        let _ = std::fs::remove_dir_all(&root);
-        std::fs::create_dir_all(root.join("result.json")).unwrap();
+        let root = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(root.path().join("result.json")).unwrap();
         write_progress_at(
-            &root,
+            root.path(),
             "running",
             &[PackagedE2ePhase {
                 id: "bootstrap".into(),
@@ -776,13 +762,12 @@ mod tests {
         )
         .unwrap();
 
-        assert!(write_terminal_result_at(&root, &valid_result()).is_err());
-        assert_eq!(read_progress_at(&root).unwrap().status, "running");
+        assert!(write_terminal_result_at(root.path(), &valid_result()).is_err());
+        assert_eq!(read_progress_at(root.path()).unwrap().status, "running");
 
-        std::fs::remove_file(root.join("progress.json")).unwrap();
-        assert!(write_terminal_result_at(&root, &valid_result()).is_err());
-        assert!(!root.join("progress.json").exists());
-        let _ = std::fs::remove_dir_all(root);
+        std::fs::remove_file(root.path().join("progress.json")).unwrap();
+        assert!(write_terminal_result_at(root.path(), &valid_result()).is_err());
+        assert!(!root.path().join("progress.json").exists());
     }
 
     #[test]
