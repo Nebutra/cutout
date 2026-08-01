@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.14 - 2026-08-02
+
+- Deliver the user-selected Design System direction first while continuing every sibling to complete, independently verifiable fidelity.
+- Preserve candidate-local page and resource frontiers across Retry so transient Provider failures replay only missing work and never cancel ready siblings.
+- Add honest per-suite progress and bounded remaining-time states without fixed page or material quotas.
+- Require terminal packaged evidence for Design System projections, route/page media, resource-pack bindings, re-read artifact bytes, provenance, and review documents, with matching terminal result and progress status.
+
 ## 0.1.13 - 2026-07-31
 
 - Deliver three complete, comparable Design System and prototype-suite directions with Agent-authored route topology, useful non-UI material scope, and independently attributable resource packs.
