@@ -1,6 +1,7 @@
-import { forEachConcurrent } from '@/lib/async-pool'
+import { createAsyncLimiter, forEachConcurrent } from '@/lib/async-pool'
 
 export type PrototypePageGenerationMode = 'serial' | 'anchor-parallel'
+export type PrototypePageReviewMode = 'inline' | 'overlap'
 
 /**
  * Generate a complete ordered page set while keeping one stable visual anchor.
@@ -23,6 +24,11 @@ export async function generatePrototypePageSet<
     page: Page,
     predecessor: Artifact | undefined,
   ) => Promise<Artifact>
+  /** Observational work for newly generated artifacts; reused pages are not reviewed again. */
+  readonly review?: (artifact: Artifact) => Promise<void>
+  /** Inline protects a shared Provider quota; overlap uses an independent bounded review lane. */
+  readonly reviewMode?: PrototypePageReviewMode
+  readonly reviewConcurrency?: number
   readonly onProgress?: (artifacts: readonly Artifact[]) => void
 }): Promise<Artifact[]> {
   if (input.pages.length === 0) throw new Error('The prototype plan has no pages.')
@@ -41,41 +47,73 @@ export async function generatePrototypePageSet<
     .map((page) => results.get(page.id))
     .filter((artifact): artifact is Artifact => Boolean(artifact))
 
-  const publish = (page: Page, artifact: Artifact): void => {
+  const pendingReviews: Promise<void>[] = []
+  const reviewLimiter = createAsyncLimiter(input.reviewConcurrency ?? input.concurrency)
+  let overlappingReviewFailed = false
+  let overlappingReviewFailure: unknown
+
+  const queueOverlappingReview = (artifact: Artifact): void => {
+    const review = input.review
+    if (!review) return
+    pendingReviews.push(
+      reviewLimiter(() => review(artifact)).catch((error: unknown) => {
+        if (!overlappingReviewFailed) {
+          overlappingReviewFailed = true
+          overlappingReviewFailure = error
+        }
+      }),
+    )
+  }
+
+  const publish = async (page: Page, artifact: Artifact): Promise<void> => {
     if (artifact.page.id !== page.id) {
       throw new Error(
         `Prototype generator returned page "${artifact.page.id}" for planned page "${page.id}".`,
       )
     }
+    const reviewMode = input.reviewMode ?? 'inline'
+    if (input.review && reviewMode === 'inline') await input.review(artifact)
     results.set(page.id, artifact)
     input.onProgress?.(ordered())
+    if (reviewMode === 'overlap') queueOverlappingReview(artifact)
   }
 
-  if (input.mode === 'serial') {
-    let predecessor: Artifact | undefined
-    for (const page of input.pages) {
-      const existing = results.get(page.id)
-      if (existing) {
-        predecessor = existing
-        continue
+  let generationFailed = false
+  let generationFailure: unknown
+  try {
+    if (input.mode === 'serial') {
+      let predecessor: Artifact | undefined
+      for (const page of input.pages) {
+        const existing = results.get(page.id)
+        if (existing) {
+          predecessor = existing
+          continue
+        }
+        const artifact = await input.generate(page, predecessor)
+        await publish(page, artifact)
+        predecessor = artifact
       }
-      const artifact = await input.generate(page, predecessor)
-      publish(page, artifact)
-      predecessor = artifact
+    } else {
+      const anchorPage = input.pages[0]!
+      let anchor = results.get(anchorPage.id)
+      if (!anchor) {
+        anchor = await input.generate(anchorPage, undefined)
+        await publish(anchorPage, anchor)
+      }
+      const missing = input.pages.slice(1).filter((page) => !results.has(page.id))
+      await forEachConcurrent(missing, input.concurrency, async (page) => {
+        const artifact = await input.generate(page, anchor)
+        await publish(page, artifact)
+      })
     }
-  } else {
-    const anchorPage = input.pages[0]!
-    let anchor = results.get(anchorPage.id)
-    if (!anchor) {
-      anchor = await input.generate(anchorPage, undefined)
-      publish(anchorPage, anchor)
-    }
-    const missing = input.pages.slice(1).filter((page) => !results.has(page.id))
-    await forEachConcurrent(missing, input.concurrency, async (page) => {
-      const artifact = await input.generate(page, anchor)
-      publish(page, artifact)
-    })
+  } catch (error) {
+    generationFailed = true
+    generationFailure = error
   }
+
+  await Promise.all(pendingReviews)
+  if (generationFailed) throw generationFailure
+  if (overlappingReviewFailed) throw overlappingReviewFailure
 
   const artifacts = ordered()
   if (artifacts.length !== input.pages.length) {

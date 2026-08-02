@@ -29,6 +29,9 @@ function generatePrototypePageSet<Page, Artifact>(input: {
   readonly mode: 'serial' | 'anchor-parallel'
   readonly concurrency: number
   readonly generate: (page: Page, anchor?: Artifact) => Promise<Artifact>
+  readonly review?: (artifact: Artifact) => Promise<void>
+  readonly reviewMode?: 'inline' | 'overlap'
+  readonly reviewConcurrency?: number
   readonly onProgress?: (artifacts: readonly Artifact[]) => void
 }): Promise<Artifact[]>
 
@@ -122,6 +125,13 @@ function projectPrototypeDeliveryProgress(input: {
 - `anchor-parallel` generates or reuses the first planned page before bounded
   parallel generation. Every later page receives the same design-system
   reference and the same first-page visual anchor.
+- A newly generated page enters observational Vision QA exactly once. When the
+  locked image and QA assignments use distinct provider identities, page image
+  generation and QA use separate bounded lanes: anchor bytes unblock later
+  images immediately, but page-set completion still joins every queued review.
+  When both assignments share a provider identity, review stays inline so the
+  shared Provider quota is not amplified. Recovered pages are never reviewed
+  again merely because a continuation reuses them.
 - Each page prompt contains the complete Agent-authored route and flow contract.
 - Page generation consumes the completed design-system artifact through two
   coordinated channels: `designSystem.bytes` is the immutable visual identity

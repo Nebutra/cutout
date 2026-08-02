@@ -1,0 +1,4 @@
+{"file":".trellis/spec/frontend/prototype-generation.md","reason":"Verify dynamic scope, bounded lanes, exact closure, retry, and no paid-call amplification."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Apply repository test and dependency quality expectations."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Audit scheduling contract through workspace wiring and packaged evidence."}
+{"file":".trellis/tasks/08-02-converge-production-next/research/run-041-critical-path.md","reason":"Check the implementation against the observed bottleneck rather than synthetic throughput alone."}
