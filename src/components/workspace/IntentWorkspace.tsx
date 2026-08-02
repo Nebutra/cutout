@@ -284,6 +284,7 @@ import { cn } from "@/lib/utils";
 const PROTOTYPE_QA_ENABLED = true;
 const PROTOTYPE_QA_MAX_RETRIES = 0;
 const PROTOTYPE_GENERATION_CONCURRENCY = 3;
+const PROTOTYPE_QA_CONCURRENCY = 3;
 const PROTOTYPE_BOARD_PAGE_CONCURRENCY = 3;
 const PROTOTYPE_BOARD_GROUP_CONCURRENCY_PER_PAGE = 1;
 import {
@@ -4421,13 +4422,14 @@ export function IntentWorkspace({
       existingArtifacts: existingPages,
       mode: "serial",
       concurrency: PROTOTYPE_GENERATION_CONCURRENCY,
+      reviewMode: image.providerId === chat.providerId ? "inline" : "overlap",
+      reviewConcurrency: PROTOTYPE_QA_CONCURRENCY,
       generate: async (page, predecessor) => {
         agentRunCoordinatorRef.current.checkpoint(lease);
         const artifact = await generatePrototypePage(
           plan,
           page,
           image,
-          chat,
           [
             designSystem.bytes,
             ...(materialReference ? [materialReference] : []),
@@ -4440,6 +4442,7 @@ export function IntentWorkspace({
         agentRunCoordinatorRef.current.checkpoint(lease);
         return artifact;
       },
+      review: (artifact) => reviewPrototypePage(plan, artifact, chat, lease),
       onProgress: (artifacts) => {
         setPrototypePages(artifacts);
         if (suiteRunId) {
@@ -4476,13 +4479,14 @@ export function IntentWorkspace({
       existingArtifacts: existingPages,
       mode: "anchor-parallel",
       concurrency: PROTOTYPE_GENERATION_CONCURRENCY,
+      reviewMode: image.providerId === chat.providerId ? "inline" : "overlap",
+      reviewConcurrency: PROTOTYPE_QA_CONCURRENCY,
       generate: async (page, anchor) => {
         agentRunCoordinatorRef.current.checkpoint(lease);
         const artifact = await generatePrototypePage(
           plan,
           page,
           image,
-          chat,
           [
             designSystem.bytes,
             ...(materialReference ? [materialReference] : []),
@@ -4495,6 +4499,7 @@ export function IntentWorkspace({
         agentRunCoordinatorRef.current.checkpoint(lease);
         return artifact;
       },
+      review: (artifact) => reviewPrototypePage(plan, artifact, chat, lease),
       onProgress: (artifacts) => {
         setPrototypePages(artifacts);
         if (suiteRunId) {
@@ -4518,7 +4523,6 @@ export function IntentWorkspace({
     plan: PrototypePlan,
     page: PrototypePage,
     image: ModelAssignment,
-    chat: ModelAssignment,
     referenceImages: readonly Uint8Array[],
     designMarkdown: string | undefined,
     lease: AgentRunLease,
@@ -4540,63 +4544,51 @@ export function IntentWorkspace({
     // generated an unconditioned variant and refined it in a second image call,
     // while the outer QA loop could repeat both. A reference edit is faster and
     // actually consumes the selected Design System and anchor page.
-    let lastAsset: { readonly bytes: Uint8Array; readonly mediaType: string } | null = null;
-    let attemptCount = 0;
-    const generatePage = async (prompt: string): Promise<Uint8Array> => {
-      attemptCount += 1;
-      const artifacts = await invokeDesktopImageTool({
-        capability: useReferenceEdit ? "edit-image" : "generate-image",
-        runId,
-        toolCallId: [
-          "tool",
-          lease.id,
-          suiteRunId ?? "suite",
-          "prototype-page",
-          page.id,
-          `attempt-${attemptCount}`,
-        ].join(":"),
-        logicalNodeId: `prototype-page:${suiteRunId ?? "suite"}:${page.id}`,
-        label: `Generate ${page.name} page`,
-        prompt,
-        image,
-        references: useReferenceEdit ? referenceImages : [],
-        lease,
-      });
-      agentRunCoordinatorRef.current.checkpoint(lease);
-      const asset = artifacts[0] ?? null;
-      if (!asset) throw new Error(`No image returned for ${page.name}.`);
-      lastAsset = asset;
-      return asset.bytes;
-    };
+    const artifacts = await invokeDesktopImageTool({
+      capability: useReferenceEdit ? "edit-image" : "generate-image",
+      runId,
+      toolCallId: [
+        "tool",
+        lease.id,
+        suiteRunId ?? "suite",
+        "prototype-page",
+        page.id,
+        "attempt-1",
+      ].join(":"),
+      logicalNodeId: `prototype-page:${suiteRunId ?? "suite"}:${page.id}`,
+      label: `Generate ${page.name} page`,
+      prompt: basePrompt,
+      image,
+      references: useReferenceEdit ? referenceImages : [],
+      lease,
+    });
+    agentRunCoordinatorRef.current.checkpoint(lease);
+    const asset = artifacts[0] ?? null;
+    if (!asset) throw new Error(`No image returned for ${page.name}.`);
+    return assetToPageArtifact(page, asset);
+  }
 
-    if (PROTOTYPE_QA_ENABLED) {
-      // QA records a verdict without silently issuing another paid image call.
-      const checklist = buildPageChecklist(plan, page);
-      await generateWithQa({
-        basePrompt,
-        generate: generatePage,
-        review: (bytes, signal) =>
-          reviewGeneratedImage(
-            personalizedGenerationRef.current,
-            chat,
-            bytes,
-            checklist,
-            signal,
-            (message) => console.info("[Cutout] page QA review failed:", page.id, message),
-          ),
-        maxRetries: PROTOTYPE_QA_MAX_RETRIES,
-        onVerdict: (attempt, verdict) => {
-          if (!verdict.pass) {
-            console.info("[Cutout] page QA rejected:", page.id, attempt, verdict.failures);
-          }
-        },
-        signal: lease.controller.signal,
-      });
-    } else {
-      await generatePage(basePrompt);
+  async function reviewPrototypePage(
+    plan: PrototypePlan,
+    artifact: PrototypePageArtifact,
+    chat: ModelAssignment,
+    lease: AgentRunLease,
+  ): Promise<void> {
+    if (!PROTOTYPE_QA_ENABLED) return;
+    agentRunCoordinatorRef.current.checkpoint(lease);
+    const verdict = await reviewGeneratedImage(
+      personalizedGenerationRef.current,
+      chat,
+      artifact.bytes,
+      buildPageChecklist(plan, artifact.page),
+      lease.controller.signal,
+      (message) =>
+        console.info("[Cutout] page QA review failed:", artifact.page.id, message),
+    );
+    agentRunCoordinatorRef.current.checkpoint(lease);
+    if (!verdict.pass) {
+      console.info("[Cutout] page QA rejected:", artifact.page.id, 1, verdict.failures);
     }
-    if (!lastAsset) throw new Error(`No image returned for ${page.name}.`);
-    return assetToPageArtifact(page, lastAsset);
   }
 
   async function invokeDesktopImageTool(input: {

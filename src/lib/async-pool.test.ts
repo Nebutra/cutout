@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { forEachConcurrent } from './async-pool'
+import { createAsyncLimiter, forEachConcurrent } from './async-pool'
 
 describe('forEachConcurrent', () => {
   it('bounds active work while visiting every item once', async () => {
@@ -57,5 +57,58 @@ describe('forEachConcurrent', () => {
     await expect(pending).rejects.toThrow('first failed')
     expect(secondFinished).toBe(true)
     expect(visited).toEqual([1, 2])
+  })
+})
+
+describe('createAsyncLimiter', () => {
+  it('bounds active work and preserves every result', async () => {
+    const limit = createAsyncLimiter(2)
+    let active = 0
+    let maximum = 0
+
+    const results = await Promise.all([1, 2, 3, 4, 5].map((value) =>
+      limit(async () => {
+        active += 1
+        maximum = Math.max(maximum, active)
+        await Promise.resolve()
+        active -= 1
+        return value * 2
+      }),
+    ))
+
+    expect(maximum).toBe(2)
+    expect(results).toEqual([2, 4, 6, 8, 10])
+  })
+
+  it('normalizes invalid and sub-one widths to one', async () => {
+    for (const width of [Number.NaN, 0, -3]) {
+      const limit = createAsyncLimiter(width)
+      let active = 0
+      let maximum = 0
+      await Promise.all([1, 2].map(() => limit(async () => {
+        active += 1
+        maximum = Math.max(maximum, active)
+        await Promise.resolve()
+        active -= 1
+      })))
+      expect(maximum).toBe(1)
+    }
+  })
+
+  it('releases a rejected slot and continues draining queued work', async () => {
+    const limit = createAsyncLimiter(1)
+    const visited: string[] = []
+    const failed = limit(async () => {
+      visited.push('failed')
+      throw new Error('lane failed')
+    })
+    const recovered = limit(async () => {
+      visited.push('recovered')
+      return 42
+    })
+
+    await expect(failed).rejects.toThrow('lane failed')
+    await expect(recovered).resolves.toBe(42)
+    expect(visited).toEqual(['failed', 'recovered'])
   })
 })

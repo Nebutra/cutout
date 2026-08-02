@@ -14,9 +14,15 @@ describe('prototype production throughput wiring', () => {
     const pageGeneration = workspaceSource.slice(start, end)
 
     expect(workspaceSource).toContain('const PROTOTYPE_QA_MAX_RETRIES = 0')
+    expect(workspaceSource).toContain('const PROTOTYPE_QA_CONCURRENCY = 3')
     expect(pageGeneration).toContain('capability: useReferenceEdit ? "edit-image" : "generate-image"')
     expect(pageGeneration).toContain('references: useReferenceEdit ? referenceImages : []')
+    expect(pageGeneration).not.toContain('generateWithQa')
+    expect(pageGeneration).toContain('const verdict = await reviewGeneratedImage(')
+    expect(pageGeneration).toContain('lease.controller.signal')
     expect(pageGeneration).not.toContain('visualRuntime.execute')
+    expect(workspaceSource).toContain('reviewMode: image.providerId === chat.providerId ? "inline" : "overlap"')
+    expect(workspaceSource).toContain('reviewConcurrency: PROTOTYPE_QA_CONCURRENCY')
   })
 
   it('bounds board context and produces pages concurrently without a text-free paid prepass', () => {
