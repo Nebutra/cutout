@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Download, RefreshCw, RotateCcw } from "lucide-react";
+import { BookOpen, Download, RefreshCw, RotateCcw } from "lucide-react";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -9,12 +9,20 @@ import {
 } from "@/updater/service";
 import type { UpdateState } from "@/updater";
 import { startUpdateAutoCheckScheduler } from "@/updater/auto-check-scheduler";
+import {
+  resolveUpdateReleaseNotes,
+  selectLocalizedReleaseNotes,
+  type ReleaseNotesView,
+} from "@/updater/release-notes";
+import type { LocalizedReleaseNotes } from "@/updater/contracts";
 
 export function UpdatesSection(props: {
   readonly prepareRecoverySnapshot: () => Promise<boolean>;
   readonly controller?: DesktopUpdateController;
+  readonly currentReleaseNotes?: LocalizedReleaseNotes;
+  readonly onOpenReleaseNotes?: (note: ReleaseNotesView, restoreFocusTo: HTMLElement) => void;
 }) {
-  const { t } = useLingui();
+  const { t, i18n } = useLingui();
   const controller = useMemo(
     () =>
       props.controller ??
@@ -31,6 +39,12 @@ export function UpdatesSection(props: {
     useState(false);
   const [notificationPermissionDenied, setNotificationPermissionDenied] =
     useState(false);
+  const availableReleaseNotes = state.release
+    ? resolveUpdateReleaseNotes(state.release, i18n.locale)
+    : undefined;
+  const currentReleaseNotes = props.currentReleaseNotes
+    ? selectLocalizedReleaseNotes(props.currentReleaseNotes, i18n.locale)
+    : undefined;
   useEffect(() => {
     let disposed = false;
     let stopAutoCheckScheduler: (() => void) | undefined;
@@ -125,6 +139,35 @@ export function UpdatesSection(props: {
           <Trans id="settings.updates.check_now">Check now</Trans>
         </Button>
       </div>
+      <div className="mt-3 flex items-center justify-between gap-3 border-t border-border pt-3">
+        <div className="min-w-0">
+          <p className="text-xs font-medium">
+            <Trans id="settings.updates.whats_new">What's New</Trans>
+          </p>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            {currentReleaseNotes ? (
+              t({
+                id: "settings.updates.whats_new_hint",
+                message: `Review the highlights for Cutout ${currentReleaseNotes.version}.`,
+              })
+            ) : (
+              <Trans id="settings.updates.whats_new_unavailable">
+                No release notes are available for this version.
+              </Trans>
+            )}
+          </p>
+        </div>
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={!currentReleaseNotes || !props.onOpenReleaseNotes}
+          onClick={(event) => currentReleaseNotes
+            && props.onOpenReleaseNotes?.(currentReleaseNotes, event.currentTarget)}
+        >
+          <BookOpen />
+          <Trans id="settings.updates.open_whats_new">Open</Trans>
+        </Button>
+      </div>
       <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
         {visibleChannels.length > 1 ? (
           <div
@@ -205,8 +248,38 @@ export function UpdatesSection(props: {
       >
         {statusText}
       </div>
-      {state.release?.notes ? (
-        <p className="mt-2 whitespace-pre-wrap text-xs">{state.release.notes}</p>
+      {availableReleaseNotes ? (
+        <div className="mt-3 border-t border-border pt-3">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-xs font-medium">
+                {availableReleaseNotes.headline ?? (
+                  <Trans id="settings.updates.release_details">Release details</Trans>
+                )}
+              </p>
+              <ul className="mt-2 space-y-1.5 text-xs text-muted-foreground">
+                {availableReleaseNotes.highlights.slice(0, 3).map((highlight) => (
+                  <li key={highlight.id} className="flex gap-2">
+                    <span aria-hidden="true" className="mt-[0.4rem] size-1 shrink-0 rounded-full bg-current" />
+                    <span className="min-w-0">
+                      {highlight.title ? `${highlight.title}: ` : null}
+                      {highlight.body}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <Button
+              size="sm"
+              variant="ghost"
+              disabled={!props.onOpenReleaseNotes}
+              onClick={(event) => props.onOpenReleaseNotes?.(availableReleaseNotes, event.currentTarget)}
+            >
+              <BookOpen />
+              <Trans id="settings.updates.view_release_details">Details</Trans>
+            </Button>
+          </div>
+        </div>
       ) : null}
       {state.phase === "downloading" ? (
         <div className="mt-2">

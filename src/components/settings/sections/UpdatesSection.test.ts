@@ -34,4 +34,12 @@ describe("Updates settings contract", () => {
     expect(source).toContain("startUpdateAutoCheckScheduler(controller)");
     expect(source).not.toContain("window.setTimeout");
   });
+
+  it("keeps current notes permanently discoverable and previews typed available notes", () => {
+    expect(source).toContain("selectLocalizedReleaseNotes(props.currentReleaseNotes");
+    expect(source).toContain("resolveUpdateReleaseNotes(state.release");
+    expect(source).toContain("props.onOpenReleaseNotes?.(currentReleaseNotes, event.currentTarget)");
+    expect(source).toContain("props.onOpenReleaseNotes?.(availableReleaseNotes, event.currentTarget)");
+    expect(source).not.toContain("state.release?.notes ?");
+  });
 });

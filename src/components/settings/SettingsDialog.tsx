@@ -26,6 +26,8 @@ import { SpeechSection } from './sections/SpeechSection'
 import { UpdatesSupportSection } from './sections/UpdatesSupportSection'
 import type { DesktopUpdateController } from '@/updater/service'
 import { focusSettingsTarget, type SettingsTarget } from './settings-ui'
+import type { LocalizedReleaseNotes } from '@/updater/contracts'
+import type { ReleaseNotesView } from '@/updater/release-notes'
 
 interface SettingsDialogProps {
   readonly open: boolean
@@ -37,6 +39,8 @@ interface SettingsDialogProps {
   readonly prepareUpdateRecoverySnapshot?: () => Promise<boolean>
   readonly updateController?: DesktopUpdateController
   readonly target?: SettingsTarget
+  readonly currentReleaseNotes?: LocalizedReleaseNotes
+  readonly onOpenReleaseNotes?: (note: ReleaseNotesView, restoreFocusTo: HTMLElement) => void
 }
 
 export function SettingsDialog({
@@ -49,6 +53,8 @@ export function SettingsDialog({
   prepareUpdateRecoverySnapshot = async () => true,
   updateController,
   target,
+  currentReleaseNotes,
+  onOpenReleaseNotes,
 }: SettingsDialogProps) {
   const [section, setSection] = useState<SettingsSection>(target?.section??initialSection)
   const archivedCount = projects.filter((project) => project.archivedAt).length
@@ -90,7 +96,12 @@ export function SettingsDialog({
                 onDeleteProject={onDeleteProject}
               />
             ) : section === 'updates-support' ? (
-              <UpdatesSupportSection prepareRecoverySnapshot={prepareUpdateRecoverySnapshot} updateController={updateController} />
+              <UpdatesSupportSection
+                prepareRecoverySnapshot={prepareUpdateRecoverySnapshot}
+                updateController={updateController}
+                currentReleaseNotes={currentReleaseNotes}
+                onOpenReleaseNotes={onOpenReleaseNotes}
+              />
             ) : (
               <AiSection />
             )}

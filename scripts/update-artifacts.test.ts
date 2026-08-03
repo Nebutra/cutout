@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { buildReleaseDocuments, checkUpdate, sha256, validateUpdateManifest } from './lib/update-artifacts.mjs'
+import { loadReleaseNotesCatalog, projectReleaseNotesEntry, requireReleaseNotesEntry } from './lib/release-notes.mjs'
 
 const servers: ReturnType<typeof createServer>[] = []
 afterEach(async () => { await Promise.all(servers.splice(0).map((server) => new Promise<void>((resolve) => server.close(() => resolve())))) })
@@ -64,6 +65,31 @@ describe('signed update artifact policy', () => {
     expect(generated).not.toHaveProperty('rollout')
     expect(generated).not.toHaveProperty('rollback')
     expect(generated.metadata.artifact.sha256).toBe(sha256(value.artifact))
+  })
+
+  it('derives readable legacy and structured updater notes from one reviewed entry', async () => {
+    const value = fixture('0.1.16')
+    const catalog = await loadReleaseNotesCatalog(undefined, { requireAllLocales: true })
+    const releaseNotes = projectReleaseNotesEntry(requireReleaseNotesEntry(catalog, '0.1.16'))
+    const generated = buildReleaseDocuments({ channel: 'stable', version: '0.1.16', publishedAt: '2026-08-03T00:00:00.000Z', artifactUrl: 'https://releases.example.test/Cutout.app.tar.gz', signature: value.signature, signatureFile: 'Cutout.app.tar.gz.sig', artifactDigest: sha256(value.artifact), allowedHosts: ['releases.example.test'], releaseNotes })
+    expect(generated.manifest.notes).toContain('Release highlights in your language')
+    expect(generated.manifest.notes).not.toContain('cutout.release-notes')
+    expect(generated.manifest.cutoutReleaseNotes).toEqual(releaseNotes)
+    expect(() => validateUpdateManifest(generated.manifest, { requireReleaseNotes: true, expectedReleaseNotes: releaseNotes, allowedHosts: ['releases.example.test'] })).not.toThrow()
+  })
+
+  it('keeps old manifests valid but rejects missing, mismatched, or malformed required projections', async () => {
+    const legacy = fixture().manifest
+    expect(() => validateUpdateManifest(legacy)).not.toThrow()
+    expect(() => validateUpdateManifest(legacy, { requireReleaseNotes: true })).toThrow('requires reviewed')
+    const catalog = await loadReleaseNotesCatalog()
+    const releaseNotes = projectReleaseNotesEntry(requireReleaseNotesEntry(catalog, '0.1.16'))
+    const mismatched = { ...fixture('0.1.17').manifest, cutoutReleaseNotes: releaseNotes }
+    expect(() => validateUpdateManifest(mismatched)).toThrow('does not match')
+    const unreadable = { ...fixture('0.1.16').manifest, cutoutReleaseNotes: releaseNotes, notes: JSON.stringify(releaseNotes) }
+    expect(() => validateUpdateManifest(unreadable)).toThrow('reviewed English')
+    const malformed = { ...fixture('0.1.16').manifest, cutoutReleaseNotes: { ...releaseNotes, remoteUrl: 'https://example.test/notes' } }
+    expect(() => validateUpdateManifest(malformed)).toThrow('unknown field')
   })
 
   it('emits every built platform in the manifest and enumerates them in supply-chain metadata', () => {
@@ -128,6 +154,19 @@ describe('signed update artifact policy', () => {
     await expect(readFile(join(directory, 'rollback.json'), 'utf8')).rejects.toThrow()
     const manifest = JSON.parse(await readFile(join(directory, 'latest.json'), 'utf8'))
     expect(() => validateUpdateManifest(manifest, { expectedSignature: value.signature, allowedHosts: ['releases.example.test'] })).not.toThrow()
+  })
+
+  it('generates catalog-backed updater metadata through the production CLI', async () => {
+    const value = fixture('0.1.16'), root = await mkdtemp(join(tmpdir(), 'cutout-update-notes-')), artifact = join(root, 'Cutout.app.tar.gz')
+    await writeFile(artifact, value.artifact); await writeFile(`${artifact}.sig`, value.signature)
+    const result = spawnSync(process.execPath, ['scripts/update-artifacts.mjs', 'generate', '--artifact', artifact, '--version', '0.1.16', '--channel', 'stable', '--artifact-url', 'https://releases.example.test/Cutout.app.tar.gz', '--allowed-hosts', 'releases.example.test', '--release-notes-catalog', 'src/release-notes/catalog.json', '--require-all-locales', '--output', join(root, 'out')], { cwd: process.cwd(), encoding: 'utf8' })
+    expect(result.status, result.stderr).toBe(0)
+    const manifestPath = join(root, 'out', 'stable', 'latest.json')
+    const manifest = JSON.parse(await readFile(manifestPath, 'utf8'))
+    expect(manifest.notes).toMatch(/^Know what changed/m)
+    expect(manifest.cutoutReleaseNotes).toMatchObject({ protocol: 'cutout.release-notes.v1', version: '0.1.16' })
+    const validate = spawnSync(process.execPath, ['scripts/update-artifacts.mjs', 'validate', '--manifest', manifestPath, '--allowed-hosts', 'releases.example.test', '--release-notes-catalog', 'src/release-notes/catalog.json', '--require-release-notes', '--require-all-locales'], { cwd: process.cwd(), encoding: 'utf8' })
+    expect(validate.status, validate.stderr).toBe(0)
   })
 
   it.each(['--rollout', '--previous-version', '--previous-manifest-url'])('rejects unsupported release policy flag %s', (flag) => {

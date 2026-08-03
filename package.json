@@ -18,6 +18,8 @@
     "test:adapters": "vitest run scripts/cutout-adapters.test.ts",
     "test:integration-smoke": "vitest run scripts/integration-smoke.test.ts src/production-readiness/runtime.test.ts",
     "test:update-artifacts": "vitest run scripts/update-artifacts.test.ts",
+    "release-notes:validate": "node scripts/release-notes.mjs validate",
+    "release-notes:render": "node scripts/release-notes.mjs render",
     "update:generate": "node scripts/update-artifacts.mjs generate",
     "update:validate": "node scripts/update-artifacts.mjs validate",
     "integration:smoke": "node scripts/integration-smoke.mjs",

@@ -40,6 +40,69 @@ describe('desktop updater service', () => {
     expect(controller.getState().capability?.currentVersion).toBe('3.4.5')
   })
 
+  it('maps the native localized release-note projection without parsing raw updater data', async () => {
+    runtime.check.mockResolvedValueOnce({
+      phase: 'available',
+      downloadedBytes: 0,
+      availableVersion: '0.1.16',
+      releaseNotes: 'Readable English fallback.',
+      localizedReleaseNotes: {
+        protocol: 'cutout.release-notes.v1',
+        version: '0.1.16',
+        releasedOn: '2026-08-03',
+        locales: {
+          en: {
+            headline: 'Know what changed',
+            highlights: [{ id: 'details', title: 'Review details', body: 'Read before installing.' }],
+          },
+        },
+      },
+    })
+    const controller = createDesktopUpdateOrchestrator({
+      prepareRecoverySnapshot: async () => true,
+      storage: { getItem: () => null, setItem: () => {} },
+      getAppVersion: async () => '0.1.15',
+    })
+    await controller.initialize()
+    await controller.check()
+    expect(controller.getState().release).toMatchObject({
+      version: '0.1.16',
+      notes: 'Readable English fallback.',
+      localizedNotes: { version: '0.1.16', locales: { en: { headline: 'Know what changed' } } },
+    })
+  })
+
+  it('drops an invalid native localized projection without hiding the English fallback', async () => {
+    runtime.check.mockResolvedValueOnce({
+      phase: 'available',
+      downloadedBytes: 0,
+      availableVersion: '0.1.16',
+      releaseNotes: 'Readable English fallback.',
+      localizedReleaseNotes: {
+        protocol: 'cutout.release-notes.v1',
+        version: '0.1.16',
+        releasedOn: '2026-08-03',
+        locales: {
+          en: {
+            headline: 'Know what changed',
+            highlights: [{ id: 'details', title: 'Review details', body: '<strong>unsafe</strong>' }],
+          },
+        },
+      },
+    })
+    const controller = createDesktopUpdateOrchestrator({
+      prepareRecoverySnapshot: async () => true,
+      storage: { getItem: () => null, setItem: () => {} },
+      getAppVersion: async () => '0.1.15',
+    })
+    await controller.initialize()
+    await controller.check()
+    expect(controller.getState().release).toEqual({
+      version: '0.1.16',
+      notes: 'Readable English fallback.',
+    })
+  })
+
   it('uses native capability to expose configured channels', async () => {
     runtime.getStatus.mockResolvedValueOnce({
       phase: 'idle',

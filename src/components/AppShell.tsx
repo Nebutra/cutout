@@ -114,6 +114,17 @@ import { projectDurableHostEvents } from "@/agent-host/run-event-projection";
 import { createRunEventStore } from "@/agent-runtime/run-events";
 import { createDesktopUpdateOrchestrator } from "@/updater/service";
 import { startUpdateAutoCheckScheduler } from "@/updater/auto-check-scheduler";
+import { readPersistedUpdateNotificationVersion } from "@/updater/update-notifications";
+import {
+  BUNDLED_CURRENT_RELEASE_NOTES,
+  dismissReleaseNotes,
+  initializeReleaseNotesLifecycle,
+  selectLocalizedReleaseNotes,
+  type ReleaseNotesView,
+} from "@/updater/release-notes";
+import { PRODUCT_VERSION } from "@/product-version";
+import { WhatsNewDialog } from "@/components/release-notes/WhatsNewDialog";
+import { useLingui } from "@lingui/react/macro";
 import {
   Dialog,
   DialogContent,
@@ -312,6 +323,7 @@ function projectShellReducer(
 }
 
 export function AppShell() {
+  const { i18n } = useLingui();
   const crashSessionStartedRef = useRef(false);
   useEffect(() => {
     if (crashSessionStartedRef.current) return;
@@ -429,6 +441,25 @@ export function AppShell() {
       return true;
     },
   }), [projectRepository, recoveryBackend, recoveryService]);
+  const [releaseNotesView, setReleaseNotesView] = useState<ReleaseNotesView>();
+  const [releaseNotesOpen, setReleaseNotesOpen] = useState(false);
+  const releaseNotesReturnFocusRef = useRef<HTMLElement | null>(null);
+  const releaseNotesLifecycleStartedRef = useRef(false);
+  useEffect(() => {
+    if (releaseNotesLifecycleStartedRef.current) return;
+    releaseNotesLifecycleStartedRef.current = true;
+    const decision = initializeReleaseNotesLifecycle({
+      storage: localStorage,
+      currentVersion: PRODUCT_VERSION,
+      bundledNotes: BUNDLED_CURRENT_RELEASE_NOTES,
+      updateNotificationVersion: readPersistedUpdateNotificationVersion(localStorage),
+    });
+    if (!decision.shouldOpen || !BUNDLED_CURRENT_RELEASE_NOTES) return;
+    const localized = selectLocalizedReleaseNotes(BUNDLED_CURRENT_RELEASE_NOTES, i18n.locale);
+    if (!localized) return;
+    setReleaseNotesView(localized);
+    setReleaseNotesOpen(true);
+  }, [i18n.locale]);
   useEffect(() => {
     let disposed = false;
     let stopAutoCheckScheduler: (() => void) | undefined;
@@ -568,6 +599,16 @@ export function AppShell() {
   >([]);
   const openSettings = useCallback((target?:SettingsTarget) => {setSettingsTarget(target);setSettingsOpen(true)}, []);
   const settingsUI = useMemo(() => ({ open: openSettings }), [openSettings]);
+  const openReleaseNotes = useCallback((note: ReleaseNotesView, restoreFocusTo?: HTMLElement) => {
+    releaseNotesReturnFocusRef.current = restoreFocusTo
+      ?? (document.activeElement instanceof HTMLElement ? document.activeElement : null);
+    setReleaseNotesView(note);
+    setReleaseNotesOpen(true);
+  }, []);
+  const changeReleaseNotesOpen = useCallback((open: boolean) => {
+    if (!open && releaseNotesView) dismissReleaseNotes(localStorage, releaseNotesView.version);
+    setReleaseNotesOpen(open);
+  }, [releaseNotesView]);
 
   // The asset-library drawer open-state also lives here, so the TopBar button
   // (via the LibraryUI context) can open it.
@@ -2199,10 +2240,18 @@ export function AppShell() {
                 onDeleteProject={(id) => void deleteProject(id)}
                 prepareUpdateRecoverySnapshot={() => activeProjectId ? saveActiveProjectNowRef.current(activeProjectId) : Promise.resolve(true)}
                 updateController={updateController}
+                currentReleaseNotes={BUNDLED_CURRENT_RELEASE_NOTES}
+                onOpenReleaseNotes={openReleaseNotes}
                 target={settingsTarget}
               />
             </Suspense>
           ) : null}
+          <WhatsNewDialog
+            note={releaseNotesView}
+            open={releaseNotesOpen}
+            onOpenChange={changeReleaseNotesOpen}
+            restoreFocusTo={releaseNotesReturnFocusRef.current}
+          />
           {libraryOpen ? (
             <Suspense
               fallback={<OverlayLoading label="Loading asset library" />}

@@ -102,6 +102,53 @@ describe('cross-platform release workflow', () => {
     expect(generate.run).not.toMatch(/rollout|rollback|previous-version|previous-manifest/i)
   })
 
+  it('requires exact reviewed notes in every shipped locale before quality and native builds', async () => {
+    const source = await readFile('.github/workflows/release-update.yml', 'utf8')
+    const workflow = YAML.parse(source)
+    const validateSteps = workflow.jobs.validate.steps
+    const versionIndex = validateSteps.findIndex((step: { name?: string }) => step.name === 'Require tag and source versions to match')
+    const notesIndex = validateSteps.findIndex((step: { name?: string }) => step.name === 'Require exact reviewed release notes')
+    const notesGate = validateSteps[notesIndex]
+
+    expect(notesIndex).toBeGreaterThan(versionIndex)
+    expect(notesGate.env.RELEASE_VERSION).toBe('${{ steps.release.outputs.version }}')
+    expect(notesGate.run).toContain('release-notes:validate')
+    expect(notesGate.run).toContain('--catalog src/release-notes/catalog.json')
+    expect(notesGate.run).toContain('--version "$RELEASE_VERSION"')
+    expect(notesGate.run).toContain('--require-all-locales')
+    expect(workflow.jobs.quality.needs).toBe('validate')
+    expect(workflow.jobs.build.needs).toEqual(['validate', 'quality'])
+  })
+
+  it('publishes deterministic catalog-backed notes through file inputs', async () => {
+    const source = await readFile('.github/workflows/release-update.yml', 'utf8')
+    const workflow = YAML.parse(source)
+    const steps = workflow.jobs.publish.steps
+    const renderIndex = steps.findIndex((step: { name?: string }) => step.name === 'Render reviewed GitHub release notes')
+    const generateIndex = steps.findIndex((step: { name?: string }) => step.name === 'Generate and validate updater metadata')
+    const attestationIndex = steps.findIndex((step: { name?: string }) => step.name === 'Attest release assets')
+    const publishIndex = steps.findIndex((step: { name?: string }) => step.name === 'Create draft release, upload verified assets, and publish')
+    const render = steps[renderIndex]
+    const generate = steps[generateIndex]
+    const publish = steps[publishIndex]
+
+    expect(renderIndex).toBeGreaterThan(-1)
+    expect(generateIndex).toBeGreaterThan(renderIndex)
+    expect(attestationIndex).toBeGreaterThan(generateIndex)
+    expect(publishIndex).toBeGreaterThan(attestationIndex)
+    expect(render.env.RELEASE_VERSION).toBe('${{ needs.validate.outputs.version }}')
+    expect(render.run).toContain('release-notes:render')
+    expect(render.run).toContain('--catalog src/release-notes/catalog.json')
+    expect(render.run).toContain('--version "$RELEASE_VERSION"')
+    expect(render.run).toContain('--output dist/release-notes')
+    expect(render.run).toContain('--require-all-locales')
+    expect(generate.run).toMatch(/update:generate[^\n]+--release-notes-catalog src\/release-notes\/catalog\.json[^\n]+--require-all-locales/)
+    expect(generate.run).toMatch(/update:validate[^\n]+--release-notes-catalog src\/release-notes\/catalog\.json[^\n]+--require-release-notes[^\n]+--require-all-locales/)
+    expect(publish.run).toContain('--notes-file dist/release-notes/github-release.md')
+    expect(publish.run).not.toContain('--generate-notes')
+    expect(source).not.toContain('--generate-notes')
+  })
+
   it('feeds every platform updater artifact into the manifest generator', async () => {
     const source = await readFile('.github/workflows/release-update.yml', 'utf8')
     const workflow = YAML.parse(source)
