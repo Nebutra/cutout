@@ -30,7 +30,7 @@ for (const scenario of scenarios) {
     expect(geometry.right).toBeLessThanOrEqual(scenario.width);
     expect(geometry.bottom).toBeLessThanOrEqual(scenario.height);
     expect(geometry.scrollWidth).toBeLessThanOrEqual(geometry.clientWidth);
-    await expect(dialog.locator("ol > li")).toHaveCount(3);
+    await expect(dialog.locator("ol > li")).toHaveCount(4);
   });
 }
 
