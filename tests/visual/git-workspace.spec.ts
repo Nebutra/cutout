@@ -13,13 +13,15 @@ function boxesOverlap(
 }
 
 test.beforeEach(async ({ page }) => {
+  const pageErrors: Error[] = []
+  page.on('pageerror', (error) => pageErrors.push(error))
   await page.addInitScript(({ commitOid }) => {
     const status = { repositoryId: 'repo.fixture', snapshotToken: 'snapshot.fixture', branch: 'main', upstream: 'origin/main', ahead: 1, behind: 0, detached: false, files: [{ path: 'src/app.tsx', originalPath: null, indexStatus: ' ', worktreeStatus: 'M', conflicted: false }] }
     let runEventStore: unknown = { version: 'agent-run-events.v1', activeRunId: null, events: [], activeRun: null }
     let runEventSha256: string | null = null
     ;(window as unknown as { __TAURI_INTERNALS__: { invoke: (command: string, input?: unknown) => Promise<unknown> } }).__TAURI_INTERNALS__ = {
       invoke: async (command, input) => {
-        if (command === 'ai_native_poll' || command === 'load_providers' || command === 'list_key_status') return []
+        if (command === 'load_providers' || command === 'list_key_status') return []
         if (command === 'key_status') return false
         if (command.startsWith('agent_host_')) return { status: 'running', events: [], runs: {} }
         if (command === 'registry_authorize_workspace') return { canceled: false, handle: 'workspace:fixture', label: 'Fixture repository' }
@@ -41,6 +43,7 @@ test.beforeEach(async ({ page }) => {
   }, { commitOid: oid })
   await page.setViewportSize({ width: 1200, height: 800 })
   await page.goto('/')
+  expect(pageErrors).toEqual([])
   await page.getByRole('textbox', { name: 'Describe what you want to design...' }).fill('Git workspace fixture')
   await page.getByRole('button', { name: 'Create from brief' }).click()
   const workspaceRail = page.getByRole('navigation', { name: 'Workspace panels' })

@@ -39,6 +39,46 @@ type StreamFrame =
  */
 type ChannelMessage = ArrayBuffer | StreamFrame | string
 
+type CancellableProxyCommand =
+  | 'ai_proxy_request'
+  | 'ai_proxy_stream'
+  | 'ai_image_edit'
+
+/**
+ * Tauri's invoke promise has no AbortSignal channel. Bind every cancellable AI
+ * command to an opaque native request id, return promptly on owner abort, and
+ * tell Rust to drop the underlying reqwest future so a timed-out paid request
+ * does not continue in the background.
+ */
+export async function invokeCancellableProxy<T>(
+  command: CancellableProxyCommand,
+  args: Record<string, unknown>,
+  signal?: AbortSignal | null,
+): Promise<T> {
+  if (!signal) return invoke<T>(command, args)
+  signal.throwIfAborted()
+  const requestId = crypto.randomUUID()
+  const nativeRequest = invoke<T>(command, { ...args, requestId })
+  let abort: (() => void) | undefined
+  const aborted = new Promise<never>((_, reject) => {
+    abort = () => {
+      void invoke<boolean>('ai_proxy_cancel', { requestId }).catch(() => undefined)
+      reject(new DOMException('The operation was aborted.', 'AbortError'))
+    }
+    signal.addEventListener('abort', abort, { once: true })
+  })
+  if (signal.aborted) abort?.()
+  try {
+    return await Promise.race([nativeRequest, aborted])
+  } finally {
+    if (abort) signal.removeEventListener('abort', abort)
+    // The race may resolve from cancellation before Tauri reports the native
+    // command rejection. Always observe that promise to avoid an unhandled
+    // rejection while Rust closes the request.
+    void nativeRequest.catch(() => undefined)
+  }
+}
+
 /** Header names we must never forward: the SDK's dummy auth + hop-by-hop. */
 const STRIP_REQUEST_HEADERS = new Set([
   'authorization',
@@ -218,8 +258,9 @@ async function bufferedResponse(
   method: string,
   headers: Record<string, string>,
   body: string | undefined,
+  signal: AbortSignal | null,
 ): Promise<Response> {
-  const res = await invoke<ProxyResponse>('ai_proxy_request', {
+  const res = await invokeCancellableProxy<ProxyResponse>('ai_proxy_request', {
     providerId,
     kind,
     wireProtocol,
@@ -227,7 +268,7 @@ async function bufferedResponse(
     method,
     headers,
     body,
-  })
+  }, signal)
   const guarded = bufferedProxyGuard(res, url)
   if (guarded) return guarded
   return new Response(res.body, {
@@ -270,8 +311,29 @@ async function streamingResponse(
     },
   )
 
+  let streamSettled = false
+  let removeAbortListener = () => {}
+  const finishStream = () => {
+    if (streamSettled) return
+    streamSettled = true
+    removeAbortListener()
+    if (headSeen) {
+      controller.close()
+      return
+    }
+    onHeadError(new Error('Provider stream ended before response headers.'))
+  }
+  const failStream = (error: Error) => {
+    if (streamSettled) return
+    streamSettled = true
+    removeAbortListener()
+    if (headSeen) controller.error(error)
+    else onHeadError(error)
+  }
+
   const channel = new Channel<ChannelMessage>()
   channel.onmessage = (message) => {
+    if (streamSettled) return
     if (message instanceof ArrayBuffer) {
       if (message.byteLength > 0) controller.enqueue(new Uint8Array(message))
       return
@@ -280,16 +342,15 @@ async function streamingResponse(
       typeof message === 'string' ? (JSON.parse(message) as StreamFrame) : message
     switch (frame.type) {
       case 'head':
+        if (headSeen) return
         headSeen = true
         onHead(frame)
         break
       case 'end':
-        controller.close()
+        finishStream()
         break
       case 'error': {
-        const error = new Error(frame.message)
-        if (headSeen) controller.error(error)
-        else onHeadError(error)
+        failStream(new Error(frame.message))
         break
       }
     }
@@ -297,17 +358,20 @@ async function streamingResponse(
 
   if (signal) {
     const abort = () => {
-      const error = new DOMException('The operation was aborted.', 'AbortError')
-      if (headSeen) controller.error(error)
-      else onHeadError(error)
+      failStream(new DOMException('The operation was aborted.', 'AbortError'))
     }
     if (signal.aborted) abort()
-    else signal.addEventListener('abort', abort, { once: true })
+    else {
+      signal.addEventListener('abort', abort, { once: true })
+      removeAbortListener = () => signal.removeEventListener('abort', abort)
+    }
   }
 
   // Kick off the Rust command. Do not await — resolves after streaming ends.
-  // A pre-head failure rejects here with a ProxyError string (no frames sent).
-  void invoke<void>('ai_proxy_stream', {
+  // Native completion is also a terminal authority. This closes the JS stream
+  // if a hidden WebView misses the final channel frame after Rust has already
+  // released the response socket.
+  const nativeRequest = invokeCancellableProxy<void>('ai_proxy_stream', {
     providerId,
     kind,
     wireProtocol,
@@ -316,12 +380,13 @@ async function streamingResponse(
     headers,
     body,
     onChunk: channel,
-  }).catch((error: unknown) => {
-    const wrapped =
-      error instanceof Error ? error : new Error(String(error))
-    if (headSeen) controller.error(wrapped)
-    else onHeadError(wrapped)
-  })
+  }, signal)
+  void nativeRequest.then(
+    finishStream,
+    (error: unknown) => failStream(
+      error instanceof Error ? error : new Error(String(error)),
+    ),
+  )
 
   const head = await headReady
   const guarded = streamingProxyGuard(head.status, head.headers, url)
@@ -365,6 +430,15 @@ export function tauriFetch(
         request.signal ?? init?.signal ?? null,
       )
     }
-    return bufferedResponse(providerId, kind, wireProtocol, url, method, headers, body)
+    return bufferedResponse(
+      providerId,
+      kind,
+      wireProtocol,
+      url,
+      method,
+      headers,
+      body,
+      request.signal ?? init?.signal ?? null,
+    )
   }
 }

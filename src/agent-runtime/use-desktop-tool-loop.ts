@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef } from 'react'
+import { useCallback, useEffect, useMemo, useRef } from 'react'
 import { createDesktopToolLoop, type DesktopToolLoop } from './desktop-tool-loop'
 import {
   composerRouteToPaidToolRequest,
@@ -12,7 +12,11 @@ import {
 import { createDesktopToolExecutor, createToolExecutorRegistry, type CutoutResultSink, type DesktopToolArtifact } from '@/services/desktop-tool-executor'
 import type { ModelAssignment, ModelAssignments } from '@/services/ai/model-assignment-types'
 import type { ProviderConfig } from '@/services/ai/provider-types'
-import type { ServiceRegistry } from '@/services/types'
+import type { CapabilityBindings } from '@/services/ai/model-capabilities'
+import type {
+  ForegroundSegmentationService,
+  ServiceRegistry,
+} from '@/services/types'
 import type { AgentRunEvent } from './run-events'
 import { ContentAddressedDesktopArtifactStore, parseArtifactId } from '@/services/content-addressed-desktop-artifacts'
 import { approveFirstVisualCandidate, createDesktopVisualToolInvoker, createStorageVisualExecutionStore, createVisualTaskRuntime } from '@/visual-generation'
@@ -24,6 +28,40 @@ import { runDurableHostEffect } from '@/agent-host/durable-effect'
 const DESKTOP_TOOL_TIMEOUT_MS = 300_000
 const ZERO_USD_ESTIMATE: MoneyEstimate = { currency: 'USD', amount: 0 }
 const DESKTOP_PAID_TOOL_POLICY: PaidToolPolicy = { allowPaid: true }
+const FOREGROUND_SEGMENTATION_UNAVAILABLE =
+  'capability-required: foreground segmentation is unavailable on this host.'
+
+export async function probeForegroundSegmentationCapability(
+  service: ForegroundSegmentationService | undefined,
+): Promise<{ readonly available: boolean; readonly reason: string }> {
+  if (!service) {
+    return { available: false, reason: FOREGROUND_SEGMENTATION_UNAVAILABLE }
+  }
+  try {
+    const result = await service.capabilities()
+    if (!result?.ok) {
+      return {
+        available: false,
+        reason: result?.error ?? FOREGROUND_SEGMENTATION_UNAVAILABLE,
+      }
+    }
+    const capability = result.data
+    if (!capability || capability.available !== true) {
+      return {
+        available: false,
+        reason: capability?.reason ?? FOREGROUND_SEGMENTATION_UNAVAILABLE,
+      }
+    }
+    return { available: true, reason: '' }
+  } catch (error) {
+    return {
+      available: false,
+      reason: error instanceof Error
+        ? error.message
+        : FOREGROUND_SEGMENTATION_UNAVAILABLE,
+    }
+  }
+}
 
 function capabilityEstimate(
   capabilities: readonly PaidToolExecutorCapability[],
@@ -64,6 +102,8 @@ export interface DesktopToolInvocation {
   readonly prompt?: string
   readonly image: ModelAssignment
   readonly inputs?: readonly { readonly id: string; readonly mediaType: string; readonly bytes: Uint8Array }[]
+  readonly signal?: AbortSignal
+  readonly expectedSourceImageId?: string
 }
 
 export function createExplicitDesktopPaidToolRequest(input: {
@@ -92,9 +132,13 @@ export function createExplicitDesktopPaidToolRequest(input: {
 }
 
 export function useDesktopToolLoop(input: {
-  readonly services: Pick<ServiceRegistry, 'providers' | 'generation' | 'cutout'>
+  readonly services: Pick<
+    ServiceRegistry,
+    'providers' | 'generation' | 'cutout' | 'foregroundSegmentation'
+  >
   readonly providers: readonly ProviderConfig[]
   readonly assignments: ModelAssignments
+  readonly capabilityBindings?: CapabilityBindings
   readonly revision: number
   readonly append: (events: readonly AgentRunEvent[]) => void
   readonly cutoutResultSink?: CutoutResultSink
@@ -109,14 +153,27 @@ export function useDesktopToolLoop(input: {
     processTreeCancellation: 'supported', cpuLimit: 'capability-required',
     networkIsolation: 'capability-required',
   } }), [])
+  const semanticCutoutAvailable = useRef(false)
+  useEffect(() => {
+    let current = true
+    void probeForegroundSegmentationCapability(
+      input.services.foregroundSegmentation,
+    ).then((result) => {
+      if (current) semanticCutoutAvailable.current = result.available
+    })
+    return () => { current = false }
+  }, [input.services.foregroundSegmentation])
   const authorize = useCallback(async (runId: string, requestId: string, request: PaidToolRequest, approvalId: string) => {
     const requestDigest = await digestRequest({ runId, requestId, revision: state.current.revision, request })
-    const issuedAt = Date.now(), lease = permissionBroker.issue({ version: 'cutout.capability-lease.v1', leaseId: `lease:${requestId}`, approvalId, subject: runId, requestDigest, scopes: request.capability === 'cutout' ? ['paid'] : ['paid', 'credential'], workspaceRoot: 'authorized-workspace', allowedPaths: [], allowedCommands: [], allowedHosts: [], limits: { maxDurationMs: 600_000, maxBytes: 100_000_000, maxProcesses: 1 }, issuedAt, expiresAt: issuedAt + 600_000 })
+    const issuedAt = Date.now(), lease = permissionBroker.issue({ version: 'cutout.capability-lease.v1', leaseId: `lease:${requestId}`, approvalId, subject: runId, requestDigest, scopes: isLocalCutout(request.capability) ? ['paid'] : ['paid', 'credential'], workspaceRoot: 'authorized-workspace', allowedPaths: [], allowedCommands: [], allowedHosts: [], limits: { maxDurationMs: 600_000, maxBytes: 100_000_000, maxProcesses: 1 }, issuedAt, expiresAt: issuedAt + 600_000 })
     return { capabilityLeaseId: lease.leaseId, requestDigest }
   }, [permissionBroker])
   const capabilities = useCallback((): readonly PaidToolExecutorCapability[] => [
-    ...desktopPaidToolCapabilities(state.current.providers, state.current.assignments),
+    ...desktopPaidToolCapabilities(state.current.providers, state.current.assignments, {
+      descriptors: state.current.capabilityBindings?.descriptors,
+    }),
     { capability: 'cutout', providerId: 'local', model: 'cutout-v1', available: true, estimatedCost: ZERO_USD_ESTIMATE },
+    { capability: 'semantic-cutout', providerId: 'local', model: 'apple-vision-foreground-v1', available: semanticCutoutAvailable.current, estimatedCost: ZERO_USD_ESTIMATE },
   ], [])
   const loop = useMemo<DesktopToolLoop>(() => {
     const store = artifacts.current!
@@ -144,7 +201,9 @@ export function useDesktopToolLoop(input: {
   }, [authorize, capabilities, permissionBroker])
 
   const visualRuntime = useMemo(() => {
-    const visualCapabilities = desktopPaidToolCapabilities(input.providers, input.assignments)
+    const visualCapabilities = desktopPaidToolCapabilities(input.providers, input.assignments, {
+      descriptors: input.capabilityBindings?.descriptors,
+    })
     const estimate = (capability: 'generate-image' | 'edit-image') => capabilityEstimate(visualCapabilities, capability) ?? ZERO_USD_ESTIMATE
     return createVisualTaskRuntime({
       tools: createDesktopVisualToolInvoker({ loop, expectedRevision: () => state.current.revision, estimateFor: estimate,
@@ -152,16 +211,35 @@ export function useDesktopToolLoop(input: {
       }),
       reviewer: approveFirstVisualCandidate('agent'), store: createStorageVisualExecutionStore(localStorage), estimates: { generate: estimate('generate-image'), edit: estimate('edit-image') }, append: (events) => state.current.append(events),
     })
-  }, [input.assignments, input.providers, loop])
+  }, [input.assignments, input.capabilityBindings, input.providers, loop])
 
   async function invoke(invocation: DesktopToolInvocation): Promise<readonly DesktopToolArtifact[]> {
+    invocation.signal?.throwIfAborted()
+    if (invocation.capability === 'semantic-cutout') {
+      const availability = await probeForegroundSegmentationCapability(
+        state.current.services.foregroundSegmentation,
+      )
+      semanticCutoutAvailable.current = availability.available
+      if (!availability.available) {
+        throw new Error(availability.reason)
+      }
+    }
+    invocation.signal?.throwIfAborted()
     const inputIds = await Promise.all((invocation.inputs ?? []).map((artifact) => artifacts.current!.write({ ...artifact, source: 'edit-image', runId: invocation.runId })))
+    invocation.signal?.throwIfAborted()
     const requestId = crypto.randomUUID()
     const request = createExplicitDesktopPaidToolRequest({
       capability: invocation.capability,
       intent: invocation.intent,
       prompt: invocation.prompt,
-      image: invocation.capability === 'cutout' ? { providerId: 'local', model: 'cutout-v1' } : invocation.image,
+      image: isLocalCutout(invocation.capability)
+        ? {
+            providerId: 'local',
+            model: invocation.capability === 'semantic-cutout'
+              ? 'apple-vision-foreground-v1'
+              : 'cutout-v1',
+          }
+        : invocation.image,
       inputArtifactIds: inputIds,
       capabilities: capabilities(),
     })
@@ -172,6 +250,8 @@ export function useDesktopToolLoop(input: {
       label: invocation.label,
       expectedRevision: state.current.revision,
       request,
+      signal: invocation.signal,
+      expectedSourceImageId: invocation.expectedSourceImageId,
     });return loop.settled(invocation.toolCallId, requestId)}
     const workspace=getAuthorizedWorkspace()
     const result=workspace?await runDurableHostEffect({host:createTauriAgentHostService({workspaceHandle:workspace.handle,instanceId:'desktop.effect'}),runId:invocation.runId,nodeId:invocation.toolCallId,effectKey:`paid:${invocation.toolCallId}`,execute:async()=>{const value=await execute();if(!value.receipt)throw new Error(value.ok?'Paid tool receipt is missing.':value.error);return{value,receiptId:value.receipt.receiptId}}}):await execute()
@@ -205,4 +285,8 @@ export function useDesktopToolLoop(input: {
 async function digestRequest(value: unknown): Promise<string> {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify(value)))
   return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('')
+}
+
+function isLocalCutout(capability: PaidToolCapability): boolean {
+  return capability === 'cutout' || capability === 'semantic-cutout'
 }

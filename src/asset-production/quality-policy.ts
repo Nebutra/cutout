@@ -44,6 +44,15 @@ export function warningIssue(
   }
 }
 
+export function observationalIssue(
+  code: string,
+  message: string,
+  source: Extract<ProductionIssue['source'], 'deterministic-check' | 'model-review'>,
+  recordedAt = Date.now(),
+): ProductionIssue {
+  return { code, kind: 'warning', message, waivable: true, source, recordedAt }
+}
+
 export function hasIntegrityBlocker(issues: readonly ProductionIssue[]): boolean {
   return issues.some((issue) => issue.kind === 'integrity')
 }
@@ -86,4 +95,3 @@ export function isConsumableTask(task: ProductionTaskState): boolean {
 function decisionArtifact(task: ProductionTaskState): ProductionArtifactRef | undefined {
   return task.output ?? task.candidate
 }
-

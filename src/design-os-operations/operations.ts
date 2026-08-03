@@ -12,7 +12,12 @@ import {
   type ComponentCompilerOutput,
   type ComponentManifest,
 } from '@/components-compiler'
-import { compileDesignKit, type DesignKit, type DesignKitTokenInput } from '@/design-kit'
+import {
+  compileDesignKit,
+  type DesignKit,
+  type DesignKitTokenInput,
+  type SelectedDesignMarkdownInput,
+} from '@/design-kit'
 import { validateDesignDocument, type DesignDocument } from '@/design-ir'
 import {
   applySourcePatch,
@@ -249,9 +254,14 @@ function revisionGuard(document: DesignDocument): RevisionGuard {
 export async function compileDesignKitOperation(
   document: DesignDocument,
   tokens?: readonly DesignKitTokenInput[],
+  selectedDesignMarkdown?: SelectedDesignMarkdownInput,
 ): Promise<Result<DesignKit>> {
   if (!tokens || tokens.length === 0) return err('Design Kit compilation requires explicit token adapter inputs.')
-  return capture(() => compileDesignKit({ document, tokens: [...tokens] }))
+  return capture(() => compileDesignKit({
+    document,
+    tokens: [...tokens],
+    ...(selectedDesignMarkdown ? { selectedDesignMarkdown } : {}),
+  }))
 }
 
 export async function compileBrandKitOperation(

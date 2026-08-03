@@ -68,7 +68,7 @@ function ToolRow({ tool, now, showElapsed, onApprove, onDeny }: { readonly tool:
       ) : null}
       {tool.approval && onApprove && onDeny ? (
         <div className="ml-5 mt-2 flex gap-1.5">
-          <Button size="sm" onClick={() => onApprove(tool.approval!.toolCallId, tool.approval!.requestId)}><Check /> Approve</Button>
+          <Button size="sm" data-agent-action="approve-tool" onClick={() => onApprove(tool.approval!.toolCallId, tool.approval!.requestId)}><Check /> Approve</Button>
           <Button size="sm" variant="outline" onClick={() => onDeny(tool.approval!.toolCallId, tool.approval!.requestId)}><Ban /> Deny</Button>
         </div>
       ) : null}

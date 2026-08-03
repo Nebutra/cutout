@@ -1,0 +1,4 @@
+{"type":"spec","path":".trellis/spec/frontend/prototype-generation.md","reason":"Defines full-route suite, Design System selection, and downstream asset contracts."}
+{"type":"spec","path":".trellis/spec/frontend/byok-provider-protocols.md","reason":"Defines local credential discovery, provider verification, and capability evidence boundaries."}
+{"type":"contract","path":"cutout.agent-capabilities.json","reason":"Authoritative public Agent capability and limitation manifest."}
+{"type":"source","path":"src/components/workspace/IntentWorkspace.tsx","reason":"Primary desktop orchestration and user journey implementation."}

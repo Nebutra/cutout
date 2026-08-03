@@ -26,12 +26,6 @@ msgid "global_library.toast_assets_updated"
 msgstr "{0, plural, other {已更新 # 项素材}}"
 
 #. js-lingui-explicit-id
-#. placeholder {0}: coverage.missing.length
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.capability_gaps_count"
-msgstr "{0, plural, other {# 项能力缺口}}"
-
-#. js-lingui-explicit-id
 #. placeholder {0}: plan.files.length
 #. placeholder {1}: plan.conflicts.length
 #: src/components/library/RegistryInstallPanel.tsx
@@ -99,13 +93,6 @@ msgstr "{0} 套件编辑器"
 #: src/components/settings/ModelSlot.tsx
 msgid "settings.models_discovered_from_endpoint"
 msgstr "从端点发现了 {0} 个模型"
-
-#. js-lingui-explicit-id
-#. placeholder {0}: coverage.covered.length
-#. placeholder {1}: coverage.total
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.task_dimensions_covered"
-msgstr "已覆盖 {0}/{1} 个任务维度"
 
 #. js-lingui-explicit-id
 #: src/components/preview/PreviewMeta.tsx
@@ -205,11 +192,6 @@ msgstr "补充限制条件或描述其他方向…"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
-msgid "settings.empty_desc"
-msgstr "添加一个提供方并填入 API Key 即可开始使用 AI 功能。"
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
 msgid "settings.add_provider"
 msgstr "添加提供方"
 
@@ -224,10 +206,14 @@ msgid "global_library.add_tag_placeholder"
 msgstr "添加标签"
 
 #. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
 #: src/components/settings/sections/SpeechSection.tsx
 msgid "settings.advanced"
 msgstr "高级"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.advanced_ai_management"
+msgstr "高级 AI 管理"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
@@ -243,6 +229,16 @@ msgstr "Agent 个性"
 #: src/components/settings/SettingsSidebar.tsx
 msgid "settings.section_ai"
 msgstr "AI"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.ai_setup_ready"
+msgstr "AI 路由已配置"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.ai_setup_action_required"
+msgstr "AI 设置需要处理"
 
 #. js-lingui-explicit-id
 #: src/components/settings/AboutFooter.tsx
@@ -268,11 +264,6 @@ msgstr "全部（{total}）"
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.all_collections"
 msgstr "全部合集"
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.all_dimensions_covered"
-msgstr "所有已配置的维度都有适配器覆盖。模型级别的证据会在选择时校验。"
 
 #. js-lingui-explicit-id
 #: src/components/home/ProjectHome.tsx
@@ -466,11 +457,6 @@ msgid "global_library.policy_auto_compatible"
 msgstr "自动兼容"
 
 #. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.model_routing_description"
-msgstr "自动路由只会把每个任务分配给具备所需能力的可用适配器。"
-
-#. js-lingui-explicit-id
 #: src/components/settings/sections/SpeechSection.tsx
 msgid "settings.speech.models_description"
 msgstr "默认使用自动路由。在连接兼容适配器之前，语音识别（ASR）与语音合成（TTS）仍需对应能力。"
@@ -491,6 +477,11 @@ msgid "settings.speech.auto_play_aria"
 msgstr "自动播放 TTS 回复"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.ai_setup_unavailable"
+msgstr "自动 AI 设置不可用"
+
+#. js-lingui-explicit-id
 #: src/components/home/ProjectHome.tsx
 msgid "home.nav_back"
 msgstr "后退"
@@ -502,6 +493,7 @@ msgstr "Base URL"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/UpdatesSection.tsx
+#: src/updater/update-notifications.ts
 msgid "settings.updates.beta"
 msgstr "测试版"
 
@@ -524,6 +516,11 @@ msgstr "品牌 VI"
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.tab_brand_kits"
 msgstr "品牌套件"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.browse_providers"
+msgstr "浏览提供商"
 
 #. js-lingui-explicit-id
 #: src/components/library/GlobalLibraryView.tsx
@@ -611,6 +608,11 @@ msgid "settings.updates.check_now"
 msgstr "立即检查"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.ai_setup_checking"
+msgstr "正在检查 AI 设置"
+
+#. js-lingui-explicit-id
 #: src/components/settings/sections/UpdatesSection.tsx
 msgid "settings.updates.checking"
 msgstr "正在检查更新…"
@@ -646,6 +648,11 @@ msgid "workspace.human_loop_choose_direction"
 msgstr "选择一个方向"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.ai_setup_connect_description"
+msgstr "选择提供商并验证其凭据。"
+
+#. js-lingui-explicit-id
 #: src/components/workspace/IntentWorkspace.tsx
 msgid "workspace.human_loop_instruction"
 msgstr "选择一个方向。你也可以在下方补充说明，然后点击箭头继续。"
@@ -653,6 +660,11 @@ msgstr "选择一个方向。你也可以在下方补充说明，然后点击箭
 #. js-lingui-explicit-id
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.clear_selection"
+msgstr "清除"
+
+#. js-lingui-explicit-id
+#: src/components/home/SidebarAccount.tsx
+msgid "home.notifications_clear"
 msgstr "清除"
 
 #. js-lingui-explicit-id
@@ -749,6 +761,21 @@ msgid "settings.key_placeholder_replace"
 msgstr "已配置，输入以替换"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.configured_providers"
+msgstr "已配置的提供商"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.ai_setup_verification_description"
+msgstr "配置的提供商必须启用并通过验证，Cutout 才能使用。"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.configuring"
+msgstr "正在配置"
+
+#. js-lingui-explicit-id
 #: src/components/library/KitLibraryInspector.tsx
 msgid "kit_library.audit_conflicts"
 msgstr "冲突"
@@ -771,18 +798,8 @@ msgstr "连接一个提供方"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
-msgid "settings.connect_provider_with_capabilities"
-msgstr "连接一个具备这些能力的提供方"
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.connect_ai_capabilities"
-msgstr "连接 AI 能力"
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.connect_ai_capabilities_description"
-msgstr "先连接一个提供方，Cutout 会自动为文本、视觉、语音、编码和图像任务路由。"
+msgid "settings.ai_setup_connect_title"
+msgstr "连接 AI 以开始使用"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
@@ -901,10 +918,14 @@ msgid "home.create_from_brief"
 msgstr "根据简报创建"
 
 #. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
 #: src/components/settings/sections/SpeechSection.tsx
 msgid "settings.dimension_tts_description"
 msgstr "生成语音音频。"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.ai_setup_ready_description"
+msgstr "凭据和目录路由已配置。图片生成会在首张图片实际完成后得到验证。"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/IntegrationsSection.tsx
@@ -948,6 +969,27 @@ msgid "settings.personalization.custom_requires_instructions"
 msgstr "自定义个性需要先填写指令才能保存。"
 
 #. js-lingui-explicit-id
+#. placeholder {0}: release.version
+#: src/updater/update-notifications.ts
+msgid "updates.notification.available_detail"
+msgstr "Cutout {0} 已在{channelLabel}渠道推出。"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.ai_setup_credentials_auto_description"
+msgstr "Cutout 可以自动验证并配置这些本地凭据。"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.ai_setup_discovery_unavailable_description"
+msgstr "Cutout 无法检查此设备上的可复用凭据。请重试或手动连接提供商。"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.ai_setup_configuration_unavailable_description"
+msgstr "Cutout 无法加载当前 AI 配置。请重试。"
+
+#. js-lingui-explicit-id
 #. placeholder {0}: state.preferences.channel
 #: src/components/settings/sections/UpdatesSection.tsx
 msgid "settings.updates.up_to_date"
@@ -956,7 +998,7 @@ msgstr "Cutout 在 {0} 通道上已是最新。"
 #. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
 msgid "settings.provider_source_keychain"
-msgstr "Cutout 钥匙串"
+msgstr "Cutout 本地凭据"
 
 #. js-lingui-explicit-id
 #: src/components/home/SidebarAccount.tsx
@@ -1047,14 +1089,14 @@ msgid "settings.integrations.desktop_not_installed"
 msgstr "未安装桌面提供方。"
 
 #. js-lingui-explicit-id
-#: src/components/settings/sections/GeneralSection.tsx
-msgid "settings.developer_mode.title"
-msgstr "开发者模式"
-
-#. js-lingui-explicit-id
 #: src/components/settings/sections/RecoverySection.tsx
 msgid "settings.recovery.diagnostic_preview_aria"
 msgstr "诊断包预览"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/RecoverySection.tsx
+msgid "settings.recovery.advanced"
+msgstr "诊断与恢复"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/SpeechSection.tsx
@@ -1080,16 +1122,6 @@ msgstr "断开连接"
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.discover_references"
 msgstr "发现参考资料"
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.discovered_on_mac"
-msgstr "在这台 Mac 上发现"
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.discovered_providers"
-msgstr "发现的提供方"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/PersonalizationSection.tsx
@@ -1364,11 +1396,6 @@ msgid "settings.recovery.host_error"
 msgstr "无法完成主机恢复。"
 
 #. js-lingui-explicit-id
-#: src/components/settings/sections/RecoverySection.tsx
-msgid "settings.recovery.host_status"
-msgstr "主机恢复："
-
-#. js-lingui-explicit-id
 #: src/components/library/TeamGovernancePanel.tsx
 msgid "team.host_required"
 msgstr "需要主机"
@@ -1550,11 +1577,6 @@ msgid "home.local_projects"
 msgstr "本地项目"
 
 #. js-lingui-explicit-id
-#: src/components/settings/sections/RecoverySection.tsx
-msgid "settings.recovery.title"
-msgstr "本地恢复"
-
-#. js-lingui-explicit-id
 #: src/components/library/TeamGovernancePanel.tsx
 msgid "team.local_review"
 msgstr "本地评审"
@@ -1585,9 +1607,19 @@ msgid "global_library.reference_locked"
 msgstr "已锁定"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.manage_providers"
+msgstr "管理提供商"
+
+#. js-lingui-explicit-id
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.kit_editor_description"
 msgstr "管理已批准的、内容寻址的套件投影。"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.manual_model_bindings"
+msgstr "手动模型绑定"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/PersonalizationSection.tsx
@@ -1635,15 +1667,15 @@ msgid "settings.model_or_blank_placeholder"
 msgstr "填写模型，或留空以自动选择"
 
 #. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.model_routing"
-msgstr "模型路由"
-
-#. js-lingui-explicit-id
 #. placeholder {0}: project.name
 #: src/components/home/ProjectHome.tsx
 msgid "home.more_actions_named"
 msgstr "{0} 的更多操作"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.ai_setup_capabilities_title"
+msgstr "还需要更多 AI 能力"
 
 #. js-lingui-explicit-id
 #: src/components/library/GlobalLibraryView.tsx
@@ -1731,11 +1763,6 @@ msgid "slices.empty_no_regions_title"
 msgstr "未找到区域"
 
 #. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.no_reusable_credential"
-msgstr "没有可复用的凭据"
-
-#. js-lingui-explicit-id
 #: src/components/slices/SliceGridEmpty.tsx
 msgid "slices.empty_no_regions_automatic_hint"
 msgstr "未找到可复用区域。请尝试其他素材图。"
@@ -1779,6 +1806,22 @@ msgid "home.notifications"
 msgstr "通知"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/UpdatesSection.tsx
+msgid "settings.updates.system_notifications_aria"
+msgstr "Cutout 在后台运行时通知我有可用更新"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/UpdatesSection.tsx
+msgid "settings.updates.system_notifications_hint"
+msgstr "当 Cutout 在后台发现更新时通知我。"
+
+#. js-lingui-explicit-id
+#. placeholder {0}: notification.title
+#: src/components/home/SidebarAccount.tsx
+msgid "home.notification_open"
+msgstr "打开{0}"
+
+#. js-lingui-explicit-id
 #: src/components/library/TeamGovernancePanel.tsx
 msgid "team.open_project_to_review"
 msgstr "打开一个项目以开始评审。"
@@ -1807,6 +1850,11 @@ msgstr "可选的备用模型"
 #: src/components/source/DropZone.tsx
 msgid "source.dropzone_hint"
 msgstr "或点击浏览 · PNG、JPEG、WebP"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.manual_model_bindings_description"
+msgstr "为特定任务覆盖自动路由。"
 
 #. js-lingui-explicit-id
 #: src/components/library/KitLibraryInspector.tsx
@@ -1997,6 +2045,11 @@ msgid "settings.provider_updated_toast"
 msgstr "已更新提供方"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.advanced_ai_management_description"
+msgstr "提供商、手动模型绑定和 SVG 导出。"
+
+#. js-lingui-explicit-id
 #: src/components/library/KitLibraryInspector.tsx
 msgid "kit_library.publish_new_version"
 msgstr "发布新版本"
@@ -2077,6 +2130,11 @@ msgstr "注册表桌面主机需要 Cutout 桌面应用。"
 #: src/components/library/RegistryInstallPanel.tsx
 msgid "registry_install.section_aria"
 msgstr "注册表安装"
+
+#. js-lingui-explicit-id
+#: src/components/home/SidebarAccount.tsx
+msgid "home.notification_remind_tomorrow"
+msgstr "明天提醒我"
 
 #. js-lingui-explicit-id
 #: src/components/settings/ProviderRow.tsx
@@ -2198,6 +2256,11 @@ msgid "home.restore"
 msgstr "恢复"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.retry"
+msgstr "重试"
+
+#. js-lingui-explicit-id
 #: src/components/settings/sections/PersonalizationSection.tsx
 msgid "settings.personalization.retry"
 msgstr "重试"
@@ -2218,6 +2281,11 @@ msgid "home.retry"
 msgstr "重试"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.ai_setup_credentials_found"
+msgstr "发现可复用凭据"
+
+#. js-lingui-explicit-id
 #: src/components/settings/sections/PersonalizationSection.tsx
 msgid "settings.personalization.use_memory_desc"
 msgstr "在后续会话中复用已批准的偏好。"
@@ -2236,6 +2304,11 @@ msgstr "评审分支"
 #: src/components/library/ReviewBranchEditor.tsx
 msgid "review_branch.comment_aria"
 msgstr "评审评论"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.ai_setup_checking_description"
+msgstr "正在检查已配置的提供商和此设备上的可复用凭据。"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/IntegrationsSection.tsx
@@ -2321,6 +2394,11 @@ msgid "settings.integrations.expired"
 msgstr "会话已过期。请刷新或重新连接。"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.setup_automatically"
+msgstr "自动设置"
+
+#. js-lingui-explicit-id
 #: src/components/home/SidebarAccount.tsx
 #: src/components/settings/SettingsDialog.tsx
 msgid "settings.menu_label"
@@ -2351,11 +2429,6 @@ msgstr "快捷键"
 #: src/components/settings/VectorizerPanel.tsx
 msgid "settings.key_show"
 msgstr "显示"
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/GeneralSection.tsx
-msgid "settings.developer_mode.hint"
-msgstr "在项目内显示只读的 DAG、Design IR 和回执审计工具。"
 
 #. js-lingui-explicit-id
 #: src/components/inspector/SliceDimensions.tsx
@@ -2416,7 +2489,6 @@ msgid "settings.speech.shortcut_aria"
 msgstr "语音快捷键"
 
 #. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
 #: src/components/settings/sections/SpeechSection.tsx
 msgid "settings.dimension_asr_label"
 msgstr "语音转文本"
@@ -2428,6 +2500,7 @@ msgstr "语音输出"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/UpdatesSection.tsx
+#: src/updater/update-notifications.ts
 msgid "settings.updates.stable"
 msgstr "稳定版"
 
@@ -2474,6 +2547,16 @@ msgid "home.theme_system"
 msgstr "跟随系统"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/UpdatesSection.tsx
+msgid "settings.updates.system_notifications"
+msgstr "系统通知"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/UpdatesSection.tsx
+msgid "settings.updates.system_notifications_denied"
+msgstr "由于未授予权限，系统通知仍处于关闭状态。"
+
+#. js-lingui-explicit-id
 #: src/components/topbar/TabsMenu.tsx
 msgid "topbar.tabs_in_window"
 msgstr "此窗口中的标签页"
@@ -2504,7 +2587,6 @@ msgid "vectorizer.mode_test"
 msgstr "测试"
 
 #. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
 #: src/components/settings/sections/SpeechSection.tsx
 msgid "settings.dimension_tts_label"
 msgstr "文本转语音"
@@ -2588,10 +2670,14 @@ msgid "settings.personalization.tool_memory_enabled_toast"
 msgstr "已启用工具辅助记忆"
 
 #. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
 #: src/components/settings/sections/SpeechSection.tsx
 msgid "settings.dimension_asr_description"
 msgstr "转录语音音频。"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/RecoverySection.tsx
+msgid "settings.recovery.title"
+msgstr "故障排查"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/SpeechSection.tsx
@@ -2664,6 +2750,11 @@ msgstr "不支持的文件：{name}"
 #: src/components/source/SourceMeta.tsx
 msgid "source.meta_untitled"
 msgstr "未命名"
+
+#. js-lingui-explicit-id
+#: src/updater/update-notifications.ts
+msgid "updates.notification.available_title"
+msgstr "有可用更新"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/UpdatesSection.tsx
@@ -2767,6 +2858,11 @@ msgstr "经过验证的本地预览、来源信息，以及具备能力感知的
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.verifying_component_blobs"
 msgstr "正在验证组件源文件…"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.ai_setup_configuring_description"
+msgstr "正在验证本地凭据并配置所需的模型路由。"
 
 #. js-lingui-explicit-id
 #: src/components/library/GlobalLibraryView.tsx
@@ -2873,3 +2969,8 @@ msgstr "打开的标签页和最近关闭的标签页会显示在这里"
 #: src/components/home/ProjectHome.tsx
 msgid "home.your_projects"
 msgstr "你的项目"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.ai_setup_capabilities_description"
+msgstr "已验证的提供商尚未涵盖所有必需任务。"

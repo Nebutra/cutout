@@ -1,0 +1,2 @@
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "Review focused tests, lint, build, and dependency-neutral frontend changes."}
+{"file": ".trellis/spec/frontend/component-guidelines.md", "reason": "Verify accessibility and stable settings control structure."}

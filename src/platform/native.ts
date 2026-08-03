@@ -5,6 +5,12 @@
  * interface, so tests inject a fake and no Tauri runtime is required. See spec §4a.
  */
 import { invoke } from '@tauri-apps/api/core'
+import type {
+  CodingPatch,
+  CodingReceipt,
+  CodingTask,
+} from '@/coding-runtime/contracts'
+import type { NativeCodingWorkspaceBridge } from '@/coding-runtime/native-workspace'
 
 /** One asset to persist. `bytes` is primary; `dataUrl` is a fallback. */
 export interface SaveAssetInput {
@@ -64,6 +70,25 @@ export interface WorkspaceAuthorizationResult {
   canceled: boolean
   handle: string | null
   label: string | null
+}
+
+export interface ManagedCodingWorkspaceResult {
+  handle: string
+  label: string
+}
+
+export interface ManagedCodingAssetInput {
+  id: string
+  mediaType: string
+  bytes: Uint8Array
+  sha256: string
+}
+
+export interface ManagedCodingAssetReceipt {
+  id: string
+  path: string
+  sha256: string
+  byteLength: number
 }
 
 export interface NativeRunEventStoreSnapshot {
@@ -153,6 +178,21 @@ export interface VectorizeSvgResult {
   svg: string
 }
 
+export interface ForegroundSegmentationCapabilities {
+  available: boolean
+  platform: string
+  backend: 'apple-vision' | 'unavailable'
+  reason: string | null
+}
+
+export interface ForegroundSegmentationNativeResult {
+  pngBytes: Uint8Array
+  width: number
+  height: number
+  instanceCount: number
+  backend: 'apple-vision'
+}
+
 export interface NativeBridge {
   /** Persist assets under a fresh native folder-picker grant. */
   saveAssets(assets: SaveAssetInput[]): Promise<SaveAssetsResult>
@@ -162,6 +202,12 @@ export interface NativeBridge {
   scanRepository?(): Promise<NativeRepositoryScanResult>
   /** Optional local Git capability, available in the desktop host only. */
   authorizeWorkspace?(): Promise<WorkspaceAuthorizationResult>
+  /** Creates an empty host-owned Coding output root and returns only its opaque handle. */
+  createManagedCodingWorkspace?(): Promise<ManagedCodingWorkspaceResult>
+  seedManagedCodingAssets?(
+    workspaceHandle: string,
+    assets: readonly ManagedCodingAssetInput[],
+  ): Promise<ManagedCodingAssetReceipt[]>
   readRunEventStore?(workspaceHandle: string): Promise<NativeRunEventStoreSnapshot>
   writeRunEventStore?(
     workspaceHandle: string,
@@ -194,6 +240,8 @@ export interface NativeBridge {
     bytes: Uint8Array
     mode?: VectorizerAiMode
   }): Promise<VectorizeSvgResult>
+  foregroundSegmentationCapabilities?(): Promise<ForegroundSegmentationCapabilities>
+  foregroundSegment?(bytes: Uint8Array): Promise<ForegroundSegmentationNativeResult>
 }
 
 /**
@@ -237,6 +285,13 @@ export const tauriBridge: NativeBridge = {
   },
   scanRepository: () => invoke<NativeRepositoryScanResult>('scan_repository'),
   authorizeWorkspace: () => invoke<WorkspaceAuthorizationResult>('registry_authorize_workspace'),
+  createManagedCodingWorkspace: () =>
+    invoke<ManagedCodingWorkspaceResult>('coding_workspace_create_managed'),
+  seedManagedCodingAssets: (workspaceHandle, assets) =>
+    invoke<ManagedCodingAssetReceipt[]>('coding_workspace_seed_managed_assets', {
+      workspaceHandle,
+      assets: assets.map((asset) => ({ ...asset, bytes: Array.from(asset.bytes) })),
+    }),
   readRunEventStore: (workspaceHandle) =>
     invoke<NativeRunEventStoreSnapshot>('workspace_run_events_read', { workspaceHandle }),
   writeRunEventStore: (workspaceHandle, expectedSha256, store) =>
@@ -278,4 +333,50 @@ export const tauriBridge: NativeBridge = {
       bytes: Array.from(bytes),
       mode: mode ?? null,
     }),
+  foregroundSegmentationCapabilities: () =>
+    invoke<ForegroundSegmentationCapabilities>('foreground_segmentation_capabilities'),
+  foregroundSegment: async (bytes) => {
+    const result = await invoke<
+      Omit<ForegroundSegmentationNativeResult, 'pngBytes'> & { pngBytes: number[] }
+    >('foreground_segment', { bytes: Array.from(bytes) })
+    return { ...result, pngBytes: Uint8Array.from(result.pngBytes) }
+  },
+}
+
+/** Opaque-handle bridge for controlled CodingTask staging and promotion. */
+export const tauriCodingWorkspaceBridge: NativeCodingWorkspaceBridge = {
+  snapshot: (workspaceHandle, paths) =>
+    invoke('coding_workspace_snapshot', { workspaceHandle, paths }),
+  readAllowed: (workspaceHandle, paths) =>
+    invoke('coding_workspace_read_allowed', { workspaceHandle, paths }),
+  preview: (workspaceHandle, task, patch) =>
+    invoke<CodingReceipt['changedFiles']>('coding_workspace_preview', {
+      workspaceHandle,
+      task,
+      patch,
+    }),
+  stage: (workspaceHandle, task, patch) =>
+    invoke('coding_workspace_stage', { workspaceHandle, task, patch }),
+  runChecks: (workspaceHandle, stageId, commands, maxDurationMs) =>
+    invoke('coding_workspace_run_checks', {
+      workspaceHandle,
+      stageId,
+      commands,
+      maxDurationMs,
+    }),
+  promote: (
+    workspaceHandle,
+    task: CodingTask,
+    patch: CodingPatch,
+    stageId,
+    expectedSnapshotId,
+  ) => invoke('coding_workspace_promote', {
+    workspaceHandle,
+    task,
+    patch,
+    stageId,
+    expectedSnapshotId,
+  }),
+  rollback: (workspaceHandle, stageId) =>
+    invoke('coding_workspace_rollback', { workspaceHandle, stageId }),
 }

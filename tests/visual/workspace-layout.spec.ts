@@ -9,10 +9,10 @@ async function project(page: import("@playwright/test").Page) {
     .getByRole("textbox", { name: "Describe what you want to design..." })
     .fill("Components UX regression");
   await page.getByRole("button", { name: "Create from brief" }).click();
+  await expect(page.getByRole("complementary", { name: "Agent workspace" })).toBeVisible();
   if (viewport && viewport.width < 768) {
     await page.setViewportSize(viewport);
   }
-  await expect(page.getByRole("complementary", { name: "Agent workspace" })).toBeVisible();
 }
 test("workspace modes use stable non-overlapping geometry", async ({
   page,
@@ -20,6 +20,12 @@ test("workspace modes use stable non-overlapping geometry", async ({
   await project(page);
   const viewport = page.viewportSize()!;
   for (const dark of [false, true]) {
+    if (viewport.width < 768) await page.setViewportSize({ width: 1024, height: viewport.height });
+    const agentToggle = page.getByRole("button", { name: "Agent", exact: true });
+    if (await agentToggle.isVisible() && await agentToggle.getAttribute("aria-pressed") !== "true") {
+      await agentToggle.click();
+    }
+    if (viewport.width < 768) await page.setViewportSize(viewport);
     await page.evaluate(
       (enabled) => document.documentElement.classList.toggle("dark", enabled),
       dark,

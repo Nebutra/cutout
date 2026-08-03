@@ -2,6 +2,7 @@
 //! Secret values are inspected only for presence and never serialized to the WebView.
 
 use std::collections::{HashMap, HashSet};
+use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, Instant};
@@ -10,13 +11,41 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use tauri::{AppHandle, Manager, Runtime};
 
+use super::agent_credentials;
 use super::ai_proxy;
 use super::keys;
-use super::providers::{self, ProviderConfig, ProviderKind, ProviderWireProtocol};
+use super::providers::{
+    self, ProviderConfig, ProviderKind, ProviderWireProtocol, CC_SWITCH_BASE_URL,
+};
 
 const MAX_CONFIG_BYTES: u64 = 1024 * 1024;
+const MAX_CC_SWITCH_DB_BYTES: u64 = 256 * 1024 * 1024;
 const MAX_DRAFTS: usize = 32;
 const DRAFT_TTL: Duration = Duration::from_secs(10 * 60);
+const CODEX_CC_SWITCH_PROVIDER_ID: &str = "ccswitch";
+const CC_SWITCH_DB_LOCATION: &str = "~/.cc-switch/cc-switch.db";
+const CC_SWITCH_DB_SCHEMA_ID: &str = "cc-switch-db-codex-v1";
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct CcSwitchSettings {
+    auth: CcSwitchAuth,
+    config: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct CcSwitchAuth {
+    #[serde(rename = "OPENAI_API_KEY")]
+    api_key: String,
+}
+
+struct CcSwitchProviderRecord {
+    provider_id: String,
+    base_url: String,
+    model_hint: Option<String>,
+    secret: String,
+}
 
 struct ProviderDraftSession {
     created_at: Instant,
@@ -26,6 +55,8 @@ struct ProviderDraftSession {
     candidate_id: Option<String>,
     provider_id: Option<String>,
     secret: Option<String>,
+    candidate_fingerprint: Option<String>,
+    candidate_secret_revision: Option<String>,
     checked_models: Option<Vec<String>>,
 }
 
@@ -91,6 +122,10 @@ pub struct ProviderCandidate {
     pub source: String,
     pub source_label: String,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub agent_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub schema_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub config_location: Option<String>,
     pub kind: String,
     pub label: String,
@@ -108,6 +143,19 @@ pub struct ProviderCandidate {
 #[serde(rename_all = "camelCase")]
 pub struct ProviderProbeResult {
     pub models: Vec<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AutoConfigureCandidateInput {
+    candidate_id: String,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AutoConfiguredProvider {
+    provider: ProviderConfig,
+    models: Vec<String>,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -128,7 +176,7 @@ pub enum DiscoveryError {
     NotImportable,
     #[error("provider config uses an unsupported wire protocol: {0}")]
     UnsupportedWireProtocol(String),
-    #[error("keychain import failed: {0}")]
+    #[error("local credential import failed: {0}")]
     Keychain(String),
     #[error("provider endpoint returned HTTP {0}")]
     Http(u16),
@@ -142,6 +190,8 @@ pub enum DiscoveryError {
     DraftExpired,
     #[error("provider draft capacity reached")]
     DraftCapacity,
+    #[error("provider draft credential source is ambiguous")]
+    DraftAmbiguous,
     #[error("provider already exists")]
     Conflict,
     #[error("provider persistence failed: {0}")]
@@ -166,6 +216,7 @@ impl Serialize for DiscoveryError {
             Self::CatalogUnsupported => "catalog-unsupported",
             Self::DraftExpired => "draft-expired",
             Self::DraftCapacity => "draft-capacity",
+            Self::DraftAmbiguous => "draft-invalid",
             Self::Conflict => "conflict",
             Self::Persistence(_) => "persistence-failed",
         };
@@ -176,7 +227,7 @@ impl Serialize for DiscoveryError {
     }
 }
 
-fn candidate_id(parts: &[&str]) -> String {
+pub(super) fn candidate_id(parts: &[&str]) -> String {
     let mut digest = Sha256::new();
     for part in parts {
         digest.update(part.as_bytes());
@@ -185,32 +236,246 @@ fn candidate_id(parts: &[&str]) -> String {
     format!("provider-candidate:{:x}", digest.finalize())
 }
 
-fn read_exact_config(path: &Path) -> Result<Option<String>, DiscoveryError> {
-    if let Some(parent) = path.parent() {
-        if std::fs::symlink_metadata(parent)
-            .map(|value| value.file_type().is_symlink())
-            .unwrap_or(false)
-        {
-            return Err(DiscoveryError::Symlink(parent.display().to_string()));
+#[cfg(windows)]
+fn supported_windows_prefix(component: std::path::Component<'_>) -> bool {
+    use std::path::{Component, Prefix};
+
+    match component {
+        Component::Prefix(prefix) => matches!(
+            prefix.kind(),
+            Prefix::Disk(_)
+                | Prefix::UNC(_, _)
+                | Prefix::VerbatimDisk(_)
+                | Prefix::VerbatimUNC(_, _)
+        ),
+        _ => true,
+    }
+}
+
+fn metadata_is_link_or_reparse(metadata: &std::fs::Metadata) -> bool {
+    if metadata.file_type().is_symlink() {
+        return true;
+    }
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::MetadataExt;
+        use windows_sys::Win32::Storage::FileSystem::FILE_ATTRIBUTE_REPARSE_POINT;
+
+        return metadata.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0;
+    }
+    #[cfg(not(windows))]
+    false
+}
+
+fn exact_path_metadata(path: &Path) -> Result<Option<std::fs::Metadata>, DiscoveryError> {
+    if !path.is_absolute()
+        || path.components().any(|part| {
+            matches!(
+                part,
+                std::path::Component::CurDir | std::path::Component::ParentDir
+            )
+        })
+    {
+        return Err(DiscoveryError::Read("invalid exact config path".into()));
+    }
+    let label = path
+        .file_name()
+        .and_then(|value| value.to_str())
+        .unwrap_or("config");
+    let mut cursor = PathBuf::new();
+    let mut latest = None;
+    for component in path.components() {
+        #[cfg(windows)]
+        if !supported_windows_prefix(component) {
+            return Err(DiscoveryError::Read("invalid exact config path".into()));
+        }
+        cursor.push(component.as_os_str());
+        #[cfg(windows)]
+        if matches!(component, std::path::Component::Prefix(_)) {
+            continue;
+        }
+        match std::fs::symlink_metadata(&cursor) {
+            Ok(metadata) if metadata_is_link_or_reparse(&metadata) => {
+                return Err(DiscoveryError::Symlink(label.into()))
+            }
+            Ok(metadata) => latest = Some(metadata),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+            Err(error) if error.kind() == std::io::ErrorKind::PermissionDenied => {
+                return Err(DiscoveryError::Read(
+                    "permission denied while reading config".into(),
+                ))
+            }
+            Err(_) => return Err(DiscoveryError::Read("failed to inspect config".into())),
         }
     }
-    let metadata = match std::fs::symlink_metadata(path) {
-        Ok(value) => value,
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
-        Err(error) => return Err(DiscoveryError::Read(error.to_string())),
+    Ok(latest)
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct FileIdentity {
+    #[cfg(unix)]
+    device: u64,
+    #[cfg(unix)]
+    inode: u64,
+    #[cfg(windows)]
+    volume: u64,
+    #[cfg(windows)]
+    index: u64,
+    #[cfg(not(any(unix, windows)))]
+    length: u64,
+    #[cfg(not(any(unix, windows)))]
+    modified: Option<std::time::SystemTime>,
+}
+
+#[cfg(unix)]
+fn file_identity(file: &std::fs::File) -> Result<FileIdentity, DiscoveryError> {
+    use std::os::unix::fs::MetadataExt;
+    let metadata = file
+        .metadata()
+        .map_err(|_| DiscoveryError::Read("failed to inspect opened config".into()))?;
+    Ok(FileIdentity {
+        device: metadata.dev(),
+        inode: metadata.ino(),
+    })
+}
+
+#[cfg(windows)]
+fn windows_file_information(file: &std::fs::File) -> Result<(FileIdentity, u32), DiscoveryError> {
+    use std::mem::MaybeUninit;
+    use std::os::windows::io::AsRawHandle;
+    use windows_sys::Win32::Storage::FileSystem::{
+        GetFileInformationByHandle, BY_HANDLE_FILE_INFORMATION,
     };
-    if metadata.file_type().is_symlink() {
-        return Err(DiscoveryError::Symlink(path.display().to_string()));
+
+    let mut information = MaybeUninit::<BY_HANDLE_FILE_INFORMATION>::uninit();
+    // SAFETY: `file` owns a valid handle and the output pointer refers to
+    // writable storage for the documented Windows structure.
+    let succeeded =
+        unsafe { GetFileInformationByHandle(file.as_raw_handle() as _, information.as_mut_ptr()) };
+    if succeeded == 0 {
+        return Err(DiscoveryError::Read(
+            "failed to inspect opened config".into(),
+        ));
     }
-    if !metadata.is_file() {
+    // SAFETY: GetFileInformationByHandle initialized the structure on success.
+    let information = unsafe { information.assume_init() };
+    Ok((
+        FileIdentity {
+            volume: u64::from(information.dwVolumeSerialNumber),
+            index: (u64::from(information.nFileIndexHigh) << 32)
+                | u64::from(information.nFileIndexLow),
+        },
+        information.dwFileAttributes,
+    ))
+}
+
+#[cfg(windows)]
+fn file_identity(file: &std::fs::File) -> Result<FileIdentity, DiscoveryError> {
+    Ok(windows_file_information(file)?.0)
+}
+
+#[cfg(not(any(unix, windows)))]
+fn file_identity(file: &std::fs::File) -> Result<FileIdentity, DiscoveryError> {
+    let metadata = file
+        .metadata()
+        .map_err(|_| DiscoveryError::Read("failed to inspect opened config".into()))?;
+    Ok(FileIdentity {
+        length: metadata.len(),
+        modified: metadata.modified().ok(),
+    })
+}
+
+fn open_exact_config(path: &Path) -> Result<std::fs::File, DiscoveryError> {
+    let mut options = std::fs::OpenOptions::new();
+    options.read(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.custom_flags(libc::O_CLOEXEC | libc::O_NOFOLLOW);
+    }
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::OpenOptionsExt;
+        use windows_sys::Win32::Storage::FileSystem::FILE_FLAG_OPEN_REPARSE_POINT;
+        options.custom_flags(FILE_FLAG_OPEN_REPARSE_POINT);
+    }
+    let file = options
+        .open(path)
+        .map_err(|_| DiscoveryError::Read("failed to open config".into()))?;
+    #[cfg(windows)]
+    {
+        use windows_sys::Win32::Storage::FileSystem::FILE_ATTRIBUTE_REPARSE_POINT;
+        if windows_file_information(&file)?.1 & FILE_ATTRIBUTE_REPARSE_POINT != 0 {
+            let label = path
+                .file_name()
+                .and_then(|value| value.to_str())
+                .unwrap_or("config");
+            return Err(DiscoveryError::Symlink(label.into()));
+        }
+    }
+    Ok(file)
+}
+
+fn exact_path_file_identity(path: &Path) -> Result<Option<FileIdentity>, DiscoveryError> {
+    let Some(metadata) = exact_path_metadata(path)? else {
         return Ok(None);
+    };
+    if !metadata.is_file() {
+        return Err(DiscoveryError::Read("config is not a regular file".into()));
     }
-    if metadata.len() > MAX_CONFIG_BYTES {
-        return Err(DiscoveryError::TooLarge(path.display().to_string()));
+    open_exact_config(path).and_then(|file| file_identity(&file).map(Some))
+}
+
+pub(super) fn exact_regular_file_present(path: &Path) -> Result<bool, DiscoveryError> {
+    let Some(metadata) = exact_path_metadata(path)? else {
+        return Ok(false);
+    };
+    if !metadata.is_file() {
+        return Err(DiscoveryError::Read("config is not a regular file".into()));
     }
-    std::fs::read_to_string(path)
+    Ok(true)
+}
+
+pub(super) fn read_exact_config(path: &Path) -> Result<Option<String>, DiscoveryError> {
+    let Some(before) = exact_path_metadata(path)? else {
+        return Ok(None);
+    };
+    let label = path
+        .file_name()
+        .and_then(|value| value.to_str())
+        .unwrap_or("config");
+    if !before.is_file() {
+        return Err(DiscoveryError::Read("config is not a regular file".into()));
+    }
+    if before.len() > MAX_CONFIG_BYTES {
+        return Err(DiscoveryError::TooLarge(label.into()));
+    }
+    let mut file = open_exact_config(path)?;
+    let opened = file
+        .metadata()
+        .map_err(|_| DiscoveryError::Read("failed to inspect opened config".into()))?;
+    let opened_identity = file_identity(&file)?;
+    if !opened.is_file() || exact_path_file_identity(path)? != Some(opened_identity) {
+        return Err(DiscoveryError::Read(
+            "config identity changed before read".into(),
+        ));
+    }
+    let mut bytes = Vec::with_capacity((opened.len() as usize).min(MAX_CONFIG_BYTES as usize));
+    file.by_ref()
+        .take(MAX_CONFIG_BYTES + 1)
+        .read_to_end(&mut bytes)
+        .map_err(|_| DiscoveryError::Read("failed to read config".into()))?;
+    if bytes.len() as u64 > MAX_CONFIG_BYTES {
+        return Err(DiscoveryError::TooLarge(label.into()));
+    }
+    if exact_path_file_identity(path)? != Some(opened_identity) {
+        return Err(DiscoveryError::Read(
+            "config identity changed during read".into(),
+        ));
+    }
+    String::from_utf8(bytes)
         .map(Some)
-        .map_err(|error| DiscoveryError::Read(error.to_string()))
+        .map_err(|_| DiscoveryError::Parse("config is not valid UTF-8".into()))
 }
 
 fn normalize_wire(value: Option<&str>) -> Result<Option<String>, DiscoveryError> {
@@ -230,92 +495,487 @@ fn normalized_draft_wire_protocol(
         .map_err(DiscoveryError::UnsupportedWireProtocol)
 }
 
-fn discover_codex(home: &Path) -> Result<Vec<ProviderCandidate>, DiscoveryError> {
-    let codex_home = std::env::var_os("CODEX_HOME").map(PathBuf::from);
-    let config_location = if codex_home.is_some() {
-        "$CODEX_HOME/config.toml"
+fn codex_location(home: &Path) -> (PathBuf, &'static str) {
+    match std::env::var_os("CODEX_HOME") {
+        Some(path) => (PathBuf::from(path), "$CODEX_HOME"),
+        None => (home.join(".codex"), "~/.codex"),
+    }
+}
+
+fn codex_api_key_from(path: &Path) -> Result<Option<String>, DiscoveryError> {
+    let Some(raw) = read_exact_config(path)? else {
+        return Ok(None);
+    };
+    let value: serde_json::Value = serde_json::from_str(&raw)
+        .map_err(|_| DiscoveryError::Parse("Codex auth: invalid JSON".into()))?;
+    Ok(value
+        .get("OPENAI_API_KEY")
+        .and_then(serde_json::Value::as_str)
+        .filter(|value| !value.is_empty())
+        .map(str::to_owned))
+}
+
+fn codex_auth_source(
+    codex_home: &Path,
+    legacy_auth: Option<&Path>,
+) -> Result<(Option<String>, bool), DiscoveryError> {
+    let primary = codex_home.join("auth.json");
+    if read_exact_config(&primary)?.is_some() {
+        return Ok((codex_api_key_from(&primary)?, false));
+    }
+    match legacy_auth {
+        Some(path) => Ok((codex_api_key_from(path)?, true)),
+        None => Ok((None, false)),
+    }
+}
+
+#[cfg(test)]
+fn discover_codex_at(
+    codex_home: &Path,
+    display_root: &str,
+) -> Result<Vec<ProviderCandidate>, DiscoveryError> {
+    discover_codex_at_with_legacy(codex_home, display_root, None)
+}
+
+fn discover_codex_at_with_legacy(
+    codex_home: &Path,
+    display_root: &str,
+    legacy_auth: Option<&Path>,
+) -> Result<Vec<ProviderCandidate>, DiscoveryError> {
+    let config_location = format!("{display_root}/config.toml");
+    let (auth_key, using_legacy_auth) = codex_auth_source(codex_home, legacy_auth)?;
+    let auth_location = if using_legacy_auth {
+        "~/.config/codex/auth.json".into()
     } else {
-        "~/.codex/config.toml"
+        format!("{display_root}/auth.json")
     };
-    let path = codex_home
-        .unwrap_or_else(|| home.join(".codex"))
-        .join("config.toml");
-    let Some(raw) = read_exact_config(&path)? else {
-        return Ok(vec![]);
+    let config = match read_exact_config(&codex_home.join("config.toml"))? {
+        Some(raw) => Some(
+            toml::from_str::<toml::Value>(&raw)
+                .map_err(|_| DiscoveryError::Parse("Codex config: invalid TOML".into()))?,
+        ),
+        None => None,
     };
-    let value: toml::Value = toml::from_str(&raw)
-        .map_err(|error| DiscoveryError::Parse(format!("Codex config: {error}")))?;
-    let model_hint = value
-        .get("model")
+    let auth_key_available = auth_key.is_some();
+    let model_hint = config
+        .as_ref()
+        .and_then(|value| value.get("model"))
         .and_then(toml::Value::as_str)
         .map(str::to_owned);
-    let selected = value.get("model_provider").and_then(toml::Value::as_str);
-    let Some(table) = value.get("model_providers").and_then(toml::Value::as_table) else {
-        return Ok(vec![]);
-    };
+    let selected = config
+        .as_ref()
+        .and_then(|value| value.get("model_provider"))
+        .and_then(toml::Value::as_str);
+    let table = config
+        .as_ref()
+        .and_then(|value| value.get("model_providers"))
+        .and_then(toml::Value::as_table);
     let mut out = Vec::new();
-    for (provider_id, entry) in table {
-        let Some(provider) = entry.as_table() else {
-            continue;
-        };
-        let env_key = provider.get("env_key").and_then(toml::Value::as_str);
-        let base_url = provider
-            .get("base_url")
-            .and_then(toml::Value::as_str)
-            .map(str::to_owned);
-        let wire_protocol = normalize_wire(provider.get("wire_api").and_then(toml::Value::as_str))?;
-        let mut warnings = Vec::new();
-        if provider.contains_key("experimental_bearer_token") || provider.contains_key("auth") {
-            warnings.push("Command-backed or session authentication is not importable.".into());
+    let mut has_openai_provider = false;
+    if let Some(table) = table {
+        for (provider_id, entry) in table {
+            let Some(provider) = entry.as_table() else {
+                continue;
+            };
+            let is_openai = provider_id == "openai";
+            let is_cc_switch = provider_id == CODEX_CC_SWITCH_PROVIDER_ID
+                && provider.get("base_url").and_then(toml::Value::as_str)
+                    == Some(CC_SWITCH_BASE_URL);
+            // A reviewed CC Switch profile owns the Codex auth-file credential.
+            // Do not also project that same secret as a public OpenAI candidate.
+            has_openai_provider |= is_openai || is_cc_switch;
+            let env_key = provider.get("env_key").and_then(toml::Value::as_str);
+            let env_available = env_key.and_then(std::env::var_os).is_some();
+            let use_auth_file = (is_openai || is_cc_switch) && auth_key_available && !env_available;
+            let base_url = provider
+                .get("base_url")
+                .and_then(toml::Value::as_str)
+                .map(str::to_owned);
+            let wire_protocol = normalize_wire(
+                provider.get("wire_api").and_then(toml::Value::as_str),
+            )?
+            .or_else(|| {
+                Some(
+                    if is_openai || is_cc_switch {
+                        "responses"
+                    } else {
+                        "chat-completions"
+                    }
+                    .into(),
+                )
+            });
+            let mut warnings = Vec::new();
+            if provider.contains_key("experimental_bearer_token") || provider.contains_key("auth") {
+                warnings.push("Command-backed or session authentication is not importable.".into());
+            }
+            let label = provider
+                .get("name")
+                .and_then(toml::Value::as_str)
+                .unwrap_or(provider_id);
+            out.push(ProviderCandidate {
+                id: candidate_id(&["codex", provider_id, base_url.as_deref().unwrap_or("")]),
+                source: "codex".into(),
+                source_label: "Codex".into(),
+                agent_id: Some("codex".into()),
+                schema_id: Some(
+                    if use_auth_file && using_legacy_auth {
+                        "codex-config-legacy-auth-v1"
+                    } else {
+                        "codex-config-v1"
+                    }
+                    .into(),
+                ),
+                config_location: Some(if use_auth_file {
+                    auth_location.clone()
+                } else {
+                    config_location.clone()
+                }),
+                kind: if is_openai {
+                    "openai".into()
+                } else if is_cc_switch {
+                    "cc-switch".into()
+                } else {
+                    "openai-compatible".into()
+                },
+                label: label.into(),
+                base_url,
+                wire_protocol,
+                model_hint: if selected == Some(provider_id.as_str()) {
+                    model_hint.clone()
+                } else {
+                    None
+                },
+                credential: CredentialPreview {
+                    source_type: if env_available {
+                        "environment"
+                    } else if use_auth_file {
+                        "config-literal"
+                    } else {
+                        "none"
+                    }
+                    .into(),
+                    reference: if use_auth_file {
+                        Some("OPENAI_API_KEY".into())
+                    } else {
+                        env_key.map(str::to_owned)
+                    },
+                    available: env_available || use_auth_file,
+                    importable: env_available || use_auth_file,
+                },
+                warnings,
+            });
         }
-        let label = provider
-            .get("name")
-            .and_then(toml::Value::as_str)
-            .unwrap_or(provider_id);
-        let reference = env_key.map(str::to_owned);
-        let available = env_key.and_then(std::env::var_os).is_some();
+    }
+    if auth_key_available && !has_openai_provider {
         out.push(ProviderCandidate {
-            id: candidate_id(&["codex", provider_id, base_url.as_deref().unwrap_or("")]),
+            id: candidate_id(&["codex", "openai", "https://api.openai.com/v1"]),
             source: "codex".into(),
             source_label: "Codex".into(),
-            config_location: Some(config_location.into()),
-            kind: if provider_id == "openai" {
-                "openai".into()
-            } else {
-                "openai-compatible".into()
-            },
-            label: label.into(),
-            base_url,
-            wire_protocol,
-            model_hint: if selected == Some(provider_id.as_str()) {
-                model_hint.clone()
-            } else {
-                None
-            },
-            credential: CredentialPreview {
-                source_type: if env_key.is_some() {
-                    "environment"
+            agent_id: Some("codex".into()),
+            schema_id: Some(
+                if using_legacy_auth {
+                    "codex-legacy-auth-v1"
                 } else {
-                    "none"
+                    "codex-auth-v1"
                 }
                 .into(),
-                reference,
-                available,
-                importable: available,
+            ),
+            config_location: Some(auth_location),
+            kind: "openai".into(),
+            label: "OpenAI".into(),
+            base_url: Some("https://api.openai.com/v1".into()),
+            wire_protocol: Some("responses".into()),
+            model_hint,
+            credential: CredentialPreview {
+                source_type: "config-literal".into(),
+                reference: Some("OPENAI_API_KEY".into()),
+                available: true,
+                importable: true,
             },
-            warnings,
+            warnings: vec![],
         });
     }
     Ok(out)
 }
 
-fn discover_claude(home: &Path) -> Result<Vec<ProviderCandidate>, DiscoveryError> {
-    let path = home.join(".claude").join("settings.json");
-    let Some(raw) = read_exact_config(&path)? else {
-        return Ok(vec![]);
+fn discover_codex(home: &Path) -> Result<Vec<ProviderCandidate>, DiscoveryError> {
+    let (codex_home, display_root) = codex_location(home);
+    discover_codex_at_with_legacy(
+        &codex_home,
+        display_root,
+        Some(&home.join(".config/codex/auth.json")),
+    )
+}
+
+fn cc_switch_db_error() -> DiscoveryError {
+    DiscoveryError::Read("CC Switch database is unavailable".into())
+}
+
+fn validate_cc_switch_provider_schema(
+    connection: &rusqlite::Connection,
+) -> Result<(), DiscoveryError> {
+    let mut statement = connection
+        .prepare("SELECT name, type, \"notnull\", pk FROM pragma_table_info('providers')")
+        .map_err(|_| cc_switch_db_error())?;
+    let columns = statement
+        .query_map([], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                (
+                    row.get::<_, String>(1)?,
+                    row.get::<_, i64>(2)?,
+                    row.get::<_, i64>(3)?,
+                ),
+            ))
+        })
+        .map_err(|_| cc_switch_db_error())?
+        .collect::<Result<HashMap<_, _>, _>>()
+        .map_err(|_| cc_switch_db_error())?;
+    for (name, expected_type, expected_not_null, expected_primary_key) in [
+        ("id", "TEXT", 1, 1),
+        ("app_type", "TEXT", 1, 2),
+        ("settings_config", "TEXT", 1, 0),
+        ("is_current", "BOOLEAN", 1, 0),
+    ] {
+        let Some((actual_type, actual_not_null, actual_primary_key)) = columns.get(name) else {
+            return Err(DiscoveryError::Parse(
+                "CC Switch database schema is unsupported".into(),
+            ));
+        };
+        if !actual_type.eq_ignore_ascii_case(expected_type)
+            || *actual_not_null != expected_not_null
+            || *actual_primary_key != expected_primary_key
+        {
+            return Err(DiscoveryError::Parse(
+                "CC Switch database schema is unsupported".into(),
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn normalize_cc_switch_upstream_base_url(value: &str) -> Result<String, DiscoveryError> {
+    let mut parsed = reqwest::Url::parse(value)
+        .map_err(|_| DiscoveryError::Parse("CC Switch upstream endpoint is invalid".into()))?;
+    if parsed.scheme() != "https"
+        || !parsed.username().is_empty()
+        || parsed.password().is_some()
+        || parsed.query().is_some()
+        || parsed.fragment().is_some()
+    {
+        return Err(DiscoveryError::Parse(
+            "CC Switch upstream endpoint is not importable".into(),
+        ));
+    }
+    if matches!(parsed.path(), "" | "/") {
+        parsed.set_path("/v1");
+    } else {
+        let normalized_path = parsed.path().trim_end_matches('/').to_owned();
+        parsed.set_path(&normalized_path);
+    }
+    let normalized = parsed.to_string();
+    ai_proxy::enforce_host("openai-compatible", &normalized).map_err(|_| {
+        DiscoveryError::Parse("CC Switch upstream endpoint is not importable".into())
+    })?;
+    Ok(normalized)
+}
+
+fn parse_cc_switch_settings(raw: &str) -> Result<(String, Option<String>, String), DiscoveryError> {
+    if raw.len() > MAX_CONFIG_BYTES as usize {
+        return Err(DiscoveryError::TooLarge(
+            "CC Switch provider settings".into(),
+        ));
+    }
+    let settings: CcSwitchSettings = serde_json::from_str(raw)
+        .map_err(|_| DiscoveryError::Parse("CC Switch provider settings are invalid".into()))?;
+    if settings.auth.api_key.is_empty()
+        || settings.auth.api_key.len() > 16 * 1024
+        || settings.auth.api_key.chars().any(char::is_whitespace)
+        || settings.auth.api_key.chars().any(char::is_control)
+    {
+        return Err(DiscoveryError::NotImportable);
+    }
+    let config: toml::Value = toml::from_str(&settings.config)
+        .map_err(|_| DiscoveryError::Parse("CC Switch Codex config is invalid".into()))?;
+    let table = config
+        .as_table()
+        .ok_or_else(|| DiscoveryError::Parse("CC Switch Codex config is invalid".into()))?;
+    if table.contains_key("model_provider") || table.contains_key("model_providers") {
+        return Err(DiscoveryError::Parse(
+            "CC Switch Codex config has an ambiguous upstream".into(),
+        ));
+    }
+    let base_url = table
+        .get("base_url")
+        .and_then(toml::Value::as_str)
+        .ok_or_else(|| DiscoveryError::Parse("CC Switch upstream endpoint is missing".into()))?;
+    if table.get("wire_api").and_then(toml::Value::as_str) != Some("responses") {
+        return Err(DiscoveryError::UnsupportedWireProtocol(
+            "CC Switch upstream must use Responses".into(),
+        ));
+    }
+    let model_hint = match table.get("model") {
+        Some(value) => {
+            let model = value.as_str().ok_or_else(|| {
+                DiscoveryError::Parse("CC Switch selected model is invalid".into())
+            })?;
+            validate_sanitized_text(model, 160)?;
+            Some(model.to_owned())
+        }
+        None => None,
     };
-    let value: serde_json::Value = serde_json::from_str(&raw)
-        .map_err(|error| DiscoveryError::Parse(format!("Claude settings: {error}")))?;
+    Ok((
+        normalize_cc_switch_upstream_base_url(base_url)?,
+        model_hint,
+        settings.auth.api_key,
+    ))
+}
+
+fn cc_switch_current_provider_at(
+    database_path: &Path,
+) -> Result<Option<CcSwitchProviderRecord>, DiscoveryError> {
+    fn database_identity(path: &Path) -> Result<Option<FileIdentity>, DiscoveryError> {
+        let Some(metadata) = exact_path_metadata(path)? else {
+            return Ok(None);
+        };
+        if !metadata.is_file() {
+            return Err(DiscoveryError::Read(
+                "CC Switch database is not a regular file".into(),
+            ));
+        }
+        if metadata.len() > MAX_CC_SWITCH_DB_BYTES {
+            return Err(DiscoveryError::TooLarge("CC Switch database".into()));
+        }
+        exact_path_file_identity(path)
+    }
+
+    let Some(before_identity) = database_identity(database_path)? else {
+        return Ok(None);
+    };
+    let result = (|| {
+        let connection = rusqlite::Connection::open_with_flags(
+            database_path,
+            rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX,
+        )
+        .map_err(|_| cc_switch_db_error())?;
+        connection
+            .busy_timeout(Duration::from_secs(2))
+            .map_err(|_| cc_switch_db_error())?;
+        connection
+            .pragma_update(None, "query_only", "ON")
+            .map_err(|_| cc_switch_db_error())?;
+        validate_cc_switch_provider_schema(&connection)?;
+
+        let mut statement = connection
+            .prepare(
+                "SELECT id, length(settings_config), \
+                        CASE WHEN length(settings_config) <= ?1 THEN settings_config END \
+                 FROM providers \
+                 WHERE app_type = 'codex' AND is_current = 1 LIMIT 2",
+            )
+            .map_err(|_| cc_switch_db_error())?;
+        let mut rows = statement
+            .query([MAX_CONFIG_BYTES as i64])
+            .map_err(|_| cc_switch_db_error())?;
+        let Some(row) = rows.next().map_err(|_| cc_switch_db_error())? else {
+            return Ok(None);
+        };
+        let provider_id: String = row.get(0).map_err(|_| cc_switch_db_error())?;
+        let settings_length: i64 = row.get(1).map_err(|_| cc_switch_db_error())?;
+        if settings_length < 0 || settings_length as u64 > MAX_CONFIG_BYTES {
+            return Err(DiscoveryError::TooLarge(
+                "CC Switch provider settings".into(),
+            ));
+        }
+        let settings: String = row.get(2).map_err(|_| cc_switch_db_error())?;
+        if rows.next().map_err(|_| cc_switch_db_error())?.is_some() {
+            return Err(DiscoveryError::Parse(
+                "CC Switch has multiple current Codex providers".into(),
+            ));
+        }
+        Ok(Some((provider_id, settings)))
+    })();
+    if database_identity(database_path)? != Some(before_identity) {
+        return Err(DiscoveryError::Read(
+            "CC Switch database identity changed during read".into(),
+        ));
+    };
+    let Some((provider_id, settings)) = result? else {
+        return Ok(None);
+    };
+    if provider_id.is_empty()
+        || provider_id.len() > 160
+        || provider_id.chars().any(char::is_control)
+    {
+        return Err(DiscoveryError::Parse(
+            "CC Switch current provider identity is invalid".into(),
+        ));
+    }
+    let (base_url, model_hint, secret) = parse_cc_switch_settings(&settings)?;
+    Ok(Some(CcSwitchProviderRecord {
+        provider_id,
+        base_url,
+        model_hint,
+        secret,
+    }))
+}
+
+fn cc_switch_candidate(record: &CcSwitchProviderRecord) -> ProviderCandidate {
+    ProviderCandidate {
+        id: candidate_id(&[
+            "cc-switch-db",
+            &record.provider_id,
+            record.base_url.as_str(),
+        ]),
+        source: "cc-switch".into(),
+        source_label: "CC Switch".into(),
+        agent_id: Some("codex".into()),
+        schema_id: Some(CC_SWITCH_DB_SCHEMA_ID.into()),
+        config_location: Some(CC_SWITCH_DB_LOCATION.into()),
+        kind: "openai-compatible".into(),
+        label: "CC Switch current Codex upstream".into(),
+        base_url: Some(record.base_url.clone()),
+        wire_protocol: Some("responses".into()),
+        model_hint: record.model_hint.clone(),
+        credential: CredentialPreview {
+            source_type: "cc-switch-db".into(),
+            reference: Some("OPENAI_API_KEY".into()),
+            available: true,
+            importable: true,
+        },
+        warnings: vec![],
+    }
+}
+
+fn discover_cc_switch(home: &Path) -> Result<Vec<ProviderCandidate>, DiscoveryError> {
+    Ok(
+        cc_switch_current_provider_at(&home.join(".cc-switch/cc-switch.db"))?
+            .as_ref()
+            .map(cc_switch_candidate)
+            .into_iter()
+            .collect(),
+    )
+}
+
+fn discover_claude(home: &Path) -> Result<Vec<ProviderCandidate>, DiscoveryError> {
+    let (root, display_root) = match std::env::var_os("CLAUDE_CONFIG_DIR") {
+        Some(value) => {
+            let root = PathBuf::from(value);
+            if !root.is_absolute() {
+                return Err(DiscoveryError::Read(
+                    "invalid CLAUDE_CONFIG_DIR root".into(),
+                ));
+            }
+            (root, "$CLAUDE_CONFIG_DIR")
+        }
+        None => (home.join(".claude"), "~/.claude"),
+    };
+    let path = root.join("settings.json");
+    let value: serde_json::Value = match read_exact_config(&path)? {
+        Some(raw) => serde_json::from_str(&raw)
+            .map_err(|_| DiscoveryError::Parse("Claude settings: invalid JSON".into()))?,
+        None => serde_json::json!({}),
+    };
     let env = value.get("env").and_then(serde_json::Value::as_object);
     let base_url = env
         .and_then(|v| v.get("ANTHROPIC_BASE_URL"))
@@ -329,9 +989,8 @@ fn discover_claude(home: &Path) -> Result<Vec<ProviderCandidate>, DiscoveryError
         .and_then(|v| v.get("ANTHROPIC_AUTH_TOKEN"))
         .and_then(serde_json::Value::as_str)
         .filter(|value| !value.is_empty());
-    if base_url.is_none() && api_key.is_none() && auth_token.is_none() {
-        return Ok(vec![]);
-    }
+    let helper_present = value.get("apiKeyHelper").is_some();
+    let credentials_present = exact_regular_file_present(&root.join(".credentials.json"))?;
     let (source_type, reference, available, importable, warnings) = if api_key.is_some() {
         (
             "config-literal",
@@ -358,27 +1017,82 @@ fn discover_claude(home: &Path) -> Result<Vec<ProviderCandidate>, DiscoveryError
             vec![],
         )
     };
-    Ok(vec![ProviderCandidate {
-        id: candidate_id(&["claude", base_url.as_deref().unwrap_or("")]),
-        source: "claude".into(),
-        source_label: "Claude Code".into(),
-        config_location: Some("~/.claude/settings.json".into()),
-        kind: "anthropic".into(),
-        label: "Claude Code Anthropic".into(),
-        base_url,
-        wire_protocol: Some("anthropic-messages".into()),
-        model_hint: value
-            .get("model")
-            .and_then(serde_json::Value::as_str)
-            .map(str::to_owned),
-        credential: CredentialPreview {
-            source_type: source_type.into(),
-            reference,
-            available,
-            importable,
-        },
-        warnings,
-    }])
+    let mut rows = Vec::new();
+    if base_url.is_some() || api_key.is_some() || auth_token.is_some() || available {
+        rows.push(ProviderCandidate {
+            id: candidate_id(&["claude", base_url.as_deref().unwrap_or("")]),
+            source: "claude".into(),
+            source_label: "Claude Code".into(),
+            agent_id: Some("claude-code".into()),
+            schema_id: Some("claude-settings-v1".into()),
+            config_location: Some(format!("{display_root}/settings.json")),
+            kind: "anthropic".into(),
+            label: "Claude Code Anthropic".into(),
+            base_url: base_url.clone(),
+            wire_protocol: Some("anthropic-messages".into()),
+            model_hint: value
+                .get("model")
+                .and_then(serde_json::Value::as_str)
+                .map(str::to_owned),
+            credential: CredentialPreview {
+                source_type: source_type.into(),
+                reference,
+                available,
+                importable,
+            },
+            warnings,
+        });
+    }
+    let binding_base = base_url
+        .clone()
+        .unwrap_or_else(|| "https://api.anthropic.com/v1".into());
+    if helper_present {
+        rows.push(ProviderCandidate {
+            id: candidate_id(&["claude", "helper", &binding_base]),
+            source: "claude".into(),
+            source_label: "Claude Code".into(),
+            agent_id: Some("claude-code".into()),
+            schema_id: Some("claude-helper-presence-v1".into()),
+            config_location: Some(format!("{display_root}/settings.json")),
+            kind: "anthropic".into(),
+            label: "Claude Code Anthropic".into(),
+            base_url: base_url.clone(),
+            wire_protocol: Some("anthropic-messages".into()),
+            model_hint: None,
+            credential: CredentialPreview {
+                source_type: "helper".into(),
+                reference: Some("API key helper".into()),
+                available: true,
+                importable: false,
+            },
+            warnings: vec!["Command-backed credentials are never executed or imported.".into()],
+        });
+    }
+    if credentials_present {
+        rows.push(ProviderCandidate {
+            id: candidate_id(&["claude", "oauth-session", &binding_base]),
+            source: "claude".into(),
+            source_label: "Claude Code".into(),
+            agent_id: Some("claude-code".into()),
+            schema_id: Some("claude-oauth-presence-v1".into()),
+            config_location: Some(format!("{display_root}/.credentials.json")),
+            kind: "anthropic".into(),
+            label: "Claude Code Anthropic".into(),
+            base_url: base_url.clone(),
+            wire_protocol: Some("anthropic-messages".into()),
+            model_hint: None,
+            credential: CredentialPreview {
+                source_type: "session".into(),
+                reference: Some("OAuth session".into()),
+                available: true,
+                importable: false,
+            },
+            warnings: vec![
+                "OAuth sessions are display-only and cannot be imported as API keys.".into(),
+            ],
+        });
+    }
+    Ok(rows)
 }
 
 fn discover_environment() -> Vec<ProviderCandidate> {
@@ -412,6 +1126,8 @@ fn discover_environment() -> Vec<ProviderCandidate> {
                 id: candidate_id(&["environment", env]),
                 source: "environment".into(),
                 source_label: "Process environment".into(),
+                agent_id: None,
+                schema_id: None,
                 config_location: None,
                 kind: kind.into(),
                 label: label.into(),
@@ -453,7 +1169,9 @@ fn discover_cutout_keychain<R: Runtime>(app: &AppHandle<R>) -> Vec<ProviderCandi
             Some(ProviderCandidate {
                 id: candidate_id(&["cutout-keychain", id]),
                 source: "cutout-keychain".into(),
-                source_label: "Cutout Keychain".into(),
+                source_label: "Cutout local credentials".into(),
+                agent_id: None,
+                schema_id: None,
                 config_location: None,
                 kind: row.get("kind")?.as_str()?.into(),
                 label: row.get("label")?.as_str()?.into(),
@@ -471,7 +1189,7 @@ fn discover_cutout_keychain<R: Runtime>(app: &AppHandle<R>) -> Vec<ProviderCandi
                     .map(str::to_owned),
                 credential: CredentialPreview {
                     source_type: "keychain".into(),
-                    reference: Some("Cutout provider credential".into()),
+                    reference: Some("Cutout local provider credential".into()),
                     available: true,
                     importable: true,
                 },
@@ -506,10 +1224,42 @@ pub async fn discover_provider_candidates<R: Runtime>(
     app: AppHandle<R>,
 ) -> Result<Vec<ProviderCandidate>, DiscoveryError> {
     let home = app.path().home_dir().map_err(|_| DiscoveryError::Home)?;
-    let mut candidates = discover_codex(&home)?;
-    candidates.extend(discover_claude(&home)?);
+    let mut candidates = Vec::new();
+    let mut first_error = None;
+    for result in [
+        discover_cc_switch(&home),
+        discover_codex(&home),
+        discover_claude(&home),
+        agent_credentials::discover(&home),
+    ] {
+        match result {
+            Ok(rows) => candidates.extend(rows),
+            Err(error) => {
+                first_error.get_or_insert(error);
+            }
+        }
+    }
     candidates.extend(discover_environment());
     candidates.extend(discover_cutout_keychain(&app));
+    finalize_candidates(candidates, first_error)
+}
+
+fn finalize_candidates(
+    mut candidates: Vec<ProviderCandidate>,
+    mut first_error: Option<DiscoveryError>,
+) -> Result<Vec<ProviderCandidate>, DiscoveryError> {
+    candidates.retain(|candidate| match validate_candidate(candidate) {
+        Ok(()) => true,
+        Err(error) => {
+            first_error.get_or_insert(error);
+            false
+        }
+    });
+    if candidates.is_empty() {
+        if let Some(error) = first_error {
+            return Err(error);
+        }
+    }
     let mut seen = HashSet::new();
     candidates.retain(|candidate| seen.insert(candidate.id.clone()));
     candidates.sort_by(|a, b| {
@@ -518,22 +1268,61 @@ pub async fn discover_provider_candidates<R: Runtime>(
     Ok(candidates)
 }
 
-fn candidate_secret(candidate: &ProviderCandidate, home: &Path) -> Result<String, DiscoveryError> {
+fn candidate_secret_at(
+    candidate: &ProviderCandidate,
+    home: &Path,
+    codex_home: &Path,
+) -> Result<String, DiscoveryError> {
     match (
         candidate.source.as_str(),
         candidate.credential.reference.as_deref(),
     ) {
-        ("environment" | "codex", Some(name)) => {
+        ("environment", Some(name)) => {
             std::env::var(name).map_err(|_| DiscoveryError::CandidateMissing)
+        }
+        ("codex", Some(name)) if candidate.credential.source_type == "environment" => {
+            std::env::var(name).map_err(|_| DiscoveryError::CandidateMissing)
+        }
+        ("codex", Some("OPENAI_API_KEY"))
+            if candidate.credential.source_type == "config-literal" =>
+        {
+            let legacy = home.join(".config/codex/auth.json");
+            let primary = codex_home.join("auth.json");
+            let source = if candidate
+                .schema_id
+                .as_deref()
+                .is_some_and(|schema| schema.contains("legacy-auth"))
+            {
+                &legacy
+            } else {
+                &primary
+            };
+            codex_api_key_from(source)?.ok_or(DiscoveryError::CandidateMissing)
+        }
+        ("cc-switch", Some("OPENAI_API_KEY"))
+            if candidate.credential.source_type == "cc-switch-db"
+                && candidate.schema_id.as_deref() == Some(CC_SWITCH_DB_SCHEMA_ID) =>
+        {
+            let record = cc_switch_current_provider_at(&home.join(".cc-switch/cc-switch.db"))?
+                .ok_or(DiscoveryError::CandidateMissing)?;
+            let current = cc_switch_candidate(&record);
+            if candidate_fingerprint(&current)? != candidate_fingerprint(candidate)? {
+                return Err(DiscoveryError::CandidateMissing);
+            }
+            Ok(record.secret)
         }
         ("claude", Some(name)) if candidate.credential.source_type == "environment" => {
             std::env::var(name).map_err(|_| DiscoveryError::CandidateMissing)
         }
         ("claude", Some("ANTHROPIC_API_KEY")) => {
-            let path = home.join(".claude/settings.json");
+            let root = match std::env::var_os("CLAUDE_CONFIG_DIR") {
+                Some(value) => PathBuf::from(value),
+                None => home.join(".claude"),
+            };
+            let path = root.join("settings.json");
             let raw = read_exact_config(&path)?.ok_or(DiscoveryError::CandidateMissing)?;
             let value: serde_json::Value = serde_json::from_str(&raw)
-                .map_err(|error| DiscoveryError::Parse(format!("Claude settings: {error}")))?;
+                .map_err(|_| DiscoveryError::Parse("Claude settings: invalid JSON".into()))?;
             value
                 .get("env")
                 .and_then(|env| env.get("ANTHROPIC_API_KEY"))
@@ -542,8 +1331,146 @@ fn candidate_secret(candidate: &ProviderCandidate, home: &Path) -> Result<String
                 .map(str::to_owned)
                 .ok_or(DiscoveryError::CandidateMissing)
         }
-        _ => Err(DiscoveryError::NotImportable),
+        _ => agent_credentials::resolve(candidate, home),
     }
+}
+
+fn candidate_fingerprint(candidate: &ProviderCandidate) -> Result<String, DiscoveryError> {
+    let bytes =
+        serde_json::to_vec(candidate).map_err(|error| DiscoveryError::Parse(error.to_string()))?;
+    Ok(format!("{:x}", Sha256::digest(bytes)))
+}
+
+fn secret_revision(secret: &str) -> String {
+    format!("{:x}", Sha256::digest(secret.as_bytes()))
+}
+
+fn candidate_effective_base_url(candidate: &ProviderCandidate) -> Option<&str> {
+    candidate.base_url.as_deref().or_else(|| {
+        let kind: ProviderKind =
+            serde_json::from_value(serde_json::Value::String(candidate.kind.clone())).ok()?;
+        ai_proxy::default_base_url(kind)
+    })
+}
+
+fn validate_existing_provider_binding<R: Runtime>(
+    app: &AppHandle<R>,
+    provider_id: &str,
+    supplied_kind: &str,
+    supplied_base_url: &str,
+    supplied_wire_protocol: Option<ProviderWireProtocol>,
+) -> Result<(), DiscoveryError> {
+    let providers = providers::load_providers_sync(app)
+        .map_err(|error| DiscoveryError::Persistence(error.to_string()))?;
+    let provider = providers
+        .iter()
+        .find(|provider| provider.id == provider_id)
+        .ok_or(DiscoveryError::CandidateMissing)?;
+    let effective_wire = provider
+        .kind
+        .effective_wire_protocol(provider.wire_protocol)
+        .map_err(DiscoveryError::UnsupportedWireProtocol)?;
+    let effective_base = provider
+        .base_url
+        .as_deref()
+        .or_else(|| ai_proxy::default_base_url(provider.kind));
+    if provider.kind.as_str() != supplied_kind
+        || effective_base != Some(supplied_base_url)
+        || effective_wire != supplied_wire_protocol
+    {
+        return Err(DiscoveryError::NotImportable);
+    }
+    Ok(())
+}
+
+fn looks_secret_bearing(value: &str) -> bool {
+    let lower = value.to_ascii_lowercase();
+    lower.starts_with("sk-")
+        || lower.contains("bearer ")
+        || ["api_key=", "apikey=", "token=", "secret=", "password="]
+            .iter()
+            .any(|marker| lower.contains(marker))
+}
+
+fn validate_sanitized_text(value: &str, maximum: usize) -> Result<(), DiscoveryError> {
+    if value.is_empty()
+        || value.len() > maximum
+        || value.chars().any(char::is_control)
+        || Path::new(value).is_absolute()
+        || value.starts_with(['/', '\\'])
+        || (value.len() >= 3
+            && value.as_bytes()[0].is_ascii_alphabetic()
+            && value.as_bytes()[1] == b':'
+            && matches!(value.as_bytes()[2], b'\\' | b'/'))
+        || looks_secret_bearing(value)
+    {
+        return Err(DiscoveryError::Parse(
+            "provider candidate contains unsafe display metadata".into(),
+        ));
+    }
+    Ok(())
+}
+
+fn validate_candidate(candidate: &ProviderCandidate) -> Result<(), DiscoveryError> {
+    validate_sanitized_text(&candidate.source_label, 80)?;
+    validate_sanitized_text(&candidate.label, 120)?;
+    if let Some(location) = candidate.config_location.as_deref() {
+        validate_sanitized_text(location, 160)?;
+        if !(location.starts_with("~/") || location.starts_with('$'))
+            || location.split('/').any(|part| part == "..")
+            || location.contains('\\')
+        {
+            return Err(DiscoveryError::Parse(
+                "provider candidate contains an unsafe location label".into(),
+            ));
+        }
+    }
+    if let Some(reference) = candidate.credential.reference.as_deref() {
+        validate_sanitized_text(reference, 128)?;
+        if matches!(
+            candidate.credential.source_type.as_str(),
+            "environment" | "dotenv"
+        ) {
+            let mut bytes = reference.bytes();
+            if !matches!(bytes.next(), Some(b'A'..=b'Z' | b'a'..=b'z' | b'_'))
+                || !bytes.all(|byte| byte.is_ascii_alphanumeric() || byte == b'_')
+            {
+                return Err(DiscoveryError::Parse(
+                    "provider candidate contains an unsafe environment reference".into(),
+                ));
+            }
+        }
+    }
+    if let Some(model) = candidate.model_hint.as_deref() {
+        validate_sanitized_text(model, 160)?;
+    }
+    for warning in &candidate.warnings {
+        validate_sanitized_text(warning, 240)?;
+    }
+    if let Some(base_url) = candidate.base_url.as_deref() {
+        let parsed = reqwest::Url::parse(base_url).map_err(|_| {
+            DiscoveryError::Parse("provider candidate has an invalid endpoint".into())
+        })?;
+        if !matches!(parsed.scheme(), "http" | "https")
+            || !parsed.username().is_empty()
+            || parsed.password().is_some()
+            || parsed.query().is_some()
+            || parsed.fragment().is_some()
+        {
+            return Err(DiscoveryError::Parse(
+                "provider candidate has an unsafe endpoint".into(),
+            ));
+        }
+        ai_proxy::enforce_host(&candidate.kind, base_url).map_err(|_| {
+            DiscoveryError::Parse("provider candidate endpoint is not allowed".into())
+        })?;
+    }
+    Ok(())
+}
+
+fn candidate_secret(candidate: &ProviderCandidate, home: &Path) -> Result<String, DiscoveryError> {
+    let (codex_home, _) = codex_location(home);
+    candidate_secret_at(candidate, home, &codex_home)
 }
 
 fn model_ids(body: &str) -> Result<Vec<String>, DiscoveryError> {
@@ -572,12 +1499,43 @@ fn model_ids(body: &str) -> Result<Vec<String>, DiscoveryError> {
 }
 
 #[tauri::command]
-pub async fn create_provider_draft(
+pub async fn create_provider_draft<R: Runtime>(
+    app: AppHandle<R>,
     input: CreateDraftInput,
 ) -> Result<DraftSummary, DiscoveryError> {
+    let source_count = usize::from(input.candidate_id.is_some())
+        + usize::from(input.provider_id.is_some())
+        + usize::from(input.secret.as_ref().is_some_and(|value| !value.is_empty()));
     let kind: ProviderKind = serde_json::from_value(serde_json::Value::String(input.kind.clone()))
         .map_err(|error| DiscoveryError::Parse(error.to_string()))?;
+    validate_draft_source_count(kind, source_count)?;
     let wire_protocol = normalized_draft_wire_protocol(kind, input.wire_protocol)?;
+    let candidate_fingerprint = if let Some(id) = input.candidate_id.as_deref() {
+        let candidate = discover_provider_candidates(app.clone())
+            .await?
+            .into_iter()
+            .find(|candidate| candidate.id == id)
+            .ok_or(DiscoveryError::CandidateMissing)?;
+        if !candidate.credential.importable
+            || candidate.kind != input.kind
+            || candidate_effective_base_url(&candidate) != Some(input.base_url.as_str())
+            || candidate.wire_protocol.as_deref() != wire_protocol.map(ProviderWireProtocol::as_str)
+        {
+            return Err(DiscoveryError::NotImportable);
+        }
+        Some(candidate_fingerprint(&candidate)?)
+    } else {
+        None
+    };
+    if let Some(provider_id) = input.provider_id.as_deref() {
+        validate_existing_provider_binding(
+            &app,
+            provider_id,
+            &input.kind,
+            &input.base_url,
+            wire_protocol,
+        )?;
+    }
     let mut store = drafts()
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
@@ -596,6 +1554,8 @@ pub async fn create_provider_draft(
             candidate_id: input.candidate_id,
             provider_id: input.provider_id,
             secret: input.secret.filter(|value| !value.is_empty()),
+            candidate_fingerprint,
+            candidate_secret_revision: None,
             checked_models: None,
         },
     );
@@ -603,6 +1563,21 @@ pub async fn create_provider_draft(
         draft_id,
         expires_in_seconds: DRAFT_TTL.as_secs(),
     })
+}
+
+fn validate_draft_source_count(
+    kind: ProviderKind,
+    source_count: usize,
+) -> Result<(), DiscoveryError> {
+    let local_without_key = matches!(
+        kind,
+        ProviderKind::Ollama | ProviderKind::Vllm | ProviderKind::LmStudio
+    );
+    if source_count > 1 || (source_count == 0 && !local_without_key) {
+        Err(DiscoveryError::DraftAmbiguous)
+    } else {
+        Ok(())
+    }
 }
 
 async fn resolve_draft_secret<R: Runtime>(
@@ -618,16 +1593,42 @@ async fn resolve_draft_secret<R: Runtime>(
             .iter()
             .find(|item| item.id == *id)
             .ok_or(DiscoveryError::CandidateMissing)?;
-        if candidate.source == "cutout-keychain" {
-            let source_id = cutout_source_id(app, id)?;
-            return keys::read_secret(&source_id)
-                .map_err(|error| DiscoveryError::Keychain(error.to_string()));
+        if let Some(expected) = draft.candidate_fingerprint.as_deref() {
+            if candidate_fingerprint(candidate)? != expected {
+                return Err(DiscoveryError::CandidateMissing);
+            }
         }
-        let home = app.path().home_dir().map_err(|_| DiscoveryError::Home)?;
-        return candidate_secret(candidate, &home);
+        let secret = if candidate.source == "cutout-keychain" {
+            let source_id = cutout_source_id(app, id)?;
+            keys::read_secret(&source_id)
+                .map_err(|error| DiscoveryError::Keychain(error.to_string()))?
+        } else {
+            let home = app.path().home_dir().map_err(|_| DiscoveryError::Home)?;
+            candidate_secret(candidate, &home)?
+        };
+        if let Some(expected) = draft.candidate_secret_revision.as_deref() {
+            if secret_revision(&secret) != expected {
+                return Err(DiscoveryError::CandidateMissing);
+            }
+        }
+        return Ok(secret);
     }
     if let Some(id) = &draft.provider_id {
-        return keys::read_secret(id).map_err(|error| DiscoveryError::Keychain(error.to_string()));
+        validate_existing_provider_binding(
+            app,
+            id,
+            &draft.kind,
+            &draft.base_url,
+            draft.wire_protocol,
+        )?;
+        let secret =
+            keys::read_secret(id).map_err(|error| DiscoveryError::Keychain(error.to_string()))?;
+        if let Some(expected) = draft.candidate_secret_revision.as_deref() {
+            if secret_revision(&secret) != expected {
+                return Err(DiscoveryError::CandidateMissing);
+            }
+        }
+        return Ok(secret);
     }
     if matches!(draft.kind.as_str(), "ollama" | "vllm" | "lm-studio") {
         return Ok(String::new());
@@ -638,7 +1639,7 @@ async fn resolve_draft_secret<R: Runtime>(
 async fn check_draft<R: Runtime>(
     app: &AppHandle<R>,
     draft: &ProviderDraftSession,
-) -> Result<Vec<String>, DiscoveryError> {
+) -> Result<(Vec<String>, Option<String>), DiscoveryError> {
     // This intentionally remains an authenticated catalog request. The four
     // supported generation protocols do not share a standardized no-cost
     // OPTIONS/HEAD probe, and Check connection must never trigger generation.
@@ -657,12 +1658,15 @@ async fn check_draft<R: Runtime>(
     )
     .await
     .map_err(|error| DiscoveryError::Request(error.to_string()))?;
-    match response.status {
+    let models = match response.status {
         200..=299 => model_ids(&response.body),
         401 | 403 => Err(DiscoveryError::Http(response.status)),
         404 | 405 => Err(DiscoveryError::CatalogUnsupported),
         status => Err(DiscoveryError::Http(status)),
-    }
+    }?;
+    let revision = (draft.candidate_id.is_some() || draft.provider_id.is_some())
+        .then(|| secret_revision(&secret));
+    Ok((models, revision))
 }
 
 #[tauri::command]
@@ -684,6 +1688,8 @@ pub async fn check_provider_draft<R: Runtime>(
             candidate_id: draft.candidate_id.clone(),
             provider_id: draft.provider_id.clone(),
             secret: draft.secret.clone(),
+            candidate_fingerprint: draft.candidate_fingerprint.clone(),
+            candidate_secret_revision: draft.candidate_secret_revision.clone(),
             checked_models: draft.checked_models.clone(),
         }
     };
@@ -695,13 +1701,10 @@ pub async fn check_provider_draft<R: Runtime>(
         .get_mut(&draft_id)
         .ok_or(DiscoveryError::DraftExpired)?;
     match result {
-        Ok(models) => {
+        Ok((models, revision)) => {
+            current.candidate_secret_revision = revision;
             current.checked_models = Some(models.clone());
             Ok(ProviderProbeResult { models })
-        }
-        Err(DiscoveryError::CatalogUnsupported) => {
-            current.checked_models = Some(Vec::new());
-            Err(DiscoveryError::CatalogUnsupported)
         }
         Err(error) => Err(error),
     }
@@ -764,10 +1767,472 @@ pub async fn import_provider_draft<R: Runtime>(
     Ok(provider)
 }
 
+fn automatic_provider_id(candidate_id: &str) -> Result<String, DiscoveryError> {
+    let digest = candidate_id
+        .strip_prefix("provider-candidate:")
+        .filter(|value| value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit()))
+        .ok_or(DiscoveryError::CandidateMissing)?;
+    Ok(format!("local-import-{}", &digest[..24]))
+}
+
+fn automatic_default_model(
+    candidate: &ProviderCandidate,
+    models: &[String],
+) -> Result<String, DiscoveryError> {
+    candidate
+        .model_hint
+        .as_ref()
+        .filter(|hint| models.iter().any(|model| model == *hint))
+        .cloned()
+        .or_else(|| models.first().cloned())
+        .ok_or(DiscoveryError::CatalogMalformed)
+}
+
+fn checkpoint_automatic_error(error: &DiscoveryError) {
+    let phase = match error {
+        DiscoveryError::Http(401 | 403) => "ai-native-catalog-unauthorized",
+        DiscoveryError::Http(_) => "ai-native-catalog-http-failed",
+        DiscoveryError::CatalogMalformed | DiscoveryError::CatalogUnsupported => {
+            "ai-native-catalog-invalid"
+        }
+        DiscoveryError::Request(_) => "ai-native-catalog-request-failed",
+        DiscoveryError::CandidateMissing | DiscoveryError::NotImportable => {
+            "ai-native-credential-missing"
+        }
+        DiscoveryError::Keychain(_) => "ai-native-credential-vault-failed",
+        _ => "ai-native-configuration-failed",
+    };
+    crate::commands::packaged_e2e::native_checkpoint(phase);
+}
+
+async fn checked_automatic_draft<R: Runtime>(
+    app: &AppHandle<R>,
+    draft: &ProviderDraftSession,
+) -> Result<Vec<String>, DiscoveryError> {
+    match check_draft(app, draft).await {
+        Ok((models, _)) => {
+            crate::commands::packaged_e2e::native_checkpoint("ai-native-catalog-checked");
+            Ok(models)
+        }
+        Err(error) => {
+            checkpoint_automatic_error(&error);
+            Err(error)
+        }
+    }
+}
+
+/// Atomically turns one reviewed local credential into a verified Cutout
+/// Provider. The secret is resolved, checked, and stored entirely in Rust.
+#[tauri::command]
+pub async fn auto_configure_provider_candidate<R: Runtime>(
+    app: AppHandle<R>,
+    input: AutoConfigureCandidateInput,
+) -> Result<AutoConfiguredProvider, DiscoveryError> {
+    let candidate = discover_provider_candidates(app.clone())
+        .await?
+        .into_iter()
+        .find(|candidate| candidate.id == input.candidate_id)
+        .ok_or(DiscoveryError::CandidateMissing)?;
+    if !candidate.credential.available || !candidate.credential.importable {
+        return Err(DiscoveryError::NotImportable);
+    }
+    crate::commands::packaged_e2e::native_checkpoint("ai-native-candidate-resolved");
+    let base_url = candidate_effective_base_url(&candidate)
+        .map(str::to_owned)
+        .ok_or_else(|| DiscoveryError::Parse("provider endpoint is unavailable".into()))?;
+    let kind: ProviderKind =
+        serde_json::from_value(serde_json::Value::String(candidate.kind.clone()))
+            .map_err(|error| DiscoveryError::Parse(error.to_string()))?;
+    let wire_protocol = normalized_draft_wire_protocol(
+        kind,
+        candidate
+            .wire_protocol
+            .as_deref()
+            .map(|protocol| {
+                serde_json::from_value(serde_json::Value::String(protocol.to_owned()))
+                    .map_err(|error| DiscoveryError::UnsupportedWireProtocol(error.to_string()))
+            })
+            .transpose()?,
+    )?;
+    crate::commands::packaged_e2e::native_checkpoint("ai-native-binding-normalized");
+    let provider_id = automatic_provider_id(&candidate.id)?;
+    let configured = providers::load_providers_sync(&app)
+        .map_err(|error| DiscoveryError::Persistence(error.to_string()))?;
+    crate::commands::packaged_e2e::native_checkpoint("ai-native-config-loaded");
+
+    if let Some(existing) = configured
+        .iter()
+        .find(|provider| provider.id == provider_id)
+    {
+        validate_existing_provider_binding(
+            &app,
+            &provider_id,
+            &candidate.kind,
+            &base_url,
+            wire_protocol,
+        )?;
+        let draft = ProviderDraftSession {
+            created_at: Instant::now(),
+            kind: candidate.kind,
+            base_url,
+            wire_protocol,
+            candidate_id: None,
+            provider_id: Some(provider_id),
+            secret: None,
+            candidate_fingerprint: None,
+            candidate_secret_revision: None,
+            checked_models: None,
+        };
+        let models = checked_automatic_draft(&app, &draft).await?;
+        return Ok(AutoConfiguredProvider {
+            provider: existing.clone(),
+            models,
+        });
+    }
+
+    let home = app.path().home_dir().map_err(|_| DiscoveryError::Home)?;
+    let secret = candidate_secret(&candidate, &home)?;
+    crate::commands::packaged_e2e::native_checkpoint("ai-native-secret-resolved");
+    let draft = ProviderDraftSession {
+        created_at: Instant::now(),
+        kind: candidate.kind.clone(),
+        base_url: base_url.clone(),
+        wire_protocol,
+        candidate_id: Some(candidate.id.clone()),
+        provider_id: None,
+        secret: Some(secret.clone()),
+        candidate_fingerprint: Some(candidate_fingerprint(&candidate)?),
+        candidate_secret_revision: None,
+        checked_models: None,
+    };
+    let models = checked_automatic_draft(&app, &draft).await?;
+    let provider = ProviderConfig {
+        id: provider_id.clone(),
+        kind,
+        label: candidate.label.clone(),
+        base_url: Some(base_url),
+        wire_protocol,
+        default_model: automatic_default_model(&candidate, &models)?,
+        enabled: true,
+    };
+    keys::store_imported_key(&provider_id, &secret)
+        .map_err(|_| DiscoveryError::Keychain("credential vault write failed".into()))?;
+    crate::commands::packaged_e2e::native_checkpoint("ai-native-key-stored");
+    let mut next = configured;
+    next.push(provider.clone());
+    if let Err(error) = providers::save_providers_atomic(&app, &next) {
+        let _ = keys::delete_imported_key(&provider_id);
+        return Err(DiscoveryError::Persistence(error.to_string()));
+    }
+    crate::commands::packaged_e2e::native_checkpoint("ai-native-provider-saved");
+    Ok(AutoConfiguredProvider { provider, models })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tempfile::tempdir;
+
+    #[test]
+    fn automatic_ids_are_stable_and_opaque() {
+        let candidate = format!("provider-candidate:{}", "a".repeat(64));
+        assert_eq!(
+            automatic_provider_id(&candidate).unwrap(),
+            format!("local-import-{}", "a".repeat(24))
+        );
+        assert!(automatic_provider_id("candidate:/local/path").is_err());
+    }
+    use tempfile::TempDir;
+
+    fn tempdir() -> std::io::Result<TempDir> {
+        tempfile::tempdir_in(std::env::temp_dir().canonicalize()?)
+    }
+
+    fn create_cc_switch_database(home: &Path, settings: &str) -> PathBuf {
+        let root = home.join(".cc-switch");
+        std::fs::create_dir_all(&root).unwrap();
+        let path = root.join("cc-switch.db");
+        let connection = rusqlite::Connection::open(&path).unwrap();
+        connection
+            .execute_batch(
+                "CREATE TABLE providers (
+                    id TEXT NOT NULL,
+                    app_type TEXT NOT NULL,
+                    name TEXT NOT NULL,
+                    settings_config TEXT NOT NULL,
+                    is_current BOOLEAN NOT NULL DEFAULT 0,
+                    PRIMARY KEY (id, app_type)
+                );",
+            )
+            .unwrap();
+        connection
+            .execute(
+                "INSERT INTO providers (id, app_type, name, settings_config, is_current)
+                 VALUES (?1, 'codex', 'Current upstream', ?2, 1)",
+                rusqlite::params!["current", settings],
+            )
+            .unwrap();
+        path
+    }
+
+    fn cc_switch_settings(base_url: &str, model: &str, secret: &str) -> String {
+        serde_json::json!({
+            "auth": { "OPENAI_API_KEY": secret },
+            "config": format!(
+                "base_url = {base_url:?}\nwire_api = \"responses\"\nmodel = {model:?}\n[features]\njs_repl = true\n"
+            ),
+        })
+        .to_string()
+    }
+
+    #[test]
+    fn cc_switch_current_upstream_is_importable_without_exposing_its_secret() {
+        let home = tempdir().unwrap();
+        let secret = "cc-switch-db-secret-must-stay-native";
+        create_cc_switch_database(
+            home.path(),
+            &cc_switch_settings("https://relay.example/", "gpt-observed", secret),
+        );
+
+        let rows = discover_cc_switch(home.path()).unwrap();
+        assert_eq!(rows.len(), 1);
+        let candidate = &rows[0];
+        assert_eq!(candidate.source, "cc-switch");
+        assert_eq!(candidate.schema_id.as_deref(), Some(CC_SWITCH_DB_SCHEMA_ID));
+        assert_eq!(candidate.kind, "openai-compatible");
+        assert_eq!(
+            candidate.base_url.as_deref(),
+            Some("https://relay.example/v1")
+        );
+        assert_eq!(candidate.wire_protocol.as_deref(), Some("responses"));
+        assert_eq!(candidate.model_hint.as_deref(), Some("gpt-observed"));
+        assert!(candidate.credential.available);
+        assert!(candidate.credential.importable);
+        assert_eq!(candidate_secret(candidate, home.path()).unwrap(), secret);
+        assert!(!serde_json::to_string(candidate).unwrap().contains(secret));
+        assert!(matches!(
+            automatic_default_model(candidate, &[]),
+            Err(DiscoveryError::CatalogMalformed)
+        ));
+    }
+
+    #[test]
+    fn cc_switch_database_is_optional_and_never_created_by_discovery() {
+        let home = tempdir().unwrap();
+        let path = home.path().join(".cc-switch/cc-switch.db");
+        assert!(discover_cc_switch(home.path()).unwrap().is_empty());
+        assert!(!path.exists());
+    }
+
+    #[test]
+    fn cc_switch_database_adapter_rejects_oversized_database_before_opening() {
+        let home = tempdir().unwrap();
+        let root = home.path().join(".cc-switch");
+        std::fs::create_dir(&root).unwrap();
+        let file = std::fs::File::create(root.join("cc-switch.db")).unwrap();
+        file.set_len(MAX_CC_SWITCH_DB_BYTES + 1).unwrap();
+        assert!(matches!(
+            discover_cc_switch(home.path()),
+            Err(DiscoveryError::TooLarge(_))
+        ));
+    }
+
+    #[test]
+    fn cc_switch_database_adapter_does_not_materialize_oversized_settings() {
+        let home = tempdir().unwrap();
+        create_cc_switch_database(home.path(), &"x".repeat(MAX_CONFIG_BYTES as usize + 1));
+        assert!(matches!(
+            discover_cc_switch(home.path()),
+            Err(DiscoveryError::TooLarge(_))
+        ));
+    }
+
+    #[test]
+    fn cc_switch_database_adapter_rejects_schema_and_binding_ambiguity() {
+        let home = tempdir().unwrap();
+        let root = home.path().join(".cc-switch");
+        std::fs::create_dir(&root).unwrap();
+        let path = root.join("cc-switch.db");
+        let connection = rusqlite::Connection::open(&path).unwrap();
+        connection
+            .execute_batch(
+                "CREATE TABLE providers (
+                    id TEXT NOT NULL,
+                    app_type TEXT NOT NULL,
+                    settings_config TEXT NOT NULL,
+                    PRIMARY KEY (id, app_type)
+                );",
+            )
+            .unwrap();
+        drop(connection);
+        assert!(matches!(
+            discover_cc_switch(home.path()),
+            Err(DiscoveryError::Parse(_))
+        ));
+
+        std::fs::remove_file(&path).unwrap();
+        let settings = cc_switch_settings("https://relay.example/v1", "model", "secret");
+        create_cc_switch_database(home.path(), &settings);
+        let connection = rusqlite::Connection::open(&path).unwrap();
+        connection
+            .execute(
+                "INSERT INTO providers (id, app_type, name, settings_config, is_current)
+                 VALUES ('other', 'codex', 'Other', ?1, 1)",
+                [settings],
+            )
+            .unwrap();
+        drop(connection);
+        assert!(matches!(
+            discover_cc_switch(home.path()),
+            Err(DiscoveryError::Parse(_))
+        ));
+    }
+
+    #[test]
+    fn cc_switch_database_adapter_rejects_unreviewed_settings_shapes() {
+        for settings in [
+            serde_json::json!({
+                "auth": { "OPENAI_API_KEY": "secret" },
+                "config": "base_url = \"https://relay.example/v1\"\nwire_api = \"responses\"",
+                "unexpected": true,
+            })
+            .to_string(),
+            serde_json::json!({
+                "auth": { "OPENAI_API_KEY": "secret", "access_token": "not-importable" },
+                "config": "base_url = \"https://relay.example/v1\"\nwire_api = \"responses\"",
+            })
+            .to_string(),
+            cc_switch_settings("http://127.0.0.1:9999/v1", "model", "secret"),
+            cc_switch_settings(
+                "https://user:password@relay.example/v1",
+                "model",
+                "secret",
+            ),
+            cc_switch_settings(
+                "https://relay.example/v1?token=not-allowed",
+                "model",
+                "secret",
+            ),
+            serde_json::json!({
+                "auth": { "OPENAI_API_KEY": "secret" },
+                "config": "base_url = \"https://relay.example/v1\"\nwire_api = \"chat-completions\"",
+            })
+            .to_string(),
+            serde_json::json!({
+                "auth": { "OPENAI_API_KEY": "secret" },
+                "config": "base_url = \"https://relay.example/v1\"\nwire_api = \"responses\"\nmodel_provider = \"other\"",
+            })
+            .to_string(),
+        ] {
+            let home = tempdir().unwrap();
+            create_cc_switch_database(home.path(), &settings);
+            assert!(discover_cc_switch(home.path()).is_err());
+        }
+    }
+
+    #[test]
+    fn cc_switch_candidate_is_reread_and_rejects_binding_drift() {
+        let home = tempdir().unwrap();
+        let path = create_cc_switch_database(
+            home.path(),
+            &cc_switch_settings("https://first.example/v1", "model-a", "first-secret"),
+        );
+        let candidate = discover_cc_switch(home.path()).unwrap().remove(0);
+        let changed = cc_switch_settings("https://second.example/v1", "model-b", "second-secret");
+        let connection = rusqlite::Connection::open(path).unwrap();
+        connection
+            .execute(
+                "UPDATE providers SET settings_config = ?1 WHERE app_type = 'codex' AND is_current = 1",
+                [changed],
+            )
+            .unwrap();
+        drop(connection);
+
+        assert!(matches!(
+            candidate_secret(&candidate, home.path()),
+            Err(DiscoveryError::CandidateMissing)
+        ));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn cc_switch_database_adapter_rejects_symlinked_database() {
+        use std::os::unix::fs::symlink;
+
+        let source_home = tempdir().unwrap();
+        let path = create_cc_switch_database(
+            source_home.path(),
+            &cc_switch_settings("https://relay.example/v1", "model", "secret"),
+        );
+        let linked_home = tempdir().unwrap();
+        std::fs::create_dir(linked_home.path().join(".cc-switch")).unwrap();
+        symlink(&path, linked_home.path().join(".cc-switch/cc-switch.db")).unwrap();
+        assert!(matches!(
+            discover_cc_switch(linked_home.path()),
+            Err(DiscoveryError::Symlink(_))
+        ));
+    }
+
+    #[test]
+    fn exact_config_reader_accepts_platform_absolute_temp_paths() {
+        let directory = tempdir().unwrap();
+        let path = directory.path().join("config.json");
+        std::fs::write(&path, r#"{"model":"test"}"#).unwrap();
+
+        assert_eq!(
+            read_exact_config(&path).unwrap().as_deref(),
+            Some(r#"{"model":"test"}"#)
+        );
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_config_identity_uses_the_file_index_not_mutable_metadata() {
+        let directory = tempdir().unwrap();
+        let left_path = directory.path().join("left.json");
+        let right_path = directory.path().join("right.json");
+        std::fs::write(&left_path, "{}").unwrap();
+        std::fs::write(&right_path, "{}").unwrap();
+        let timestamp = std::time::UNIX_EPOCH + Duration::from_secs(1_700_000_000);
+        std::fs::OpenOptions::new()
+            .write(true)
+            .open(&left_path)
+            .unwrap()
+            .set_times(std::fs::FileTimes::new().set_modified(timestamp))
+            .unwrap();
+        std::fs::OpenOptions::new()
+            .write(true)
+            .open(&right_path)
+            .unwrap()
+            .set_times(std::fs::FileTimes::new().set_modified(timestamp))
+            .unwrap();
+
+        let left = open_exact_config(&left_path).unwrap();
+        let right = open_exact_config(&right_path).unwrap();
+        assert_eq!(
+            left.metadata().unwrap().len(),
+            right.metadata().unwrap().len()
+        );
+        assert_eq!(
+            left.metadata().unwrap().modified().unwrap(),
+            right.metadata().unwrap().modified().unwrap()
+        );
+        assert_ne!(
+            file_identity(&left).unwrap(),
+            file_identity(&right).unwrap()
+        );
+    }
+
+    #[test]
+    fn sanitized_text_rejects_absolute_path_labels_on_every_platform() {
+        for value in [
+            "/Users/example/.codex/auth.json",
+            r"C:\Users\example\.codex\auth.json",
+            "C:/Users/example/.codex/auth.json",
+            r"\\server\share\.codex\auth.json",
+        ] {
+            assert!(validate_sanitized_text(value, 160).is_err(), "{value}");
+        }
+    }
 
     #[test]
     fn codex_returns_only_sanitized_metadata() {
@@ -786,12 +2251,203 @@ wire_api = "responses"
 "#,
         )
         .unwrap();
-        let rows = discover_codex(home.path()).unwrap();
+        let rows = discover_codex_at(&home.path().join(".codex"), "~/.codex").unwrap();
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0].wire_protocol.as_deref(), Some("responses"));
         let json = serde_json::to_string(&rows).unwrap();
         assert!(json.contains("CUTOUT_TEST_NEVER_SET"));
         assert!(!json.contains("apiKey"));
+    }
+
+    #[test]
+    fn codex_auth_only_candidate_is_importable_and_secret_stays_native() {
+        let home = tempdir().unwrap();
+        let codex_home = home.path().join(".codex");
+        std::fs::create_dir(&codex_home).unwrap();
+        std::fs::write(
+            codex_home.join("auth.json"),
+            r#"{"OPENAI_API_KEY":"sentinel-secret-must-not-cross-ipc"}"#,
+        )
+        .unwrap();
+
+        let rows = discover_codex_at(&codex_home, "~/.codex").unwrap();
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].kind, "openai");
+        assert_eq!(rows[0].wire_protocol.as_deref(), Some("responses"));
+        assert_eq!(rows[0].credential.source_type, "config-literal");
+        assert_eq!(
+            rows[0].credential.reference.as_deref(),
+            Some("OPENAI_API_KEY")
+        );
+        assert!(rows[0].credential.available);
+        assert!(rows[0].credential.importable);
+        assert_eq!(
+            candidate_secret_at(&rows[0], home.path(), &codex_home).unwrap(),
+            "sentinel-secret-must-not-cross-ipc"
+        );
+        let json = serde_json::to_string(&rows).unwrap();
+        assert!(!json.contains("sentinel-secret-must-not-cross-ipc"));
+    }
+
+    #[test]
+    fn codex_openai_config_falls_back_to_auth_file_when_env_is_unavailable() {
+        let home = tempdir().unwrap();
+        let codex_home = home.path().join(".codex");
+        std::fs::create_dir(&codex_home).unwrap();
+        std::fs::write(
+            codex_home.join("config.toml"),
+            r#"
+model = "gpt-test"
+model_provider = "openai"
+[model_providers.openai]
+name = "OpenAI from Codex"
+env_key = "CUTOUT_TEST_NEVER_SET"
+wire_api = "responses"
+"#,
+        )
+        .unwrap();
+        std::fs::write(
+            codex_home.join("auth.json"),
+            r#"{"OPENAI_API_KEY":"native-auth-secret"}"#,
+        )
+        .unwrap();
+
+        let rows = discover_codex_at(&codex_home, "~/.codex").unwrap();
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].label, "OpenAI from Codex");
+        assert_eq!(rows[0].model_hint.as_deref(), Some("gpt-test"));
+        assert_eq!(rows[0].credential.source_type, "config-literal");
+        assert_eq!(
+            candidate_secret_at(&rows[0], home.path(), &codex_home).unwrap(),
+            "native-auth-secret"
+        );
+        assert!(!serde_json::to_string(&rows)
+            .unwrap()
+            .contains("native-auth-secret"));
+    }
+
+    #[test]
+    fn codex_cc_switch_profile_reuses_auth_file_without_exposing_it() {
+        let home = tempdir().unwrap();
+        let codex_home = home.path().join(".codex");
+        std::fs::create_dir(&codex_home).unwrap();
+        std::fs::write(
+            codex_home.join("config.toml"),
+            r#"
+model = "gpt-5.6-sol"
+model_provider = "ccswitch"
+[model_providers.ccswitch]
+name = "CC Switch"
+base_url = "http://127.0.0.1:15721/v1"
+wire_api = "responses"
+"#,
+        )
+        .unwrap();
+        std::fs::write(
+            codex_home.join("auth.json"),
+            r#"{"OPENAI_API_KEY":"cc-switch-native-secret"}"#,
+        )
+        .unwrap();
+
+        let rows = discover_codex_at(&codex_home, "~/.codex").unwrap();
+        assert_eq!(rows.len(), 1);
+        let candidate = &rows[0];
+        assert_eq!(candidate.kind, "cc-switch");
+        assert_eq!(candidate.base_url.as_deref(), Some(CC_SWITCH_BASE_URL));
+        assert_eq!(candidate.wire_protocol.as_deref(), Some("responses"));
+        assert_eq!(candidate.model_hint.as_deref(), Some("gpt-5.6-sol"));
+        assert_eq!(candidate.credential.source_type, "config-literal");
+        assert!(candidate.credential.available);
+        assert!(candidate.credential.importable);
+        assert_eq!(
+            candidate_secret_at(candidate, home.path(), &codex_home).unwrap(),
+            "cc-switch-native-secret"
+        );
+        assert!(!serde_json::to_string(&rows)
+            .unwrap()
+            .contains("cc-switch-native-secret"));
+    }
+
+    #[test]
+    fn codex_cc_switch_name_does_not_authorize_an_unreviewed_endpoint() {
+        let home = tempdir().unwrap();
+        let codex_home = home.path().join(".codex");
+        std::fs::create_dir(&codex_home).unwrap();
+        std::fs::write(
+            codex_home.join("config.toml"),
+            r#"
+model_provider = "ccswitch"
+[model_providers.ccswitch]
+name = "CC Switch"
+base_url = "http://192.168.1.20:15721/v1"
+wire_api = "responses"
+"#,
+        )
+        .unwrap();
+        std::fs::write(
+            codex_home.join("auth.json"),
+            r#"{"OPENAI_API_KEY":"must-not-bind-to-lan"}"#,
+        )
+        .unwrap();
+
+        let rows = discover_codex_at(&codex_home, "~/.codex").unwrap();
+        assert_eq!(rows.len(), 2);
+        let configured = rows
+            .iter()
+            .find(|candidate| candidate.label == "CC Switch")
+            .unwrap();
+        assert_eq!(configured.kind, "openai-compatible");
+        assert!(!configured.credential.available);
+        assert!(!configured.credential.importable);
+        assert!(rows.iter().any(|candidate| candidate.kind == "openai"));
+    }
+
+    #[test]
+    fn codex_oauth_or_empty_auth_is_not_imported_as_an_api_key() {
+        let home = tempdir().unwrap();
+        let codex_home = home.path().join(".codex");
+        std::fs::create_dir(&codex_home).unwrap();
+        std::fs::write(
+            codex_home.join("auth.json"),
+            r#"{"tokens":{"access_token":"oauth-session-must-not-import"}}"#,
+        )
+        .unwrap();
+        assert!(discover_codex_at(&codex_home, "~/.codex")
+            .unwrap()
+            .is_empty());
+
+        std::fs::write(codex_home.join("auth.json"), r#"{"OPENAI_API_KEY":""}"#).unwrap();
+        assert!(discover_codex_at(&codex_home, "~/.codex")
+            .unwrap()
+            .is_empty());
+    }
+
+    #[test]
+    fn codex_legacy_auth_is_used_only_when_primary_auth_is_absent() {
+        let home = tempdir().unwrap();
+        let codex_home = home.path().join(".codex");
+        let legacy = home.path().join(".config/codex/auth.json");
+        std::fs::create_dir(&codex_home).unwrap();
+        std::fs::create_dir_all(legacy.parent().unwrap()).unwrap();
+        std::fs::write(&legacy, r#"{"OPENAI_API_KEY":"legacy-secret"}"#).unwrap();
+
+        let rows = discover_codex_at_with_legacy(&codex_home, "~/.codex", Some(&legacy)).unwrap();
+        assert_eq!(rows[0].schema_id.as_deref(), Some("codex-legacy-auth-v1"));
+        assert_eq!(
+            candidate_secret_at(&rows[0], home.path(), &codex_home).unwrap(),
+            "legacy-secret"
+        );
+
+        std::fs::write(
+            codex_home.join("auth.json"),
+            r#"{"tokens":{"access_token":"oauth"}}"#,
+        )
+        .unwrap();
+        assert!(
+            discover_codex_at_with_legacy(&codex_home, "~/.codex", Some(&legacy))
+                .unwrap()
+                .is_empty()
+        );
     }
 
     #[test]
@@ -812,9 +2468,9 @@ wire_api = "responses"
         .unwrap();
 
         let rows = discover_claude(home.path()).unwrap();
-        assert_eq!(rows.len(), 1);
-        assert_eq!(rows[0].credential.source_type, "config-literal");
-        assert!(rows[0].credential.importable);
+        assert_eq!(rows.len(), 2);
+        let api = rows.iter().find(|row| row.credential.importable).unwrap();
+        assert_eq!(api.credential.source_type, "config-literal");
         let json = serde_json::to_string(&rows).unwrap();
         assert!(!json.contains("literal-secret-must-not-cross-ipc"));
         assert!(!json.contains("echo must-not-run"));
@@ -824,7 +2480,10 @@ wire_api = "responses"
             r#"{"apiKeyHelper":"echo must-not-run"}"#,
         )
         .unwrap();
-        assert!(discover_claude(home.path()).unwrap().is_empty());
+        let rows = discover_claude(home.path()).unwrap();
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].credential.source_type, "helper");
+        assert!(!rows[0].credential.importable);
     }
 
     #[cfg(unix)]
@@ -837,7 +2496,23 @@ wire_api = "responses"
         std::fs::write(&target, "model='x'").unwrap();
         symlink(&target, home.path().join(".codex/config.toml")).unwrap();
         assert!(matches!(
-            discover_codex(home.path()),
+            discover_codex_at(&home.path().join(".codex"), "~/.codex"),
+            Err(DiscoveryError::Symlink(_))
+        ));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn rejects_symlinked_codex_auth() {
+        use std::os::unix::fs::symlink;
+        let home = tempdir().unwrap();
+        let codex_home = home.path().join(".codex");
+        std::fs::create_dir(&codex_home).unwrap();
+        let target = home.path().join("actual-auth.json");
+        std::fs::write(&target, r#"{"OPENAI_API_KEY":"secret"}"#).unwrap();
+        symlink(&target, codex_home.join("auth.json")).unwrap();
+        assert!(matches!(
+            discover_codex_at(&codex_home, "~/.codex"),
             Err(DiscoveryError::Symlink(_))
         ));
     }
@@ -851,6 +2526,19 @@ wire_api = "responses"
         file.set_len(MAX_CONFIG_BYTES + 1).unwrap();
         assert!(matches!(
             read_exact_config(&path),
+            Err(DiscoveryError::TooLarge(_))
+        ));
+    }
+
+    #[test]
+    fn rejects_oversized_codex_auth_before_parsing() {
+        let home = tempdir().unwrap();
+        let codex_home = home.path().join(".codex");
+        std::fs::create_dir(&codex_home).unwrap();
+        let file = std::fs::File::create(codex_home.join("auth.json")).unwrap();
+        file.set_len(MAX_CONFIG_BYTES + 1).unwrap();
+        assert!(matches!(
+            discover_codex_at(&codex_home, "~/.codex"),
             Err(DiscoveryError::TooLarge(_))
         ));
     }
@@ -871,7 +2559,7 @@ wire_api = "legacy-completions"
         .unwrap();
 
         assert!(matches!(
-            discover_codex(home.path()),
+            discover_codex_at(&home.path().join(".codex"), "~/.codex"),
             Err(DiscoveryError::UnsupportedWireProtocol(value)) if value == "legacy-completions"
         ));
     }
@@ -912,6 +2600,113 @@ wire_api = "legacy-completions"
             .unwrap(),
             Some(ProviderWireProtocol::GoogleGenerateContent)
         );
+        assert!(validate_draft_source_count(ProviderKind::Openai, 0).is_err());
+        assert!(validate_draft_source_count(ProviderKind::Openai, 2).is_err());
+        assert!(validate_draft_source_count(ProviderKind::Openai, 1).is_ok());
+        assert!(validate_draft_source_count(ProviderKind::Ollama, 0).is_ok());
+        assert!(validate_draft_source_count(ProviderKind::Vllm, 0).is_ok());
+        assert!(validate_draft_source_count(ProviderKind::LmStudio, 0).is_ok());
+    }
+
+    #[test]
+    fn candidate_sanitization_rejects_config_exfiltration_fields() {
+        let base = ProviderCandidate {
+            id: candidate_id(&["test"]),
+            source: "codex".into(),
+            source_label: "Codex".into(),
+            agent_id: Some("codex".into()),
+            schema_id: Some("codex-config-v1".into()),
+            config_location: Some("~/.codex/config.toml".into()),
+            kind: "openai-compatible".into(),
+            label: "Reviewed relay".into(),
+            base_url: Some("https://relay.example/v1".into()),
+            wire_protocol: Some("responses".into()),
+            model_hint: Some("model-1".into()),
+            credential: CredentialPreview {
+                source_type: "environment".into(),
+                reference: Some("RELAY_API_KEY".into()),
+                available: true,
+                importable: true,
+            },
+            warnings: vec![],
+        };
+        assert!(validate_candidate(&base).is_ok());
+        for invalid in [
+            ProviderCandidate {
+                base_url: Some("https://user:secret@relay.example/v1".into()),
+                ..base.clone()
+            },
+            ProviderCandidate {
+                base_url: Some("https://relay.example/v1?api_key=secret".into()),
+                ..base.clone()
+            },
+            ProviderCandidate {
+                model_hint: Some("sk-secret-model".into()),
+                ..base.clone()
+            },
+            ProviderCandidate {
+                label: "/Users/person/.codex/auth.json".into(),
+                ..base.clone()
+            },
+            ProviderCandidate {
+                config_location: Some("../../secret".into()),
+                ..base.clone()
+            },
+            ProviderCandidate {
+                credential: CredentialPreview {
+                    reference: Some("NOT-A-VAR".into()),
+                    ..base.credential.clone()
+                },
+                ..base.clone()
+            },
+        ] {
+            assert!(validate_candidate(&invalid).is_err());
+        }
+
+        let unsupported_source = ProviderCandidate {
+            id: candidate_id(&["unsupported-source"]),
+            base_url: Some("http://192.168.1.20:15721/v1".into()),
+            ..base.clone()
+        };
+        let isolated = finalize_candidates(vec![unsupported_source.clone(), base], None).unwrap();
+        assert_eq!(isolated.len(), 1);
+        assert_eq!(isolated[0].label, "Reviewed relay");
+        assert!(finalize_candidates(vec![unsupported_source], None).is_err());
+    }
+
+    #[test]
+    fn candidate_and_secret_revisions_bind_source_and_binding_without_serializing_secret() {
+        let candidate = ProviderCandidate {
+            id: candidate_id(&["source"]),
+            source: "codex".into(),
+            source_label: "Codex".into(),
+            agent_id: Some("codex".into()),
+            schema_id: Some("codex-auth-v1".into()),
+            config_location: Some("~/.codex/auth.json".into()),
+            kind: "openai".into(),
+            label: "OpenAI".into(),
+            base_url: Some("https://api.openai.com/v1".into()),
+            wire_protocol: Some("responses".into()),
+            model_hint: None,
+            credential: CredentialPreview {
+                source_type: "config-literal".into(),
+                reference: Some("OPENAI_API_KEY".into()),
+                available: true,
+                importable: true,
+            },
+            warnings: vec![],
+        };
+        let fingerprint = candidate_fingerprint(&candidate).unwrap();
+        let changed = ProviderCandidate {
+            base_url: Some("https://relay.example/v1".into()),
+            ..candidate.clone()
+        };
+        assert_ne!(fingerprint, candidate_fingerprint(&changed).unwrap());
+        assert_ne!(
+            secret_revision("first-secret"),
+            secret_revision("second-secret")
+        );
+        assert!(!fingerprint.contains("first-secret"));
     }
 
     #[test]
@@ -925,6 +2720,8 @@ wire_api = "legacy-completions"
             candidate_id: None,
             provider_id: None,
             secret: None,
+            candidate_fingerprint: None,
+            candidate_secret_revision: None,
             checked_models: None,
         };
         store.insert(
@@ -987,6 +2784,8 @@ wire_api = "legacy-completions"
                     candidate_id: None,
                     provider_id: None,
                     secret: None,
+                    candidate_fingerprint: None,
+                    candidate_secret_revision: None,
                     checked_models: Some(vec!["model".into()]),
                 },
             );

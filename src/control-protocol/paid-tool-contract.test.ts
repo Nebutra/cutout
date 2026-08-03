@@ -55,14 +55,34 @@ describe('paid tool boundaries', () => {
   })
 
   it('maps desktop assignments to a non-secret shared capability declaration', () => {
+    const assignment = { providerId: 'provider-1', model: 'image-model' }
     expect(desktopPaidToolCapabilities(
       [{ id: 'provider-1', kind: 'openai', label: 'OpenAI', defaultModel: 'chat', enabled: true }],
-      { image: { providerId: 'provider-1', model: 'image-model' } },
+      { image: assignment },
+      {
+        descriptors: [{
+          providerId: 'provider-1',
+          model: 'image-model',
+          capabilities: ['image-generation', 'image-edit'],
+          source: 'verified-catalog',
+          evidence: [
+            { capability: 'image-generation', kind: 'verified', sourceId: 'test' },
+            { capability: 'image-edit', kind: 'verified', sourceId: 'test' },
+          ],
+        }],
+      },
       { 'generate-image': { currency: 'USD', amount: 0.1 } },
     )).toEqual([
       expect.objectContaining({ capability: 'generate-image', providerId: 'provider-1', model: 'image-model', estimatedCost: { currency: 'USD', amount: 0.1 } }),
       expect.objectContaining({ capability: 'edit-image', providerId: 'provider-1', model: 'image-model' }),
     ])
+  })
+
+  it('advertises no paid image capability without exact model evidence', () => {
+    expect(desktopPaidToolCapabilities(
+      [{ id: 'provider-1', kind: 'openai', label: 'OpenAI', defaultModel: 'chat', enabled: true }],
+      { image: { providerId: 'provider-1', model: 'image-model' } },
+    )).toEqual([])
   })
 
   it('maps the locked composer image route into the shared request contract', () => {

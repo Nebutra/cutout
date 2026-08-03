@@ -2,9 +2,11 @@
 
 pub mod agent_host;
 pub mod ai;
-pub mod ai_native;
+pub mod coding_workspace;
+pub mod foreground_segmentation;
 pub mod git;
 pub mod native_approval;
+pub mod packaged_e2e;
 pub mod registry_desktop;
 pub mod save_assets;
 pub mod save_bundle;

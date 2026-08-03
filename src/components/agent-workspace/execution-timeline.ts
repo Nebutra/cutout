@@ -45,7 +45,24 @@ export function activeExecutionTimeline(timeline: ExecutionTimeline | null | und
   // A terminal failure belongs to the single Agent error message, not a second
   // execution card. Keep this surface strictly for work still in progress or
   // awaiting a user decision.
-  const steps = timeline.steps.filter((step) => step.status === 'running' || step.status === 'waiting')
+  const steps = timeline.steps
+    .filter((step) => step.status === 'running' || step.status === 'waiting')
+    .flatMap((step): readonly ExecutionTimelineStep[] => {
+      if (!step.id.startsWith('step:prepare:')) return [step]
+      const activeTools = step.tools.filter((tool) => tool.status === 'running' || tool.status === 'waiting')
+      if (activeTools.length === 0) return []
+
+      // Preparation already renders as the compact chat activity bubble. Real
+      // tools and approval gates nested under that durable audit step still
+      // need an actionable dock surface, but without repeating preparation.
+      return [{
+        id: `${step.id}:tools`,
+        label: 'Tools',
+        status: activeTools.some((tool) => tool.status === 'waiting') ? 'waiting' : 'running',
+        startedAt: Math.min(...activeTools.map((tool) => tool.startedAt)),
+        tools: activeTools,
+      }]
+    })
   return steps.length > 0 ? { ...timeline, steps } : null
 }
 

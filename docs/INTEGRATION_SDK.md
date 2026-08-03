@@ -31,7 +31,7 @@ credentials.
   injected and authorization completes; Cutout never stores provider tokens.
 - Figma and Obsidian: installable foreground plugin artifacts are provided.
   Availability begins only after a matching short-lived host handshake.
-- Pencil, Paper, Framer and Canva: versioned MCP/CLI/plugin/app host contracts
+- Pen, Paper, Framer and Canva: versioned MCP/CLI/plugin/app host contracts
   and approval receipts are implemented. No bundled provider process or cloud
   service is represented as running.
 

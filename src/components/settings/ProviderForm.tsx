@@ -183,9 +183,13 @@ export function ProviderForm({ initial, initialKind, discovered, onDone }: Provi
       if (nativeDraftId) await cancelProviderDraft(nativeDraftId)
       const draftId = await createProviderDraft({
         kind, baseUrl: resolvedBaseUrl, wireProtocol,
-        ...(discovered ? { candidateId: discovered.id } : {}),
-        ...(initial?.id ? { providerId: initial.id } : {}),
-        ...(secret ? { secret } : {}),
+        ...(discovered
+          ? { candidateId: discovered.id }
+          : secret
+            ? { secret }
+            : initial?.id
+              ? { providerId: initial.id }
+              : {}),
       })
       setNativeDraftId(draftId)
       const models = await checkProviderDraft(draftId)
@@ -210,7 +214,7 @@ export function ProviderForm({ initial, initialKind, discovered, onDone }: Provi
           defaultModel: defaultModel.trim(), enabled: true,
         })
         setSecret(''); setNativeDraftId(undefined)
-        setProviderVerification(saved.id,{status:'verified',model:defaultModel,checkedAt:new Date().toISOString()})
+        setProviderVerification(saved.id,{status:'verified',model:defaultModel,models:probedModels,checkedAt:new Date().toISOString()})
         await queryClient.invalidateQueries({ queryKey: ['providers'] })
         toast.success(t({ id: 'settings.provider_added_toast', message: 'Provider added' }), { description: saved.label })
         onDone()
@@ -233,7 +237,7 @@ export function ProviderForm({ initial, initialKind, discovered, onDone }: Provi
         setSecret('') // wipe the secret from JS the moment Rust has it
       }
       if (probedModels.length > 0) {
-        setProviderVerification(saved.id,{status:'verified',model:defaultModel,checkedAt:new Date().toISOString()})
+        setProviderVerification(saved.id,{status:'verified',model:defaultModel,models:probedModels,checkedAt:new Date().toISOString()})
       }
       toast.success(
         isEdit
@@ -249,8 +253,8 @@ export function ProviderForm({ initial, initialKind, discovered, onDone }: Provi
       if (!needsKey || providedKey || hasKey) {
         void testKey
           .mutateAsync(saved.id)
-          .then(({ model }) => {
-            setProviderVerification(saved.id,{status:'verified',model,checkedAt:new Date().toISOString()})
+          .then(({ model, models }) => {
+            setProviderVerification(saved.id,{status:'verified',model,models:[...models],checkedAt:new Date().toISOString()})
             toast.success(
               t({ id: 'settings.status_verified', message: 'Verified' }),
               { description: `${saved.label} · ${model}` },

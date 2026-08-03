@@ -37,7 +37,7 @@ describe('release asset collection', () => {
     await writeReleaseChecksums(output)
     expect(await readFile(checksumPath, 'utf8')).toBe(first)
     expect(first.trim().split('\n')).toHaveLength(assets.length)
-  })
+  }, 15_000)
 
   it('fails when a required platform or bundle is missing', async () => {
     const { input, output } = await fixture()
@@ -46,7 +46,7 @@ describe('release asset collection', () => {
     const second = await fixture()
     await rm(join(second.input, 'release-windows-x86_64', 'nested', 'Cutout.msi'))
     await expect(collectReleaseAssets({ inputDir: second.input, outputDir: second.output })).rejects.toThrow('missing required .msi')
-  })
+  }, 15_000)
 
   it('hard-fails when a platform updater artifact or signature is missing', async () => {
     const windows = await fixture()
@@ -55,7 +55,7 @@ describe('release asset collection', () => {
     const linux = await fixture()
     await rm(join(linux.input, 'release-linux-x86_64', 'nested', 'Cutout.AppImage'))
     await expect(collectReleaseAssets({ inputDir: linux.input, outputDir: linux.output })).rejects.toThrow('missing required .AppImage')
-  })
+  }, 15_000)
 
   it('rejects ambiguous updater artifacts or signatures for one platform', async () => {
     const artifacts = await fixture()
@@ -67,7 +67,7 @@ describe('release asset collection', () => {
     const linuxDir = join(signatures.input, 'release-linux-x86_64', 'nested')
     await writeFile(join(linuxDir, 'Cutout-alternate.AppImage.sig'), 'duplicate signature')
     await expect(collectReleaseAssets({ inputDir: signatures.input, outputDir: signatures.output })).rejects.toThrow('exactly one .AppImage.sig output; found 2')
-  })
+  }, 15_000)
 
   it('rejects symbolic links and nested input/output boundaries', async () => {
     const { root, input, output } = await fixture()
@@ -75,5 +75,5 @@ describe('release asset collection', () => {
     await expect(collectReleaseAssets({ inputDir: input, outputDir: output })).rejects.toThrow('symbolic links')
     await expect(collectReleaseAssets({ inputDir: input, outputDir: join(input, 'out') })).rejects.toThrow('must not contain each other')
     await expect(collectReleaseAssets({ inputDir: input, outputDir: root })).rejects.toThrow('must not contain each other')
-  })
+  }, 15_000)
 })

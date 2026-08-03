@@ -55,6 +55,42 @@ function input(overrides: Partial<DesignKitInput> = {}): DesignKitInput {
   }
 }
 
+function selectedCandidateSet(materialId: string) {
+  return {
+    id: 'candidate-set:design-system:1',
+    kind: 'design-system' as const,
+    baseRevisionId: 'revision:1',
+    proposal: {
+      mode: 'fixed' as const,
+      decidedBy: 'user' as const,
+      count: 1,
+      rationale: 'Use the approved single direction.',
+      directions: [{
+        id: 'direction:1',
+        label: 'Selected',
+        thesis: 'Use the selected image-grounded direction.',
+        vary: ['visual tone'],
+        preserve: ['product brief'],
+      }],
+      bounds: { maxCandidates: 4, maxParallelism: 2 },
+    },
+    candidates: [{
+      id: 'candidate:1',
+      directionId: 'direction:1',
+      status: 'ready' as const,
+      outputs: [{ role: 'design-markdown', materialId }],
+      provenanceIds: ['provenance:brand'],
+    }],
+    selection: {
+      candidateId: 'candidate:1',
+      selectedAt: timestamp,
+      actor: { kind: 'human' as const, id: 'user:1' },
+      baseRevisionId: 'revision:1',
+      provenanceId: 'provenance:selection',
+    },
+  }
+}
+
 describe('Design Kit v1 compiler', () => {
   it('compiles explicit verified and draft IR tokens into stable portable kit files', async () => {
     const compiled = await compileDesignKit(input())
@@ -91,6 +127,156 @@ describe('Design Kit v1 compiler', () => {
     const second = await compileDesignKit(input({ tokens: [...input().tokens].reverse() }))
 
     expect(second).toEqual(first)
+  })
+
+  it('emits a hash-verified selected DESIGN.md verbatim and binds it in the manifest', async () => {
+    const designMarkdown = [
+      '---',
+      'tokens:',
+      '  color:',
+      '    primary: "#0ea5e9"',
+      '---',
+      '# Selected visual direction',
+      '',
+      'This image-grounded document remains authoritative.',
+      '',
+    ].join('\n')
+    const contentSha256 = await sha256(designMarkdown)
+    const selectedDocument: DesignDocument = {
+      ...document(),
+      candidateSets: [selectedCandidateSet('material:design-markdown')],
+      provenance: [
+        ...document().provenance,
+        {
+          id: 'provenance:selection',
+          operation: 'manual',
+          sourceIds: ['source:brand'],
+          actor: { kind: 'human', id: 'user:1' },
+          recordedAt: timestamp,
+        },
+      ],
+      materials: [{
+        id: 'material:design-markdown',
+        kind: 'design-markdown',
+        name: 'DESIGN.md',
+        revisions: [{
+          id: 'material:design-markdown:revision:1',
+          ordinal: 1,
+          createdAt: timestamp,
+          content: {
+            id: 'content:design-markdown',
+            uri: `artifact:sha256:${contentSha256}`,
+            mediaType: 'text/markdown',
+            sha256: contentSha256,
+          },
+          provenanceId: 'provenance:brand',
+        }],
+        currentRevisionId: 'material:design-markdown:revision:1',
+      }],
+    }
+    const compiled = await compileDesignKit({
+      ...input({ document: selectedDocument }),
+      selectedDesignMarkdown: {
+        candidateSetId: 'candidate-set:design-system:1',
+        candidateId: 'candidate:1',
+        materialId: 'material:design-markdown',
+        revisionId: 'material:design-markdown:revision:1',
+        provenanceId: 'provenance:selection',
+        content: designMarkdown,
+      },
+    })
+
+    expect(content(compiled, 'DESIGN.md')).toBe(designMarkdown)
+    expect(content(compiled, 'design-system.html')).toContain('This image-grounded document remains authoritative.')
+    expect(compiled.source.designMarkdown).toEqual({
+      kind: 'selected-material',
+      candidateSetId: 'candidate-set:design-system:1',
+      candidateId: 'candidate:1',
+      materialId: 'material:design-markdown',
+      revisionId: 'material:design-markdown:revision:1',
+      contentSha256,
+      provenanceId: 'provenance:selection',
+    })
+    expect(JSON.parse(content(compiled, 'manifest.json')).source.designMarkdown).toEqual(
+      compiled.source.designMarkdown,
+    )
+    expect(compiled.files.every((file) => file.provenance.provenanceIds.includes('provenance:selection'))).toBe(true)
+  })
+
+  it('retains the generated token-table fallback when no selected DESIGN.md is provided', async () => {
+    const compiled = await compileDesignKit(input())
+
+    expect(compiled.source.designMarkdown).toEqual({ kind: 'generated-token-table' })
+    expect(content(compiled, 'DESIGN.md')).toContain('| `color.primary` | draft |')
+  })
+
+  it('rejects selected DESIGN.md bytes or validation that do not match the authoritative material', async () => {
+    const validDesignMarkdown = '---\nprimary: "#0ea5e9"\n---\n# Selected\n'
+    const contentSha256 = await sha256(validDesignMarkdown)
+    const selectedDocument: DesignDocument = {
+      ...document(),
+      candidateSets: [selectedCandidateSet('material:design-markdown')],
+      provenance: [
+        ...document().provenance,
+        {
+          id: 'provenance:selection',
+          operation: 'manual',
+          sourceIds: ['source:brand'],
+          actor: { kind: 'human', id: 'user:1' },
+          recordedAt: timestamp,
+        },
+      ],
+      materials: [{
+        id: 'material:design-markdown',
+        kind: 'design-markdown',
+        name: 'DESIGN.md',
+        revisions: [{
+          id: 'material:design-markdown:revision:1',
+          ordinal: 1,
+          createdAt: timestamp,
+          content: { id: 'content:design-markdown', uri: 'artifact:design-md', sha256: contentSha256 },
+        }],
+        currentRevisionId: 'material:design-markdown:revision:1',
+      }],
+    }
+    const selected = {
+      candidateSetId: 'candidate-set:design-system:1',
+      candidateId: 'candidate:1',
+      materialId: 'material:design-markdown',
+      revisionId: 'material:design-markdown:revision:1',
+      provenanceId: 'provenance:selection',
+    } as const
+
+    await expect(compileDesignKit({
+      ...input({ document: selectedDocument }),
+      selectedDesignMarkdown: { ...selected, candidateId: 'candidate:stale', content: validDesignMarkdown },
+    })).rejects.toThrow('not the promoted selection')
+
+    await expect(compileDesignKit({
+      ...input({ document: selectedDocument }),
+      selectedDesignMarkdown: { ...selected, content: `${validDesignMarkdown}changed` },
+    })).rejects.toThrow('does not match revision')
+
+    const invalidDesignMarkdown = '---\nradius: 12px\n---\n# Selected\n'
+    const invalidSha256 = await sha256(invalidDesignMarkdown)
+    await expect(compileDesignKit({
+      ...input({
+        document: {
+          ...selectedDocument,
+          materials: [{
+            ...selectedDocument.materials[0]!,
+            revisions: [{
+              ...selectedDocument.materials[0]!.revisions[0]!,
+              content: {
+                ...selectedDocument.materials[0]!.revisions[0]!.content,
+                sha256: invalidSha256,
+              },
+            }],
+          }],
+        },
+      }),
+      selectedDesignMarkdown: { ...selected, content: invalidDesignMarkdown },
+    })).rejects.toThrow('no color tokens')
   })
 
   it('refuses inferred or incompatible token bindings at the adapter boundary', async () => {

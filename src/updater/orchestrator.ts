@@ -9,7 +9,7 @@ import type {
   UpdateState,
 } from "./contracts";
 
-const DAY_MS = 24 * 60 * 60 * 1_000;
+const SIX_HOURS_MS = 6 * 60 * 60 * 1_000;
 
 type Listener = (state: UpdateState) => void;
 
@@ -33,7 +33,7 @@ export function shouldAutoCheck(
   if (!preferences.autoCheck || !delayElapsed) return false;
   if (!preferences.lastCheckedAt) return true;
   const checkedAt = Date.parse(preferences.lastCheckedAt);
-  return !Number.isFinite(checkedAt) || now - checkedAt >= DAY_MS;
+  return !Number.isFinite(checkedAt) || now - checkedAt >= SIX_HOURS_MS;
 }
 
 export function createUpdateOrchestrator(input: {
@@ -49,6 +49,7 @@ export function createUpdateOrchestrator(input: {
     downloaded: 0,
   };
   let downloadAttempt = 0;
+  let checkInFlight: Promise<void> | undefined;
   const listeners = new Set<Listener>();
   const publish = (patch: Partial<UpdateState>) => {
     state = { ...state, ...patch };
@@ -80,7 +81,7 @@ export function createUpdateOrchestrator(input: {
     }
   };
 
-  const check = async () => {
+  const performCheck = async () => {
     if (!state.capability?.available) return;
     if (!channelAvailable(state.capability, state.preferences.channel)) return;
     publish({ phase: "checking", error: undefined, retryAction: undefined });
@@ -102,6 +103,17 @@ export function createUpdateOrchestrator(input: {
     } catch (error) {
       publish({ phase: "error", error: message(error), retryAction: retryAction(error, "check") });
     }
+  };
+
+  const check = () => {
+    if (checkInFlight) return checkInFlight;
+    const operation = performCheck();
+    checkInFlight = operation;
+    const clear = () => {
+      if (checkInFlight === operation) checkInFlight = undefined;
+    };
+    void operation.then(clear, clear);
+    return operation;
   };
 
   const autoCheck = async (delayElapsed = true) => {

@@ -16,6 +16,7 @@
  */
 import {
   generateText as aiGenerateText,
+  hasToolCall,
   streamText as aiStreamText,
   stepCountIs,
   tool as aiTool,
@@ -23,7 +24,6 @@ import {
 } from 'ai'
 import type { ModelMessage } from 'ai'
 import type { z } from 'zod'
-import { invoke } from '@tauri-apps/api/core'
 import { err, isErr, ok } from '@/services/types'
 import type { Result } from '@/services/types'
 import type { PromptPart, PromptService } from '@/prompts/types'
@@ -40,9 +40,14 @@ import type {
   GenerationService,
   ProviderService,
 } from './types'
-import { effectiveProviderWireProtocol, type ProviderConfig } from './provider-types'
+import {
+  effectiveProviderWireProtocol,
+  supportsOpenAIImageEndpoints,
+  type ProviderConfig,
+  type ProviderWireProtocol,
+} from './provider-types'
 import { resolveModel } from './models'
-import { tauriFetch } from './tauri-fetch'
+import { invokeCancellableProxy, tauriFetch } from './tauri-fetch'
 import { apiBaseUrl } from './base-url'
 import { createDefaultGenerationAdapterRegistry, type GenerationAdapterRegistry } from './provider-adapter-registry'
 
@@ -73,6 +78,21 @@ interface ProxyResponse {
 /** Build the AI SDK model for a config, wired to the per-provider proxy fetch. */
 async function buildModel(cfg: ProviderConfig, modelId: string, adapters:GenerationAdapterRegistry) {return adapters.createModel(cfg,modelId)}
 
+function requestReasoningProtocol(
+  cfg: ProviderConfig,
+  explicit: GenerateInput['reasoningProtocol'],
+): ProviderConfig['kind'] | NonNullable<GenerateInput['reasoningProtocol']> {
+  if (explicit) return explicit
+  // This selects the SDK request shape only; it does not claim that an
+  // arbitrary compatible model supports reasoning. Callers still opt in by
+  // providing reasoningEffort, and non-Responses relays keep provider default.
+  if (
+    (cfg.kind === 'openai-compatible' || cfg.kind === 'cc-switch')
+    && effectiveProviderWireProtocol(cfg) === 'responses'
+  ) return 'openai'
+  return cfg.kind
+}
+
 /** Map a domain `PromptPart` to an AI SDK v6 user-message content part. */
 function toContentPart(part: PromptPart) {
   if (part.type === 'text') return { type: 'text' as const, text: part.text }
@@ -89,12 +109,14 @@ type Prepared =
       readonly prompt: string
       readonly systemContext?: string
       readonly providerOptions: ReasoningProviderOptions
+      readonly wireProtocol?: ProviderWireProtocol
     }
   | {
       readonly model: Awaited<ReturnType<typeof buildModel>>
       readonly system: string
       readonly messages: ModelMessage[]
       readonly providerOptions: ReasoningProviderOptions
+      readonly wireProtocol?: ProviderWireProtocol
     }
 
 /** Count how many instruction sources are supplied (must be exactly one). */
@@ -305,7 +327,8 @@ function shouldRetryAsTextJson(message: string): boolean {
     lower.includes('schema') ||
     lower.includes('structured') ||
     lower.includes('response_format') ||
-    lower.includes('object')
+    lower.includes('object') ||
+    lower.includes('no output generated')
   )
 }
 
@@ -347,6 +370,89 @@ function extractJson(text: string): string {
 interface StructuredParseFailure {
   readonly error: string
   readonly jsonText: string
+  readonly category: Extract<
+    StructuredFailureCategory,
+    'invalid-json' | 'schema-mismatch'
+  >
+}
+
+type StructuredAttempt =
+  | 'native-schema'
+  | 'forced-tool'
+  | 'text-json'
+  | 'repair-json'
+
+type StructuredFailureCategory =
+  | 'aborted'
+  | 'authentication'
+  | 'rate-limited'
+  | 'endpoint-misconfigured'
+  | 'transport'
+  | 'unsupported'
+  | 'output-missing'
+  | 'invalid-json'
+  | 'schema-mismatch'
+  | 'provider-rejected'
+  | 'unknown'
+
+interface StructuredAttemptFailure {
+  readonly attempt: StructuredAttempt
+  readonly category: StructuredFailureCategory
+}
+
+function structuredFailureCategory(error: unknown): StructuredFailureCategory {
+  const message = errorText(error).toLowerCase()
+  const status = isRecord(error) && typeof error.statusCode === 'number'
+    ? error.statusCode
+    : Number(message.match(/\b(?:http\s*)?(\d{3})\b/i)?.[1] ?? Number.NaN)
+
+  if (
+    (isRecord(error) && error.name === 'AbortError')
+    || message.includes('abort')
+  ) return 'aborted'
+  if (status === 401 || status === 403 || message.includes('unauthorized')) {
+    return 'authentication'
+  }
+  if (status === 429 || message.includes('rate limit')) return 'rate-limited'
+  if (
+    TRANSPORT_ERROR_PATTERNS.some((pattern) => pattern.test(message))
+    || message.includes(TRANSPORT_HINT.toLowerCase())
+  ) return 'transport'
+  if (
+    message.includes('html page')
+    || message.includes('provider base url')
+    || message.includes('not the web console')
+    || message.includes('non-api response')
+  ) return 'endpoint-misconfigured'
+  if (
+    message.includes('response_format')
+    || message.includes('not supported')
+    || message.includes('unsupported')
+    || message.includes('capability-required')
+  ) return 'unsupported'
+  if (
+    message.includes('no output generated')
+    || message.includes('did not submit structured tool output')
+    || message.includes('no tool call')
+  ) return 'output-missing'
+  if (
+    message.includes('parseable json')
+    || message.includes('invalid json')
+    || message.includes('json parse')
+  ) return 'invalid-json'
+  if (message.includes('schema') || message.includes('structured')) {
+    return 'schema-mismatch'
+  }
+  if (Number.isFinite(status) && status >= 400) return 'provider-rejected'
+  return 'unknown'
+}
+
+function structuredFailureText(
+  failures: readonly StructuredAttemptFailure[],
+): string {
+  return `Structured output failed: ${failures
+    .map(({ attempt, category }) => `${attempt}=${category}`)
+    .join('; ')}.`
 }
 
 type StructuredParseResult<T> =
@@ -366,6 +472,7 @@ function parseStructuredTextDetailed<T>(
       ok: false,
       failure: {
         jsonText,
+        category: 'invalid-json',
         error: `The model did not return parseable JSON: ${errorText(error)}`,
       },
     }
@@ -377,16 +484,12 @@ function parseStructuredTextDetailed<T>(
       ok: false,
       failure: {
         jsonText,
+        category: 'schema-mismatch',
         error: `The model returned JSON that did not match the schema: ${validation.error.message}`,
       },
     }
   }
   return { ok: true, data: validation.data }
-}
-
-function parseStructuredText<T>(text: string, schema: z.ZodType<T>): Result<T> {
-  const parsed = parseStructuredTextDetailed(text, schema)
-  return parsed.ok ? ok(parsed.data) : err(parsed.failure.error)
 }
 
 function repairJsonSystem(
@@ -407,11 +510,56 @@ function repairJsonSystem(
   ].join('\n')
 }
 
+async function generateStructuredTool<T>(
+  prepared: Extract<Prepared, { readonly messages: ModelMessage[] }>,
+  input: GenerateInput,
+  schema: z.ZodType<T>,
+): Promise<T> {
+  const toolName = 'submit_structured_output'
+  const request = {
+    model: prepared.model,
+    system: [
+      prepared.system,
+      '',
+      'Call submit_structured_output exactly once with the complete requested object.',
+      'Do not answer with prose or omit any required collection items.',
+    ].join('\n'),
+    messages: prepared.messages,
+    abortSignal: input.signal,
+    maxOutputTokens: input.maxOutputTokens,
+    providerOptions: prepared.providerOptions,
+    tools: {
+      [toolName]: aiTool({
+        description: 'Submit the complete schema-valid object requested by the user.',
+        inputSchema: schema,
+      }),
+    },
+    toolChoice: { type: 'tool', toolName },
+  } as const
+  // The packaged journey proves this same Responses route can complete the
+  // buffered conversational tool loop. Prefer that established response
+  // parser for a forced function call; compatible streaming gateways vary in
+  // which argument-delta/final events they emit. Other protocols retain the
+  // streaming path that avoids buffering long provider responses.
+  const calls = prepared.wireProtocol === 'responses'
+    ? (await aiGenerateText(request)).toolCalls
+    : await aiStreamText(request).toolCalls
+  const call = calls.find((candidate) => candidate.toolName === toolName)
+  if (!call) throw new Error('The model did not submit structured tool output.')
+  const parsed = schema.safeParse(call.input)
+  if (!parsed.success) {
+    throw new Error(`Structured tool output did not match the schema: ${parsed.error.message}`)
+  }
+  return parsed.data
+}
+
 export function createLocalGenerationService(
   providers: ConfigSource,
   prompts?: PromptSource,
   adapters:GenerationAdapterRegistry=createDefaultGenerationAdapterRegistry(),
 ): GenerationService {
+  const structuredToolPreferred = new Set<string>()
+
   async function resolveConfig(
     id: string,
   ): Promise<ProviderConfig | undefined> {
@@ -428,15 +576,16 @@ export function createLocalGenerationService(
     if (!cfg) return err('provider not configured')
     const modelId = resolveModel(cfg.kind, cfg.defaultModel, input.model)
     const model = await buildModel(cfg, modelId,adapters)
+    const wireProtocol = effectiveProviderWireProtocol(cfg)
     // Thinking strength → per-vendor providerOptions (`{}` when unset/unsafe).
     const providerOptions = reasoningProviderOptions(
-      input.reasoningProtocol ?? cfg.kind,
+      requestReasoningProtocol(cfg, input.reasoningProtocol),
       input.reasoningEffort,
     )
 
     // Back-compat raw text path — a single prompt string, no multimodal parts.
     if (input.prompt !== undefined) {
-      return ok({ model, prompt: input.prompt, ...(input.systemContext?{systemContext:input.systemContext}:{}), providerOptions })
+      return ok({ model, prompt: input.prompt, ...(input.systemContext?{systemContext:input.systemContext}:{}), providerOptions, wireProtocol })
     }
 
     // Structured path: resolve the system instruction, then attach user content.
@@ -449,6 +598,7 @@ export function createLocalGenerationService(
         system = [input.systemContext,rendered.system].filter(Boolean).join('\n\n')
         scaffold = rendered.userScaffold ?? []
       } catch (error) {
+        if (input.signal?.aborted) return err('Operation aborted')
         return err(error instanceof Error ? error.message : String(error))
       }
     } else {
@@ -463,7 +613,7 @@ export function createLocalGenerationService(
     const messages: ModelMessage[] = [
       { role: 'user', content: parts.map(toContentPart) },
     ]
-    return ok({ model, system, messages, providerOptions })
+    return ok({ model, system, messages, providerOptions, wireProtocol })
   }
 
   return {
@@ -529,6 +679,10 @@ export function createLocalGenerationService(
       if (!cfg) return err('provider not configured')
       const modelId = resolveModel(cfg.kind, cfg.defaultModel, input.model)
       const model = await buildModel(cfg, modelId,adapters)
+      const providerOptions = reasoningProviderOptions(
+        requestReasoningProtocol(cfg, input.reasoningProtocol),
+        input.reasoningEffort,
+      )
       const tools = Object.fromEntries(
         input.tools.map((generationTool) => [
           generationTool.name,
@@ -545,8 +699,13 @@ export function createLocalGenerationService(
           ...(input.systemContext?{system:input.systemContext}:{}),
           prompt: input.prompt,
           tools,
-          stopWhen: stepCountIs(input.maxSteps),
+          stopWhen: [
+            stepCountIs(input.maxSteps),
+            ...(input.terminalToolNames ?? []).map((toolName) => hasToolCall(toolName)),
+          ],
           abortSignal: input.signal,
+          maxOutputTokens: input.maxOutputTokens,
+          providerOptions,
         })
         // `result.toolResults` silently omits any call whose `execute()` threw —
         // walking every step's raw content (which carries `tool-error` parts too)
@@ -591,6 +750,7 @@ export function createLocalGenerationService(
                 system: p.system,
                 messages: p.messages,
                 abortSignal: input.signal,
+                maxOutputTokens: input.maxOutputTokens,
                 providerOptions: p.providerOptions,
               })
             : await aiGenerateText({
@@ -598,6 +758,7 @@ export function createLocalGenerationService(
                 ...(p.systemContext?{system:p.systemContext}:{}),
                 prompt: p.prompt,
                 abortSignal: input.signal,
+                maxOutputTokens: input.maxOutputTokens,
                 providerOptions: p.providerOptions,
               })
         return ok(text)
@@ -617,6 +778,7 @@ export function createLocalGenerationService(
               system: p.system,
               messages: p.messages,
               abortSignal: input.signal,
+              maxOutputTokens: input.maxOutputTokens,
               providerOptions: p.providerOptions,
             })
           : aiStreamText({
@@ -624,6 +786,7 @@ export function createLocalGenerationService(
               ...(p.systemContext?{system:p.systemContext}:{}),
               prompt: p.prompt,
               abortSignal: input.signal,
+              maxOutputTokens: input.maxOutputTokens,
               providerOptions: p.providerOptions,
             })
       for await (const delta of result.textStream) {
@@ -637,55 +800,99 @@ export function createLocalGenerationService(
     ): Promise<Result<T>> {
       const prepared = await prepare(input)
       if (isErr(prepared)) return prepared
-      // Structured output rides on `generateText` via `experimental_output`
-      // (`Output.object`); vision naming uses the chat/understanding slot, so a
-      // multimodal (`messages`) call is the only shape that reaches this path.
+      // Structured output uses the streaming transport because some
+      // OpenAI-compatible relays close buffered Responses requests. Vision
+      // naming uses the chat/understanding slot, so a multimodal (`messages`)
+      // call is the only shape that reaches this path.
       const p = prepared.data
       if (!('messages' in p)) {
         return err('structured output requires system/promptRef input')
       }
+      const structuredKey = `${input.providerId}:${p.wireProtocol ?? 'none'}:${input.model ?? 'default'}`
+      const failures: StructuredAttemptFailure[] = []
+      if (!structuredToolPreferred.has(structuredKey)) {
+        try {
+          const result = aiStreamText({
+            model: p.model,
+            system: p.system,
+            messages: p.messages,
+            abortSignal: input.signal,
+            maxOutputTokens: input.maxOutputTokens,
+            providerOptions: p.providerOptions,
+            output: Output.object({ schema }),
+          })
+          return ok(await result.output)
+        } catch (error) {
+          const message = errorText(error)
+          failures.push({
+            attempt: 'native-schema',
+            category: structuredFailureCategory(error),
+          })
+          if (!shouldRetryAsTextJson(message)) {
+            return err(structuredFailureText(failures))
+          }
+          structuredToolPreferred.add(structuredKey)
+        }
+      }
+
       try {
-        const result = await aiGenerateText({
+        return ok(await generateStructuredTool(p, input, schema))
+      } catch (error) {
+        const message = errorText(error)
+        failures.push({
+          attempt: 'forced-tool',
+          category: structuredFailureCategory(error),
+        })
+        if (!shouldRetryAsTextJson(message)) {
+          return err(structuredFailureText(failures))
+        }
+      }
+      let activeTextAttempt: Extract<
+        StructuredAttempt,
+        'text-json' | 'repair-json'
+      > = 'text-json'
+      try {
+        const fallback = aiStreamText({
           model: p.model,
-          system: p.system,
+          system: `${p.system}\n\n${JSON_ONLY_SUFFIX}`,
           messages: p.messages,
           abortSignal: input.signal,
+          maxOutputTokens: input.maxOutputTokens,
           providerOptions: p.providerOptions,
-          experimental_output: Output.object({ schema }),
         })
-        return ok(result.experimental_output)
-      } catch (error) {
-        const structuredError = errorText(error)
-        if (!shouldRetryAsTextJson(structuredError)) return err(structuredError)
-        try {
-          const { text } = await aiGenerateText({
-            model: p.model,
-            system: `${p.system}\n\n${JSON_ONLY_SUFFIX}`,
-            messages: p.messages,
-            abortSignal: input.signal,
-            providerOptions: p.providerOptions,
-          })
-          const parsed = parseStructuredTextDetailed(text, schema)
-          if (parsed.ok) return ok(parsed.data)
+        const text = await fallback.text
+        const parsed = parseStructuredTextDetailed(text, schema)
+        if (parsed.ok) return ok(parsed.data)
+        failures.push({
+          attempt: 'text-json',
+          category: parsed.failure.category,
+        })
 
-          const repaired = await aiGenerateText({
-            model: p.model,
-            system: repairJsonSystem(p.system, parsed.failure),
-            messages: p.messages,
-            abortSignal: input.signal,
-            providerOptions: p.providerOptions,
-          })
-          const repairedParsed = parseStructuredText(repaired.text, schema)
-          if (repairedParsed.ok) return repairedParsed
-
-          return err(
-            `Structured JSON generation failed (${structuredError}); fallback text JSON failed: ${parsed.failure.error}; repair JSON also failed: ${repairedParsed.error}`,
-          )
-        } catch (fallbackError) {
-          return err(
-            `Structured JSON generation failed (${structuredError}); fallback text JSON also failed: ${errorText(fallbackError)}`,
-          )
-        }
+        activeTextAttempt = 'repair-json'
+        const repaired = aiStreamText({
+          model: p.model,
+          system: repairJsonSystem(p.system, parsed.failure),
+          messages: p.messages,
+          abortSignal: input.signal,
+          maxOutputTokens: input.maxOutputTokens,
+          providerOptions: p.providerOptions,
+        })
+        const repairedParsed = parseStructuredTextDetailed(
+          await repaired.text,
+          schema,
+        )
+        if (repairedParsed.ok) return ok(repairedParsed.data)
+        failures.push({
+          attempt: 'repair-json',
+          category: repairedParsed.failure.category,
+        })
+        return err(structuredFailureText(failures))
+      } catch (fallbackError) {
+        failures.push({
+          attempt: activeTextAttempt,
+          category: structuredFailureCategory(fallbackError),
+        })
+        return err(structuredFailureText(failures))
       }
     },
 
@@ -704,7 +911,7 @@ export function createLocalGenerationService(
       // the AI SDK's stricter `b64_json` response schema.
       const wireProtocol = effectiveProviderWireProtocol(cfg)
       if (
-        (cfg.kind === 'openai' || cfg.kind === 'openai-compatible') &&
+        supportsOpenAIImageEndpoints(cfg.kind) &&
         (wireProtocol === 'responses' || wireProtocol === 'chat-completions')
       ) {
         if (instructionSourceCount(input) !== 1) {
@@ -737,7 +944,7 @@ export function createLocalGenerationService(
           if (input.signal?.aborted) return err('Operation aborted')
           const baseUrl = apiBaseUrl(cfg.kind, cfg.baseUrl, wireProtocol)
           if (!baseUrl) return err('provider has no base URL for image generation')
-          const res = await invoke<ProxyResponse>('ai_proxy_request', {
+          const res = await invokeCancellableProxy<ProxyResponse>('ai_proxy_request', {
             providerId: cfg.id,
             kind: cfg.kind,
             wireProtocol,
@@ -749,9 +956,7 @@ export function createLocalGenerationService(
               prompt: promptText,
               n: 1,
             }),
-          })
-          // Tauri IPC cannot currently abort this command in flight. Treat the
-          // response as cooperative cancellation and never publish late bytes.
+          }, input.signal)
           if (input.signal?.aborted) return err('Operation aborted')
           if (res.status < 200 || res.status >= 300) {
             const providerMessage = errorBodyMessage(res.body)
@@ -761,6 +966,7 @@ export function createLocalGenerationService(
           }
           return parseImageGenerationBody(res.body)
         } catch (error) {
+          if (input.signal?.aborted) return err('Operation aborted')
           return err(error instanceof Error ? error.message : String(error))
         }
       }
@@ -788,6 +994,7 @@ export function createLocalGenerationService(
           .map((file) => ({ mediaType: file.mediaType, bytes: file.uint8Array }))
         return ok(assets)
       } catch (error) {
+        if (input.signal?.aborted) return err('Operation aborted')
         return err(error instanceof Error ? error.message : String(error))
       }
     },
@@ -800,7 +1007,7 @@ export function createLocalGenerationService(
       // The edits endpoint is OpenAI-shaped; other kinds have no `/images/edits`.
       const wireProtocol = effectiveProviderWireProtocol(cfg)
       if (
-        (cfg.kind !== 'openai' && cfg.kind !== 'openai-compatible') ||
+        !supportsOpenAIImageEndpoints(cfg.kind) ||
         (wireProtocol !== 'responses' && wireProtocol !== 'chat-completions')
       ) {
         return err('image edit requires an OpenAI-compatible provider')
@@ -816,7 +1023,7 @@ export function createLocalGenerationService(
       // real key is injected in Rust; the base64 reply is decoded to PNG bytes.
       try {
         if (input.signal?.aborted) return err('Operation aborted')
-        const res = await invoke<{ images: string[] }>('ai_image_edit', {
+        const res = await invokeCancellableProxy<{ images: string[] }>('ai_image_edit', {
           providerId: cfg.id,
           kind: cfg.kind,
           wireProtocol,
@@ -826,9 +1033,7 @@ export function createLocalGenerationService(
           images: input.images.map((bytes) => Array.from(bytes)),
           size: input.size ?? null,
           inputFidelity: input.inputFidelity ?? 'high',
-        })
-        // `invoke` has no physical AbortSignal channel. Discard a late native
-        // response so a cancelled/superseded run cannot publish paid output.
+        }, input.signal)
         if (input.signal?.aborted) return err('Operation aborted')
         const assets: GeneratedAsset[] = res.images.map((b64) => ({
           mediaType: 'image/png',
@@ -837,6 +1042,7 @@ export function createLocalGenerationService(
         if (assets.length === 0) return err('The model returned no image.')
         return ok(assets)
       } catch (error) {
+        if (input.signal?.aborted) return err('Operation aborted')
         return err(error instanceof Error ? error.message : String(error))
       }
     },

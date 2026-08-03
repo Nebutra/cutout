@@ -60,8 +60,47 @@ describe('CutoutResultSink', () => {
     expect(getStoreState().analysis.slices).toEqual([])
   })
 
+  it('rejects publication when the loaded source no longer matches the approved input', async () => {
+    getStoreState().loadImage({ bitmap: bitmap(), name: 'replacement', autoAnalyze: false })
+    const sink = createCutoutResultSink(getStoreState)
+    await expect(sink.commit({
+      execution: { ...execution(), expectedSourceImageId: 'source:old' },
+      outputArtifactIds: [outputArtifactId],
+      slices: [{
+        id: 'slice-1',
+        index: 0,
+        box: { x: 0, y: 0, width: 2, height: 2 },
+        png: new Blob(['x']),
+        width: 2,
+        height: 2,
+      }],
+    })).rejects.toThrow('source changed')
+    expect(getStoreState().analysis.slices).toEqual([])
+    expect(Object.keys(getStoreState().assetProduction.runs)).toEqual([])
+  })
+
   it('keeps ordinary imports opted into automatic analysis', () => {
     getStoreState().loadImage({ bitmap: bitmap(), name: 'manual' })
     expect(getStoreState().source.autoAnalyze).toBe(true)
+  })
+
+  it('preserves semantic mask evidence without projecting it as a slice', async () => {
+    getStoreState().loadImage({ bitmap: bitmap(), name: 'photo', autoAnalyze: false })
+    const sink = createCutoutResultSink(getStoreState)
+    const maskArtifactId = `artifact:sha256:${'c'.repeat(64)}`
+    await sink.commit({
+      execution: { ...execution(), requestId: 'request-semantic' },
+      outputArtifactIds: [outputArtifactId],
+      maskArtifactId,
+      providerRoute: 'local/apple-vision-foreground-v1',
+      slices: [{ id: 'subject-1', index: 0, box: { x: 0, y: 0, width: 2, height: 2 }, png: new Blob(['x']), width: 2, height: 2 }],
+    })
+
+    expect(getStoreState().analysis.slices).toHaveLength(1)
+    const run = getStoreState().assetProduction.runs['asset-production:tool:request-semantic']!
+    expect(Object.values(run.tasks)[0]?.evidence).toMatchObject({
+      maskArtifactId,
+      providerRoute: 'local/apple-vision-foreground-v1',
+    })
   })
 })

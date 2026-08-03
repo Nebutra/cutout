@@ -1,0 +1,2 @@
+ 1807   03:52 Ss   zsh -c for i in {1..360}; do test -f /private/tmp/cutout-packaged-e2e/result.json && { cat /private/tmp/cutout-packaged-e2e/result.json; exit 0; }; test $(stat -f %m /private/tmp/cutout-packaged-e2e/progress.json) -gt $(( $(date +%s) - 10 )) && { cat /private/tmp/cutout-packaged-e2e/progress.json; exit 0; }; sleep 1; done; cat /private/tmp/cutout-packaged-e2e/progress.json
+  693   14:40 Ss+  /Applications/Cutout.app/Contents/MacOS/app

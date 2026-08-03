@@ -37,8 +37,9 @@ installer version differs from their release version.
 - The generated `latest.json` advertises every built platform. Its `platforms`
   map carries `darwin-aarch64`, `darwin-x86_64`, `windows-x86_64`, and
   `linux-x86_64`, each with its own HTTPS updater URL and signature. The Windows
-  auto-update target is the signed NSIS installer (`.exe`); the MSI ships only
-  as a downloadable installer. The Linux target is the signed `.AppImage`.
+  auto-update target is the Tauri-signed NSIS installer (`.exe`); the MSI ships
+  only as a downloadable installer. The Linux target is the Tauri-signed
+  `.AppImage`.
   `darwin-aarch64` is the mandatory primary anchor —
   validation still fails closed if it is absent, and every other present
   platform is validated with the same HTTPS/allowlist/signature checks.
@@ -66,8 +67,8 @@ installer version differs from their release version.
   `TAURI_SIGNING_PRIVATE_KEY`, `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`, and
   `CUTOUT_UPDATER_PUBKEY`. The updater private key must be password-protected.
   The private key and password are step-scoped only to the pinned Tauri build
-  actions that create updater signatures. Setup, tests, artifact upload, and
-  the publish job receive neither signing secret.
+  actions. Setup, tests, artifact upload, and the publish job receive neither
+  signing secret.
   GitHub distribution defaults the stable endpoint to the repository's
   `releases/latest/download/latest.json` and the allowlist to `github.com`.
   `CUTOUT_UPDATER_STABLE_ENDPOINTS`, `CUTOUT_UPDATER_ALLOWED_HOSTS`, and
@@ -75,24 +76,28 @@ installer version differs from their release version.
 - The protected `release` environment also owns `APPLE_CERTIFICATE` (base64
   PKCS#12), `APPLE_CERTIFICATE_PASSWORD`, `APPLE_SIGNING_IDENTITY`,
   `APPLE_API_KEY`, `APPLE_API_ISSUER`, and `APPLE_API_PRIVATE_KEY`. These Apple
-  secrets are scoped only to macOS preparation and build steps; Windows and
-  Linux Tauri steps receive none of them.
-- The protected environment also owns `WINDOWS_CERTIFICATE` (base64 PKCS#12)
-  and `WINDOWS_CERTIFICATE_PASSWORD`. The Windows job imports that certificate
-  into the ephemeral current-user store, injects only its SHA-1 thumbprint into
-  the ignored merge config, requires SHA-256 signing and an HTTPS timestamp,
-  verifies the NSIS and MSI signer plus timestamp, and always removes the
-  temporary certificate material.
+  secrets are scoped only to macOS preparation, Tauri build, and explicit DMG
+  notarization steps; Windows and Linux Tauri steps receive none of them.
+- Windows NSIS and MSI installers are intentionally published without
+  Authenticode. The Windows job requires exactly one installer of each type and
+  verifies `Get-AuthenticodeSignature` status `NotSigned` so the release cannot
+  accidentally claim a signer or timestamp that does not exist. Windows users
+  may receive Microsoft Defender SmartScreen warnings.
+- The Windows NSIS updater artifact still requires the independent Tauri
+  updater signature produced by the pinned build action. That sidecar is
+  cryptographically verified before workflow-artifact upload, alongside the
+  checksums and GitHub provenance generated for every release asset.
 - The macOS preparation step hard-fails when any Apple input is absent, writes
   `APPLE_API_PRIVATE_KEY` to `$RUNNER_TEMP/AuthKey_<key-id>.p8` with mode
   `0600`, and exports only `APPLE_API_KEY_PATH` for the Tauri process. The
   temporary key is removed after packaging, including failed builds.
 - macOS artifacts are uploadable only after the generated `.app` and `.dmg`
   both pass Developer ID signature verification, Gatekeeper assessment, and
-  stapled-ticket validation. Tauri's macOS build waits for app notarization and
-  stapling; because the DMG is created afterward, release CI must separately
-  submit the signed DMG with `notarytool --wait` and staple it before these
-  checks run.
+  stapled-ticket validation. Tauri 2.11.4 notarizes and staples the `.app`
+  before creating the DMG; signing that later container does not notarize it.
+  Release CI must therefore submit the finished DMG separately with
+  `notarytool --wait`, staple the accepted ticket, and only then run both
+  artifacts through the verification gate.
 - Private keys remain CI secrets. Public endpoint/key configuration remains CI
   variables and is compiled into release builds.
 - Each matrix job requires exactly one platform updater artifact and sibling
@@ -118,11 +123,16 @@ installer version differs from their release version.
   plugin source fingerprints and mirrored text trees normalize both forms.
   Cross-platform tests use native path parsing and Windows `.cmd` shims for
   package executables; unsupported Windows process-tree control fails closed.
+  Tests that launch real compilers, browsers, packagers, or other child
+  processes declare an explicit per-test timeout sized for the slowest supported
+  CI platform. Do not rely on the framework's short default timeout, raise the
+  global timeout, or skip a platform to hide normal process startup variance.
   Screenshot baselines run on macOS Chrome, while platform-neutral contract
   tests remain matrixed across macOS, Linux, and Windows.
-- AppShell initializes once, delays automatic checking for 8 seconds, and uses
-  the persisted 24-hour preference gate. The Home action subscribes to this
-  state; it does not call GitHub or the native updater directly.
+- AppShell initializes once, delays automatic checking for 8 seconds, and starts
+  the shared lifecycle scheduler. Successful automatic checks are gated for six
+  hours; periodic scheduling adds 0-30 minutes of jitter and focus, visible,
+  and online recovery triggers may retry eligible checks.
 - The Home action exists only when `state.release` is present and phase is one
   of `available`, `downloading`, `ready`, `installing`, or `error`. An error
   without a known release remains hidden.
@@ -150,8 +160,8 @@ installer version differs from their release version.
 | Any Apple signing/notarization secret is absent on macOS | Stop before invoking the macOS Tauri build |
 | App notarization or explicit DMG notarization is not accepted | Do not run artifact upload or publication |
 | App or DMG signature, Gatekeeper, or stapler validation fails | Do not upload that macOS workflow artifact |
-| Windows certificate is absent, invalid, expired, lacks code-signing EKU, or has no private key | Stop before the Windows Tauri build |
-| NSIS or MSI Authenticode signer/status/timestamp is invalid | Do not upload the Windows workflow artifact |
+| Windows NSIS or MSI count differs from one | Do not upload the Windows workflow artifact |
+| NSIS or MSI unexpectedly carries an Authenticode signature | Fail until the signing policy and verification contract are deliberately updated |
 | GitHub provenance attestation fails | Keep the Release unpublished |
 | Release tag already has a Release | Refuse immutable asset replacement |
 | Upload is incomplete | Release remains a draft, not a public success |
@@ -165,9 +175,12 @@ installer version differs from their release version.
 - Good: all four matrix entries finish, collected names include their platform
   and architecture, `latest.json` carries all four platform entries, updater
   evidence validates for each, and one draft is promoted.
-- Good: Tauri receives an Apple `Accepted` result for the app, release CI
-  receives a separate `Accepted` result for the later-created DMG, and both
-  artifacts report `source=Notarized Developer ID` before upload.
+- Good: Tauri receives an Apple `Accepted` result for the app, the workflow
+  receives a separate `Accepted` result for the DMG, and both artifacts report
+  `source=Notarized Developer ID` before upload.
+- Good: the Windows job proves the NSIS and MSI are intentionally unsigned,
+  verifies the independent Tauri updater signature for NSIS, and publishes the
+  same checksums and GitHub provenance evidence as every other platform.
 - Good: the delayed desktop check discovers a newer signed GitHub release; one
   compact Home action appears and opens the existing update controls.
 - Base: a manual build selects an existing version tag reachable from `main`
@@ -177,7 +190,7 @@ installer version differs from their release version.
   header has no empty update placeholder.
 - Bad: each matrix entry runs `gh release create`, uploads its own
   `latest.json`, or has repository write permission.
-- Bad: release CI treats Tauri's app notarization as proof that the
+- Bad: the workflow treats Tauri's app notarization as proof that the
   subsequently created DMG is notarized, or validates the DMG before separately
   submitting and stapling it.
 - Bad: CI edits version manifests after checkout to make a mismatched tag pass.
@@ -191,21 +204,27 @@ installer version differs from their release version.
   symlink rejection, directory boundaries, and deterministic SHA-256 output.
 - `scripts/release-workflow.test.ts`: four-entry matrix, validate/build/publish
   dependency graph, least-privilege permissions, isolated macOS/non-macOS Tauri
-  actions pinned to a reviewed commit, all Action SHA pins, Apple/Windows/updater
-  secret scoping, temporary key handling, updater sidecar verification, macOS
-  notarization, Windows Authenticode, attestation, single-authority publication,
-  draft promotion, and the multi-platform manifest generation step.
+  actions pinned to a reviewed commit, all Action SHA pins, Apple/updater secret
+  scoping, temporary key handling, app-before-DMG notarization ordering, macOS
+  signature/notarization verification, explicit unsigned Windows validation,
+  attestation, single-authority publication, draft promotion, and
+  multi-platform manifest generation.
 - `scripts/ci-platform-contracts.test.ts`: browser installation ordering,
   platform-specific executable selection, and LF/CRLF frontmatter parsing.
+- Child-process integration tests: explicit per-test timeout budgets that still
+  fail closed on a stuck compiler/browser/packager and cover the slowest CI
+  platform without platform skips.
 - `scripts/update-artifacts.test.ts`: signature, HTTPS/allowlist, downgrade
   rejection, unsupported rollout/rollback flags, SBOM, provenance,
   multi-platform manifest generation (all four platform keys, non-primary
   fail-closed), and generated-manifest validation.
 - `src/components/home/SidebarAccount.test.tsx`: hidden idle/checking/error
   states, visible actionable phases, version label, and Settings target.
-- `src/updater/{runtime,service,orchestrator}.test.ts`: narrow Tauri commands,
-  current package version, auto-check interval, progress, cancellation, recovery
-  gates, and install/restart ordering.
+- `src/updater/{runtime,service,orchestrator,auto-check-scheduler,update-notifications}.test.ts`:
+  narrow Tauri commands, current package version, six-hour eligibility,
+  single-flight checks, lifecycle scheduling, notification dedupe/deferral,
+  permission opt-in, progress, cancellation, recovery gates, and
+  install/restart ordering.
 
 ### 7. Wrong vs Correct
 
@@ -241,6 +260,18 @@ publish:
 Build jobs produce isolated workflow artifacts. One final owner validates the
 complete set, creates a draft, uploads once, and only then publishes.
 
+#### Correct
+
+```yaml
+- name: Verify updater artifact signature
+  run: verify-updater-signature <nsis> <nsis.sig>
+- name: Verify intentionally unsigned Windows installers
+  run: require-authenticode-status NotSigned <nsis> <msi>
+```
+
+The updater signature authenticates the exact NSIS bytes while the explicit
+`NotSigned` check keeps the separate Authenticode distribution claim truthful.
+
 Do not create a second updater controller inside the Home sidebar or implement
 a direct `fetch()` against GitHub there. That would duplicate the persisted
 check interval and bypass the Rust signature/allowlist boundary. Subscribe to
@@ -252,3 +283,122 @@ A Tauri updater signature proves updater artifact authenticity. It does not
 prove Apple notarization, Windows Authenticode, Linux repository publication,
 or clean-machine installation. Those claims require separate credentials and
 verification evidence under `docs/RELEASE_CHECKLIST.md`.
+
+## Scenario: Lifecycle-aware update discovery and notifications
+
+### 1. Scope / Trigger
+
+Apply whenever the updater controller, automatic-check scheduling, persisted
+update preferences, notification bell projection, native notification plugin,
+or update Settings/Home UI changes.
+
+### 2. Signatures
+
+```ts
+startUpdateAutoCheckScheduler(
+  controller: { autoCheck(delayElapsed: boolean): Promise<void> },
+  options?: UpdateAutoCheckSchedulerOptions,
+): () => void
+
+createDesktopUpdateOrchestrator(input: {
+  prepareRecoverySnapshot(): Promise<boolean>
+  storage?: Pick<Storage, "getItem" | "setItem">
+  getAppVersion?: () => Promise<string>
+}): DesktopUpdateController
+
+DesktopUpdateController.setSystemNotificationsEnabled(
+  enabled: boolean,
+): Promise<boolean>
+
+DesktopUpdateController.deferUpdateNotification(
+  notificationId: string,
+): readonly LocalNotification[]
+```
+
+### 3. Contracts
+
+- `createUpdateOrchestrator` owns updater state, the successful-check timestamp,
+  and one shared in-flight check promise for manual and automatic callers.
+- `startUpdateAutoCheckScheduler` waits 8 seconds before any trigger can check,
+  then schedules 6 hours plus 0-30 minutes of jitter. Focus, `online`, and
+  visible-document recovery call only `controller.autoCheck(true)`.
+- Failed checks do not write `lastCheckedAt`; successful checks do. Cleanup
+  removes the startup/periodic timers and every lifecycle listener.
+- Release identity is `update:<channel>:<version>`. The separate
+  `cutout.updates.notifications.v1` ledger survives bell clearing, replaces an
+  older update row, and records a 24-hour `deferredUntil` reminder.
+- The Home update action remains visible from updater state while bell clearing
+  or deferral affects only the projected notification row.
+- Native notifications are opt-in. Only the Settings toggle may request OS
+  permission, denial leaves the preference off, and delivery occurs only while
+  the app is not both visible and focused.
+- JavaScript receives only `notification:allow-is-permission-granted`,
+  `notification:allow-request-permission`, and `notification:allow-notify`.
+  Release discovery/download/install remains behind Cutout's Rust updater
+  commands and signature/allowlist policy.
+- Every new visible updater string, notification body, action label, status,
+  and accessibility label must have a Lingui ID and non-empty translation in
+  all shipped catalogs. Before locale activation, notification text falls back
+  to English instead of blocking update projection.
+
+### 4. Validation & Error Matrix
+
+| Condition | Required behavior |
+| --- | --- |
+| Startup delay has not elapsed | Ignore timer and lifecycle triggers |
+| Successful check is less than six hours old | Skip the automatic backend check |
+| Manual and automatic checks overlap | Reuse one in-flight operation |
+| Backend check fails | Publish retryable error; do not advance eligibility |
+| Same channel/version is rediscovered | Do not add or resend a notification |
+| Newer channel/version is discovered | Replace the prior update notification |
+| Reminder is less than 24 hours old | Keep the bell row hidden |
+| Reminder has expired and check is eligible | Recreate one unread row and re-alert |
+| Permission is denied or revoked | Keep bell alert; disable native preference |
+| App is visible and focused | Suppress native delivery; keep bell alert |
+| Lingui locale is not active yet | Use English notification fallback |
+
+### 5. Good / Base / Bad Cases
+
+- Good: a long-running background app regains network after six hours, finds a
+  signed release, creates one localized bell row, and sends one opted-in native
+  notification.
+- Base: the app checks at startup, remains current, and lifecycle triggers inside
+  six hours cause no backend request.
+- Bad: each component owns a timer or fetch, clearing the bell resets dedupe, or
+  enabling automatic checks implicitly requests native notification permission.
+
+### 6. Tests Required
+
+- Scheduler tests assert startup gating, both jitter bounds, periodic recursion,
+  focus/visibility/online triggers, rejected checks, and complete cleanup.
+- Orchestrator tests assert six-hour boundary, invalid timestamp recovery,
+  manual/automatic single-flight behavior, and failure timestamp semantics.
+- Notification tests assert per-version dedupe, stale replacement, clear-safe
+  ledger persistence, exact 24-hour deferral, expired re-alert, permission
+  grant/denial/revocation, foreground suppression, and English fallback.
+- UI tests assert Settings navigation, explicit permission-backed toggle,
+  localized clear/reminder actions, and persistent Home update visibility.
+- `pnpm i18n:ci`, catalog parity tests, TypeScript/build, Rust tests, Agent/plugin
+  validation, and updater release-contract tests are release blocking.
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```ts
+window.setInterval(() => fetch("https://github.com/.../latest.json"), 60_000)
+clearLocalNotifications() // also clears update-version dedupe
+requestPermission() // during startup
+```
+
+#### Correct
+
+```ts
+const stop = startUpdateAutoCheckScheduler(appShellUpdateController)
+controller.subscribe(projectAvailableReleaseOnce)
+await controller.setSystemNotificationsEnabled(true) // explicit user toggle
+```
+
+The scheduler coordinates eligibility through the existing controller, the
+notification ledger is independent from bell history, and the Rust updater
+remains the only release trust boundary.

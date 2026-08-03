@@ -1,6 +1,7 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import type { DesignDocument } from '@/design-ir'
 import type { SourceIngestOperation } from '@/control-protocol'
+import type { CodingBackend, CodingPatch, CodingTask, CodingWorkspace } from '@/coding-runtime'
 import {
   createHeadlessRuntime,
   createInMemoryRuntimeStore,
@@ -99,6 +100,69 @@ function request(operation: unknown, overrides: Record<string, unknown> = {}) {
 }
 
 describe('repo-native headless runtime', () => {
+  it('keeps controlled coding behind trusted approval authorization', async () => {
+    const initial = projectState()
+    initial.policy = {
+      ...initial.policy,
+      allowApply: true,
+      allowedOperations: [...initial.policy.allowedOperations, 'coding.execute'],
+    }
+    const task: CodingTask = {
+      version: 'cutout.coding-task.v1',
+      taskId: 'coding:headless-authorized',
+      kind: 'execute',
+      goal: 'Apply the reviewed route.',
+      acceptanceCriteria: ['The allowlisted check passes.'],
+      repo: { snapshotId: 'snapshot:base' },
+      inputs: {
+        designDocumentRef: 'design-ir:selected',
+        brandKitRefs: [],
+        designKitRefs: ['design-kit:selected'],
+        prototypeRefs: ['prototype:home'],
+        imageAssetRefs: [],
+      },
+      target: { stack: 'vite-react', packageManager: 'pnpm' },
+      constraints: { allowedPaths: ['app'], allowedCommands: ['typecheck'] },
+      expectedRevision: 0,
+      budget: { maxChangedFiles: 2, maxBytes: 10_000, maxDurationMs: 10_000 },
+    }
+    const patch: CodingPatch = {
+      version: 'cutout.coding-patch.v1',
+      taskId: task.taskId,
+      baseSnapshotId: task.repo.snapshotId,
+      files: [{ path: 'app/index.html', operation: 'create', contents: '<main />' }],
+      rationale: 'Implemented the reviewed route.',
+      provenance: { backend: 'provider:verified:model', inputRefs: [] },
+    }
+    const backend: CodingBackend = { id: 'provider:verified:model', propose: vi.fn(async () => patch) }
+    const workspace: CodingWorkspace = {
+      snapshotId: vi.fn(async () => task.repo.snapshotId),
+      readAllowed: vi.fn(async () => ({ 'app/README.md': 'Controlled context.' })),
+      preview: vi.fn(async () => [{ path: 'app/index.html', operation: 'create' as const }]),
+      stage: vi.fn(async () => ({ id: 'stage.opaque', changedFiles: [{ path: 'app/index.html', operation: 'create' as const }] })),
+      runChecks: vi.fn(async () => [{ name: 'typecheck', status: 'passed' as const }]),
+      promote: vi.fn(async () => ({ snapshotId: 'snapshot:next', changedFiles: [{ path: 'app/index.html', operation: 'create' as const }] })),
+      rollback: vi.fn(async () => undefined),
+    }
+    const runtime = createHeadlessRuntime(createInMemoryRuntimeStore(initial), { backend, workspace })
+    const operation = { type: 'coding.execute', task } as const
+
+    const denied = await runtime.execute(request(operation, { requestId: 'coding-denied' }))
+    expect(denied).toMatchObject({ status: 'denied', error: { code: 'approval-required' } })
+    expect(backend.propose).not.toHaveBeenCalled()
+
+    const applied = await runtime.execute(
+      request(operation, { requestId: 'coding-approved' }),
+      { approval: { id: 'lease-reviewed-coding', grantedAt: 1 } },
+    )
+    expect(applied).toMatchObject({
+      status: 'ok',
+      revision: 1,
+      result: { operation: 'coding.execute', receipt: { status: 'applied' } },
+    })
+    expect(backend.propose).toHaveBeenCalledOnce()
+  })
+
   it('persists, queries, paginates, cancels, and replays one shared run lifecycle', async () => {
     const initial = projectState()
     initial.policy = {

@@ -17,6 +17,9 @@ vi.mock('ai', () => ({
   generateText: generateTextMock,
   generateImage: generateImageMock,
   streamText: streamTextMock,
+  stepCountIs: vi.fn((count: number) => ({ type: 'step-count', count })),
+  hasToolCall: vi.fn((toolName: string) => ({ type: 'has-tool-call', toolName })),
+  tool: vi.fn((config: unknown) => config),
   Output: {
     object: vi.fn((config: unknown) => ({ kind: 'object-output', config })),
   },
@@ -52,11 +55,73 @@ beforeEach(() => {
 
 describe('GenerationService adapter injection',()=>{it('uses the injected registry instead of a provider-kind switch',async()=>{const model={id:'injected'},createModel=vi.fn(async()=>model),registry=new GenerationAdapterRegistry([{kind:'openai-compatible',policy:()=>({auth:'rust-keychain-proxy',headerStrategy:'openai-compatible',baseURL:'https://relay.example/v1'}),createModel}]);generateTextMock.mockResolvedValueOnce({text:'ok'});const generation=createLocalGenerationService(providersWith([cfg()]),prompts,registry);await expect(generation.generateText({providerId:'p1',prompt:'hello'})).resolves.toEqual(ok('ok'));expect(createModel).toHaveBeenCalledWith(expect.objectContaining({id:'p1'}),'chat-model');expect(generateTextMock).toHaveBeenCalledWith(expect.objectContaining({model}))})})
 
+describe('GenerationService.generateWithTools', () => {
+  it('stops on terminal tools and applies the bounded routing model controls', async () => {
+    const model = { id: 'injected' }
+    const registry = new GenerationAdapterRegistry([{
+      kind: 'openai-compatible',
+      policy: () => ({
+        auth: 'rust-keychain-proxy',
+        headerStrategy: 'openai-compatible',
+        baseURL: 'https://relay.example/v1',
+      }),
+      createModel: vi.fn(async () => model),
+    }])
+    generateTextMock.mockResolvedValueOnce({ text: '', steps: [] })
+    const generation = createLocalGenerationService(
+      providersWith([cfg({ wireProtocol: 'responses' })]),
+      prompts,
+      registry,
+    )
+
+    await generation.generateWithTools({
+      providerId: 'p1',
+      prompt: 'classify',
+      tools: [],
+      maxSteps: 4,
+      maxOutputTokens: 1_200,
+      terminalToolNames: ['proceed_with_generation'],
+      reasoningEffort: 'low',
+      reasoningProtocol: 'openai',
+    })
+
+    expect(generateTextMock).toHaveBeenCalledWith(expect.objectContaining({
+      maxOutputTokens: 1_200,
+      providerOptions: { openai: { reasoningEffort: 'low' } },
+      stopWhen: [
+        { type: 'step-count', count: 4 },
+        { type: 'has-tool-call', toolName: 'proceed_with_generation' },
+      ],
+    }))
+  })
+})
+
 describe('GenerationService.generateObject', () => {
-  it('falls back to plain text JSON when structured output is not supported', async () => {
-    generateTextMock
-      .mockRejectedValueOnce(new Error('Invalid JSON response'))
-      .mockResolvedValueOnce({ text: '```json\n{"name":"dashboard"}\n```' })
+  it('uses bounded OpenAI reasoning controls for an explicit Responses wire call', async () => {
+    streamTextMock.mockReturnValueOnce({ output: Promise.resolve({ name: 'route' }) })
+    const generation = createLocalGenerationService(
+      providersWith([cfg({ wireProtocol: 'responses' })]),
+      prompts,
+    )
+
+    await generation.generateObject(
+      {
+        providerId: 'p1',
+        reasoningEffort: 'low',
+        promptRef: { id: 'test-json' },
+        input: [{ type: 'text', text: 'brief' }],
+      },
+      z.object({ name: z.string() }),
+    )
+
+    expect(streamTextMock).toHaveBeenCalledWith(expect.objectContaining({
+      providerOptions: { openai: { reasoningEffort: 'low' } },
+    }))
+  })
+
+  it('streams structured output and returns the final object', async () => {
+    const finalObject = { name: 'dashboard' }
+    streamTextMock.mockReturnValueOnce({ output: Promise.resolve(finalObject) })
 
     const generation = createLocalGenerationService(
       providersWith([cfg()]),
@@ -68,6 +133,49 @@ describe('GenerationService.generateObject', () => {
       {
         providerId: 'p1',
         model: 'chat-model',
+        maxOutputTokens: 8_000,
+        promptRef: { id: 'test-json' },
+        input: [{ type: 'text', text: 'brief' }],
+      },
+      schema,
+    )
+
+    expect(result).toEqual(ok(finalObject))
+    expect(streamTextMock).toHaveBeenCalledTimes(1)
+    expect(streamTextMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        output: expect.objectContaining({
+          kind: 'object-output',
+          config: { schema },
+        }),
+      }),
+    )
+    expect(generateTextMock).not.toHaveBeenCalled()
+  })
+
+  it('falls back to plain text JSON when structured output is not supported', async () => {
+    streamTextMock
+      .mockReturnValueOnce({
+        output: Promise.reject(new Error('No output generated. Check the stream for errors.')),
+      })
+      .mockReturnValueOnce({
+        toolCalls: Promise.reject(new Error('Structured tool output did not match the schema')),
+      })
+      .mockReturnValueOnce({
+        text: Promise.resolve('```json\n{"name":"dashboard"}\n```'),
+      })
+
+    const generation = createLocalGenerationService(
+      providersWith([cfg()]),
+      prompts,
+    )
+    const schema = z.object({ name: z.string() })
+
+    const result = await generation.generateObject(
+      {
+        providerId: 'p1',
+        model: 'chat-model',
+        maxOutputTokens: 8_000,
         promptRef: { id: 'test-json' },
         input: [{ type: 'text', text: 'brief' }],
       },
@@ -75,19 +183,146 @@ describe('GenerationService.generateObject', () => {
     )
 
     expect(result).toEqual(ok({ name: 'dashboard' }))
-    expect(generateTextMock).toHaveBeenCalledTimes(2)
-    expect(generateTextMock.mock.calls[0][0].experimental_output).toBeDefined()
-    expect(generateTextMock.mock.calls[1][0].experimental_output).toBeUndefined()
-    expect(generateTextMock.mock.calls[1][0].system).toContain(
+    expect(streamTextMock).toHaveBeenCalledTimes(3)
+    expect(generateTextMock).not.toHaveBeenCalled()
+    expect(streamTextMock.mock.calls[1][0].toolChoice).toEqual({
+      type: 'tool',
+      toolName: 'submit_structured_output',
+    })
+    expect(streamTextMock.mock.calls[2][0].output).toBeUndefined()
+    expect(streamTextMock.mock.calls.map(([input]) => input.maxOutputTokens)).toEqual([
+      8_000,
+      8_000,
+      8_000,
+    ])
+    expect(streamTextMock.mock.calls[2][0].system).toContain(
       'Return only one valid JSON value',
     )
   })
 
+  it('uses a forced schema tool when provider structured output is unavailable', async () => {
+    streamTextMock
+      .mockReturnValueOnce({
+        output: Promise.reject(new Error('No output generated. Check the stream for errors.')),
+      })
+      .mockReturnValueOnce({
+        toolCalls: Promise.resolve([
+          { toolName: 'submit_structured_output', input: { name: 'itinerary' } },
+        ]),
+      })
+
+    const generation = createLocalGenerationService(
+      providersWith([cfg()]),
+      prompts,
+    )
+    const result = await generation.generateObject(
+      {
+        providerId: 'p1',
+        promptRef: { id: 'test-json' },
+        input: [{ type: 'text', text: 'brief' }],
+      },
+      z.object({ name: z.string() }),
+    )
+
+    expect(result).toEqual(ok({ name: 'itinerary' }))
+    expect(streamTextMock).toHaveBeenCalledTimes(2)
+    expect(streamTextMock.mock.calls[1][0]).toEqual(
+      expect.objectContaining({
+        tools: expect.objectContaining({
+          submit_structured_output: expect.objectContaining({
+            inputSchema: expect.anything(),
+          }),
+        }),
+        toolChoice: { type: 'tool', toolName: 'submit_structured_output' },
+      }),
+    )
+    expect(generateTextMock).not.toHaveBeenCalled()
+  })
+
+  it('uses the proven buffered tool transport for a Responses provider', async () => {
+    streamTextMock.mockReturnValueOnce({
+      output: Promise.reject(new Error('No output generated. Check the stream for errors.')),
+    })
+    generateTextMock.mockResolvedValueOnce({
+      toolCalls: [
+        { toolName: 'submit_structured_output', input: { name: 'itinerary' } },
+      ],
+    })
+
+    const generation = createLocalGenerationService(
+      providersWith([cfg({ wireProtocol: 'responses' })]),
+      prompts,
+    )
+    const result = await generation.generateObject(
+      {
+        providerId: 'p1',
+        promptRef: { id: 'test-json' },
+        input: [{ type: 'text', text: 'brief' }],
+      },
+      z.object({ name: z.string() }),
+    )
+
+    expect(result).toEqual(ok({ name: 'itinerary' }))
+    expect(streamTextMock).toHaveBeenCalledTimes(1)
+    expect(generateTextMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tools: expect.objectContaining({
+          submit_structured_output: expect.objectContaining({
+            inputSchema: expect.anything(),
+          }),
+        }),
+        toolChoice: { type: 'tool', toolName: 'submit_structured_output' },
+      }),
+    )
+  })
+
+  it('remembers the compatible structured tool route for later calls', async () => {
+    streamTextMock
+      .mockReturnValueOnce({
+        output: Promise.reject(new Error('No output generated. Check the stream for errors.')),
+      })
+      .mockReturnValueOnce({
+        toolCalls: Promise.resolve([
+          { toolName: 'submit_structured_output', input: { name: 'first' } },
+        ]),
+      })
+      .mockReturnValueOnce({
+        toolCalls: Promise.resolve([
+          { toolName: 'submit_structured_output', input: { name: 'second' } },
+        ]),
+      })
+
+    const generation = createLocalGenerationService(
+      providersWith([cfg()]),
+      prompts,
+    )
+    const input = {
+      providerId: 'p1',
+      model: 'chat-model',
+      promptRef: { id: 'test-json' },
+      input: [{ type: 'text' as const, text: 'brief' }],
+    }
+    const schema = z.object({ name: z.string() })
+
+    await expect(generation.generateObject(input, schema)).resolves.toEqual(ok({ name: 'first' }))
+    await expect(generation.generateObject(input, schema)).resolves.toEqual(ok({ name: 'second' }))
+
+    expect(streamTextMock).toHaveBeenCalledTimes(3)
+    expect(streamTextMock.mock.calls[0][0].output).toBeDefined()
+    expect(streamTextMock.mock.calls[1][0].toolChoice).toBeDefined()
+    expect(streamTextMock.mock.calls[2][0].toolChoice).toBeDefined()
+  })
+
   it('repairs fallback JSON when it parses but fails the schema', async () => {
-    generateTextMock
-      .mockRejectedValueOnce(new Error('Invalid JSON response'))
-      .mockResolvedValueOnce({ text: '{"items":[]}' })
-      .mockResolvedValueOnce({ text: '{"items":["hero"]}' })
+    streamTextMock
+      .mockReturnValueOnce({
+        output: Promise.reject(new Error('Invalid JSON response')),
+      })
+      .mockReturnValueOnce({
+        toolCalls: Promise.reject(new Error('Structured tool output did not match the schema')),
+      })
+      .mockReturnValueOnce({ text: Promise.resolve('{"items":[]}') })
+      .mockReturnValueOnce({ text: Promise.resolve('{"items":["hero"]}') })
 
     const generation = createLocalGenerationService(
       providersWith([cfg()]),
@@ -106,16 +341,53 @@ describe('GenerationService.generateObject', () => {
     )
 
     expect(result).toEqual(ok({ items: ['hero'] }))
-    expect(generateTextMock).toHaveBeenCalledTimes(3)
-    expect(generateTextMock.mock.calls[2][0].system).toContain(
+    expect(streamTextMock).toHaveBeenCalledTimes(4)
+    expect(generateTextMock).not.toHaveBeenCalled()
+    expect(streamTextMock.mock.calls[3][0].system).toContain(
       'Repair the previous JSON',
     )
-    expect(generateTextMock.mock.calls[2][0].system).toContain('too_small')
-    expect(generateTextMock.mock.calls[2][0].system).toContain('{"items":[]}')
+    expect(streamTextMock.mock.calls[3][0].system).toContain('too_small')
+    expect(streamTextMock.mock.calls[3][0].system).toContain('{"items":[]}')
+  })
+
+  it('does not retry an aborted structured stream', async () => {
+    const controller = new AbortController()
+    controller.abort()
+    streamTextMock.mockReturnValueOnce({
+      output: Promise.reject(new DOMException('Operation aborted', 'AbortError')),
+    })
+
+    const generation = createLocalGenerationService(
+      providersWith([cfg()]),
+      prompts,
+    )
+
+    const result = await generation.generateObject(
+      {
+        providerId: 'p1',
+        promptRef: { id: 'test-json' },
+        input: [{ type: 'text', text: 'brief' }],
+        signal: controller.signal,
+      },
+      z.object({ name: z.string() }),
+    )
+
+    expect(result.ok).toBe(false)
+    if (!result.ok) {
+      expect(result.error).toBe(
+        'Structured output failed: native-schema=aborted.',
+      )
+    }
+    expect(streamTextMock).toHaveBeenCalledWith(
+      expect.objectContaining({ abortSignal: controller.signal }),
+    )
+    expect(generateTextMock).not.toHaveBeenCalled()
   })
 
   it('does not retry non-structured API failures', async () => {
-    generateTextMock.mockRejectedValueOnce(new Error('HTTP 401 unauthorized'))
+    streamTextMock.mockReturnValueOnce({
+      output: Promise.reject(new Error('HTTP 401 unauthorized')),
+    })
 
     const generation = createLocalGenerationService(
       providersWith([cfg()]),
@@ -131,19 +403,25 @@ describe('GenerationService.generateObject', () => {
       z.object({ name: z.string() }),
     )
 
-    expect(result).toEqual({ ok: false, error: 'HTTP 401 unauthorized' })
-    expect(generateTextMock).toHaveBeenCalledTimes(1)
+    expect(result).toEqual({
+      ok: false,
+      error: 'Structured output failed: native-schema=authentication.',
+    })
+    expect(streamTextMock).toHaveBeenCalledTimes(1)
+    expect(generateTextMock).not.toHaveBeenCalled()
   })
 
   it('reports provider HTML responses instead of retrying JSON fallback', async () => {
-    generateTextMock.mockRejectedValueOnce(
-      Object.assign(new Error('Invalid JSON response'), {
-        statusCode: 200,
-        url: 'https://aigw.example.com/chat/completions',
-        responseHeaders: { 'content-type': 'text/html; charset=utf-8' },
-        responseBody: '<!doctype html><html><title>Mox Ai Gateway</title></html>',
-      }),
-    )
+    streamTextMock.mockReturnValueOnce({
+      output: Promise.reject(
+        Object.assign(new Error('Invalid JSON response'), {
+          statusCode: 200,
+          url: 'https://aigw.example.com/chat/completions',
+          responseHeaders: { 'content-type': 'text/html; charset=utf-8' },
+          responseBody: '<!doctype html><html><title>Mox Ai Gateway</title></html>',
+        }),
+      ),
+    })
 
     const generation = createLocalGenerationService(
       providersWith([cfg()]),
@@ -161,18 +439,24 @@ describe('GenerationService.generateObject', () => {
 
     expect(result.ok).toBe(false)
     if (!result.ok) {
-      expect(result.error).toContain('Provider returned an HTML page')
-      expect(result.error).toContain('provider base URL')
+      expect(result.error).toBe(
+        'Structured output failed: native-schema=endpoint-misconfigured.',
+      )
+      expect(result.error).not.toContain('aigw.example.com')
+      expect(result.error).not.toContain('Mox Ai Gateway')
     }
-    expect(generateTextMock).toHaveBeenCalledTimes(1)
+    expect(streamTextMock).toHaveBeenCalledTimes(1)
+    expect(generateTextMock).not.toHaveBeenCalled()
   })
 
   it('rewrites transport-level failures with the gateway host and a BYOK hint', async () => {
-    generateTextMock.mockRejectedValueOnce(
-      new Error(
-        'request failed: error sending request for url (https://aigw.mox.ktvsky.com/v1/images/generations)',
+    streamTextMock.mockReturnValueOnce({
+      output: Promise.reject(
+        new Error(
+          'request failed: error sending request for url (https://aigw.mox.ktvsky.com/v1/images/generations)',
+        ),
       ),
-    )
+    })
 
     const generation = createLocalGenerationService(
       providersWith([cfg()]),
@@ -190,11 +474,54 @@ describe('GenerationService.generateObject', () => {
 
     expect(result.ok).toBe(false)
     if (!result.ok) {
-      expect(result.error).toContain('Could not reach https://aigw.mox.ktvsky.com')
-      expect(result.error).toContain('Check your BYOK provider base URL and network connectivity')
-      expect(result.error.length).toBeLessThanOrEqual(500)
+      expect(result.error).toBe(
+        'Structured output failed: native-schema=transport.',
+      )
+      expect(result.error).not.toContain('aigw.mox.ktvsky.com')
     }
-    expect(generateTextMock).toHaveBeenCalledTimes(1)
+    expect(streamTextMock).toHaveBeenCalledTimes(1)
+    expect(generateTextMock).not.toHaveBeenCalled()
+  })
+
+  it('reports every attempted structured route with closed categories only', async () => {
+    streamTextMock
+      .mockReturnValueOnce({
+        output: Promise.reject(
+          new Error('Invalid JSON response from https://secret.example/v1/responses'),
+        ),
+      })
+      .mockReturnValueOnce({
+        toolCalls: Promise.reject(
+          new Error('Structured tool output did not match the schema at /private/provider.json'),
+        ),
+      })
+      .mockReturnValueOnce({
+        text: Promise.resolve('not JSON; prompt=private-planner-brief'),
+      })
+      .mockReturnValueOnce({ text: Promise.resolve('{"items":[]}') })
+
+    const generation = createLocalGenerationService(
+      providersWith([cfg()]),
+      prompts,
+    )
+    const result = await generation.generateObject(
+      {
+        providerId: 'p1',
+        promptRef: { id: 'test-json' },
+        input: [{ type: 'text', text: 'brief' }],
+      },
+      z.object({ items: z.array(z.string()).min(1) }),
+    )
+
+    expect(result).toEqual({
+      ok: false,
+      error: 'Structured output failed: native-schema=invalid-json; forced-tool=schema-mismatch; text-json=invalid-json; repair-json=schema-mismatch.',
+    })
+    if (!result.ok) {
+      expect(result.error).not.toMatch(
+        /secret\.example|private\/provider|private-planner-brief|prompt=|\/v1\/responses/,
+      )
+    }
   })
 })
 
@@ -251,6 +578,67 @@ describe('GenerationService.generateImages', () => {
     expect(body.model).toBe('gpt-image-2')
     expect(body.prompt).toContain('Return the requested object.')
     expect(body.prompt).toContain('政府官网')
+  })
+
+  it('uses the native images endpoint for the reviewed CC Switch provider', async () => {
+    invokeMock.mockResolvedValueOnce({
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ data: [{ b64_json: 'QUJD' }] }),
+    })
+    const generation = createLocalGenerationService(providersWith([cfg({
+      kind: 'cc-switch',
+      baseUrl: 'http://127.0.0.1:15721/v1',
+      wireProtocol: 'responses',
+    })]), prompts)
+
+    const result = await generation.generateImages({
+      providerId: 'p1',
+      model: 'gpt-image-2',
+      prompt: 'Generate one image.',
+    })
+
+    expect(result).toEqual({
+      ok: true,
+      data: [{ mediaType: 'image/png', bytes: new Uint8Array([65, 66, 67]) }],
+    })
+    expect(invokeMock).toHaveBeenCalledWith(
+      'ai_proxy_request',
+      expect.objectContaining({
+        kind: 'cc-switch',
+        wireProtocol: 'responses',
+        url: 'http://127.0.0.1:15721/v1/images/generations',
+      }),
+    )
+  })
+
+  it('routes CC Switch reference conditioning through the native edit command', async () => {
+    invokeMock.mockResolvedValueOnce({ images: ['QUJD'] })
+    const generation = createLocalGenerationService(providersWith([cfg({
+      kind: 'cc-switch',
+      baseUrl: 'http://127.0.0.1:15721/v1',
+      wireProtocol: 'responses',
+    })]), prompts)
+
+    const result = await generation.editImage({
+      providerId: 'p1',
+      model: 'gpt-image-2',
+      prompt: 'Preserve the reference.',
+      images: [new Uint8Array([1, 2, 3])],
+    })
+
+    expect(result).toEqual({
+      ok: true,
+      data: [{ mediaType: 'image/png', bytes: new Uint8Array([65, 66, 67]) }],
+    })
+    expect(invokeMock).toHaveBeenCalledWith(
+      'ai_image_edit',
+      expect.objectContaining({
+        kind: 'cc-switch',
+        wireProtocol: 'responses',
+        baseUrl: 'http://127.0.0.1:15721/v1',
+      }),
+    )
   })
 
   it('does not route a custom Google protocol through OpenAI image generation', async () => {

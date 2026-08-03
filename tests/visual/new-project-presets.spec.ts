@@ -59,12 +59,16 @@ test("new project and presets are fast idempotent draft actions", async ({
   await expect(
     page.getByRole("complementary", { name: "Agent workspace" }),
   ).toBeVisible();
-  await page.getByRole("button", { name: "New task" }).click();
-  await expect(composer).toBeVisible();
-  await expect(composer).toBeFocused();
-  await expect(composer).toHaveValue("");
-  await page.getByRole("button", { name: "New task" }).click();
-  await expect(composer).toBeFocused();
+  await page.getByRole("button", { name: "New project" }).click();
+  const agentComposer = page.getByRole("textbox", { name: "Message the Agent" });
+  await expect(agentComposer).toBeVisible();
+  await expect(agentComposer).toHaveValue("");
+  await expect(page.getByRole("button", { name: "Untitled project", exact: true })).toBeVisible();
+  await expect(composer).toHaveCount(0);
+  await page.getByRole("button", { name: "New project" }).click();
+  await expect(agentComposer).toBeVisible();
+  await expect(agentComposer).toHaveValue("");
+  await page.getByRole("button", { name: "Home", exact: true }).click();
   await page.getByRole("button", { name: /^All projects\b/ }).click();
   const directory = page.getByRole("heading",{name:"Your projects"}).locator("../../..");
   await expect(

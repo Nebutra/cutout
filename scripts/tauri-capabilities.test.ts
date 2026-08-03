@@ -15,6 +15,10 @@ async function readCapability(name: string): Promise<Capability> {
   ) as Capability
 }
 
+async function readRepositoryFile(path: string): Promise<string> {
+  return readFile(`${root}/${path}`, 'utf8')
+}
+
 const expectedMainWindowPermissions = [
   'core:app:allow-version',
   'core:event:allow-listen',
@@ -44,5 +48,35 @@ describe('Tauri capability least privilege contract', () => {
 
     expect(permissions.filter((permission) => permission.endsWith(':default'))).toEqual([])
     expect(permissions.filter((permission) => /^(?:fs|dialog):/.test(permission))).toEqual([])
+  })
+
+  it('keeps the retired GUI Queue out of native modules, handlers and permissions', async () => {
+    const sources = await Promise.all([
+      readRepositoryFile('src-tauri/src/commands/mod.rs'),
+      readRepositoryFile('src-tauri/src/lib.rs'),
+      readRepositoryFile('src-tauri/permissions/application.toml'),
+    ])
+
+    for (const source of sources) {
+      expect(source).not.toMatch(/\bai_native(?:_|::)/)
+    }
+    expect(sources[2]).toContain(
+      'commands.allow = ["save_assets", "save_bundle", "scan_repository"]',
+    )
+  })
+
+  it('registers foreground segmentation as a narrow desktop capability', async () => {
+    const [modules, handlers, permissions, desktopCapability] = await Promise.all([
+      readRepositoryFile('src-tauri/src/commands/mod.rs'),
+      readRepositoryFile('src-tauri/src/lib.rs'),
+      readRepositoryFile('src-tauri/permissions/application.toml'),
+      readCapability('updater'),
+    ])
+
+    expect(modules).toContain('pub mod foreground_segmentation;')
+    expect(handlers).toContain('foreground_segmentation_capabilities')
+    expect(handlers).toContain('foreground_segment')
+    expect(permissions).toContain('identifier = "foreground-segmentation"')
+    expect(desktopCapability.permissions).toContain('foreground-segmentation')
   })
 })

@@ -59,12 +59,16 @@ describe('generation adapter registry', () => {
 
   it('registers compatible transports including local runtimes', () => {
     const registry = createDefaultGenerationAdapterRegistry()
-    for (const kind of ['dashscope', 'deepseek', 'openrouter', 'ollama', 'vllm', 'lm-studio']) {
+    for (const kind of ['cc-switch', 'dashscope', 'deepseek', 'openrouter', 'ollama', 'vllm', 'lm-studio']) {
       expect(registry.adapter(kind).policy({
         id: 'p',
         kind,
         label: kind,
-        baseUrl: kind === 'ollama' ? 'http://127.0.0.1:11434' : undefined,
+        baseUrl: kind === 'cc-switch'
+          ? 'http://127.0.0.1:15721/v1'
+          : kind === 'ollama'
+            ? 'http://127.0.0.1:11434'
+            : undefined,
         defaultModel: 'm',
         enabled: true,
       })).toMatchObject({ auth: 'rust-keychain-proxy' })

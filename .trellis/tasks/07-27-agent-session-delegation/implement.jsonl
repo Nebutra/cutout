@@ -1,0 +1,4 @@
+{"path":".trellis/spec/frontend/agent-control-safety.md","reason":"Desktop Agent authority, workspace, lease, lifecycle, and truthfulness contract."}
+{"path":".trellis/spec/frontend/byok-provider-protocols.md","reason":"Keep Agent sessions separate from provider keys and OAuth/session import."}
+{"path":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Session execution crosses native process, IPC, durable event, and UI layers."}
+{"path":".trellis/tasks/07-27-agent-session-delegation/research/runtime-contracts.md","reason":"Pinned Codex/Claude runtime evidence and Host gaps."}

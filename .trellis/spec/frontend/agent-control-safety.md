@@ -28,6 +28,9 @@ receipts. `.cutout` state and provenance remain authoritative.
   durable Agent response, its effective text, and the user turn it answers.
   `AgentWorkspaceDock` exposes Regenerate only while no run is active and uses
   durable `branch-selected` events for sibling response navigation.
+- The supported external controller surface is `cutout.control.v1` through the
+  CLI/MCP adapters. The desktop invoke registry exposes no legacy GUI Queue or
+  WebView automation command family.
 
 ### 3. Contracts
 
@@ -44,6 +47,13 @@ receipts. `.cutout` state and provenance remain authoritative.
 - Desktop paid-tool requests always require explicit approval. Their budget
   ceilings come from the matching host capability estimate, never a persisted
   user allowance, and the desktop host policy does not project a `maxCost`.
+- Desktop-local `cutout` and `semantic-cutout` require only the `paid` scope;
+  they never require or imply a provider credential. Semantic availability is
+  checked immediately before artifact writes and approval so unsupported hosts
+  return `capability-required` without presenting an unusable approval request.
+- Uploaded-material execution carries the owning Agent `AbortSignal` and
+  `expectedSourceImageId` through approval, execution, and result publication.
+  A cancelled run or replaced source cannot publish into the current project.
 - Lease reservation and the complete control request run under the same
   project-scoped external-control lock. Reserved leases are single-use even
   when the operation returns a denied or invalid response.
@@ -56,11 +66,24 @@ receipts. `.cutout` state and provenance remain authoritative.
 - Every durable-host mutation reloads state and commits under the store's
   cross-instance exclusive transaction. Starting a second host preserves live
   leases; recovery requeues only leases expired at the shared clock boundary.
+- Native Agent Host checkpoints use descriptor-relative file operations on
+  POSIX: the authorized root and `.cutout` directory stay open while the exact
+  bounded regular file is read or atomically replaced. Path identity is
+  revalidated before and after the rename, so directory replacement cannot
+  redirect a temporary file or commit.
+- Native POSIX process custody retains an owned child handle together with its
+  process-group identity. Cancellation verifies that the original child is
+  still live and still leads that group before signaling; a stale registration
+  never signals a numeric PGID that may have been reused. Persisted state never
+  restores signal authority.
 - Controlled reads reject absolute paths, traversal, symlink roots/components,
   non-regular files, identity changes, and size/count limit violations.
-- AI Native reference reads are relative to the host-owned
-  `ai-native/imports/` staging root and reject absolute paths, traversal,
-  symlinks, non-regular files, and files over the bounded import size.
+- External controllers never fall back to a hidden desktop/WebView queue when
+  `cutout.control.v1` lacks a provider or effect. They return the explicit
+  `capability-required` or unsupported result instead.
+- Runtime diagnostics used by desktop recovery are an internal observation
+  mechanism. They do not accept commands, paths, credentials, or approval data
+  and do not form a second Agent control surface.
 - Both TypeScript and native repository scanners reject trees deeper than 64
   directory levels before continuing traversal.
 - The stdio MCP entry never derives project authority from the launch
@@ -73,6 +96,15 @@ receipts. `.cutout` state and provenance remain authoritative.
   allowlisted environment, bounded duration/output, and POSIX process-group
   cancellation. Unsupported Windows process-tree control fails as
   `capability-required`; this is not a general-purpose shell or kernel sandbox.
+- Controlled Coding workspace revisions hash every task-scoped allowed root
+  together with package/type-check configuration. Initial validation,
+  pre-promotion CAS, and the result receipt use the same scoped snapshot; a
+  reviewed path outside `src` must never disappear from revision authority.
+- Desktop Coding promotion requires native confirmation only after the exact
+  staged patch digest and scoped snapshot have been revalidated. The opaque
+  approval id is retained in the applied receipt and the stage is consumed
+  after promotion. The fixed packaged-E2E build may issue this approval inside
+  native code after the same checks; no renderer-supplied approval has authority.
 - Governance facts attach axe nodes only to the scenario element that contains
   their target. Non-color cues require explicit state-bound evidence.
 - A successful composite receipt has unique targets and an artifact index that
@@ -95,6 +127,18 @@ receipts. `.cutout` state and provenance remain authoritative.
   the effective source user turn, ignores selected-material repair context,
   emits no duplicate `intent-recorded` event, appends an immutable sibling
   `agent-message`, and selects it through a durable `branch-selected` event.
+- Durable run events and durable chat rows have different lifetimes. A
+  `step:prepare:<run-id>` lifecycle remains authoritative Git/audit evidence,
+  but the conversation projects at most one preparation activity bubble: the
+  current run's unresolved `step-started` event while work is active. An empty
+  stream placeholder does not replace it; the first non-empty live Agent text
+  does. `step-succeeded`, `step-failed`, and `step-cancelled` remain available
+  to the full execution/audit projection and receipts but never become terminal
+  chat rows or active-dock timeline cards. The active dock suppresses the
+  preparation step itself; it shows a timeline only for substantive
+  non-preparation steps, non-chat tools, or explicit approvals. Tools and
+  approvals nested under preparation remain actionable without repeating the
+  preparation label.
 - User turns may link to the selected Agent response with `parentEventId`, and
   Agent responses may link to their source turn with `responseToEventId`.
   Legacy unlinked transcripts replay linearly. Branch selection remains
@@ -124,6 +168,7 @@ receipts. `.cutout` state and provenance remain authoritative.
 | Workspace lease file changes state, reservation, or response without the host key | Reject the catalog signature before reservation or completion |
 | Desktop apply receives a caller-authored approval string | It has no authority; require native confirmation after preview |
 | Project-bound MCP tool runs without `CUTOUT_PROJECT_ROOT` | Return `project-binding-required` without reading or writing project state |
+| Caller attempts the retired desktop GUI Queue compatibility surface | No script, bridge, invoke handler, or permission exists; use `cutout.control.v1` |
 | Registry apply omits either `planId` or `approvalLeaseId` | Reject; never downgrade to a dry-run response |
 | Registry content or workspace state changes after preview | Reject the stale `planId` before writing |
 | Claim missing, terminal, delayed, cancelled, or held by another owner | Do not start heartbeat or effect |
@@ -134,6 +179,9 @@ receipts. `.cutout` state and provenance remain authoritative.
 | Path/root is a symlink or changes identity | Reject without returning controlled file contents or launching a command |
 | Repository exceeds the depth budget or declares executable Git config | Reject before deeper scanning or Git execution |
 | Platform cannot enforce required process-tree semantics | Return `capability-required` |
+| A task-scoped file changes after Coding patch preview, including below an allowed root outside `src` | Reject promotion with `revision-conflict` and preserve the external change |
+| Semantic foreground extraction is unavailable | Return `capability-required` before artifact writes or approval; do not enter generation |
+| Approved material run is cancelled or its source identity changes | Reject publication and leave the current source/production state unchanged |
 | Axe violation target is outside a scenario | Do not attach it to that scenario |
 | Receipt claims success with failed target or mismatched artifacts | Schema validation fails |
 | No coding backend/workspace is injected | Return `capability-required`, never simulated success |
@@ -145,6 +193,12 @@ receipts. `.cutout` state and provenance remain authoritative.
 | Agent reply is older, pending, non-durable, lacks a source turn, or another run is active | Do not expose message Regenerate |
 | Regenerate tool gate returns no call or selects a non-conversational tool | Revise through the conversational path; never enter asset generation |
 | Regenerate tool gate fails | Publish the new classified run failure; never resume or fall through to the asset pipeline |
+| Current run has an unresolved `step:prepare:*` start and no non-empty live Agent text | Show exactly one pending preparation activity bubble |
+| Live Agent label exists but streamed text is still empty | Keep the preparation activity visible; do not replace it with a blank pending bubble |
+| First non-empty live Agent text arrives | Replace the preparation activity with one live Agent message |
+| Pure preparation is unresolved | Keep the step in the full audit projection; render one chat activity bubble and zero active-dock timeline cards |
+| Preparation contains a non-chat tool or explicit approval | Render the tool or approval in the active timeline without repeating the preparation step |
+| Preparation succeeds, fails, or is cancelled | Keep the terminal event in full audit state and render zero preparation chat bubbles or active-dock timeline cards |
 
 ### 5. Good / Base / Bad Cases
 
@@ -159,6 +213,9 @@ receipts. `.cutout` state and provenance remain authoritative.
   icon, reuses the source user turn, appends a sibling response, selects it,
   and exposes stable previous/next navigation without a second user bubble or
   paid asset execution.
+- Good preparation projection: repeated regeneration appends distinct durable
+  preparation lifecycles, while chat shows one current activity during request
+  checking and no preparation activity after completion or branch switching.
 - Base: sibling Agent replies remain recoverable through branch navigation;
   only the selected response at the active head is eligible for regeneration.
 - Bad: reconstruct `{ id, grantedAt }` from a CLI flag, execute after a failed
@@ -168,6 +225,9 @@ receipts. `.cutout` state and provenance remain authoritative.
 - Bad: implement message Regenerate by calling the normal create path with a
   new intent event or by letting a no-call classifier result fall into asset
   generation.
+- Bad: add the latest event for every historical preparation step to the
+  conversation feed. Unique per-run step IDs then accumulate permanent bubbles
+  and overlap the current live reply.
 
 ### 6. Tests Required
 
@@ -181,9 +241,13 @@ receipts. `.cutout` state and provenance remain authoritative.
 - Node filesystem store: run events and ledger in one transaction, recovery
   from an interrupted journal, and stale revision conflict.
 - Source scanner/tool host/Tauri: traversal, symlink root/component,
-  replacement/identity drift, absolute AI Native imports, over-depth trees,
-  executable Git configuration, least-privilege capability drift, and
-  unsupported platform behavior.
+  replacement/identity drift, over-depth trees, executable Git configuration,
+  least-privilege capability drift, absence of legacy GUI Queue handlers and
+  permissions, and unsupported platform behavior.
+- Native Agent Host: checkpoint directory swap-out/swap-back during write,
+  opened-file replacement during read, live-versus-expired lease recovery,
+  stale heartbeat grants, owned-child process-group cancellation, stale PGID
+  reuse resistance, repeated cancellation, and shutdown cleanup.
 - Governance: Document roots, multiple scenarios, unrelated axe targets, and
   explicit ambiguous/non-color evidence.
 - Delivery/coding: exact artifact index, unique target ids, failed/cancelled
@@ -197,10 +261,19 @@ receipts. `.cutout` state and provenance remain authoritative.
   no duplicate user turns, selected-material isolation, restart/legacy
   recovery, no-call/non-conversational fail-closed behavior, and stale-error
   clearing before the awaited tool-gate boundary.
+- Preparation activity: historical and current runs, empty versus non-empty
+  live stream state, succeeded/failed/cancelled terminals, repeated
+  regeneration, both branch directions, exact DOM activity/message counts,
+  pure-preparation active-timeline suppression, nested tool/approval
+  preservation, and proof that terminal preparation evidence remains persisted
+  and visible through the full execution/audit projection.
 - Repository history: authorization after mount, opaque-handle read/write,
   deterministic ordered union, identical legacy deduplication, branch
   selection restoration, divergent-ID rejection, CAS conflict, credential
   rejection, local-state preservation, and sanitized in-product failure copy.
+- Uploaded material: semantic capability preflight before approval, paid-only
+  local scope, cancellation propagation, expected source identity binding, and
+  no prototype/image-generation fallthrough on capability failure.
 - Run `pnpm agent:validate` after every CLI, MCP, protocol, capability, Skill,
   manifest, or plugin-runtime change.
 
@@ -243,6 +316,25 @@ createAssets('create', {
 The first form appends another user turn and may fall into material or asset
 generation. The second reuses the durable turn, isolates message regeneration
 from canvas repair, and appends a selected sibling Agent reply.
+
+#### Wrong
+
+```ts
+for (const event of latestPreparationEventByStep.values()) {
+  conversationEventIds.add(event.eventId)
+}
+```
+
+#### Correct
+
+```ts
+const activePreparation = selectActivePreparationEvent(runEvents)
+const showPreparation = working && activePreparation && !liveAgentText.trim()
+```
+
+The first form confuses append-only audit durability with conversation lifetime
+and retains one row per regeneration. The second derives one ephemeral display
+state from the authoritative active-run lifecycle without deleting evidence.
 
 ## Scenario: Inventory reviewed local coding Agents
 
@@ -288,6 +380,14 @@ permission, not by the provider secret/network permission.
   or credential-shaped fields.
 - Discovery never launches an Agent, installer, package manager, shell, login
   flow, helper, or version command and never recursively scans the home folder.
+- Credential adapters are a separate native provider surface. They may parse
+  only the nine reviewed exact schemas, return sanitized candidate metadata,
+  and import an API key only through a checked native draft. The webview never
+  supplies an Agent path, field selector, or Agent-source secret.
+- OAuth, subscription, bearer, helper, keyring, and session material remains
+  display-only or unsupported. Inventory support must not be represented as
+  session delegation, a bundled coding runtime, or permission to invoke an
+  owning Agent.
 
 ### 4. Validation & Error Matrix
 
@@ -304,7 +404,8 @@ permission, not by the provider secret/network permission.
 
 - Good: Homebrew/Bun symlinks resolve to executable files, exact Codex,
   Claude, OpenCode, Pi/OMP, Gemini, Qwen, Kimi, and Vibe roots are inspected,
-  and the UI receives sanitized metadata for all 39 rows.
+  and the frontend boundary accepts sanitized metadata for all 39 rows without
+  requiring the default AI settings page to render the inventory.
 - Base: no reviewed Agents are installed; the command still returns 39 stable
   rows with `not-installed`, `not-found`, and truthful unsupported flags.
 - Bad: run `npx -y`, `uvx`, `--version`, or a login helper; recursively search

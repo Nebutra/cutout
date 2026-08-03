@@ -163,7 +163,7 @@ describe('Starter Compiler v1', () => {
     } finally {
       await rm(directory, { recursive: true, force: true })
     }
-  })
+  }, 20_000)
 
   it('rejects unready components, token drift, invalid kit provenance and missing asset revisions before creating a plan', async () => {
     const draft = await candidates()

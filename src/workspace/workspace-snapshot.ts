@@ -16,12 +16,20 @@ import type { CompositeDeliveryReceipt, DeliveryPlan, DeliveryRequest } from '@/
 import type { ApprovedDeliverableReceipt } from '@/global-library'
 import type { BrandViRun } from '@/brand-kit'
 import type { CanvasAnnotation } from '@/components/workspace/canvas-annotations'
+import type { CandidateSet } from '@/candidate-selection/contracts'
+import type { CodingReceipt } from '@/coding-runtime/contracts'
+import type { PrototypeAssetManifest } from '@/prototype/asset-manifest'
+import type {
+  PrototypePageReviewRecord,
+  PrototypeResourceReviewRecord,
+} from '@/prototype/review-evidence'
 
 export type WorkspaceWorkflowPhase =
   | 'idle'
   | 'planning'
   | 'review'
   | 'design-system'
+  | 'design-system-selection'
   | 'generating-suite'
 
 export type WorkspaceNamingStatus =
@@ -44,8 +52,53 @@ export interface PersistedPrototypeDesignSystem extends PersistedPrototypeImage 
   readonly designMarkdown: string
 }
 
+export interface PersistedPrototypeDesignSystemCandidateSet {
+  readonly set: CandidateSet
+  readonly artifacts: Readonly<Record<string, PersistedPrototypeDesignSystem>>
+}
+
 export interface PersistedPrototypePage extends PersistedPrototypeImage {
   readonly page: PrototypePage
+  /** Additive for workspace.v1 compatibility; historical pages omit review evidence. */
+  readonly review?: PrototypePageReviewRecord
+}
+
+export interface PersistedPrototypeSuiteDesignSystemBinding {
+  readonly candidateSetId: string
+  readonly candidateId: string
+  readonly directionId: string
+  readonly baseRevisionId: string
+  readonly provenanceIds: readonly string[]
+  readonly artifact: PersistedPrototypeDesignSystem
+}
+
+export interface PersistedPrototypeResourcePackAsset {
+  readonly manifestItemId: string
+  readonly artifactId: string
+  readonly provenanceIds: readonly string[]
+  /** Additive for historical resource-pack bindings. */
+  readonly review?: PrototypeResourceReviewRecord
+}
+
+export interface PersistedPrototypeResourcePack {
+  readonly id: string
+  readonly manifest: PrototypeAssetManifest
+  readonly manifestProvenanceId: string
+  readonly assets: readonly PersistedPrototypeResourcePackAsset[]
+}
+
+export interface PersistedPrototypeSuiteCandidate {
+  readonly designSystem: PersistedPrototypeSuiteDesignSystemBinding
+  readonly plan: PrototypePlan
+  readonly pages: readonly PersistedPrototypePage[]
+  readonly resourcePack: PersistedPrototypeResourcePack
+  readonly provenanceIds: readonly string[]
+  readonly codingReceipt?: CodingReceipt
+}
+
+export interface PersistedPrototypeSuiteCandidateSet {
+  readonly set: CandidateSet
+  readonly artifacts: Readonly<Record<string, PersistedPrototypeSuiteCandidate>>
 }
 
 export interface PersistedReferenceAttachment {
@@ -63,6 +116,10 @@ export interface WorkspaceSnapshot {
   readonly humanLoopChoiceId: string | null
   readonly humanLoopCustomAnswer: string
   readonly prototypeDesignSystem: PersistedPrototypeDesignSystem | null
+  /** Additive multi-direction state; the singular field remains the selected projection. */
+  readonly prototypeDesignSystemCandidates?: PersistedPrototypeDesignSystemCandidateSet | null
+  /** Complete suite alternatives; singular plan/design/pages remain the selected projection. */
+  readonly prototypeSuiteCandidates?: PersistedPrototypeSuiteCandidateSet | null
   readonly prototypePages: readonly PersistedPrototypePage[]
   readonly selectedPrototypePageId: string | null
   readonly runError: string | null
@@ -90,6 +147,8 @@ export interface WorkspaceSnapshot {
   readonly canvasAnnotations?: readonly CanvasAnnotation[]
   /** Durable evidence for inputs that require a runtime capability not currently available. */
   readonly capabilityReceipts?: readonly WorkspaceCapabilityReceipt[]
+  /** Preview/apply evidence for controlled Coding handoffs. */
+  readonly codingReceipts?: readonly CodingReceipt[]
 }
 
 export interface WorkspaceCapabilityReceipt {
@@ -114,6 +173,8 @@ export function createEmptyWorkspaceSnapshot(
     humanLoopChoiceId: null,
     humanLoopCustomAnswer: '',
     prototypeDesignSystem: null,
+    prototypeDesignSystemCandidates: null,
+    prototypeSuiteCandidates: null,
     prototypePages: [],
     selectedPrototypePageId: null,
     runError: null,
@@ -132,6 +193,8 @@ export function isWorkspaceSnapshotEmpty(
   return (
     !snapshot.prototypePlan &&
     !snapshot.prototypeDesignSystem &&
+    !snapshot.prototypeDesignSystemCandidates &&
+    !snapshot.prototypeSuiteCandidates &&
     snapshot.prototypePages.length === 0 &&
     !snapshot.selectedPrototypePageId &&
     !snapshot.runError &&
@@ -144,7 +207,7 @@ export function isWorkspaceSnapshotEmpty(
     !snapshot.composerModelPolicy &&
     !snapshot.composerThinkingPolicy &&
     !snapshot.outcome &&
-    !snapshot.agentRunEvents &&
+    !(snapshot.agentRunEvents?.events.length) &&
     !snapshot.designOsAuthoring &&
     !snapshot.deliveryRequest &&
     !snapshot.deliveryPlan &&
@@ -153,6 +216,7 @@ export function isWorkspaceSnapshotEmpty(
     !snapshot.brandViRun &&
     !(snapshot.canvasAnnotations?.length) &&
     !(snapshot.capabilityReceipts?.length) &&
+    !(snapshot.codingReceipts?.length) &&
     !snapshot.designDocument &&
     !hasCreativeBoardContent(snapshot.creativeBoard)
   )
@@ -182,6 +246,49 @@ export function workspaceSnapshotFingerprint(
       ].join(':'),
     )
     .join(',')
+  const designCandidates = snapshot.prototypeDesignSystemCandidates
+    ? textFingerprint(JSON.stringify({
+        set: snapshot.prototypeDesignSystemCandidates.set,
+        artifacts: Object.fromEntries(
+          Object.entries(snapshot.prototypeDesignSystemCandidates.artifacts).map(([id, artifact]) => [id, {
+            name: artifact.name,
+            mediaType: artifact.mediaType,
+            width: artifact.width,
+            height: artifact.height,
+            bytes: artifact.bytes.byteLength,
+            designMarkdown: textFingerprint(artifact.designMarkdown),
+          }]),
+        ),
+      }))
+    : ''
+  const suiteCandidates = snapshot.prototypeSuiteCandidates
+    ? textFingerprint(JSON.stringify({
+        set: snapshot.prototypeSuiteCandidates.set,
+        artifacts: Object.fromEntries(
+          Object.entries(snapshot.prototypeSuiteCandidates.artifacts).map(([id, artifact]) => [id, {
+            designSystem: {
+              ...artifact.designSystem,
+              artifact: {
+                ...artifact.designSystem.artifact,
+                bytes: artifact.designSystem.artifact.bytes.byteLength,
+                designMarkdown: textFingerprint(artifact.designSystem.artifact.designMarkdown),
+              },
+            },
+            plan: artifact.plan,
+            pages: artifact.pages.map((page) => ({
+              page: page.page,
+              mediaType: page.mediaType,
+              width: page.width,
+              height: page.height,
+              bytes: page.bytes.byteLength,
+            })),
+            resourcePack: artifact.resourcePack,
+            provenanceIds: artifact.provenanceIds,
+            codingReceipt: artifact.codingReceipt,
+          }]),
+        ),
+      }))
+    : ''
   const attachments = (snapshot.attachments ?? [])
     .map((attachment) =>
       [
@@ -201,6 +308,8 @@ export function workspaceSnapshotFingerprint(
     snapshot.humanLoopChoiceId ?? '',
     snapshot.humanLoopCustomAnswer,
     design,
+    designCandidates,
+    suiteCandidates,
     pages,
     snapshot.selectedPrototypePageId ?? '',
     snapshot.runError ?? '',
@@ -224,6 +333,9 @@ export function workspaceSnapshotFingerprint(
     snapshot.capabilityReceipts?.length
       ? textFingerprint(JSON.stringify(snapshot.capabilityReceipts))
       : '',
+    snapshot.codingReceipts?.length
+      ? textFingerprint(JSON.stringify(snapshot.codingReceipts))
+      : '',
     hasCreativeBoardContent(snapshot.creativeBoard) ? textFingerprint(JSON.stringify(snapshot.creativeBoard)) : '',
     // DesignDocument is normally derived from the fields above. Including it
     // here would make an otherwise unchanged snapshot look dirty when the
@@ -243,6 +355,8 @@ function hasWorkspaceProjectionInput(snapshot: WorkspaceSnapshot): boolean {
   return Boolean(
     snapshot.prototypePlan ||
       snapshot.prototypeDesignSystem ||
+      snapshot.prototypeDesignSystemCandidates ||
+      snapshot.prototypeSuiteCandidates ||
       snapshot.prototypePages.length > 0 ||
       snapshot.selectedPrototypePageId ||
       snapshot.runError ||
@@ -262,7 +376,8 @@ function hasWorkspaceProjectionInput(snapshot: WorkspaceSnapshot): boolean {
       snapshot.deliveryReceipt ||
       snapshot.brandViRun ||
       (snapshot.canvasAnnotations?.length ?? 0) > 0 ||
-      (snapshot.capabilityReceipts?.length ?? 0) > 0
+      (snapshot.capabilityReceipts?.length ?? 0) > 0 ||
+      (snapshot.codingReceipts?.length ?? 0) > 0
   )
 }
 

@@ -15,17 +15,18 @@ describe("workspace rail source contract", () => {
     expect(source).toContain("inspectorActive={designDockVisible}");
   });
 
-  it("clears drawer selection before opening Assets or Deliver", () => {
+  it("clears drawers for Assets while preserving them across Deliver", () => {
     expect(source).toMatch(
       /onOpenAssets=\{\(\) => \{\s*setAgentDockVisible\(false\);\s*setFilesDockVisible\(false\);\s*setDesignDockVisible\(false\);\s*setGitDockVisible\(false\);\s*library\.open\(\);/,
     );
     expect(source).toMatch(
-      /onOpenDeliver=\{\(\) => \{\s*setAgentDockVisible\(false\);\s*setFilesDockVisible\(false\);\s*setDesignDockVisible\(false\);\s*setGitDockVisible\(false\);\s*onOpenDesignOs\("delivery"\);/,
+      /onOpenDeliver=\{\(\) => \{\s*onOpenDesignOs\("delivery"\);\s*\}\}/,
     );
   });
 
   it("keeps one accessible, focus-visible RailItem treatment", () => {
-    expect(source.match(/<RailItem/g)).toHaveLength(7);
+    expect(source.match(/<RailItem/g)).toHaveLength(6);
+    expect(source).not.toContain('label="Advanced"');
     expect(source).toContain("aria-label={label}");
     expect(source).toContain("aria-pressed={active}");
     expect(source).toContain("flex size-12 shrink-0 flex-col");

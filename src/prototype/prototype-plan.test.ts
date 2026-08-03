@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest'
+import { z } from 'zod'
 import {
+  generatedPrototypePlanningMaterialSchema,
   generatedPrototypePlanSchema,
+  generatedPrototypePlanningSeedSchema,
+  prototypePlanningSeedSchema,
   prototypePlanSchema,
   validatePrototypePlan,
   type PrototypePlan,
@@ -153,6 +157,23 @@ describe('PrototypePlan', () => {
 
     const authored = prototypePlanSchema.parse({
       ...structuredClone(validPlan),
+      designSystem: {
+        ...structuredClone(validPlan.designSystem),
+        exploration: {
+          mode: 'auto',
+          decidedBy: 'agent',
+          count: 1,
+          rationale: 'The requirement already establishes one clear visual direction.',
+          directions: [{
+            id: 'direction:primary',
+            label: 'Primary direction',
+            thesis: 'Preserve the requested product identity.',
+            vary: ['visual treatment'],
+            preserve: ['product intent'],
+          }],
+          bounds: { maxCandidates: 8, maxParallelism: 2 },
+        },
+      },
       reviewDocument: {
         format: 'markdown',
         primaryFlow: '# Primary flow\n\nA focused review.',
@@ -171,6 +192,198 @@ describe('PrototypePlan', () => {
     const parsed = prototypePlanSchema.parse(raw)
 
     expect(parsed.pages[0].regions[0].assetRoute).toBe('board-cutout')
+  })
+
+  it('requires each Agent-authored route to declare zero or more classified materials', () => {
+    const seed = {
+      product: {
+        name: 'Field Notes',
+        summary: 'A route journal for urban walks.',
+        audience: 'Independent walkers',
+        primaryGoal: 'Turn observations into reusable route stories.',
+        platform: 'responsive web app',
+      },
+      rationale: 'The route graph and materials follow the actual journal workflow.',
+      suites: [{
+        direction: {
+          id: 'editorial',
+          label: 'Editorial field guide',
+          thesis: 'Prioritize place identity and collected observations.',
+          vary: ['material density'],
+          preserve: ['route accuracy'],
+        },
+        pages: [
+          {
+            id: 'route-index',
+            name: 'Route index',
+            route: '/routes',
+            purpose: 'Browse saved walking routes.',
+            viewport: {
+              platform: 'desktop', width: 1440, height: 1000, scroll: 'long-scroll',
+            },
+            materials: [],
+          },
+          {
+            id: 'route-story',
+            name: 'Route story',
+            route: '/routes/story',
+            purpose: 'Read the observations and visual identity of one route.',
+            viewport: {
+              platform: 'desktop', width: 1440, height: 1000, scroll: 'long-scroll',
+            },
+            materials: [
+              {
+                id: 'marker-set',
+                name: 'Route marker set',
+                description: 'Three reusable illustrated location markers.',
+                production: 'board-cutout',
+                boardGroupId: 'route-markers',
+              },
+              {
+                id: 'route-map',
+                name: 'Illustrated route map',
+                description: 'One art-directed map showing the complete walk.',
+                production: 'direct-generate',
+              },
+            ],
+          },
+        ],
+      }],
+    }
+
+    const parsed = prototypePlanningSeedSchema.parse(seed)
+    expect(parsed.suites[0]!.pages[0]!.materials).toEqual([])
+    expect(parsed.suites[0]!.pages[1]!.materials.map((material) => material.production)).toEqual([
+      'board-cutout',
+      'direct-generate',
+    ])
+    expect(parsed.suites[0]!.pages[1]!.materials[0]!.boardGroupId).toBe('route-markers')
+
+    const missing = structuredClone(seed)
+    delete (missing.suites[0]!.pages[0] as { materials?: unknown }).materials
+    expect(prototypePlanningSeedSchema.safeParse(missing).success).toBe(false)
+
+    const invalidProduction = structuredClone(seed)
+    invalidProduction.suites[0]!.pages[1]!.materials[0]!.production = 'ignore-code-ui'
+    expect(prototypePlanningSeedSchema.safeParse(invalidProduction).success).toBe(false)
+
+    const invalidDirectGroup = structuredClone(seed)
+    invalidDirectGroup.suites[0]!.pages[1]!.materials[1]!.boardGroupId = 'not-a-board'
+    expect(prototypePlanningSeedSchema.safeParse(invalidDirectGroup).success).toBe(false)
+
+    const historicalMissingGroup = structuredClone(seed)
+    delete (historicalMissingGroup.suites[0]!.pages[1]!.materials[0] as {
+      boardGroupId?: string
+    }).boardGroupId
+    expect(prototypePlanningSeedSchema.safeParse(historicalMissingGroup).success).toBe(true)
+    const generatedMissingGroup = generatedPrototypePlanningSeedSchema.safeParse(
+      historicalMissingGroup,
+    )
+    expect(generatedMissingGroup.success).toBe(false)
+    if (generatedMissingGroup.success) {
+      throw new Error('Expected newly generated board materials to require a group id.')
+    }
+    expect(generatedMissingGroup.error.issues[0]).toMatchObject({
+      path: ['suites', 0, 'pages', 1, 'materials', 0, 'boardGroupId'],
+      message: 'Invalid input: expected string, received undefined',
+    })
+
+    const providerSchema = JSON.stringify(
+      z.toJSONSchema(generatedPrototypePlanningMaterialSchema),
+    )
+    expect(providerSchema).toContain(
+      '"required":["id","name","description","production","boardGroupId"]',
+    )
+  })
+
+  it('does not impose a per-route material quota on an Agent-authored graph', () => {
+    const materials = Array.from({ length: 30 }, (_, index) => ({
+      id: `scene-${index + 1}`,
+      name: `Scene ${index + 1}`,
+      description: `Standalone reusable scene ${index + 1}.`,
+      production: 'direct-generate' as const,
+    }))
+    const result = generatedPrototypePlanningSeedSchema.safeParse({
+      product: {
+        name: 'World Atlas',
+        summary: 'A reference atlas whose authored scene graph is unusually broad.',
+        audience: 'World builders',
+        primaryGoal: 'Organize reusable scenes for one atlas route.',
+        platform: 'desktop app',
+      },
+      rationale: 'The domain requires every independently reusable authored scene.',
+      suites: [{
+        direction: {
+          id: 'atlas',
+          label: 'Atlas',
+          thesis: 'Treat every scene as independent production material.',
+          vary: ['scene treatment'],
+          preserve: ['world identity'],
+        },
+        pages: [{
+          id: 'world-atlas',
+          name: 'World atlas',
+          route: '/atlas',
+          purpose: 'Browse the complete authored scene collection.',
+          viewport: {
+            platform: 'desktop', width: 1440, height: 1000, scroll: 'long-scroll',
+          },
+          materials,
+        }],
+      }],
+    })
+
+    expect(result.success).toBe(true)
+    expect(result.success && result.data.suites[0]!.pages[0]!.materials).toHaveLength(30)
+  })
+
+  it('rejects duplicate material ids within one route', () => {
+    const result = prototypePlanningSeedSchema.safeParse({
+      product: {
+        name: 'Field Notes',
+        summary: 'A route journal for urban walks.',
+        audience: 'Independent walkers',
+        primaryGoal: 'Turn observations into reusable route stories.',
+        platform: 'responsive web app',
+      },
+      rationale: 'One route with separately produced visual materials.',
+      suites: [{
+        direction: {
+          id: 'editorial',
+          label: 'Editorial field guide',
+          thesis: 'Prioritize place identity.',
+          vary: ['material treatment'],
+          preserve: ['route accuracy'],
+        },
+        pages: [{
+          id: 'route-story',
+          name: 'Route story',
+          route: '/routes/story',
+          purpose: 'Read one route.',
+          viewport: {
+            platform: 'desktop', width: 1440, height: 1000, scroll: 'long-scroll',
+          },
+          materials: [
+            {
+              id: 'map',
+              name: 'Route map',
+              description: 'A reusable route map.',
+              production: 'direct-generate',
+            },
+            {
+              id: 'map',
+              name: 'Marker board',
+              description: 'A board of route markers.',
+              production: 'board-cutout',
+            },
+          ],
+        }],
+      }],
+    })
+
+    expect(result.success).toBe(false)
+    if (result.success) throw new Error('Expected duplicate materials to fail validation.')
+    expect(result.error.issues[0]?.message).toContain('Duplicate material id "map"')
   })
 
   it('validates a dynamic human-in-the-loop question', () => {

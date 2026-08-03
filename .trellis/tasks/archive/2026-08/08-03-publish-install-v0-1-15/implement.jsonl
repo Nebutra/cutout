@@ -1,0 +1,2 @@
+{"file":".trellis/spec/frontend/release-pipeline.md","reason":"Defines synchronized versions, protected release authority, four-platform artifacts, signing/notarization, updater metadata, and truthful install evidence."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Defines repository quality and dependency hygiene expected before committing the release candidate."}

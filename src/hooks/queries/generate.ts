@@ -63,8 +63,9 @@ export function useGenerateFromProto() {
       if (!asset) throw new Error('The model returned no image.')
 
       // The generated sheet becomes the cutout source → auto-analysis follows.
-      const bitmap = await decodeImage(bytesToBlob(asset.bytes, asset.mediaType))
-      loadImage({ bitmap, name: 'generated-sheet' })
+      const encodedImage = bytesToBlob(asset.bytes, asset.mediaType)
+      const bitmap = await decodeImage(encodedImage)
+      loadImage({ bitmap, encodedImage, name: 'generated-sheet' })
       return asset
     },
   })

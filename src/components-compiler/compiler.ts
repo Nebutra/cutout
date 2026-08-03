@@ -133,13 +133,14 @@ export async function compileComponentCandidates(input: ComponentCandidateInput)
   const parsed = componentCandidateInputSchema.parse(input)
   const documentValidation = validateDesignDocument(parsed.document)
   if (!documentValidation.ok) throw new Error(`Invalid DesignDocument: ${documentValidation.error}`)
+  const document = documentValidation.data.document
 
   const candidates = normalizeAndValidateCandidates(parsed.document, parsed.candidates)
-  const documentFingerprint = await fingerprint(parsed.document)
+  const documentFingerprint = await fingerprint(document)
   const declarationFingerprint = await fingerprint(candidates)
   const source = {
-    documentId: parsed.document.meta.id,
-    revisionId: parsed.document.revision.id,
+    documentId: document.meta.id,
+    revisionId: document.revision.id,
     documentFingerprint,
     declarationFingerprint,
   } as const
@@ -183,7 +184,7 @@ export async function validateComponentManifest(
   const documentValidation = validateDesignDocument(document)
   if (!documentValidation.ok) throw new Error(`Invalid DesignDocument: ${documentValidation.error}`)
   const manifest = componentManifestSchema.parse(manifestInput)
-  const documentFingerprint = await fingerprint(document)
+  const documentFingerprint = await fingerprint(documentValidation.data.document)
   if (manifest.source.documentId !== document.meta.id || manifest.source.revisionId !== document.revision.id) {
     throw new Error('Component Candidate Manifest does not belong to this DesignDocument revision.')
   }

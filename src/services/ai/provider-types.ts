@@ -24,16 +24,27 @@ export const providerWireProtocolSchema = z.enum([
 export type ProviderWireProtocol = z.infer<typeof providerWireProtocolSchema>
 
 export function isOpenAIShapedProvider(kind: ProviderKind): boolean {
-  return kind === 'openai' || kind === 'openai-compatible' || [
+  return kind === 'openai' || kind === 'openai-compatible' || kind === 'cc-switch' || [
     'dashscope','deepseek','zhipu','moonshot','volcengine','siliconflow',
     'openrouter','together','groq','fireworks','xai','mistral',
     'ollama','vllm','lm-studio',
   ].includes(kind)
 }
 
+/** Provider routes implemented by the native `/images/generations` and `/images/edits` bridge. */
+export function supportsOpenAIImageEndpoints(
+  provider: ProviderKind | Pick<ProviderConfig, 'kind' | 'wireProtocol'> | undefined,
+): boolean {
+  const kind = typeof provider === 'string' ? provider : provider?.kind
+  if (kind !== 'openai' && kind !== 'openai-compatible' && kind !== 'cc-switch') return false
+  if (!provider || typeof provider === 'string') return true
+  const protocol = effectiveProviderWireProtocol(provider)
+  return protocol === 'responses' || protocol === 'chat-completions'
+}
+
 /** Effective wire default for old records that predate the persisted field. */
 export function defaultProviderWireProtocol(kind: ProviderKind): ProviderWireProtocol | undefined {
-  if (kind === 'openai') return 'responses'
+  if (kind === 'openai' || kind === 'cc-switch') return 'responses'
   if (kind === 'anthropic') return 'anthropic-messages'
   if (kind === 'google') return 'google-generate-content'
   if (isOpenAIShapedProvider(kind)) return 'chat-completions'
@@ -43,7 +54,7 @@ export function defaultProviderWireProtocol(kind: ProviderKind): ProviderWirePro
 export function supportedProviderWireProtocols(
   kind: ProviderKind,
 ): readonly ProviderWireProtocol[] {
-  if (kind === 'openai') return ['responses', 'chat-completions']
+  if (kind === 'openai' || kind === 'cc-switch') return ['responses', 'chat-completions']
   if (kind === 'anthropic') return ['anthropic-messages']
   if (kind === 'google') return ['google-generate-content']
   if (kind === 'openai-compatible') {
@@ -79,6 +90,7 @@ export const PROVIDER_KINDS: readonly ProviderKind[] = [
   'google',
   'gateway',
   'openai-compatible',
+  'cc-switch',
   'dashscope','deepseek','zhipu','moonshot','volcengine','siliconflow',
   'openrouter','together','groq','fireworks','xai','mistral',
   'ollama','vllm','lm-studio',

@@ -12,6 +12,7 @@ import {
   validateDesignDocument,
   type DesignDocument,
 } from '@/design-ir'
+import { designSystemMarkdownValidationError } from '@/prototype/design-system-validation'
 
 const sha256Schema = z.string().regex(/^[a-f0-9]{64}$/i)
 const cssNameSchema = z.string().regex(
@@ -30,6 +31,28 @@ export const designKitTokenCategorySchema = z.enum([
 
 export const designKitTokenStatusSchema = z.enum(['verified', 'draft'])
 
+export const selectedDesignMarkdownInputSchema = z.object({
+  candidateSetId: z.string().min(1),
+  candidateId: z.string().min(1),
+  materialId: z.string().min(1),
+  revisionId: z.string().min(1),
+  provenanceId: z.string().min(1),
+  content: z.string().min(1),
+}).strict()
+
+export const designKitDesignMarkdownSourceSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('generated-token-table') }).strict(),
+  z.object({
+    kind: z.literal('selected-material'),
+    candidateSetId: z.string().min(1),
+    candidateId: z.string().min(1),
+    materialId: z.string().min(1),
+    revisionId: z.string().min(1),
+    contentSha256: sha256Schema,
+    provenanceId: z.string().min(1),
+  }).strict(),
+])
+
 /**
  * Explicit adapter from the intentionally generic Design IR token to an
  * executable Design Kit token. There is deliberately no `value` field: values
@@ -46,6 +69,7 @@ export const designKitTokenInputSchema = z.object({
 export const designKitInputSchema = z.object({
   document: designDocumentSchema,
   tokens: z.array(designKitTokenInputSchema),
+  selectedDesignMarkdown: selectedDesignMarkdownInputSchema.optional(),
 }).strict()
 
 export const designKitFileSchema = z.object({
@@ -78,11 +102,14 @@ export const designKitSchema = z.object({
     revisionId: z.string().min(1),
     documentFingerprint: sha256Schema,
     adapterFingerprint: sha256Schema,
+    designMarkdown: designKitDesignMarkdownSourceSchema.optional(),
   }).strict(),
   files: z.array(designKitFileSchema),
 }).strict()
 
 export type DesignKitTokenInput = z.infer<typeof designKitTokenInputSchema>
+export type SelectedDesignMarkdownInput = z.infer<typeof selectedDesignMarkdownInputSchema>
+export type DesignKitDesignMarkdownSource = z.infer<typeof designKitDesignMarkdownSourceSchema>
 export type DesignKitInput = z.infer<typeof designKitInputSchema>
 export type DesignKitFile = z.infer<typeof designKitFileSchema>
 export type DesignKit = z.infer<typeof designKitSchema>
@@ -100,6 +127,11 @@ interface ResolvedToken {
   readonly irTier?: 'primitive' | 'semantic' | 'alias'
   /** The Design IR token's own `aliasOf` (semantic alias target id) — distinct from this kit's CSS `aliasOf` above. */
   readonly irAliasOf?: string
+}
+
+interface ResolvedDesignMarkdown {
+  readonly content: string
+  readonly source: DesignKitDesignMarkdownSource
 }
 
 const compatibleKinds: Readonly<Record<ResolvedToken['category'], readonly string[]>> = {
@@ -120,22 +152,35 @@ export async function compileDesignKit(input: DesignKitInput): Promise<DesignKit
   const parsed = designKitInputSchema.parse(input)
   const documentValidation = validateDesignDocument(parsed.document)
   if (!documentValidation.ok) throw new Error(`Invalid DesignDocument: ${documentValidation.error}`)
-  const tokens = resolveTokens(parsed.document, parsed.tokens)
-  const documentFingerprint = await fingerprint(parsed.document)
+  const document = documentValidation.data.document
+  const tokens = resolveTokens(document, parsed.tokens)
+  const documentFingerprint = await fingerprint(document)
   const adapterFingerprint = await fingerprint(tokens.map(adapterFingerprintEntry))
+  const resolvedDesignMarkdown = await resolveDesignMarkdown(
+    document,
+    parsed.selectedDesignMarkdown,
+    tokens,
+    { documentFingerprint, adapterFingerprint },
+  )
   const source = {
-    documentId: parsed.document.meta.id,
-    revisionId: parsed.document.revision.id,
+    documentId: document.meta.id,
+    revisionId: document.revision.id,
     documentFingerprint,
     adapterFingerprint,
+    designMarkdown: resolvedDesignMarkdown.source,
   } as const
 
   const tokenIds = tokens.map((token) => token.tokenId)
-  const provenanceIds = uniqueSorted(tokens.flatMap((token) => token.provenanceId ? [token.provenanceId] : []))
+  const provenanceIds = uniqueSorted([
+    ...tokens.flatMap((token) => token.provenanceId ? [token.provenanceId] : []),
+    ...(resolvedDesignMarkdown.source.kind === 'selected-material'
+      ? [resolvedDesignMarkdown.source.provenanceId]
+      : []),
+  ])
   const provenance = {
     compiler: 'cutout.design-kit.v1' as const,
-    documentId: parsed.document.meta.id,
-    revisionId: parsed.document.revision.id,
+    documentId: document.meta.id,
+    revisionId: document.revision.id,
     tokenIds,
     provenanceIds,
   }
@@ -145,9 +190,9 @@ export async function compileDesignKit(input: DesignKitInput): Promise<DesignKit
     ['tokens.css', renderTokensCss(tokens)],
     ['tailwind.css', renderTailwindCss(tokens)],
     ['theme.ts', renderThemeTs(tokens)],
-    ['DESIGN.md', renderDesignMarkdown(parsed.document, tokens, source)],
-    ['design-system.html', renderDesignSystemHtml(parsed.document, tokens, source)],
-    ['demo.html', renderDemoHtml(parsed.document, tokens, source)],
+    ['DESIGN.md', resolvedDesignMarkdown.content],
+    ['design-system.html', renderDesignSystemHtml(document, tokens, resolvedDesignMarkdown.content)],
+    ['demo.html', renderDemoHtml(document, tokens, source)],
   ]
 
   const filesWithoutManifest = await Promise.all(sourceFiles.map(async ([path, content]) => ({
@@ -171,6 +216,80 @@ export async function compileDesignKit(input: DesignKitInput): Promise<DesignKit
     source,
     files: [...filesWithoutManifest, manifest].sort((left, right) => compareText(left.path, right.path)),
   })
+}
+
+async function resolveDesignMarkdown(
+  document: DesignDocument,
+  selected: SelectedDesignMarkdownInput | undefined,
+  tokens: readonly ResolvedToken[],
+  source: { readonly documentFingerprint: string; readonly adapterFingerprint: string },
+): Promise<ResolvedDesignMarkdown> {
+  if (!selected) {
+    return {
+      content: renderDesignMarkdown(document, tokens, source),
+      source: { kind: 'generated-token-table' },
+    }
+  }
+
+  const candidateSet = document.candidateSets?.find((entry) => entry.id === selected.candidateSetId)
+  if (!candidateSet || candidateSet.kind !== 'design-system') {
+    throw new Error(`Selected DESIGN.md candidate set "${selected.candidateSetId}" does not exist.`)
+  }
+  if (
+    candidateSet.selection?.candidateId !== selected.candidateId
+    || candidateSet.selection.provenanceId !== selected.provenanceId
+  ) {
+    throw new Error(`Selected DESIGN.md candidate "${selected.candidateId}" is not the promoted selection.`)
+  }
+  const candidate = candidateSet.candidates.find((entry) => entry.id === selected.candidateId)
+  if (!candidate || candidate.status !== 'ready') {
+    throw new Error(`Selected DESIGN.md candidate "${selected.candidateId}" is not ready.`)
+  }
+  if (!candidate.outputs.some((output) => output.materialId === selected.materialId)) {
+    throw new Error(`Selected DESIGN.md material "${selected.materialId}" is not an output of candidate "${selected.candidateId}".`)
+  }
+
+  const material = document.materials.find((entry) => entry.id === selected.materialId)
+  if (!material) {
+    throw new Error(`Selected DESIGN.md material "${selected.materialId}" does not exist in the DesignDocument.`)
+  }
+  if (material.kind !== 'design-markdown') {
+    throw new Error(`Selected DESIGN.md material "${selected.materialId}" is not a design-markdown material.`)
+  }
+  if (material.currentRevisionId !== selected.revisionId) {
+    throw new Error(`Selected DESIGN.md revision "${selected.revisionId}" is not current for material "${selected.materialId}".`)
+  }
+  const revision = material.revisions.find((entry) => entry.id === selected.revisionId)
+  if (!revision) {
+    throw new Error(`Selected DESIGN.md revision "${selected.revisionId}" does not exist on material "${selected.materialId}".`)
+  }
+  if (!revision.content.sha256) {
+    throw new Error(`Selected DESIGN.md revision "${selected.revisionId}" is missing a content digest.`)
+  }
+  const contentSha256 = await sha256Text(selected.content)
+  if (contentSha256.toLowerCase() !== revision.content.sha256.toLowerCase()) {
+    throw new Error(`Selected DESIGN.md content does not match revision "${selected.revisionId}".`)
+  }
+  if (!document.provenance.some((entry) => entry.id === selected.provenanceId)) {
+    throw new Error(`Selected DESIGN.md provenance "${selected.provenanceId}" does not exist in the DesignDocument.`)
+  }
+  const validationError = designSystemMarkdownValidationError(selected.content)
+  if (validationError) {
+    throw new Error(`Selected DESIGN.md is invalid: ${validationError}`)
+  }
+
+  return {
+    content: selected.content,
+    source: {
+      kind: 'selected-material',
+      candidateSetId: selected.candidateSetId,
+      candidateId: selected.candidateId,
+      materialId: selected.materialId,
+      revisionId: selected.revisionId,
+      contentSha256,
+      provenanceId: selected.provenanceId,
+    },
+  }
 }
 
 function resolveTokens(
@@ -321,7 +440,7 @@ function renderDesignMarkdown(
 function renderDesignSystemHtml(
   document: DesignDocument,
   tokens: readonly ResolvedToken[],
-  source: { readonly documentFingerprint: string; readonly adapterFingerprint: string },
+  designMarkdown: string,
 ): string {
   const byCategory = groupBy(tokens, (token) => token.category)
   const colorTokens = byCategory.color ?? []
@@ -371,7 +490,7 @@ function renderDesignSystemHtml(
         </div>`).join('')
 
   const files: ReadonlyArray<readonly [string, string]> = [
-    ['DESIGN.md', renderDesignMarkdown(document, tokens, source)],
+    ['DESIGN.md', designMarkdown],
     ['tokens.json', renderTokensJson(tokens)],
     ['tokens.css', renderTokensCss(tokens)],
     ['tailwind.css', renderTailwindCss(tokens)],
@@ -559,7 +678,7 @@ ${css}
 }
 
 function renderManifest(
-  source: { readonly documentId: string; readonly revisionId: string; readonly documentFingerprint: string; readonly adapterFingerprint: string },
+  source: DesignKit['source'],
   files: readonly Pick<DesignKitFile, 'path' | 'sha256' | 'sourceFingerprint' | 'provenance'>[],
 ): string {
   return `${JSON.stringify({

@@ -26,12 +26,6 @@ msgid "global_library.toast_assets_updated"
 msgstr "{0, plural, one {# asset updated} other {# assets updated}}"
 
 #. js-lingui-explicit-id
-#. placeholder {0}: coverage.missing.length
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.capability_gaps_count"
-msgstr "{0, plural, one {# capability gap} other {# capability gaps}}"
-
-#. js-lingui-explicit-id
 #. placeholder {0}: plan.files.length
 #. placeholder {1}: plan.conflicts.length
 #: src/components/library/RegistryInstallPanel.tsx
@@ -99,13 +93,6 @@ msgstr "{0} kit editor"
 #: src/components/settings/ModelSlot.tsx
 msgid "settings.models_discovered_from_endpoint"
 msgstr "{0} models discovered from endpoint"
-
-#. js-lingui-explicit-id
-#. placeholder {0}: coverage.covered.length
-#. placeholder {1}: coverage.total
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.task_dimensions_covered"
-msgstr "{0} of {1} task dimensions covered"
 
 #. js-lingui-explicit-id
 #: src/components/preview/PreviewMeta.tsx
@@ -205,11 +192,6 @@ msgstr "Add a constraint or describe another direction…"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
-msgid "settings.empty_desc"
-msgstr "Add a provider and enter an API key to start using AI features."
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
 msgid "settings.add_provider"
 msgstr "Add provider"
 
@@ -224,10 +206,14 @@ msgid "global_library.add_tag_placeholder"
 msgstr "Add tag"
 
 #. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
 #: src/components/settings/sections/SpeechSection.tsx
 msgid "settings.advanced"
 msgstr "Advanced"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.advanced_ai_management"
+msgstr "Advanced AI management"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
@@ -243,6 +229,16 @@ msgstr "Agent personality"
 #: src/components/settings/SettingsSidebar.tsx
 msgid "settings.section_ai"
 msgstr "AI"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.ai_setup_ready"
+msgstr "AI routes are configured"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.ai_setup_action_required"
+msgstr "AI setup needs attention"
 
 #. js-lingui-explicit-id
 #: src/components/settings/AboutFooter.tsx
@@ -268,11 +264,6 @@ msgstr "All ({total})"
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.all_collections"
 msgstr "All collections"
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.all_dimensions_covered"
-msgstr "All configured dimensions have adapter coverage. Model-level evidence is checked at selection time."
 
 #. js-lingui-explicit-id
 #: src/components/home/ProjectHome.tsx
@@ -466,11 +457,6 @@ msgid "global_library.policy_auto_compatible"
 msgstr "Auto compatible"
 
 #. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.model_routing_description"
-msgstr "Auto routes each task only to an available adapter with the required capability."
-
-#. js-lingui-explicit-id
 #: src/components/settings/sections/SpeechSection.tsx
 msgid "settings.speech.models_description"
 msgstr "Auto routing is used by default. ASR and TTS remain capability-required until compatible adapters are connected."
@@ -491,6 +477,11 @@ msgid "settings.speech.auto_play_aria"
 msgstr "Auto-play TTS responses"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.ai_setup_unavailable"
+msgstr "Automatic AI setup is unavailable"
+
+#. js-lingui-explicit-id
 #: src/components/home/ProjectHome.tsx
 msgid "home.nav_back"
 msgstr "Back"
@@ -502,6 +493,7 @@ msgstr "Base URL"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/UpdatesSection.tsx
+#: src/updater/update-notifications.ts
 msgid "settings.updates.beta"
 msgstr "Beta"
 
@@ -524,6 +516,11 @@ msgstr "Brand kit"
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.tab_brand_kits"
 msgstr "Brand Kits"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.browse_providers"
+msgstr "Browse providers"
 
 #. js-lingui-explicit-id
 #: src/components/library/GlobalLibraryView.tsx
@@ -611,6 +608,11 @@ msgid "settings.updates.check_now"
 msgstr "Check now"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.ai_setup_checking"
+msgstr "Checking AI setup"
+
+#. js-lingui-explicit-id
 #: src/components/settings/sections/UpdatesSection.tsx
 msgid "settings.updates.checking"
 msgstr "Checking for updates..."
@@ -646,6 +648,11 @@ msgid "workspace.human_loop_choose_direction"
 msgstr "Choose a direction"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.ai_setup_connect_description"
+msgstr "Choose a provider and verify its credentials."
+
+#. js-lingui-explicit-id
 #: src/components/workspace/IntentWorkspace.tsx
 msgid "workspace.human_loop_instruction"
 msgstr "Choose one direction. Add optional context below, then press the arrow."
@@ -653,6 +660,11 @@ msgstr "Choose one direction. Add optional context below, then press the arrow."
 #. js-lingui-explicit-id
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.clear_selection"
+msgstr "Clear"
+
+#. js-lingui-explicit-id
+#: src/components/home/SidebarAccount.tsx
+msgid "home.notifications_clear"
 msgstr "Clear"
 
 #. js-lingui-explicit-id
@@ -749,6 +761,21 @@ msgid "settings.key_placeholder_replace"
 msgstr "Configured — type to replace"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.configured_providers"
+msgstr "Configured providers"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.ai_setup_verification_description"
+msgstr "Configured providers must be enabled and verified before Cutout can use them."
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.configuring"
+msgstr "Configuring"
+
+#. js-lingui-explicit-id
 #: src/components/library/KitLibraryInspector.tsx
 msgid "kit_library.audit_conflicts"
 msgstr "Conflicts"
@@ -771,18 +798,8 @@ msgstr "Connect a provider"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
-msgid "settings.connect_provider_with_capabilities"
-msgstr "Connect a provider with these capabilities"
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.connect_ai_capabilities"
-msgstr "Connect AI capabilities"
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.connect_ai_capabilities_description"
-msgstr "Connect one provider first. Cutout will then route text, vision, speech, coding and image tasks automatically."
+msgid "settings.ai_setup_connect_title"
+msgstr "Connect AI to get started"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
@@ -901,10 +918,14 @@ msgid "home.create_from_brief"
 msgstr "Create from brief"
 
 #. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
 #: src/components/settings/sections/SpeechSection.tsx
 msgid "settings.dimension_tts_description"
 msgstr "Create spoken audio."
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.ai_setup_ready_description"
+msgstr "Credentials and catalog routes are configured. Image generation is verified when the first image completes."
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/IntegrationsSection.tsx
@@ -948,6 +969,27 @@ msgid "settings.personalization.custom_requires_instructions"
 msgstr "Custom personality requires instructions before it can be saved."
 
 #. js-lingui-explicit-id
+#. placeholder {0}: release.version
+#: src/updater/update-notifications.ts
+msgid "updates.notification.available_detail"
+msgstr "Cutout {0} is available on the {channelLabel} channel."
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.ai_setup_credentials_auto_description"
+msgstr "Cutout can verify and configure these local credentials automatically."
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.ai_setup_discovery_unavailable_description"
+msgstr "Cutout could not check reusable credentials on this device. Try again or connect a provider manually."
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.ai_setup_configuration_unavailable_description"
+msgstr "Cutout could not load the current AI configuration. Try again."
+
+#. js-lingui-explicit-id
 #. placeholder {0}: state.preferences.channel
 #: src/components/settings/sections/UpdatesSection.tsx
 msgid "settings.updates.up_to_date"
@@ -956,7 +998,7 @@ msgstr "Cutout is up to date on the {0} channel."
 #. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
 msgid "settings.provider_source_keychain"
-msgstr "Cutout Keychain"
+msgstr "Cutout local credentials"
 
 #. js-lingui-explicit-id
 #: src/components/home/SidebarAccount.tsx
@@ -1047,14 +1089,14 @@ msgid "settings.integrations.desktop_not_installed"
 msgstr "Desktop provider is not installed."
 
 #. js-lingui-explicit-id
-#: src/components/settings/sections/GeneralSection.tsx
-msgid "settings.developer_mode.title"
-msgstr "Developer mode"
-
-#. js-lingui-explicit-id
 #: src/components/settings/sections/RecoverySection.tsx
 msgid "settings.recovery.diagnostic_preview_aria"
 msgstr "Diagnostic bundle preview"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/RecoverySection.tsx
+msgid "settings.recovery.advanced"
+msgstr "Diagnostics and recovery"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/SpeechSection.tsx
@@ -1080,16 +1122,6 @@ msgstr "Disconnect"
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.discover_references"
 msgstr "Discover references"
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.discovered_on_mac"
-msgstr "Discovered on this Mac"
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.discovered_providers"
-msgstr "Discovered providers"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/PersonalizationSection.tsx
@@ -1364,11 +1396,6 @@ msgid "settings.recovery.host_error"
 msgstr "Host recovery could not be completed."
 
 #. js-lingui-explicit-id
-#: src/components/settings/sections/RecoverySection.tsx
-msgid "settings.recovery.host_status"
-msgstr "Host recovery:"
-
-#. js-lingui-explicit-id
 #: src/components/library/TeamGovernancePanel.tsx
 msgid "team.host_required"
 msgstr "Host required"
@@ -1550,11 +1577,6 @@ msgid "home.local_projects"
 msgstr "Local projects"
 
 #. js-lingui-explicit-id
-#: src/components/settings/sections/RecoverySection.tsx
-msgid "settings.recovery.title"
-msgstr "Local recovery"
-
-#. js-lingui-explicit-id
 #: src/components/library/TeamGovernancePanel.tsx
 msgid "team.local_review"
 msgstr "Local review"
@@ -1585,9 +1607,19 @@ msgid "global_library.reference_locked"
 msgstr "Locked"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.manage_providers"
+msgstr "Manage providers"
+
+#. js-lingui-explicit-id
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.kit_editor_description"
 msgstr "Manage the approved, content-addressed kit projection."
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.manual_model_bindings"
+msgstr "Manual model bindings"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/PersonalizationSection.tsx
@@ -1635,15 +1667,15 @@ msgid "settings.model_or_blank_placeholder"
 msgstr "Model or leave blank for Auto"
 
 #. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.model_routing"
-msgstr "Model routing"
-
-#. js-lingui-explicit-id
 #. placeholder {0}: project.name
 #: src/components/home/ProjectHome.tsx
 msgid "home.more_actions_named"
 msgstr "More actions for {0}"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.ai_setup_capabilities_title"
+msgstr "More AI capabilities are needed"
 
 #. js-lingui-explicit-id
 #: src/components/library/GlobalLibraryView.tsx
@@ -1731,11 +1763,6 @@ msgid "slices.empty_no_regions_title"
 msgstr "No regions found"
 
 #. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.no_reusable_credential"
-msgstr "No reusable credential"
-
-#. js-lingui-explicit-id
 #: src/components/slices/SliceGridEmpty.tsx
 msgid "slices.empty_no_regions_automatic_hint"
 msgstr "No reusable regions were found. Try a different asset sheet."
@@ -1779,6 +1806,22 @@ msgid "home.notifications"
 msgstr "Notifications"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/UpdatesSection.tsx
+msgid "settings.updates.system_notifications_aria"
+msgstr "Notify me about updates while Cutout is in the background"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/UpdatesSection.tsx
+msgid "settings.updates.system_notifications_hint"
+msgstr "Notify when an update is found while Cutout is in the background."
+
+#. js-lingui-explicit-id
+#. placeholder {0}: notification.title
+#: src/components/home/SidebarAccount.tsx
+msgid "home.notification_open"
+msgstr "Open {0}"
+
+#. js-lingui-explicit-id
 #: src/components/library/TeamGovernancePanel.tsx
 msgid "team.open_project_to_review"
 msgstr "Open a project to start a review."
@@ -1807,6 +1850,11 @@ msgstr "Optional fallback model"
 #: src/components/source/DropZone.tsx
 msgid "source.dropzone_hint"
 msgstr "or click to browse · PNG, JPEG, WebP"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.manual_model_bindings_description"
+msgstr "Override automatic routing for a specific task."
 
 #. js-lingui-explicit-id
 #: src/components/library/KitLibraryInspector.tsx
@@ -1997,6 +2045,11 @@ msgid "settings.provider_updated_toast"
 msgstr "Provider updated"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.advanced_ai_management_description"
+msgstr "Providers, manual model bindings and SVG export."
+
+#. js-lingui-explicit-id
 #: src/components/library/KitLibraryInspector.tsx
 msgid "kit_library.publish_new_version"
 msgstr "Publish new version"
@@ -2077,6 +2130,11 @@ msgstr "Registry desktop host requires the Cutout desktop app."
 #: src/components/library/RegistryInstallPanel.tsx
 msgid "registry_install.section_aria"
 msgstr "Registry install"
+
+#. js-lingui-explicit-id
+#: src/components/home/SidebarAccount.tsx
+msgid "home.notification_remind_tomorrow"
+msgstr "Remind tomorrow"
 
 #. js-lingui-explicit-id
 #: src/components/settings/ProviderRow.tsx
@@ -2198,6 +2256,11 @@ msgid "home.restore"
 msgstr "Restore"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.retry"
+msgstr "Retry"
+
+#. js-lingui-explicit-id
 #: src/components/settings/sections/PersonalizationSection.tsx
 msgid "settings.personalization.retry"
 msgstr "Retry"
@@ -2218,6 +2281,11 @@ msgid "home.retry"
 msgstr "Retry"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.ai_setup_credentials_found"
+msgstr "Reusable credentials found"
+
+#. js-lingui-explicit-id
 #: src/components/settings/sections/PersonalizationSection.tsx
 msgid "settings.personalization.use_memory_desc"
 msgstr "Reuse approved preferences in future sessions."
@@ -2236,6 +2304,11 @@ msgstr "Review branch"
 #: src/components/library/ReviewBranchEditor.tsx
 msgid "review_branch.comment_aria"
 msgstr "Review comment"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.ai_setup_checking_description"
+msgstr "Reviewing configured providers and reusable credentials on this device."
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/IntegrationsSection.tsx
@@ -2321,6 +2394,11 @@ msgid "settings.integrations.expired"
 msgstr "Session expired. Refresh or reconnect."
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.setup_automatically"
+msgstr "Set up automatically"
+
+#. js-lingui-explicit-id
 #: src/components/home/SidebarAccount.tsx
 #: src/components/settings/SettingsDialog.tsx
 msgid "settings.menu_label"
@@ -2351,11 +2429,6 @@ msgstr "Shortcut"
 #: src/components/settings/VectorizerPanel.tsx
 msgid "settings.key_show"
 msgstr "Show"
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/GeneralSection.tsx
-msgid "settings.developer_mode.hint"
-msgstr "Show read-only DAG, Design IR and receipt audit tools inside projects."
 
 #. js-lingui-explicit-id
 #: src/components/inspector/SliceDimensions.tsx
@@ -2416,7 +2489,6 @@ msgid "settings.speech.shortcut_aria"
 msgstr "Speech shortcut"
 
 #. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
 #: src/components/settings/sections/SpeechSection.tsx
 msgid "settings.dimension_asr_label"
 msgstr "Speech to text"
@@ -2428,6 +2500,7 @@ msgstr "Spoken output"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/UpdatesSection.tsx
+#: src/updater/update-notifications.ts
 msgid "settings.updates.stable"
 msgstr "Stable"
 
@@ -2474,6 +2547,16 @@ msgid "home.theme_system"
 msgstr "System"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/UpdatesSection.tsx
+msgid "settings.updates.system_notifications"
+msgstr "System notifications"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/UpdatesSection.tsx
+msgid "settings.updates.system_notifications_denied"
+msgstr "System notifications remain off because permission was not granted."
+
+#. js-lingui-explicit-id
 #: src/components/topbar/TabsMenu.tsx
 msgid "topbar.tabs_in_window"
 msgstr "Tabs in this window"
@@ -2504,7 +2587,6 @@ msgid "vectorizer.mode_test"
 msgstr "Test"
 
 #. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
 #: src/components/settings/sections/SpeechSection.tsx
 msgid "settings.dimension_tts_label"
 msgstr "Text to speech"
@@ -2588,10 +2670,14 @@ msgid "settings.personalization.tool_memory_enabled_toast"
 msgstr "Tool-assisted memory enabled"
 
 #. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
 #: src/components/settings/sections/SpeechSection.tsx
 msgid "settings.dimension_asr_description"
 msgstr "Transcribe spoken audio."
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/RecoverySection.tsx
+msgid "settings.recovery.title"
+msgstr "Troubleshooting"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/SpeechSection.tsx
@@ -2664,6 +2750,11 @@ msgstr "Unsupported file: {name}"
 #: src/components/source/SourceMeta.tsx
 msgid "source.meta_untitled"
 msgstr "untitled"
+
+#. js-lingui-explicit-id
+#: src/updater/update-notifications.ts
+msgid "updates.notification.available_title"
+msgstr "Update available"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/UpdatesSection.tsx
@@ -2767,6 +2858,11 @@ msgstr "Verified local preview, provenance, and capability-aware asset actions."
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.verifying_component_blobs"
 msgstr "Verifying component source blobs…"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.ai_setup_configuring_description"
+msgstr "Verifying local credentials and configuring the required model routes."
 
 #. js-lingui-explicit-id
 #: src/components/library/GlobalLibraryView.tsx
@@ -2873,3 +2969,8 @@ msgstr "Your open tabs and recently closed tabs will appear here"
 #: src/components/home/ProjectHome.tsx
 msgid "home.your_projects"
 msgstr "Your projects"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.ai_setup_capabilities_description"
+msgstr "Your verified providers do not cover every required task."

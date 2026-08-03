@@ -63,6 +63,21 @@ describe('local notification projection', () => {
     ])
   })
 
+  it('migrates legacy records without action metadata and accepts actionable update records', () => {
+    const storage = memory()
+    storage.setItem('cutout.notifications.v1', JSON.stringify([
+      { id: 'agent:legacy', source: 'agent', kind: 'success', title: 'Done', detail: 'Complete', createdAt: 41, read: true },
+      { id: 'update:stable:1.2.0', source: 'update', kind: 'attention', title: 'Update available', detail: 'Cutout 1.2.0 is available.', createdAt: 42, read: false, action: { type: 'open-settings', section: 'updates-support', anchor: 'updates' } },
+    ]))
+
+    const loaded = loadLocalNotifications(storage)
+    expect(loaded).toEqual([
+      expect.objectContaining({ id: 'update:stable:1.2.0', action: { type: 'open-settings', section: 'updates-support', anchor: 'updates' } }),
+      expect.objectContaining({ id: 'agent:legacy' }),
+    ])
+    expect(loaded[1]).not.toHaveProperty('action')
+  })
+
   it('stays silent for auto-approved tool calls and never surfaces billing amounts', () => {
     const approval = {
       type: 'tool-approval-requested' as const,

@@ -556,15 +556,15 @@ Attempted immutable v0.1.2 release, diagnosed post-build DMG notarization and Ta
 - None - task complete
 
 
-## Session 17: Persist Agent conversation branches in Git
+## Session 17: Ship Agent response regeneration in v0.1.4
 
 **Date**: 2026-07-22
-**Task**: Persist Agent conversation branches in Git
-**Branch**: `main`
+**Task**: Ship Agent response regeneration in v0.1.4
+**Branch**: `release/v0.1.4`
 
 ### Summary
 
-Implemented immutable sibling Agent responses with previous/next selection, durable preparing lifecycle rows, authorized .cutout/run-events.json reconciliation and CAS persistence, project-isolation safeguards, and full frontend/Rust/visual regression coverage.
+Added latest-response Regenerate with durable revision semantics, fixed stale retry error cleanup and fail-closed tool-gate behavior, published signed/notarized v0.1.4 for all platforms, and reinstalled/verified the arm64 macOS release.
 
 ### Main Changes
 
@@ -574,7 +574,8 @@ Implemented immutable sibling Agent responses with previous/next selection, dura
 
 | Hash | Message |
 |------|---------|
-| `3043e27` | (see git log) |
+| `4297089` | (see git log) |
+| `cd8fcd1` | (see git log) |
 
 ### Testing
 
@@ -589,15 +590,448 @@ Implemented immutable sibling Agent responses with previous/next selection, dura
 - None - task complete
 
 
-## Session 18: Common local Agent inventory
+## Session 18: Reinstall local Cutout v0.1.4
+
+**Date**: 2026-07-22
+**Task**: Reinstall local Cutout v0.1.4
+**Branch**: `release/v0.1.4`
+
+### Summary
+
+Redownloaded and checksum-verified the stable Apple Silicon DMG, preserved the prior app bundle in Trash, reinstalled Cutout v0.1.4, validated signature/Gatekeeper/notarization, and confirmed the app window and existing local projects.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+(No commits - planning session)
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 19: Harden release updater and close security issues
+
+**Date**: 2026-07-22
+**Task**: Harden release updater and close security issues
+**Branch**: `chore/archive-harden-release-task`
+
+### Summary
+
+Hardened Cutout security boundaries and updater trust, protected release governance, stabilized Windows CI, upgraded Actions to Node 24, remediated fast-uri, and closed all GitHub issues with verified main CI.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `957be1c` | (see git log) |
+| `039c07a` | (see git log) |
+| `8617887` | (see git log) |
+| `0bc05f9` | (see git log) |
+| `827581e` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 20: Remove legacy GUI queue
+
+**Date**: 2026-07-23
+**Task**: Remove legacy GUI queue
+**Branch**: `cleanup/legacy-code`
+
+### Summary
+
+Removed the deprecated GUI Queue, Queue-only semantic experiment, native handlers and permissions; retained persisted compatibility and runtime diagnostics; merged PR #19 after full cross-platform quality gates.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `1cce065` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 21: Faithful uploaded-material extraction
+
+**Date**: 2026-07-23
+**Task**: Faithful uploaded-material extraction
+**Branch**: `chore/archive-general-material-extraction`
+
+### Summary
+
+Added staged Agent routing for deterministic asset-sheet slicing and Apple Vision foreground extraction, exact source-byte preservation, mask/provenance evidence, cancellation/source binding, truthful capability gaps, plugin/spec synchronization, and merged PR #21 after full cross-platform CI.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `5f41ac9` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 22: Remove project developer mode
+
+**Date**: 2026-07-23
+**Task**: Remove project developer mode
+**Branch**: `remove/developer-mode`
+
+### Summary
+
+Removed the General settings developer toggle, workspace Advanced rail action, developer audit dialog/export, and advanced navigation capability; added safe migration for retired local state and updated unit, visual, localization, and state-management contracts.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `c085038` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 23: Remediate Dependabot dependency chains
+
+**Date**: 2026-07-23
+**Task**: Remediate Dependabot dependency chains
+**Branch**: `chore/archive-remediate-dependabot-alerts`
+
+### Summary
+
+Removed the shadcn/MCP/Hono dependency graph by vendoring its exact Tailwind support CSS, vendored a library-only VTracer 0.6.5 to eliminate Clap 2 and atty, preserved licenses and provenance, passed full local and GitHub CI, merged PR #23, and left glib visible as constrained by Tauri's Linux GTK stack.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `901bbcf` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 24: Selectable Design System Variants
+
+**Date**: 2026-07-23
+**Task**: Selectable Design System Variants
+**Branch**: `chore/archive-design-system-variants`
+
+### Summary
+
+Added Agent-resolved Design System candidate generation, comparison and explicit selection; persisted candidate provenance through workspace and Design IR; projected only the selected DESIGN.md and tokens into prototypes and exports; preserved legacy single-system recovery; validated and merged the capability to github/main.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `f413a90` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 25: Fix regenerate activity bubble duplication
+
+**Date**: 2026-07-23
+**Task**: Fix regenerate activity bubble duplication
+**Branch**: `fix/regenerate-bubble-duplication`
+
+### Summary
+
+Separated durable preparation lifecycle evidence from transient conversation projection; added live-text precedence, terminal suppression, branch and DOM regressions, and captured the contract in Agent safety specs.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `bd185d0` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 26: Release and install Cutout v0.1.6
+
+**Date**: 2026-07-23
+**Task**: Release and install Cutout v0.1.6
+**Branch**: `chore/archive-release-install-v0-1-6`
+
+### Summary
+
+Prepared, reviewed, merged, tagged, signed, notarized, published, verified, and installed Cutout v0.1.6 from the public Apple Silicon DMG; preserved user data and moved the old v0.1.5 app to Trash.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `ca28859b8a9a25e73fa9fb7c3cc703b4489f2091` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 27: Fix duplicate preparation projection
+
+**Date**: 2026-07-24
+**Task**: Fix duplicate preparation projection
+**Branch**: `fix/preparing-run-duplicate-projection`
+
+### Summary
+
+Kept durable preparation events in the full audit projection while rendering pure preparation on only the compact Agent activity surface; preserved actionable tools and approvals and added composed DOM regressions.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `2f84034` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 28: Release and install Cutout v0.1.7
+
+**Date**: 2026-07-24
+**Task**: Release and install Cutout v0.1.7
+**Branch**: `chore/archive-release-install-v0-1-7`
+
+### Summary
+
+Published the single-active-surface preparation fix as the atomic four-platform v0.1.7 release, verified checksums and notarization, replaced the local ad-hoc v0.1.6 bundle with the public Developer ID signed/notarized ARM64 build, and moved the old bundle to Trash.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `13d4eda` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 29: Simplify troubleshooting recovery UX
+
+**Date**: 2026-07-24
+**Task**: Simplify troubleshooting recovery UX
+**Branch**: `fix/simplify-local-recovery-settings`
+
+### Summary
+
+Reduced Settings recovery cognitive load to one direct UI reset plus a lightweight diagnostics disclosure, hid unauthorized host actions, localized the new hierarchy, added component and desktop/mobile visual coverage, and captured the convention in frontend specs.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `cb459e9` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 30: Publish and install Cutout v0.1.8
+
+**Date**: 2026-07-25
+**Task**: Publish and install Cutout v0.1.8
+**Branch**: `chore/archive-release-v0.1.8`
+
+### Summary
+
+Merged troubleshooting recovery UX, stabilized Windows release asset fixture timeouts, published signed/notarized four-platform v0.1.8 with updater metadata and provenance, and replaced local v0.1.7 with verified ARM64 v0.1.8 while preserving user data.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `cb459e9` | (see git log) |
+| `30e8617` | (see git log) |
+| `25dbdb6` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 31: Pen identity and Codex credential reuse
 
 **Date**: 2026-07-27
-**Task**: Common local Agent inventory
-**Branch**: `main`
+**Task**: Pen identity and Codex credential reuse
+**Branch**: `fix/pen-local-credentials`
 
 ### Summary
 
-Added a pinned offline registry and sanitized metadata-only installation inventory for all 39 reviewed coding Agents, with strict native IPC validation and least-privilege Tauri permissioning.
+Renamed the Pencil integration to Pen with legacy surface aliases, restored native Codex auth.json API-key discovery without exposing secrets, synchronized Agent contracts and docs, and passed full TypeScript, Rust, build, and validation gates.
 
 ### Main Changes
 
@@ -607,7 +1041,7 @@ Added a pinned offline registry and sanitized metadata-only installation invento
 
 | Hash | Message |
 |------|---------|
-| `f7654b1` | (see git log) |
+| `bf03bfe` | (see git log) |
 
 ### Testing
 
@@ -622,15 +1056,15 @@ Added a pinned offline registry and sanitized metadata-only installation invento
 - None - task complete
 
 
-## Session 19: Evaluate ImageMagick slicing quality
+## Session 32: Stabilize secret visibility toggles
 
-**Date**: 2026-07-29
-**Task**: Evaluate ImageMagick slicing quality
-**Branch**: `main`
+**Date**: 2026-07-27
+**Task**: Stabilize secret visibility toggles
+**Branch**: `fix/key-visibility-icon-jitter`
 
 ### Summary
 
-Benchmarked Cutout against ImageMagick-only and hybrid slicing on the six-asset effect fixture; kept the current pipeline after ImageMagick regressed soft alpha and recomposition quality.
+Removed active-state vertical jitter from provider and Vectorizer secret visibility buttons, added component and desktop/mobile pointer geometry regressions, and documented the embedded icon-button positioning rule.
 
 ### Main Changes
 
@@ -640,7 +1074,245 @@ Benchmarked Cutout against ImageMagick-only and hybrid slicing on the six-asset 
 
 | Hash | Message |
 |------|---------|
-| `1eee32c` | (see git log) |
+| `f73f251` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 33: Publish Cutout OTA v0.1.10
+
+**Date**: 2026-07-27
+**Task**: Publish Cutout OTA v0.1.10
+**Branch**: `chore/archive-publish-ota-v0-1-10`
+
+### Summary
+
+Published Cutout v0.1.10 through the protected atomic four-platform OTA workflow and verified public checksums, updater signatures, provenance, and macOS notarization.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `15702bc` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 34: Publish and install Cutout v0.1.11
+
+**Date**: 2026-07-27
+**Task**: Publish and install Cutout v0.1.11
+**Branch**: `release/v0.1.11`
+
+### Summary
+
+Published the reviewed 39-Agent inventory, nine API-key adapters, and Agent Host hardening as the protected four-platform v0.1.11 release; verified updater signatures, checksums, SBOM, provenance, Developer ID signing, notarization, and stapling; replaced local v0.1.9 with the verified Apple Silicon package while preserving the old bundle in Trash.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `36bd3d5` | (see git log) |
+| `eca2ddf` | (see git log) |
+| `6f78f26` | (see git log) |
+| `f596be9` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 35: Simplify automatic AI setup
+
+**Date**: 2026-07-28
+**Task**: Simplify automatic AI setup
+**Branch**: `chore/archive-simplify-automatic-ai-setup`
+
+### Summary
+
+Reframed AI settings around one automatic setup outcome, moved provider controls and routing details into advanced settings, removed the default local Agent inventory, and added verified setup projection coverage.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `b0ae583` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 36: Complete packaged UI asset journey
+
+**Date**: 2026-07-31
+**Task**: Complete packaged UI asset journey
+**Branch**: `test/e2e-complete-user-journey`
+
+### Summary
+
+Validated a fresh-VM packaged GUI journey from reviewed local credential discovery through three dynamic Design Systems, distinct prototype suites, real non-UI asset production, slicing, selection, and terminal resource-pack delivery; hardened Provider routing, retry, authority, throughput, provenance, background lifecycle, release contracts, and prepared v0.1.13.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `daf895c` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 37: Converge UI asset production and release v0.1.14
+
+**Date**: 2026-08-02
+**Task**: Converge UI asset production and release v0.1.14
+**Branch**: `chore/archive-converge-production-delivery`
+
+### Summary
+
+Closed complete multi-candidate UI asset delivery, proved the real packaged VM outcome, fixed Windows-portable terminal evidence tests, merged through the protected quality gate, published signed and notarized v0.1.14 artifacts, and replaced the local v0.1.13 app with verified v0.1.14.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `cd74948` | (see git log) |
+| `a4f8055` | (see git log) |
+| `ce3d950` | (see git log) |
+| `40274e5` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 38: Overlap independent prototype page QA
+
+**Date**: 2026-08-02
+**Task**: Overlap independent prototype page QA
+**Branch**: `fix/converge-production-next`
+
+### Summary
+
+Separated paid page-image generation from observational Vision QA only for distinct provider identities, added a bounded QA lane and full join semantics, preserved same-provider serialization and existing production scope, and verified browser, frontend, build, Agent, and packaged Rust gates.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `eaabb00` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 39: Publish and install Cutout v0.1.15
+
+**Date**: 2026-08-03
+**Task**: Publish and install Cutout v0.1.15
+**Branch**: `chore/finish-v0.1.15`
+
+### Summary
+
+Merged PR #53, tagged and published the signed/notarized four-platform v0.1.15 Release, verified public updater/checksum/provenance evidence, and replaced local Cutout 0.1.14 with the verified Apple Silicon build while preserving the old app in Trash.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `543c22a` | (see git log) |
+| `1c8d457` | (see git log) |
 
 ### Testing
 

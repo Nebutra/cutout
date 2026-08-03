@@ -5,6 +5,7 @@ import {
   designMarkdownToTailwindTheme,
   designMarkdownToTokensJson,
   hasExportableTokens,
+  projectDesignMarkdownTokens,
 } from './design-md-export'
 
 const DESIGN_MD = [
@@ -55,5 +56,65 @@ describe('design markdown exports', () => {
     expect(hasExportableTokens(empty)).toBe(false)
     expect(designMarkdownToCssVariables(empty)).toBe(':root {\n}\n')
     expect(designMarkdownToTailwindTheme(empty)).toBe('@theme {\n}\n')
+  })
+
+  it('projects validated controls into stable provenance-bound Design IR tokens', () => {
+    const projected = projectDesignMarkdownTokens(parseEditableDesignMarkdown([
+      '---',
+      'tokens:',
+      '  color:',
+      '    primary: "#beff50"',
+      '  spacing:',
+      '    md: "16px"',
+      '  radius:',
+      '    card: "12px"',
+      '  typography:',
+      '    bodySize: "18px"',
+      '---',
+      '# Design',
+    ].join('\n')), { provenanceId: 'provenance:selection:1' })
+
+    expect(projected).toEqual([
+      {
+        id: 'token:design-md:color:tokens-color-primary',
+        name: 'tokens.color.primary',
+        kind: 'color',
+        value: '#beff50',
+        provenanceId: 'provenance:selection:1',
+      },
+      {
+        id: 'token:design-md:spacing:tokens-spacing-md',
+        name: 'tokens.spacing.md',
+        kind: 'spacing',
+        value: '16px',
+        provenanceId: 'provenance:selection:1',
+      },
+      {
+        id: 'token:design-md:radius:tokens-radius-card',
+        name: 'tokens.radius.card',
+        kind: 'radius',
+        value: '12px',
+        provenanceId: 'provenance:selection:1',
+      },
+      {
+        id: 'token:design-md:typography:tokens-typography-bodysize',
+        name: 'tokens.typography.bodySize',
+        kind: 'typography',
+        value: '18px',
+        provenanceId: 'provenance:selection:1',
+      },
+    ])
+  })
+
+  it('rejects token promotion when the parsed document has not passed DESIGN.md validation', () => {
+    expect(() => projectDesignMarkdownTokens(
+      parseEditableDesignMarkdown('# Design\n\n- radius: 12px'),
+      { provenanceId: 'provenance:selection:1' },
+    )).toThrow('valid YAML frontmatter')
+
+    expect(() => projectDesignMarkdownTokens(
+      parseEditableDesignMarkdown('---\nradius: 12px\n---\n# Design'),
+      { provenanceId: 'provenance:selection:1' },
+    )).toThrow('color tokens')
   })
 })

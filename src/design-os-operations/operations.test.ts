@@ -145,4 +145,98 @@ describe('Design OS operations', () => {
     })).resolves.toMatchObject({ ok: false, error: expect.stringContaining('current DesignDocument revision') })
     expect(save).toHaveBeenCalledTimes(1)
   })
+
+  it('threads a verified selected DESIGN.md through the additive compiler operation input', async () => {
+    const designMarkdown = '---\nprimary: "#00875a"\n---\n# Selected system\n'
+    const contentSha256 = await sha256(designMarkdown)
+    const current = document({
+      sources: [{
+        id: 'source:design-system',
+        kind: 'document',
+        role: 'evidence',
+        title: 'Selected design system',
+        license,
+        content: [{ id: 'content:source', uri: 'cutout://design-system' }],
+      }],
+      tokens: [{
+        id: 'token:primary', name: 'Primary', kind: 'color', value: '#00875a',
+        provenanceId: 'provenance:selection',
+      }],
+      candidateSets: [{
+        id: 'candidate-set:design-system:1',
+        kind: 'design-system',
+        baseRevisionId: 'revision:1',
+        proposal: {
+          mode: 'fixed',
+          decidedBy: 'user',
+          count: 1,
+          rationale: 'Use the selected direction.',
+          directions: [{
+            id: 'direction:1',
+            label: 'Selected',
+            thesis: 'Use the approved visual system.',
+            vary: ['visual tone'],
+            preserve: ['product brief'],
+          }],
+          bounds: { maxCandidates: 4, maxParallelism: 2 },
+        },
+        candidates: [{
+          id: 'candidate:1',
+          directionId: 'direction:1',
+          status: 'ready',
+          outputs: [{ role: 'design-markdown', materialId: 'material:design-markdown' }],
+          provenanceIds: ['provenance:selection'],
+        }],
+        selection: {
+          candidateId: 'candidate:1',
+          selectedAt: timestamp,
+          actor: { kind: 'human', id: 'user:1' },
+          baseRevisionId: 'revision:1',
+          provenanceId: 'provenance:selection',
+        },
+      }],
+      materials: [{
+        id: 'material:design-markdown',
+        kind: 'design-markdown',
+        name: 'DESIGN.md',
+        revisions: [{
+          id: 'material:design-markdown:revision:1',
+          ordinal: 1,
+          createdAt: timestamp,
+          content: { id: 'content:design-markdown', uri: 'artifact:design-markdown', sha256: contentSha256 },
+          provenanceId: 'provenance:selection',
+        }],
+        currentRevisionId: 'material:design-markdown:revision:1',
+      }],
+      provenance: [{
+        id: 'provenance:selection',
+        operation: 'validate',
+        sourceIds: ['source:design-system'],
+        actor: { kind: 'human', id: 'user:1' },
+        recordedAt: timestamp,
+      }],
+    })
+    const compiled = await compileDesignKitOperation(current, [{
+      tokenId: 'token:primary', status: 'verified', category: 'color', cssName: 'primary',
+    }], {
+      candidateSetId: 'candidate-set:design-system:1',
+      candidateId: 'candidate:1',
+      materialId: 'material:design-markdown',
+      revisionId: 'material:design-markdown:revision:1',
+      provenanceId: 'provenance:selection',
+      content: designMarkdown,
+    })
+
+    expect(compiled).toMatchObject({
+      ok: true,
+      data: { source: { designMarkdown: { kind: 'selected-material', contentSha256 } } },
+    })
+    if (!compiled.ok) throw new Error(compiled.error)
+    expect(compiled.data.files.find(({ path }) => path === 'DESIGN.md')?.content).toBe(designMarkdown)
+  })
 })
+
+async function sha256(value: string): Promise<string> {
+  const digest = await globalThis.crypto.subtle.digest('SHA-256', new TextEncoder().encode(value))
+  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('')
+}

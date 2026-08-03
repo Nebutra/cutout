@@ -1,0 +1,4 @@
+{"path":".trellis/spec/frontend/agent-control-safety.md","reason":"Review workspace, process, lease, event, and claim boundaries."}
+{"path":".trellis/spec/frontend/byok-provider-protocols.md","reason":"Review auth-class truth and separation from BYOK credentials."}
+{"path":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Review complete native-to-UI data flow and lifecycle."}
+{"path":".trellis/tasks/07-27-agent-session-delegation/research/runtime-contracts.md","reason":"Review exact runtime/version/legal constraints."}

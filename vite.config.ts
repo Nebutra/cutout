@@ -6,6 +6,7 @@ import react from '@vitejs/plugin-react'
 import babel from '@rolldown/plugin-babel'
 import tailwindcss from '@tailwindcss/vite'
 import { lingui, linguiTransformerBabelPreset } from '@lingui/vite-plugin'
+import { resolveVitestMaxWorkers } from './scripts/lib/vitest-workers.ts'
 
 const host = process.env.TAURI_DEV_HOST
 const productVersion = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')).version
@@ -76,5 +77,6 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     include: ['src/**/*.{test,spec}.{ts,tsx}', 'scripts/**/*.test.ts'],
+    maxWorkers: resolveVitestMaxWorkers(process.platform),
   },
 })

@@ -1,11 +1,12 @@
 /**
  * AboutFooter — a single line pinned to the bottom of the Settings sidebar.
  *
- * The product's "about" surface: version + stack. Clicking toasts the identity
- * (kept lightweight per the design's restraint principle — no About section).
+ * The product's compact identity row: name + version. Clicking preserves the
+ * technical About details in a toast (no dedicated About section).
  */
 import { toast } from 'sonner'
 import { useLingui } from '@lingui/react/macro'
+import { Info } from 'lucide-react'
 import { PRODUCT_VERSION } from '@/product-version'
 
 export function AboutFooter() {
@@ -22,9 +23,11 @@ export function AboutFooter() {
           }),
         })
       }
-      className="w-full truncate rounded-md px-2.5 py-1.5 text-left text-[11px] text-muted-foreground/70 transition-colors hover:text-muted-foreground"
+      className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-sm text-muted-foreground transition-colors hover:bg-foreground/5 hover:text-foreground"
     >
-      Cutout v{PRODUCT_VERSION} · Tauri 2 · React 19
+      <Info className="size-4 shrink-0" aria-hidden="true" />
+      <span className="min-w-0 flex-1">Cutout</span>
+      <span className="shrink-0 tabular-nums">v{PRODUCT_VERSION}</span>
     </button>
   )
 }

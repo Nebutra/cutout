@@ -1,0 +1,242 @@
+{
+  "protocol": "cutout.packaged-e2e-result.v1",
+  "status": "passed",
+  "phases": [
+    {
+      "id": "native-boot",
+      "status": "passed"
+    },
+    {
+      "id": "webview-renderable",
+      "status": "passed"
+    },
+    {
+      "id": "webview-loaded",
+      "status": "passed"
+    },
+    {
+      "id": "bootstrap",
+      "status": "passed"
+    },
+    {
+      "id": "settings-opened",
+      "status": "passed"
+    },
+    {
+      "id": "ai-native-candidate-resolved",
+      "status": "passed"
+    },
+    {
+      "id": "ai-native-binding-normalized",
+      "status": "passed"
+    },
+    {
+      "id": "ai-native-config-loaded",
+      "status": "passed"
+    },
+    {
+      "id": "ai-native-secret-resolved",
+      "status": "passed"
+    },
+    {
+      "id": "ai-native-catalog-checked",
+      "status": "passed"
+    },
+    {
+      "id": "ai-native-key-stored",
+      "status": "passed"
+    },
+    {
+      "id": "ai-native-provider-saved",
+      "status": "passed"
+    },
+    {
+      "id": "ai-configured",
+      "status": "passed"
+    },
+    {
+      "id": "settings-closed",
+      "status": "passed"
+    },
+    {
+      "id": "home-ready",
+      "status": "passed"
+    },
+    {
+      "id": "casual-chat-submitted",
+      "status": "passed"
+    },
+    {
+      "id": "pipeline-stage-tool-gate",
+      "status": "passed"
+    },
+    {
+      "id": "provider-response",
+      "status": "passed"
+    },
+    {
+      "id": "creative-brief-submitted",
+      "status": "passed"
+    },
+    {
+      "id": "pipeline-stage-image-route-catalogued",
+      "status": "passed"
+    },
+    {
+      "id": "pipeline-stage-research-brief",
+      "status": "passed"
+    },
+    {
+      "id": "pipeline-stage-planner",
+      "status": "passed"
+    },
+    {
+      "id": "planner-stage-complete",
+      "status": "passed"
+    },
+    {
+      "id": "design-candidate-1-generating",
+      "status": "passed"
+    },
+    {
+      "id": "design-candidate-2-generating",
+      "status": "passed"
+    },
+    {
+      "id": "pipeline-stage-image-execution-started",
+      "status": "passed"
+    },
+    {
+      "id": "pipeline-stage-image-execution-proven",
+      "status": "passed"
+    },
+    {
+      "id": "design-candidate-1-ready",
+      "status": "passed"
+    },
+    {
+      "id": "design-candidate-2-ready",
+      "status": "passed"
+    },
+    {
+      "id": "design-candidate-3-generating",
+      "status": "passed"
+    },
+    {
+      "id": "design-candidate-3-ready",
+      "status": "passed"
+    },
+    {
+      "id": "design-candidates-ready",
+      "status": "passed"
+    },
+    {
+      "id": "design-candidate-selected",
+      "status": "passed"
+    },
+    {
+      "id": "prototype-suite-1-generating-pages-0-of-7-resources-0-of-8",
+      "status": "passed"
+    },
+    {
+      "id": "prototype-suite-1-generating-pages-first-1-of-7-resources-0-of-8",
+      "status": "passed"
+    },
+    {
+      "id": "prototype-suite-1-generating-pages-half-4-of-7-resources-0-of-8",
+      "status": "passed"
+    },
+    {
+      "id": "prototype-suite-1-generating-pages-complete-7-of-7-resources-0-of-8",
+      "status": "passed"
+    },
+    {
+      "id": "prototype-suite-1-generating-pages-7-of-7-resources-first-1-of-8",
+      "status": "passed"
+    },
+    {
+      "id": "prototype-suite-1-generating-pages-7-of-7-resources-half-4-of-8",
+      "status": "passed"
+    },
+    {
+      "id": "prototype-suite-1-ready-pages-7-of-7-resources-8-of-8",
+      "status": "passed"
+    },
+    {
+      "id": "prototype-suite-2-generating-pages-0-of-8-resources-0-of-8",
+      "status": "passed"
+    },
+    {
+      "id": "prototype-suite-2-generating-pages-first-1-of-8-resources-0-of-8",
+      "status": "passed"
+    },
+    {
+      "id": "prototype-suite-2-generating-pages-half-4-of-8-resources-0-of-8",
+      "status": "passed"
+    },
+    {
+      "id": "prototype-suite-2-generating-pages-complete-8-of-8-resources-0-of-8",
+      "status": "passed"
+    },
+    {
+      "id": "prototype-suite-2-generating-pages-8-of-8-resources-first-1-of-8",
+      "status": "passed"
+    },
+    {
+      "id": "prototype-suite-2-generating-pages-8-of-8-resources-half-4-of-8",
+      "status": "passed"
+    },
+    {
+      "id": "prototype-suite-2-ready-pages-8-of-8-resources-8-of-8",
+      "status": "passed"
+    },
+    {
+      "id": "prototype-suite-3-generating-pages-0-of-7-resources-0-of-8",
+      "status": "passed"
+    },
+    {
+      "id": "prototype-suite-3-generating-pages-first-1-of-7-resources-0-of-8",
+      "status": "passed"
+    },
+    {
+      "id": "prototype-suite-3-failed-pages-3-of-7-resources-0-of-8",
+      "status": "failed"
+    },
+    {
+      "id": "run-retried",
+      "status": "passed"
+    },
+    {
+      "id": "prototype-suite-3-generating-pages-half-4-of-7-resources-0-of-8",
+      "status": "passed"
+    },
+    {
+      "id": "prototype-suite-3-generating-pages-complete-7-of-7-resources-0-of-8",
+      "status": "passed"
+    },
+    {
+      "id": "prototype-suite-3-generating-pages-7-of-7-resources-first-1-of-8",
+      "status": "passed"
+    },
+    {
+      "id": "prototype-suite-3-generating-pages-7-of-7-resources-half-4-of-8",
+      "status": "passed"
+    },
+    {
+      "id": "prototype-suite-3-ready-pages-7-of-7-resources-8-of-8",
+      "status": "passed"
+    },
+    {
+      "id": "prototype-suite-ready",
+      "status": "passed"
+    },
+    {
+      "id": "prototype-suite-selected",
+      "status": "passed"
+    },
+    {
+      "id": "resource-pack-ready",
+      "status": "passed"
+    }
+  ]
+}

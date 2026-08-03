@@ -51,7 +51,7 @@ function isLikelyHtml(body: string): boolean {
   return trimmed.startsWith('<!doctype html') || trimmed.startsWith('<html')
 }
 
-function validateModelsResponse(body: string): Result<void> {
+function validateModelsResponse(body: string): Result<string[]> {
   if (isLikelyHtml(body)) {
     return err(
       'HTTP 200 but /models returned a web page, not provider API JSON. Check that Base URL points to the API endpoint, not the web console.',
@@ -67,12 +67,13 @@ function validateModelsResponse(body: string): Result<void> {
     )
   }
 
-  if (!parseProviderModelIds(parsed)) {
+  const models = parseProviderModelIds(parsed)
+  if (!models) {
     return err(
       'HTTP 200 but /models did not return a supported data/models catalog response.',
     )
   }
-  return ok(undefined)
+  return ok(models)
 }
 
 /** Load + validate the persisted provider list (missing file → `[]` in Rust). */
@@ -151,7 +152,7 @@ export function createLocalProviderService(): ProviderService {
       return Object.fromEntries(rows.map((r) => [r.id, r.hasKey]))
     },
 
-    async test(id: string): Promise<Result<{ model: string }>> {
+    async test(id: string): Promise<Result<{ model: string; models: readonly string[] }>> {
       const list = await loadProviders()
       const cfg = list.find((p) => p.id === id)
       if (!cfg) return err('provider not configured')
@@ -179,7 +180,7 @@ export function createLocalProviderService(): ProviderService {
           if (res.status >= 200 && res.status < 300) {
             const valid = validateModelsResponse(res.body)
             if (!isOk(valid)) return err(valid.error)
-            return ok({ model: cfg.defaultModel })
+            return ok({ model: cfg.defaultModel, models: valid.data })
           }
           const body = snippet(res.body)
           return err(`HTTP ${res.status}${body ? ` · ${body}` : ''}`)

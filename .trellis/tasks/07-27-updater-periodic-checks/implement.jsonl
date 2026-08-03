@@ -1,0 +1,2 @@
+{"file":".trellis/spec/frontend/release-pipeline.md","reason":"Implement periodic checks without bypassing the native signed updater."}
+{"file":".trellis/spec/frontend/state-management.md","reason":"Preserve single controller ownership, persistence, and lifecycle cleanup."}

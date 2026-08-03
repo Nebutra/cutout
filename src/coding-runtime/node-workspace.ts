@@ -37,8 +37,8 @@ export function createNodeCodingWorkspace(
   };
   const stages = new Map<string, string>();
   return {
-    async snapshotId() {
-      return snapshot(await root());
+    async snapshotId(paths = ["src"]) {
+      return snapshot(await root(), paths);
     },
     async readAllowed(paths) {
       const base = await root();
@@ -93,12 +93,18 @@ export function createNodeCodingWorkspace(
       const base = await root();
       if (!stages.has(stageId))
         throw new Error("revision-conflict: Unknown or expired coding stage.");
-      if ((await snapshot(base)) !== expectedSnapshotId)
+      if (
+        (await snapshot(base, task.constraints.allowedPaths)) !==
+        expectedSnapshotId
+      )
         throw new Error(
           "revision-conflict: Repository changed before staged promotion.",
         );
       const changedFiles = await applyPatch(base, task, patch);
-      return { snapshotId: await snapshot(base), changedFiles };
+      return {
+        snapshotId: await snapshot(base, task.constraints.allowedPaths),
+        changedFiles,
+      };
     },
     async rollback(stageId) {
       const stageRoot = stages.get(stageId);
@@ -277,9 +283,12 @@ async function collectFiles(
     );
 }
 
-async function snapshot(base: string) {
+async function snapshot(base: string, controlledPaths: readonly string[]) {
   const files: Record<string, string> = {};
-  for (const entry of ["src", "package.json", "tsconfig.json"]) {
+  const entries = [
+    ...new Set([...controlledPaths, "package.json", "tsconfig.json"]),
+  ];
+  for (const entry of entries) {
     try {
       await collectFiles(base, await safePath(base, entry, true), files);
     } catch (error) {

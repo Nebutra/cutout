@@ -37,6 +37,8 @@ describe("createAgentRunRetryControl", () => {
     control.onRetry?.();
     expect(createAssets).toHaveBeenCalledWith("create", {
       briefOverride: "Create a checkout flow",
+      skipToolGate: true,
+      ignoreSelectedMaterial: true,
     });
   });
 
@@ -78,6 +80,8 @@ describe("createAgentRunRetryControl", () => {
     control.onRetry?.();
     expect(createAssets).toHaveBeenCalledWith("create", {
       briefOverride: "Restore the checkout flow",
+      skipToolGate: true,
+      ignoreSelectedMaterial: true,
     });
   });
 

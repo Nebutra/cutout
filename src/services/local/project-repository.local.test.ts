@@ -20,6 +20,8 @@ import {
 } from '@/asset-production'
 import { selectExportPayload } from '@/store/selectors'
 import { createRunEvent, projectAgentResponseBranches, replayRunEvents } from '@/agent-runtime/run-events'
+import { createPrototypeAssetManifest } from '@/prototype/asset-manifest'
+import type { WorkspaceSnapshot } from '@/workspace/workspace-snapshot'
 
 const pngBlob = (byte = 1) =>
   new Blob([new Uint8Array([byte])], { type: 'image/png' })
@@ -151,6 +153,157 @@ describe('project-repository.local', () => {
       liveAgentOutput: '',
       attachments: [],
       webSearchEnabled: false,
+    }
+  }
+
+  function suitePlanningSnapshot(): WorkspaceSnapshot {
+    const base = planningSnapshot()
+    const plan = base.prototypePlan!
+    const designMarkdown = [
+      '---',
+      'tokens:',
+      '  color:',
+      '    background: "#ffffff"',
+      '    surface: "#f5f5f5"',
+      '    text: "#111111"',
+      '    primary: "#0055ff"',
+      '    accent: "#ffcc00"',
+      '  spacing:',
+      '    md: "16px"',
+      '  radius:',
+      '    md: "8px"',
+      '---',
+      '# Repository suite',
+    ].join('\n')
+    const designSystem = {
+      name: 'Repository suite',
+      designMarkdown,
+      bytes: Uint8Array.from([1, 2, 3]),
+      mediaType: 'image/png',
+      width: 100,
+      height: 100,
+    }
+    const direction = {
+      id: 'direction:repository',
+      label: 'Repository suite',
+      thesis: 'Persist a complete suite through IndexedDB.',
+      vary: ['information architecture'],
+      preserve: ['product identity'],
+    }
+    const proposal = {
+      mode: 'fixed' as const,
+      decidedBy: 'user' as const,
+      count: 1,
+      rationale: 'Exercise repository restart recovery.',
+      directions: [direction],
+      bounds: { maxCandidates: 8, maxParallelism: 2 },
+    }
+    const manifest = createPrototypeAssetManifest(plan, plan.pages)
+    const codingReceipt = {
+      version: 'cutout.coding-receipt.v1' as const,
+      receiptId: 'receipt:repository-suite',
+      taskId: 'coding:repository:suite',
+      status: 'applied' as const,
+      baseSnapshotId: 'snapshot:base',
+      resultSnapshotId: 'snapshot:result',
+      changedFiles: [{ path: 'site/pages/index.html', operation: 'create' as const, sha256: 'a'.repeat(64) }],
+      checks: [{ name: 'build', status: 'passed' as const }],
+      screenshots: [],
+      provenance: {
+        backend: 'controlled-provider-backend',
+        inputRefs: ['candidate:suite:repository'],
+        patchSha256: 'b'.repeat(64),
+      },
+      startedAt: 1_700_000_020_000,
+      completedAt: 1_700_000_030_000,
+    }
+    return {
+      ...base,
+      prototypeDesignSystem: designSystem,
+      prototypeDesignSystemCandidates: {
+        set: {
+          id: 'candidate-set:design:repository',
+          kind: 'design-system',
+          baseRevisionId: 'revision:design:repository',
+          proposal,
+          candidates: [{
+            id: 'candidate:design:repository',
+            directionId: direction.id,
+            status: 'ready',
+            outputs: [
+              { role: 'design-system', materialId: 'material:design-system-candidate:candidate:design:repository:visual' },
+              { role: 'design-markdown', materialId: 'material:design-system-candidate:candidate:design:repository:markdown' },
+            ],
+            provenanceIds: ['provenance:design:repository'],
+          }],
+          selection: {
+            candidateId: 'candidate:design:repository',
+            selectedAt: '2026-07-28T08:00:00.000Z',
+            actor: { kind: 'human', id: 'workspace-user' },
+            baseRevisionId: 'revision:design:repository',
+            provenanceId: 'provenance:design-selection:repository',
+          },
+        },
+        artifacts: { 'candidate:design:repository': designSystem },
+      },
+      prototypeSuiteCandidates: {
+        set: {
+          id: 'candidate-set:suite:repository',
+          kind: 'prototype-suite',
+          baseRevisionId: 'revision:suite:repository',
+          proposal,
+          candidates: [{
+            id: 'candidate:suite:repository',
+            directionId: direction.id,
+            status: 'ready',
+            outputs: [
+              { role: 'prototype-suite', materialId: 'material:prototype-suite:candidate:suite:repository:suite' },
+              { role: 'resource-pack', materialId: 'material:prototype-suite:candidate:suite:repository:resource-pack' },
+            ],
+            provenanceIds: ['provenance:suite:repository'],
+          }],
+          selection: {
+            candidateId: 'candidate:suite:repository',
+            selectedAt: '2026-07-28T09:00:00.000Z',
+            actor: { kind: 'human', id: 'workspace-user' },
+            baseRevisionId: 'revision:suite:repository',
+            provenanceId: 'provenance:suite-selection:repository',
+          },
+        },
+        artifacts: {
+          'candidate:suite:repository': {
+            designSystem: {
+              candidateSetId: 'candidate-set:design:repository',
+              candidateId: 'candidate:design:repository',
+              directionId: direction.id,
+              baseRevisionId: 'revision:design:repository',
+              provenanceIds: ['provenance:design:repository'],
+              artifact: designSystem,
+            },
+            plan,
+            pages: plan.pages.map((page) => ({
+              page,
+              bytes: Uint8Array.from([4, 5, 6]),
+              mediaType: 'image/png',
+              width: page.viewport.width,
+              height: page.viewport.height,
+            })),
+            resourcePack: {
+              id: 'resource-pack:repository',
+              manifest,
+              manifestProvenanceId: 'provenance:resource-pack:repository',
+              assets: manifest.assets.map((asset, index) => ({
+                manifestItemId: asset.id,
+                artifactId: `artifact:repository:${index + 1}`,
+                provenanceIds: [`provenance:resource-asset:repository:${index + 1}`],
+              })),
+            },
+            provenanceIds: ['provenance:suite:repository'],
+            codingReceipt,
+          },
+        },
+      },
+      codingReceipts: [codingReceipt],
     }
   }
 
@@ -323,6 +476,36 @@ describe('project-repository.local', () => {
     if (!loaded.ok) return
     expect(loaded.data.workspace?.prototypePlan?.humanLoop.mode).toBe('ask')
     expect(loaded.data.workspace?.humanLoopChoiceId).toBe('commerce')
+  })
+
+  it('restores authoritative prototype-suite and Coding materials after repository restart', async () => {
+    const idb = new IDBFactory()
+    const project = {
+      ...createEmptyProjectRecord(305),
+      name: 'Suite restart',
+      brief: 'Persist a complete prototype suite.',
+      status: 'Ready' as const,
+      workspace: suitePlanningSnapshot(),
+    }
+    const first = createLocalProjectRepository({ idb })
+    expect((await first.save(project)).ok).toBe(true)
+
+    const restarted = createLocalProjectRepository({ idb })
+    const loaded = await restarted.load(project.id)
+
+    if (!loaded.ok) throw new Error(loaded.error)
+    expect(loaded.data.designDocument?.candidateSets?.map((set) => set.kind)).toEqual([
+      'design-system',
+      'prototype-suite',
+    ])
+    expect(loaded.data.workspace?.prototypeSuiteCandidates?.set.selection?.candidateId)
+      .toBe('candidate:suite:repository')
+    expect(
+      loaded.data.workspace?.prototypeSuiteCandidates
+        ?.artifacts['candidate:suite:repository']?.pages[0]?.bytes,
+    ).toEqual(Uint8Array.from([4, 5, 6]))
+    expect(loaded.data.workspace?.codingReceipts?.[0]?.receiptId)
+      .toBe('receipt:repository-suite')
   })
 
   it('backfills a raw legacy IndexedDB record without a version upgrade and remains idempotent', async () => {
@@ -581,6 +764,47 @@ describe('project-repository.local', () => {
     )
 
     getStoreState().resetProject()
+  })
+
+  it('persists and restores the exact encoded source instead of normalizing it', async () => {
+    const state = getStoreState()
+    state.resetProject()
+    const bytes = Uint8Array.of(255, 216, 255, 224, 1, 2, 3)
+    state.loadImage({
+      bitmap: { width: 16, height: 12, close() {} } as ImageBitmap,
+      encodedImage: new Blob([bytes], { type: 'image/jpeg' }),
+      name: 'photo',
+      autoAnalyze: false,
+    })
+
+    const record = await createProjectRecordFromStore({
+      id: 'project:exact-source',
+      createdAt: 1,
+      state: getStoreState(),
+      now: 2,
+    })
+
+    expect(record.source?.blob.type).toBe('image/jpeg')
+    expect(new Uint8Array(await record.source!.blob.arrayBuffer())).toEqual(bytes)
+
+    const previous = globalThis.createImageBitmap
+    Object.defineProperty(globalThis, 'createImageBitmap', {
+      configurable: true,
+      value: vi.fn(async () => ({ width: 16, height: 12, close() {} } as ImageBitmap)),
+    })
+    try {
+      state.resetProject()
+      state.restoreProject(await createRestoreInputFromProject(record))
+      expect(getStoreState().source.encodedImage?.type).toBe('image/jpeg')
+      expect(new Uint8Array(await getStoreState().source.encodedImage!.arrayBuffer()))
+        .toEqual(bytes)
+    } finally {
+      Object.defineProperty(globalThis, 'createImageBitmap', {
+        configurable: true,
+        value: previous,
+      })
+      state.resetProject()
+    }
   })
 
   it('round-trips per-region slice tree linkage (regionId/pageId) through save + restore', async () => {

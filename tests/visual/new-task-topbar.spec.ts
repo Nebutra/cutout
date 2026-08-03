@@ -20,12 +20,12 @@ async function projectCount(page: Page) {
   });
 }
 
-test("Topbar New task resets Home and returns projects without creating drafts", async ({ page }) => {
+test("Topbar New project creates clean workspaces without persisting blank drafts", async ({ page }) => {
   await page.goto("/");
   const composer = page.getByRole("textbox", { name: "Describe what you want to design..." });
-  const newTask = page.getByRole("button", { name: "New task" });
+  const newProject = page.getByRole("button", { name: "New project" });
   const initialCount = await projectCount(page);
-  const buttonBox = await newTask.boundingBox();
+  const buttonBox = await newProject.boundingBox();
   expect(buttonBox!.width).toBeGreaterThanOrEqual(44);
   expect(buttonBox!.height).toBeGreaterThanOrEqual(44);
 
@@ -37,38 +37,36 @@ test("Topbar New task resets Home and returns projects without creating drafts",
     buffer: Buffer.from([137, 80, 78, 71]),
   });
   await expect(page.getByLabel("Composer attachments")).toContainText("reference.png");
-  await newTask.focus();
-  await expect(newTask).toBeFocused();
+  await newProject.focus();
+  await expect(newProject).toBeFocused();
   await page.keyboard.press("Space");
-  await expect(composer).toBeFocused();
-  await expect(composer).toHaveValue("");
-  await expect(page.getByLabel("Composer attachments")).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Web", exact: true })).toHaveAttribute("aria-pressed", "false");
+  await expect(page.getByRole("complementary", { name: "Agent workspace" })).toBeVisible();
+  await expect(page.getByRole("textbox", { name: "Message the Agent" })).toHaveValue("");
+  await expect(page.getByRole("button", { name: "Untitled project", exact: true })).toBeVisible();
+  await expect(composer).toHaveCount(0);
   expect(await projectCount(page)).toBe(initialCount);
 
+  await page.getByRole("button", { name: "Home", exact: true }).click();
+  await expect(composer).toBeVisible();
   const projectName = `Persistent project ${Date.now()}`;
   await composer.fill(projectName);
   await page.getByRole("button", { name: "Create from brief" }).click();
-  await expect(page.getByRole("textbox", { name: "Message the Agent" })).toHaveValue(projectName);
-  await newTask.click();
-  await expect(composer).toBeVisible();
-  await expect(composer).toBeFocused();
-  await expect(composer).toHaveValue("");
+  await expect(page.getByRole("textbox", { name: "Message the Agent" })).toHaveValue("");
+  await newProject.click();
+  await expect(page.getByRole("textbox", { name: "Message the Agent" })).toHaveValue("");
+  await expect(page.getByRole("button", { name: "Untitled project", exact: true })).toBeVisible();
+  await expect(composer).toHaveCount(0);
   await expect.poll(() => projectCount(page)).toBe(initialCount + 1);
 
-  await newTask.click();
-  await newTask.click();
-  await expect(composer).toBeFocused();
+  await newProject.click();
+  await newProject.click();
+  await expect(page.getByRole("textbox", { name: "Message the Agent" })).toHaveValue("");
   expect(await projectCount(page)).toBe(initialCount + 1);
+  await page.getByRole("button", { name: "Home", exact: true }).click();
   await page.getByRole("button", { name: /^All projects\b/ }).click();
   const directory = page.getByRole("heading", { name: "Your projects" }).locator("../../..");
   await expect(directory.getByRole("button", { name: `Open ${projectName}` })).toHaveCount(1);
   await expect(directory.getByRole("button", { name: "Open Untitled project" })).toHaveCount(0);
 
-  await page.getByRole("button", { name: "New task" }).click();
-  for (const dark of [false, true]) {
-    await page.evaluate((enabled) => document.documentElement.classList.toggle("dark", enabled), dark);
-    await expect(page.getByRole("main")).toHaveScreenshot(`new-task-home-${dark ? "dark" : "light"}.png`);
-  }
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
 });

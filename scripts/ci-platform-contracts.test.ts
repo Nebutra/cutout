@@ -5,6 +5,7 @@ import { resolveChromeExecutable } from '../playwright.config'
 import { normalizeText, sha256NormalizedText } from './lib/normalized-text.mjs'
 import { nodeCommandNeedsShell, resolveNodeCommand } from './lib/node-command.mjs'
 import { parseSkillFrontmatter } from './lib/skill-frontmatter.mjs'
+import { resolveVitestMaxWorkers } from './lib/vitest-workers.ts'
 
 describe('cross-platform CI contracts', () => {
   it('installs Chromium before running the contract test suite', async () => {
@@ -39,6 +40,12 @@ describe('cross-platform CI contracts', () => {
     expect(resolveChromeExecutable('/custom/chrome', 'linux')).toBe('/custom/chrome')
   })
 
+  it('caps Vitest concurrency on Windows runners', () => {
+    expect(resolveVitestMaxWorkers('win32')).toBe(2)
+    expect(resolveVitestMaxWorkers('darwin')).toBeUndefined()
+    expect(resolveVitestMaxWorkers('linux')).toBeUndefined()
+  })
+
   it.each(['\n', '\r\n'])('accepts product skill frontmatter with %j line endings', (eol) => {
     const source = ['---', 'name: example', 'description: Example skill', '---', 'Body'].join(eol)
 
@@ -60,6 +67,7 @@ describe('cross-platform CI contracts', () => {
     expect(resolveNodeCommand('npm', 'win32')).toBe('npm.cmd')
     expect(resolveNodeCommand('C:\\repo\\node_modules\\.bin\\tsc', 'win32')).toBe('C:\\repo\\node_modules\\.bin\\tsc.cmd')
     expect(resolveNodeCommand('node.exe', 'win32')).toBe('node.exe')
+    expect(resolveNodeCommand('taskkill.exe', 'win32')).toBe('taskkill.exe')
     expect(resolveNodeCommand('pnpm', 'linux')).toBe('pnpm')
     expect(nodeCommandNeedsShell('npm.cmd', 'win32')).toBe(true)
     expect(nodeCommandNeedsShell('C:\\tools\\pnpm.cmd', 'win32')).toBe(true)

@@ -12,7 +12,11 @@ export interface AgentRunRetryControl {
 
 type CreateAssets = (
   mode: AgentRunRetryMode,
-  options?: { readonly briefOverride?: string },
+  options?: {
+    readonly briefOverride?: string;
+    readonly skipToolGate?: boolean;
+    readonly ignoreSelectedMaterial?: boolean;
+  },
 ) => void | Promise<void>;
 
 export function resolveAgentRunError(
@@ -47,7 +51,11 @@ export function createAgentRunRetryControl(
   return {
     label: "Retry",
     onRetry: () =>
-      void createAssets("create", { briefOverride: retryableBrief }),
+      void createAssets("create", {
+        briefOverride: retryableBrief,
+        skipToolGate: true,
+        ignoreSelectedMaterial: true,
+      }),
   };
 }
 

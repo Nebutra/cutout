@@ -10,7 +10,7 @@ async function openUpdatesAndSupport(page: Page) {
   await page.getByText('Updates & Support', { exact: true }).click()
 }
 
-test('Local recovery is truthful, redacted, and never deletes project data', async ({ page }) => {
+test('Troubleshooting is truthful, redacted, and never deletes project data', async ({ page }) => {
   await page.addInitScript(() => {
     localStorage.setItem('cutout.project.sentinel', JSON.stringify({ id: 'project:keep' }))
     localStorage.setItem('cutout.workspace-navigation.v2', JSON.stringify({ advanced: true }))
@@ -18,11 +18,16 @@ test('Local recovery is truthful, redacted, and never deletes project data', asy
     ;(globalThis as typeof globalThis & { __SECRET_SENTINEL__?: string }).__SECRET_SENTINEL__ = 'MOX_API_KEY=must-not-appear'
   })
   await openUpdatesAndSupport(page)
-  const recovery = page.getByText('Local recovery', { exact: true }).locator('..')
+  const recovery = page.getByText('Troubleshooting', { exact: true }).locator('..')
   await expect(recovery).toContainText('Project data is not deleted.')
+  await expect(recovery.getByRole('button')).toHaveCount(1)
+  const advanced = recovery.locator('details')
+  await expect(advanced).not.toHaveAttribute('open', '')
+  await expect(page.getByRole('dialog')).toHaveScreenshot('local-recovery-settings-collapsed.png')
+  await advanced.getByText('Diagnostics and recovery', { exact: true }).click()
   await expect(recovery.getByRole('status')).toContainText('Authorize a workspace before using host recovery.')
-  await expect(page.getByRole('button', { name: 'Check host' })).toBeDisabled()
-  await expect(page.getByRole('button', { name: 'Recover host' })).toBeDisabled()
+  await expect(page.getByRole('button', { name: 'Check host' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Recover host' })).toHaveCount(0)
 
   await page.getByRole('button', { name: 'Preview diagnostics' }).click()
   const preview = page.getByLabel('Diagnostic bundle preview')
@@ -39,5 +44,7 @@ test('Local recovery is truthful, redacted, and never deletes project data', asy
   expect(state.project).toContain('project:keep')
   expect(state.navigation).toBeNull()
   expect(state.grid).toBeNull()
-  await expect(page.getByRole('dialog')).toHaveScreenshot('local-recovery-settings.png')
+  await expect(page.getByRole('dialog')).toHaveScreenshot('local-recovery-settings.png', {
+    mask: [preview],
+  })
 })

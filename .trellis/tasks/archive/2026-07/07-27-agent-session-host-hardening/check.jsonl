@@ -1,0 +1,4 @@
+{"path":".trellis/spec/frontend/agent-control-safety.md","reason":"Review canonical workspace, lease, process, persistence, and error boundaries."}
+{"path":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Review state migration and native/renderer lifecycle consistency."}
+{"path":".trellis/tasks/07-27-agent-session-delegation/research/runtime-contracts.md","reason":"Review against the identified Host blockers."}
+{"path":".trellis/tasks/07-27-agent-session-host-hardening/design.md","reason":"Review implementation against the child design."}

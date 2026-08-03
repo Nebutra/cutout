@@ -35,7 +35,7 @@ for (const viewport of [
 ])
   test.describe(viewport.name, () => {
     test.use({ viewport: { width: viewport.width, height: viewport.height } });
-    test("presets only prepare the brief and global plus is idempotent", async ({
+    test("presets only prepare the brief and New project opens a clean workspace", async ({
       page,
     }) => {
       const errors: string[] = [];
@@ -58,14 +58,17 @@ for (const viewport of [
         ).toBeEnabled();
       }
       await page
-        .getByRole("button", { name: "New task" })
+        .getByRole("button", { name: "New project" })
         .click();
-      await expect(textarea).toHaveValue("");
-      await expect(textarea).toBeFocused();
+      await expect(
+        page.getByRole("complementary", { name: "Agent workspace" }),
+      ).toBeVisible();
+      await expect(page.getByRole("textbox", { name: "Message the Agent" })).toHaveValue("");
+      await expect(textarea).toHaveCount(0);
       expect(await projectCount(page)).toBe(initialCount);
       expect(errors).toEqual([]);
     });
-    test("one submit opens one project and plus returns to a clean focused Home", async ({
+    test("one submit persists one project and New project opens a clean blank workspace", async ({
       page,
     }) => {
       const errors: string[] = [];
@@ -87,11 +90,14 @@ for (const viewport of [
       await page.waitForTimeout(500);
       expect(await projectCount(page)).toBeLessThanOrEqual(before + 1);
       await page
-        .getByRole("button", { name: "New task" })
+        .getByRole("button", { name: "New project" })
         .click();
-      await expect(textarea).toBeVisible();
-      await expect(textarea).toHaveValue("");
-      await expect(textarea).toBeFocused();
+      await expect(
+        page.getByRole("complementary", { name: "Agent workspace" }),
+      ).toBeVisible();
+      await expect(page.getByRole("textbox", { name: "Message the Agent" })).toHaveValue("");
+      await expect(page.getByRole("button", { name: "Untitled project", exact: true })).toBeVisible();
+      await expect(textarea).toHaveCount(0);
       expect(await projectCount(page)).toBeLessThanOrEqual(before + 1);
       expect(errors).toEqual([]);
     });

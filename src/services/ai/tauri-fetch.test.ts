@@ -91,4 +91,58 @@ describe('tauriFetch', () => {
       expect.objectContaining({ wireProtocol: 'google-generate-content' }),
     )
   })
+
+  it('closes the response body when native streaming settles without an end frame', async () => {
+    let finishNative!: () => void
+    invokeMock.mockImplementation((command: string, args: { onChunk?: { onmessage?: (message: unknown) => void } }) => {
+      if (command !== 'ai_proxy_stream') return Promise.resolve(undefined)
+      queueMicrotask(() => {
+        args.onChunk?.onmessage?.({
+          type: 'head',
+          status: 200,
+          headers: { 'content-type': 'text/event-stream' },
+        })
+      })
+      return new Promise<void>((resolve) => { finishNative = resolve })
+    })
+
+    const response = await tauriFetch('p1', 'openai-compatible', 'responses')(
+      'https://relay.example/v1/responses',
+      { method: 'POST', body: JSON.stringify({ stream: true }) },
+    )
+    const body = response.text()
+    finishNative()
+
+    await expect(body).resolves.toBe('')
+  })
+
+  it('rejects when native streaming settles before response headers', async () => {
+    invokeMock.mockResolvedValue(undefined)
+
+    await expect(tauriFetch('p1', 'openai-compatible', 'responses')(
+      'https://relay.example/v1/responses',
+      { method: 'POST', body: JSON.stringify({ stream: true }) },
+    )).rejects.toThrow('Provider stream ended before response headers')
+  })
+
+  it('cancels the native buffered request when the owning signal aborts', async () => {
+    let resolveRequest!: (value: unknown) => void
+    invokeMock.mockImplementation((command: string) => {
+      if (command === 'ai_proxy_cancel') return Promise.resolve(true)
+      return new Promise((resolve) => { resolveRequest = resolve })
+    })
+    const controller = new AbortController()
+    const pending = tauriFetch('p1', 'openai-compatible')(
+      'https://relay.example/v1/images/generations',
+      { method: 'POST', body: '{}', signal: controller.signal },
+    )
+    await vi.waitFor(() => expect(invokeMock).toHaveBeenCalledOnce())
+    const requestId = invokeMock.mock.calls[0]?.[1]?.requestId
+    expect(requestId).toMatch(/^[0-9a-f-]{36}$/)
+
+    controller.abort()
+    await expect(pending).rejects.toMatchObject({ name: 'AbortError' })
+    expect(invokeMock).toHaveBeenCalledWith('ai_proxy_cancel', { requestId })
+    resolveRequest({ status: 200, headers: {}, body: '{}' })
+  })
 })

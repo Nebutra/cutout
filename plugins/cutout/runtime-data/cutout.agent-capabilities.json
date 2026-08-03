@@ -4,7 +4,7 @@
   "product": {
     "name": "Cutout",
     "positioning": "Agent-native Design OS with a visual workbench and repo-native control plane",
-    "packageVersion": "0.1.3"
+    "packageVersion": "0.1.15"
   },
   "protocol": {
     "control": "cutout.control.v1",
@@ -24,7 +24,7 @@
   },
   "externalControllers": {
     "protocol": "cutout.external-controller.v1",
-    "role": "External Coding Agents control Cutout through standard MCP, CLI, repository Skills and AGENTS.md. Cutout does not embed or take over their coding runtime.",
+    "role": "External Coding Agents control Cutout through standard MCP, CLI, repository Skills and AGENTS.md. Cutout does not take over their coding runtime; the desktop app separately bundles a bounded Provider-backed Coding backend for its own reviewed design handoffs.",
     "clients": ["Codex", "Claude Code", "any MCP-capable coding agent"],
     "sessionBinding": "The MCP host fixes CUTOUT_PROJECT_ROOT; handshake returns opaque project/session bindings and never accepts a replacement root.",
     "progressiveDisclosure": ["cutout_controller_handshake", "cutout_capabilities_status", "cutout_skills_list", "cutout_skill_read"],
@@ -34,9 +34,9 @@
   "integrations": {
     "role": "Product, knowledge, design and prototype apps connected through their documented APIs or SDKs; integrations are not external controllers.",
     "available": ["figma-authorized-snapshot"],
-    "hostRequired": ["figma-foreground-plugin", "obsidian-vault-plugin", "pencil-mcp-cli", "paper-desktop-mcp", "framer-editor-plugin", "canva-apps-sdk"],
+    "hostRequired": ["figma-foreground-plugin", "obsidian-vault-plugin", "pen-mcp-cli", "paper-desktop-mcp", "framer-editor-plugin", "canva-apps-sdk"],
     "authorizationRequired": ["notion-p1-adapter", "github-p1-adapter", "canva-connect-api"],
-    "planned": ["figma-node", "obsidian", "pencil", "paper", "framer", "canva"],
+    "planned": ["figma-node", "obsidian", "pen", "paper", "framer", "canva"],
     "liveSync": false
   },
   "operations": [
@@ -56,10 +56,10 @@
     { "type": "export.design-kit", "modes": ["dry-run", "apply"], "effect": "managed-export", "approval": "policy-and-explicit-id" },
     { "type": "export.brand-kit", "modes": ["dry-run", "apply"], "effect": "managed-export", "approval": "policy-and-explicit-id" },
     { "type": "export.starter", "modes": ["dry-run", "apply"], "effect": "managed-export", "approval": "policy-and-explicit-id" },
-    { "type": "coding.execute", "modes": ["dry-run", "apply"], "effect": "provider-required", "approval": "policy-and-explicit-id", "notes": "Requires an injected controlled coding backend and workspace; the bundled headless host returns capability-required." },
+    { "type": "coding.execute", "modes": ["dry-run", "apply"], "effect": "provider-required", "approval": "policy-and-explicit-id", "notes": "The desktop app binds a verified Provider backend to a host-managed workspace and exact previewed patch. The bundled CLI/MCP headless host still requires injected adapters and otherwise returns capability-required." },
     { "type": "coding.review", "modes": ["dry-run", "apply"], "effect": "provider-required", "approval": "policy-and-explicit-id", "notes": "Review is a versioned CodingTask, never arbitrary shell or an unscoped repository read." },
     { "type": "coding.repair", "modes": ["dry-run", "apply"], "effect": "provider-required", "approval": "policy-and-explicit-id", "notes": "Repair consumes prior evidence and stays revision-, path-, command-, time-, and byte-budget scoped." },
-    { "type": "tool.invoke", "modes": ["dry-run", "apply"], "effect": "provider-required", "approval": "paid-tool-contract", "notes": "No provider executor exists in the current headless host; apply returns capability-required." }
+    { "type": "tool.invoke", "modes": ["dry-run", "apply"], "effect": "provider-required", "approval": "paid-tool-contract", "notes": "The desktop app executes assigned image Providers through the native secret/origin boundary and content-addressed artifact store. No executor exists in the default CLI/MCP headless host, whose apply returns capability-required." }
   ],
   "cli": {
     "command": "pnpm cutout --project <root>",
@@ -75,7 +75,7 @@
     "defaultMode": "dry-run",
     "applyRequires": ["operation enabled by .cutout policy", "host-issued short-lived single-use approval lease bound to operation, preview digest, and expected revision"],
     "paidActions": "Budget and approval are declared by cutout.control.v1; the desktop executor can require a short-lived capability lease, while the current headless host has no paid-tool executor.",
-    "secrets": "Control requests, manifests and receipts reject or redact credential-shaped values; provider credentials stay in the host keychain, auth headers are assembled in Rust, and credentials are never part of this manifest.",
+    "secrets": "Control requests, manifests and receipts reject or redact credential-shaped values; provider credentials stay in the native local credential store, auth headers are assembled in Rust, and credentials are never part of this manifest.",
     "filesystemBoundary": "Controlled paths resolve below the canonical selected project root and reject absolute paths, parent traversal and symlink components; generated writes stay below .cutout/exports and use no caller-selected destination.",
     "permissionBroker": "Host-issued cutout.capability-lease.v1 leases bind subject, request digest, approval id, scopes, paths, commands, hosts, budgets and expiry. Durable approval-lease state is HMAC-authenticated with a host key outside the workspace, and desktop writes require native confirmation rather than a caller-authored approval string; revocation, expiry, tampering and replay fail closed and authorization produces an immutable receipt.",
     "toolSandbox": "The Node host maps a fixed command enum to argv with shell disabled, copies only allowlisted non-secret environment variables, and enforces wall-clock/output budgets plus POSIX process-group cancellation. It is not an arbitrary shell.",
@@ -107,8 +107,8 @@
     "No video processing pipeline.",
     "No cloud collaboration or remote project service.",
     "No arbitrary command execution, process spawning, absolute-path scans or arbitrary export destinations.",
-    "No provider executor, bundled coding host or credentials; coding.* requires an injected controlled backend and workspace and otherwise returns capability-required.",
-    "The desktop app has an internal durable local Agent Host under an authorized workspace, but its lifecycle commands are not exposed through cutout.control.v1, CLI, or MCP and it has no provider or arbitrary-shell executor.",
+    "No provider executor or bundled Coding workspace is available in the default CLI/MCP headless host; coding.* requires injected controlled adapters and tool.invoke returns capability-required.",
+    "The desktop app has an internal durable local Agent Host, a native-routed Provider executor, and a bounded static-site Coding backend under an opaque host-managed workspace. Those desktop lifecycle bindings are not exposed through cutout.control.v1, CLI, or MCP, and no arbitrary-shell executor is provided.",
     "CPU hard limits are capability-required; the Node command host currently enforces wall-clock and output-byte limits, not a kernel CPU quota.",
     "General Node network isolation is capability-required; provider network traffic is instead constrained by the Rust proxy boundary.",
     "Reliable Windows process-tree cancellation is capability-required until a Job Object host adapter is implemented; POSIX hosts use detached process-group termination.",

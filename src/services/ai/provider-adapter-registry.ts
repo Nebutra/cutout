@@ -93,6 +93,7 @@ export function createProtocolGenerationAdapter(input: {
 
 export const OPENAI_COMPATIBLE_GENERATION_KINDS = [
   'openai-compatible',
+  'cc-switch',
   'dashscope',
   'deepseek',
   'zhipu',

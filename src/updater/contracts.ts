@@ -1,5 +1,6 @@
 export type UpdateChannel = "stable" | "beta";
 export type UpdateRetryAction = "check" | "download" | "install";
+export const UPDATE_PREFERENCES_STORAGE_KEY = "cutout.updates.preferences.v1";
 
 export interface UpdateChannelCapability {
   readonly available: boolean;
@@ -55,6 +56,10 @@ export interface UpdatePreferences {
   readonly channel: UpdateChannel;
   readonly autoCheck: boolean;
   readonly lastCheckedAt?: string;
+}
+
+export interface PersistedUpdatePreferences extends UpdatePreferences {
+  readonly systemNotifications: boolean;
 }
 
 export interface UpdatePreferenceStore {

@@ -1,0 +1,3 @@
+{"file":".trellis/spec/frontend/release-pipeline.md","reason":"Defines synchronized versions, protected PR/tag authority, four-platform signing, notarization, updater, publication, and local truthfulness contracts."}
+{"file":"docs/RELEASE_CHECKLIST.md","reason":"Defines the local release gates, public evidence checks, packaged-app verification, and data-safety boundary."}
+{"file":"cutout.agent-capabilities.json","reason":"The authoritative Agent surface must remain synchronized with the product version and preserve its explicit limitations."}

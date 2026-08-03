@@ -12,9 +12,13 @@ export function createCutoutResultSink(
   >,
 ): CutoutResultSink {
   return {
-    async commit({ execution, slices, outputArtifactIds }) {
+    async commit({ execution, slices, outputArtifactIds, maskArtifactId, providerRoute }) {
       const initial = getState()
       if (!initial.source.bitmap || !initial.source.imageId) {
+        throw new Error('The cutout source changed before its result could be published.')
+      }
+      if (execution.expectedSourceImageId
+        && initial.source.imageId !== execution.expectedSourceImageId) {
         throw new Error('The cutout source changed before its result could be published.')
       }
       if (slices.length !== outputArtifactIds.length) {
@@ -54,9 +58,15 @@ export function createCutoutResultSink(
         runId: productionRunId,
         outputs,
         cutoutParams: execution.cutoutParams ?? DEFAULT_PARAMS,
+        maskArtifactId,
+        providerRoute,
       })
       const current = getState()
       if (current.source.imageId !== sourceImageId) {
+        throw new Error('The cutout source changed before its result could be published.')
+      }
+      if (execution.expectedSourceImageId
+        && current.source.imageId !== execution.expectedSourceImageId) {
         throw new Error('The cutout source changed before its result could be published.')
       }
       if (!current.commitAssetProduction(initial.assetProduction.revision, production)) {

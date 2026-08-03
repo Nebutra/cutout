@@ -23,7 +23,7 @@ Status: production acceptance contract. A checked box requires attached receipt 
 - Figma closes after apply and commits an undo boundary. Framer publishes only from approved staging.
 - Canva export/publish retains required user interaction and does not impersonate Connect API.
 
-## Local MCP/CLI: Pencil and Paper
+## Local MCP/CLI: Pen and Paper
 
 - Host process is discovered, version checked and scoped to the selected/open document.
 - `.pen` schema changes invoke the versioned migration capability before writes.

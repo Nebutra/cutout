@@ -161,6 +161,10 @@ function fakeRegistry(key: string, base: string): ServiceRegistry {
   return {
     session: { current: async () => ({ userId: 'test', isAuthenticated: false }) },
     cutout: { run: async () => err('not used in this test') },
+    foregroundSegmentation: {
+      capabilities: async () => ok({ available: false, platform: 'test', backend: 'unavailable', reason: 'capability-required' }),
+      segment: async () => err('capability-required'),
+    },
     assets: {
       list: async () => ok([]),
       load: notUsed,
@@ -186,7 +190,7 @@ function fakeRegistry(key: string, base: string): ServiceRegistry {
       setKey: notUsed,
       status: async () => ({ hasKey: true }),
       statuses: async (ids) => Object.fromEntries(ids.map((id) => [id, true])),
-      test: async () => ok({ model: MODEL }),
+      test: async () => ok({ model: MODEL, models: [MODEL] }),
     },
     generation: {
       generateText: async () => err('not used in this test'),

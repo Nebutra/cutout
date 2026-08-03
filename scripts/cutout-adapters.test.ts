@@ -422,7 +422,7 @@ describe('headless CLI and MCP adapters', () => {
       expect(reportedIntegrations.authorizationRequired).toEqual(declaredCapabilities.integrations.authorizationRequired)
       expect(reportedIntegrations.available).toEqual(['figma-authorized-snapshot'])
       expect(reportedIntegrations.authorizationRequired).toEqual(expect.arrayContaining(['notion-p1-adapter','github-p1-adapter']))
-      expect(reportedIntegrations.hostRequired).toEqual(expect.arrayContaining(['figma-foreground-plugin','obsidian-vault-plugin','pencil-mcp-cli','paper-desktop-mcp','framer-editor-plugin','canva-apps-sdk']))
+      expect(reportedIntegrations.hostRequired).toEqual(expect.arrayContaining(['figma-foreground-plugin','obsidian-vault-plugin','pen-mcp-cli','paper-desktop-mcp','framer-editor-plugin','canva-apps-sdk']))
       expect(githubIntegrationManifest.availability).toBe('authorization-required')
       expect(notionIntegrationManifest.availability).toBe('authorization-required')
       expect(skills).toMatchObject({ result: { structuredContent: { response: { version: 'cutout.product-skills.v1', skills: expect.any(Array) } } } })

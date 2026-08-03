@@ -39,7 +39,6 @@ import type { LiveDesignOsArtifacts } from "@/components/design-os-workbench/liv
 import { buildTokenContrastGovernance } from "@/components/design-os-workbench/token-governance";
 import { LibraryUIProvider } from "@/components/library/library-ui";
 import { useAnalysisBridge } from "@/hooks/useAnalysisBridge";
-import { useAiNativeControl } from "@/hooks/useAiNativeControl";
 import { useAutoRun } from "@/hooks/useAutoRun";
 import { useHotkeys, type HotkeyHandlers } from "@/hooks/useHotkeys";
 import { useImageImport } from "@/hooks/useImageImport";
@@ -61,6 +60,10 @@ import {
 import { isErr } from "@/services/types";
 import type { BundleRepository } from "@/services/types";
 import type { DesignDocument } from "@/design-ir";
+import {
+  selectedDesignMarkdownBinding,
+  type SelectedDesignMarkdownBinding,
+} from "@/prototype/design-system-candidates";
 import type { StarterPlan } from "@/starter-compiler";
 import { useServices } from "@/services/context";
 import type {
@@ -87,12 +90,14 @@ import {
   projectWorkspaceSurface,
   returnFromDeliver,
   saveWorkspaceNavigation,
-  WORKSPACE_NAVIGATION_EVENT,
   type WorkspaceNavigation,
   type WorkspaceNavigationSession,
 } from "@/workspace/navigation";
 import { cn } from "@/lib/utils";
-import { withViewTransition } from "@/lib/view-transition";
+import {
+  withViewTransition,
+  withViewTransitionApplied,
+} from "@/lib/view-transition";
 import {
   checkpointProjectForRecovery,
   createIndexedDbRecoveryBackend,
@@ -102,12 +107,13 @@ import {
   markCleanExit,
   startCrashSession,
 } from "@/local-recovery";
-import { recordAiNativeDiagnostic } from "@/services/ai-native/diagnostics";
+import { recordRuntimeDiagnostic } from "@/services/runtime-diagnostics";
 import { clearAuthorizedWorkspaceForProjectTransition, getAuthorizedWorkspace, subscribeAuthorizedWorkspace } from "@/platform/authorized-workspace";
 import { bindTauriAgentHostLifecycle, createTauriAgentHostService } from "@/agent-host/tauri-service";
 import { projectDurableHostEvents } from "@/agent-host/run-event-projection";
 import { createRunEventStore } from "@/agent-runtime/run-events";
 import { createDesktopUpdateOrchestrator } from "@/updater/service";
+import { startUpdateAutoCheckScheduler } from "@/updater/auto-check-scheduler";
 import {
   Dialog,
   DialogContent,
@@ -312,7 +318,7 @@ export function AppShell() {
     crashSessionStartedRef.current = true;
     const marker = createLocalStorageCrashMarkerStore(localStorage);
     const result = startCrashSession(marker, { sessionId: crypto.randomUUID(), now: new Date().toISOString() });
-    if (result.crashed) recordAiNativeDiagnostic({ level: "warn", scope: "startup", message: result.safeMode ? "Repeated unclean startup; safe mode recommended." : "Recovered from an unclean startup.", details: { crashCount: result.marker.crashCount, safeMode: result.safeMode } });
+    if (result.crashed) recordRuntimeDiagnostic({ level: "warn", scope: "startup", message: result.safeMode ? "Repeated unclean startup; safe mode recommended." : "Recovered from an unclean startup.", details: { crashCount: result.marker.crashCount, safeMode: result.safeMode } });
     const clean = () => markCleanExit(marker);
     window.addEventListener("pagehide", clean, { once: true });
     return () => window.removeEventListener("pagehide", clean);
@@ -333,7 +339,6 @@ export function AppShell() {
   // One bridge / one worker for the whole shell (auto-run + manual rerun).
   const { analyze } = useAnalysisBridge();
   useAutoRun(analyze);
-  useAiNativeControl({ analyze });
 
   const { importFile, openPicker, pickFile, inputProps } = useImageImport();
   const { exportAll, exportOne } = useExport();
@@ -390,15 +395,6 @@ export function AppShell() {
       /* optional local preference */
     }
   }, [workspaceNavigation]);
-  useEffect(() => {
-    const sync = (event: Event) =>
-      setWorkspaceNavigation(
-        (event as CustomEvent<WorkspaceNavigation>).detail ??
-          loadWorkspaceNavigation(),
-      );
-    window.addEventListener(WORKSPACE_NAVIGATION_EVENT, sync);
-    return () => window.removeEventListener(WORKSPACE_NAVIGATION_EVENT, sync);
-  }, []);
   const {
     projects,
     projectLoadState,
@@ -434,12 +430,15 @@ export function AppShell() {
     },
   }), [projectRepository, recoveryBackend, recoveryService]);
   useEffect(() => {
-    let timer: number | undefined;
     let disposed = false;
+    let stopAutoCheckScheduler: (() => void) | undefined;
     void updateController.initialize().then(() => {
-      if (!disposed) timer = window.setTimeout(() => void updateController.autoCheck(true), 8_000);
+      if (!disposed) stopAutoCheckScheduler = startUpdateAutoCheckScheduler(updateController);
     });
-    return () => { disposed = true; if (timer !== undefined) window.clearTimeout(timer); };
+    return () => {
+      disposed = true;
+      stopAutoCheckScheduler?.();
+    };
   }, [updateController]);
 
   useEffect(() => {
@@ -576,7 +575,6 @@ export function AppShell() {
   const [openHomeLibrary, setOpenHomeLibrary] = useState(false);
   const openLibrary = useCallback(() => setLibraryOpen(true), []);
 
-  const [advancedAuditOpen, setAdvancedAuditOpen] = useState(false);
   const [designOsOpen, setDesignOsOpen] = useState(false);
   const [sourceIngestOpen, setSourceIngestOpen] = useState(false);
   const [sourceIngestPreview, setSourceIngestPreview] = useState<
@@ -621,7 +619,7 @@ export function AppShell() {
   >(null);
   useEffect(() => {
     if (
-      (!designOsOpen && !advancedAuditOpen && workspaceSurface.surface !== "inline-main") ||
+      (!designOsOpen && workspaceSurface.surface !== "inline-main") ||
       !designDocument ||
       designOsModelFactory
     )
@@ -640,7 +638,6 @@ export function AppShell() {
     designDocument,
     designOsModelFactory,
     designOsOpen,
-    advancedAuditOpen,
     workspaceSurface.surface,
   ]);
   const designOsModel = useMemo(() => {
@@ -730,7 +727,7 @@ export function AppShell() {
         workspaceReturnToRef.current = session.returnTo;
         setWorkspaceNavigation(session.current);
       } else {
-        setWorkspaceNavigation({ version: 2, mode: "canvas", advanced: workspaceNavigation.advanced });
+        setWorkspaceNavigation({ version: 2, mode: "canvas" });
         setDesignOsDefaultTab(tab);
         setDesignOsOpen(true);
       }
@@ -880,7 +877,8 @@ export function AppShell() {
 
   const exportWorkbenchKit = useCallback(
     async (itemId: string) => {
-      const current = getStoreState().workspaceSnapshot?.designDocument;
+      const workspace = getStoreState().workspaceSnapshot;
+      const current = workspace?.designDocument;
       if (!current) return;
       const {
         compileBrandKitOperation,
@@ -949,6 +947,7 @@ export function AppShell() {
       const compiled = await compileDesignKitOperation(
         current,
         headlessTokenAdapters(current.tokens),
+        selectedDesignMarkdownBinding(workspace, current),
       );
       if (isErr(compiled)) {
         toast.error("Design Kit is blocked", { description: compiled.error });
@@ -1004,7 +1003,8 @@ export function AppShell() {
   );
 
   const generateSpecimen = useCallback(async () => {
-    const current = getStoreState().workspaceSnapshot?.designDocument;
+    const workspace = getStoreState().workspaceSnapshot;
+    const current = workspace?.designDocument;
     if (!current) {
       toast.error("No DesignDocument is available");
       return;
@@ -1016,6 +1016,7 @@ export function AppShell() {
     const compiled = await compileDesignKitOperation(
       current,
       headlessTokenAdapters(current.tokens),
+      selectedDesignMarkdownBinding(workspace, current),
     );
     if (isErr(compiled)) {
       toast.error("Could not generate specimen", {
@@ -1176,6 +1177,7 @@ export function AppShell() {
         services.bundles,
         snapshot.designOsAuthoring ?? undefined,
         brandViComplete,
+        selectedDesignMarkdownBinding(snapshot, current),
       );
       const outcomeId =
         snapshot.outcome?.contract.id ?? `outcome:${current.meta.id}`;
@@ -1256,6 +1258,7 @@ export function AppShell() {
         services.bundles,
         snapshot.designOsAuthoring ?? undefined,
         brandViComplete,
+        selectedDesignMarkdownBinding(snapshot, current),
       );
       try {
         const replayed = await center.preview(request);
@@ -1441,6 +1444,7 @@ export function AppShell() {
       const kit = await compileDesignKitOperation(
         current,
         headlessTokenAdapters(current.tokens),
+        selectedDesignMarkdownBinding(snapshot, current),
       );
       const components = await compileComponentsOperation(
         current,
@@ -1684,10 +1688,10 @@ export function AppShell() {
         activeRecordRef.current = loaded.data;
         lastSavedFingerprintRef.current = "";
         const restoreInput = await createRestoreInputFromProject(loaded.data);
-        restoreProject(restoreInput);
-        withViewTransition(() =>
-          dispatchProjectShell({ type: "open-project", id }),
-        );
+        await withViewTransitionApplied(() => {
+          restoreProject(restoreInput);
+          dispatchProjectShell({ type: "open-project", id });
+        });
       } catch (error) {
         toast.error("Could not restore project", {
           description: error instanceof Error ? error.message : String(error),
@@ -1744,10 +1748,10 @@ export function AppShell() {
     restoringRef.current = true;
     activeRecordRef.current = project;
     lastSavedFingerprintRef.current = "";
-    resetProject();
-    withViewTransition(() =>
-      dispatchProjectShell({ type: "create-project", project }),
-    );
+    await withViewTransitionApplied(() => {
+      resetProject();
+      dispatchProjectShell({ type: "create-project", project });
+    });
     queueMicrotask(() => {
       restoringRef.current = false;
     });
@@ -2074,7 +2078,7 @@ export function AppShell() {
       );
       state.requestAgentRun("create-assets");
       workspaceReturnToRef.current = undefined;
-      setWorkspaceNavigation({ version: 2, mode: "agent", advanced: workspaceNavigation.advanced });
+      setWorkspaceNavigation({ version: 2, mode: "agent" });
     },
     onAddDeliveryDestination: () => openSettings({section:'integrations',anchor:'connections'}),
   };
@@ -2164,13 +2168,21 @@ export function AppShell() {
                 ) : <DeferredSurfaceFallback label="Loading delivery workspace" />
               ) : null}
               {view === "project" ? (
-                <div className={cn("min-h-0 flex-1 flex-col", inlineDeliveryTab ? "hidden" : "flex")} aria-hidden={Boolean(inlineDeliveryTab)} inert={Boolean(inlineDeliveryTab)} data-slot="project-workspace-surface">
+                <div
+                  className={cn(
+                    "min-h-0 flex-1 flex-col",
+                    inlineDeliveryTab
+                      ? "pointer-events-none invisible absolute inset-0 flex"
+                      : "flex",
+                  )}
+                  aria-hidden={Boolean(inlineDeliveryTab)}
+                  inert={Boolean(inlineDeliveryTab)}
+                  data-slot="project-workspace-surface"
+                >
                   <Suspense fallback={<DeferredSurfaceFallback label="Loading project workspace" />}>
                     <PipelineCanvas
                       key={projectVersion}
                       onOpenDesignOs={openDesignOs}
-                      advanced={workspaceNavigation.advanced}
-                      onOpenAdvanced={() => setAdvancedAuditOpen(true)}
                     />
                   </Suspense>
                 </div>
@@ -2191,11 +2203,6 @@ export function AppShell() {
               />
             </Suspense>
           ) : null}
-          <DeveloperAuditDialog
-            open={advancedAuditOpen}
-            onOpenChange={setAdvancedAuditOpen}
-            model={designOsModel}
-          />
           {libraryOpen ? (
             <Suspense
               fallback={<OverlayLoading label="Loading asset library" />}
@@ -2327,6 +2334,7 @@ async function buildUnifiedLocalDeliveryCenter(
   bundles: BundleRepository,
   authoring: DesignOsAuthoringState | undefined,
   brandViComplete: boolean,
+  selectedDesignMarkdown?: SelectedDesignMarkdownBinding,
 ) {
   const [operations, designKitModule, componentModule, deliveryModule] =
     await Promise.all([
@@ -2339,6 +2347,7 @@ async function buildUnifiedLocalDeliveryCenter(
   const designKitResult = await operations.compileDesignKitOperation(
     document,
     headlessTokenAdapters(document.tokens),
+    selectedDesignMarkdown,
   );
   if (isErr(designKitResult)) throw new Error(designKitResult.error);
   const designKit = designKitResult.data;
@@ -2550,133 +2559,4 @@ function workspaceAutosaveFingerprint(
     params,
     slices,
   ].join("|");
-}
-
-function DeveloperAuditDialog({
-  open,
-  onOpenChange,
-  model,
-}: {
-  readonly open: boolean;
-  readonly onOpenChange: (open: boolean) => void;
-  readonly model: DesignOsWorkbenchModel | null;
-}) {
-  const [section, setSection] = useState<"ir" | "receipts">("ir");
-  const report = model
-    ? {
-        protocol: "cutout.redacted-audit.v1",
-        document: {
-          id: model.summary.documentId,
-          revisionId: model.summary.revisionId,
-          revisionNumber: model.summary.revisionNumber,
-          counts: model.summary.counts,
-        },
-        receipts: {
-          governance: model.governance
-            ? {
-                id: model.governance.receipt.receiptId,
-                status: model.governance.receipt.status,
-                evidenceHash: model.governance.receipt.evidenceHash,
-                findingCount: model.governance.receipt.findings.length,
-              }
-            : null,
-          delivery: model.delivery?.receipt
-            ? {
-                id: model.delivery.receipt.id,
-                status: model.delivery.receipt.status,
-                targetCount: model.delivery.receipt.targets.length,
-              }
-            : null,
-        },
-      }
-    : null;
-  const href = report
-    ? `data:application/json;charset=utf-8,${encodeURIComponent(JSON.stringify(report, null, 2))}`
-    : undefined;
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[88vh] max-w-3xl overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Developer audit</DialogTitle>
-          <DialogDescription>
-            Read-only project structure and redacted evidence. Prompts, source
-            content, secrets and local paths are excluded.
-          </DialogDescription>
-          <details className="text-xs text-muted-foreground">
-            <summary className="cursor-pointer font-medium text-foreground">Host diagnostics</summary>
-            <p className="mt-2">Accessibility inspection: {typeof window !== "undefined" && (window as typeof window & { axe?: unknown }).axe ? "Axe host available" : "Axe host unavailable"}</p>
-          </details>
-        </DialogHeader>
-        {report ? (
-          <div className="space-y-4 text-sm">
-            <div
-              role="tablist"
-              aria-label="Developer audit sections"
-              className="flex gap-2"
-            >
-              {(
-                [
-                  ["ir", "Design IR"],
-                  ["receipts", "Receipts"],
-                ] as const
-              ).map(([id, label]) => (
-                <button
-                  key={id}
-                  type="button"
-                  role="tab"
-                  aria-selected={section === id}
-                  onClick={() => setSection(id)}
-                  className={cn(
-                    "rounded-md px-2 py-1",
-                    section === id && "bg-muted",
-                  )}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-            {section === "ir" ? (
-              <section role="tabpanel" aria-label="Design IR audit">
-                <h3 className="font-medium">Design IR</h3>
-                <dl className="mt-2 grid grid-cols-2 gap-2 text-xs">
-                  <dt>Revision</dt>
-                  <dd>{report.document.revisionNumber}</dd>
-                  {Object.entries(report.document.counts).map(
-                    ([key, value]) => (
-                      <>
-                        <dt key={`${key}-label`} className="capitalize">
-                          {key}
-                        </dt>
-                        <dd key={key}>{value}</dd>
-                      </>
-                    ),
-                  )}
-                </dl>
-              </section>
-            ) : null}
-            {section === "receipts" ? (
-              <section role="tabpanel" aria-label="Receipts audit">
-                <h3 className="font-medium">Receipts</h3>
-                <p className="text-xs text-muted-foreground">
-                  {report.receipts.governance ? 1 : 0} governance ·{" "}
-                  {report.receipts.delivery ? 1 : 0} delivery
-                </p>
-              </section>
-            ) : null}
-            <a
-              download="cutout-audit.redacted.json"
-              href={href}
-              className="inline-flex h-8 items-center rounded-md border border-border px-3 text-xs font-medium"
-            >
-              Export redacted report
-            </a>
-          </div>
-        ) : (
-          <p role="status" className="text-sm text-muted-foreground">
-            No canonical Design IR is available for this project yet.
-          </p>
-        )}
-      </DialogContent>
-    </Dialog>
-  );
 }

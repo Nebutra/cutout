@@ -32,4 +32,31 @@ describe('prototype review document', () => {
     expect(prototypeReviewMarkdown(plan, 'primary-flow')).not.toContain('## Detail')
     expect(prototypeReviewMarkdown(plan, 'full-plan')).toContain('## Detail')
   })
+
+  it('appends the resolved candidate count, directions, and runtime bounds', () => {
+    const explored: PrototypePlan = {
+      ...plan,
+      designSystem: {
+        ...plan.designSystem,
+        exploration: {
+          mode: 'auto',
+          decidedBy: 'agent',
+          count: 2,
+          rationale: 'Two directions expose the meaningful tradeoff.',
+          directions: [
+            { id: 'quiet', label: 'Quiet', thesis: 'Restrained.', vary: ['density'], preserve: ['identity'] },
+            { id: 'bold', label: 'Bold', thesis: 'Expressive.', vary: ['shape'], preserve: ['identity'] },
+          ],
+          bounds: { maxCandidates: 8, maxParallelism: 2 },
+          estimate: { currency: 'USD', amount: 0.4 },
+        },
+      },
+    }
+    const markdown = prototypeReviewMarkdown(explored, 'full-plan')
+    expect(markdown).toContain('## Design System directions')
+    expect(markdown).toContain('**2 directions**')
+    expect(markdown).toContain('### Quiet')
+    expect(markdown).toContain('up to 8 candidates, 2 concurrent')
+    expect(markdown).toContain('Estimated provider cost: 0.4 USD')
+  })
 })

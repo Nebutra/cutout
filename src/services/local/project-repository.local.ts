@@ -16,12 +16,14 @@ import {
   migrateLegacySlicesToAssetProduction,
   type AssetProductionSnapshot,
 } from '@/asset-production'
-import { bitmapToBytes, bytesToBlob, decodeImage } from '@/lib/image'
+import { bytesToBlob, decodeImage } from '@/lib/image'
+import { resolveSourceMaterial } from '@/store/source-material'
 import { err, ok, type Result } from '@/services/types'
 import { ContentAddressedDesktopArtifactStore } from '@/services/content-addressed-desktop-artifacts'
 import {
   designDocumentToWorkspaceSnapshot,
   fingerprint,
+  legacyWorkspaceSupplementalContent,
   migrateWorkspaceV1,
   projectRecordToDesignDocument,
   validateDesignDocument,
@@ -314,12 +316,7 @@ export async function createProjectRecordFromStore(input: {
   const source = state.source.bitmap
     ? input.previous?.source && input.previous.sourceImageId === state.source.imageId
       ? input.previous.source
-      : {
-          name: state.source.name || 'source',
-          blob: bytesToBlob(await bitmapToBytes(state.source.bitmap)),
-          width: state.source.width,
-          height: state.source.height,
-        }
+      : await storedSourceFromState(state.source)
     : undefined
   const mockup = state.mockup
     ? {
@@ -433,9 +430,23 @@ async function restoreStoredSource(
 ): Promise<ProjectRestoreInput['source']> {
   if (!source) return undefined
   try {
-    return { name: source.name, bitmap: await decodeImage(source.blob) }
+    return {
+      name: source.name,
+      bitmap: await decodeImage(source.blob),
+      encodedImage: source.blob,
+    }
   } catch {
     return undefined
+  }
+}
+
+async function storedSourceFromState(source: Store['source']): Promise<StoredImage> {
+  const material = await resolveSourceMaterial(source)
+  return {
+    name: source.name || 'source',
+    blob: bytesToBlob(material.bytes, material.mediaType),
+    width: source.width,
+    height: source.height,
   }
 }
 
@@ -648,6 +659,8 @@ function workspaceWasMigrated(workspace: WorkspaceSnapshot | null): boolean {
     || workspace.humanLoopChoiceId === undefined
     || workspace.humanLoopCustomAnswer === undefined
     || workspace.prototypeDesignSystem === undefined
+    || workspace.prototypeDesignSystemCandidates === undefined
+    || workspace.prototypeSuiteCandidates === undefined
     || workspace.prototypePages === undefined
     || workspace.selectedPrototypePageId === undefined
     || workspace.runError === undefined
@@ -667,8 +680,11 @@ function mergeWorkspaceProjection(
     ...base,
     prototypePlan: projected.prototypePlan,
     prototypeDesignSystem: projected.prototypeDesignSystem,
+    prototypeDesignSystemCandidates: projected.prototypeDesignSystemCandidates,
+    prototypeSuiteCandidates: projected.prototypeSuiteCandidates,
     prototypePages: projected.prototypePages,
     attachments: projected.attachments,
+    codingReceipts: projected.codingReceipts,
   }
 }
 
@@ -694,6 +710,49 @@ function sameRepresentableWorkspace(
               bytes: workspace.prototypeDesignSystem.bytes.byteLength,
             }
           : null,
+        designSystemCandidates: workspace.prototypeDesignSystemCandidates
+          ? {
+              set: workspace.prototypeDesignSystemCandidates.set,
+              artifacts: Object.fromEntries(
+                Object.entries(workspace.prototypeDesignSystemCandidates.artifacts).map(([id, artifact]) => [id, {
+                  name: artifact.name,
+                  designMarkdown: artifact.designMarkdown,
+                  mediaType: artifact.mediaType,
+                  width: artifact.width,
+                  height: artifact.height,
+                  bytes: artifact.bytes.byteLength,
+                }]),
+              ),
+            }
+          : null,
+        prototypeSuiteCandidates: workspace.prototypeSuiteCandidates
+          ? {
+              set: workspace.prototypeSuiteCandidates.set,
+              artifacts: Object.fromEntries(
+                Object.entries(workspace.prototypeSuiteCandidates.artifacts).map(([id, artifact]) => [id, {
+                  designSystem: {
+                    ...artifact.designSystem,
+                    artifact: {
+                      ...artifact.designSystem.artifact,
+                      bytes: artifact.designSystem.artifact.bytes.byteLength,
+                    },
+                  },
+                  plan: artifact.plan,
+                  pages: artifact.pages.map((page) => ({
+                    page: page.page,
+                    mediaType: page.mediaType,
+                    width: page.width,
+                    height: page.height,
+                    bytes: page.bytes.byteLength,
+                  })),
+                  resourcePack: artifact.resourcePack,
+                  provenanceIds: artifact.provenanceIds,
+                  codingReceipt: artifact.codingReceipt,
+                }]),
+              ),
+            }
+          : null,
+        codingReceipts: workspace.codingReceipts ?? [],
         pages: workspace.prototypePages.map((page) => ({
           page: page.page,
           mediaType: page.mediaType,
@@ -738,8 +797,23 @@ async function createLegacyContentResolver(
   } else if (record.designMarkdown) {
     add('workspace/DESIGN.md', new TextEncoder().encode(record.designMarkdown.content))
   }
+  const candidateState = record.workspace?.prototypeDesignSystemCandidates
+  if (candidateState) {
+    for (const [candidateId, artifact] of Object.entries(candidateState.artifacts)) {
+      add(`workspace/design-system-candidates/${candidateId}/image`, artifact.bytes)
+      add(
+        `workspace/design-system-candidates/${candidateId}/DESIGN.md`,
+        new TextEncoder().encode(artifact.designMarkdown),
+      )
+    }
+  }
   for (const page of record.workspace?.prototypePages ?? []) {
     add(`workspace/pages/${page.page.id}`, page.bytes)
+  }
+  if (record.workspace) {
+    for (const [uri, bytes] of legacyWorkspaceSupplementalContent(record.id, record.workspace)) {
+      content.set(uri, bytes)
+    }
   }
   for (const attachment of record.workspace?.attachments ?? []) {
     add(`attachments/${attachment.id}`, attachment.bytes)

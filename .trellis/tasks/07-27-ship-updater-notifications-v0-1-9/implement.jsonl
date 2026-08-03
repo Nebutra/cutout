@@ -1,0 +1,4 @@
+{"file":".trellis/spec/frontend/release-pipeline.md","reason":"Preserve updater trust, scheduling, publication, and installation contracts."}
+{"file":".trellis/spec/frontend/state-management.md","reason":"Keep one AppShell-owned update controller and deterministic derived notification state."}
+{"file":".trellis/spec/frontend/component-guidelines.md","reason":"Keep Home/Settings notification controls accessible and consistent."}
+{"file":"docs/RELEASE_CHECKLIST.md","reason":"Apply complete version, signing, publication, and installation gates for v0.1.9."}

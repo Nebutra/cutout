@@ -3,23 +3,23 @@ import { getVersion } from "@tauri-apps/api/app";
 import { getAuthorizedWorkspace } from "@/platform/authorized-workspace";
 import { createTauriAgentHostService } from "@/agent-host/tauri-service";
 import { createTauriUpdaterRuntime, type UpdateSnapshot } from "./runtime";
-import { UpdateOperationError, type UpdateBackend, type UpdateInstallSafety, type UpdatePreferenceStore, type UpdatePreferences, type UpdateRetryAction } from "./contracts";
+import { UpdateOperationError, type UpdateBackend, type UpdateInstallSafety, type UpdatePreferenceStore, type UpdateRetryAction } from "./contracts";
 import { createUpdateOrchestrator } from "./orchestrator";
+import { createUpdateNotificationService, readPersistedUpdatePreferences, writeUpdatePreferences } from "./update-notifications";
 
-const PREFERENCES_KEY = "cutout.updates.preferences.v1";
 type RuntimeSnapshot = UpdateSnapshot & { releaseNotes?: string; publishedAt?: string };
 
 export function createLocalUpdatePreferences(storage: Pick<Storage, "getItem" | "setItem">): UpdatePreferenceStore {
   return {
     read() {
-      try {
-        const parsed = JSON.parse(storage.getItem(PREFERENCES_KEY) ?? "null") as Partial<UpdatePreferences> | null;
-        return { channel: parsed?.channel === "beta" ? "beta" : "stable", autoCheck: parsed?.autoCheck !== false, ...(parsed?.lastCheckedAt ? { lastCheckedAt: parsed.lastCheckedAt } : {}) };
-      } catch {
-        return { channel: "stable", autoCheck: true };
-      }
+      const persisted = readPersistedUpdatePreferences(storage);
+      return {
+        channel: persisted.channel,
+        autoCheck: persisted.autoCheck,
+        ...(persisted.lastCheckedAt ? { lastCheckedAt: persisted.lastCheckedAt } : {}),
+      };
     },
-    write(value) { storage.setItem(PREFERENCES_KEY, JSON.stringify(value)); },
+    write(value) { writeUpdatePreferences(storage, value); },
   };
 }
 
@@ -33,6 +33,7 @@ export function createDesktopUpdateOrchestrator(input: {
   readonly storage?: Pick<Storage, "getItem" | "setItem">;
   readonly getAppVersion?: () => Promise<string>;
 }) {
+  const storage = input.storage ?? localStorage;
   const runtime = createTauriUpdaterRuntime();
   const readVersion = input.getAppVersion ?? getVersion;
   const operationFailure = async (error: unknown, fallback: UpdateRetryAction) => {
@@ -111,7 +112,27 @@ export function createDesktopUpdateOrchestrator(input: {
       await createTauriAgentHostService({ workspaceHandle: workspace.handle, instanceId: `updater.${crypto.randomUUID()}` }).shutdown();
     },
   };
-  return createUpdateOrchestrator({ backend, safety, preferences: createLocalUpdatePreferences(input.storage ?? localStorage) });
+  const controller = createUpdateOrchestrator({
+    backend,
+    safety,
+    preferences: createLocalUpdatePreferences(storage),
+  });
+  const updateNotifications = createUpdateNotificationService({
+    storage,
+    localNotificationStorage: input.storage,
+  });
+  controller.subscribe((state) => {
+    if (state.phase === "available" && state.release) {
+      void updateNotifications.project(state.preferences.channel, state.release);
+    }
+  });
+  return {
+    ...controller,
+    getSystemNotificationsEnabled: updateNotifications.getSystemNotificationsEnabled,
+    subscribeSystemNotifications: updateNotifications.subscribeSystemNotifications,
+    setSystemNotificationsEnabled: updateNotifications.setSystemNotificationsEnabled,
+    deferUpdateNotification: updateNotifications.defer,
+  };
 }
 
 export type DesktopUpdateController = ReturnType<typeof createDesktopUpdateOrchestrator>;

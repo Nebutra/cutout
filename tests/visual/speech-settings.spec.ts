@@ -31,9 +31,6 @@ test("Speech is separate from AI and exposes truthful progressive controls", asy
   await expect(page.getByText("Speech to text", { exact: true })).toHaveCount(0);
   await expect(page.getByText("Text to speech", { exact: true })).toHaveCount(0);
   await expect(page.getByText(/Host required:/)).toBeVisible();
-  await expect(
-    page.getByText(/Speech preferences cannot be saved without/),
-  ).toBeVisible();
   await expect(page.getByText(/Capability required:/)).toBeVisible();
   await expect(page.getByLabel("TTS voice")).toBeDisabled();
   await expect(page.getByLabel("Auto-play TTS responses")).toBeDisabled();

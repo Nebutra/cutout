@@ -222,6 +222,20 @@ fn write_and_verify(target: &Path, bytes: &[u8]) -> Result<String, BundleError> 
     Ok(sha256(&persisted))
 }
 
+#[cfg(unix)]
+fn sync_directory(path: &Path) -> Result<(), BundleError> {
+    File::open(path)
+        .and_then(|directory| directory.sync_all())
+        .map_err(|error| BundleError::Io(error.to_string()))
+}
+
+#[cfg(not(unix))]
+fn sync_directory(_path: &Path) -> Result<(), BundleError> {
+    // std::fs::File cannot open directories on Windows. The subsequent
+    // same-volume rename remains atomic, but directory fsync is unavailable.
+    Ok(())
+}
+
 fn write_bundle_to_root(
     root: &Path,
     bundle: &BundleInput,
@@ -261,9 +275,7 @@ fn write_bundle_to_root(
             });
         }
 
-        File::open(&staging)
-            .and_then(|directory| directory.sync_all())
-            .map_err(|error| BundleError::Io(error.to_string()))?;
+        sync_directory(&staging)?;
         fs::rename(&staging, &final_path).map_err(|error| {
             if final_path.exists() {
                 BundleError::Conflict
@@ -271,9 +283,7 @@ fn write_bundle_to_root(
                 BundleError::Io(error.to_string())
             }
         })?;
-        if let Ok(directory) = File::open(&root) {
-            let _ = directory.sync_all();
-        }
+        let _ = sync_directory(&root);
 
         Ok(SaveBundleResult {
             canceled: false,

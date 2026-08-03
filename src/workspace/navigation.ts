@@ -1,7 +1,6 @@
 import { z } from "zod";
 
 export const WORKSPACE_NAVIGATION_KEY = "cutout.workspace-navigation.v2";
-export const WORKSPACE_NAVIGATION_EVENT = "cutout:workspace-navigation";
 export const workspaceModeSchema = z.enum(["agent", "canvas", "deliver"]);
 export type WorkspaceMode = z.infer<typeof workspaceModeSchema>;
 export const legacyDesignOsViewSchema = z.enum([
@@ -27,9 +26,6 @@ export const workspaceInspectorSchema = z.enum([
   "kits",
   "components",
   "starter",
-  "dag",
-  "ir",
-  "receipts",
 ]);
 export type WorkspaceInspector = z.infer<typeof workspaceInspectorSchema>;
 export const workspaceNavigationSchema = z
@@ -37,39 +33,32 @@ export const workspaceNavigationSchema = z
     version: z.literal(2),
     mode: workspaceModeSchema,
     inspector: workspaceInspectorSchema.optional(),
-    advanced: z.boolean().default(false),
   })
   .strict();
 export type WorkspaceNavigation = z.infer<typeof workspaceNavigationSchema>;
 export const defaultWorkspaceNavigation: WorkspaceNavigation = {
   version: 2,
   mode: "canvas",
-  advanced: false,
 };
-const advancedInspectors = new Set<WorkspaceInspector>([
-  "dag",
-  "ir",
-  "receipts",
-]);
 
 export function migrateLegacyDesignOsView(
   view: LegacyDesignOsView,
 ): WorkspaceNavigation {
   if (view === "delivery")
-    return { version: 2, mode: "deliver", advanced: false };
+    return { version: 2, mode: "deliver" };
   if (view === "kits" || view === "components" || view === "starter")
-    return { version: 2, mode: "deliver", inspector: view, advanced: false };
+    return { version: 2, mode: "deliver", inspector: view };
   if (view === "overview")
-    return { version: 2, mode: "canvas", advanced: false };
+    return defaultWorkspaceNavigation;
   if (view === "dag" || view === "ir" || view === "receipts")
-    return { version: 2, mode: "canvas", advanced: true, inspector: view };
-  return { version: 2, mode: "canvas", inspector: view, advanced: false };
+    return defaultWorkspaceNavigation;
+  return { version: 2, mode: "canvas", inspector: view };
 }
 export function migrateWorkspaceNavigation(
   input: unknown,
 ): WorkspaceNavigation {
   const current = workspaceNavigationSchema.safeParse(input);
-  if (current.success) return sanitize(current.data);
+  if (current.success) return current.data;
   if (typeof input === "string") {
     const legacy = legacyDesignOsViewSchema.safeParse(input);
     if (legacy.success) return migrateLegacyDesignOsView(legacy.data);
@@ -81,23 +70,30 @@ export function migrateWorkspaceNavigation(
       );
     if (legacy.success) return migrateLegacyDesignOsView(legacy.data);
     const oldMode = workspaceModeSchema.safeParse(record.mode);
-    if (oldMode.success)
-      return sanitize({ version: 2, mode: oldMode.data, advanced: false });
+    if (oldMode.success) {
+      const oldInspector = legacyDesignOsViewSchema.safeParse(record.inspector);
+      if (
+        oldInspector.success &&
+        (oldInspector.data === "dag" ||
+          oldInspector.data === "ir" ||
+          oldInspector.data === "receipts")
+      ) {
+        return defaultWorkspaceNavigation;
+      }
+      const currentInspector = workspaceInspectorSchema.safeParse(
+        record.inspector,
+      );
+      if (currentInspector.success) {
+        return {
+          version: 2,
+          mode: oldMode.data,
+          inspector: currentInspector.data,
+        };
+      }
+      return { version: 2, mode: oldMode.data };
+    }
   }
   return defaultWorkspaceNavigation;
-}
-function sanitize(value: WorkspaceNavigation): WorkspaceNavigation {
-  return value.inspector &&
-    advancedInspectors.has(value.inspector) &&
-    !value.advanced
-    ? { version: 2, mode: value.mode, advanced: false }
-    : value;
-}
-export function isInspectorVisible(
-  inspector: WorkspaceInspector,
-  navigation: WorkspaceNavigation,
-) {
-  return !advancedInspectors.has(inspector) || navigation.advanced;
 }
 export function loadWorkspaceNavigation(storage?: Pick<Storage, "getItem">) {
   try {
@@ -118,27 +114,7 @@ export function saveWorkspaceNavigation(
   const parsed = workspaceNavigationSchema.parse(value),
     host = storage ?? globalThis.document?.defaultView?.localStorage;
   if (!host) throw new Error("Workspace navigation storage is unavailable.");
-  host.setItem(WORKSPACE_NAVIGATION_KEY, JSON.stringify(sanitize(parsed)));
-}
-export function setDeveloperMode(
-  enabled: boolean,
-  storage?: Pick<Storage, "getItem" | "setItem">,
-) {
-  const current = loadWorkspaceNavigation(storage),
-    next = {
-      ...current,
-      advanced: enabled,
-      ...(!enabled &&
-      current.inspector &&
-      advancedInspectors.has(current.inspector)
-        ? { inspector: undefined }
-        : {}),
-    };
-  saveWorkspaceNavigation(next, storage);
-  globalThis.document?.defaultView?.dispatchEvent(
-    new CustomEvent(WORKSPACE_NAVIGATION_EVENT, { detail: next }),
-  );
-  return next;
+  host.setItem(WORKSPACE_NAVIGATION_KEY, JSON.stringify(parsed));
 }
 
 export function legacyTabForNavigation(
@@ -157,23 +133,21 @@ export function legacyTabForNavigation(
   return "overview";
 }
 
-export type WorkspaceOpenAction = "canvas" | "system" | "deliver" | "kits" | "components" | "starter" | "developer";
+export type WorkspaceOpenAction = "canvas" | "system" | "deliver" | "kits" | "components" | "starter";
 export interface WorkspaceSurfaceProjection {
   readonly route: WorkspaceMode;
-  readonly surface: "inline-main" | "canvas-inspector" | "developer-dialog";
+  readonly surface: "inline-main" | "canvas-inspector";
   readonly title: string;
-  readonly tab: Exclude<LegacyDesignOsView, "dag" | "ir" | "receipts"> | "dag" | "ir" | "receipts";
-  readonly exposeAxeHostStatus: boolean;
+  readonly tab: Exclude<LegacyDesignOsView, "dag" | "ir" | "receipts">;
 }
 
 /** UI-only routing contract. It never grants capabilities or changes policy. */
 export function projectWorkspaceOpenAction(action: WorkspaceOpenAction): WorkspaceSurfaceProjection {
   if (["deliver", "kits", "components", "starter"].includes(action)) {
     const tab = action === "deliver" ? "delivery" : action as "kits" | "components" | "starter";
-    return { route: "deliver", surface: "inline-main", title: action === "deliver" ? "Deliver" : action[0]!.toUpperCase() + action.slice(1), tab, exposeAxeHostStatus: false };
+    return { route: "deliver", surface: "inline-main", title: action === "deliver" ? "Deliver" : action[0]!.toUpperCase() + action.slice(1), tab };
   }
-  if (action === "developer") return { route: "canvas", surface: "developer-dialog", title: "Developer audit", tab: "receipts", exposeAxeHostStatus: true };
-  return { route: "canvas", surface: "canvas-inspector", title: action === "system" ? "System" : "Canvas", tab: "overview", exposeAxeHostStatus: false };
+  return { route: "canvas", surface: "canvas-inspector", title: action === "system" ? "System" : "Canvas", tab: "overview" };
 }
 
 export function projectWorkspaceSurface(navigation: WorkspaceNavigation): WorkspaceSurfaceProjection {
@@ -181,9 +155,8 @@ export function projectWorkspaceSurface(navigation: WorkspaceNavigation): Worksp
     const action = navigation.inspector === "kits" || navigation.inspector === "components" || navigation.inspector === "starter" ? navigation.inspector : "deliver";
     return projectWorkspaceOpenAction(action);
   }
-  if (navigation.advanced && navigation.inspector && advancedInspectors.has(navigation.inspector)) return { route: "canvas", surface: "developer-dialog", title: "Developer audit", tab: navigation.inspector, exposeAxeHostStatus: true };
   const tab = navigation.inspector && ["sources", "figma", "workflows"].includes(navigation.inspector) ? navigation.inspector as "sources" | "figma" | "workflows" : "overview";
-  return { route: navigation.mode, surface: "canvas-inspector", title: tab === "overview" ? "Canvas" : "System", tab, exposeAxeHostStatus: false };
+  return { route: navigation.mode, surface: "canvas-inspector", title: tab === "overview" ? "Canvas" : "System", tab };
 }
 
 export interface WorkspaceNavigationSession {
@@ -197,7 +170,7 @@ export function enterWorkspaceSurface(session: WorkspaceNavigationSession, actio
   if (projection.surface !== "inline-main") return { ...session, current: migrateLegacyDesignOsView(projection.tab as LegacyDesignOsView) }
   const current = migrateLegacyDesignOsView(projection.tab as LegacyDesignOsView)
   const returnTo = session.current.mode === "deliver" ? session.returnTo : session.current
-  return { current, returnTo: returnTo?.mode === "deliver" ? { version: 2, mode: "canvas", advanced: false } : returnTo }
+  return { current, returnTo: returnTo?.mode === "deliver" ? defaultWorkspaceNavigation : returnTo }
 }
 
 /** Return from Deliver while preserving the prior Canvas or Agent navigation. */

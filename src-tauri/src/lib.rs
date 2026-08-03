@@ -2,13 +2,22 @@ mod commands;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    commands::packaged_e2e::native_checkpoint("native-boot");
     let builder = tauri::Builder::default()
+        .on_page_load(|_, payload| {
+            if matches!(payload.event(), tauri::webview::PageLoadEvent::Finished) {
+                commands::packaged_e2e::native_checkpoint("webview-loaded");
+            }
+        })
         .manage(commands::registry_desktop::RegistryDesktopState::default())
-        .manage(commands::agent_host::AgentHostDesktopState::default());
+        .manage(commands::agent_host::AgentHostDesktopState::default())
+        .manage(commands::ai::ai_proxy::AiProxyCancellationState::default());
     #[cfg(desktop)]
     let builder = builder.manage(commands::updater::UpdateRuntimeState::default());
     #[cfg(desktop)]
     let builder = builder.manage(commands::workspace_bridge::WorkspaceBridgeState::default());
+    #[cfg(desktop)]
+    let builder = builder.manage(commands::coding_workspace::CodingWorkspaceState::default());
     builder
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_os::init())
@@ -18,6 +27,12 @@ pub fn run() {
             commands::save_assets::save_assets,
             commands::save_bundle::save_bundle,
             commands::scan_repository::scan_repository,
+            commands::packaged_e2e::packaged_e2e_mode,
+            commands::packaged_e2e::packaged_e2e_tick,
+            commands::packaged_e2e::packaged_e2e_checkpoint,
+            commands::packaged_e2e::packaged_e2e_complete,
+            commands::foreground_segmentation::foreground_segmentation_capabilities,
+            commands::foreground_segmentation::foreground_segment,
             commands::git::git_capability,
             commands::git::git_status,
             commands::git::git_log,
@@ -45,6 +60,7 @@ pub fn run() {
             commands::ai::providers::save_providers,
             commands::ai::local_agent_inventory::discover_local_agent_inventory,
             commands::ai::provider_discovery::discover_provider_candidates,
+            commands::ai::provider_discovery::auto_configure_provider_candidate,
             commands::ai::provider_discovery::create_provider_draft,
             commands::ai::provider_discovery::check_provider_draft,
             commands::ai::provider_discovery::import_provider_draft,
@@ -52,14 +68,9 @@ pub fn run() {
             // BYOK: secure AI transport proxy
             commands::ai::ai_proxy::ai_proxy_request,
             commands::ai::ai_proxy::ai_proxy_stream,
+            commands::ai::ai_proxy::ai_proxy_cancel,
             // BYOK: 垫图 reference-conditioned image edit (multipart /images/edits)
             commands::ai::image_edit::ai_image_edit,
-            // AI Native: file-queue JSON API for local agents / CLI
-            commands::ai_native::ai_native_paths,
-            commands::ai_native::ai_native_poll,
-            commands::ai_native::ai_native_complete,
-            commands::ai_native::ai_native_read_file,
-            commands::ai_native::ai_native_write_artifact,
             // PNG → SVG vectorization
             commands::vectorize::set_vectorizer_api_key,
             commands::vectorize::vectorizer_key_status,
@@ -109,20 +120,75 @@ pub fn run() {
             commands::workspace_bridge::workspace_run_events_read,
             #[cfg(desktop)]
             commands::workspace_bridge::workspace_run_events_write,
+            #[cfg(desktop)]
+            commands::coding_workspace::coding_workspace_create_managed,
+            #[cfg(desktop)]
+            commands::coding_workspace::coding_workspace_seed_managed_assets,
+            #[cfg(desktop)]
+            commands::coding_workspace::coding_workspace_snapshot,
+            #[cfg(desktop)]
+            commands::coding_workspace::coding_workspace_read_allowed,
+            #[cfg(desktop)]
+            commands::coding_workspace::coding_workspace_preview,
+            #[cfg(desktop)]
+            commands::coding_workspace::coding_workspace_stage,
+            #[cfg(desktop)]
+            commands::coding_workspace::coding_workspace_run_checks,
+            #[cfg(desktop)]
+            commands::coding_workspace::coding_workspace_promote,
+            #[cfg(desktop)]
+            commands::coding_workspace::coding_workspace_rollback,
         ])
         .setup(|app| {
-            // Local file secret store replaces the OS keychain (no access prompts
-            // on unsigned builds). Resolve its directory once, here.
+            use tauri::Manager;
+
+            #[cfg(target_os = "macos")]
+            if commands::packaged_e2e::enabled() {
+                use objc2::MainThreadMarker;
+                use objc2_app_kit::NSApplication;
+                use objc2_foundation::{NSActivityOptions, NSProcessInfo, NSString};
+
+                // A fully hidden WKWebView can be suspended after a long native
+                // Provider await. Keep the dedicated E2E renderer visible to
+                // WebKit while making the process accessory-only and the window
+                // non-focusable, so it cannot activate or take keyboard focus.
+                app.set_activation_policy(tauri::ActivationPolicy::Accessory);
+                let main_thread = MainThreadMarker::new()
+                    .ok_or("packaged E2E setup must run on the macOS main thread")?;
+                NSApplication::sharedApplication(main_thread).unhideWithoutActivation();
+                let activity = NSProcessInfo::processInfo().beginActivityWithOptions_reason(
+                    NSActivityOptions::UserInitiatedAllowingIdleSystemSleep,
+                    &NSString::from_str("Cutout packaged E2E WebView"),
+                );
+                // The dedicated executable owns this activity until process exit.
+                // Forgetting the token is intentional and cannot affect production.
+                std::mem::forget(activity);
+                let window = app
+                    .get_webview_window("main")
+                    .ok_or("packaged E2E main window is unavailable")?;
+                window.set_focusable(false)?;
+                window.show()?;
+                if !window.is_visible()? || window.is_focused()? {
+                    return Err("packaged E2E window lifecycle is unsafe".into());
+                }
+                commands::packaged_e2e::native_checkpoint("webview-renderable");
+            }
+
+            // Migrate the retired plaintext store only after every entry reaches
+            // the OS credential vault. No secret or account metadata is logged.
             {
-                use tauri::Manager;
                 let dir = app
                     .path()
                     .app_config_dir()
                     .expect("app config dir must resolve for secret storage");
                 commands::secret_store::init_dir(dir);
+                if let Err(error) = commands::secret_store::migrate_to_keychain() {
+                    log::warn!("Legacy credential migration was deferred: {error}");
+                }
             }
             #[cfg(desktop)]
             {
+                app.handle().plugin(tauri_plugin_notification::init())?;
                 app.handle()
                     .plugin(tauri_plugin_updater::Builder::new().build())?;
                 app.handle().plugin(tauri_plugin_process::init())?;

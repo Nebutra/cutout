@@ -26,12 +26,6 @@ msgid "global_library.toast_assets_updated"
 msgstr "{0, plural, other {# 件のアセットを更新しました}}"
 
 #. js-lingui-explicit-id
-#. placeholder {0}: coverage.missing.length
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.capability_gaps_count"
-msgstr "{0, plural, other {# 件の機能ギャップ}}"
-
-#. js-lingui-explicit-id
 #. placeholder {0}: plan.files.length
 #. placeholder {1}: plan.conflicts.length
 #: src/components/library/RegistryInstallPanel.tsx
@@ -99,13 +93,6 @@ msgstr "{0} キットエディター"
 #: src/components/settings/ModelSlot.tsx
 msgid "settings.models_discovered_from_endpoint"
 msgstr "エンドポイントから {0} 件のモデルを検出しました"
-
-#. js-lingui-explicit-id
-#. placeholder {0}: coverage.covered.length
-#. placeholder {1}: coverage.total
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.task_dimensions_covered"
-msgstr "{1} 件中 {0} 件のタスク領域をカバー"
 
 #. js-lingui-explicit-id
 #: src/components/preview/PreviewMeta.tsx
@@ -205,11 +192,6 @@ msgstr "制約を追加するか、別の方向性を説明してください…
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
-msgid "settings.empty_desc"
-msgstr "AI機能を使い始めるには、プロバイダーを追加してAPIキーを入力してください。"
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
 msgid "settings.add_provider"
 msgstr "プロバイダーを追加"
 
@@ -224,10 +206,14 @@ msgid "global_library.add_tag_placeholder"
 msgstr "タグを追加"
 
 #. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
 #: src/components/settings/sections/SpeechSection.tsx
 msgid "settings.advanced"
 msgstr "詳細設定"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.advanced_ai_management"
+msgstr "AI の詳細管理"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
@@ -243,6 +229,16 @@ msgstr "Agent のパーソナリティ"
 #: src/components/settings/SettingsSidebar.tsx
 msgid "settings.section_ai"
 msgstr "AI"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.ai_setup_ready"
+msgstr "AI ルートを設定しました"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.ai_setup_action_required"
+msgstr "AI の設定に対応が必要です"
 
 #. js-lingui-explicit-id
 #: src/components/settings/AboutFooter.tsx
@@ -268,11 +264,6 @@ msgstr "すべて（{total}）"
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.all_collections"
 msgstr "すべてのコレクション"
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.all_dimensions_covered"
-msgstr "設定済みのすべてのタスク領域がアダプターでカバーされています。モデル単位のエビデンスは選択時に確認されます。"
 
 #. js-lingui-explicit-id
 #: src/components/home/ProjectHome.tsx
@@ -466,11 +457,6 @@ msgid "global_library.policy_auto_compatible"
 msgstr "自動互換"
 
 #. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.model_routing_description"
-msgstr "自動ルーティングでは、各タスクを必要な機能を備えた利用可能なアダプターにのみ振り分けます。"
-
-#. js-lingui-explicit-id
 #: src/components/settings/sections/SpeechSection.tsx
 msgid "settings.speech.models_description"
 msgstr "デフォルトでは自動ルーティングを使用します。互換アダプターが接続されるまで、ASR と TTS は対応する能力が必要です。"
@@ -491,6 +477,11 @@ msgid "settings.speech.auto_play_aria"
 msgstr "TTS 応答を自動再生"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.ai_setup_unavailable"
+msgstr "AI の自動設定を利用できません"
+
+#. js-lingui-explicit-id
 #: src/components/home/ProjectHome.tsx
 msgid "home.nav_back"
 msgstr "戻る"
@@ -502,6 +493,7 @@ msgstr "ベースURL"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/UpdatesSection.tsx
+#: src/updater/update-notifications.ts
 msgid "settings.updates.beta"
 msgstr "ベータ"
 
@@ -524,6 +516,11 @@ msgstr "ブランドキット"
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.tab_brand_kits"
 msgstr "ブランドキット"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.browse_providers"
+msgstr "プロバイダーを参照"
 
 #. js-lingui-explicit-id
 #: src/components/library/GlobalLibraryView.tsx
@@ -611,6 +608,11 @@ msgid "settings.updates.check_now"
 msgstr "今すぐ確認"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.ai_setup_checking"
+msgstr "AI の設定を確認しています"
+
+#. js-lingui-explicit-id
 #: src/components/settings/sections/UpdatesSection.tsx
 msgid "settings.updates.checking"
 msgstr "更新を確認中..."
@@ -646,6 +648,11 @@ msgid "workspace.human_loop_choose_direction"
 msgstr "方向を選択"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.ai_setup_connect_description"
+msgstr "プロバイダーを選択し、認証情報を検証してください。"
+
+#. js-lingui-explicit-id
 #: src/components/workspace/IntentWorkspace.tsx
 msgid "workspace.human_loop_instruction"
 msgstr "方向を1つ選んでください。必要に応じて下に補足を入力し、矢印を押して続行します。"
@@ -653,6 +660,11 @@ msgstr "方向を1つ選んでください。必要に応じて下に補足を�
 #. js-lingui-explicit-id
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.clear_selection"
+msgstr "クリア"
+
+#. js-lingui-explicit-id
+#: src/components/home/SidebarAccount.tsx
+msgid "home.notifications_clear"
 msgstr "クリア"
 
 #. js-lingui-explicit-id
@@ -749,6 +761,21 @@ msgid "settings.key_placeholder_replace"
 msgstr "設定済み — 入力すると置き換わります"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.configured_providers"
+msgstr "設定済みのプロバイダー"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.ai_setup_verification_description"
+msgstr "Cutout で使用するには、設定済みのプロバイダーを有効にして検証する必要があります。"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.configuring"
+msgstr "設定中"
+
+#. js-lingui-explicit-id
 #: src/components/library/KitLibraryInspector.tsx
 msgid "kit_library.audit_conflicts"
 msgstr "競合"
@@ -771,18 +798,8 @@ msgstr "プロバイダーを接続"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
-msgid "settings.connect_provider_with_capabilities"
-msgstr "これらの機能を備えたプロバイダーを接続"
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.connect_ai_capabilities"
-msgstr "AI機能を接続"
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.connect_ai_capabilities_description"
-msgstr "まず1つのプロバイダーを接続してください。接続後、Cutoutはテキスト、ビジョン、音声、コーディング、画像の各タスクを自動的にルーティングします。"
+msgid "settings.ai_setup_connect_title"
+msgstr "AI に接続して開始"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
@@ -901,10 +918,14 @@ msgid "home.create_from_brief"
 msgstr "ブリーフから作成"
 
 #. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
 #: src/components/settings/sections/SpeechSection.tsx
 msgid "settings.dimension_tts_description"
 msgstr "音声を生成します。"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.ai_setup_ready_description"
+msgstr "認証情報とカタログルートを設定しました。画像生成は最初の画像が実際に完成した時点で検証されます。"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/IntegrationsSection.tsx
@@ -948,6 +969,27 @@ msgid "settings.personalization.custom_requires_instructions"
 msgstr "カスタムパーソナリティを保存するには、先に指示が必要です。"
 
 #. js-lingui-explicit-id
+#. placeholder {0}: release.version
+#: src/updater/update-notifications.ts
+msgid "updates.notification.available_detail"
+msgstr "Cutout {0} が{channelLabel}チャンネルで利用可能です。"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.ai_setup_credentials_auto_description"
+msgstr "Cutout はこれらのローカル認証情報を自動的に検証して設定できます。"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.ai_setup_discovery_unavailable_description"
+msgstr "このデバイスで再利用可能な認証情報を確認できませんでした。再試行するか、プロバイダーを手動で接続してください。"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.ai_setup_configuration_unavailable_description"
+msgstr "現在の AI 設定を読み込めませんでした。再試行してください。"
+
+#. js-lingui-explicit-id
 #. placeholder {0}: state.preferences.channel
 #: src/components/settings/sections/UpdatesSection.tsx
 msgid "settings.updates.up_to_date"
@@ -956,7 +998,7 @@ msgstr "Cutout は {0} チャネルで最新です。"
 #. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
 msgid "settings.provider_source_keychain"
-msgstr "Cutout Keychain"
+msgstr "Cutout ローカル認証情報"
 
 #. js-lingui-explicit-id
 #: src/components/home/SidebarAccount.tsx
@@ -1047,14 +1089,14 @@ msgid "settings.integrations.desktop_not_installed"
 msgstr "デスクトッププロバイダーがインストールされていません。"
 
 #. js-lingui-explicit-id
-#: src/components/settings/sections/GeneralSection.tsx
-msgid "settings.developer_mode.title"
-msgstr "開発者モード"
-
-#. js-lingui-explicit-id
 #: src/components/settings/sections/RecoverySection.tsx
 msgid "settings.recovery.diagnostic_preview_aria"
 msgstr "診断バンドルのプレビュー"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/RecoverySection.tsx
+msgid "settings.recovery.advanced"
+msgstr "診断と復旧"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/SpeechSection.tsx
@@ -1080,16 +1122,6 @@ msgstr "切断"
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.discover_references"
 msgstr "参照を検出"
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.discovered_on_mac"
-msgstr "Discovered on this Mac"
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.discovered_providers"
-msgstr "Discovered providers"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/PersonalizationSection.tsx
@@ -1364,11 +1396,6 @@ msgid "settings.recovery.host_error"
 msgstr "ホストの復元を完了できませんでした。"
 
 #. js-lingui-explicit-id
-#: src/components/settings/sections/RecoverySection.tsx
-msgid "settings.recovery.host_status"
-msgstr "ホストの復元:"
-
-#. js-lingui-explicit-id
 #: src/components/library/TeamGovernancePanel.tsx
 msgid "team.host_required"
 msgstr "ホストが必要です"
@@ -1550,11 +1577,6 @@ msgid "home.local_projects"
 msgstr "ローカルプロジェクト"
 
 #. js-lingui-explicit-id
-#: src/components/settings/sections/RecoverySection.tsx
-msgid "settings.recovery.title"
-msgstr "ローカル復元"
-
-#. js-lingui-explicit-id
 #: src/components/library/TeamGovernancePanel.tsx
 msgid "team.local_review"
 msgstr "ローカルレビュー"
@@ -1585,9 +1607,19 @@ msgid "global_library.reference_locked"
 msgstr "ロック中"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.manage_providers"
+msgstr "プロバイダーを管理"
+
+#. js-lingui-explicit-id
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.kit_editor_description"
 msgstr "承認済みのコンテンツアドレス指定キット投影を管理します。"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.manual_model_bindings"
+msgstr "モデルの手動割り当て"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/PersonalizationSection.tsx
@@ -1635,15 +1667,15 @@ msgid "settings.model_or_blank_placeholder"
 msgstr "モデル(空欄で自動)"
 
 #. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.model_routing"
-msgstr "モデルルーティング"
-
-#. js-lingui-explicit-id
 #. placeholder {0}: project.name
 #: src/components/home/ProjectHome.tsx
 msgid "home.more_actions_named"
 msgstr "{0} のその他の操作"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.ai_setup_capabilities_title"
+msgstr "追加の AI 機能が必要です"
 
 #. js-lingui-explicit-id
 #: src/components/library/GlobalLibraryView.tsx
@@ -1731,11 +1763,6 @@ msgid "slices.empty_no_regions_title"
 msgstr "領域が見つかりません"
 
 #. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.no_reusable_credential"
-msgstr "No reusable credential"
-
-#. js-lingui-explicit-id
 #: src/components/slices/SliceGridEmpty.tsx
 msgid "slices.empty_no_regions_automatic_hint"
 msgstr "再利用可能な領域が見つかりませんでした。別の素材シートをお試しください。"
@@ -1779,6 +1806,22 @@ msgid "home.notifications"
 msgstr "通知"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/UpdatesSection.tsx
+msgid "settings.updates.system_notifications_aria"
+msgstr "Cutout がバックグラウンドのときに更新を通知する"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/UpdatesSection.tsx
+msgid "settings.updates.system_notifications_hint"
+msgstr "Cutout がバックグラウンドで更新を検出したときに通知します。"
+
+#. js-lingui-explicit-id
+#. placeholder {0}: notification.title
+#: src/components/home/SidebarAccount.tsx
+msgid "home.notification_open"
+msgstr "{0}を開く"
+
+#. js-lingui-explicit-id
 #: src/components/library/TeamGovernancePanel.tsx
 msgid "team.open_project_to_review"
 msgstr "レビューを開始するにはプロジェクトを開いてください。"
@@ -1807,6 +1850,11 @@ msgstr "フォールバックモデル(任意)"
 #: src/components/source/DropZone.tsx
 msgid "source.dropzone_hint"
 msgstr "またはクリックして参照 · PNG、JPEG、WebP"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.manual_model_bindings_description"
+msgstr "特定のタスクの自動ルーティングを上書きします。"
 
 #. js-lingui-explicit-id
 #: src/components/library/KitLibraryInspector.tsx
@@ -1997,6 +2045,11 @@ msgid "settings.provider_updated_toast"
 msgstr "プロバイダーを更新しました"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.advanced_ai_management_description"
+msgstr "プロバイダー、モデルの手動割り当て、SVG 書き出し。"
+
+#. js-lingui-explicit-id
 #: src/components/library/KitLibraryInspector.tsx
 msgid "kit_library.publish_new_version"
 msgstr "新しいバージョンを公開"
@@ -2077,6 +2130,11 @@ msgstr "レジストリデスクトップホストにはCutoutデスクトップ
 #: src/components/library/RegistryInstallPanel.tsx
 msgid "registry_install.section_aria"
 msgstr "レジストリのインストール"
+
+#. js-lingui-explicit-id
+#: src/components/home/SidebarAccount.tsx
+msgid "home.notification_remind_tomorrow"
+msgstr "明日通知"
 
 #. js-lingui-explicit-id
 #: src/components/settings/ProviderRow.tsx
@@ -2198,6 +2256,11 @@ msgid "home.restore"
 msgstr "復元"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.retry"
+msgstr "再試行"
+
+#. js-lingui-explicit-id
 #: src/components/settings/sections/PersonalizationSection.tsx
 msgid "settings.personalization.retry"
 msgstr "再試行"
@@ -2218,6 +2281,11 @@ msgid "home.retry"
 msgstr "再試行"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.ai_setup_credentials_found"
+msgstr "再利用可能な認証情報が見つかりました"
+
+#. js-lingui-explicit-id
 #: src/components/settings/sections/PersonalizationSection.tsx
 msgid "settings.personalization.use_memory_desc"
 msgstr "承認済みの設定を今後のセッションで再利用します。"
@@ -2236,6 +2304,11 @@ msgstr "レビューブランチ"
 #: src/components/library/ReviewBranchEditor.tsx
 msgid "review_branch.comment_aria"
 msgstr "レビューコメント"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.ai_setup_checking_description"
+msgstr "設定済みのプロバイダーと、このデバイスで再利用可能な認証情報を確認しています。"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/IntegrationsSection.tsx
@@ -2321,6 +2394,11 @@ msgid "settings.integrations.expired"
 msgstr "セッションの期限が切れました。更新するか再接続してください。"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.setup_automatically"
+msgstr "自動的に設定"
+
+#. js-lingui-explicit-id
 #: src/components/home/SidebarAccount.tsx
 #: src/components/settings/SettingsDialog.tsx
 msgid "settings.menu_label"
@@ -2351,11 +2429,6 @@ msgstr "ショートカット"
 #: src/components/settings/VectorizerPanel.tsx
 msgid "settings.key_show"
 msgstr "表示"
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/GeneralSection.tsx
-msgid "settings.developer_mode.hint"
-msgstr "プロジェクト内に読み取り専用の DAG、Design IR、レシート監査ツールを表示します。"
 
 #. js-lingui-explicit-id
 #: src/components/inspector/SliceDimensions.tsx
@@ -2416,7 +2489,6 @@ msgid "settings.speech.shortcut_aria"
 msgstr "音声ショートカット"
 
 #. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
 #: src/components/settings/sections/SpeechSection.tsx
 msgid "settings.dimension_asr_label"
 msgstr "音声認識"
@@ -2428,6 +2500,7 @@ msgstr "音声出力"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/UpdatesSection.tsx
+#: src/updater/update-notifications.ts
 msgid "settings.updates.stable"
 msgstr "安定版"
 
@@ -2474,6 +2547,16 @@ msgid "home.theme_system"
 msgstr "システム"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/UpdatesSection.tsx
+msgid "settings.updates.system_notifications"
+msgstr "システム通知"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/UpdatesSection.tsx
+msgid "settings.updates.system_notifications_denied"
+msgstr "権限が付与されなかったため、システム通知はオフのままです。"
+
+#. js-lingui-explicit-id
 #: src/components/topbar/TabsMenu.tsx
 msgid "topbar.tabs_in_window"
 msgstr "このウィンドウのタブ"
@@ -2504,7 +2587,6 @@ msgid "vectorizer.mode_test"
 msgstr "テスト"
 
 #. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
 #: src/components/settings/sections/SpeechSection.tsx
 msgid "settings.dimension_tts_label"
 msgstr "音声合成"
@@ -2588,10 +2670,14 @@ msgid "settings.personalization.tool_memory_enabled_toast"
 msgstr "ツール支援メモリを有効にしました"
 
 #. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
 #: src/components/settings/sections/SpeechSection.tsx
 msgid "settings.dimension_asr_description"
 msgstr "音声を文字に書き起こします。"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/RecoverySection.tsx
+msgid "settings.recovery.title"
+msgstr "トラブルシューティング"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/SpeechSection.tsx
@@ -2664,6 +2750,11 @@ msgstr "サポートされていないファイル: {name}"
 #: src/components/source/SourceMeta.tsx
 msgid "source.meta_untitled"
 msgstr "無題"
+
+#. js-lingui-explicit-id
+#: src/updater/update-notifications.ts
+msgid "updates.notification.available_title"
+msgstr "アップデートがあります"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/UpdatesSection.tsx
@@ -2767,6 +2858,11 @@ msgstr "検証済みのローカルプレビュー、来歴、機能に応じた
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.verifying_component_blobs"
 msgstr "コンポーネントのソースBlobを検証中…"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.ai_setup_configuring_description"
+msgstr "ローカル認証情報を検証し、必要なモデルルートを設定しています。"
 
 #. js-lingui-explicit-id
 #: src/components/library/GlobalLibraryView.tsx
@@ -2873,3 +2969,8 @@ msgstr "開いているタブと最近閉じたタブがここに表示されま
 #: src/components/home/ProjectHome.tsx
 msgid "home.your_projects"
 msgstr "あなたのプロジェクト"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.ai_setup_capabilities_description"
+msgstr "検証済みのプロバイダーでは、必要なすべてのタスクをまだ満たしていません。"

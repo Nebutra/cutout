@@ -23,6 +23,8 @@ export async function publishToolCutoutProduction(input: {
   readonly runId: string
   readonly outputs: readonly ToolCutoutArtifact[]
   readonly cutoutParams: CutoutParams
+  readonly maskArtifactId?: string
+  readonly providerRoute?: string
   readonly createdAt?: number
 }): Promise<AssetProductionSnapshot> {
   if (input.outputs.length === 0) {
@@ -60,9 +62,10 @@ export async function publishToolCutoutProduction(input: {
           artifact: output.artifact,
           evidence: {
             sourceArtifactId: input.sourceArtifactId,
+            maskArtifactId: input.maskArtifactId,
             bounds: output.box,
             cutoutParams: input.cutoutParams,
-            providerRoute: 'local/cutout-v1',
+            providerRoute: input.providerRoute ?? 'local/cutout-v1',
           },
         }
       },

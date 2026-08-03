@@ -1,0 +1,7 @@
+{"file":".trellis/spec/frontend/prototype-generation.md","reason":"Verify only the promoted visual reference and validated DESIGN.md reach page generation and Asset Production remains suite-complete."}
+{"file":".trellis/spec/frontend/state-management.md","reason":"Verify old singular workspaces normalize once, candidate selection persists, and UI consumers do not fork recovery logic."}
+{"file":".trellis/spec/frontend/agent-control-safety.md","reason":"Verify candidate counts and cost are previewed, paid calls retain real approval/receipt boundaries, stale selection fails closed, and no unsupported external provider claim is added."}
+{"file":".trellis/spec/frontend/paid-tool-prompt-contract.md","reason":"Verify every planned direction is deliberate and traceable while user constraints and reference identity remain intact."}
+{"file":".trellis/spec/frontend/cutout-pipeline.md","reason":"Verify selection replacement after dependent output requires explicit invalidation/regeneration and never mixes source revisions."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Verify focused unit/E2E coverage, readable implementation, error handling, and repository quality gates."}
+{"file":".trellis/tasks/07-23-design-system-variants/design.md","reason":"Check implementation against the complete consumption map, candidate contract, promotion/token model, UX, compatibility, failure matrix, and rollback constraints."}

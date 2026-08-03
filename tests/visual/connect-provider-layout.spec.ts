@@ -7,7 +7,8 @@ async function open(page: Page) {
   await page.getByRole("menuitem", { name: /Settings|设置/ }).click();
   if (target) await page.setViewportSize(target);
   await page.getByText("AI", { exact: true }).click();
-  await page.getByRole("button", { name: "Connect provider" }).click();
+  await page.getByText("Advanced AI management", { exact: true }).click();
+  await page.getByRole("button", { name: "Add provider" }).click();
 }
 test("Connect Provider remains bounded and every category is reachable", async ({
   page,
@@ -140,4 +141,45 @@ test("Custom endpoint exposes explicit protocol families without overflow", asyn
   expect(geometry.scrollWidth).toBeLessThanOrEqual(geometry.clientWidth);
   expect(geometry.right).toBeLessThanOrEqual(geometry.viewport);
   await expect(dialog.getByRole("button", { name: "Check credentials and load models" })).toBeVisible();
+});
+
+test("API key visibility toggle stays vertically stable while pressed", async ({
+  page,
+}) => {
+  await open(page);
+  const dialog = page.getByRole("dialog");
+  const tabs = dialog.getByRole("tablist", { name: "Provider categories" });
+  if (await tabs.isVisible()) {
+    await tabs.getByRole("tab", { name: "Custom", exact: true }).click();
+  } else {
+    await dialog
+      .getByRole("combobox", { name: "Provider categories" })
+      .selectOption("custom");
+  }
+  const custom = dialog
+    .getByRole("button")
+    .filter({ hasText: "Custom endpoint" });
+  await custom.scrollIntoViewIfNeeded();
+  await custom.click();
+
+  const toggle = dialog.getByRole("button", { name: "Show", exact: true });
+  await expect(toggle).toBeVisible();
+  const before = await toggle.boundingBox();
+  expect(before).not.toBeNull();
+
+  await page.mouse.move(
+    before!.x + before!.width / 2,
+    before!.y + before!.height / 2,
+  );
+  await page.mouse.down();
+  const pressed = await toggle.boundingBox();
+  expect(pressed).not.toBeNull();
+  expect(pressed!.y).toBeCloseTo(before!.y, 3);
+  await page.mouse.up();
+
+  const revealed = dialog.getByRole("button", { name: "Hide", exact: true });
+  await expect(revealed).toBeVisible();
+  const after = await revealed.boundingBox();
+  expect(after).not.toBeNull();
+  expect(after!.y).toBeCloseTo(before!.y, 3);
 });

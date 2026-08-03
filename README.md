@@ -20,16 +20,19 @@ They consume the same `.cutout` state. They do not control each other through GU
 
 ## Install the macOS app
 
-Download the Apple Silicon DMG from [Cutout v0.1.3](https://github.com/Nebutra/cutout/releases/tag/v0.1.3), then drag Cutout into Applications.
+Download the Apple Silicon DMG from [Cutout v0.1.15](https://github.com/Nebutra/cutout/releases/tag/v0.1.15), then drag Cutout into Applications.
 
 The public macOS build is Developer ID signed, Apple notarized, and stapled before publication.
+
+See the [code signing policy](docs/CODE_SIGNING_POLICY.md) for the macOS,
+Windows, updater-signature, reviewer, and privacy release gates.
 
 ## Install the Codex plugin
 
 Use Codex CLI `0.144.5` or a compatible plugin-enabled version.
 
 ```bash
-codex plugin marketplace add Nebutra/cutout --ref v0.1.3
+codex plugin marketplace add Nebutra/cutout --ref v0.1.15
 codex plugin add cutout@cutout-local
 codex plugin list
 ```
@@ -37,7 +40,7 @@ codex plugin list
 `codex plugin list` should show:
 
 ```text
-cutout@cutout-local  installed, enabled  0.1.3
+cutout@cutout-local  installed, enabled  0.1.15
 ```
 
 Codex captures plugin Skills and MCP tools when a conversation starts. Open a new conversation after installing or updating the plugin.
@@ -168,4 +171,4 @@ pnpm tauri build         # desktop package
 
 Stack: Tauri 2, React 19, Vite 8, TypeScript, Tailwind v4, and shadcn/ui.
 
-Read more: [Codex plugin](docs/CODEX_PLUGIN.md) · [Agent integration](docs/AGENT_INTEGRATION.md) · [Headless Agent Control](docs/HEADLESS_AGENT_CONTROL.md) · [AI Native](docs/AI_NATIVE.md)
+Read more: [Codex plugin](docs/CODEX_PLUGIN.md) · [Agent integration](docs/AGENT_INTEGRATION.md) · [Headless Agent Control](docs/HEADLESS_AGENT_CONTROL.md)

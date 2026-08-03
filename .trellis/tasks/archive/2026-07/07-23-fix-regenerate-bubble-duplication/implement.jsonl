@@ -1,0 +1,3 @@
+{"file": ".trellis/spec/frontend/state-management.md", "reason": "Persisted event facts and UI-derived state must remain separate projections."}
+{"file": ".trellis/spec/frontend/agent-control-safety.md", "reason": "Agent run events remain authoritative audit evidence while chat is a derived surface."}
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "Frontend regression and repository quality requirements."}

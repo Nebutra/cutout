@@ -82,6 +82,7 @@ export const useStore = create<Store>()((set, get, api) => ({
       source: input.source
         ? {
             bitmap: input.source.bitmap,
+            encodedImage: input.source.encodedImage ?? null,
             name: input.source.name,
             width: input.source.bitmap.width,
             height: input.source.bitmap.height,

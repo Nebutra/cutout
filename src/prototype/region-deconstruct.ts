@@ -252,6 +252,8 @@ export interface RegionBreakdownParams {
   /** Design-system + sibling-page bytes that anchor style across region boards. */
   readonly referenceImages?: readonly Uint8Array[]
   readonly image: ModelAssignment
+  /** Exact model evidence intersected with an implemented edit adapter. */
+  readonly editSupported?: boolean
   readonly signal?: AbortSignal
   /** Streamed once per region as its slices are cut, so the UI fills in live. */
   readonly onRegionSliced: (
@@ -274,7 +276,7 @@ export interface RegionBreakdownParams {
   readonly onRegionError?: (regionId: string, message: string) => void
   /** Retry only these failed regions. Omit for a complete page breakdown. */
   readonly targetRegionIds?: readonly string[]
-  /** Paid QA re-rolls per region board (only with `deps.reviewBoard`). Default 2. */
+  /** Explicit paid QA retries per region board (only with `deps.reviewBoard`). Default 0. */
   readonly qaMaxRetries?: number
   /** Maximum region boards generated at once. Defaults to 2. */
   readonly regionConcurrency?: number
@@ -288,6 +290,8 @@ export interface RegionBreakdownParams {
   readonly onTextFreeSourceError?: (message: string) => void
   /** Streamed once per QA attempt: regionId, attempt number, and its verdict. */
   readonly onRegionQa?: (regionId: string, attempt: number, verdict: QaVerdict) => void
+  /** Records one paid generation attempt for this exact logical board node. */
+  readonly onRegionGenerationAttempt?: (regionId: string) => void
 }
 
 export interface RegionSliceEvidence {
@@ -319,9 +323,7 @@ export async function runRegionBreakdown(
   const regions = selectBoardCutoutRegions(params.page).filter(
     (region) => !targets || targets.has(region.id),
   )
-  const configs = await deps.providers.list()
-  const kind = configs.find((provider) => provider.id === params.image.providerId)?.kind
-  const useEdit = kind === 'openai' || kind === 'openai-compatible'
+  const useEdit = params.editSupported === true
   const references = params.referenceImages ?? []
 
   // Optionally swap the board source for a text-free variant of the page so
@@ -382,6 +384,7 @@ export async function runRegionBreakdown(
         boardPrompt: string,
         signal?: AbortSignal,
       ): Promise<Uint8Array> => {
+        params.onRegionGenerationAttempt?.(region.id)
         const board = useEdit
           ? await deps.generation.editImage({
               providerId: params.image.providerId,
@@ -428,13 +431,23 @@ export async function runRegionBreakdown(
       } else {
         boardBytes = await generateBoard(prompt, params.signal)
       }
-      const bitmap = await deps.decode(boardBytes)
+      let bitmap: ImageBitmap
+      try {
+        bitmap = await deps.decode(boardBytes)
+      } catch (error) {
+        throw new Error(
+          `Board decode failed: ${error instanceof Error ? error.message : String(error)}`,
+        )
+      }
       const boardWidth = bitmap.width
       const boardHeight = bitmap.height
       let slices: SliceInput[]
       try {
         const sliced = await deps.slice(bitmap, region.id, params.page.id, params.signal)
         slices = sliced.slices
+        if (slices.length === 0) {
+          throw new Error('Board slicing produced zero candidates.')
+        }
         diagnosticsByRegion[region.id] = sliced.diagnostics
         params.onRegionDiagnostics?.(region.id, sliced.diagnostics)
       } finally {

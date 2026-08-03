@@ -50,8 +50,17 @@ function harness(
 ) {
   const batches: AgentRunEvent[][] = [];
   const execute = vi.fn(
-    async (execution) =>
-      result ?? {
+    async (execution) => {
+      execution.onStarted?.({
+        eventId: `event:${execution.requestId}:tool-started`,
+        runId: execution.runId,
+        at: 2,
+        type: "tool-started",
+        toolCallId: execution.toolCallId,
+        tool: execution.request.capability,
+        label: execution.label,
+      });
+      return result ?? {
         ok: true as const,
         receipt: {
           receiptId: "receipt",
@@ -66,7 +75,8 @@ function harness(
           completedAt: 3,
         },
         events: [],
-      },
+      };
+    },
   );
   const executor: ToolExecutor = {
     capabilities: async () => [capability],
@@ -135,9 +145,57 @@ describe("desktop tool loop", () => {
     ]);
     await h.loop.approve("tool", "request");
     expect(h.execute).toHaveBeenCalledOnce();
+    expect(h.batches.flat().map((event) => event.type)).toContain("tool-started");
     expect(h.batches.flat().map((e) => e.type)).toContain(
       "tool-receipt-recorded",
     );
+  });
+
+  it("publishes execution start only after approval and before the executor settles", async () => {
+    let settle!: (value: Awaited<ReturnType<ToolExecutor["execute"]>>) => void;
+    const pending = new Promise<Awaited<ReturnType<ToolExecutor["execute"]>>>((resolve) => {
+      settle = resolve;
+    });
+    const h = harness();
+    h.execute.mockImplementation(async (execution) => {
+      execution.onStarted?.({
+        eventId: `event:${execution.requestId}:tool-started`,
+        runId: execution.runId,
+        at: 2,
+        type: "tool-started",
+        toolCallId: execution.toolCallId,
+        tool: execution.request.capability,
+        label: execution.label,
+      });
+      return pending;
+    });
+
+    await h.loop.request(input({ request: { ...input().request, approvalPolicy: "explicit" } }));
+    expect(h.batches.flat().map((event) => event.type)).toEqual(["tool-approval-requested"]);
+
+    const approval = h.loop.approve("tool", "request");
+    await vi.waitFor(() => expect(h.batches.flat().map((event) => event.type)).toEqual([
+      "tool-approval-requested",
+      "tool-approved",
+      "tool-started",
+    ]));
+    settle({
+      ok: true,
+      receipt: {
+        receiptId: "receipt",
+        requestId: "request",
+        capability: "generate-image",
+        providerId: "p",
+        model: "m",
+        status: "succeeded",
+        charged: { currency: "USD", amount: 0.08 },
+        outputArtifactIds: ["artifact"],
+        startedAt: 2,
+        completedAt: 3,
+      },
+      events: [],
+    });
+    await approval;
   });
 
   it("auto approves within budget and is idempotent by request id", async () => {
@@ -148,9 +206,36 @@ describe("desktop tool loop", () => {
     expect(h.batches.flat().map((e) => e.type)).toEqual([
       "tool-approval-requested",
       "tool-approved",
+      "tool-started",
       "tool-succeeded",
       "tool-receipt-recorded",
     ]);
+  });
+
+  it("fails a colliding tool call without replacing the pending request", async () => {
+    const h = harness();
+    const explicit = {
+      ...input().request,
+      approvalPolicy: "explicit" as const,
+    };
+    await h.loop.request(input({ request: explicit }));
+    await h.loop.request(input({ requestId: "request-2", request: explicit }));
+
+    await expect(h.loop.settled("tool", "request-2")).resolves.toMatchObject({
+      ok: false,
+      error: "The tool call is unavailable.",
+    });
+    expect(h.batches.flat()).toContainEqual(expect.objectContaining({
+      type: "tool-failed",
+      detail: "Tool call tool is already bound to another request.",
+    }));
+
+    await h.loop.approve("tool", "request");
+    await expect(h.loop.settled("tool", "request")).resolves.toMatchObject({
+      ok: true,
+      receipt: { requestId: "request" },
+    });
+    expect(h.execute).toHaveBeenCalledOnce();
   });
 
   it('does not execute or charge again after a durable successful request', async () => {
@@ -206,6 +291,35 @@ describe("desktop tool loop", () => {
     resolve(undefined as never);
   });
 
+  it("propagates the owning run signal through approval and execution", async () => {
+    const waitingController = new AbortController();
+    const waiting = harness();
+    await waiting.loop.request(input({
+      signal: waitingController.signal,
+      request: { ...input().request, approvalPolicy: "explicit" },
+    }));
+    waitingController.abort();
+    await expect(waiting.loop.settled("tool", "request")).resolves.toMatchObject({
+      ok: false,
+      error: "Cancelled by user.",
+    });
+    expect(waiting.execute).not.toHaveBeenCalled();
+
+    const runningController = new AbortController();
+    const running = harness();
+    running.execute.mockImplementation(async (execution) => {
+      await new Promise<void>((resolve) =>
+        execution.signal?.addEventListener("abort", () => resolve(), { once: true }),
+      );
+      return { ok: false, error: "cancelled", events: [] };
+    });
+    const run = running.loop.request(input({ signal: runningController.signal }));
+    await vi.waitFor(() => expect(running.execute).toHaveBeenCalledOnce());
+    runningController.abort();
+    await run;
+    expect(running.execute.mock.calls[0]?.[0].signal?.aborted).toBe(true);
+  });
+
   it("records failure, retries with a new linked id, and rejects stale revisions", async () => {
     const failed = {
       ok: false as const,
@@ -219,6 +333,7 @@ describe("desktop tool loop", () => {
     );
     const retryId = await h.loop.retry("tool", "request");
     expect(retryId).toBe("retry-1");
+    expect(h.execute).toHaveBeenCalledTimes(2);
     expect(
       h.batches.flat().find((e) => e.type === "tool-retry-linked"),
     ).toMatchObject({ previousRequestId: "request", requestId: "retry-1" });

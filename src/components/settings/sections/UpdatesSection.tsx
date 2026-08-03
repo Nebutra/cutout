@@ -8,6 +8,7 @@ import {
   type DesktopUpdateController,
 } from "@/updater/service";
 import type { UpdateState } from "@/updater";
+import { startUpdateAutoCheckScheduler } from "@/updater/auto-check-scheduler";
 
 export function UpdatesSection(props: {
   readonly prepareRecoverySnapshot: () => Promise<boolean>;
@@ -23,16 +24,29 @@ export function UpdatesSection(props: {
     [props.controller, props.prepareRecoverySnapshot],
   );
   const [state, setState] = useState<UpdateState>(() => controller.getState());
+  const [systemNotifications, setSystemNotifications] = useState(
+    () => controller.getSystemNotificationsEnabled(),
+  );
+  const [requestingNotificationPermission, setRequestingNotificationPermission] =
+    useState(false);
+  const [notificationPermissionDenied, setNotificationPermissionDenied] =
+    useState(false);
   useEffect(() => {
-    let timer: number | undefined;
+    let disposed = false;
+    let stopAutoCheckScheduler: (() => void) | undefined;
     const unsubscribe = controller.subscribe(setState);
-    if (!props.controller)
+    const unsubscribeSystemNotifications =
+      controller.subscribeSystemNotifications(setSystemNotifications);
+    if (!props.controller) {
       void controller.initialize().then(() => {
-        timer = window.setTimeout(() => void controller.autoCheck(true), 8_000);
+        if (!disposed) stopAutoCheckScheduler = startUpdateAutoCheckScheduler(controller);
       });
+    }
     return () => {
+      disposed = true;
       unsubscribe();
-      if (timer !== undefined) window.clearTimeout(timer);
+      unsubscribeSystemNotifications();
+      stopAutoCheckScheduler?.();
     };
   }, [controller, props.controller]);
   const busy =
@@ -45,6 +59,12 @@ export function UpdatesSection(props: {
   const visibleChannels = (["stable", "beta"] as const).filter(
     (channel) => state.capability?.channels[channel].available,
   );
+  const setSystemNotificationPreference = async (enabled: boolean) => {
+    setRequestingNotificationPermission(true);
+    const applied = await controller.setSystemNotificationsEnabled(enabled);
+    setNotificationPermissionDenied(enabled && !applied);
+    setRequestingNotificationPermission(false);
+  };
 
   const statusText = (() => {
     if (state.phase === "loading")
@@ -148,6 +168,36 @@ export function UpdatesSection(props: {
           />
         </label>
       </div>
+      <div className="mt-3 flex items-start justify-between gap-3 border-t border-border pt-3">
+        <div>
+          <p className="text-xs font-medium">
+            <Trans id="settings.updates.system_notifications">
+              System notifications
+            </Trans>
+          </p>
+          <p className="mt-0.5 text-[11px] text-muted-foreground">
+            <Trans id="settings.updates.system_notifications_hint">
+              Notify when an update is found while Cutout is in the background.
+            </Trans>
+          </p>
+        </div>
+        <Switch
+          aria-label={t({
+            id: "settings.updates.system_notifications_aria",
+            message: "Notify me about updates while Cutout is in the background",
+          })}
+          checked={systemNotifications}
+          disabled={requestingNotificationPermission}
+          onCheckedChange={(enabled) => void setSystemNotificationPreference(enabled)}
+        />
+      </div>
+      {notificationPermissionDenied ? (
+        <p role="status" className="mt-2 text-[11px] text-muted-foreground">
+          <Trans id="settings.updates.system_notifications_denied">
+            System notifications remain off because permission was not granted.
+          </Trans>
+        </p>
+      ) : null}
       <div
         role="status"
         aria-live="polite"

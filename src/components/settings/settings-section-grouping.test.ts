@@ -6,7 +6,7 @@ const source = (name: string) =>
   readFileSync(join(process.cwd(), "src/components/settings", name), "utf8");
 
 describe("settings section grouping", () => {
-  it("merges developer mode into General without mixing other controls", () => {
+  it("keeps General limited to theme and language", () => {
     const general = source("sections/GeneralSection.tsx");
     const ai = source("sections/AiSection.tsx");
     const support = source("sections/UpdatesSupportSection.tsx");
@@ -15,7 +15,7 @@ describe("settings section grouping", () => {
 
     expect(general).not.toMatch(/Paid actions|Local recovery/);
     expect(ai).toContain("ModelAssignments");
-    expect(general).toContain("settings.developer_mode.title");
+    expect(general).not.toContain("settings.developer_mode");
     expect(support).toContain("UpdatesSection");
     expect(support).toContain("RecoverySection");
     expect(sidebar).not.toMatch(/section_advanced|'advanced'/);

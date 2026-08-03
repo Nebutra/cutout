@@ -31,3 +31,44 @@ export async function forEachConcurrent<T>(
   await Promise.all(Array.from({ length: limit }, () => worker()))
   if (failed) throw failure
 }
+
+export type AsyncLimiter = <T>(run: () => Promise<T>) => Promise<T>
+
+/**
+ * Create a reusable bounded lane for promise-producing work.
+ *
+ * A released slot transfers directly to the oldest waiter before new callers
+ * can claim it, so queued work cannot be starved or briefly exceed the limit.
+ */
+export function createAsyncLimiter(concurrency: number): AsyncLimiter {
+  const requested = Number.isFinite(concurrency) ? Math.floor(concurrency) : 1
+  const limit = Math.max(1, requested)
+  const waiters: Array<() => void> = []
+  let active = 0
+
+  const acquire = async (): Promise<void> => {
+    if (active < limit) {
+      active += 1
+      return
+    }
+    await new Promise<void>((resolve) => waiters.push(resolve))
+  }
+
+  const release = (): void => {
+    const next = waiters.shift()
+    if (next) {
+      next()
+      return
+    }
+    active -= 1
+  }
+
+  return async <T>(run: () => Promise<T>): Promise<T> => {
+    await acquire()
+    try {
+      return await run()
+    } finally {
+      release()
+    }
+  }
+}

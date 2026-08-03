@@ -1,0 +1,7 @@
+{
+  "identifier": "com.nebutra.cutout.packaged-e2e",
+  "bundle": {
+    "targets": ["app"],
+    "createUpdaterArtifacts": false
+  }
+}

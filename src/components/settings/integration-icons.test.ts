@@ -64,7 +64,7 @@ describe('IntegrationIcon', () => {
   it('vertically centers SVG, image, and generic icon boxes consistently', () => {
     for (const [id, name] of [
       ['cutout.figma', 'Figma'],
-      ['cutout.pencil', 'Pencil'],
+      ['cutout.pen', 'Pen'],
       ['cutout.repository', 'Repository'],
     ] as const) {
       const html = renderToStaticMarkup(
@@ -76,11 +76,11 @@ describe('IntegrationIcon', () => {
     }
   })
 
-  it('renders official locally bundled Pencil and Paper artwork', () => {
+  it('renders official locally bundled Pen and Paper artwork', () => {
     for (const [id, name, source, sourceUrl] of [
       [
-        'cutout.pencil',
-        'Pencil',
+        'cutout.pen',
+        'Pen',
         'pen.dev',
         'https://pen.dev/apple-touch-icon.png',
       ],

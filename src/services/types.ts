@@ -67,6 +67,31 @@ export interface CutoutService {
   run(input: CutoutRunInput): Promise<Result<CutoutResult>>
 }
 
+/* --- Foreground segmentation (Apple Vision on supported desktop hosts) --- */
+
+export interface ForegroundSegmentationCapabilities {
+  readonly available: boolean
+  readonly platform: string
+  readonly backend: 'apple-vision' | 'unavailable'
+  readonly reason: string | null
+}
+
+export interface ForegroundSegmentationResult {
+  readonly png: Blob
+  readonly width: number
+  readonly height: number
+  readonly instanceCount: number
+  readonly backend: 'apple-vision'
+}
+
+export interface ForegroundSegmentationService {
+  capabilities(): Promise<Result<ForegroundSegmentationCapabilities>>
+  segment(input: {
+    readonly bytes: Uint8Array
+    readonly signal?: AbortSignal
+  }): Promise<Result<ForegroundSegmentationResult>>
+}
+
 /* --- Asset repository (Tauri fs export + IndexedDB library now, HTTP later) --- */
 
 /** Where a library asset originated (drives filtering + provenance display). */
@@ -211,6 +236,7 @@ export interface SessionService {
 export interface ServiceRegistry {
   readonly session: SessionService
   readonly cutout: CutoutService
+  readonly foregroundSegmentation: ForegroundSegmentationService
   readonly assets: AssetRepository
   readonly bundles: BundleRepository
   readonly repositorySources: RepositorySourceService

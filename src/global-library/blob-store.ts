@@ -2,7 +2,7 @@ const DB = 'cutout-global-library'
 const VERSION = 2
 const STORE = 'content-blobs'
 const CATALOG = 'catalog'
-const SAFE_MEDIA = /^(?:image\/(?:png|jpeg|webp|gif)|video\/(?:mp4|webm)|application\/(?:json|pdf)|text\/(?:plain|css|markdown))$/i
+const SAFE_MEDIA = /^(?:image\/(?:png|jpeg|webp|gif|bmp)|video\/(?:mp4|webm)|application\/(?:json|pdf)|text\/(?:plain|css|markdown))$/i
 
 export interface LibraryBlobRecord { readonly sha256:string; readonly mediaType:string; readonly size:number; readonly bytes:Uint8Array; readonly createdAt:string; readonly lastAccessedAt:string }
 export interface LibraryBlobQuota { readonly maximumBytes:number; readonly usedBytes:number; readonly availableBytes:number }

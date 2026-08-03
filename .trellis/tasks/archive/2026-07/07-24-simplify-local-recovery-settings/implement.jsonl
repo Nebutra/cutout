@@ -1,0 +1,2 @@
+{"file": ".trellis/spec/frontend/component-guidelines.md", "reason": "Preserve accessible disclosure and button conventions in the settings UI."}
+{"file": ".trellis/spec/frontend/agent-control-safety.md", "reason": "Keep host recovery capability and authorization boundaries truthful while changing presentation."}
