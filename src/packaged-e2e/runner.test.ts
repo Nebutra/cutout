@@ -63,7 +63,7 @@ function completeOutcomeWorkspace(): HTMLElement {
       pageCount: routeCount,
       resourceAssetCount: resourceCounts[suiteIndex],
       artifactCount: resourceCounts[suiteIndex],
-      qualityReviewStatus: 'recorded',
+      qualityReviewStatus: 'passed',
       digests: {
         designSystemImage: digest,
         designMarkdown: digest,
@@ -79,6 +79,8 @@ function completeOutcomeWorkspace(): HTMLElement {
         resourceArtifacts: digest,
         provenance: digest,
         reviewDocument: digest,
+        pageReviews: digest,
+        resourceReviews: digest,
       },
     })),
   )
@@ -714,6 +716,8 @@ describe('packaged E2E outcome evidence', () => {
       'bindings',
       'resourcePack',
       'resourceArtifacts',
+      'pageReviews',
+      'resourceReviews',
     ]) {
       const workspace = completeOutcomeWorkspace()
       const suites = JSON.parse(workspace.dataset.packagedE2eDeliveryEvidence!) as Array<{

@@ -32,6 +32,7 @@ const bindingsRepository=createCapabilityBindingsRepository(store)
 export const loadCapabilityBindings=()=>bindingsRepository.load()
 export const setCapabilityBinding=(task:ModelTaskKind,assignment:ModelAssignment)=>bindingsRepository.set(task,assignment)
 export const clearCapabilityBinding=(task:ModelTaskKind)=>bindingsRepository.clear(task)
+export const setCapabilityDescriptors=async(descriptors:CapabilityBindings['descriptors'])=>bindingsRepository.write({...await bindingsRepository.load(),descriptors})
 
 /** Load the assignment table. Missing/invalid/unavailable → `{}`. */
 export async function loadAssignments(): Promise<ModelAssignments> {

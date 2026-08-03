@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { capabilityBindingsSchema } from '@/services/ai/model-capabilities'
+import {
+  capabilityBindingsSchema,
+  type ModelDescriptor,
+} from '@/services/ai/model-capabilities'
 import type { ProviderConfig } from '@/services/ai/provider-types'
 import type { ProviderVerification } from '@/services/ai/provider-verification'
 import { modelRoutingCoverage } from './model-routing-summary'
@@ -16,8 +19,25 @@ const provider = (
   ...overrides,
 })
 
-const bindings = (map: Record<string, { providerId: string; model: string }>) =>
-  capabilityBindingsSchema.parse({ version: 'model-assignments.v2', bindings: map })
+const bindings = (
+  map: Record<string, { providerId: string; model: string }>,
+  descriptors: readonly ModelDescriptor[] = [],
+) => capabilityBindingsSchema.parse({
+  version: 'model-assignments.v2',
+  bindings: map,
+  descriptors,
+})
+
+const imageDescriptor = (providerId: string, model: string): ModelDescriptor => ({
+  providerId,
+  model,
+  capabilities: ['image-generation', 'image-edit'],
+  source: 'verified-catalog',
+  evidence: [
+    { capability: 'image-generation', kind: 'verified', sourceId: 'test' },
+    { capability: 'image-edit', kind: 'verified', sourceId: 'test' },
+  ],
+})
 
 const verification = (models: readonly string[]): ProviderVerification => ({
   status: 'verified',
@@ -46,7 +66,7 @@ describe('model routing summary', () => {
       vision: { providerId: 'openai-compatible', model: 'chat-model' },
       'image-generation': { providerId: 'openai-compatible', model: 'image-model' },
       'image-edit': { providerId: 'openai-compatible', model: 'image-model' },
-    })
+    }, [imageDescriptor('openai-compatible', 'image-model')])
     const result = modelRoutingCoverage(
       [provider('openai-compatible')],
       routes,
@@ -79,6 +99,22 @@ describe('model routing summary', () => {
       'image-generation',
       'image-edit',
     ])
+  })
+
+  it('rejects authenticated catalog presence without exact image capability evidence', () => {
+    const routes = bindings({
+      'image-generation': { providerId: 'openai-compatible', model: 'image-model' },
+      'image-edit': { providerId: 'openai-compatible', model: 'image-model' },
+    })
+    const result = modelRoutingCoverage(
+      [provider('openai-compatible')],
+      routes,
+      { 'openai-compatible': verification(['image-model']) },
+    )
+    expect(result.missing.map((item) => item.task)).toEqual(expect.arrayContaining([
+      'image-generation',
+      'image-edit',
+    ]))
   })
 
   it('ignores bindings whose provider is disabled or absent', () => {

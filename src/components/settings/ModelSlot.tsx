@@ -1,18 +1,25 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { ChevronDown, CircleAlert, ShieldCheck } from 'lucide-react'
 import { Trans, useLingui } from '@lingui/react/macro'
-import { useProviders } from '@/hooks/queries/providers'
+import { useProviders, useProviderVerifications } from '@/hooks/queries/providers'
 import { useCapabilityBindings, useEndpointModels, useSetCapabilityBinding } from '@/hooks/queries/ai-settings'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import type { ModelDimension } from './model-dimensions'
 import { requiresVerifiedVision } from './model-dimensions'
+import {
+  assessImageRoute,
+  imageRoutePresentationStatus,
+  verifiedImageRouteDescriptor,
+} from '@/services/ai/image-route-assessment'
+import { providerVerificationIsVerified } from '@/services/ai/provider-verification'
 
 type ModelSlotProps = ModelDimension & { readonly advanced: boolean }
 
 export function ModelSlot({ task, label, description, advanced }: ModelSlotProps) {
   const { t } = useLingui()
   const providers = useProviders()
+  const providerVerifications = useProviderVerifications()
   const list = useMemo(() => providers.data ?? [], [providers.data])
   const bindings = useCapabilityBindings()
   const { mutateAsync: setCapabilityBinding } = useSetCapabilityBinding()
@@ -29,6 +36,23 @@ export function ModelSlot({ task, label, description, advanced }: ModelSlotProps
     [endpointModels.data, model],
   )
   const visionRequired = requiresVerifiedVision(task)
+  const imageCapability = task === 'image-generation' || task === 'image-edit' ? task : undefined
+  const selectedVerification = selected ? providerVerifications[selected.id] : undefined
+  const imageStatus = imageCapability && selected && model.trim()
+    ? imageRoutePresentationStatus(assessImageRoute({
+        assignment: { providerId: selected.id, model: model.trim() },
+        provider: selected,
+        descriptor: verifiedImageRouteDescriptor({
+          provider: selected,
+          assignment: { providerId: selected.id, model: model.trim() },
+          descriptors: bindings.data?.descriptors ?? [],
+          verifiedCatalogModels: endpointModels.data
+            ?? (providerVerificationIsVerified(selectedVerification, model.trim())
+              ? selectedVerification?.models ?? [selectedVerification!.model!]
+              : undefined),
+        }),
+      }), imageCapability)
+    : undefined
   const unavailable = list.length === 0
   const evidence = endpointModels.isSuccess
     ? t({ id: 'settings.models_discovered_from_endpoint', message: `${endpointModels.data.length} models discovered from endpoint` })
@@ -101,6 +125,20 @@ export function ModelSlot({ task, label, description, advanced }: ModelSlotProps
           {visionRequired && model ? (
             <p className="mt-2 rounded border border-amber-500/30 bg-amber-500/10 px-2 py-1.5 text-[11px] text-amber-700 dark:text-amber-300">
               <Trans id="settings.vision_capability_unverified">This assignment remains unavailable until image-input capability is verified by catalog evidence or a provider probe.</Trans>
+            </p>
+          ) : null}
+          {imageStatus ? (
+            <p
+              className="mt-2 rounded border border-border px-2 py-1.5 text-[11px] text-muted-foreground"
+              data-image-route-status={imageStatus}
+            >
+              {imageStatus === 'recommended'
+                ? t({ id: 'settings.image_route_recommended', message: 'Recommended for high fidelity' })
+                : imageStatus === 'supported'
+                  ? t({ id: 'settings.image_route_supported', message: 'Supported' })
+                  : imageStatus === 'adapter-required'
+                    ? t({ id: 'settings.image_route_adapter_required', message: 'Adapter required' })
+                    : t({ id: 'settings.image_route_evidence_required', message: 'Verified capability evidence required' })}
             </p>
           ) : null}
         </div>

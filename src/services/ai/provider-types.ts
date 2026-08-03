@@ -31,9 +31,15 @@ export function isOpenAIShapedProvider(kind: ProviderKind): boolean {
   ].includes(kind)
 }
 
-/** Provider kinds implemented by the native `/images/generations` and `/images/edits` bridge. */
-export function supportsOpenAIImageEndpoints(kind: ProviderKind | undefined): boolean {
-  return kind === 'openai' || kind === 'openai-compatible' || kind === 'cc-switch'
+/** Provider routes implemented by the native `/images/generations` and `/images/edits` bridge. */
+export function supportsOpenAIImageEndpoints(
+  provider: ProviderKind | Pick<ProviderConfig, 'kind' | 'wireProtocol'> | undefined,
+): boolean {
+  const kind = typeof provider === 'string' ? provider : provider?.kind
+  if (kind !== 'openai' && kind !== 'openai-compatible' && kind !== 'cc-switch') return false
+  if (!provider || typeof provider === 'string') return true
+  const protocol = effectiveProviderWireProtocol(provider)
+  return protocol === 'responses' || protocol === 'chat-completions'
 }
 
 /** Effective wire default for old records that predate the persisted field. */

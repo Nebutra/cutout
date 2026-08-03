@@ -2,6 +2,11 @@ import { z } from 'zod'
 import type { ModelAssignments } from '@/services/ai/model-assignment-types'
 import type { ModelAssignment } from '@/services/ai/model-assignment-types'
 import type { ProviderConfig } from '@/services/ai/provider-types'
+import type { CapabilityBindings, ModelDescriptor } from '@/services/ai/model-capabilities'
+import {
+  assessImageRoute,
+  exactImageRouteDescriptor,
+} from '@/services/ai/image-route-assessment'
 
 const CREDENTIAL_VALUE = /(?:\b(?:sk|rk|pk)-[A-Za-z0-9_-]{8,}\b|\bBearer\s+[A-Za-z0-9._~+/-]+\b)/i
 const safeText = z.string().refine((value) => !CREDENTIAL_VALUE.test(value), 'Credential-shaped values are not accepted.')
@@ -137,19 +142,40 @@ export function previewPaidToolReceiptDowngrade(input:unknown){const receipt=pai
 export function desktopPaidToolCapabilities(
   providers: readonly ProviderConfig[],
   assignments: ModelAssignments,
+  evidence: {
+    readonly descriptors?: readonly ModelDescriptor[]
+    readonly bindings?: CapabilityBindings['bindings']
+  } = {},
   estimates: Partial<Record<PaidToolCapability, MoneyEstimate>> = {},
 ): readonly PaidToolExecutorCapability[] {
-  const enabled = new Set(providers.filter((provider) => provider.enabled).map((provider) => provider.id))
-  const image = assignments.image
-  if (!image || !enabled.has(image.providerId)) return []
   const fallback = { currency: 'USD', amount: 0, credits: 0 }
-  return (['generate-image', 'edit-image'] as const).map((capability) => ({
-    capability,
-    providerId: image.providerId,
-    model: image.model,
-    available: true,
-    estimatedCost: estimates[capability] ?? fallback,
-  }))
+  const generation = evidence.bindings?.['image-generation'] ?? assignments.image
+  const edit = evidence.bindings?.['image-edit'] ?? generation
+  const routes = [
+    { capability: 'generate-image' as const, assignment: generation },
+    { capability: 'edit-image' as const, assignment: edit },
+  ]
+  return routes.flatMap(({ capability, assignment }) => {
+    if (!assignment) return []
+    const provider = providers.find((candidate) =>
+      candidate.id === assignment.providerId && candidate.enabled)
+    if (!provider) return []
+    const assessment = assessImageRoute({
+      assignment,
+      provider,
+      descriptor: exactImageRouteDescriptor(evidence.descriptors ?? [], assignment),
+    })
+    const supported = capability === 'edit-image'
+      ? assessment.edit.supported
+      : assessment.generation.supported
+    return supported ? [{
+      capability,
+      providerId: assignment.providerId,
+      model: assignment.model,
+      available: true,
+      estimatedCost: estimates[capability] ?? fallback,
+    }] : []
+  })
 }
 
 /** Projects a locked desktop composer route into a transport-neutral request. */

@@ -19,6 +19,10 @@ import type { CanvasAnnotation } from '@/components/workspace/canvas-annotations
 import type { CandidateSet } from '@/candidate-selection/contracts'
 import type { CodingReceipt } from '@/coding-runtime/contracts'
 import type { PrototypeAssetManifest } from '@/prototype/asset-manifest'
+import type {
+  PrototypePageReviewRecord,
+  PrototypeResourceReviewRecord,
+} from '@/prototype/review-evidence'
 
 export type WorkspaceWorkflowPhase =
   | 'idle'
@@ -55,6 +59,8 @@ export interface PersistedPrototypeDesignSystemCandidateSet {
 
 export interface PersistedPrototypePage extends PersistedPrototypeImage {
   readonly page: PrototypePage
+  /** Additive for workspace.v1 compatibility; historical pages omit review evidence. */
+  readonly review?: PrototypePageReviewRecord
 }
 
 export interface PersistedPrototypeSuiteDesignSystemBinding {
@@ -70,6 +76,8 @@ export interface PersistedPrototypeResourcePackAsset {
   readonly manifestItemId: string
   readonly artifactId: string
   readonly provenanceIds: readonly string[]
+  /** Additive for historical resource-pack bindings. */
+  readonly review?: PrototypeResourceReviewRecord
 }
 
 export interface PersistedPrototypeResourcePack {

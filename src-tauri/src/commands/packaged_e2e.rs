@@ -141,6 +141,8 @@ pub struct PackagedE2eDeliveryDigests {
     resource_artifacts: String,
     provenance: String,
     review_document: String,
+    page_reviews: String,
+    resource_reviews: String,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -348,7 +350,7 @@ fn validate_outcome(outcome: &PackagedE2eOutcome) -> Result<(), String> {
             || suite.route_count as usize != suite.routes.len()
             || suite.page_count as usize != suite.routes.len()
             || suite.artifact_count != suite.resource_asset_count
-            || suite.quality_review_status != "recorded"
+            || !matches!(suite.quality_review_status.as_str(), "passed" | "attention-required")
             || !valid_delivery_digests(&suite.digests)
         {
             return Err("packaged-e2e-outcome-invalid".into());
@@ -412,6 +414,8 @@ fn valid_delivery_digests(digests: &PackagedE2eDeliveryDigests) -> bool {
         &digests.resource_artifacts,
         &digests.provenance,
         &digests.review_document,
+        &digests.page_reviews,
+        &digests.resource_reviews,
     ]
     .into_iter()
     .all(|value| {
@@ -525,7 +529,9 @@ mod tests {
             resource_pack: digest.clone(),
             resource_artifacts: digest.clone(),
             provenance: digest.clone(),
-            review_document: digest,
+            review_document: digest.clone(),
+            page_reviews: digest.clone(),
+            resource_reviews: digest,
         }
     }
 
@@ -553,7 +559,7 @@ mod tests {
                         page_count: route_count,
                         resource_asset_count: resource_count,
                         artifact_count: resource_count,
-                        quality_review_status: "recorded".into(),
+                        quality_review_status: "passed".into(),
                         digests: valid_digests(),
                     },
                 )

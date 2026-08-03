@@ -471,9 +471,45 @@ import_provider_draft(app: AppHandle, input: ImportDraftInput) -> Result<Provide
   evidence must not call image generation usable until a real image completes.
 - Automatic setup prefers each authenticated Provider's checked default model
   for text/Coding instead of taking the first alphabetically sorted catalog
-  id. Image routing uses the first available product-preferred image model,
-  currently led by `gpt-image-2`, before falling back to another checked image
-  id.
+  id. Image routing intersects exact observed/verified model evidence with an
+  implemented Provider adapter. A task binding selects the exact route but is
+  not capability evidence. Automatic setup prefers a supported
+  high-fidelity-recommended route, including reviewed GPT Image / ChatGPT Image,
+  Muse Image, MAI Image 2.5, Gemini 3 Pro Image, Qwen Image 3.0, Seedream 5 Pro,
+  Reve 2.1, GPT Image 1.5 aliases, Gemini 3.1 Flash Image aliases, and strong
+  Grok Image families, then falls back to another supported
+  compatible route without changing its exact model id. Recommendation never
+  establishes support.
+- Reviewed image-model evidence is Provider-neutral. It records only the exact
+  model id, capability, source, and capture/version identity; it must not carry
+  an adapter family or Provider classification. An authenticated endpoint model
+  list proves only that the configured Provider exposes that exact id. Cutout
+  intersects these independent facts with the Provider adapter at route
+  assessment time. The reviewed 2026-07-25 Image Edit Arena roster may establish
+  `image-edit` evidence for an exact listed id, but its rank never establishes
+  transport support, generation capability, or a high-fidelity recommendation.
+- Manual Provider verification and automatic credential setup must project the
+  same reviewed exact-model evidence. A user who verifies and selects a listed
+  edit model must not remain permanently `evidence-required`; an unlisted
+  `/models` row remains capability-unknown until separate observed/verified
+  evidence exists.
+- `image-generation` and `image-edit` are independent task routes. Automatic
+  setup, desktop paid-tool capability projection, and prototype execution must
+  honor separate bindings when different exact models own those capabilities.
+  The legacy singular image assignment is only a fallback; it must not cause an
+  available edit route to be ignored or a generation-only route to be advertised
+  for editing.
+- Automatic nomination may recognize image-family ids such as `seedream-*` and
+  `reve-*`, while exact observed/verified descriptors may nominate models whose
+  ids contain no image keyword. Nomination is discovery only: exact route
+  evidence and an implemented adapter still decide support.
+- OpenAI-shaped image routes have implemented generation and edit adapters.
+  Google/Gemini routes have an implemented generation adapter but remain
+  `adapter-required` for generic image editing. DashScope/Qwen compatible-mode
+  routes remain `adapter-required` for both generation and editing until their
+  native request, response, authentication, and cancellation contracts are
+  implemented and tested. Provider kind, catalog presence, and model-name
+  heuristics alone never authorize an image call.
 - Automatic setup stops importing candidates as soon as the configured results
   cover every required task dimension. It must continue after a failed or
   partial candidate, but it must not probe unrelated credentials after a

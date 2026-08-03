@@ -34,7 +34,7 @@ export interface PackagedE2eSuiteOutcome extends PackagedE2eCandidateOutcome {
   readonly pageCount: number
   readonly resourceAssetCount: number
   readonly artifactCount: number
-  readonly qualityReviewStatus: 'recorded'
+  readonly qualityReviewStatus: 'passed' | 'attention-required'
   readonly digests: PackagedE2eDeliveryDigests
 }
 
@@ -53,6 +53,8 @@ export interface PackagedE2eDeliveryDigests {
   readonly resourceArtifacts: string
   readonly provenance: string
   readonly reviewDocument: string
+  readonly pageReviews: string
+  readonly resourceReviews: string
 }
 
 export interface PackagedE2eOutcome {
@@ -644,7 +646,7 @@ function readSuites(workspace: HTMLElement): readonly PackagedE2eSuiteOutcome[] 
       || !isOpaqueCandidateId(value.designSystemId, 'design')
       || !isOpaqueResourcePackId(value.resourcePackId)
       || value.status !== 'ready'
-      || value.qualityReviewStatus !== 'recorded'
+      || !['passed', 'attention-required'].includes(String(value.qualityReviewStatus))
       || typeof value.resourceAssetCount !== 'number'
       || !Number.isSafeInteger(value.resourceAssetCount)
       || typeof value.artifactCount !== 'number'
@@ -677,7 +679,7 @@ function readSuites(workspace: HTMLElement): readonly PackagedE2eSuiteOutcome[] 
       pageCount: value.pageCount,
       resourceAssetCount: value.resourceAssetCount,
       artifactCount: value.artifactCount,
-      qualityReviewStatus: 'recorded' as const,
+      qualityReviewStatus: value.qualityReviewStatus as 'passed' | 'attention-required',
       digests: value.digests,
     }
   })
@@ -740,6 +742,8 @@ function isDeliveryDigests(value: unknown): value is PackagedE2eDeliveryDigests 
     'resourceArtifacts',
     'provenance',
     'reviewDocument',
+    'pageReviews',
+    'resourceReviews',
   ] as const
   return isRecord(value)
     && hasOnlyKeys(value, keys)

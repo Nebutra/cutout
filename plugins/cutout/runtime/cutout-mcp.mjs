@@ -4071,6 +4071,16 @@ function record(keyType, valueType, params) {
 		...normalizeParams(params)
 	});
 }
+function partialRecord(keyType, valueType, params) {
+	const k = clone$1(keyType);
+	k._zod.values = void 0;
+	return new ZodRecord({
+		type: "record",
+		keyType: k,
+		valueType,
+		...normalizeParams(params)
+	});
+}
 var ZodEnum = /*@__PURE__*/ $constructor("ZodEnum", (inst, def) => {
 	$ZodEnum.init(inst, def);
 	ZodType.init(inst, def);
@@ -4290,6 +4300,226 @@ function refine(fn, _params = {}) {
 function superRefine(fn, params) {
 	return /* @__PURE__ */ _superRefine(fn, params);
 }
+//#endregion
+//#region src/services/ai/model-assignment-types.ts
+/**
+* Model assignment (design spec §5a) — which model serves each output modality.
+*
+* Two slots, bucketed by output modality: `chat` (text + reasoning + vision, one
+* multimodal model) and `image` (image generation). This is the concrete landing
+* table for prompt-management's `modality → (providerId, model)` resolution:
+* `text`/`vision` prompts resolve to `chat`, `image-generation` to `image`.
+*
+* Non-secret; persisted via `@tauri-apps/plugin-store` (see `model-assignment.local`).
+*/
+var modelAssignmentSchema = object({
+	providerId: string().min(1),
+	model: string().min(1),
+	fallbackModel: string().min(1).optional(),
+	effort: _enum([
+		"low",
+		"medium",
+		"high"
+	]).optional(),
+	reasoningProtocol: _enum([
+		"openai",
+		"anthropic",
+		"google"
+	]).optional()
+});
+object({
+	chat: modelAssignmentSchema.optional(),
+	image: modelAssignmentSchema.optional()
+});
+//#endregion
+//#region src/services/ai/model-capabilities.ts
+var modelCapabilitySchema = _enum([
+	"text",
+	"vision",
+	"reasoning",
+	"tools",
+	"web-search",
+	"image-generation",
+	"image-edit",
+	"asr",
+	"tts",
+	"video-generation",
+	"video-edit"
+]);
+var modelCatalogSourceSchema = _enum([
+	"provider",
+	"remote-catalog",
+	"verified-catalog",
+	"user-declared",
+	"legacy-migration"
+]);
+var modelCapabilityEvidenceSchema = object({
+	capability: modelCapabilitySchema,
+	sourceId: string().min(1),
+	kind: _enum([
+		"declared",
+		"observed",
+		"verified"
+	]),
+	capturedAt: string().datetime().optional(),
+	reference: string().url().optional()
+}).strict();
+var modelDescriptorSchema = object({
+	providerId: string().min(1),
+	model: string().min(1),
+	capabilities: array(modelCapabilitySchema).default([]),
+	source: modelCatalogSourceSchema,
+	evidence: array(modelCapabilityEvidenceSchema).default([]),
+	verifiedAt: string().datetime().optional(),
+	metadata: object({
+		contextWindow: number().int().positive().optional(),
+		inputMediaTypes: array(string().min(1)).default([]),
+		outputMediaTypes: array(string().min(1)).default([])
+	}).strict().optional()
+}).strict();
+var modelTaskKindSchema = _enum([
+	"text",
+	"vision",
+	"research",
+	"image-generation",
+	"image-edit",
+	"asr",
+	"tts",
+	"video-generation",
+	"video-edit",
+	"webdev",
+	"image-to-webdev"
+]);
+object({
+	version: literal("model-assignments.v2"),
+	bindings: partialRecord(modelTaskKindSchema, modelAssignmentSchema).default({}),
+	descriptors: array(modelDescriptorSchema).default([]),
+	legacy: object({
+		chat: modelAssignmentSchema.optional(),
+		image: modelAssignmentSchema.optional()
+	}).strict().optional()
+}).strict();
+object({
+	version: literal("model-catalog-cache.v1"),
+	generatedAt: string().datetime(),
+	expiresAt: string().datetime(),
+	descriptors: array(modelDescriptorSchema)
+}).strict();
+//#endregion
+//#region src/services/ai/provider-types.ts
+/**
+* BYOK provider model (spec §4) — the non-secret shape.
+*
+* A `ProviderConfig` is a user-configured connection. It is stored as plain JSON
+* in the app-config dir (via the Rust `load_providers`/`save_providers`
+* commands) and carries **no key**: the secret lives only in the OS keychain,
+* referenced by `id`. Gateway is modeled as "just a provider" (`kind:'gateway'`).
+*
+* Field casing is the on-the-wire shape the Rust `providers.rs` serde struct
+* uses (`#[serde(rename_all="camelCase")]`), so `baseUrl` here maps 1:1 to the
+* persisted JSON. (The AI SDK factory option is spelled `baseURL`; the mapping
+* happens in `generation-service.local.ts`.)
+*/
+var providerWireProtocolSchema = _enum([
+	"responses",
+	"chat-completions",
+	"anthropic-messages",
+	"google-generate-content"
+]);
+function isOpenAIShapedProvider(kind) {
+	return kind === "openai" || kind === "openai-compatible" || kind === "cc-switch" || [
+		"dashscope",
+		"deepseek",
+		"zhipu",
+		"moonshot",
+		"volcengine",
+		"siliconflow",
+		"openrouter",
+		"together",
+		"groq",
+		"fireworks",
+		"xai",
+		"mistral",
+		"ollama",
+		"vllm",
+		"lm-studio"
+	].includes(kind);
+}
+/** Effective wire default for old records that predate the persisted field. */
+function defaultProviderWireProtocol(kind) {
+	if (kind === "openai" || kind === "cc-switch") return "responses";
+	if (kind === "anthropic") return "anthropic-messages";
+	if (kind === "google") return "google-generate-content";
+	if (isOpenAIShapedProvider(kind)) return "chat-completions";
+}
+function supportedProviderWireProtocols(kind) {
+	if (kind === "openai" || kind === "cc-switch") return ["responses", "chat-completions"];
+	if (kind === "anthropic") return ["anthropic-messages"];
+	if (kind === "google") return ["google-generate-content"];
+	if (kind === "openai-compatible") return [
+		"responses",
+		"chat-completions",
+		"anthropic-messages",
+		"google-generate-content"
+	];
+	if (isOpenAIShapedProvider(kind)) return ["chat-completions"];
+	return [];
+}
+function isProviderWireProtocolSupported(kind, protocol) {
+	const supported = supportedProviderWireProtocols(kind);
+	return protocol === void 0 ? supported.length === 0 : supported.includes(protocol);
+}
+/** The ordered, user-selectable kinds (drives the Settings `Select`). */
+var PROVIDER_KINDS = [
+	"anthropic",
+	"openai",
+	"google",
+	"gateway",
+	"openai-compatible",
+	"cc-switch",
+	"dashscope",
+	"deepseek",
+	"zhipu",
+	"moonshot",
+	"volcengine",
+	"siliconflow",
+	"openrouter",
+	"together",
+	"groq",
+	"fireworks",
+	"xai",
+	"mistral",
+	"ollama",
+	"vllm",
+	"lm-studio"
+];
+var providerConfigFields = {
+	kind: string().min(1).max(120).regex(/^[a-z0-9][a-z0-9._-]*$/),
+	label: string().min(1),
+	baseUrl: string().min(1).optional(),
+	wireProtocol: providerWireProtocolSchema.optional(),
+	defaultModel: string().min(1),
+	enabled: boolean()
+};
+function unsupportedWireProtocolMessage(config) {
+	if (PROVIDER_KINDS.includes(config.kind) && !isProviderWireProtocolSupported(config.kind, config.wireProtocol ?? defaultProviderWireProtocol(config.kind))) return `${config.wireProtocol ?? "no wire protocol"} is not supported for ${config.kind}`;
+}
+function addWireProtocolIssue(config, context) {
+	const message = unsupportedWireProtocolMessage(config);
+	if (message) context.addIssue({
+		code: "custom",
+		path: ["wireProtocol"],
+		message
+	});
+}
+object({
+	id: string().min(1),
+	...providerConfigFields
+}).superRefine(addWireProtocolIssue);
+object({
+	id: string().min(1).optional(),
+	...providerConfigFields
+}).superRefine(addWireProtocolIssue);
 //#endregion
 //#region src/control-protocol/paid-tool-contract.ts
 var CREDENTIAL_VALUE = /(?:\b(?:sk|rk|pk)-[A-Za-z0-9_-]{8,}\b|\bBearer\s+[A-Za-z0-9._~+/-]+\b)/i;
@@ -4935,7 +5165,7 @@ function reachablePages(plan) {
 */
 var idSchema$2 = string().min(1).max(160);
 var isoDateTimeSchema = datetime({ offset: true });
-var sha256Schema$6 = string().regex(/^[a-f0-9]{64}$/i, "Expected a SHA-256 hex digest.");
+var sha256Schema$7 = string().regex(/^[a-f0-9]{64}$/i, "Expected a SHA-256 hex digest.");
 var designIrVersionSchema = literal("design-ir.v1");
 var designDocumentMetaSchema = object({
 	id: idSchema$2,
@@ -5016,7 +5246,7 @@ var contentReferenceSchema = object({
 	/** A URL, repo-relative path, or content-addressed URI. */
 	uri: string().min(1),
 	mediaType: string().min(1).optional(),
-	sha256: sha256Schema$6.optional(),
+	sha256: sha256Schema$7.optional(),
 	/** Intrinsic raster size; avoids re-decoding or manufacturing 0x0 on restore. */
 	pixelSize: object({
 		width: number().int().positive(),
@@ -5057,7 +5287,7 @@ var sourceIngestionSchema = object({
 			path: string().min(1).max(4e3),
 			bytes: number().int().nonnegative(),
 			mediaType: string().min(1).max(255).optional(),
-			sha256: sha256Schema$6.optional()
+			sha256: sha256Schema$7.optional()
 		}).strict()).max(1e4).optional()
 	}).strict()]).optional()
 }).strict();
@@ -5163,7 +5393,7 @@ var materialProductionEvidenceSchema = object({
 	pageId: idSchema$2,
 	regionId: idSchema$2,
 	artifactId: idSchema$2,
-	artifactSha256: sha256Schema$6,
+	artifactSha256: sha256Schema$7,
 	readiness: _enum([
 		"queued",
 		"generating",
@@ -5190,7 +5420,7 @@ var materialProductionEvidenceSchema = object({
 		projectRevisionId: idSchema$2,
 		designSystemArtifactId: idSchema$2.optional(),
 		pageArtifactId: idSchema$2.optional(),
-		pageArtifactSha256: sha256Schema$6.optional()
+		pageArtifactSha256: sha256Schema$7.optional()
 	}).strict(),
 	cutoutParams: object({
 		threshold: number(),
@@ -5213,7 +5443,7 @@ var materialProductionEvidenceSchema = object({
 	lineage: object({
 		previousRunId: idSchema$2,
 		previousTaskId: idSchema$2,
-		previousArtifactSha256: sha256Schema$6
+		previousArtifactSha256: sha256Schema$7
 	}).strict().optional(),
 	issues: array(object({
 		code: string().min(1).max(120),
@@ -12666,6 +12896,36 @@ var codingReceiptSchema = object({
 	detail: string().optional()
 }).strict();
 //#endregion
+//#region src/prototype/review-evidence.ts
+var sha256Schema$6 = string().regex(/^[a-f0-9]{64}$/);
+var routeSchema = object({
+	providerId: string().min(1).max(160),
+	model: string().min(1).max(300)
+}).strict();
+var prototypeReviewVerdictSchema = object({
+	pass: boolean(),
+	failures: array(string().min(1).max(2e3)),
+	unavailable: boolean().optional()
+}).strict();
+var prototypePageReviewRecordSchema = object({
+	version: literal("prototype-page-review.v1"),
+	artifactSha256: sha256Schema$6,
+	reviewer: routeSchema,
+	verdict: prototypeReviewVerdictSchema,
+	reviewedAt: string().datetime()
+}).strict();
+var prototypeResourceReviewRecordSchema = object({
+	version: literal("prototype-resource-review.v1"),
+	artifactId: string().min(1).max(240),
+	reviewer: routeSchema,
+	verdict: prototypeReviewVerdictSchema,
+	observationalIssues: array(object({
+		code: string().min(1).max(120),
+		message: string().min(1).max(2e3)
+	}).strict()),
+	reviewedAt: string().datetime()
+}).strict();
+//#endregion
 //#region src/prototype/design-system-validation.ts
 function designSystemMarkdownValidationError(designMarkdown) {
 	const markdown = designMarkdown.trim();
@@ -12696,7 +12956,8 @@ object({
 	plan: prototypePlanSchema,
 	pages: array(object({
 		pageId: string().min(1),
-		materialId: string().min(1)
+		materialId: string().min(1),
+		review: prototypePageReviewRecordSchema.optional()
 	}).strict()),
 	resourcePackMaterialId: string().min(1),
 	provenanceIds: array(string().min(1)).min(1),
@@ -12716,7 +12977,8 @@ object({
 	version: literal(RESOURCE_ASSET_MATERIAL_VERSION),
 	manifestItemId: string().min(1),
 	artifactId: string().min(1),
-	provenanceIds: array(string().min(1)).min(1)
+	provenanceIds: array(string().min(1)).min(1),
+	review: prototypeResourceReviewRecordSchema.optional()
 }).strict();
 //#endregion
 //#region src/design-ir/candidate-selection.ts

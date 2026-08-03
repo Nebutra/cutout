@@ -13,6 +13,7 @@ import { getStoreState } from '@/store'
 import { err, ok, type Result, type ServiceRegistry } from '@/services/types'
 import type { GenerateInput } from '@/services/ai/types'
 import type { ModelAssignments } from '@/services/ai/model-assignment-types'
+import { capabilityBindingsSchema } from '@/services/ai/model-capabilities'
 import type { PrototypePage, PrototypePlan } from '@/prototype/prototype-plan'
 import { compilePrototypeImageRequestBudget } from '@/prototype/production-throughput'
 import type { VisualGenerationTask } from '@/visual-generation'
@@ -22,6 +23,7 @@ import { installE2eLocalStorage } from './intent-workspace.e2e.testkit'
 const PROVIDER_ID = 'provider:e2e'
 const CHAT_MODEL = 'chat-e2e'
 const IMAGE_MODEL = 'image-e2e'
+const EDIT_MODEL = 'flux-2-max'
 
 const desktopHarness = vi.hoisted(() => ({
   artifacts: new Map<string, { bytes: Uint8Array; mediaType: string }>(),
@@ -31,7 +33,9 @@ const desktopHarness = vi.hoisted(() => ({
   imageToolCallIds: [] as string[],
   imageToolSignals: [] as Array<AbortSignal | undefined>,
   imageToolReferenceCounts: [] as number[],
+  imageToolModels: [] as string[],
   imageToolFailure: null as null | ((toolCallId: string) => Error | null),
+  imageToolWait: null as null | ((toolCallId: string) => Promise<void>),
   boardPrompts: [] as string[],
   boardFailure: null as null | ((prompt: string) => Error | null),
   activeBoardCalls: 0,
@@ -60,6 +64,35 @@ function persistArtifact(bytes: Uint8Array, mediaType: string): string {
 }
 
 vi.mock('@/services/ai/model-assignment.local', () => ({
+  loadCapabilityBindings: async () => capabilityBindingsSchema.parse({
+    version: 'model-assignments.v2',
+    bindings: {
+      text: { providerId: PROVIDER_ID, model: CHAT_MODEL },
+      vision: { providerId: PROVIDER_ID, model: CHAT_MODEL },
+      'image-generation': { providerId: PROVIDER_ID, model: IMAGE_MODEL },
+      'image-edit': { providerId: PROVIDER_ID, model: EDIT_MODEL },
+    },
+    descriptors: [
+      {
+        providerId: PROVIDER_ID,
+        model: IMAGE_MODEL,
+        capabilities: ['image-generation'],
+        source: 'verified-catalog',
+        evidence: [
+          { capability: 'image-generation', kind: 'verified', sourceId: 'rendered-e2e' },
+        ],
+      },
+      {
+        providerId: PROVIDER_ID,
+        model: EDIT_MODEL,
+        capabilities: ['image-edit'],
+        source: 'verified-catalog',
+        evidence: [
+          { capability: 'image-edit', kind: 'observed', sourceId: 'rendered-e2e' },
+        ],
+      },
+    ],
+  }),
   loadAssignments: async (): Promise<ModelAssignments> => ({
     chat: { providerId: PROVIDER_ID, model: CHAT_MODEL },
     image: { providerId: PROVIDER_ID, model: IMAGE_MODEL },
@@ -87,12 +120,15 @@ vi.mock('@/agent-runtime/use-desktop-tool-loop', () => ({
       readonly toolCallId: string
       readonly signal?: AbortSignal
       readonly inputs?: readonly unknown[]
+      readonly image: { readonly model: string }
     }) => {
       const prompt = request.prompt ?? ''
       desktopHarness.imageToolPrompts.push(prompt)
       desktopHarness.imageToolCallIds.push(request.toolCallId)
       desktopHarness.imageToolSignals.push(request.signal)
       desktopHarness.imageToolReferenceCounts.push(request.inputs?.length ?? 0)
+      desktopHarness.imageToolModels.push(request.image.model)
+      await desktopHarness.imageToolWait?.(request.toolCallId)
       const failure = desktopHarness.imageToolFailure?.(request.toolCallId)
       if (failure) throw failure
       const marker = prompt.includes('Editorial Ledger')
@@ -532,7 +568,7 @@ function fakeRegistry(): ServiceRegistry {
       setKey: notUsed,
       status: async () => ({ hasKey: true }),
       statuses: async (ids) => Object.fromEntries(ids.map((id) => [id, true])),
-      test: async () => ok({ model: CHAT_MODEL, models: [CHAT_MODEL, IMAGE_MODEL] }),
+      test: async () => ok({ model: CHAT_MODEL, models: [CHAT_MODEL, IMAGE_MODEL, EDIT_MODEL] }),
     },
     generation: {
       generateText: async () => ok(DESIGN_MARKDOWN),
@@ -541,6 +577,7 @@ function fakeRegistry(): ServiceRegistry {
       },
       generateImages: async () => err('not used in this test'),
       editImage: async (input) => {
+        expect(input.model).toBe(EDIT_MODEL)
         desktopHarness.boardPrompts.push(input.prompt)
         desktopHarness.activeBoardCalls += 1
         desktopHarness.maximumBoardConcurrency = Math.max(
@@ -616,7 +653,9 @@ describe('brief → every planned route — rendered IntentWorkspace', () => {
     desktopHarness.imageToolCallIds.length = 0
     desktopHarness.imageToolSignals.length = 0
     desktopHarness.imageToolReferenceCounts.length = 0
+    desktopHarness.imageToolModels.length = 0
     desktopHarness.imageToolFailure = null
+    desktopHarness.imageToolWait = null
     desktopHarness.boardPrompts.length = 0
     desktopHarness.boardFailure = null
     desktopHarness.activeBoardCalls = 0
@@ -819,6 +858,9 @@ describe('brief → every planned route — rendered IntentWorkspace', () => {
     expect(pageCallIndexes.map(
       (index) => desktopHarness.imageToolReferenceCounts[index],
     ).filter((count) => count === 2)).toHaveLength(15)
+    expect(pageCallIndexes.map(
+      (index) => desktopHarness.imageToolModels[index],
+    )).toEqual(Array(18).fill(EDIT_MODEL))
 
     const productionState = getStoreState().assetProduction
     const productionRuns = Object.values(productionState.runs)
@@ -890,7 +932,7 @@ describe('brief → every planned route — rendered IntentWorkspace', () => {
       .toEqual(new Set(selectedArtifact.resourcePack.assets.map((asset) => asset.artifactId)))
   }, 60_000)
 
-  it('keeps partial candidates visible and retryable without entering selection', async () => {
+  it('allows ready partial candidates to be selected while failed siblings remain retryable', async () => {
     desktopHarness.imageToolFailure = (toolCallId) =>
       toolCallId.includes('candidate:editorial-ledger')
         ? new Error('HTTP 503 service unavailable')
@@ -917,12 +959,13 @@ describe('brief → every planned route — rendered IntentWorkspace', () => {
     const partial = await waitFor(() => {
       const current = getStoreState().workspaceSnapshot
       const candidates = current?.prototypeDesignSystemCandidates?.set.candidates
-      return current?.runError && candidates?.some(({ status }) => status === 'failed')
+      return current?.workflowPhase === 'design-system-selection'
+        && candidates?.some(({ status }) => status === 'failed')
         ? current
         : null
     })
     expect(partial).toBeTruthy()
-    expect(partial!.workflowPhase).not.toBe('design-system-selection')
+    expect(partial!.workflowPhase).toBe('design-system-selection')
     expect(partial!.prototypeDesignSystemCandidates?.set.selection).toBeUndefined()
     expect(partial!.prototypeDesignSystemCandidates?.set.candidates.map(({ status }) => status))
       .toEqual(['ready', 'failed', 'ready'])
@@ -936,11 +979,115 @@ describe('brief → every planned route — rendered IntentWorkspace', () => {
       '[data-design-candidate-action="select"]',
     )]
     expect(selectionButtons).toHaveLength(3)
-    expect(selectionButtons.every((button) => button.disabled)).toBe(true)
+    expect(selectionButtons.filter((button) => !button.disabled)).toHaveLength(2)
+    expect(selectionButtons.filter((button) => button.disabled)).toHaveLength(1)
     expect([...node.querySelectorAll<HTMLButtonElement>('button')].some(
       (button) => button.textContent?.trim() === 'Retry' && !button.disabled,
     )).toBe(true)
   })
+
+  it('preserves a human suite selection while later siblings finish', async () => {
+    let releaseLaterSibling!: () => void
+    const laterSiblingBlocked = new Promise<void>((resolve) => {
+      releaseLaterSibling = resolve
+    })
+    let heldLaterSibling = false
+    desktopHarness.imageToolWait = async (toolCallId) => {
+      if (
+        !heldLaterSibling &&
+        toolCallId.includes(':candidate:prototype-suite:1:prototype-page:')
+      ) {
+        heldLaterSibling = true
+        await laterSiblingBlocked
+      }
+    }
+
+    const node = mount()
+    const textarea = await waitFor(
+      () => node.querySelector<HTMLTextAreaElement>('[aria-label="Message the Agent"]'),
+    )
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 50))
+    })
+    act(() => {
+      const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!
+      setter.call(textarea, 'Design a complete retail operations web app with three directions. Generate it now.')
+      textarea!.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    await act(async () => {
+      node.querySelector<HTMLButtonElement>('[aria-label="Send"]')!.click()
+    })
+
+    const designSelectionButtons = await waitFor(() => {
+      const buttons = [...node.querySelectorAll<HTMLButtonElement>(
+        '[data-design-candidate-action="select"]',
+      )]
+      return buttons.length === 3 ? buttons : null
+    })
+    await act(async () => {
+      designSelectionButtons![1]!.click()
+    })
+
+    const generating = await waitFor(() => {
+      const current = getStoreState().workspaceSnapshot
+      const suites = current?.prototypeSuiteCandidates
+      return heldLaterSibling &&
+        suites?.set.candidates.find(({ id }) => id === 'candidate:prototype-suite:2')?.status === 'ready' &&
+        suites.set.candidates.find(({ id }) => id === 'candidate:prototype-suite:1')?.status === 'generating'
+        ? current
+        : null
+    }, 30_000)
+    expect(generating).toBeTruthy()
+
+    await act(async () => {
+      node.querySelector<HTMLButtonElement>(
+        '[data-agent-action="compare-prototype-suites"]',
+      )!.click()
+    })
+    const readySuiteButton = await waitFor(() =>
+      [...document.querySelectorAll<HTMLButtonElement>('[data-suite-candidate-action="select"]')]
+        .find((button) =>
+          button.dataset.suiteCandidateId === 'candidate:prototype-suite:2' && !button.disabled,
+        ),
+    )
+    await act(async () => {
+      readySuiteButton!.click()
+    })
+    expect(await waitFor(() => {
+      const selection = getStoreState().workspaceSnapshot
+        ?.prototypeSuiteCandidates?.set.selection
+      return selection?.candidateId === 'candidate:prototype-suite:2' &&
+        selection.actor.kind === 'human'
+        ? selection
+        : null
+    })).toBeTruthy()
+
+    releaseLaterSibling()
+    const completed = await waitFor(() => {
+      const current = getStoreState().workspaceSnapshot
+      return current?.prototypeSuiteCandidates?.set.candidates.every(
+        ({ status }) => status === 'ready',
+      ) && !current.runError
+        ? current
+        : null
+    }, 30_000)
+    expect(completed).toBeTruthy()
+
+    const selectedId = 'candidate:prototype-suite:2'
+    const selectedArtifact = completed!.prototypeSuiteCandidates!.artifacts[selectedId]!
+    expect(completed!.prototypeSuiteCandidates!.set.selection).toMatchObject({
+      candidateId: selectedId,
+      actor: { kind: 'human', id: 'workspace-user' },
+    })
+    expect(completed!.prototypePlan).toEqual(selectedArtifact.plan)
+    expect(completed!.prototypeDesignSystem).toEqual(selectedArtifact.designSystem.artifact)
+    expect(completed!.prototypePages).toEqual(selectedArtifact.pages)
+
+    const selectedRunId = selectedArtifact.resourcePack.id.slice('resource-pack:'.length)
+    expect(getStoreState().assetProduction.activeRunId).toBe(selectedRunId)
+    expect(new Set(getStoreState().analysis.slices.map((slice) => slice.outputArtifactId)))
+      .toEqual(new Set(selectedArtifact.resourcePack.assets.map((asset) => asset.artifactId)))
+  }, 60_000)
 
   it('resumes only missing pages after a selected suite transport failure', async () => {
     const node = mount()

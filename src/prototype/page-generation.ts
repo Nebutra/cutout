@@ -24,8 +24,8 @@ export async function generatePrototypePageSet<
     page: Page,
     predecessor: Artifact | undefined,
   ) => Promise<Artifact>
-  /** Observational work for newly generated artifacts; reused pages are not reviewed again. */
-  readonly review?: (artifact: Artifact) => Promise<void>
+  /** Adds durable review evidence to newly generated artifacts; reused pages are not reviewed again. */
+  readonly review?: (artifact: Artifact) => Promise<Artifact>
   /** Inline protects a shared Provider quota; overlap uses an independent bounded review lane. */
   readonly reviewMode?: PrototypePageReviewMode
   readonly reviewConcurrency?: number
@@ -52,16 +52,26 @@ export async function generatePrototypePageSet<
   let overlappingReviewFailed = false
   let overlappingReviewFailure: unknown
 
-  const queueOverlappingReview = (artifact: Artifact): void => {
+  const queueOverlappingReview = (page: Page, artifact: Artifact): void => {
     const review = input.review
     if (!review) return
     pendingReviews.push(
-      reviewLimiter(() => review(artifact)).catch((error: unknown) => {
-        if (!overlappingReviewFailed) {
-          overlappingReviewFailed = true
-          overlappingReviewFailure = error
-        }
-      }),
+      reviewLimiter(() => review(artifact))
+        .then((reviewed) => {
+          if (reviewed.page.id !== page.id) {
+            throw new Error(
+              `Prototype reviewer returned page "${reviewed.page.id}" for planned page "${page.id}".`,
+            )
+          }
+          results.set(page.id, reviewed)
+          input.onProgress?.(ordered())
+        })
+        .catch((error: unknown) => {
+          if (!overlappingReviewFailed) {
+            overlappingReviewFailed = true
+            overlappingReviewFailure = error
+          }
+        }),
     )
   }
 
@@ -72,10 +82,17 @@ export async function generatePrototypePageSet<
       )
     }
     const reviewMode = input.reviewMode ?? 'inline'
-    if (input.review && reviewMode === 'inline') await input.review(artifact)
-    results.set(page.id, artifact)
+    const published = input.review && reviewMode === 'inline'
+      ? await input.review(artifact)
+      : artifact
+    if (published.page.id !== page.id) {
+      throw new Error(
+        `Prototype reviewer returned page "${published.page.id}" for planned page "${page.id}".`,
+      )
+    }
+    results.set(page.id, published)
     input.onProgress?.(ordered())
-    if (reviewMode === 'overlap') queueOverlappingReview(artifact)
+    if (reviewMode === 'overlap') queueOverlappingReview(page, artifact)
   }
 
   let generationFailed = false
