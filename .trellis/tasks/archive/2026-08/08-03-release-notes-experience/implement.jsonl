@@ -1,0 +1,6 @@
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"Keep one catalog decoder/projection owner and avoid duplicated untyped parsing across release, native, and UI consumers."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Map and validate the catalog-to-workflow-to-native-to-frontend data flow at every boundary."}
+{"file":".trellis/spec/frontend/release-pipeline.md","reason":"Preserve signed updater, immutable publication, single-writer, version, attestation, and AppShell controller contracts."}
+{"file":".trellis/spec/frontend/state-management.md","reason":"Keep updater ownership centralized and release-note read state local, bounded, and independent from trust state."}
+{"file":".trellis/spec/frontend/component-guidelines.md","reason":"Implement the Settings entry and responsive dialog with existing accessibility and disclosure conventions."}
+{"file":"docs/RELEASE_CHECKLIST.md","reason":"Keep reviewed release copy, version validation, publication, and installed-app verification in the release gate."}

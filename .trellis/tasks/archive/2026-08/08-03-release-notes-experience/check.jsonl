@@ -1,0 +1,6 @@
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Audit schema parity, fallback, error handling, and round trips across catalog, workflow, Rust, TypeScript, and UI."}
+{"file":".trellis/spec/frontend/release-pipeline.md","reason":"Verify no release trust, platform, signature, allowlist, single-writer, or install-safety regression."}
+{"file":".trellis/spec/frontend/state-management.md","reason":"Verify upgrade/dismissal persistence, first-install behavior, lifecycle cleanup, and single controller ownership."}
+{"file":".trellis/spec/frontend/component-guidelines.md","reason":"Review focus, keyboard close, responsive sizing, translation wrapping, and reduced-motion behavior."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Review dependency additions, static media handling, and full local validation evidence."}
+{"file":"docs/RELEASE_CHECKLIST.md","reason":"Verify exact-version copy, public metadata/body, signed assets, and installed-app release evidence."}

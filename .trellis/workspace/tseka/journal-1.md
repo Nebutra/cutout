@@ -1325,3 +1325,36 @@ Merged PR #53, tagged and published the signed/notarized four-platform v0.1.15 R
 ### Next Steps
 
 - None - task complete
+
+
+## Session 40: Localized release notes experience
+
+**Date**: 2026-08-03
+**Task**: Localized release notes experience
+**Branch**: `feat/release-notes-experience`
+
+### Summary
+
+Added a five-locale versioned release-note catalog, backward-compatible updater and GitHub release projections, strict Rust and TypeScript validation, post-upgrade read state, responsive What's New UI, release workflow gates, and full local verification.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `f7ab625` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

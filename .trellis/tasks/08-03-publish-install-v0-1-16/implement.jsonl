@@ -1,0 +1,4 @@
+{"file":".trellis/spec/frontend/release-pipeline.md","reason":"Preserve exact-version, single-publisher, updater, signing, notarization, and release-note contracts."}
+{"file":"docs/RELEASE_CHECKLIST.md","reason":"Follow the reviewed local validation, publication evidence, and installation sequence."}
+{"file":"cutout.agent-capabilities.json","reason":"Keep the package version synchronized without changing Agent protocol or operation claims."}
+

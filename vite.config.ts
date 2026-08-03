@@ -10,11 +10,22 @@ import { resolveVitestMaxWorkers } from './scripts/lib/vitest-workers.ts'
 
 const host = process.env.TAURI_DEV_HOST
 const productVersion = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')).version
+const releaseNotesCatalog = JSON.parse(
+  readFileSync(new URL('./src/release-notes/catalog.json', import.meta.url), 'utf8'),
+) as { entries?: Array<{ version?: string; [key: string]: unknown }> }
+const bundledReleaseNotesEntry = releaseNotesCatalog.entries?.find(
+  (entry) => entry.version === productVersion,
+)
 
 // https://vite.dev/config/
 export default defineConfig({
   define: {
     __CUTOUT_VERSION__: JSON.stringify(productVersion),
+    __CUTOUT_RELEASE_NOTES__: JSON.stringify(
+      bundledReleaseNotesEntry
+        ? { protocol: 'cutout.release-notes.v1', ...bundledReleaseNotesEntry }
+        : undefined,
+    ),
   },
   plugins: [
     // @vitejs/plugin-react v6 (Vite 8 / Rolldown) is Oxc-based and no longer

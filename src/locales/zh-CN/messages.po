@@ -1089,6 +1089,11 @@ msgid "settings.integrations.desktop_not_installed"
 msgstr "未安装桌面提供方。"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/UpdatesSection.tsx
+msgid "settings.updates.view_release_details"
+msgstr "详细信息"
+
+#. js-lingui-explicit-id
 #: src/components/settings/sections/RecoverySection.tsx
 msgid "settings.recovery.diagnostic_preview_aria"
 msgstr "诊断包预览"
@@ -1384,6 +1389,11 @@ msgstr "帮助与资源"
 #: src/components/settings/VectorizerPanel.tsx
 msgid "settings.key_hide"
 msgstr "隐藏"
+
+#. js-lingui-explicit-id
+#: src/components/release-notes/WhatsNewDialog.tsx
+msgid "release_notes.version_summary"
+msgstr "此版本 Cutout 的更新亮点。"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/RecoverySection.tsx
@@ -1763,6 +1773,11 @@ msgid "slices.empty_no_regions_title"
 msgstr "未找到区域"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/UpdatesSection.tsx
+msgid "settings.updates.whats_new_unavailable"
+msgstr "当前版本暂无更新说明。"
+
+#. js-lingui-explicit-id
 #: src/components/slices/SliceGridEmpty.tsx
 msgid "slices.empty_no_regions_automatic_hint"
 msgstr "未找到可复用区域。请尝试其他素材图。"
@@ -1816,6 +1831,11 @@ msgid "settings.updates.system_notifications_hint"
 msgstr "当 Cutout 在后台发现更新时通知我。"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/UpdatesSection.tsx
+msgid "settings.updates.open_whats_new"
+msgstr "打开"
+
+#. js-lingui-explicit-id
 #. placeholder {0}: notification.title
 #: src/components/home/SidebarAccount.tsx
 msgid "home.notification_open"
@@ -1825,6 +1845,11 @@ msgstr "打开{0}"
 #: src/components/library/TeamGovernancePanel.tsx
 msgid "team.open_project_to_review"
 msgstr "打开一个项目以开始评审。"
+
+#. js-lingui-explicit-id
+#: src/components/release-notes/WhatsNewDialog.tsx
+msgid "release_notes.open_github_release"
+msgstr "打开 GitHub 版本页面"
 
 #. js-lingui-explicit-id
 #: src/components/topbar/TabsMenu.tsx
@@ -2132,6 +2157,16 @@ msgid "registry_install.section_aria"
 msgstr "注册表安装"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/UpdatesSection.tsx
+msgid "settings.updates.release_details"
+msgstr "版本详情"
+
+#. js-lingui-explicit-id
+#: src/components/release-notes/WhatsNewDialog.tsx
+msgid "release_notes.release_details"
+msgstr "版本详情"
+
+#. js-lingui-explicit-id
 #: src/components/home/SidebarAccount.tsx
 msgid "home.notification_remind_tomorrow"
 msgstr "明天提醒我"
@@ -2304,6 +2339,12 @@ msgstr "评审分支"
 #: src/components/library/ReviewBranchEditor.tsx
 msgid "review_branch.comment_aria"
 msgstr "评审评论"
+
+#. js-lingui-explicit-id
+#. placeholder {0}: currentReleaseNotes.version
+#: src/components/settings/sections/UpdatesSection.tsx
+msgid "settings.updates.whats_new_hint"
+msgstr "查看 Cutout {0} 的更新亮点。"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
@@ -2939,6 +2980,16 @@ msgstr "网页开发"
 #: src/components/home/ProjectHome.tsx
 msgid "home.start_title"
 msgstr "我们要设计什么？"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/UpdatesSection.tsx
+msgid "settings.updates.whats_new"
+msgstr "更新说明"
+
+#. js-lingui-explicit-id
+#: src/components/release-notes/WhatsNewDialog.tsx
+msgid "release_notes.whats_new"
+msgstr "更新说明"
 
 #. js-lingui-explicit-id
 #: src/components/home/ProjectHome.tsx

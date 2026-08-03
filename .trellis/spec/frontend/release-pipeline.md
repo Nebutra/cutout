@@ -19,6 +19,9 @@ installer version differs from their release version.
   `node scripts/collect-release-assets.mjs checksums --directory <dir>`
 - Updater generation/validation remains owned by `pnpm update:generate` and
   `pnpm update:validate`.
+- Release-note validation/rendering is owned by
+  `pnpm release-notes:validate` and `pnpm release-notes:render`, using the
+  repository catalog at `src/release-notes/catalog.json`.
 - macOS DMG notarization uses
   `xcrun notarytool submit <dmg> --key "$APPLE_API_KEY_PATH" --key-id "$APPLE_API_KEY" --issuer "$APPLE_API_ISSUER" --wait`, followed by
   `xcrun stapler staple <dmg>`.
@@ -28,6 +31,10 @@ installer version differs from their release version.
 ### 3. Contracts
 
 - Release tags are `v<semver>`; prerelease identifiers select the beta channel.
+- Before the reusable quality gate or any native build, the `validate` job must
+  require one catalog entry for the exact unprefixed tag version and all five
+  shipped locales (`en`, `zh-CN`, `ja`, `fr`, and `es`). Missing, mismatched,
+  partial, or invalid reviewed notes fail the release.
 - `package.json` is the display/handshake version source. Its value,
   `src-tauri/tauri.conf.json`, the root package in `src-tauri/Cargo.toml`, the
   Agent capability manifest, and the Codex plugin manifest must match the tag.
@@ -108,6 +115,14 @@ installer version differs from their release version.
 - The publish job creates a GitHub build-provenance attestation for every final
   release asset after `SHA256SUMS` is generated and before the draft Release is
   created. It alone receives `id-token: write` and `attestations: write`.
+- The publish job renders the GitHub body to
+  `dist/release-notes/github-release.md`, feeds the same exact catalog and
+  version into updater generation, and validates the resulting manifest with
+  `--require-release-notes` plus `--require-all-locales`. Standard
+  `latest.json.notes` remains readable English for existing clients, while
+  `cutoutReleaseNotes` carries the matching bounded localized projection.
+  GitHub publication uses `gh release create --notes-file`; generated PR notes
+  and shell-interpolated multiline release copy are forbidden.
 - Release metadata contains updater manifest, checksums, SPDX SBOM, and
   provenance. It does not claim rollout or rollback policy because the desktop
   updater has no consumer for those metadata files.
@@ -147,6 +162,7 @@ installer version differs from their release version.
 | Tag is not `v<semver>` | Stop in `validate`; run no native build |
 | Source versions differ | Stop in `validate` with all three observed versions |
 | Tag and source differ | Stop in `validate`; never rewrite source in CI |
+| Exact-version catalog entry is absent, invalid, or missing a shipped locale | Stop in `validate`; run no quality or native build |
 | Tag commit is not reachable from `main` | Stop before the reusable quality gate |
 | Another workflow can write contents or mutate a Release | Stop in `validate` |
 | Any matrix job fails | Do not start `publish` |
@@ -163,6 +179,7 @@ installer version differs from their release version.
 | Windows NSIS or MSI count differs from one | Do not upload the Windows workflow artifact |
 | NSIS or MSI unexpectedly carries an Authenticode signature | Fail until the signing policy and verification contract are deliberately updated |
 | GitHub provenance attestation fails | Keep the Release unpublished |
+| Catalog-backed updater projection or deterministic GitHub body generation fails | Keep the Release unpublished |
 | Release tag already has a Release | Refuse immutable asset replacement |
 | Upload is incomplete | Release remains a draft, not a public success |
 | Browser/dev build has no updater config | Home action remains absent |
@@ -175,6 +192,9 @@ installer version differs from their release version.
 - Good: all four matrix entries finish, collected names include their platform
   and architecture, `latest.json` carries all four platform entries, updater
   evidence validates for each, and one draft is promoted.
+- Good: one reviewed catalog entry produces readable English legacy updater
+  notes, the matching five-locale extension, and a deterministic GitHub body
+  consumed through `--notes-file`.
 - Good: Tauri receives an Apple `Accepted` result for the app, the workflow
   receives a separate `Accepted` result for the DMG, and both artifacts report
   `source=Notarized Developer ID` before upload.
@@ -194,6 +214,8 @@ installer version differs from their release version.
   subsequently created DMG is notarized, or validates the DMG before separately
   submitting and stapling it.
 - Bad: CI edits version manifests after checkout to make a mismatched tag pass.
+- Bad: release CI uses `--generate-notes`, accepts a partial locale set, or
+  supplies multiline/structured release notes through shell interpolation.
 
 ### 6. Tests Required
 
@@ -207,8 +229,10 @@ installer version differs from their release version.
   actions pinned to a reviewed commit, all Action SHA pins, Apple/updater secret
   scoping, temporary key handling, app-before-DMG notarization ordering, macOS
   signature/notarization verification, explicit unsigned Windows validation,
-  attestation, single-authority publication, draft promotion, and
-  multi-platform manifest generation.
+  exact-version/all-locale release-note validation, catalog-backed updater
+  generation and strict validation, deterministic notes-file publication,
+  attestation, single-authority publication, draft promotion, and multi-platform
+  manifest generation.
 - `scripts/ci-platform-contracts.test.ts`: browser installation ordering,
   platform-specific executable selection, and LF/CRLF frontmatter parsing.
 - Child-process integration tests: explicit per-test timeout budgets that still
@@ -402,3 +426,139 @@ await controller.setSystemNotificationsEnabled(true) // explicit user toggle
 The scheduler coordinates eligibility through the existing controller, the
 notification ledger is independent from bell history, and the Rust updater
 remains the only release trust boundary.
+
+## Scenario: Localized release notes across updater and installed-app state
+
+### 1. Scope / Trigger
+
+Apply whenever release copy, updater manifest generation, the native updater
+snapshot, the Updates & Support surface, or post-upgrade read state changes.
+This is one cross-layer contract: editorial data must not become a second
+network or trust path.
+
+### 2. Signatures
+
+```ts
+interface LocalizedReleaseNotes {
+  readonly protocol: "cutout.release-notes.v1"
+  readonly version: string
+  readonly releasedOn: string
+  readonly locales: Readonly<Record<string, LocalizedReleaseNotesLocale>>
+}
+
+interface ReleaseNotesReadStateV1 {
+  readonly protocol: "cutout.release-notes.read-state.v1"
+  readonly observedVersion: string
+  readonly pendingVersion?: string
+  readonly dismissedVersion?: string
+}
+
+validateLocalizedReleaseNotes(value: unknown, expectedVersion?: string):
+  LocalizedReleaseNotes | undefined
+initializeReleaseNotesLifecycle(input: ReleaseNotesLifecycleInput):
+  ReleaseNotesLifecycleDecision
+```
+
+Release tooling accepts an exact unprefixed `--version`, a repository catalog,
+and optional `--require-all-locales`. Updater generation writes readable
+English to standard `notes` and the typed projection to
+`cutoutReleaseNotes`.
+
+### 3. Contracts
+
+- `src/release-notes/catalog.json` is the single reviewed source. The release
+  validator, updater manifest, GitHub notes file, and installed-version bundle
+  select the same exact entry.
+- Standard `latest.json.notes` remains bounded English plain text for old
+  clients. Multilingual data is additive and must never be serialized into
+  `notes`.
+- Rust reads `cutoutReleaseNotes` only from the updater plugin's existing
+  `Update.raw_json`, validates it against the discovered version, and exposes
+  an optional typed snapshot field. TypeScript validates that projection again
+  at its service boundary. Neither layer performs another manifest request.
+- Only `en`, `zh-CN`, `ja`, `fr`, and `es` are accepted. Locale records preserve
+  English highlight ids and order. Content is bounded plain text; remote URLs,
+  markup, arbitrary fields, and unregistered media ids are rejected.
+- Vite embeds only the catalog entry whose version equals the package version.
+  A normal development build may embed no note; a release build may not pass
+  the exact-version catalog gate without one.
+- `cutout.release-notes.read-state.v1` is independent from update preferences,
+  notification presentation, signature trust, and install eligibility.
+  `pendingVersion` survives until dismissal, while manual reopen never changes
+  updater state.
+- Missing state means clean install, except in the first feature release when
+  an existing update-notification ledger contains the exact installed version.
+  That read-only evidence seeds one pending note; later releases use semantic
+  comparison with `observedVersion`.
+- AppShell owns the updater controller and dialog. Settings passes the actual
+  trigger element for focus restoration and never creates a second production
+  updater owner or fetches release content.
+
+### 4. Validation & Error Matrix
+
+| Condition | Required behavior |
+| --- | --- |
+| Exact catalog version or reviewed English is absent during release | Stop before quality/native builds |
+| Localized extension is missing, malformed, oversized, or version-mismatched | Keep update available; use readable English or hide details |
+| Remote locale is unsupported or highlight shape differs | Drop the localized projection without changing install eligibility |
+| Installed bundle has no exact current-version entry | Keep the permanent row disabled; do not auto-open |
+| Read state is absent on clean install | Store current observed version; do not auto-open |
+| First-release notification evidence equals installed version | Store current as observed and pending; auto-open |
+| Current semantic version is newer and has bundled notes | Store current as observed and pending; auto-open |
+| Process exits before dismissal | Preserve pending; reopen on next launch |
+| Dialog is dismissed | Clear matching pending and record matching dismissed version |
+| Same version, downgrade, invalid version, or corrupt/unavailable storage | Do not manufacture an upgrade; never block startup |
+
+### 5. Good / Base / Bad Cases
+
+- Good: one reviewed five-locale entry produces old-client English, a bounded
+  localized extension, a deterministic GitHub body, and an offline installed
+  note; an OTA upgrade opens it once and Settings can always reopen it.
+- Base: a current or clean installation has no matching bundled entry, so the
+  row is disabled and no dialog appears while update checks continue normally.
+- Bad: the frontend fetches GitHub, `notes` contains JSON, malformed localized
+  content blocks a signed update, or closing a dialog permanently suppresses a
+  future version.
+
+### 6. Tests Required
+
+- Catalog/tooling tests assert exact versions, five-locale parity, bounds,
+  unsafe-content rejection, English fallback, deterministic updater text, and
+  deterministic GitHub Markdown.
+- Manifest and Rust tests assert old-client readable `notes`, raw-response
+  projection, strict optional validation, and non-interference with download
+  and install state.
+- TypeScript tests assert boundary revalidation, clean install, first-release
+  migration, semantic/skipped upgrade, crash retry, dismissal, manual reopen,
+  downgrade, corrupt storage, storage exceptions, and future-version
+  independence.
+- Component and Playwright tests assert available/current Settings entries,
+  compact and desktop geometry, light and dark themes, long translations,
+  Escape, connected-trigger focus restoration, scrolling, and reduced motion.
+- Release contract tests assert catalog validation precedes builds and
+  publication uses `--notes-file` without weakening single-publisher,
+  signatures, allowlists, attestation, or immutable-release checks.
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```ts
+const notes = await fetch(githubReleaseUrl).then((response) => response.text())
+localStorage.setItem("update-dismissed", currentVersion) // before the dialog closes
+```
+
+#### Correct
+
+```ts
+const release = appShellUpdateController.getState().release
+const note = release?.localizedNotes ?? release?.notes
+const decision = initializeReleaseNotesLifecycle({
+  storage: localStorage,
+  currentVersion: PRODUCT_VERSION,
+  bundledNotes: BUNDLED_CURRENT_RELEASE_NOTES,
+})
+```
+
+The updater remains the only network/trust boundary, and the independent local
+state controls presentation only.
