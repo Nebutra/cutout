@@ -42,18 +42,18 @@ local macOS installation with the exact published Apple Silicon artifact.
 
 ## Acceptance Criteria
 
-- [ ] Version validation reports synchronized `0.1.15` source and tag identity.
-- [ ] Local release gates and the release PR's required CI checks pass.
-- [ ] Annotated `v0.1.15` resolves to the reviewed `main` merge commit.
-- [ ] The public stable Release is non-draft, non-prerelease, and contains all
+- [x] Version validation reports synchronized `0.1.15` source and tag identity.
+- [x] Local release gates and the release PR's required CI checks pass.
+- [x] Annotated `v0.1.15` resolves to the reviewed `main` merge commit.
+- [x] The public stable Release is non-draft, non-prerelease, and contains all
       required macOS, Windows, Linux, updater, checksum, SBOM, metadata, and
       provenance assets.
-- [ ] Public `latest.json` reports `0.1.15` for `darwin-aarch64`,
+- [x] Public `latest.json` reports `0.1.15` for `darwin-aarch64`,
       `darwin-x86_64`, `windows-x86_64`, and `linux-x86_64`, each with a
       non-empty updater signature and approved HTTPS URL.
-- [ ] The downloaded Apple Silicon DMG matches `SHA256SUMS`; the DMG and app
+- [x] The downloaded Apple Silicon DMG matches `SHA256SUMS`; the DMG and app
       pass Developer ID, Gatekeeper, and stapler verification.
-- [ ] `/Applications/Cutout.app` reports version `0.1.15`, contains an `arm64`
+- [x] `/Applications/Cutout.app` reports version `0.1.15`, contains an `arm64`
       executable, launches successfully, and the previous app remains
       recoverable from Trash.
 
