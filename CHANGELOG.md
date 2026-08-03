@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.15 - 2026-08-03
+
+- Overlap bounded observational page QA with later page image generation when image and Vision assignments use independent Providers, while retaining inline review for shared Providers.
+- Keep page-image and page-QA concurrency at three, await every review before suite completion, and preserve one image call per missing page with zero automatic QA rerolls.
+- Preserve stable anchor conditioning, ordered page publication, reuse and cancellation behavior, and Agent-authored page and material scope.
+
 ## 0.1.14 - 2026-08-02
 
 - Deliver the user-selected Design System direction first while continuing every sibling to complete, independently verifiable fidelity.
