@@ -1291,3 +1291,37 @@ Separated paid page-image generation from observational Vision QA only for disti
 ### Next Steps
 
 - None - task complete
+
+
+## Session 39: Publish and install Cutout v0.1.15
+
+**Date**: 2026-08-03
+**Task**: Publish and install Cutout v0.1.15
+**Branch**: `chore/finish-v0.1.15`
+
+### Summary
+
+Merged PR #53, tagged and published the signed/notarized four-platform v0.1.15 Release, verified public updater/checksum/provenance evidence, and replaced local Cutout 0.1.14 with the verified Apple Silicon build while preserving the old app in Trash.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `543c22a` | (see git log) |
+| `1c8d457` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
