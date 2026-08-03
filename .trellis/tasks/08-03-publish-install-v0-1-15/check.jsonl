@@ -1,0 +1,2 @@
+{"file":".trellis/spec/frontend/release-pipeline.md","reason":"Check the release candidate and publication evidence against the complete atomic release contract."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Check lint, type, test, build, dependency, and diff hygiene before tagging."}
