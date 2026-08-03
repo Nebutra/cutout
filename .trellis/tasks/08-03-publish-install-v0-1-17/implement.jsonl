@@ -1,0 +1,3 @@
+{"file":".trellis/spec/frontend/release-pipeline.md","reason":"Preserve exact-version, single-publisher, environment-approval, updater, signing, notarization, and release-note contracts."}
+{"file":".trellis/spec/frontend/byok-provider-protocols.md","reason":"Keep the release copy aligned with the reviewed Provider-neutral model-evidence and independent image-route contract."}
+{"file":".trellis/tasks/08-03-publish-install-v0-1-17/research/release-state.md","reason":"Use the exact source SHA, obsolete-tag history, public-release baseline, and isolated-worktree boundary."}

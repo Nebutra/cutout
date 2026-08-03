@@ -28,30 +28,34 @@ const bundled: LocalizedReleaseNotes = {
   protocol: "cutout.release-notes.v1",
   ...catalogEntry,
 };
+const migrationBundled: LocalizedReleaseNotes = {
+  ...bundled,
+  version: FIRST_RELEASE_NOTES_MIGRATION_VERSION,
+};
 
 describe("release notes model", () => {
   it("bundles exact-version notes and applies whole-locale English fallback", () => {
-    expect(bundled.version).toBe("0.1.16");
-    expect(selectLocalizedReleaseNotes(bundled, "zh-CN")?.headline).toContain("每次更新");
+    expect(bundled.version).toBe("0.1.17");
+    expect(selectLocalizedReleaseNotes(bundled, "zh-CN")?.headline).toContain("图像路由");
     expect(selectLocalizedReleaseNotes(bundled, "de-DE")?.headline).toBe(
       bundled.locales.en.headline,
     );
-    expect(getBundledReleaseNotes("0.1.15")).toBeUndefined();
+    expect(getBundledReleaseNotes("0.1.16")).toBeUndefined();
   });
 
   it("prefers typed localized updater notes and safely falls back to plain text", () => {
     expect(resolveUpdateReleaseNotes({
-      version: "0.1.16",
+      version: "0.1.17",
       localizedNotes: bundled,
       notes: "English fallback",
-    }, "ja")?.headline).toContain("アップデート");
+    }, "ja")?.headline).toContain("画像ルーティング");
     expect(resolveUpdateReleaseNotes({
-      version: "0.1.17",
+      version: "0.1.18",
       localizedNotes: bundled,
       notes: "Readable English fallback.",
       publishedAt: "2026-08-04T10:00:00Z",
     }, "fr")).toMatchObject({
-      version: "0.1.17",
+      version: "0.1.18",
       releasedOn: "2026-08-04",
       highlights: [{ id: "legacy-notes", body: "Readable English fallback." }],
     });
@@ -109,7 +113,7 @@ describe("release notes local lifecycle", () => {
     const result = initializeReleaseNotesLifecycle({
       storage,
       currentVersion: "0.1.16",
-      bundledNotes: bundled,
+      bundledNotes: migrationBundled,
     });
     expect(result).toMatchObject({ shouldOpen: false, state: { observedVersion: "0.1.16" } });
     expect(result.state?.pendingVersion).toBeUndefined();
@@ -120,7 +124,7 @@ describe("release notes local lifecycle", () => {
     const result = initializeReleaseNotesLifecycle({
       storage,
       currentVersion: FIRST_RELEASE_NOTES_MIGRATION_VERSION,
-      bundledNotes: bundled,
+      bundledNotes: migrationBundled,
       updateNotificationVersion: FIRST_RELEASE_NOTES_MIGRATION_VERSION,
     });
     expect(result).toMatchObject({
@@ -146,20 +150,20 @@ describe("release notes local lifecycle", () => {
     const upgrade = initializeReleaseNotesLifecycle({
       storage,
       currentVersion: "0.1.16",
-      bundledNotes: bundled,
+      bundledNotes: migrationBundled,
     });
     expect(upgrade.shouldOpen).toBe(true);
     expect(initializeReleaseNotesLifecycle({
       storage,
       currentVersion: "0.1.16",
-      bundledNotes: bundled,
+      bundledNotes: migrationBundled,
     }).shouldOpen).toBe(true);
 
     dismissReleaseNotes(storage, "0.1.16");
     expect(initializeReleaseNotesLifecycle({
       storage,
       currentVersion: "0.1.16",
-      bundledNotes: bundled,
+      bundledNotes: migrationBundled,
     }).shouldOpen).toBe(false);
     expect(JSON.parse(storage.value(RELEASE_NOTES_READ_STATE_STORAGE_KEY)!)).toMatchObject({
       dismissedVersion: "0.1.16",
@@ -176,7 +180,7 @@ describe("release notes local lifecycle", () => {
     expect(initializeReleaseNotesLifecycle({
       storage: skipped,
       currentVersion: "0.1.16",
-      bundledNotes: bundled,
+      bundledNotes: migrationBundled,
     }).shouldOpen).toBe(true);
 
     const missing = memoryStorage({
@@ -201,14 +205,14 @@ describe("release notes local lifecycle", () => {
     expect(initializeReleaseNotesLifecycle({
       storage: downgrade,
       currentVersion: "0.1.16",
-      bundledNotes: bundled,
+      bundledNotes: migrationBundled,
     })).toMatchObject({ shouldOpen: false, state: { observedVersion: "0.1.17" } });
 
     const corrupt = memoryStorage({ [RELEASE_NOTES_READ_STATE_STORAGE_KEY]: "not-json" });
     expect(initializeReleaseNotesLifecycle({
       storage: corrupt,
       currentVersion: "0.1.16",
-      bundledNotes: bundled,
+      bundledNotes: migrationBundled,
       updateNotificationVersion: "0.1.16",
     }).shouldOpen).toBe(false);
   });
@@ -240,13 +244,13 @@ describe("release notes local lifecycle", () => {
     expect(() => initializeReleaseNotesLifecycle({
       storage,
       currentVersion: "0.1.16",
-      bundledNotes: bundled,
+      bundledNotes: migrationBundled,
       updateNotificationVersion: "0.1.16",
     })).not.toThrow();
     expect(initializeReleaseNotesLifecycle({
       storage,
       currentVersion: "0.1.16",
-      bundledNotes: bundled,
+      bundledNotes: migrationBundled,
       updateNotificationVersion: "0.1.16",
     }).shouldOpen).toBe(false);
     expect(() => dismissReleaseNotes(storage, "0.1.16")).not.toThrow();
