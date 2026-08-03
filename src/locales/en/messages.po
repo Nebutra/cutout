@@ -1089,6 +1089,11 @@ msgid "settings.integrations.desktop_not_installed"
 msgstr "Desktop provider is not installed."
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/UpdatesSection.tsx
+msgid "settings.updates.view_release_details"
+msgstr "Details"
+
+#. js-lingui-explicit-id
 #: src/components/settings/sections/RecoverySection.tsx
 msgid "settings.recovery.diagnostic_preview_aria"
 msgstr "Diagnostic bundle preview"
@@ -1384,6 +1389,11 @@ msgstr "Help and resources"
 #: src/components/settings/VectorizerPanel.tsx
 msgid "settings.key_hide"
 msgstr "Hide"
+
+#. js-lingui-explicit-id
+#: src/components/release-notes/WhatsNewDialog.tsx
+msgid "release_notes.version_summary"
+msgstr "Highlights for this version of Cutout."
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/RecoverySection.tsx
@@ -1763,6 +1773,11 @@ msgid "slices.empty_no_regions_title"
 msgstr "No regions found"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/UpdatesSection.tsx
+msgid "settings.updates.whats_new_unavailable"
+msgstr "No release notes are available for this version."
+
+#. js-lingui-explicit-id
 #: src/components/slices/SliceGridEmpty.tsx
 msgid "slices.empty_no_regions_automatic_hint"
 msgstr "No reusable regions were found. Try a different asset sheet."
@@ -1816,6 +1831,11 @@ msgid "settings.updates.system_notifications_hint"
 msgstr "Notify when an update is found while Cutout is in the background."
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/UpdatesSection.tsx
+msgid "settings.updates.open_whats_new"
+msgstr "Open"
+
+#. js-lingui-explicit-id
 #. placeholder {0}: notification.title
 #: src/components/home/SidebarAccount.tsx
 msgid "home.notification_open"
@@ -1825,6 +1845,11 @@ msgstr "Open {0}"
 #: src/components/library/TeamGovernancePanel.tsx
 msgid "team.open_project_to_review"
 msgstr "Open a project to start a review."
+
+#. js-lingui-explicit-id
+#: src/components/release-notes/WhatsNewDialog.tsx
+msgid "release_notes.open_github_release"
+msgstr "Open GitHub Release"
 
 #. js-lingui-explicit-id
 #: src/components/topbar/TabsMenu.tsx
@@ -2132,6 +2157,16 @@ msgid "registry_install.section_aria"
 msgstr "Registry install"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/UpdatesSection.tsx
+msgid "settings.updates.release_details"
+msgstr "Release details"
+
+#. js-lingui-explicit-id
+#: src/components/release-notes/WhatsNewDialog.tsx
+msgid "release_notes.release_details"
+msgstr "Release details"
+
+#. js-lingui-explicit-id
 #: src/components/home/SidebarAccount.tsx
 msgid "home.notification_remind_tomorrow"
 msgstr "Remind tomorrow"
@@ -2304,6 +2339,12 @@ msgstr "Review branch"
 #: src/components/library/ReviewBranchEditor.tsx
 msgid "review_branch.comment_aria"
 msgstr "Review comment"
+
+#. js-lingui-explicit-id
+#. placeholder {0}: currentReleaseNotes.version
+#: src/components/settings/sections/UpdatesSection.tsx
+msgid "settings.updates.whats_new_hint"
+msgstr "Review the highlights for Cutout {0}."
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
@@ -2939,6 +2980,16 @@ msgstr "Web development"
 #: src/components/home/ProjectHome.tsx
 msgid "home.start_title"
 msgstr "What will we design?"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/UpdatesSection.tsx
+msgid "settings.updates.whats_new"
+msgstr "What's New"
+
+#. js-lingui-explicit-id
+#: src/components/release-notes/WhatsNewDialog.tsx
+msgid "release_notes.whats_new"
+msgstr "What's New"
 
 #. js-lingui-explicit-id
 #: src/components/home/ProjectHome.tsx

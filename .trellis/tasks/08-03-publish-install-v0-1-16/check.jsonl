@@ -1,0 +1,4 @@
+{"file":".trellis/spec/frontend/release-pipeline.md","reason":"Audit version, catalog, workflow authority, platform, signature, and updater evidence."}
+{"file":"docs/RELEASE_CHECKLIST.md","reason":"Verify public assets and local replacement against the executable checklist."}
+{"file":"cutout.agent-capabilities.json","reason":"Confirm only synchronized package identity changes on the Agent surface and run agent:validate."}
+

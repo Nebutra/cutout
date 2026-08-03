@@ -95,6 +95,12 @@ function readNotificationState(storage: Pick<Storage, "getItem">): PersistedUpda
   }
 }
 
+export function readPersistedUpdateNotificationVersion(
+  storage: Pick<Storage, "getItem">,
+): string | undefined {
+  return readNotificationState(storage).current?.version;
+}
+
 function writeNotificationState(storage: UpdateStorage, value: PersistedUpdateNotificationState): void {
   storage.setItem(UPDATE_NOTIFICATION_STATE_STORAGE_KEY, JSON.stringify(value));
 }

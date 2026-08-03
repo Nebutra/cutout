@@ -94,6 +94,10 @@ jobs:
           echo "sha=$release_sha" >> "$GITHUB_OUTPUT"
       - name: Require tag and source versions to match
         run: node scripts/validate-release-version.mjs --expected "${{ steps.release.outputs.version }}"
+      - name: Require exact reviewed release notes
+        env:
+          RELEASE_VERSION: ${{ steps.release.outputs.version }}
+        run: pnpm release-notes:validate -- --catalog src/release-notes/catalog.json --version "$RELEASE_VERSION" --require-all-locales
 
   quality:
     name: Complete release quality gate
@@ -341,6 +345,10 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Render reviewed GitHub release notes
+        env:
+          RELEASE_VERSION: ${{ needs.validate.outputs.version }}
+        run: pnpm release-notes:render -- --catalog src/release-notes/catalog.json --version "$RELEASE_VERSION" --output dist/release-notes --require-all-locales
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           pattern: release-*
@@ -373,8 +381,8 @@ jobs:
             platform_args+=(--platform "$key=$artifact")
             if [ "$key" = darwin-aarch64 ]; then primary_sig="$artifact.sig"; fi
           done
-          pnpm update:generate -- "${platform_args[@]}" --artifact-base-url "$base" --version "$RELEASE_VERSION" --channel "$CHANNEL" --allowed-hosts "$CUTOUT_UPDATER_ALLOWED_HOSTS" --revision "$RELEASE_SHA" --output dist/update
-          pnpm update:validate -- --manifest "dist/update/$CHANNEL/latest.json" --signature "$primary_sig" --allowed-hosts "$CUTOUT_UPDATER_ALLOWED_HOSTS"
+          pnpm update:generate -- "${platform_args[@]}" --artifact-base-url "$base" --version "$RELEASE_VERSION" --channel "$CHANNEL" --allowed-hosts "$CUTOUT_UPDATER_ALLOWED_HOSTS" --revision "$RELEASE_SHA" --release-notes-catalog src/release-notes/catalog.json --require-all-locales --output dist/update
+          pnpm update:validate -- --manifest "dist/update/$CHANNEL/latest.json" --signature "$primary_sig" --allowed-hosts "$CUTOUT_UPDATER_ALLOWED_HOSTS" --release-notes-catalog src/release-notes/catalog.json --require-release-notes --require-all-locales
           cp "dist/update/$CHANNEL/"* dist/release-assets/
           node scripts/collect-release-assets.mjs checksums --directory dist/release-assets
       - name: Attest release assets
@@ -401,7 +409,7 @@ jobs:
             echo "Could not prove that release $RELEASE_TAG is still absent." >&2
             exit 1
           }
-          gh release create "$RELEASE_TAG" dist/release-assets/* --verify-tag --draft --generate-notes --title "Cutout $RELEASE_TAG"
+          gh release create "$RELEASE_TAG" dist/release-assets/* --verify-tag --draft --notes-file dist/release-notes/github-release.md --title "Cutout $RELEASE_TAG"
           edit_args=(--draft=false)
           if [[ "$PRERELEASE" == true ]]; then edit_args+=(--prerelease); else edit_args+=(--latest); fi
           gh release edit "$RELEASE_TAG" "${edit_args[@]}"

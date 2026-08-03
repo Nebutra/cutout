@@ -1,0 +1,111 @@
+{
+  "protocol": "cutout.release-notes.catalog.v1",
+  "entries": [
+    {
+      "version": "0.1.16",
+      "releasedOn": "2026-08-03",
+      "locales": {
+        "en": {
+          "headline": "Know what changed before and after every update",
+          "highlights": [
+            {
+              "id": "localized-highlights",
+              "title": "Release highlights in your language",
+              "body": "Cutout now presents reviewed update highlights in English, Simplified Chinese, Japanese, French, and Spanish."
+            },
+            {
+              "id": "review-before-installing",
+              "title": "Review before installing",
+              "body": "Updates & Support shows the available release details before you download and install it."
+            },
+            {
+              "id": "reopen-offline",
+              "title": "Reopen anytime",
+              "body": "After an upgrade, What's New opens once and remains available from Updates & Support without requiring a network connection."
+            }
+          ]
+        },
+        "zh-CN": {
+          "headline": "每次更新前后，都能清楚了解变化",
+          "highlights": [
+            {
+              "id": "localized-highlights",
+              "title": "用你的语言查看更新亮点",
+              "body": "Cutout 现在会用英语、简体中文、日语、法语和西班牙语展示经过审核的更新亮点。"
+            },
+            {
+              "id": "review-before-installing",
+              "title": "安装前先查看",
+              "body": "下载并安装更新前，可在“更新与支持”中查看可用版本的详细说明。"
+            },
+            {
+              "id": "reopen-offline",
+              "title": "随时重新打开",
+              "body": "升级后，“更新说明”会自动打开一次，之后无需联网也可随时从“更新与支持”重新查看。"
+            }
+          ]
+        },
+        "ja": {
+          "headline": "アップデートの前後で変更内容を確認",
+          "highlights": [
+            {
+              "id": "localized-highlights",
+              "title": "お使いの言語でリリースの要点を表示",
+              "body": "Cutout は、確認済みのアップデート要点を英語、簡体字中国語、日本語、フランス語、スペイン語で表示するようになりました。"
+            },
+            {
+              "id": "review-before-installing",
+              "title": "インストール前に確認",
+              "body": "ダウンロードしてインストールする前に、「アップデートとサポート」で利用可能なリリースの詳細を確認できます。"
+            },
+            {
+              "id": "reopen-offline",
+              "title": "いつでも再表示",
+              "body": "アップグレード後に「新機能」が一度開き、その後もネットワーク接続なしで「アップデートとサポート」から確認できます。"
+            }
+          ]
+        },
+        "fr": {
+          "headline": "Comprenez les changements avant et après chaque mise à jour",
+          "highlights": [
+            {
+              "id": "localized-highlights",
+              "title": "Les nouveautés dans votre langue",
+              "body": "Cutout présente désormais des points forts relus en anglais, chinois simplifié, japonais, français et espagnol."
+            },
+            {
+              "id": "review-before-installing",
+              "title": "Consultez les détails avant l’installation",
+              "body": "La section Mises à jour et assistance affiche les détails de la version disponible avant son téléchargement et son installation."
+            },
+            {
+              "id": "reopen-offline",
+              "title": "Rouvrez-les à tout moment",
+              "body": "Après une mise à niveau, la fenêtre Nouveautés s’ouvre une fois et reste accessible dans Mises à jour et assistance, même hors ligne."
+            }
+          ]
+        },
+        "es": {
+          "headline": "Conoce los cambios antes y después de cada actualización",
+          "highlights": [
+            {
+              "id": "localized-highlights",
+              "title": "Novedades en tu idioma",
+              "body": "Cutout ahora presenta novedades revisadas en inglés, chino simplificado, japonés, francés y español."
+            },
+            {
+              "id": "review-before-installing",
+              "title": "Revísalas antes de instalar",
+              "body": "Actualizaciones y soporte muestra los detalles de la versión disponible antes de descargarla e instalarla."
+            },
+            {
+              "id": "reopen-offline",
+              "title": "Vuelve a abrirlas cuando quieras",
+              "body": "Después de actualizar, Novedades se abre una vez y sigue disponible en Actualizaciones y soporte sin necesidad de conexión."
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

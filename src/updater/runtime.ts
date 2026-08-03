@@ -3,6 +3,7 @@ import { listen } from "@tauri-apps/api/event";
 import type {
   UpdateChannel,
   UpdateChannelCapability,
+  LocalizedReleaseNotes,
   UpdateRetryAction,
 } from "./contracts";
 
@@ -20,6 +21,7 @@ export interface UpdateSnapshot {
   availableVersion?: string;
   releaseNotes?: string;
   publishedAt?: string;
+  localizedReleaseNotes?: LocalizedReleaseNotes;
   channel?: UpdateChannel;
   downloadedBytes: number;
   contentLength?: number;

@@ -1089,6 +1089,11 @@ msgid "settings.integrations.desktop_not_installed"
 msgstr "デスクトッププロバイダーがインストールされていません。"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/UpdatesSection.tsx
+msgid "settings.updates.view_release_details"
+msgstr "詳細"
+
+#. js-lingui-explicit-id
 #: src/components/settings/sections/RecoverySection.tsx
 msgid "settings.recovery.diagnostic_preview_aria"
 msgstr "診断バンドルのプレビュー"
@@ -1384,6 +1389,11 @@ msgstr "ヘルプとリソース"
 #: src/components/settings/VectorizerPanel.tsx
 msgid "settings.key_hide"
 msgstr "非表示"
+
+#. js-lingui-explicit-id
+#: src/components/release-notes/WhatsNewDialog.tsx
+msgid "release_notes.version_summary"
+msgstr "このバージョンの Cutout の主な変更点です。"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/RecoverySection.tsx
@@ -1763,6 +1773,11 @@ msgid "slices.empty_no_regions_title"
 msgstr "領域が見つかりません"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/UpdatesSection.tsx
+msgid "settings.updates.whats_new_unavailable"
+msgstr "このバージョンのリリースノートはありません。"
+
+#. js-lingui-explicit-id
 #: src/components/slices/SliceGridEmpty.tsx
 msgid "slices.empty_no_regions_automatic_hint"
 msgstr "再利用可能な領域が見つかりませんでした。別の素材シートをお試しください。"
@@ -1816,6 +1831,11 @@ msgid "settings.updates.system_notifications_hint"
 msgstr "Cutout がバックグラウンドで更新を検出したときに通知します。"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/UpdatesSection.tsx
+msgid "settings.updates.open_whats_new"
+msgstr "開く"
+
+#. js-lingui-explicit-id
 #. placeholder {0}: notification.title
 #: src/components/home/SidebarAccount.tsx
 msgid "home.notification_open"
@@ -1825,6 +1845,11 @@ msgstr "{0}を開く"
 #: src/components/library/TeamGovernancePanel.tsx
 msgid "team.open_project_to_review"
 msgstr "レビューを開始するにはプロジェクトを開いてください。"
+
+#. js-lingui-explicit-id
+#: src/components/release-notes/WhatsNewDialog.tsx
+msgid "release_notes.open_github_release"
+msgstr "GitHub リリースを開く"
 
 #. js-lingui-explicit-id
 #: src/components/topbar/TabsMenu.tsx
@@ -2132,6 +2157,16 @@ msgid "registry_install.section_aria"
 msgstr "レジストリのインストール"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/UpdatesSection.tsx
+msgid "settings.updates.release_details"
+msgstr "リリース詳細"
+
+#. js-lingui-explicit-id
+#: src/components/release-notes/WhatsNewDialog.tsx
+msgid "release_notes.release_details"
+msgstr "リリース詳細"
+
+#. js-lingui-explicit-id
 #: src/components/home/SidebarAccount.tsx
 msgid "home.notification_remind_tomorrow"
 msgstr "明日通知"
@@ -2304,6 +2339,12 @@ msgstr "レビューブランチ"
 #: src/components/library/ReviewBranchEditor.tsx
 msgid "review_branch.comment_aria"
 msgstr "レビューコメント"
+
+#. js-lingui-explicit-id
+#. placeholder {0}: currentReleaseNotes.version
+#: src/components/settings/sections/UpdatesSection.tsx
+msgid "settings.updates.whats_new_hint"
+msgstr "Cutout {0} の主な変更点を確認します。"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
@@ -2939,6 +2980,16 @@ msgstr "Web開発"
 #: src/components/home/ProjectHome.tsx
 msgid "home.start_title"
 msgstr "何をデザインしますか？"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/UpdatesSection.tsx
+msgid "settings.updates.whats_new"
+msgstr "新機能"
+
+#. js-lingui-explicit-id
+#: src/components/release-notes/WhatsNewDialog.tsx
+msgid "release_notes.whats_new"
+msgstr "新機能"
 
 #. js-lingui-explicit-id
 #: src/components/home/ProjectHome.tsx
