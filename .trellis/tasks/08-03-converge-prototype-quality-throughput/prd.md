@@ -48,6 +48,17 @@ separate from executable support.
   and `adapter required`; only the last state blocks execution.
 - Recommendation metadata must not mutate the exact model id sent to the
   Provider or override authenticated catalog evidence.
+- Reviewed model capability evidence must remain Provider-neutral. The exact
+  model must also appear in the configured Provider's authenticated catalog,
+  and the route must have an implemented adapter before execution.
+- The reviewed 2026-07-25 Image Edit Arena roster contributes exact
+  `image-edit` evidence only. Rank does not grant support, generation, or
+  recommendation status, and manual Provider verification consumes the same
+  evidence path as automatic setup.
+- Generation and editing may bind different exact models. Automatic setup,
+  desktop tool capability projection, and prototype reference conditioning
+  must consume the task-specific route instead of collapsing both tasks into
+  one legacy image assignment.
 
 ### R2. Truthful quality evidence
 
@@ -110,6 +121,11 @@ separate from executable support.
       unsupported.
 - [ ] Recommendation tests prove quality tier changes never change support,
       Provider protocol, exact model transport id, or approval behavior.
+- [ ] A reviewed non-recommended Arena edit model becomes executable only when
+      its exact id is verified on an endpoint with an edit adapter; absence from
+      the endpoint and an adapter-missing Provider both fail before a paid call.
+- [ ] Distinct generation/edit bindings are advertised and executed with their
+      own Provider/model identities.
 - [ ] Page review records survive workspace persistence/recovery and bind to the
       exact page digest.
 - [ ] Delivery evidence fails closed when new review records are missing or

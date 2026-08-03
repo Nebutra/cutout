@@ -15,7 +15,7 @@ import {
   exactImageRouteDescriptor,
   imageRouteRecommendationRank,
   isImageModelNominationCandidate,
-  reviewedAutomaticImageDescriptors,
+  reviewedCatalogImageDescriptors,
 } from './image-route-assessment'
 import { mergeModelDescriptors } from './model-catalog'
 
@@ -60,11 +60,15 @@ export function automaticBindingsFor(
       descriptor: exactImageRouteDescriptor(descriptors, assignment),
     })
   })
-  const image = assessed
+  const rankRoutes = (left: typeof assessed[number], right: typeof assessed[number]) =>
+    imageRouteRecommendationRank(right.assignment.model)
+    - imageRouteRecommendationRank(left.assignment.model)
+  const generation = assessed
     .filter((route) => route.generation.supported)
-    .sort((left, right) =>
-      imageRouteRecommendationRank(right.assignment.model)
-      - imageRouteRecommendationRank(left.assignment.model))[0]
+    .sort(rankRoutes)[0]
+  const edit = assessed
+    .filter((route) => route.edit.supported)
+    .sort(rankRoutes)[0]
 
   if (chat) {
     const assignment = { providerId: chat.provider.id, model: chat.model }
@@ -72,13 +76,8 @@ export function automaticBindingsFor(
       bindings[task] = assignment
     }
   }
-  if (image) {
-    const assignment = image.assignment
-    bindings['image-generation'] = assignment
-    if (image.edit.supported) {
-      bindings['image-edit'] = assignment
-    }
-  }
+  if (generation) bindings['image-generation'] = generation.assignment
+  if (edit) bindings['image-edit'] = edit.assignment
   return bindings
 }
 
@@ -121,6 +120,6 @@ function automaticDescriptorsFor(
 ) {
   return mergeModelDescriptors(configured.flatMap(({ provider, models, descriptors }) => [
     ...(descriptors ?? []),
-    ...reviewedAutomaticImageDescriptors(provider, models),
+    ...reviewedCatalogImageDescriptors(provider, models),
   ]))
 }

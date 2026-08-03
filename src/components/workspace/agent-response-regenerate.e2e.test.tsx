@@ -26,6 +26,16 @@ const MODEL = 'regeneration-model'
 const storage = installE2eLocalStorage()
 
 vi.mock('@/services/ai/model-assignment.local', () => ({
+  loadCapabilityBindings: async () => ({
+    version: 'model-assignments.v2' as const,
+    bindings: {
+      text: { providerId: PROVIDER_ID, model: MODEL },
+      vision: { providerId: PROVIDER_ID, model: MODEL },
+      'image-generation': { providerId: PROVIDER_ID, model: MODEL },
+      'image-edit': { providerId: PROVIDER_ID, model: MODEL },
+    },
+    descriptors: [],
+  }),
   loadAssignments: async (): Promise<ModelAssignments> => ({
     chat: { providerId: PROVIDER_ID, model: MODEL },
     image: { providerId: PROVIDER_ID, model: MODEL },

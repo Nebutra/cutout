@@ -2,7 +2,7 @@ import { z } from 'zod'
 import type { ModelAssignments } from '@/services/ai/model-assignment-types'
 import type { ModelAssignment } from '@/services/ai/model-assignment-types'
 import type { ProviderConfig } from '@/services/ai/provider-types'
-import type { ModelDescriptor } from '@/services/ai/model-capabilities'
+import type { CapabilityBindings, ModelDescriptor } from '@/services/ai/model-capabilities'
 import {
   assessImageRoute,
   exactImageRouteDescriptor,
@@ -144,31 +144,38 @@ export function desktopPaidToolCapabilities(
   assignments: ModelAssignments,
   evidence: {
     readonly descriptors?: readonly ModelDescriptor[]
+    readonly bindings?: CapabilityBindings['bindings']
   } = {},
   estimates: Partial<Record<PaidToolCapability, MoneyEstimate>> = {},
 ): readonly PaidToolExecutorCapability[] {
-  const image = assignments.image
-  const provider = image
-    ? providers.find((candidate) => candidate.id === image.providerId && candidate.enabled)
-    : undefined
-  if (!image || !provider) return []
-  const assessment = assessImageRoute({
-    assignment: image,
-    provider,
-    descriptor: exactImageRouteDescriptor(evidence.descriptors ?? [], image),
-  })
   const fallback = { currency: 'USD', amount: 0, credits: 0 }
-  const capabilities = [
-    ...(assessment.generation.supported ? ['generate-image' as const] : []),
-    ...(assessment.edit.supported ? ['edit-image' as const] : []),
+  const generation = evidence.bindings?.['image-generation'] ?? assignments.image
+  const edit = evidence.bindings?.['image-edit'] ?? generation
+  const routes = [
+    { capability: 'generate-image' as const, assignment: generation },
+    { capability: 'edit-image' as const, assignment: edit },
   ]
-  return capabilities.map((capability) => ({
-    capability,
-    providerId: image.providerId,
-    model: image.model,
-    available: true,
-    estimatedCost: estimates[capability] ?? fallback,
-  }))
+  return routes.flatMap(({ capability, assignment }) => {
+    if (!assignment) return []
+    const provider = providers.find((candidate) =>
+      candidate.id === assignment.providerId && candidate.enabled)
+    if (!provider) return []
+    const assessment = assessImageRoute({
+      assignment,
+      provider,
+      descriptor: exactImageRouteDescriptor(evidence.descriptors ?? [], assignment),
+    })
+    const supported = capability === 'edit-image'
+      ? assessment.edit.supported
+      : assessment.generation.supported
+    return supported ? [{
+      capability,
+      providerId: assignment.providerId,
+      model: assignment.model,
+      available: true,
+      estimatedCost: estimates[capability] ?? fallback,
+    }] : []
+  })
 }
 
 /** Projects a locked desktop composer route into a transport-neutral request. */

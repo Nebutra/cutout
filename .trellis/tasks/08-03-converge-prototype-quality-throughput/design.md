@@ -31,6 +31,19 @@ to every model under one Provider kind. `supportsOpenAIImageEndpoints` keeps its
 narrow meaning as the OpenAI adapter predicate; it is not the global edit
 capability check.
 
+Reviewed model evidence is Provider-neutral. The exact model id and capability
+are projected only when the authenticated catalog for the configured Provider
+contains that id. The 2026-07-25 Image Edit Arena roster supplies reviewed edit
+evidence but no generation, transport, or recommendation claim. Manual Provider
+verification and automatic setup both use this projection; the resulting
+descriptor is then intersected with the separately owned adapter strategy.
+
+Generation and editing retain separate task bindings through automatic setup,
+desktop paid-tool capability projection, and prototype execution. Reference-
+conditioned work selects the verified edit route first and falls back to the
+generation route only when that same route also has executable edit capability.
+The legacy singular image assignment remains a compatibility fallback.
+
 Desktop paid capability projection, Design System conditioning, and page
 generation consume the same route assessment. When edit is executable, visual
 references flow through that adapter. When generation is executable but edit

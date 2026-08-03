@@ -3,7 +3,7 @@ import { createBuiltinProviderRegistry } from '@/services/ai/provider-registry'
 import { modelTaskProfile, type CapabilityBindings } from '@/services/ai/model-capabilities'
 import {
   assessImageRoute,
-  exactImageRouteDescriptor,
+  verifiedImageRouteDescriptor,
 } from '@/services/ai/image-route-assessment'
 import {
   providerVerificationIsVerified,
@@ -38,7 +38,12 @@ export function modelRoutingCoverage(
         const assessment = assessImageRoute({
           assignment: direct,
           provider,
-          descriptor: exactImageRouteDescriptor(bindings?.descriptors ?? [], direct),
+          descriptor: verifiedImageRouteDescriptor({
+            provider,
+            assignment: direct,
+            descriptors: bindings?.descriptors ?? [],
+            verifiedCatalogModels: verifications[provider.id]?.models,
+          }),
         })
         return item.task === 'image-edit'
           ? assessment.edit.supported

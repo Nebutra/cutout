@@ -24,6 +24,14 @@ const uploadedBytes = Uint8Array.of(82, 73, 70, 70, 9, 8, 7, 6)
 const decodedImages: Blob[] = []
 
 vi.mock('@/services/ai/model-assignment.local', () => ({
+  loadCapabilityBindings: async () => ({
+    version: 'model-assignments.v2' as const,
+    bindings: {
+      text: { providerId: PROVIDER_ID, model: MODEL },
+      vision: { providerId: PROVIDER_ID, model: MODEL },
+    },
+    descriptors: [],
+  }),
   loadAssignments: async (): Promise<ModelAssignments> => ({
     chat: { providerId: PROVIDER_ID, model: MODEL },
   }),

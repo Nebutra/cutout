@@ -23,6 +23,7 @@ import { installE2eLocalStorage } from './intent-workspace.e2e.testkit'
 const PROVIDER_ID = 'provider:e2e'
 const CHAT_MODEL = 'chat-e2e'
 const IMAGE_MODEL = 'image-e2e'
+const EDIT_MODEL = 'flux-2-max'
 
 const desktopHarness = vi.hoisted(() => ({
   artifacts: new Map<string, { bytes: Uint8Array; mediaType: string }>(),
@@ -32,6 +33,7 @@ const desktopHarness = vi.hoisted(() => ({
   imageToolCallIds: [] as string[],
   imageToolSignals: [] as Array<AbortSignal | undefined>,
   imageToolReferenceCounts: [] as number[],
+  imageToolModels: [] as string[],
   imageToolFailure: null as null | ((toolCallId: string) => Error | null),
   imageToolWait: null as null | ((toolCallId: string) => Promise<void>),
   boardPrompts: [] as string[],
@@ -68,18 +70,28 @@ vi.mock('@/services/ai/model-assignment.local', () => ({
       text: { providerId: PROVIDER_ID, model: CHAT_MODEL },
       vision: { providerId: PROVIDER_ID, model: CHAT_MODEL },
       'image-generation': { providerId: PROVIDER_ID, model: IMAGE_MODEL },
-      'image-edit': { providerId: PROVIDER_ID, model: IMAGE_MODEL },
+      'image-edit': { providerId: PROVIDER_ID, model: EDIT_MODEL },
     },
-    descriptors: [{
-      providerId: PROVIDER_ID,
-      model: IMAGE_MODEL,
-      capabilities: ['image-generation', 'image-edit'],
-      source: 'verified-catalog',
-      evidence: [
-        { capability: 'image-generation', kind: 'verified', sourceId: 'rendered-e2e' },
-        { capability: 'image-edit', kind: 'verified', sourceId: 'rendered-e2e' },
-      ],
-    }],
+    descriptors: [
+      {
+        providerId: PROVIDER_ID,
+        model: IMAGE_MODEL,
+        capabilities: ['image-generation'],
+        source: 'verified-catalog',
+        evidence: [
+          { capability: 'image-generation', kind: 'verified', sourceId: 'rendered-e2e' },
+        ],
+      },
+      {
+        providerId: PROVIDER_ID,
+        model: EDIT_MODEL,
+        capabilities: ['image-edit'],
+        source: 'verified-catalog',
+        evidence: [
+          { capability: 'image-edit', kind: 'observed', sourceId: 'rendered-e2e' },
+        ],
+      },
+    ],
   }),
   loadAssignments: async (): Promise<ModelAssignments> => ({
     chat: { providerId: PROVIDER_ID, model: CHAT_MODEL },
@@ -108,12 +120,14 @@ vi.mock('@/agent-runtime/use-desktop-tool-loop', () => ({
       readonly toolCallId: string
       readonly signal?: AbortSignal
       readonly inputs?: readonly unknown[]
+      readonly image: { readonly model: string }
     }) => {
       const prompt = request.prompt ?? ''
       desktopHarness.imageToolPrompts.push(prompt)
       desktopHarness.imageToolCallIds.push(request.toolCallId)
       desktopHarness.imageToolSignals.push(request.signal)
       desktopHarness.imageToolReferenceCounts.push(request.inputs?.length ?? 0)
+      desktopHarness.imageToolModels.push(request.image.model)
       await desktopHarness.imageToolWait?.(request.toolCallId)
       const failure = desktopHarness.imageToolFailure?.(request.toolCallId)
       if (failure) throw failure
@@ -554,7 +568,7 @@ function fakeRegistry(): ServiceRegistry {
       setKey: notUsed,
       status: async () => ({ hasKey: true }),
       statuses: async (ids) => Object.fromEntries(ids.map((id) => [id, true])),
-      test: async () => ok({ model: CHAT_MODEL, models: [CHAT_MODEL, IMAGE_MODEL] }),
+      test: async () => ok({ model: CHAT_MODEL, models: [CHAT_MODEL, IMAGE_MODEL, EDIT_MODEL] }),
     },
     generation: {
       generateText: async () => ok(DESIGN_MARKDOWN),
@@ -563,6 +577,7 @@ function fakeRegistry(): ServiceRegistry {
       },
       generateImages: async () => err('not used in this test'),
       editImage: async (input) => {
+        expect(input.model).toBe(EDIT_MODEL)
         desktopHarness.boardPrompts.push(input.prompt)
         desktopHarness.activeBoardCalls += 1
         desktopHarness.maximumBoardConcurrency = Math.max(
@@ -638,6 +653,7 @@ describe('brief → every planned route — rendered IntentWorkspace', () => {
     desktopHarness.imageToolCallIds.length = 0
     desktopHarness.imageToolSignals.length = 0
     desktopHarness.imageToolReferenceCounts.length = 0
+    desktopHarness.imageToolModels.length = 0
     desktopHarness.imageToolFailure = null
     desktopHarness.imageToolWait = null
     desktopHarness.boardPrompts.length = 0
@@ -842,6 +858,9 @@ describe('brief → every planned route — rendered IntentWorkspace', () => {
     expect(pageCallIndexes.map(
       (index) => desktopHarness.imageToolReferenceCounts[index],
     ).filter((count) => count === 2)).toHaveLength(15)
+    expect(pageCallIndexes.map(
+      (index) => desktopHarness.imageToolModels[index],
+    )).toEqual(Array(18).fill(EDIT_MODEL))
 
     const productionState = getStoreState().assetProduction
     const productionRuns = Object.values(productionState.runs)
