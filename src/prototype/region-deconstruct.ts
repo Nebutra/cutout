@@ -30,7 +30,6 @@ import type { GenerationService } from '@/services/ai/types'
 import type { ProviderService } from '@/services/ai/types'
 import type { ModelAssignment } from '@/services/ai/model-assignment-types'
 import type { ReasoningEffort } from '@/services/ai/reasoning'
-import { supportsOpenAIImageEndpoints } from '@/services/ai/provider-types'
 import { nameSlices } from '@/services/ai/naming'
 import { isErr } from '@/services/types'
 import { buildBoardChecklist, generateWithQa, type QaVerdict } from './generation-qa'
@@ -253,6 +252,8 @@ export interface RegionBreakdownParams {
   /** Design-system + sibling-page bytes that anchor style across region boards. */
   readonly referenceImages?: readonly Uint8Array[]
   readonly image: ModelAssignment
+  /** Exact model evidence intersected with an implemented edit adapter. */
+  readonly editSupported?: boolean
   readonly signal?: AbortSignal
   /** Streamed once per region as its slices are cut, so the UI fills in live. */
   readonly onRegionSliced: (
@@ -322,9 +323,7 @@ export async function runRegionBreakdown(
   const regions = selectBoardCutoutRegions(params.page).filter(
     (region) => !targets || targets.has(region.id),
   )
-  const configs = await deps.providers.list()
-  const kind = configs.find((provider) => provider.id === params.image.providerId)?.kind
-  const useEdit = supportsOpenAIImageEndpoints(kind)
+  const useEdit = params.editSupported === true
   const references = params.referenceImages ?? []
 
   // Optionally swap the board source for a text-free variant of the page so

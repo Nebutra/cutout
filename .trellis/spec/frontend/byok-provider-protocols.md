@@ -471,9 +471,26 @@ import_provider_draft(app: AppHandle, input: ImportDraftInput) -> Result<Provide
   evidence must not call image generation usable until a real image completes.
 - Automatic setup prefers each authenticated Provider's checked default model
   for text/Coding instead of taking the first alphabetically sorted catalog
-  id. Image routing uses the first available product-preferred image model,
-  currently led by `gpt-image-2`, before falling back to another checked image
-  id.
+  id. Image routing intersects exact observed/verified model evidence with an
+  implemented Provider adapter. A task binding selects the exact route but is
+  not capability evidence. Automatic setup prefers a supported
+  high-fidelity-recommended route, including reviewed GPT Image / ChatGPT Image,
+  Muse Image, MAI Image 2.5, Gemini 3 Pro Image, Qwen Image 3.0, Seedream 5 Pro,
+  Reve 2.1, GPT Image 1.5 aliases, Gemini 3.1 Flash Image aliases, and strong
+  Grok Image families, then falls back to another supported
+  compatible route without changing its exact model id. Recommendation never
+  establishes support.
+- Automatic nomination may recognize image-family ids such as `seedream-*` and
+  `reve-*`, while exact observed/verified descriptors may nominate models whose
+  ids contain no image keyword. Nomination is discovery only: exact route
+  evidence and an implemented adapter still decide support.
+- OpenAI-shaped image routes have implemented generation and edit adapters.
+  Google/Gemini routes have an implemented generation adapter but remain
+  `adapter-required` for generic image editing. DashScope/Qwen compatible-mode
+  routes remain `adapter-required` for both generation and editing until their
+  native request, response, authentication, and cancellation contracts are
+  implemented and tested. Provider kind, catalog presence, and model-name
+  heuristics alone never authorize an image call.
 - Automatic setup stops importing candidates as soon as the configured results
   cover every required task dimension. It must continue after a failed or
   partial candidate, but it must not probe unrelated credentials after a

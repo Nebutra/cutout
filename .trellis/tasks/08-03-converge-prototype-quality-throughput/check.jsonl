@@ -1,0 +1,6 @@
+{"file":".trellis/spec/frontend/prototype-generation.md","reason":"Verify exact route-suite, QA, retry, concurrency, and delivery evidence behavior."}
+{"file":".trellis/spec/frontend/byok-provider-protocols.md","reason":"Verify model eligibility does not rewrite protocol capability truth."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Apply project quality and dependency review gates."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Audit review evidence round trips and UI/runtime authority boundaries."}
+{"file":".trellis/tasks/08-03-converge-prototype-quality-throughput/research/model-eligibility.md","reason":"Check implementation against researched model boundary."}
+{"file":".trellis/tasks/08-03-converge-prototype-quality-throughput/research/quality-state-throughput.md","reason":"Check QA truth, selection stability, and scheduler safety against evidence."}

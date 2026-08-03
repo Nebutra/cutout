@@ -58,8 +58,13 @@ import { useServices } from "@/services/context";
 import { createCutoutResultSink } from "@/services/cutout-result-sink";
 import { isErr } from "@/services/types";
 import type { ModelAssignment } from "@/services/ai/model-assignment-types";
-import { supportsOpenAIImageEndpoints } from "@/services/ai/provider-types";
-import { ensureProviderVerification } from "@/services/ai/provider-verification";
+import {
+  ensureProviderVerification,
+} from "@/services/ai/provider-verification";
+import {
+  assessImageRoute,
+  exactImageRouteDescriptor,
+} from "@/services/ai/image-route-assessment";
 import type {
   ComposerModelPolicy,
   ComposerThinkingPolicy,
@@ -83,7 +88,10 @@ import {
 } from "@/services/ai/generation-error";
 import type { PackagedE2eFailureDiagnostic } from "@/packaged-e2e/runner";
 import { packagedE2eFailureDiagnostic } from "@/packaged-e2e/failure-diagnostic";
-import { useModelAssignments } from "@/hooks/queries/ai-settings";
+import {
+  useCapabilityBindings,
+  useModelAssignments,
+} from "@/hooks/queries/ai-settings";
 import { useProviders } from "@/hooks/queries/providers";
 import {
   useDeconstructMockup,
@@ -264,8 +272,11 @@ import {
 } from "@/components/files-panel/FilesPanel";
 import { bytesToBlob, blobToBytes, decodeImage } from "@/lib/image";
 import { resolveSourceMaterial } from "@/store/source-material";
-import { forEachConcurrent } from "@/lib/async-pool";
 import { compilePrototypeImageRequestBudget } from "@/prototype/production-throughput";
+import {
+  interleavePrototypeProductionWork,
+  schedulePrototypeProductionWork,
+} from "@/prototype/production-work-scheduler";
 import {
   nameRegionSlices,
   runRegionBreakdown,
@@ -285,7 +296,6 @@ const PROTOTYPE_QA_ENABLED = true;
 const PROTOTYPE_QA_MAX_RETRIES = 0;
 const PROTOTYPE_GENERATION_CONCURRENCY = 3;
 const PROTOTYPE_QA_CONCURRENCY = 3;
-const PROTOTYPE_BOARD_PAGE_CONCURRENCY = 3;
 const PROTOTYPE_BOARD_GROUP_CONCURRENCY_PER_PAGE = 1;
 import {
   persistReferenceAttachment,
@@ -356,7 +366,12 @@ import {
   type ProductionIssue,
   type ProductionReviewProjection,
   type ProductionRunStatus,
+  sha256Bytes,
 } from "@/asset-production";
+import {
+  projectPrototypeResourceReviewRecord,
+  type PrototypePageReviewRecord,
+} from "@/prototype/review-evidence";
 
 type AssetStageId =
   | "idle"
@@ -499,6 +514,9 @@ export function IntentWorkspace({
     useState<PrototypeSuiteCandidateSet | null>(() =>
       recoverPrototypeSuiteCandidateSet(initialWorkspace?.prototypeSuiteCandidates),
     );
+  const prototypeSuiteSelectionRef = useRef(
+    prototypeSuiteCandidates?.set.selection,
+  );
   const [packagedE2eRetryImageCallCount, setPackagedE2eRetryImageCallCount] =
     useState(0);
   const packagedE2ePlannedImageCallCount = useMemo(() => {
@@ -643,8 +661,7 @@ export function IntentWorkspace({
     prototypeDesignSystemCandidates &&
       !prototypeDesignSystemCandidates.set.selection &&
       prototypeDesignSystemCandidates.set.proposal.count > 1 &&
-      readyPrototypeDesignSystemCandidates(prototypeDesignSystemCandidates).length ===
-        prototypeDesignSystemCandidates.set.proposal.count,
+      readyPrototypeDesignSystemCandidates(prototypeDesignSystemCandidates).length > 0,
   );
   useEffect(() => {
     if (!designSystemSelectionRequired) return;
@@ -810,11 +827,13 @@ export function IntentWorkspace({
   );
   const productionReviewCount = productionReviewQueue.length;
   const assignments = useModelAssignments();
+  const capabilityBindings = useCapabilityBindings();
   const providers = useProviders();
   const desktopTools = useDesktopToolLoop({
     services,
     providers: providers.data ?? [],
     assignments: assignments.data ?? {},
+    capabilityBindings: capabilityBindings.data,
     revision: designDocument?.revision.number ?? 0,
     append: emitRunEvents,
     cutoutResultSink: createCutoutResultSink(getStoreState),
@@ -1847,6 +1866,22 @@ export function IntentWorkspace({
         routePreferences,
       });
       route = { ...chatRoute, ...imageRoute };
+      const imageProvider = providerList.find(
+        (provider) => provider.id === route.image.providerId,
+      );
+      const assessment = assessImageRoute({
+        assignment: route.image,
+        provider: imageProvider,
+        descriptor: exactImageRouteDescriptor(
+          capabilityBindings.data?.descriptors ?? [],
+          route.image,
+        ),
+      });
+      if (!assessment.generation.supported) {
+        throw new Error(
+          `capability-required: image-generation ${assessment.generation.reason}. Verify the exact model capability and configure an implemented provider adapter.`,
+        );
+      }
       routePolicy.appendRouteReceipts(
         [imageRoute.imagePolicy.routeReceipt]
           .filter((receipt) => receipt !== undefined)
@@ -2070,14 +2105,6 @@ export function IntentWorkspace({
     if (!prototypeDesignSystemCandidates) return;
     try {
       if (
-        readyPrototypeDesignSystemCandidates(prototypeDesignSystemCandidates).length !==
-        prototypeDesignSystemCandidates.set.proposal.count
-      ) {
-        throw new Error(
-          "Every requested Design System direction must be ready before selection.",
-        );
-      }
-      if (
         designDocument &&
         !prototypeDesignSystemCandidates.set.baseRevisionId.startsWith("workspace.v1:") &&
         prototypeDesignSystemCandidates.set.baseRevisionId !== designDocument.revision.id
@@ -2133,7 +2160,13 @@ export function IntentWorkspace({
       if (!recovered.designSystem || recovered.pages.length !== artifact.plan.pages.length) {
         throw new Error("The selected prototype suite media is incomplete.");
       }
-      await restorePrototypeSuiteResourcePack(artifact);
+      prototypeSuiteSelectionRef.current = selected.set.selection;
+      const siblingGenerating = selected.set.candidates.some(
+        (candidate) => candidate.id !== candidateId && candidate.status === "generating",
+      );
+      await restorePrototypeSuiteResourcePack(artifact, {
+        selectAuthority: !siblingGenerating,
+      });
       setPrototypeSuiteCandidates(selected);
       setPrototypePlan(artifact.plan);
       setPrototypeScope("full-plan");
@@ -2149,6 +2182,7 @@ export function IntentWorkspace({
 
   async function restorePrototypeSuiteResourcePack(
     suite: PersistedPrototypeSuiteCandidate,
+    options: { readonly selectAuthority?: boolean } = {},
   ): Promise<void> {
     const production = getStoreState().assetProduction;
     const authoritativeRun = resolveResourcePackProductionRun(
@@ -2212,6 +2246,7 @@ export function IntentWorkspace({
     for (const entry of resolved) {
       getStoreState().renameSlice(entry.input.id, entry.name);
     }
+    if (options.selectAuthority === false) return;
     const selectedProduction = selectResourcePackProductionAuthority(
       production,
       suite.resourcePack,
@@ -2917,13 +2952,20 @@ export function IntentWorkspace({
         baseRevisionId: designDocument?.revision.id ?? "workspace.v1:unprojected",
       });
     if (!options.resumePrototypeSuiteCandidates) {
+      prototypeSuiteSelectionRef.current = undefined;
       setPrototypeSuiteDeliveryObservations({});
       prototypeSuiteRetryFrontiersRef.current = {};
     }
     const publish = (next: PrototypeSuiteCandidateSet) => {
-      suites = next;
+      const selection = prototypeSuiteSelectionRef.current;
+      const selectedCandidate = selection
+        ? next.set.candidates.find((candidate) => candidate.id === selection.candidateId)
+        : undefined;
+      suites = selection && selectedCandidate?.status === "ready" && next.artifacts[selection.candidateId]
+        ? { ...next, set: { ...next.set, selection } }
+        : next;
       agentRunCoordinatorRef.current.publish(lease, () =>
-        setPrototypeSuiteCandidates(next),
+        setPrototypeSuiteCandidates(suites),
       );
     };
     publish(suites);
@@ -3005,9 +3047,13 @@ export function IntentWorkspace({
           prototypeRouteGraphFingerprint(retryFrontier.plan) ===
             prototypeRouteGraphFingerprint(planned.data),
         );
-        setPrototypePlan(planned.data);
-        setPrototypeDesignSystem(designArtifact);
-        if (!resumeCurrentSuite) setPrototypePages([]);
+        const projectSingular = !prototypeSuiteSelectionRef.current
+          || prototypeSuiteSelectionRef.current.candidateId === suiteCandidate.id;
+        if (projectSingular) {
+          setPrototypePlan(planned.data);
+          setPrototypeDesignSystem(designArtifact);
+          if (!resumeCurrentSuite) setPrototypePages([]);
+        }
         const generated = await generateSinglePrototypeSuite(
           text,
           planned.data,
@@ -3019,6 +3065,7 @@ export function IntentWorkspace({
             preserveCandidateSets: true,
             suiteRunId: suiteCandidate.id,
             resumePages: retryFrontier?.pages,
+            projectSingular,
             repair: undefined,
             targetPageIds: undefined,
           },
@@ -3070,6 +3117,27 @@ export function IntentWorkspace({
       (candidate) => candidate.status !== "ready" || !suites.artifacts[candidate.id],
     );
     if (incompleteSuiteCandidates.length > 0) {
+      const humanSelection = prototypeSuiteSelectionRef.current;
+      const humanArtifact = humanSelection
+        ? suites.artifacts[humanSelection.candidateId]
+        : undefined;
+      const humanCandidate = humanSelection
+        ? suites.set.candidates.find((candidate) => candidate.id === humanSelection.candidateId)
+        : undefined;
+      if (humanArtifact && humanCandidate?.status === "ready") {
+        await restorePrototypeSuiteResourcePack(humanArtifact);
+        const recovered = recoverPrototypeArtifacts({
+          designSystem: humanArtifact.designSystem.artifact,
+          pages: humanArtifact.pages,
+        });
+        if (!recovered.designSystem || recovered.pages.length !== humanArtifact.plan.pages.length) {
+          throw new Error("The human-selected prototype suite media is incomplete.");
+        }
+        setPrototypePlan(humanArtifact.plan);
+        setPrototypeDesignSystem(recovered.designSystem);
+        setPrototypePages(recovered.pages);
+        setSelectedPrototypePageId(humanArtifact.plan.pages[0]?.id ?? null);
+      }
       const details = incompleteSuiteCandidates
         .flatMap((candidate) => candidate.error ? [candidate.error] : [])
         .join(" ");
@@ -3078,9 +3146,14 @@ export function IntentWorkspace({
       throw new Error(message);
     }
 
-    const selectedSuiteCandidate = suites.set.candidates.find(
-      (candidate) => candidate.directionId === selectedDirectionId && candidate.status === "ready",
-    );
+    const humanSelection = prototypeSuiteSelectionRef.current;
+    const selectedSuiteCandidate = humanSelection
+      ? suites.set.candidates.find(
+          (candidate) => candidate.id === humanSelection.candidateId && candidate.status === "ready",
+        )
+      : suites.set.candidates.find(
+          (candidate) => candidate.directionId === selectedDirectionId && candidate.status === "ready",
+        );
     if (!selectedSuiteCandidate) {
       const details = suites.set.candidates
         .filter((candidate) => candidate.error)
@@ -3088,21 +3161,27 @@ export function IntentWorkspace({
         .join(" ");
       throw new Error(details || "The selected prototype direction did not complete.");
     }
-    const selected = selectPrototypeSuiteCandidate(
-      suites,
-      selectedSuiteCandidate.id,
-      { kind: "human", id: "workspace-user" },
-    );
+    const selected = humanSelection
+      ? suites
+      : selectPrototypeSuiteCandidate(
+          suites,
+          selectedSuiteCandidate.id,
+          designCandidates.set.selection!.actor,
+        );
     publish(selected);
     const artifact = selectedPrototypeSuite(selected);
     if (!artifact) throw new Error("The selected prototype suite is unavailable.");
     await restorePrototypeSuiteResourcePack(artifact);
-    setPrototypePlan(artifact.plan);
-    setPrototypeDesignSystem(options.selectedDesignSystem);
-    setPrototypePages(recoverPrototypeArtifacts({
-      designSystem: null,
+    const recoveredSelection = recoverPrototypeArtifacts({
+      designSystem: artifact.designSystem.artifact,
       pages: artifact.pages,
-    }).pages);
+    });
+    if (!recoveredSelection.designSystem) {
+      throw new Error("The selected prototype suite Design System is unavailable.");
+    }
+    setPrototypePlan(artifact.plan);
+    setPrototypeDesignSystem(recoveredSelection.designSystem);
+    setPrototypePages(recoveredSelection.pages);
     setSelectedPrototypePageId(artifact.plan.pages[0]?.id ?? null);
     setWorkflowPhase("idle");
   }
@@ -3131,6 +3210,8 @@ export function IntentWorkspace({
       readonly suiteRunId?: string;
       /** Candidate-local settled pages retained while independent siblings continue. */
       readonly resumePages?: readonly PrototypePageArtifact[];
+      /** Whether this sibling currently owns the singular workspace projection. */
+      readonly projectSingular?: boolean;
     },
     lease: AgentRunLease,
   ): Promise<GeneratedPrototypeSuite | null> {
@@ -3197,14 +3278,14 @@ export function IntentWorkspace({
       },
     });
 
-    if (options.startFresh) {
+    if (options.projectSingular !== false && options.startFresh) {
       setPrototypePages(reusablePages);
       setPrototypeDesignSystem(options.selectedDesignSystem ?? null);
       if (!options.preserveCandidateSets) setPrototypeDesignSystemCandidates(null);
       setSelectedPrototypePageId(
         reusablePages.length > 0 ? (reusablePages[0]?.page.id ?? null) : null,
       );
-    } else if (reusablePages.length > 0) {
+    } else if (options.projectSingular !== false && reusablePages.length > 0) {
       setPrototypePages(reusablePages);
       setSelectedPrototypePageId((selected) =>
         selected && pageIds.has(selected)
@@ -3513,10 +3594,29 @@ export function IntentWorkspace({
           candidate.route === "direct-generate" &&
           (!executionTargetRegions || executionTargetRegions.has(candidate.regionId)),
       );
-      await forEachConcurrent(
-        directTasks,
-        PROTOTYPE_GENERATION_CONCURRENCY,
-        async (task) => {
+      const extractionPageIds = new Set(
+        selectPagesWithBoardCutouts(generated.map((artifact) => artifact.page)).map(
+          (page) => page.id,
+        ),
+      );
+      const extractionTargets = generated.filter((artifact) =>
+        extractionPageIds.has(artifact.page.id),
+      );
+      const cutoutParams = getStoreState().params;
+      const anchorPage = generated[0];
+      type ProductionWork =
+        | { readonly kind: "direct"; readonly task: (typeof directTasks)[number] }
+        | { readonly kind: "board"; readonly artifact: (typeof extractionTargets)[number] };
+      const productionWork = interleavePrototypeProductionWork<ProductionWork>(
+        directTasks.map((task) => ({ kind: "direct" as const, task })),
+        extractionTargets.map((artifact) => ({ kind: "board" as const, artifact })),
+      );
+      await schedulePrototypeProductionWork({
+        work: productionWork,
+        concurrency: PROTOTYPE_GENERATION_CONCURRENCY,
+        run: async (work) => {
+        if (work.kind === "direct") {
+        const task = work.task;
         const pageArtifact = generated.find(
           (candidate) => candidate.page.id === task.pageId,
         );
@@ -3545,10 +3645,7 @@ export function IntentWorkspace({
             styleSummary: plan.designSystem.styleSummary,
             assetDirection: plan.designSystem.assetDirection,
           });
-          const providerKind = (providers.data ?? []).find(
-            (provider) => provider.id === image.providerId,
-          )?.kind;
-          const useEdit = supportsOpenAIImageEndpoints(providerKind);
+          const useEdit = currentImageRouteAssessment(image).edit.supported;
           const references = [pageArtifact.bytes, designSystem.bytes];
           let generatedAsset: { readonly bytes: Uint8Array; readonly mediaType: string } | null = null;
           const directOutcome = await generateWithQa({
@@ -3692,23 +3789,9 @@ export function IntentWorkspace({
             }),
           );
         }
-        },
-      );
-
-      const extractionPageIds = new Set(
-        selectPagesWithBoardCutouts(generated.map((artifact) => artifact.page)).map(
-          (page) => page.id,
-        ),
-      );
-      const extractionTargets = generated.filter((artifact) =>
-        extractionPageIds.has(artifact.page.id),
-      );
-      const cutoutParams = getStoreState().params;
-      const anchorPage = generated[0];
-      await forEachConcurrent(
-        extractionTargets,
-        PROTOTYPE_BOARD_PAGE_CONCURRENCY,
-        async (artifact) => {
+          return;
+        }
+        const artifact = work.artifact;
         const referenceBytes = [
           designSystem.bytes,
           ...(anchorPage && anchorPage.page.id !== artifact.page.id
@@ -3751,6 +3834,7 @@ export function IntentWorkspace({
             pageBytes: artifact.bytes,
             referenceImages: referenceBytes,
             image,
+            editSupported: currentImageRouteAssessment(image).edit.supported,
             signal: lease.controller.signal,
             targetRegionIds: executionTargetRegions
               ? [...executionTargetRegions]
@@ -3996,7 +4080,7 @@ export function IntentWorkspace({
         );
         agentRunCoordinatorRef.current.checkpoint(lease);
         },
-      );
+      });
 
       const failedProductionRegions = [...new Set(
         projectProductionReviewQueue(productionSnapshot, productionRunId)
@@ -4045,6 +4129,11 @@ export function IntentWorkspace({
         manifestItemId: task.manifestItemId,
         artifactId: artifact.artifactId,
         provenanceIds: [`provenance:${artifact.sha256}`],
+        review: projectPrototypeResourceReviewRecord({
+          artifactId: artifact.artifactId,
+          task: state,
+          reviewer: { providerId: route.chat.providerId, model: route.chat.model },
+        }),
       };
     });
     return {
@@ -4058,6 +4147,17 @@ export function IntentWorkspace({
         assets: resourceAssets,
       },
     };
+  }
+
+  function currentImageRouteAssessment(image: ModelAssignment) {
+    return assessImageRoute({
+      assignment: image,
+      provider: (providers.data ?? []).find((provider) => provider.id === image.providerId),
+      descriptor: exactImageRouteDescriptor(
+        capabilityBindings.data?.descriptors ?? [],
+        image,
+      ),
+    });
   }
 
   async function generatePrototypeDesignSystem(
@@ -4092,8 +4192,14 @@ export function IntentWorkspace({
       attempt === 1
         ? `workspace:${lease.id}`
         : `workspace:${lease.id}:design-system:${candidateId}${retryIdentity}`;
+    const canEdit = currentImageRouteAssessment(image).edit.supported;
+    if (materialReference && !canEdit) {
+      throw new Error(
+        "The configured image provider cannot preserve the selected material because its route does not support edit-image.",
+      );
+    }
     const edited =
-      references.length > 0
+      references.length > 0 && canEdit
         ? await invokeDesktopImageTool({
             capability: "edit-image",
             runId,
@@ -4241,6 +4347,12 @@ export function IntentWorkspace({
         .join(" ");
       throw new Error(details || "No Design System candidate completed successfully.");
     }
+    if (candidateSet.set.proposal.count > 1) {
+      autoNamePendingRef.current = false;
+      setNamingStatus("idle");
+      setWorkflowPhase("design-system-selection");
+      return null;
+    }
     if (!execution.complete || readyIds.length !== candidateSet.set.proposal.count) {
       const details = candidateSet.set.candidates
         .filter((candidate) => candidate.error)
@@ -4250,13 +4362,6 @@ export function IntentWorkspace({
         `Design System candidate generation is incomplete (${readyIds.length}/${candidateSet.set.proposal.count} ready).${details ? ` ${details}` : ""}`,
       );
     }
-    if (candidateSet.set.proposal.count > 1) {
-      autoNamePendingRef.current = false;
-      setNamingStatus("idle");
-      setWorkflowPhase("design-system-selection");
-      return null;
-    }
-
     const selected = selectPrototypeDesignSystemCandidate(
       candidateSet,
       readyIds[0]!,
@@ -4444,7 +4549,11 @@ export function IntentWorkspace({
       },
       review: (artifact) => reviewPrototypePage(plan, artifact, chat, lease),
       onProgress: (artifacts) => {
-        setPrototypePages(artifacts);
+        if (
+          !suiteRunId ||
+          !prototypeSuiteSelectionRef.current ||
+          prototypeSuiteSelectionRef.current.candidateId === suiteRunId
+        ) setPrototypePages(artifacts);
         if (suiteRunId) {
           const frontier = prototypeSuiteRetryFrontiersRef.current[suiteRunId];
           if (frontier) {
@@ -4501,7 +4610,11 @@ export function IntentWorkspace({
       },
       review: (artifact) => reviewPrototypePage(plan, artifact, chat, lease),
       onProgress: (artifacts) => {
-        setPrototypePages(artifacts);
+        if (
+          !suiteRunId ||
+          !prototypeSuiteSelectionRef.current ||
+          prototypeSuiteSelectionRef.current.candidateId === suiteRunId
+        ) setPrototypePages(artifacts);
         if (suiteRunId) {
           const frontier = prototypeSuiteRetryFrontiersRef.current[suiteRunId];
           if (frontier) {
@@ -4534,11 +4647,8 @@ export function IntentWorkspace({
       prototypePagePrompt(plan, page, designMarkdown),
     );
     const runId = `workspace:${lease.id}`;
-    const providerKind = (providers.data ?? []).find(
-      (provider) => provider.id === image.providerId,
-    )?.kind;
     const useReferenceEdit = referenceImages.length > 0 &&
-      supportsOpenAIImageEndpoints(providerKind);
+      currentImageRouteAssessment(image).edit.supported;
 
     // One paid invocation owns one page attempt. The previous visual DAG always
     // generated an unconditioned variant and refined it in a second image call,
@@ -4573,22 +4683,31 @@ export function IntentWorkspace({
     artifact: PrototypePageArtifact,
     chat: ModelAssignment,
     lease: AgentRunLease,
-  ): Promise<void> {
-    if (!PROTOTYPE_QA_ENABLED) return;
+  ): Promise<PrototypePageArtifact> {
     agentRunCoordinatorRef.current.checkpoint(lease);
-    const verdict = await reviewGeneratedImage(
-      personalizedGenerationRef.current,
-      chat,
-      artifact.bytes,
-      buildPageChecklist(plan, artifact.page),
-      lease.controller.signal,
-      (message) =>
-        console.info("[Cutout] page QA review failed:", artifact.page.id, message),
-    );
+    const verdict = PROTOTYPE_QA_ENABLED
+      ? await reviewGeneratedImage(
+          personalizedGenerationRef.current,
+          chat,
+          artifact.bytes,
+          buildPageChecklist(plan, artifact.page),
+          lease.controller.signal,
+          (message) =>
+            console.info("[Cutout] page QA review failed:", artifact.page.id, message),
+        )
+      : { pass: false, failures: ["Visual QA is unavailable."], unavailable: true };
     agentRunCoordinatorRef.current.checkpoint(lease);
     if (!verdict.pass) {
       console.info("[Cutout] page QA rejected:", artifact.page.id, 1, verdict.failures);
     }
+    const review: PrototypePageReviewRecord = {
+      version: "prototype-page-review.v1",
+      artifactSha256: await sha256Bytes(artifact.bytes),
+      reviewer: { providerId: chat.providerId, model: chat.model },
+      verdict: { ...verdict, failures: [...verdict.failures] },
+      reviewedAt: new Date().toISOString(),
+    };
+    return { ...artifact, review };
   }
 
   async function invokeDesktopImageTool(input: {
@@ -7590,9 +7709,11 @@ function DesignSystemCandidateComparison({
   readonly onRetry?: () => void;
   readonly readOnly?: boolean;
 }) {
-  const selectionReady =
-    readyPrototypeDesignSystemCandidates(candidateSet).length ===
-    candidateSet.set.proposal.count;
+  const readyCount = readyPrototypeDesignSystemCandidates(candidateSet).length;
+  const selectionReady = readyCount > 0;
+  const hasIncompleteCandidates = candidateSet.set.candidates.some(
+    (candidate) => candidate.status !== "ready",
+  );
   return (
     <div className="flex h-full min-h-0 flex-col bg-background">
       <div className="shrink-0 border-b border-border px-4 py-3">
@@ -7603,7 +7724,7 @@ function DesignSystemCandidateComparison({
               ? "Choose a Design System direction"
               : "Design System directions are incomplete"}
           </h2>
-          {!selectionReady && onRetry ? (
+          {hasIncompleteCandidates && onRetry ? (
             <Button
               type="button"
               variant="outline"
@@ -8821,6 +8942,7 @@ function persistPrototypePage(
   return {
     ...persistPrototypeImage(artifact),
     page: artifact.page,
+    ...(artifact.review ? { review: artifact.review } : {}),
   };
 }
 

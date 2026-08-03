@@ -1,6 +1,7 @@
 import { invoke } from '@tauri-apps/api/core'
 import { z } from 'zod'
 import { providerWireProtocolSchema, providerConfigSchema, providerKindSchema, type ProviderConfig, type ProviderWireProtocol } from './provider-types'
+import { modelDescriptorSchema } from './model-capabilities'
 
 const secretMarker = /^(?:sk-)|(?:bearer\s)|(?:api_?key|token|secret|password)=/i
 const hasControlCharacter = (value: string) => Array.from(value).some((character) => {
@@ -49,6 +50,7 @@ export async function discoverProviderCandidates(): Promise<ProviderDiscoveryCan
 const autoConfiguredProviderSchema = z.object({
   provider: providerConfigSchema,
   models: z.array(sanitizedText(300)).min(1),
+  descriptors: z.array(modelDescriptorSchema).optional(),
 }).strict()
 
 export type AutoConfiguredProvider = z.infer<typeof autoConfiguredProviderSchema>

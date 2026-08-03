@@ -18,20 +18,21 @@ describe('prototype production throughput wiring', () => {
     expect(pageGeneration).toContain('capability: useReferenceEdit ? "edit-image" : "generate-image"')
     expect(pageGeneration).toContain('references: useReferenceEdit ? referenceImages : []')
     expect(pageGeneration).not.toContain('generateWithQa')
-    expect(pageGeneration).toContain('const verdict = await reviewGeneratedImage(')
+    expect(pageGeneration).toContain('await reviewGeneratedImage(')
     expect(pageGeneration).toContain('lease.controller.signal')
     expect(pageGeneration).not.toContain('visualRuntime.execute')
     expect(workspaceSource).toContain('reviewMode: image.providerId === chat.providerId ? "inline" : "overlap"')
     expect(workspaceSource).toContain('reviewConcurrency: PROTOTYPE_QA_CONCURRENCY')
   })
 
-  it('bounds board context and produces pages concurrently without a text-free paid prepass', () => {
-    const start = workspaceSource.indexOf('const extractionTargets =')
+  it('interleaves direct and board work under one global image ceiling', () => {
+    const start = workspaceSource.indexOf('const directTasks =')
     const end = workspaceSource.indexOf('const failedProductionRegions =', start)
     const boardProduction = workspaceSource.slice(start, end)
 
-    expect(boardProduction).toContain('await forEachConcurrent(')
-    expect(boardProduction).toContain('PROTOTYPE_BOARD_PAGE_CONCURRENCY')
+    expect(boardProduction).toContain('interleavePrototypeProductionWork<ProductionWork>(')
+    expect(boardProduction).toContain('await schedulePrototypeProductionWork({')
+    expect(boardProduction).toContain('concurrency: PROTOTYPE_GENERATION_CONCURRENCY')
     expect(boardProduction).toContain('PROTOTYPE_BOARD_GROUP_CONCURRENCY_PER_PAGE')
     expect(boardProduction).toContain('designSystem.bytes')
     expect(boardProduction).toContain('anchorPage.bytes')

@@ -120,6 +120,7 @@ describe('generatePrototypePageSet', () => {
         maximumReviews = Math.max(maximumReviews, activeReviews)
         if (value.page.id === 'home') await anchorReview
         activeReviews -= 1
+        return value
       },
     })
 
@@ -158,6 +159,7 @@ describe('generatePrototypePageSet', () => {
       },
       async review(value) {
         if (value.page.id === 'home') await anchorReview
+        return value
       },
       onProgress: (artifacts) => progress.push(artifacts.map((value) => value.page.id)),
     })
@@ -188,6 +190,7 @@ describe('generatePrototypePageSet', () => {
       async review(value) {
         reviewed += 1
         if (value.page.id === 'catalog') await finalReview
+        return value
       },
     })
     void pending.then(() => {
@@ -213,6 +216,7 @@ describe('generatePrototypePageSet', () => {
       generate: async (page) => artifact(page),
       review: async (value) => {
         reviewed.push(value.page.id)
+        return value
       },
     })
     expect(reviewed).toEqual(['catalog'])
@@ -235,7 +239,10 @@ describe('generatePrototypePageSet', () => {
         if (page.id === 'catalog') throw new Error('image failed')
         return artifact(page)
       },
-      review: async () => anchorReview,
+      review: async (value) => {
+        await anchorReview
+        return value
+      },
     })
     void pending.then(
       () => { settled = true },
@@ -276,6 +283,7 @@ describe('generatePrototypePageSet', () => {
           throw new Error('review failed')
         }
         if (value.page.id === 'account') await finalReview
+        return value
       },
     })
     void pending.then(
@@ -299,5 +307,25 @@ describe('generatePrototypePageSet', () => {
       concurrency: 2,
       generate: async () => artifact(pages[1]!),
     })).rejects.toThrow('returned page "catalog" for planned page "home"')
+  })
+
+  it('returns and republishes transformed overlapping review artifacts', async () => {
+    const progress: Array<Array<{ id: string; reviewed: boolean }>> = []
+    const result = await generatePrototypePageSet({
+      pages: pages.slice(0, 2),
+      mode: 'anchor-parallel',
+      concurrency: 2,
+      reviewMode: 'overlap',
+      generate: async (page) => ({ ...artifact(page), reviewed: false }),
+      review: async (value) => ({ ...value, reviewed: true }),
+      onProgress: (artifacts) => progress.push(artifacts.map((value) => ({
+        id: value.page.id,
+        reviewed: value.reviewed,
+      }))),
+    })
+
+    expect(result.every((value) => value.reviewed)).toBe(true)
+    expect(progress.some((items) => items.some((item) => !item.reviewed))).toBe(true)
+    expect(progress.at(-1)?.every((item) => item.reviewed)).toBe(true)
   })
 })

@@ -21,6 +21,10 @@ import { migratePersistedPrototypeDesignSystemCandidateSet } from '@/prototype/d
 import { validatePrototypeSuiteCandidateSet } from '@/prototype/prototype-suite-candidates'
 import { codingReceiptSchema, type CodingReceipt } from '@/coding-runtime/contracts'
 import { prototypePlanSchema } from '@/prototype/prototype-plan'
+import {
+  prototypePageReviewRecordSchema,
+  prototypeResourceReviewRecordSchema,
+} from '@/prototype/review-evidence'
 import { z } from 'zod'
 
 const LEGACY_ACTOR_ID = 'cutout-legacy-workspace'
@@ -44,6 +48,7 @@ const prototypeSuiteMaterialSchema = z.object({
   pages: z.array(z.object({
     pageId: z.string().min(1),
     materialId: z.string().min(1),
+    review: prototypePageReviewRecordSchema.optional(),
   }).strict()),
   resourcePackMaterialId: z.string().min(1),
   provenanceIds: z.array(z.string().min(1)).min(1),
@@ -66,6 +71,7 @@ const resourceAssetMaterialSchema = z.object({
   manifestItemId: z.string().min(1),
   artifactId: z.string().min(1),
   provenanceIds: z.array(z.string().min(1)).min(1),
+  review: prototypeResourceReviewRecordSchema.optional(),
 }).strict()
 
 export interface LegacyProjectIdentity {
@@ -224,6 +230,9 @@ export function legacyWorkspaceSupplementalContent(
   const content = new Map<string, Uint8Array>()
   const add = (path: string, bytes: Uint8Array) => {
     content.set(legacyUri(projectId, path), bytes)
+  }
+  for (const page of workspace.prototypePages) {
+    if (page.review) add(pageReviewLegacyPath(page.page.id), jsonBytes(page.review))
   }
   for (const candidate of suiteState?.set.candidates ?? []) {
     const artifact = suiteState?.artifacts[candidate.id]
@@ -684,12 +693,29 @@ export async function designDocumentToWorkspaceSnapshot(
     if (!page) return err(`Material "${material.id}" has no matching prototype page.`)
     const bytes = await resolveBytes(material, resolver)
     if (!bytes) return err(`Missing or invalid content for material "${material.id}".`)
+    const reviewMaterial = valid.materials.find(
+      (candidate) => candidate.id === pageReviewMaterialId(pageId),
+    )
+    const reviewContent = reviewMaterial
+      ? await resolveJson(reviewMaterial, resolver)
+      : null
+    if (reviewContent && !reviewContent.ok) return reviewContent
+    const review = reviewContent
+      ? prototypePageReviewRecordSchema.safeParse(reviewContent.data)
+      : null
+    if (review && !review.success) {
+      return err(`Invalid page review material "${reviewMaterial!.id}".`)
+    }
+    if (review?.success && review.data.artifactSha256 !== await sha256(bytes)) {
+      return err(`Stale page review material "${reviewMaterial!.id}".`)
+    }
     pageArtifacts.push({
       page,
       bytes,
       mediaType: currentContent(material).mediaType ?? 'application/octet-stream',
       width: page.viewport.width,
       height: page.viewport.height,
+      ...(review?.success ? { review: review.data } : {}),
     })
   }
 
@@ -931,7 +957,11 @@ async function recoverPrototypeSuiteState(input: {
         mediaType: currentContent(pageMaterial).mediaType ?? 'application/octet-stream',
         width: size.width,
         height: size.height,
+        ...(pageReference.review ? { review: pageReference.review } : {}),
       })
+      if (pageReference.review && pageReference.review.artifactSha256 !== await sha256(bytes)) {
+        return err(`Prototype suite page review for "${pageReference.pageId}" is stale.`)
+      }
     }
 
     const resourceMaterial = materials.get(resourcePackMaterialId)
@@ -963,7 +993,11 @@ async function recoverPrototypeSuiteState(input: {
         manifestItemId: asset.data.manifestItemId,
         artifactId: asset.data.artifactId,
         provenanceIds: asset.data.provenanceIds,
+        ...(asset.data.review ? { review: asset.data.review } : {}),
       })
+      if (asset.data.review && asset.data.review.artifactId !== asset.data.artifactId) {
+        return err(`Resource asset review for "${asset.data.manifestItemId}" is stale.`)
+      }
     }
 
     const codingReceipt = descriptor.data.codingReceiptMaterialId
@@ -1209,6 +1243,16 @@ async function legacyMaterials(input: {
       provenanceId: input.provenanceId,
       createdAt: input.createdAt,
     }))
+    if (artifact.review) {
+      materials.push(await jsonMaterial({
+        id: pageReviewMaterialId(artifact.page.id),
+        name: `${artifact.page.name} review`,
+        value: artifact.review,
+        uri: legacyUri(input.projectId, pageReviewLegacyPath(artifact.page.id)),
+        provenanceId: input.provenanceId,
+        createdAt: input.createdAt,
+      }))
+    }
   }
   for (const slice of input.slices) {
     materials.push(await material({
@@ -1269,6 +1313,7 @@ function prototypeSuiteContentProjection(input: {
   const pages = input.artifact.pages.map((page, index) => ({
     pageId: page.page.id,
     materialId: suiteSupportMaterialId(input.candidateId, `page:${index + 1}`),
+    ...(page.review ? { review: page.review } : {}),
   }))
   const assets = input.artifact.resourcePack.assets.map((asset, index) => ({
     manifestItemId: asset.manifestItemId,
@@ -1307,6 +1352,7 @@ function prototypeSuiteContentProjection(input: {
       manifestItemId: asset.manifestItemId,
       artifactId: asset.artifactId,
       provenanceIds: asset.provenanceIds,
+      ...(asset.review ? { review: asset.review } : {}),
     })),
   }
 }
@@ -1397,6 +1443,14 @@ function suiteContentReferenceId(candidateId: string, role: string): string {
 
 function codingReceiptMaterialId(receiptId: string): string {
   return relatedDesignIrId('material:coding-receipt:', receiptId)
+}
+
+function pageReviewMaterialId(pageId: string): string {
+  return relatedDesignIrId('material:prototype-page-review:', pageId)
+}
+
+function pageReviewLegacyPath(pageId: string): string {
+  return `workspace/pages/${pageId}/review.json`
 }
 
 function codingReceiptProvenanceId(receiptId: string): string {

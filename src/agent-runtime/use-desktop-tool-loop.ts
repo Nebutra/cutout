@@ -12,6 +12,7 @@ import {
 import { createDesktopToolExecutor, createToolExecutorRegistry, type CutoutResultSink, type DesktopToolArtifact } from '@/services/desktop-tool-executor'
 import type { ModelAssignment, ModelAssignments } from '@/services/ai/model-assignment-types'
 import type { ProviderConfig } from '@/services/ai/provider-types'
+import type { CapabilityBindings } from '@/services/ai/model-capabilities'
 import type {
   ForegroundSegmentationService,
   ServiceRegistry,
@@ -137,6 +138,7 @@ export function useDesktopToolLoop(input: {
   >
   readonly providers: readonly ProviderConfig[]
   readonly assignments: ModelAssignments
+  readonly capabilityBindings?: CapabilityBindings
   readonly revision: number
   readonly append: (events: readonly AgentRunEvent[]) => void
   readonly cutoutResultSink?: CutoutResultSink
@@ -167,7 +169,9 @@ export function useDesktopToolLoop(input: {
     return { capabilityLeaseId: lease.leaseId, requestDigest }
   }, [permissionBroker])
   const capabilities = useCallback((): readonly PaidToolExecutorCapability[] => [
-    ...desktopPaidToolCapabilities(state.current.providers, state.current.assignments),
+    ...desktopPaidToolCapabilities(state.current.providers, state.current.assignments, {
+      descriptors: state.current.capabilityBindings?.descriptors,
+    }),
     { capability: 'cutout', providerId: 'local', model: 'cutout-v1', available: true, estimatedCost: ZERO_USD_ESTIMATE },
     { capability: 'semantic-cutout', providerId: 'local', model: 'apple-vision-foreground-v1', available: semanticCutoutAvailable.current, estimatedCost: ZERO_USD_ESTIMATE },
   ], [])
@@ -197,7 +201,9 @@ export function useDesktopToolLoop(input: {
   }, [authorize, capabilities, permissionBroker])
 
   const visualRuntime = useMemo(() => {
-    const visualCapabilities = desktopPaidToolCapabilities(input.providers, input.assignments)
+    const visualCapabilities = desktopPaidToolCapabilities(input.providers, input.assignments, {
+      descriptors: input.capabilityBindings?.descriptors,
+    })
     const estimate = (capability: 'generate-image' | 'edit-image') => capabilityEstimate(visualCapabilities, capability) ?? ZERO_USD_ESTIMATE
     return createVisualTaskRuntime({
       tools: createDesktopVisualToolInvoker({ loop, expectedRevision: () => state.current.revision, estimateFor: estimate,
@@ -205,7 +211,7 @@ export function useDesktopToolLoop(input: {
       }),
       reviewer: approveFirstVisualCandidate('agent'), store: createStorageVisualExecutionStore(localStorage), estimates: { generate: estimate('generate-image'), edit: estimate('edit-image') }, append: (events) => state.current.append(events),
     })
-  }, [input.assignments, input.providers, loop])
+  }, [input.assignments, input.capabilityBindings, input.providers, loop])
 
   async function invoke(invocation: DesktopToolInvocation): Promise<readonly DesktopToolArtifact[]> {
     invocation.signal?.throwIfAborted()

@@ -6,6 +6,7 @@ import {
 } from '@/prototype/design-system-candidates'
 import { createPrototypeAssetManifest } from '@/prototype/asset-manifest'
 import type { CodingReceipt } from '@/coding-runtime/contracts'
+import { sha256Bytes } from '@/asset-production/hash'
 import {
   designDocumentToWorkspaceSnapshot,
   legacyWorkspaceSupplementalContent,
@@ -279,6 +280,27 @@ describe('legacy workspace Design IR projection', () => {
 
   it('round-trips complete prototype suites, resource bindings, selection, and Coding receipts', async () => {
     const source = snapshotWithSuite()
+    const suiteArtifact = source.prototypeSuiteCandidates?.artifacts['candidate:suite:selected']
+    const page = suiteArtifact?.pages[0]
+    const resource = suiteArtifact?.resourcePack.assets[0]
+    if (!page || !resource) throw new Error('Expected complete suite fixture.')
+    const pageReview = {
+      version: 'prototype-page-review.v1' as const,
+      artifactSha256: await sha256Bytes(page.bytes),
+      reviewer: { providerId: 'reviewer', model: 'vision-model' },
+      verdict: { pass: true, failures: [] },
+      reviewedAt: '2026-08-03T00:00:00.000Z',
+    }
+    const resourceReview = {
+      version: 'prototype-resource-review.v1' as const,
+      artifactId: resource.artifactId,
+      reviewer: { providerId: 'reviewer', model: 'vision-model' },
+      verdict: { pass: false, failures: ['Needs attention.'] },
+      observationalIssues: [{ code: 'qa-rejected', message: 'Needs attention.' }],
+      reviewedAt: '2026-08-03T00:00:01.000Z',
+    }
+    ;(page as { review?: typeof pageReview }).review = pageReview
+    ;(resource as { review?: typeof resourceReview }).review = resourceReview
     const document = await projectWorkspaceSnapshotToDesignDocument({
       project: project(),
       workspace: source,
@@ -314,16 +336,56 @@ describe('legacy workspace Design IR projection', () => {
     expect(suite?.set.selection?.candidateId).toBe('candidate:suite:selected')
     expect(suite?.artifacts['candidate:suite:selected']?.pages[0]?.bytes)
       .toEqual(Uint8Array.from([31, 32, 33]))
+    expect(suite?.artifacts['candidate:suite:selected']?.pages[0]?.review).toEqual(pageReview)
     expect(suite?.artifacts['candidate:suite:selected']?.resourcePack.assets).toEqual([
       {
         manifestItemId: 'home-hero-1',
         artifactId: 'artifact:suite:selected:hero',
         provenanceIds: ['provenance:resource-asset:selected'],
+        review: resourceReview,
       },
     ])
     expect(suite?.artifacts['candidate:suite:selected']?.codingReceipt)
       .toEqual(codingReceipt())
     expect(restored.data.snapshot.codingReceipts).toEqual([codingReceipt()])
+  })
+
+  it('round-trips singular page review evidence and rejects stale review bytes', async () => {
+    const source = snapshot()
+    const page = source.prototypePages[0]!
+    const review = {
+      version: 'prototype-page-review.v1' as const,
+      artifactSha256: await sha256Bytes(page.bytes),
+      reviewer: { providerId: 'reviewer', model: 'vision-model' },
+      verdict: { pass: true, failures: [] },
+      reviewedAt: '2026-08-03T00:00:00.000Z',
+    }
+    const reviewed = {
+      ...source,
+      prototypePages: [{ ...page, review }],
+    }
+    const document = await projectWorkspaceSnapshotToDesignDocument({
+      project: project(),
+      workspace: reviewed,
+    })
+    expect(document.materials.map((material) => material.id)).toContain(
+      'material:prototype-page-review:home',
+    )
+    const content = contentByUri(reviewed, document)
+    const restored = await designDocumentToWorkspaceSnapshot(document, {
+      resolveContent: (reference) => content.get(reference.uri),
+    })
+    expect(restored.ok && restored.data.snapshot.prototypePages[0]?.review).toEqual(review)
+
+    const stale = new Map(content)
+    const pageMaterial = document.materials.find(
+      (material) => material.id === 'material:prototype-page:home',
+    )
+    stale.set(pageMaterial!.revisions[0]!.content.uri, Uint8Array.from([9, 9, 9]))
+    const rejected = await designDocumentToWorkspaceSnapshot(document, {
+      resolveContent: (reference) => stale.get(reference.uri),
+    })
+    expect(rejected).toMatchObject({ ok: false })
   })
 
   it('fails closed when a ready suite page reference cannot be resolved', async () => {

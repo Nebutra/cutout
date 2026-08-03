@@ -12,6 +12,10 @@ import {
   validatePrototypeSuiteCandidateSet,
 } from './prototype-suite-candidates'
 import type { VerifiedResourcePackArtifact } from './resource-pack-production'
+import {
+  prototypePageReviewRecordSchema,
+  prototypeResourceReviewRecordSchema,
+} from './review-evidence'
 
 export interface PrototypeDeliveryEvidence {
   readonly candidateId: `suite-${number}`
@@ -23,7 +27,7 @@ export interface PrototypeDeliveryEvidence {
   readonly pageCount: number
   readonly resourceAssetCount: number
   readonly artifactCount: number
-  readonly qualityReviewStatus: 'recorded'
+  readonly qualityReviewStatus: 'passed' | 'attention-required'
   readonly digests: {
     readonly designSystemImage: string
     readonly designMarkdown: string
@@ -39,6 +43,8 @@ export interface PrototypeDeliveryEvidence {
     readonly resourceArtifacts: string
     readonly provenance: string
     readonly reviewDocument: string
+    readonly pageReviews: string
+    readonly resourceReviews: string
   }
 }
 
@@ -77,13 +83,25 @@ export async function projectPrototypeDeliveryEvidence(
       throw new Error(`Candidate "${candidate.id}" has no matching Design System direction.`)
     }
 
-    const pageMedia = await Promise.all(artifact.pages.map(async (page) => ({
-      pageId: page.page.id,
-      mediaType: page.mediaType,
-      width: page.width,
-      height: page.height,
-      sha256: await sha256Bytes(page.bytes),
-    })))
+    let attentionRequired = false
+    const pageReviews = []
+    const pageMedia = []
+    for (const page of artifact.pages) {
+      const digest = await sha256Bytes(page.bytes)
+      const parsedReview = prototypePageReviewRecordSchema.safeParse(page.review)
+      if (!parsedReview.success || parsedReview.data.artifactSha256 !== digest) {
+        throw new Error(`Candidate "${candidate.id}" has missing or stale page review evidence for "${page.page.id}".`)
+      }
+      attentionRequired ||= !parsedReview.data.verdict.pass || parsedReview.data.verdict.unavailable === true
+      pageReviews.push({ pageId: page.page.id, review: parsedReview.data })
+      pageMedia.push({
+        pageId: page.page.id,
+        mediaType: page.mediaType,
+        width: page.width,
+        height: page.height,
+        sha256: digest,
+      })
+    }
     const provenance = {
       designSystem: artifact.designSystem.provenanceIds,
       suite: artifact.provenanceIds,
@@ -93,6 +111,16 @@ export async function projectPrototypeDeliveryEvidence(
         provenanceIds: asset.provenanceIds,
       })),
     }
+    const resourceReviews = artifact.resourcePack.assets.map((asset) => {
+      const parsed = prototypeResourceReviewRecordSchema.safeParse(asset.review)
+      if (!parsed.success || parsed.data.artifactId !== asset.artifactId) {
+        throw new Error(`Candidate "${candidate.id}" has missing or stale resource review evidence for "${asset.manifestItemId}".`)
+      }
+      attentionRequired ||= !parsed.data.verdict.pass
+        || parsed.data.verdict.unavailable === true
+        || parsed.data.observationalIssues.length > 0
+      return { manifestItemId: asset.manifestItemId, review: parsed.data }
+    })
     const bindings = artifact.resourcePack.assets.map((asset) => ({
       manifestItemId: asset.manifestItemId,
       artifactId: asset.artifactId,
@@ -139,7 +167,7 @@ export async function projectPrototypeDeliveryEvidence(
       pageCount: artifact.pages.length,
       resourceAssetCount: artifact.resourcePack.assets.length,
       artifactCount: artifact.resourcePack.assets.length,
-      qualityReviewStatus: 'recorded',
+      qualityReviewStatus: attentionRequired ? 'attention-required' : 'passed',
       digests: {
         designSystemImage: await sha256Bytes(artifact.designSystem.artifact.bytes),
         designMarkdown: await sha256Text(markdown),
@@ -155,6 +183,8 @@ export async function projectPrototypeDeliveryEvidence(
         resourceArtifacts: await sha256Json(resourceArtifacts),
         provenance: await sha256Json(provenance),
         reviewDocument: await sha256Text(canonicalJson(reviewDocument)),
+        pageReviews: await sha256Json(pageReviews),
+        resourceReviews: await sha256Json(resourceReviews),
       },
     })
   }

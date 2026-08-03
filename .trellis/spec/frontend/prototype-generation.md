@@ -29,7 +29,7 @@ function generatePrototypePageSet<Page, Artifact>(input: {
   readonly mode: 'serial' | 'anchor-parallel'
   readonly concurrency: number
   readonly generate: (page: Page, anchor?: Artifact) => Promise<Artifact>
-  readonly review?: (artifact: Artifact) => Promise<void>
+  readonly review?: (artifact: Artifact) => Promise<Artifact>
   readonly reviewMode?: 'inline' | 'overlap'
   readonly reviewConcurrency?: number
   readonly onProgress?: (artifacts: readonly Artifact[]) => void
@@ -132,6 +132,9 @@ function projectPrototypeDeliveryProgress(input: {
   When both assignments share a provider identity, review stays inline so the
   shared Provider quota is not amplified. Recovered pages are never reviewed
   again merely because a continuation reuses them.
+- Page review transforms the generated artifact by attaching a versioned receipt
+  bound to the exact page SHA-256. Workspace and Design IR round trips preserve
+  valid receipts; stale receipts never satisfy terminal delivery proof.
 - Each page prompt contains the complete Agent-authored route and flow contract.
 - Page generation consumes the completed design-system artifact through two
   coordinated channels: `designSystem.bytes` is the immutable visual identity
@@ -195,10 +198,13 @@ function projectPrototypeDeliveryProgress(input: {
 - Terminal packaged success requires one sanitized delivery record for every
   promised suite. Each record uses bounded ordinal Design System, suite, and
   distinct resource-pack IDs; exact route/page/artifact counts; explicit
-  `recorded` review status; and lowercase SHA-256 digests for Design System
+  `passed` or `attention-required` review status; and lowercase SHA-256 digests for Design System
   media/Markdown, deterministic token projections, route/page media, manifest,
   exact bindings, resource-pack identity, verified bound resource media,
-  provenance, and review document. Bound resource media is re-read from the
+  provenance, page review evidence, resource review evidence, and review
+  document. Page review evidence must bind the exact page digest, and resource
+  review evidence must bind the exact artifact id. Missing, stale, rejected, or
+  unavailable review evidence cannot be represented as a pass. Bound resource media is re-read from the
   local content-addressed store and checked against its completed production
   task digest; binding ids alone are not delivery proof.
   Missing or malformed evidence rejects success without exposing runtime IDs,

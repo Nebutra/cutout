@@ -13,6 +13,10 @@ import type {
   PersistedPrototypeSuiteCandidateSet,
   WorkspaceSnapshot,
 } from '@/workspace/workspace-snapshot'
+import {
+  prototypePageReviewRecordSchema,
+  prototypeResourceReviewRecordSchema,
+} from './review-evidence'
 import { createPrototypeAssetManifest } from './asset-manifest'
 import { designSystemMarkdownValidationError } from './design-system-validation'
 import { prototypeMediaValidationError } from './prototype-artifact-recovery'
@@ -413,8 +417,16 @@ function validateCompletePages(
     }
     const mediaError = prototypeMediaValidationError(value)
     if (mediaError) return err(`Prototype page "${id}": ${mediaError}`)
+    const review = value.review === undefined
+      ? undefined
+      : prototypePageReviewRecordSchema.safeParse(value.review)
+    if (review && !review.success) return err(`Prototype page "${id}" contains invalid review evidence.`)
     seen.add(id)
-    pages.set(id, { ...value, page: parsedPage.data } as PersistedPrototypePage)
+    pages.set(id, {
+      ...value,
+      page: parsedPage.data,
+      ...(review?.success ? { review: review.data } : {}),
+    } as PersistedPrototypePage)
   }
   return ok(plan.pages.map((page) => pages.get(page.id)!))
 }
@@ -449,12 +461,22 @@ function validateResourcePack(
     }
     const provenanceIds = validateIds(value.provenanceIds, `Resource asset "${value.manifestItemId}" provenance`)
     if (!provenanceIds.ok) return provenanceIds
+    const review = value.review === undefined
+      ? undefined
+      : prototypeResourceReviewRecordSchema.safeParse(value.review)
+    if (review && !review.success) {
+      return err(`Resource asset "${value.manifestItemId}" contains invalid review evidence.`)
+    }
+    if (review?.success && review.data.artifactId !== value.artifactId) {
+      return err(`Resource asset "${value.manifestItemId}" contains stale review evidence.`)
+    }
     manifestIds.add(value.manifestItemId)
     artifactIds.add(value.artifactId)
     assets.push({
       manifestItemId: value.manifestItemId,
       artifactId: value.artifactId,
       provenanceIds: provenanceIds.data,
+      ...(review?.success ? { review: review.data } : {}),
     })
   }
   return ok({

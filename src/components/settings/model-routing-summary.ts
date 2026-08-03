@@ -2,6 +2,10 @@ import type { ProviderConfig } from '@/services/ai/provider-types'
 import { createBuiltinProviderRegistry } from '@/services/ai/provider-registry'
 import { modelTaskProfile, type CapabilityBindings } from '@/services/ai/model-capabilities'
 import {
+  assessImageRoute,
+  exactImageRouteDescriptor,
+} from '@/services/ai/image-route-assessment'
+import {
   providerVerificationIsVerified,
   type ProviderVerification,
 } from '@/services/ai/provider-verification'
@@ -28,7 +32,20 @@ export function modelRoutingCoverage(
       && providerVerificationIsVerified(verifications[providerId], model)
   const covered=MODEL_DIMENSIONS.filter((item) => {
     const direct = bindings?.bindings[item.task]
-    if (direct?.model.trim() && isVerifiedRoute(direct.providerId, direct.model)) return true
+    if (direct?.model.trim()) {
+      const provider = providerById.get(direct.providerId)
+      if (provider && (item.task === 'image-generation' || item.task === 'image-edit')) {
+        const assessment = assessImageRoute({
+          assignment: direct,
+          provider,
+          descriptor: exactImageRouteDescriptor(bindings?.descriptors ?? [], direct),
+        })
+        return item.task === 'image-edit'
+          ? assessment.edit.supported
+          : assessment.generation.supported
+      }
+      if (isVerifiedRoute(direct.providerId, direct.model)) return true
+    }
     const fallbackTask = item.task === 'webdev'
       ? 'text'
       : item.task === 'image-to-webdev'

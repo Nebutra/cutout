@@ -2,6 +2,11 @@ import { z } from 'zod'
 import type { ModelAssignments } from '@/services/ai/model-assignment-types'
 import type { ModelAssignment } from '@/services/ai/model-assignment-types'
 import type { ProviderConfig } from '@/services/ai/provider-types'
+import type { ModelDescriptor } from '@/services/ai/model-capabilities'
+import {
+  assessImageRoute,
+  exactImageRouteDescriptor,
+} from '@/services/ai/image-route-assessment'
 
 const CREDENTIAL_VALUE = /(?:\b(?:sk|rk|pk)-[A-Za-z0-9_-]{8,}\b|\bBearer\s+[A-Za-z0-9._~+/-]+\b)/i
 const safeText = z.string().refine((value) => !CREDENTIAL_VALUE.test(value), 'Credential-shaped values are not accepted.')
@@ -137,13 +142,27 @@ export function previewPaidToolReceiptDowngrade(input:unknown){const receipt=pai
 export function desktopPaidToolCapabilities(
   providers: readonly ProviderConfig[],
   assignments: ModelAssignments,
+  evidence: {
+    readonly descriptors?: readonly ModelDescriptor[]
+  } = {},
   estimates: Partial<Record<PaidToolCapability, MoneyEstimate>> = {},
 ): readonly PaidToolExecutorCapability[] {
-  const enabled = new Set(providers.filter((provider) => provider.enabled).map((provider) => provider.id))
   const image = assignments.image
-  if (!image || !enabled.has(image.providerId)) return []
+  const provider = image
+    ? providers.find((candidate) => candidate.id === image.providerId && candidate.enabled)
+    : undefined
+  if (!image || !provider) return []
+  const assessment = assessImageRoute({
+    assignment: image,
+    provider,
+    descriptor: exactImageRouteDescriptor(evidence.descriptors ?? [], image),
+  })
   const fallback = { currency: 'USD', amount: 0, credits: 0 }
-  return (['generate-image', 'edit-image'] as const).map((capability) => ({
+  const capabilities = [
+    ...(assessment.generation.supported ? ['generate-image' as const] : []),
+    ...(assessment.edit.supported ? ['edit-image' as const] : []),
+  ]
+  return capabilities.map((capability) => ({
     capability,
     providerId: image.providerId,
     model: image.model,
