@@ -60,10 +60,13 @@ import { isErr } from "@/services/types";
 import type { ModelAssignment } from "@/services/ai/model-assignment-types";
 import {
   ensureProviderVerification,
+  loadProviderVerifications,
+  providerVerificationIsVerified,
 } from "@/services/ai/provider-verification";
 import {
   assessImageRoute,
-  exactImageRouteDescriptor,
+  projectVerifiedImageCapabilityBindings,
+  verifiedImageRouteDescriptor,
 } from "@/services/ai/image-route-assessment";
 import type {
   ComposerModelPolicy,
@@ -92,7 +95,10 @@ import {
   useCapabilityBindings,
   useModelAssignments,
 } from "@/hooks/queries/ai-settings";
-import { useProviders } from "@/hooks/queries/providers";
+import {
+  useProviders,
+  useProviderVerifications,
+} from "@/hooks/queries/providers";
 import {
   useDeconstructMockup,
   useNameSlices,
@@ -829,11 +835,38 @@ export function IntentWorkspace({
   const assignments = useModelAssignments();
   const capabilityBindings = useCapabilityBindings();
   const providers = useProviders();
+  const providerVerifications = useProviderVerifications();
+  const verifiedCatalogModelsByProvider = useMemo(
+    () => Object.fromEntries(
+      Object.entries(providerVerifications).map(([providerId, verification]) => [
+        providerId,
+        providerVerificationIsVerified(verification)
+          ? verification.models ?? [verification.model!]
+          : [],
+      ]),
+    ),
+    [providerVerifications],
+  );
+  const runtimeCapabilityBindings = useMemo(
+    () => projectVerifiedImageCapabilityBindings({
+      bindings: capabilityBindings.data,
+      providers: providers.data ?? [],
+      catalogModelsByProvider: verifiedCatalogModelsByProvider,
+    }),
+    [
+      capabilityBindings.data,
+      providers.data,
+      verifiedCatalogModelsByProvider,
+    ],
+  );
+  const runtimeCapabilityBindingsRef = useRef(runtimeCapabilityBindings);
+  runtimeCapabilityBindingsRef.current = runtimeCapabilityBindings;
   const desktopTools = useDesktopToolLoop({
     services,
     providers: providers.data ?? [],
     assignments: assignments.data ?? {},
-    capabilityBindings: capabilityBindings.data,
+    capabilityBindings: runtimeCapabilityBindings,
+    resolveCapabilityBindings: () => runtimeCapabilityBindingsRef.current,
     revision: designDocument?.revision.number ?? 0,
     append: emitRunEvents,
     cutoutResultSink: createCutoutResultSink(getStoreState),
@@ -1857,6 +1890,19 @@ export function IntentWorkspace({
           return result.data;
         }, undefined, imageModel);
       }
+      const latestVerifications = loadProviderVerifications();
+      runtimeCapabilityBindingsRef.current = projectVerifiedImageCapabilityBindings({
+        bindings: capabilityBindings.data,
+        providers: providerList,
+        catalogModelsByProvider: Object.fromEntries(
+          Object.entries(latestVerifications).map(([providerId, verification]) => [
+            providerId,
+            providerVerificationIsVerified(verification)
+              ? verification.models ?? [verification.model!]
+              : [],
+          ]),
+        ),
+      });
       const imageRoute = lockComposerImageRoute({
         model: composerModelPolicy,
         thinking: composerThinkingPolicy,
@@ -1872,10 +1918,15 @@ export function IntentWorkspace({
       const assessment = assessImageRoute({
         assignment: route.image,
         provider: imageProvider,
-        descriptor: exactImageRouteDescriptor(
-          capabilityBindings.data?.descriptors ?? [],
-          route.image,
-        ),
+        descriptor: imageProvider
+          ? verifiedImageRouteDescriptor({
+              provider: imageProvider,
+              assignment: route.image,
+              descriptors: runtimeCapabilityBindingsRef.current?.descriptors ?? [],
+              verifiedCatalogModels:
+                loadProviderVerifications()[imageProvider.id]?.models,
+            })
+          : undefined,
       });
       if (!assessment.generation.supported) {
         throw new Error(
@@ -3645,7 +3696,7 @@ export function IntentWorkspace({
             styleSummary: plan.designSystem.styleSummary,
             assetDirection: plan.designSystem.assetDirection,
           });
-          const useEdit = currentImageRouteAssessment(image).edit.supported;
+          const editImage = currentImageEditRoute(image);
           const references = [pageArtifact.bytes, designSystem.bytes];
           let generatedAsset: { readonly bytes: Uint8Array; readonly mediaType: string } | null = null;
           const directOutcome = await generateWithQa({
@@ -3654,10 +3705,10 @@ export function IntentWorkspace({
               recordPackagedE2eImageCall(
                 `prototype-direct:${options.suiteRunId ?? "suite"}:${task.taskId}`,
               );
-              const result = useEdit
+              const result = editImage
                 ? await personalizedGenerationRef.current.editImage({
-                    providerId: image.providerId,
-                    model: image.model,
+                    providerId: editImage.providerId,
+                    model: editImage.model,
                     prompt,
                     images: references,
                     inputFidelity: "high",
@@ -3798,6 +3849,7 @@ export function IntentWorkspace({
             ? [anchorPage.bytes]
             : []),
         ];
+        const editImage = currentImageEditRoute(image);
         await runRegionBreakdown(
           {
             generation: {
@@ -3833,8 +3885,8 @@ export function IntentWorkspace({
             page: artifact.page,
             pageBytes: artifact.bytes,
             referenceImages: referenceBytes,
-            image,
-            editSupported: currentImageRouteAssessment(image).edit.supported,
+            image: editImage ?? image,
+            editSupported: Boolean(editImage),
             signal: lease.controller.signal,
             targetRegionIds: executionTargetRegions
               ? [...executionTargetRegions]
@@ -4150,14 +4202,34 @@ export function IntentWorkspace({
   }
 
   function currentImageRouteAssessment(image: ModelAssignment) {
+    const provider = (providers.data ?? []).find(
+      (candidate) => candidate.id === image.providerId,
+    );
     return assessImageRoute({
       assignment: image,
-      provider: (providers.data ?? []).find((provider) => provider.id === image.providerId),
-      descriptor: exactImageRouteDescriptor(
-        capabilityBindings.data?.descriptors ?? [],
-        image,
-      ),
+      provider,
+      descriptor: provider
+        ? verifiedImageRouteDescriptor({
+            provider,
+            assignment: image,
+            descriptors: runtimeCapabilityBindingsRef.current?.descriptors ?? [],
+            verifiedCatalogModels: providerVerifications[provider.id]?.models,
+          })
+        : undefined,
     });
+  }
+
+  function currentImageEditRoute(
+    generationImage: ModelAssignment,
+  ): ModelAssignment | undefined {
+    const configured = runtimeCapabilityBindingsRef.current
+      ?.bindings["image-edit"];
+    for (const candidate of [configured, generationImage]) {
+      if (candidate && currentImageRouteAssessment(candidate).edit.supported) {
+        return candidate;
+      }
+    }
+    return undefined;
   }
 
   async function generatePrototypeDesignSystem(
@@ -4192,20 +4264,20 @@ export function IntentWorkspace({
       attempt === 1
         ? `workspace:${lease.id}`
         : `workspace:${lease.id}:design-system:${candidateId}${retryIdentity}`;
-    const canEdit = currentImageRouteAssessment(image).edit.supported;
-    if (materialReference && !canEdit) {
+    const editImage = currentImageEditRoute(image);
+    if (materialReference && !editImage) {
       throw new Error(
         "The configured image provider cannot preserve the selected material because its route does not support edit-image.",
       );
     }
     const edited =
-      references.length > 0 && canEdit
+      references.length > 0 && editImage
         ? await invokeDesktopImageTool({
             capability: "edit-image",
             runId,
             label: "Generate design system",
             prompt,
-            image,
+            image: editImage,
             references,
             toolCallId: `tool:${lease.id}:design-system:${candidateId}${retryIdentity}:edit`,
             logicalNodeId: `design-system:${candidateId}`,
@@ -4647,8 +4719,8 @@ export function IntentWorkspace({
       prototypePagePrompt(plan, page, designMarkdown),
     );
     const runId = `workspace:${lease.id}`;
-    const useReferenceEdit = referenceImages.length > 0 &&
-      currentImageRouteAssessment(image).edit.supported;
+    const editImage = currentImageEditRoute(image);
+    const useReferenceEdit = referenceImages.length > 0 && Boolean(editImage);
 
     // One paid invocation owns one page attempt. The previous visual DAG always
     // generated an unconditioned variant and refined it in a second image call,
@@ -4668,7 +4740,7 @@ export function IntentWorkspace({
       logicalNodeId: `prototype-page:${suiteRunId ?? "suite"}:${page.id}`,
       label: `Generate ${page.name} page`,
       prompt: basePrompt,
-      image,
+      image: useReferenceEdit ? editImage! : image,
       references: useReferenceEdit ? referenceImages : [],
       lease,
     });

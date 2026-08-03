@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { ChevronDown, CircleAlert, ShieldCheck } from 'lucide-react'
 import { Trans, useLingui } from '@lingui/react/macro'
-import { useProviders } from '@/hooks/queries/providers'
+import { useProviders, useProviderVerifications } from '@/hooks/queries/providers'
 import { useCapabilityBindings, useEndpointModels, useSetCapabilityBinding } from '@/hooks/queries/ai-settings'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -9,15 +9,17 @@ import type { ModelDimension } from './model-dimensions'
 import { requiresVerifiedVision } from './model-dimensions'
 import {
   assessImageRoute,
-  exactImageRouteDescriptor,
   imageRoutePresentationStatus,
+  verifiedImageRouteDescriptor,
 } from '@/services/ai/image-route-assessment'
+import { providerVerificationIsVerified } from '@/services/ai/provider-verification'
 
 type ModelSlotProps = ModelDimension & { readonly advanced: boolean }
 
 export function ModelSlot({ task, label, description, advanced }: ModelSlotProps) {
   const { t } = useLingui()
   const providers = useProviders()
+  const providerVerifications = useProviderVerifications()
   const list = useMemo(() => providers.data ?? [], [providers.data])
   const bindings = useCapabilityBindings()
   const { mutateAsync: setCapabilityBinding } = useSetCapabilityBinding()
@@ -35,14 +37,20 @@ export function ModelSlot({ task, label, description, advanced }: ModelSlotProps
   )
   const visionRequired = requiresVerifiedVision(task)
   const imageCapability = task === 'image-generation' || task === 'image-edit' ? task : undefined
+  const selectedVerification = selected ? providerVerifications[selected.id] : undefined
   const imageStatus = imageCapability && selected && model.trim()
     ? imageRoutePresentationStatus(assessImageRoute({
         assignment: { providerId: selected.id, model: model.trim() },
         provider: selected,
-        descriptor: exactImageRouteDescriptor(
-          bindings.data?.descriptors ?? [],
-          { providerId: selected.id, model: model.trim() },
-        ),
+        descriptor: verifiedImageRouteDescriptor({
+          provider: selected,
+          assignment: { providerId: selected.id, model: model.trim() },
+          descriptors: bindings.data?.descriptors ?? [],
+          verifiedCatalogModels: endpointModels.data
+            ?? (providerVerificationIsVerified(selectedVerification, model.trim())
+              ? selectedVerification?.models ?? [selectedVerification!.model!]
+              : undefined),
+        }),
       }), imageCapability)
     : undefined
   const unavailable = list.length === 0

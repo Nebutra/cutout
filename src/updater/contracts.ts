@@ -2,6 +2,26 @@ export type UpdateChannel = "stable" | "beta";
 export type UpdateRetryAction = "check" | "download" | "install";
 export const UPDATE_PREFERENCES_STORAGE_KEY = "cutout.updates.preferences.v1";
 
+export interface LocalizedReleaseNotesHighlight {
+  readonly id: string;
+  readonly title: string;
+  readonly body: string;
+  readonly mediaId?: string;
+  readonly alt?: string;
+}
+
+export interface LocalizedReleaseNotesLocale {
+  readonly headline: string;
+  readonly highlights: readonly LocalizedReleaseNotesHighlight[];
+}
+
+export interface LocalizedReleaseNotes {
+  readonly protocol: "cutout.release-notes.v1";
+  readonly version: string;
+  readonly releasedOn: string;
+  readonly locales: Readonly<Record<string, LocalizedReleaseNotesLocale>>;
+}
+
 export interface UpdateChannelCapability {
   readonly available: boolean;
   readonly reason?: string;
@@ -11,6 +31,7 @@ export interface UpdateRelease {
   readonly version: string;
   readonly notes?: string;
   readonly publishedAt?: string;
+  readonly localizedNotes?: LocalizedReleaseNotes;
 }
 
 export interface UpdateCapability {

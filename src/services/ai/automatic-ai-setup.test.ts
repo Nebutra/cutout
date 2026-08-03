@@ -95,8 +95,40 @@ describe('automatic AI setup', () => {
     expect(bindings['image-edit']).toEqual(bindings['image-generation'])
   })
 
-  it.each(['seedream-5-pro', 'reve-2.1'])(
-    'does not nominate the recommended-looking %s family without capability evidence',
+  it('binds generation and editing independently when different exact models own them', () => {
+    const generationModel = 'canvas-generation-v1'
+    const editModel = 'flux-2-max'
+    const bindings = automaticBindingsFor([
+      configured(
+        'relay',
+        'openai-compatible',
+        ['gpt-5.5', generationModel, editModel],
+        'gpt-5.5',
+        [{
+          providerId: 'relay',
+          model: generationModel,
+          capabilities: ['image-generation'],
+          source: 'verified-catalog',
+          evidence: [{
+            capability: 'image-generation',
+            kind: 'verified',
+            sourceId: 'test',
+          }],
+        }],
+      ),
+    ])
+    expect(bindings['image-generation']).toEqual({
+      providerId: 'relay',
+      model: generationModel,
+    })
+    expect(bindings['image-edit']).toEqual({
+      providerId: 'relay',
+      model: editModel,
+    })
+  })
+
+  it.each(['seedream-5-pro'])(
+    'does not nominate the recommended-looking %s family without exact capability evidence',
     (model) => {
       const bindings = automaticBindingsFor([
         configured('relay', 'openai-compatible', ['gpt-5.5', model], 'gpt-5.5'),
@@ -105,6 +137,14 @@ describe('automatic AI setup', () => {
       expect(bindings['image-edit']).toBeUndefined()
     },
   )
+
+  it('binds an exact reviewed Arena model for editing without inventing generation', () => {
+    const bindings = automaticBindingsFor([
+      configured('relay', 'openai-compatible', ['gpt-5.5', 'reve-2.1'], 'gpt-5.5'),
+    ])
+    expect(bindings['image-generation']).toBeUndefined()
+    expect(bindings['image-edit']).toEqual({ providerId: 'relay', model: 'reve-2.1' })
+  })
 
   it('uses fidelity only to order supported routes and preserves the exact model id', () => {
     const bindings = automaticBindingsFor([

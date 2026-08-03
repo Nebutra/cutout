@@ -2,12 +2,11 @@ import { getStoreState } from "@/store";
 import { getVersion } from "@tauri-apps/api/app";
 import { getAuthorizedWorkspace } from "@/platform/authorized-workspace";
 import { createTauriAgentHostService } from "@/agent-host/tauri-service";
-import { createTauriUpdaterRuntime, type UpdateSnapshot } from "./runtime";
+import { createTauriUpdaterRuntime } from "./runtime";
 import { UpdateOperationError, type UpdateBackend, type UpdateInstallSafety, type UpdatePreferenceStore, type UpdateRetryAction } from "./contracts";
 import { createUpdateOrchestrator } from "./orchestrator";
 import { createUpdateNotificationService, readPersistedUpdatePreferences, writeUpdatePreferences } from "./update-notifications";
-
-type RuntimeSnapshot = UpdateSnapshot & { releaseNotes?: string; publishedAt?: string };
+import { validateLocalizedReleaseNotes } from "./release-notes";
 
 export function createLocalUpdatePreferences(storage: Pick<Storage, "getItem" | "setItem">): UpdatePreferenceStore {
   return {
@@ -67,8 +66,16 @@ export function createDesktopUpdateOrchestrator(input: {
     },
     async check(channel) {
       try {
-        const snapshot = await runtime.check(channel) as RuntimeSnapshot;
-        return snapshot.availableVersion ? { version: snapshot.availableVersion, notes: snapshot.releaseNotes, publishedAt: snapshot.publishedAt } : undefined;
+        const snapshot = await runtime.check(channel);
+        const localizedNotes = snapshot.availableVersion
+          ? validateLocalizedReleaseNotes(snapshot.localizedReleaseNotes, snapshot.availableVersion)
+          : undefined;
+        return snapshot.availableVersion ? {
+          version: snapshot.availableVersion,
+          ...(snapshot.releaseNotes ? { notes: snapshot.releaseNotes } : {}),
+          ...(snapshot.publishedAt ? { publishedAt: snapshot.publishedAt } : {}),
+          ...(localizedNotes ? { localizedNotes } : {}),
+        } : undefined;
       } catch (error) {
         throw await operationFailure(error, "check");
       }

@@ -4,6 +4,7 @@
 
 - Treat `package.json` as the product display/handshake version source and synchronize `src-tauri/Cargo.toml`, `src-tauri/tauri.conf.json`, the Agent capability manifest, and the Codex plugin manifest through `node scripts/validate-release-version.mjs`.
 - Require the pushed `v<semver>` tag to equal that synchronized source version; the release workflow never rewrites reviewed source after tagging.
+- Add one exact-version entry to `src/release-notes/catalog.json` before tagging. Require reviewed English, Simplified Chinese, Japanese, French, and Spanish content by running `pnpm release-notes:validate -- --catalog src/release-notes/catalog.json --version <semver> --require-all-locales`; a missing, mismatched, partial, or invalid entry must fail before quality and native builds.
 - Record user-visible changes in `CHANGELOG.md` and review generated diffs.
 - Run `scripts/release-macos.sh --local` for the provider-free local gate.
 
@@ -44,6 +45,7 @@
 - Scope the updater private key and password only to the exact commit-pinned Tauri build actions that sign bundles. Do not expose them to checkout, package installation, tests, caches, artifact upload, metadata generation, or Release publication.
 - Before uploading each platform workflow artifact, require exactly one updater artifact and sibling `.sig`, then cryptographically verify the sidecar against `CUTOUT_UPDATER_PUBKEY` with the repository-owned Rust verifier. Metadata generation must consume verified sidecars without receiving the private key.
 - Generate and validate separate stable/beta manifests with SHA-256, SPDX SBOM, local provenance metadata, and GitHub build-provenance attestations. Rollout and rollback metadata are not published because the desktop updater does not consume those policies.
+- Generate `latest.json.notes` (readable English), `latest.json.cutoutReleaseNotes` (bounded localized data), the bundled note, and `github-release.md` from the same exact catalog entry. Release-mode updater validation must use `--release-notes-catalog`, `--require-release-notes`, and `--require-all-locales`; do not pass JSON through the legacy `notes` field.
 - Run `pnpm test:update-artifacts` for update, 204/no-update, downgrade rejection, bad signature, bad URL, SBOM, provenance, and all-platform manifest cases.
 
 ## Cross-platform GitHub Release
@@ -59,6 +61,7 @@
 - Create the GitHub Release as a draft, upload and validate the complete asset set, then make it public. Never publish a partial matrix as a successful release.
 - Require `scripts/validate-release-authority.mjs` to prove that only the final `publish` job can mutate Releases or receive `contents: write`.
 - Attest every collected release asset with `actions/attest-build-provenance` after checksums are finalized and before the draft Release is created.
+- Render the reviewed GitHub body with `pnpm release-notes:render` and publish it through `gh release create --notes-file dist/release-notes/github-release.md`. Do not use GitHub-generated PR notes or interpolate multiline release copy into the shell.
 - The generated updater manifest must include and verify the signed updater artifact for Apple Silicon macOS, Intel macOS, Windows x64, and Linux x64 before publication. Native installer availability alone is not update evidence.
 - The packaged desktop app checks after an 8-second startup delay, retries on a six-hour schedule with bounded jitter and lifecycle/network recovery triggers, and shares one in-flight check across manual and automatic callers. Home shows the Update action only after a newer signed release is discovered; the action opens Updates & Support for download and verified install/restart. The notification bell deduplicates by channel/version, supports a 24-hour reminder, and native system notifications remain explicit opt-in.
 - The Tauri updater signature is not Apple notarization or Windows Authenticode. Do not represent the intentionally unsigned Windows installers as Authenticode-signed or as a trusted Windows publisher.

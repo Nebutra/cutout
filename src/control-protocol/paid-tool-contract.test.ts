@@ -85,6 +85,46 @@ describe('paid tool boundaries', () => {
     )).toEqual([])
   })
 
+  it('advertises independently bound generation and edit routes', () => {
+    const generation = { providerId: 'provider-1', model: 'generation-model' }
+    const edit = { providerId: 'provider-2', model: 'edit-model' }
+    expect(desktopPaidToolCapabilities(
+      [
+        { id: 'provider-1', kind: 'openai', label: 'OpenAI A', defaultModel: 'chat', enabled: true },
+        { id: 'provider-2', kind: 'openai-compatible', label: 'OpenAI B', baseUrl: 'https://relay.example/v1', defaultModel: 'chat', enabled: true },
+      ],
+      { image: generation },
+      {
+        bindings: { 'image-generation': generation, 'image-edit': edit },
+        descriptors: [
+          {
+            ...generation,
+            capabilities: ['image-generation'],
+            source: 'verified-catalog',
+            evidence: [{ capability: 'image-generation', kind: 'verified', sourceId: 'test' }],
+          },
+          {
+            ...edit,
+            capabilities: ['image-edit'],
+            source: 'verified-catalog',
+            evidence: [{ capability: 'image-edit', kind: 'observed', sourceId: 'test' }],
+          },
+        ],
+      },
+    )).toEqual([
+      expect.objectContaining({
+        capability: 'generate-image',
+        providerId: 'provider-1',
+        model: 'generation-model',
+      }),
+      expect.objectContaining({
+        capability: 'edit-image',
+        providerId: 'provider-2',
+        model: 'edit-model',
+      }),
+    ])
+  })
+
   it('maps the locked composer image route into the shared request contract', () => {
     const prompt = 'Full generated repair context. '.repeat(1_000)
     expect(prompt.length).toBeGreaterThan(20_000)

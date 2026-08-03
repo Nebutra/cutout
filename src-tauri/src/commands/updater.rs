@@ -3,13 +3,54 @@ use super::{
     registry_desktop::RegistryDesktopState,
 };
 use reqwest::Url;
-use serde::Serialize;
-use std::{collections::HashSet, env, sync::Arc, time::Duration};
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
+use std::{
+    collections::{BTreeMap, HashSet},
+    env,
+    sync::Arc,
+    time::Duration,
+};
 use tauri::{AppHandle, Emitter, State};
 use tauri_plugin_updater::{Update, UpdaterExt};
 use tokio::sync::{Mutex, Notify};
 
 const DEFAULT_TIMEOUT_SECS: u64 = 30;
+const RELEASE_NOTES_PROTOCOL: &str = "cutout.release-notes.v1";
+const RELEASE_NOTES_MAX_BYTES: usize = 48 * 1024;
+const RELEASE_NOTES_MAX_HEADLINE_CHARS: usize = 120;
+const RELEASE_NOTES_MAX_HIGHLIGHTS: usize = 6;
+const RELEASE_NOTES_MAX_ID_CHARS: usize = 64;
+const RELEASE_NOTES_MAX_TITLE_CHARS: usize = 100;
+const RELEASE_NOTES_MAX_BODY_CHARS: usize = 600;
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct LocalizedReleaseNotesHighlight {
+    id: String,
+    title: String,
+    body: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    media_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    alt: Option<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct LocalizedReleaseNotesLocale {
+    headline: String,
+    highlights: Vec<LocalizedReleaseNotesHighlight>,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct LocalizedReleaseNotes {
+    protocol: String,
+    version: String,
+    released_on: String,
+    locales: BTreeMap<String, LocalizedReleaseNotesLocale>,
+}
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -52,6 +93,7 @@ pub struct UpdateSnapshot {
     available_version: Option<String>,
     release_notes: Option<String>,
     published_at: Option<String>,
+    localized_release_notes: Option<LocalizedReleaseNotes>,
     channel: Option<String>,
     downloaded_bytes: u64,
     content_length: Option<u64>,
@@ -59,6 +101,182 @@ pub struct UpdateSnapshot {
     unavailable_reason: Option<String>,
     retry_action: Option<UpdateRetryAction>,
     channel_capabilities: UpdateChannelCapabilities,
+}
+
+fn is_plain_text(value: &str, maximum: usize) -> bool {
+    !value.is_empty()
+        && value.trim() == value
+        && value.chars().count() <= maximum
+        && !value.chars().any(char::is_control)
+        && !value.contains('<')
+        && !value.contains('>')
+        && !value.contains("://")
+}
+
+fn is_semantic_version(value: &str) -> bool {
+    let (core, prerelease) = match value.split_once('-') {
+        Some((core, prerelease)) => (core, Some(prerelease)),
+        None => (value, None),
+    };
+    let components = core.split('.').collect::<Vec<_>>();
+    if components.len() != 3
+        || components.iter().any(|component| {
+            component.is_empty()
+                || !component.bytes().all(|byte| byte.is_ascii_digit())
+                || (component.len() > 1 && component.starts_with('0'))
+        })
+    {
+        return false;
+    }
+    match prerelease {
+        None => true,
+        Some(prerelease) => {
+            !prerelease.is_empty()
+                && prerelease.split('.').all(|component| {
+                    !component.is_empty()
+                        && component
+                            .bytes()
+                            .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-')
+                        && !(component.len() > 1
+                            && component.bytes().all(|byte| byte.is_ascii_digit())
+                            && component.starts_with('0'))
+                })
+        }
+    }
+}
+
+fn is_calendar_date(value: &str) -> bool {
+    let bytes = value.as_bytes();
+    if bytes.len() != 10
+        || bytes[4] != b'-'
+        || bytes[7] != b'-'
+        || bytes
+            .iter()
+            .enumerate()
+            .any(|(index, byte)| !matches!(index, 4 | 7) && !byte.is_ascii_digit())
+    {
+        return false;
+    }
+    let Ok(year) = value[0..4].parse::<u32>() else {
+        return false;
+    };
+    if year < 100 {
+        return false;
+    }
+    let Ok(month) = value[5..7].parse::<u32>() else {
+        return false;
+    };
+    let Ok(day) = value[8..10].parse::<u32>() else {
+        return false;
+    };
+    let leap = year % 4 == 0 && (year % 100 != 0 || year % 400 == 0);
+    let maximum = match month {
+        1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
+        4 | 6 | 9 | 11 => 30,
+        2 if leap => 29,
+        2 => 28,
+        _ => return false,
+    };
+    day > 0 && day <= maximum
+}
+
+fn validate_localized_release_notes(notes: &LocalizedReleaseNotes, expected_version: &str) -> bool {
+    if notes.protocol != RELEASE_NOTES_PROTOCOL
+        || notes.version != expected_version
+        || !is_semantic_version(&notes.version)
+        || !is_calendar_date(&notes.released_on)
+        || notes.locales.is_empty()
+        || notes.locales.len() > 5
+        || !notes.locales.contains_key("en")
+        || notes
+            .locales
+            .keys()
+            .any(|locale| !matches!(locale.as_str(), "en" | "zh-CN" | "ja" | "fr" | "es"))
+    {
+        return false;
+    }
+    let Some(english) = notes.locales.get("en") else {
+        return false;
+    };
+    if english.highlights.is_empty() || english.highlights.len() > RELEASE_NOTES_MAX_HIGHLIGHTS {
+        return false;
+    }
+    let expected_shape = english
+        .highlights
+        .iter()
+        .map(|highlight| (&highlight.id, &highlight.media_id))
+        .collect::<Vec<_>>();
+    notes.locales.values().all(|locale| {
+        is_plain_text(&locale.headline, RELEASE_NOTES_MAX_HEADLINE_CHARS)
+            && !locale.highlights.is_empty()
+            && locale.highlights.len() <= RELEASE_NOTES_MAX_HIGHLIGHTS
+            && locale
+                .highlights
+                .iter()
+                .map(|highlight| (&highlight.id, &highlight.media_id))
+                .eq(expected_shape.iter().copied())
+            && locale.highlights.iter().all(|highlight| {
+                is_plain_text(&highlight.id, RELEASE_NOTES_MAX_ID_CHARS)
+                    && highlight.id.bytes().enumerate().all(|(index, byte)| {
+                        byte.is_ascii_lowercase()
+                            || byte.is_ascii_digit()
+                            || (index > 0 && (byte == b'.' || byte == b'-'))
+                    })
+                    && !highlight.id.ends_with('.')
+                    && !highlight.id.ends_with('-')
+                    && is_plain_text(&highlight.title, RELEASE_NOTES_MAX_TITLE_CHARS)
+                    && is_plain_text(&highlight.body, RELEASE_NOTES_MAX_BODY_CHARS)
+                    // No bundled release-note media ids are shipped yet.
+                    && highlight.media_id.is_none()
+                    && highlight.alt.is_none()
+            })
+    })
+}
+
+fn project_localized_release_notes(
+    raw_json: &Value,
+    expected_version: &str,
+) -> Option<LocalizedReleaseNotes> {
+    let value = raw_json.get("cutoutReleaseNotes")?;
+    if serde_json::to_vec(value).ok()?.len() > RELEASE_NOTES_MAX_BYTES {
+        return None;
+    }
+    if value
+        .get("locales")
+        .and_then(Value::as_object)
+        .is_some_and(|locales| {
+            locales.values().any(|locale| {
+                locale
+                    .get("highlights")
+                    .and_then(Value::as_array)
+                    .is_some_and(|highlights| {
+                        highlights.iter().any(|highlight| {
+                            highlight.get("mediaId").is_some() || highlight.get("alt").is_some()
+                        })
+                    })
+            })
+        })
+    {
+        return None;
+    }
+    let notes = serde_json::from_value::<LocalizedReleaseNotes>(value.clone()).ok()?;
+    validate_localized_release_notes(&notes, expected_version).then_some(notes)
+}
+
+fn set_available_release(
+    snapshot: &mut UpdateSnapshot,
+    version: String,
+    release_notes: Option<String>,
+    published_at: Option<String>,
+    raw_json: &Value,
+) {
+    snapshot.phase = UpdatePhase::Available;
+    snapshot.localized_release_notes = project_localized_release_notes(raw_json, &version);
+    snapshot.available_version = Some(version);
+    snapshot.release_notes = release_notes;
+    snapshot.published_at = published_at;
+    snapshot.error = None;
+    snapshot.retry_action = None;
 }
 
 #[derive(Default)]
@@ -358,12 +576,13 @@ pub async fn updater_check(
             )
             .await);
         }
-        inner.snapshot.phase = UpdatePhase::Available;
-        inner.snapshot.available_version = Some(update.version.clone());
-        inner.snapshot.release_notes = update.body.clone();
-        inner.snapshot.published_at = update.date.map(|date| date.to_string());
-        inner.snapshot.error = None;
-        inner.snapshot.retry_action = None;
+        set_available_release(
+            &mut inner.snapshot,
+            update.version.clone(),
+            update.body.clone(),
+            update.date.map(|date| date.to_string()),
+            &update.raw_json,
+        );
         inner.update = Some(update);
     } else {
         inner.snapshot.phase = UpdatePhase::Idle;
@@ -517,6 +736,35 @@ pub async fn updater_install_and_relaunch(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::json;
+
+    fn release_notes_raw(version: &str) -> Value {
+        json!({
+            "version": version,
+            "notes": "Readable English fallback.",
+            "cutoutReleaseNotes": {
+                "protocol": "cutout.release-notes.v1",
+                "version": version,
+                "releasedOn": "2026-08-03",
+                "locales": {
+                    "en": {
+                        "headline": "Know what changed",
+                        "highlights": [
+                            { "id": "review-first", "title": "Review first", "body": "Read the details before installing." },
+                            { "id": "reopen-later", "title": "Reopen later", "body": "The same notes remain available offline." }
+                        ]
+                    },
+                    "zh-CN": {
+                        "headline": "了解本次更新",
+                        "highlights": [
+                            { "id": "review-first", "title": "安装前查看", "body": "安装前先阅读详细说明。" },
+                            { "id": "reopen-later", "title": "稍后再看", "body": "离线时仍可重新查看。" }
+                        ]
+                    }
+                }
+            }
+        })
+    }
 
     #[test]
     fn operation_phases_are_single_flight() {
@@ -632,5 +880,94 @@ mod tests {
             "endpoint",
         )
         .is_err());
+    }
+
+    #[test]
+    fn projects_bounded_localized_notes_from_the_existing_raw_response() {
+        let projected = project_localized_release_notes(&release_notes_raw("0.1.16"), "0.1.16")
+            .expect("valid projection");
+
+        assert_eq!(projected.protocol, RELEASE_NOTES_PROTOCOL);
+        assert_eq!(projected.version, "0.1.16");
+        assert_eq!(projected.locales.len(), 2);
+        assert_eq!(projected.locales["zh-CN"].highlights[0].id, "review-first");
+        assert_eq!(
+            serde_json::to_value(projected).unwrap()["releasedOn"],
+            "2026-08-03"
+        );
+    }
+
+    #[test]
+    fn release_note_versions_and_dates_use_strict_shared_vocabulary() {
+        assert!(is_semantic_version("0.1.16"));
+        assert!(is_semantic_version("0.1.16-beta.1"));
+        assert!(!is_semantic_version("v0.1.16"));
+        assert!(!is_semantic_version("0.1.16-01"));
+        assert!(is_calendar_date("2028-02-29"));
+        assert!(!is_calendar_date("2026-02-29"));
+    }
+
+    #[test]
+    fn ignores_mismatched_unknown_and_oversized_extensions() {
+        assert!(project_localized_release_notes(&release_notes_raw("0.1.16"), "0.1.17").is_none());
+
+        let mut unknown = release_notes_raw("0.1.16");
+        unknown["cutoutReleaseNotes"]["remoteUrl"] = json!("https://example.test/notes");
+        assert!(project_localized_release_notes(&unknown, "0.1.16").is_none());
+
+        let mut oversized = release_notes_raw("0.1.16");
+        oversized["cutoutReleaseNotes"]["padding"] = json!("x".repeat(RELEASE_NOTES_MAX_BYTES));
+        assert!(project_localized_release_notes(&oversized, "0.1.16").is_none());
+    }
+
+    #[test]
+    fn rejects_malformed_locale_content_and_unshipped_media() {
+        let mut parity = release_notes_raw("0.1.16");
+        parity["cutoutReleaseNotes"]["locales"]["zh-CN"]["highlights"][0]["id"] =
+            json!("different-id");
+        assert!(project_localized_release_notes(&parity, "0.1.16").is_none());
+
+        let mut control = release_notes_raw("0.1.16");
+        control["cutoutReleaseNotes"]["locales"]["en"]["headline"] = json!("unsafe\nheadline");
+        assert!(project_localized_release_notes(&control, "0.1.16").is_none());
+
+        let mut markup = release_notes_raw("0.1.16");
+        markup["cutoutReleaseNotes"]["locales"]["en"]["headline"] =
+            json!("<strong>unsafe</strong>");
+        assert!(project_localized_release_notes(&markup, "0.1.16").is_none());
+
+        let mut media = release_notes_raw("0.1.16");
+        media["cutoutReleaseNotes"]["locales"]["en"]["highlights"][0]["mediaId"] =
+            json!("https://example.test/image.png");
+        media["cutoutReleaseNotes"]["locales"]["en"]["highlights"][0]["alt"] = json!("Preview");
+        assert!(project_localized_release_notes(&media, "0.1.16").is_none());
+    }
+
+    #[test]
+    fn invalid_localized_notes_do_not_interfere_with_available_update_state() {
+        let mut raw = release_notes_raw("0.1.16");
+        raw["cutoutReleaseNotes"]["protocol"] = json!("unsupported");
+        let mut snapshot = UpdateSnapshot::default();
+
+        set_available_release(
+            &mut snapshot,
+            "0.1.16".into(),
+            Some("Readable English fallback.".into()),
+            Some("2026-08-03T00:00:00Z".into()),
+            &raw,
+        );
+
+        assert_eq!(snapshot.phase, UpdatePhase::Available);
+        assert_eq!(snapshot.available_version.as_deref(), Some("0.1.16"));
+        assert_eq!(
+            snapshot.release_notes.as_deref(),
+            Some("Readable English fallback.")
+        );
+        assert_eq!(
+            snapshot.published_at.as_deref(),
+            Some("2026-08-03T00:00:00Z")
+        );
+        assert!(snapshot.localized_release_notes.is_none());
+        assert!(can_download(&snapshot));
     }
 }

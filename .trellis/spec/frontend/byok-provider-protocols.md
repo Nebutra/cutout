@@ -480,6 +480,25 @@ import_provider_draft(app: AppHandle, input: ImportDraftInput) -> Result<Provide
   Grok Image families, then falls back to another supported
   compatible route without changing its exact model id. Recommendation never
   establishes support.
+- Reviewed image-model evidence is Provider-neutral. It records only the exact
+  model id, capability, source, and capture/version identity; it must not carry
+  an adapter family or Provider classification. An authenticated endpoint model
+  list proves only that the configured Provider exposes that exact id. Cutout
+  intersects these independent facts with the Provider adapter at route
+  assessment time. The reviewed 2026-07-25 Image Edit Arena roster may establish
+  `image-edit` evidence for an exact listed id, but its rank never establishes
+  transport support, generation capability, or a high-fidelity recommendation.
+- Manual Provider verification and automatic credential setup must project the
+  same reviewed exact-model evidence. A user who verifies and selects a listed
+  edit model must not remain permanently `evidence-required`; an unlisted
+  `/models` row remains capability-unknown until separate observed/verified
+  evidence exists.
+- `image-generation` and `image-edit` are independent task routes. Automatic
+  setup, desktop paid-tool capability projection, and prototype execution must
+  honor separate bindings when different exact models own those capabilities.
+  The legacy singular image assignment is only a fallback; it must not cause an
+  available edit route to be ignored or a generation-only route to be advertised
+  for editing.
 - Automatic nomination may recognize image-family ids such as `seedream-*` and
   `reve-*`, while exact observed/verified descriptors may nominate models whose
   ids contain no image keyword. Nomination is discovery only: exact route

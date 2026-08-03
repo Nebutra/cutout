@@ -27,7 +27,7 @@ const deepseek: ProviderConfig = {
 const verified = {
   status: 'verified' as const,
   model: 'gpt-5',
-  models: ['gpt-5'],
+  models: ['gpt-5', 'gpt-image-2'],
   checkedAt: '2026-07-28T00:00:00.000Z',
 }
 
@@ -36,8 +36,8 @@ const fullOpenAiBindings = capabilityBindingsSchema.parse({
   bindings: {
     text: { providerId: 'openai', model: 'gpt-5' },
     vision: { providerId: 'openai', model: 'gpt-5' },
-    'image-generation': { providerId: 'openai', model: 'gpt-5' },
-    'image-edit': { providerId: 'openai', model: 'gpt-5' },
+    'image-generation': { providerId: 'openai', model: 'gpt-image-2' },
+    'image-edit': { providerId: 'openai', model: 'gpt-image-2' },
   },
 })
 

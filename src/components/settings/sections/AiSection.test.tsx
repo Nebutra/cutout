@@ -79,8 +79,8 @@ describe('AiSection', () => {
         bindings: {
           text: { providerId: 'openai', model: 'gpt-5' },
           vision: { providerId: 'openai', model: 'gpt-5' },
-          'image-generation': { providerId: 'openai', model: 'gpt-5' },
-          'image-edit': { providerId: 'openai', model: 'gpt-5' },
+          'image-generation': { providerId: 'openai', model: 'gpt-image-2' },
+          'image-edit': { providerId: 'openai', model: 'gpt-image-2' },
         },
       },
     })
@@ -89,7 +89,7 @@ describe('AiSection', () => {
       openai: {
         status: 'verified',
         model: 'gpt-5',
-        models: ['gpt-5'],
+        models: ['gpt-5', 'gpt-image-2'],
         checkedAt: '2026-07-28T00:00:00.000Z',
       },
     })

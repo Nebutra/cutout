@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.16 - 2026-08-03
+
+- Present reviewed release highlights in English, Simplified Chinese, Japanese, French, and Spanish.
+- Show available release details in Updates & Support before users download and install an update.
+- Open What's New once after an upgrade and keep the current version's notes available offline from Updates & Support.
+
 ## 0.1.15 - 2026-08-03
 
 - Overlap bounded observational page QA with later page image generation when image and Vision assignments use independent Providers, while retaining inline review for shared Providers.

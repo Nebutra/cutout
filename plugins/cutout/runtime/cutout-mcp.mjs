@@ -4399,6 +4399,12 @@ object({
 		image: modelAssignmentSchema.optional()
 	}).strict().optional()
 }).strict();
+object({
+	version: literal("model-catalog-cache.v1"),
+	generatedAt: string().datetime(),
+	expiresAt: string().datetime(),
+	descriptors: array(modelDescriptorSchema)
+}).strict();
 //#endregion
 //#region src/services/ai/provider-types.ts
 /**

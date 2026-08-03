@@ -322,6 +322,7 @@ describe('runRegionBreakdown', () => {
       pageBytes: new Uint8Array([9, 9, 9]),
       referenceImages: [new Uint8Array([1, 1])],
       image: IMAGE,
+      editSupported: true,
       onRegionSliced: () => {},
     })
     expect(editImage).toHaveBeenCalledOnce()
@@ -352,6 +353,7 @@ describe('runRegionBreakdown', () => {
       pageBytes: new Uint8Array([9, 9, 9]),
       referenceImages: [new Uint8Array([1, 1])],
       image: IMAGE,
+      editSupported: true,
       onRegionSliced: () => {},
     })
 
@@ -509,6 +511,7 @@ describe('pageTextFreeVariantPrompt + textFreeSource', () => {
       page: page([region({ id: 'a', name: 'Hero' }), region({ id: 'c', name: 'Gallery' })]),
       pageBytes: new Uint8Array([1]),
       image: IMAGE,
+      editSupported: true,
       textFreeSource: true,
       onRegionSliced: () => {},
     })
@@ -532,6 +535,7 @@ describe('pageTextFreeVariantPrompt + textFreeSource', () => {
       page: page([region({ id: 'a', name: 'Hero' })]),
       pageBytes,
       image: IMAGE,
+      editSupported: true,
       textFreeSource: true,
       onTextFreeSourceError: (message) => notices.push(message),
       onRegionSliced: () => {},

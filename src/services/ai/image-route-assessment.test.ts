@@ -5,7 +5,9 @@ import {
   imageRouteFidelity,
   imageRouteRecommendationRank,
   imageRoutePresentationStatus,
-  reviewedAutomaticImageDescriptors,
+  projectVerifiedImageCapabilityBindings,
+  reviewedCatalogImageDescriptors,
+  verifiedImageRouteDescriptor,
 } from './image-route-assessment'
 import type { ProviderConfig } from './provider-types'
 
@@ -111,7 +113,7 @@ describe('image route assessment', () => {
 
   it('bootstraps only reviewed exact models from an authenticated catalog', () => {
     const route = provider('openai')
-    expect(reviewedAutomaticImageDescriptors(route, [
+    expect(reviewedCatalogImageDescriptors(route, [
       'gpt-image-2',
       'custom-image-gen',
       'seedream-5-pro',
@@ -121,10 +123,79 @@ describe('image route assessment', () => {
         model: 'gpt-image-2',
         capabilities: ['image-generation', 'image-edit'],
         evidence: expect.arrayContaining([
-          expect.objectContaining({ capability: 'image-edit', kind: 'verified' }),
+          expect.objectContaining({ capability: 'image-edit', kind: 'observed' }),
         ]),
       }),
     ])
+  })
+
+  it('turns Arena edit evidence into support only after exact endpoint verification', () => {
+    const route = provider('openai-compatible', 'chat-completions')
+    const assignment = { providerId: route.id, model: 'flux-2-max' }
+    expect(verifiedImageRouteDescriptor({
+      provider: route,
+      assignment,
+      descriptors: [],
+      verifiedCatalogModels: [],
+    })).toBeUndefined()
+
+    const exact = verifiedImageRouteDescriptor({
+      provider: route,
+      assignment,
+      descriptors: [],
+      verifiedCatalogModels: ['other-model', assignment.model],
+    })
+    expect(exact).toMatchObject({
+      providerId: route.id,
+      model: assignment.model,
+      capabilities: ['image-edit'],
+      evidence: [expect.objectContaining({
+        kind: 'observed',
+        sourceId: 'arena-image-edit:2026-07-25',
+      })],
+    })
+    expect(assessImageRoute({ provider: route, assignment, descriptor: exact })).toMatchObject({
+      fidelity: 'compatible',
+      generation: { supported: false, reason: 'evidence-required' },
+      edit: { supported: true, strategy: 'openai-images-edits' },
+    })
+  })
+
+  it('keeps reviewed edit capability adapter-required on an unimplemented transport', () => {
+    const route = provider('dashscope', 'chat-completions')
+    const assignment = { providerId: route.id, model: 'qwen-image-edit-2511' }
+    const exact = verifiedImageRouteDescriptor({
+      provider: route,
+      assignment,
+      descriptors: [],
+      verifiedCatalogModels: [assignment.model],
+    })
+    expect(assessImageRoute({ provider: route, assignment, descriptor: exact }).edit)
+      .toEqual({ supported: false, reason: 'adapter-required' })
+  })
+
+  it('projects reviewed catalog evidence into runtime bindings without changing assignments', () => {
+    const route = provider('openai-compatible', 'chat-completions')
+    const assignment = { providerId: route.id, model: 'flux-2-max' }
+    const bindings = {
+      version: 'model-assignments.v2' as const,
+      bindings: { 'image-edit': assignment },
+      descriptors: [],
+    }
+    const projected = projectVerifiedImageCapabilityBindings({
+      bindings,
+      providers: [route],
+      catalogModelsByProvider: { [route.id]: [assignment.model] },
+    })
+    expect(projected?.bindings).toEqual(bindings.bindings)
+    expect(projected?.descriptors).toEqual([
+      expect.objectContaining({
+        providerId: route.id,
+        model: assignment.model,
+        capabilities: ['image-edit'],
+      }),
+    ])
+    expect(bindings.descriptors).toEqual([])
   })
 
   it('supports verified Google generation but keeps edit adapter-required', () => {

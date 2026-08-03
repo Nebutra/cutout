@@ -2,6 +2,7 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { basename, join, resolve } from 'node:path'
 import { buildReleaseDocuments, readSignedArtifact, sha256, validateUpdateManifest } from './lib/update-artifacts.mjs'
+import { loadReleaseNotesCatalog, projectReleaseNotesEntry, requireReleaseNotesEntry } from './lib/release-notes.mjs'
 
 const [command, ...argv] = process.argv.slice(2)
 const args = Object.fromEntries(argv.map((value, index) => value.startsWith('--') ? [value.slice(2), argv[index + 1] && !argv[index + 1].startsWith('--') ? argv[index + 1] : 'true'] : null).filter(Boolean))
@@ -12,7 +13,8 @@ const json = (value) => `${JSON.stringify(value, null, 2)}\n`
 if (command === 'validate') {
   const manifest = JSON.parse(await readFile(resolve(required('manifest')), 'utf8'))
   const signature = args.signature ? await readFile(resolve(args.signature), 'utf8') : undefined
-  validateUpdateManifest(manifest, { expectedSignature: signature, allowedHosts: list(args['allowed-hosts']) })
+  const releaseNotes = await resolveReleaseNotes(manifest.version)
+  validateUpdateManifest(manifest, { expectedSignature: signature, allowedHosts: list(args['allowed-hosts']), requireReleaseNotes: args['require-release-notes'] === 'true', expectedReleaseNotes: releaseNotes })
   process.stdout.write(`Valid updater manifest ${manifest.version}.\n`)
 } else if (command === 'generate') {
   for (const unsupported of ['rollout', 'previous-version', 'previous-manifest-url']) {
@@ -20,7 +22,9 @@ if (command === 'validate') {
   }
   const channel = args.channel ?? 'stable', output = resolve(args.output ?? 'dist/update')
   const platforms = await resolvePlatforms()
-  const documents = buildReleaseDocuments({ channel, version: required('version'), notes: args.notes, publishedAt: args['pub-date'] ?? new Date().toISOString(), platforms, sourceRevision: args.revision ?? process.env.GITHUB_SHA ?? 'local', allowedHosts: list(args['allowed-hosts']) })
+  const version = required('version')
+  const releaseNotes = await resolveReleaseNotes(version)
+  const documents = buildReleaseDocuments({ channel, version, notes: args.notes, releaseNotes, publishedAt: args['pub-date'] ?? new Date().toISOString(), platforms, sourceRevision: args.revision ?? process.env.GITHUB_SHA ?? 'local', allowedHosts: list(args['allowed-hosts']) })
   const directory = join(output, channel); await mkdir(directory, { recursive: true })
   const rendered = { 'latest.json': json(documents.manifest), 'sbom.spdx.json': json(documents.sbom), 'provenance.json': json(documents.provenance) }
   documents.metadata.sbom.sha256 = sha256(rendered['sbom.spdx.json'])
@@ -32,6 +36,12 @@ if (command === 'validate') {
 
 function required(name) { const value = args[name]; if (!value || value === 'true') throw new Error(`--${name} is required.`); return value }
 function list(value) { return value ? value.split(',').map((item) => item.trim().toLowerCase()).filter(Boolean) : undefined }
+
+async function resolveReleaseNotes(version) {
+  if (!args['release-notes-catalog']) return undefined
+  const catalog = await loadReleaseNotesCatalog(resolve(required('release-notes-catalog')), { requireAllLocales: args['require-all-locales'] === 'true' })
+  return projectReleaseNotesEntry(requireReleaseNotesEntry(catalog, version, { requireAllLocales: args['require-all-locales'] === 'true' }))
+}
 
 async function resolvePlatforms() {
   if (platformFlags.length) {
