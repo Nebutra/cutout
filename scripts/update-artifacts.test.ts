@@ -68,11 +68,11 @@ describe('signed update artifact policy', () => {
   })
 
   it('derives readable legacy and structured updater notes from one reviewed entry', async () => {
-    const value = fixture('0.1.18')
+    const value = fixture('0.1.19')
     const catalog = await loadReleaseNotesCatalog(undefined, { requireAllLocales: true })
-    const releaseNotes = projectReleaseNotesEntry(requireReleaseNotesEntry(catalog, '0.1.18'))
-    const generated = buildReleaseDocuments({ channel: 'stable', version: '0.1.18', publishedAt: '2026-08-04T00:00:00.000Z', artifactUrl: 'https://releases.example.test/Cutout.app.tar.gz', signature: value.signature, signatureFile: 'Cutout.app.tar.gz.sig', artifactDigest: sha256(value.artifact), allowedHosts: ['releases.example.test'], releaseNotes })
-    expect(generated.manifest.notes).toContain('One AI readiness view')
+    const releaseNotes = projectReleaseNotesEntry(requireReleaseNotesEntry(catalog, '0.1.19'))
+    const generated = buildReleaseDocuments({ channel: 'stable', version: '0.1.19', publishedAt: '2026-08-04T00:00:00.000Z', artifactUrl: 'https://releases.example.test/Cutout.app.tar.gz', signature: value.signature, signatureFile: 'Cutout.app.tar.gz.sig', artifactDigest: sha256(value.artifact), allowedHosts: ['releases.example.test'], releaseNotes })
+    expect(generated.manifest.notes).toContain('See what Agent preparation is doing')
     expect(generated.manifest.notes).not.toContain('cutout.release-notes')
     expect(generated.manifest.cutoutReleaseNotes).toEqual(releaseNotes)
     expect(() => validateUpdateManifest(generated.manifest, { requireReleaseNotes: true, expectedReleaseNotes: releaseNotes, allowedHosts: ['releases.example.test'] })).not.toThrow()
@@ -83,12 +83,14 @@ describe('signed update artifact policy', () => {
     expect(() => validateUpdateManifest(legacy)).not.toThrow()
     expect(() => validateUpdateManifest(legacy, { requireReleaseNotes: true })).toThrow('requires reviewed')
     const catalog = await loadReleaseNotesCatalog()
-    const releaseNotes = projectReleaseNotesEntry(requireReleaseNotesEntry(catalog, '0.1.18'))
-    const mismatched = { ...fixture('0.1.19').manifest, cutoutReleaseNotes: releaseNotes }
+    const releaseNotes = projectReleaseNotesEntry(requireReleaseNotesEntry(catalog, '0.1.19'))
+    // Deliberately a different version from the catalog entry above, so the
+    // version check fires rather than the notes-text check.
+    const mismatched = { ...fixture('0.1.20').manifest, cutoutReleaseNotes: releaseNotes }
     expect(() => validateUpdateManifest(mismatched)).toThrow('does not match')
-    const unreadable = { ...fixture('0.1.18').manifest, cutoutReleaseNotes: releaseNotes, notes: JSON.stringify(releaseNotes) }
+    const unreadable = { ...fixture('0.1.19').manifest, cutoutReleaseNotes: releaseNotes, notes: JSON.stringify(releaseNotes) }
     expect(() => validateUpdateManifest(unreadable)).toThrow('reviewed English')
-    const malformed = { ...fixture('0.1.18').manifest, cutoutReleaseNotes: { ...releaseNotes, remoteUrl: 'https://example.test/notes' } }
+    const malformed = { ...fixture('0.1.19').manifest, cutoutReleaseNotes: { ...releaseNotes, remoteUrl: 'https://example.test/notes' } }
     expect(() => validateUpdateManifest(malformed)).toThrow('unknown field')
   })
 
@@ -157,14 +159,14 @@ describe('signed update artifact policy', () => {
   })
 
   it('generates catalog-backed updater metadata through the production CLI', async () => {
-    const value = fixture('0.1.18'), root = await mkdtemp(join(tmpdir(), 'cutout-update-notes-')), artifact = join(root, 'Cutout.app.tar.gz')
+    const value = fixture('0.1.19'), root = await mkdtemp(join(tmpdir(), 'cutout-update-notes-')), artifact = join(root, 'Cutout.app.tar.gz')
     await writeFile(artifact, value.artifact); await writeFile(`${artifact}.sig`, value.signature)
-    const result = spawnSync(process.execPath, ['scripts/update-artifacts.mjs', 'generate', '--artifact', artifact, '--version', '0.1.18', '--channel', 'stable', '--artifact-url', 'https://releases.example.test/Cutout.app.tar.gz', '--allowed-hosts', 'releases.example.test', '--release-notes-catalog', 'src/release-notes/catalog.json', '--require-all-locales', '--output', join(root, 'out')], { cwd: process.cwd(), encoding: 'utf8' })
+    const result = spawnSync(process.execPath, ['scripts/update-artifacts.mjs', 'generate', '--artifact', artifact, '--version', '0.1.19', '--channel', 'stable', '--artifact-url', 'https://releases.example.test/Cutout.app.tar.gz', '--allowed-hosts', 'releases.example.test', '--release-notes-catalog', 'src/release-notes/catalog.json', '--require-all-locales', '--output', join(root, 'out')], { cwd: process.cwd(), encoding: 'utf8' })
     expect(result.status, result.stderr).toBe(0)
     const manifestPath = join(root, 'out', 'stable', 'latest.json')
     const manifest = JSON.parse(await readFile(manifestPath, 'utf8'))
-    expect(manifest.notes).toMatch(/^Clearer local AI readiness/m)
-    expect(manifest.cutoutReleaseNotes).toMatchObject({ protocol: 'cutout.release-notes.v1', version: '0.1.18' })
+    expect(manifest.notes).toMatch(/^Readable preparation and honest paid-action decisions/m)
+    expect(manifest.cutoutReleaseNotes).toMatchObject({ protocol: 'cutout.release-notes.v1', version: '0.1.19' })
     const validate = spawnSync(process.execPath, ['scripts/update-artifacts.mjs', 'validate', '--manifest', manifestPath, '--allowed-hosts', 'releases.example.test', '--release-notes-catalog', 'src/release-notes/catalog.json', '--require-release-notes', '--require-all-locales'], { cwd: process.cwd(), encoding: 'utf8' })
     expect(validate.status, validate.stderr).toBe(0)
   })
