@@ -29,10 +29,13 @@ Apple inputs and writes `APPLE_API_PRIVATE_KEY` to
 
 The current Tauri action is split into a macOS invocation and a non-macOS
 invocation. The macOS invocation receives Apple secrets and relies on Tauri
-2.11.4's built-in signing, notarization wait, and stapling behavior. The
-non-macOS invocation receives no Apple credential values.
+2.11.4's built-in signing, notarization wait, and stapling behavior for the app.
+Tauri creates and signs the DMG only after app notarization, so a separate
+macOS-only step submits the finished DMG with `xcrun notarytool submit --wait`
+and staples the accepted ticket. The non-macOS invocation receives no Apple
+credential values.
 
-After the macOS build, a verification step resolves the generated `.app` and
+After DMG notarization, a verification step resolves the generated `.app` and
 `.dmg`, checks the Developer ID signature with `codesign`, checks Gatekeeper
 acceptance with `spctl`, and validates stapled tickets with `xcrun stapler`.
 Artifacts are uploaded only after these checks pass.
@@ -49,6 +52,19 @@ Artifacts are uploaded only after these checks pass.
 6. Run repository validation locally.
 7. Push the reviewed workflow change and exercise it only from an existing
    version-matched tag or after a separate release-version review.
+
+## Protected Run Evidence
+
+- Workflow run: `29893617632`
+- Source commit: `fef31444d12b1cc6d05a8671de25f868d44cf4d3`
+- arm64 app submission: `a7eba846-7067-4102-91c2-c2bc73f878f2`
+- arm64 DMG submission: `98780c0a-59c2-4aa1-9134-6bc9cb4aab4f`
+- x86_64 app submission: `46f4f5a8-2e2d-4aaa-a1da-e44b72a8c945`
+- x86_64 DMG submission: `1a48c349-e6c6-413e-a26b-c9eaab8889ee`
+- Both app and DMG checks reported `source=Notarized Developer ID` and valid
+  stapled tickets. Updater metadata generation and validation also passed. The
+  publish job then refused to replace existing Release `v0.1.1`, as required by
+  the immutable-release contract.
 
 ## Rollback
 

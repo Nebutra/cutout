@@ -17,8 +17,10 @@
 - [x] Generate and upload the Tauri updater key pair configuration.
 - [x] List protected environment configuration by name and verify no secret
   files were added to git.
-- [ ] Exercise a protected release workflow without publishing an unreviewed
-  version.
+- [x] Exercise protected release workflow `29893617632` against existing tag
+  `v0.1.1`; all four build jobs passed, both app and DMG notarization gates
+  passed for both macOS architectures, updater metadata generated and validated,
+  and publication stopped at the expected immutable-release refusal.
 
 ## Validation Commands
 

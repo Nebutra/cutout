@@ -12,11 +12,11 @@
   "assignee": "tseka",
   "createdAt": "2026-07-22",
   "completedAt": null,
-  "branch": null,
+  "branch": "release/macos-notarization",
   "base_branch": "main",
   "worktree_path": null,
-  "commit": null,
-  "pr_url": null,
+  "commit": "fef31444d12b1cc6d05a8671de25f868d44cf4d3",
+  "pr_url": "https://github.com/Nebutra/cutout/pull/13",
   "subtasks": [],
   "children": [
     "07-22-verify-release-credentials",
@@ -24,6 +24,6 @@
   ],
   "parent": null,
   "relatedFiles": [],
-  "notes": "",
+  "notes": "Protected release run 29893617632 proved Apple notarization and stapling for both app and DMG on arm64 and x86_64, plus updater metadata generation and validation. Publication intentionally stopped because immutable Release v0.1.1 already exists.",
   "meta": {}
 }

@@ -1,0 +1,5 @@
+{"file":".trellis/tasks/07-27-agent-credential-adapters/prd.md","reason":"Verify all nine adapters, compatibility, negative cases, and child-task boundaries"}
+{"file":".trellis/tasks/07-27-local-agent-credential-discovery/research/paseo-39-agent-discovery-matrix.md","reason":"Check every enabled shape against reviewed evidence"}
+{"file":".trellis/spec/frontend/byok-provider-protocols.md","reason":"Verify kind/protocol/endpoint binding and non-generation connection checks"}
+{"file":".trellis/spec/frontend/agent-control-safety.md","reason":"Verify exact paths, symlink rejection, no execution, and secret-free IPC"}
+{"file":"cutout.agent-capabilities.json","reason":"Verify unsupported delegation/provider-executor claims remain truthful"}

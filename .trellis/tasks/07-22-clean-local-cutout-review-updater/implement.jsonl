@@ -1,0 +1,2 @@
+{"file":".trellis/spec/frontend/release-pipeline.md","reason":"Review the protected release, updater artifact, notarization, rollout, and immutable-tag contracts."}
+{"file":"docs/RELEASE_CHECKLIST.md","reason":"Apply the operational release and desktop updater validation checklist."}

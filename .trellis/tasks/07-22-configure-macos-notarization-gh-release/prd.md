@@ -59,9 +59,11 @@ committing private credentials.
 - [x] Release workflow contract tests cover the Apple secret boundary and
   verification steps.
 - [x] `pnpm agent:validate` and release workflow tests pass.
-- [ ] A protected workflow run reaches signed/notarized build execution, or any
-  remaining external account prerequisite is reported precisely without
-  claiming a successful notarization.
+- [x] Protected workflow run `29893617632` completed both macOS build jobs with
+  Apple-accepted app and DMG submissions, stapled tickets, Gatekeeper
+  acceptance, packaged-app smoke tests, uploaded workflow artifacts, and valid
+  updater metadata. The final publish job intentionally refused to replace the
+  existing immutable `v0.1.1` Release.
 
 ## Out of Scope
 
@@ -76,3 +78,6 @@ committing private credentials.
 - The CSR alone cannot sign or notarize an app; Apple must issue the matching
   certificate and the private key generated with the CSR must remain available
   in the local keychain.
+- Tauri 2.11.4 notarizes and staples the app before it creates the DMG. The
+  workflow must submit the finished DMG separately with `notarytool --wait`,
+  staple it, and only then run Gatekeeper and stapler validation on the DMG.

@@ -1,0 +1,7 @@
+{"_example": "Fill with {\"file\": \"<path>\", \"reason\": \"<why>\"}. Put spec/research files only — no code paths. Run `python3 .trellis/scripts/get_context.py --mode packages` to list available specs. Delete this line once real entries are added."}
+{"file": ".trellis/spec/frontend/byok-provider-protocols.md", "reason": "Provider credential, protocol, and secret-boundary contract"}
+{"file": ".trellis/spec/frontend/agent-control-safety.md", "reason": "Authorization lease, controlled path, and process execution contract"}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "Cross-layer DTO, IPC, persistence, and UI projection guidance"}
+{"file": ".trellis/tasks/07-27-local-agent-credential-discovery/research/paseo-agent-catalog-2026-07-27.md", "reason": "Pinned 39-Agent catalog and safe local CLI probe evidence"}
+{"file": "cutout.agent-capabilities.json", "reason": "Current Agent capability and provider-executor truth contract"}
+{"file": ".trellis/tasks/07-27-local-agent-credential-discovery/research/paseo-39-agent-discovery-matrix.md", "reason": "Complete detection/import/delegation evidence matrix for all 39 Agents"}

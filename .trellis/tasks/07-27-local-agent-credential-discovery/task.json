@@ -1,0 +1,31 @@
+{
+  "id": "local-agent-credential-discovery",
+  "name": "local-agent-credential-discovery",
+  "title": "Discover and authorize local Agent credentials",
+  "description": "Discover supported local Agent credential and session sources, show sanitized metadata, and require explicit authorization before import or delegated use.",
+  "status": "planning",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P1",
+  "creator": "tseka",
+  "assignee": "tseka",
+  "createdAt": "2026-07-27",
+  "completedAt": null,
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [
+    "07-27-common-agent-inventory",
+    "07-27-agent-credential-adapters",
+    "07-27-agent-session-delegation",
+    "07-27-agent-source-settings-ui"
+  ],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {}
+}

@@ -1,0 +1,3 @@
+{"file":".trellis/spec/frontend/release-pipeline.md","reason":"Verification must enforce the complete signed/notarized four-platform release and local installation evidence."}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"Check every repeated version value and generated runtime mirror for drift."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Check release metadata, generated plugin runtime, native bundle, updater, and docs remain synchronized."}
