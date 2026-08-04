@@ -1,6 +1,6 @@
 {
   "protocol": "cutout.codex-plugin-runtime.v1",
-  "packageVersion": "0.1.18",
+  "packageVersion": "0.1.19",
   "sourceHashes": {
     "node_modules/.pnpm/@tauri-apps+api@2.11.1/node_modules/@tauri-apps/api/core.js": "b2187a1c0c0a25806dc64f8823757ce553c09d3bbe3e409bd05cab32e245f1c9",
     "node_modules/.pnpm/@tauri-apps+api@2.11.1/node_modules/@tauri-apps/api/external/tslib/tslib.es6.js": "76dace0a1ae47c1d3e604591b8a15db2f534b776009b9e68e786dae7fe763f70",
@@ -146,7 +146,7 @@
     "src/design-ir/validate.ts": "f4f99b144b4d45655afa634bf0497d07d6e1e1187adf63fce2de3f4e3f138575",
     "src/design-ir/workspace-projection.ts": "11bda7d6269da192e6b3260c6236d5d078836623845513498b82f7cd853aa007",
     "src/design-kit/astryx.ts": "fca94583f58da8c8a94ffff2ca7b2ea1cba8a317258f39b99a72f585d356a861",
-    "src/design-kit/compiler.ts": "e7639020301833454823760558613b517e15f4bf0435f2ee7c7dc0ecd282fc6b",
+    "src/design-kit/compiler.ts": "c4d1ce8b5b8623dce31aba2cba93957a2da2868fbd4ca9514c472ba462b1b658",
     "src/design-kit/demo-html-token-sync.ts": "c97e3581301133811642d81592a16c798f27ffce016e0c493a21452d16c9a5ac",
     "src/design-kit/headless.ts": "fa78ee091279f7a9fafab4da75d12b91001205c830c8f57a8b77d9fceebf5b33",
     "src/design-kit/index.ts": "7338c2e2263863d6dc312692edfa32435a0d89862a82cea35329063cc7d61878",

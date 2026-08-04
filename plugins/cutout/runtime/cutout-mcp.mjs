@@ -15554,13 +15554,13 @@ function renderDemoHtml(document, tokens, _source) {
 	const shadows = tokens.filter((token) => token.category === "shadow");
 	const typography = tokens.filter((token) => token.category === "typography");
 	const pick = (list, index, fallback) => list.length ? list[index % list.length] : fallback;
-	const accent = pick(colors, 0, void 0);
+	const accent = pick(colors, 0);
 	const surface = pick(colors, 1, accent);
 	const ink = pick(colors, 2, accent);
-	const gap = pick(spacing, 2, void 0);
-	const radius = pick(radii, 0, void 0);
-	const shadow = pick(shadows, 0, void 0);
-	const font = pick(typography, 0, void 0);
+	const gap = pick(spacing, 2);
+	const radius = pick(radii, 0);
+	const shadow = pick(shadows, 0);
+	const font = pick(typography, 0);
 	const css = renderTokensCss(tokens);
 	const varOr = (token, fallback) => token ? `var(${cssVariable$1(token)})` : fallback;
 	return `<!doctype html>
