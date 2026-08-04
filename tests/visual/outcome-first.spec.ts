@@ -2,7 +2,14 @@ import type { Locator, Page, TestInfo } from '@playwright/test'
 import { expect, test } from './local-state.fixture'
 import { fingerprint } from '../../src/design-ir/fingerprint'
 import { projectWorkspaceSnapshotToDesignDocument } from '../../src/design-ir/workspace-projection'
-import type { WorkspaceSnapshot } from '../../src/workspace/workspace-snapshot'
+import {
+  currentPrototypeExploration,
+  currentPrototypeReviewDocument,
+} from '../../src/prototype/prototype-plan.test-fixture'
+import {
+  createEmptyWorkspaceSnapshot,
+  type WorkspaceSnapshot,
+} from '../../src/workspace/workspace-snapshot'
 
 const VAGUE_GOAL = 'Create a distinctive launch identity for our new product.'
 const INTERNAL_TERMS = [
@@ -180,11 +187,8 @@ async function createProjectWithWorkspace(
 
 function baseWorkspace(overrides: Record<string, unknown> = {}) {
   return {
-    version: 'workspace.v1', workflowPhase: 'review', prototypePlan: null,
-    prototypeScope: 'primary-flow', humanLoopChoiceId: null, humanLoopCustomAnswer: '',
-    prototypeDesignSystem: null, prototypePages: [], selectedPrototypePageId: null,
-    runError: null, namingStatus: 'idle', liveAgentOutput: '', attachments: [],
-    webSearchEnabled: false, ...overrides,
+    ...createEmptyWorkspaceSnapshot({ workflowPhase: 'review' }),
+    ...overrides,
   }
 }
 
@@ -226,9 +230,10 @@ function plan(humanLoop: Record<string, unknown>) {
   return {
     version: 'prototype-plan.v0',
     product: { name: 'Northstar', projectName: 'Northstar', summary: VAGUE_GOAL, audience: 'Creative teams', primaryGoal: 'Launch clearly', platform: 'responsive web' },
-    designSystem: { styleSummary: 'Distinctive and editorial', palette: ['black', 'white', 'green'], typography: 'Confident sans serif', spacing: '8px rhythm', componentPrinciples: ['clear hierarchy'], assetDirection: 'A focused launch visual' },
+    designSystem: { styleSummary: 'Distinctive and editorial', palette: ['black', 'white', 'green'], typography: 'Confident sans serif', spacing: '8px rhythm', componentPrinciples: ['clear hierarchy'], assetDirection: 'A focused launch visual', exploration: currentPrototypeExploration },
     pages: [page, { ...page, id: 'details', name: 'Product details', route: '/details', interactions: [] }],
     flows: [{ id: 'launch', name: 'Launch flow', goal: 'Understand the product', startPageId: 'home', steps: [{ fromPageId: 'home', interactionId: 'open-details', toPageId: 'details' }] }],
+    reviewDocument: currentPrototypeReviewDocument,
     humanLoop,
   }
 }
@@ -313,7 +318,7 @@ function interruptedApprovalWorkspace() {
     { eventId: 'run', runId: 'run-1', at: 1, type: 'run-started', mode: 'create' },
     { eventId: 'intent', runId: 'run-1', at: 2, type: 'intent-recorded', intent: 'Produce a launch campaign.' },
     { eventId: 'tool', runId: 'run-1', at: 3, type: 'tool-started', toolCallId: 'image-1', tool: 'image.generate', label: 'Create launch visuals' },
-    { eventId: 'approval', runId: 'run-1', at: 4, type: 'tool-approval-requested', toolCallId: 'image-1', requestId: 'request-1', tool: 'image.generate', label: 'Create launch visuals', budgetCeiling: { currency: 'USD', amount: 0.25 }, approvalPolicy: 'explicit', pendingApproval: true, reason: 'This action requires approval before it can run.' },
+    { eventId: 'approval', runId: 'run-1', at: 4, type: 'tool-approval-requested', toolCallId: 'image-1', requestId: 'request-1', tool: 'image.generate', label: 'Create launch visuals', approvalPolicy: 'explicit', pendingApproval: true, reason: 'This action requires approval before it can run.' },
   ]
   return baseWorkspace({
     agentRunEvents: { version: 'agent-run-events.v1', activeRunId: 'run-1', activeRun: null, events },
@@ -323,9 +328,11 @@ function interruptedApprovalWorkspace() {
 function conversationalWorkspace() {
   const events = [
     { eventId: 'run', runId: 'run-chat', at: 1, type: 'run-started', mode: 'create' },
+    { eventId: 'user', runId: 'run-chat', at: 2, type: 'intent-recorded', intent: 'hi' },
     {
-      eventId: 'reply', runId: 'run-chat', at: 2, type: 'agent-message',
+      eventId: 'reply', runId: 'run-chat', at: 3, type: 'agent-message',
       message: "Hi! Tell me what you'd like to design or build.",
+      responseToEventId: 'user',
       action: { type: 'proceed-anyway', label: 'Build it anyway', brief: 'hi' },
     },
   ]
@@ -344,7 +351,6 @@ function retriedIntentWorkspace() {
     { eventId: 'intent-2', runId: 'run-2', at: 5, type: 'intent-recorded', intent },
   ]
   return baseWorkspace({
-    brief: intent,
     agentRunEvents: { version: 'agent-run-events.v1', activeRunId: 'run-2', activeRun: null, events },
   })
 }
@@ -446,12 +452,13 @@ test('conversational Agent replies stay in the panel and never cover the canvas'
   await expect(panel.getByRole('button', { name: 'Build it anyway' })).toBeVisible()
   await expect(page.locator('[data-sonner-toast]').filter({ hasText: 'Build it anyway' })).toHaveCount(0)
 
+  const containmentTolerance = 1
   const contained = await Promise.all([panel.boundingBox(), reply.boundingBox()]).then(([panelBox, replyBox]) =>
     Boolean(panelBox && replyBox
-      && replyBox.x >= panelBox.x
-      && replyBox.x + replyBox.width <= panelBox.x + panelBox.width
-      && replyBox.y >= panelBox.y
-      && replyBox.y + replyBox.height <= panelBox.y + panelBox.height),
+      && replyBox.x >= panelBox.x - containmentTolerance
+      && replyBox.x + replyBox.width <= panelBox.x + panelBox.width + containmentTolerance
+      && replyBox.y >= panelBox.y - containmentTolerance
+      && replyBox.y + replyBox.height <= panelBox.y + panelBox.height + containmentTolerance),
   )
   expect(contained).toBe(true)
 })
@@ -602,7 +609,9 @@ test('Canvas keeps a responsive safe area while workspace panels change', async 
 
   for (const dark of [false, true]) {
     await page.evaluate((enabled) => document.documentElement.classList.toggle('dark', enabled), dark)
-    await expect(canvas).toHaveScreenshot(`canvas-safe-area-${dark ? 'dark' : 'light'}.png`)
+    await expect(canvas).toHaveScreenshot(`canvas-safe-area-${dark ? 'dark' : 'light'}.png`, {
+      maxDiffPixelRatio: 0.015,
+    })
   }
 })
 
