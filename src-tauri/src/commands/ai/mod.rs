@@ -17,6 +17,5 @@ pub mod auth_header;
 pub mod codex_system;
 pub mod image_edit;
 pub mod keys;
-pub mod local_agent_inventory;
 pub mod provider_discovery;
 pub mod providers;

@@ -1,9 +1,9 @@
 //! Desktop-only Codex planning runtime.
 //!
 //! The renderer receives a closed planning API, never a process, path, argv,
-//! environment, auth, sandbox, tool, or generic JSON-RPC bridge. Codex 0.146.0
-//! is run with an isolated host-owned configuration whose model request was
-//! capture-proven to contain zero tools.
+//! environment, auth, sandbox, tool, or generic JSON-RPC bridge. Compatible
+//! signed Codex runtimes are negotiated against the reviewed app-server schema
+//! and run with an isolated host-owned zero-tool configuration.
 
 use std::collections::HashMap;
 use std::fs::{self, OpenOptions};
@@ -21,8 +21,10 @@ use sha2::{Digest, Sha256};
 use tauri::ipc::Channel;
 use tauri::{AppHandle, Manager, Runtime, State};
 
+use super::provider_discovery::read_exact_config;
+
 const RUNTIME_ID: &str = "codex-system";
-const SUPPORTED_VERSION: &str = "0.146.0";
+const MINIMUM_RUNTIME_VERSION: (u64, u64, u64) = (0, 146, 0);
 const MAX_PATH_ENTRIES: usize = 128;
 const MAX_COMMAND_OUTPUT_BYTES: usize = 256 * 1024;
 const MAX_SCHEMA_BYTES: u64 = 4 * 1024 * 1024;
@@ -41,16 +43,24 @@ const HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(30);
 const TURN_TIMEOUT: Duration = Duration::from_secs(600);
 const INTERRUPT_GRACE: Duration = Duration::from_secs(5);
 const EXPECTED_MACOS_TEAM_ID: &str = "2DC432GLL2";
+const REVIEWED_CC_SWITCH_BASE_URL: &str = "http://127.0.0.1:15721/v1";
 #[cfg(target_os = "macos")]
 const MACOS_CODEX_CANDIDATES: &[&str] = &["/opt/homebrew/bin/codex", "/usr/local/bin/codex"];
-const REQUIRED_METHODS: &[&str] = &[
-    "account/read",
-    "model/list",
-    "thread/start",
-    "thread/resume",
-    "turn/start",
-    "turn/steer",
-    "turn/interrupt",
+const REQUIRED_REQUESTS: &[(&str, &str)] = &[
+    ("initialize", "InitializeParams"),
+    ("account/read", "GetAccountParams"),
+    ("model/list", "ModelListParams"),
+    ("thread/start", "ThreadStartParams"),
+    ("thread/resume", "ThreadResumeParams"),
+    ("turn/start", "TurnStartParams"),
+    ("turn/steer", "TurnSteerParams"),
+    ("turn/interrupt", "TurnInterruptParams"),
+];
+const REQUIRED_NOTIFICATIONS: &[(&str, &str)] = &[
+    ("error", "ErrorNotification"),
+    ("item/agentMessage/delta", "AgentMessageDeltaNotification"),
+    ("item/completed", "ItemCompletedNotification"),
+    ("turn/completed", "TurnCompletedNotification"),
 ];
 
 const ZERO_TOOL_CONFIG: &str = r#"approval_policy = "never"
@@ -144,7 +154,6 @@ pub enum RuntimeAuthClass {
 pub enum RuntimeCapabilityEvidence {
     Proven,
     Unsupported,
-    Unknown,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
@@ -165,9 +174,16 @@ pub enum StableRuntimeReason {
     AuthenticationRequired,
     ProtocolUnsupported,
     RuntimeVersionUnsupported,
-    RestrictedReadRootsRequired,
     ExecutionAdapterUnavailable,
     ProbeFailed,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum StableTurnFailureReason {
+    UpstreamUnavailable,
+    ModelOutputInvalid,
+    RuntimeFailed,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
@@ -183,6 +199,8 @@ pub struct PlanningRuntimeEvidence {
     version: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     reason: Option<StableRuntimeReason>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    last_failure: Option<StableTurnFailureReason>,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -199,6 +217,8 @@ pub enum CodexRuntimeError {
     Transport,
     #[error("planning runtime protocol is unsupported")]
     Protocol,
+    #[error("planning runtime upstream is unavailable")]
+    UpstreamUnavailable,
     #[error("planning runtime output exceeded its limit")]
     Overflow,
     #[error("planning runtime timed out")]
@@ -264,6 +284,11 @@ pub enum CodexPlanningEvent {
         request_id: String,
         turn_id: String,
         receipt: CodexExecutionReceipt,
+    },
+    Failed {
+        request_id: String,
+        turn_id: String,
+        reason: StableTurnFailureReason,
     },
     Interrupted {
         request_id: String,
@@ -367,6 +392,8 @@ struct ExecutionStore {
     version: String,
     runtime_version: String,
     execution: RuntimeExecutionEvidence,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    last_failure: Option<StableTurnFailureReason>,
     updated_at: u64,
 }
 
@@ -380,6 +407,7 @@ fn unavailable(reason: StableRuntimeReason) -> PlanningRuntimeEvidence {
         execution: RuntimeExecutionEvidence::Unproven,
         version: None,
         reason: Some(reason),
+        last_failure: None,
     }
 }
 
@@ -554,7 +582,14 @@ fn terminate_process_group(pid: u32) {
     #[cfg(unix)]
     if let Ok(process_id) = i32::try_from(pid) {
         unsafe {
-            libc::kill(-process_id, libc::SIGKILL);
+            let mut status = 0;
+            // The PID is authority only while it still names our live child and
+            // that child still leads the process group created at spawn.
+            if libc::waitpid(process_id, &mut status, libc::WNOHANG) == 0
+                && libc::getpgid(process_id) == process_id
+            {
+                libc::kill(-process_id, libc::SIGKILL);
+            }
         }
     }
 }
@@ -609,19 +644,36 @@ fn parse_version(output: &Output) -> Option<String> {
         return None;
     }
     let value = String::from_utf8_lossy(&output.stdout);
-    let version = value.split_whitespace().find(|part| {
-        part.bytes()
-            .next()
-            .is_some_and(|byte| byte.is_ascii_digit())
-    })?;
-    if version.len() > 40
-        || !version
-            .bytes()
-            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'-' | b'+'))
-    {
+    let version = value
+        .split_whitespace()
+        .find(|part| parse_runtime_version(part).is_some())?;
+    Some(version.to_owned())
+}
+
+fn parse_runtime_version(value: &str) -> Option<(u64, u64, u64)> {
+    if value.is_empty() || value.len() > 40 {
         return None;
     }
-    Some(version.to_owned())
+    let mut parts = value.split('.');
+    let mut next = || {
+        let part = parts.next()?;
+        if part.is_empty()
+            || !part.bytes().all(|byte| byte.is_ascii_digit())
+            || (part.len() > 1 && part.starts_with('0'))
+        {
+            return None;
+        }
+        part.parse::<u64>().ok()
+    };
+    let version = (next()?, next()?, next()?);
+    if parts.next().is_some() {
+        return None;
+    }
+    Some(version)
+}
+
+fn runtime_version_supported(value: &str) -> bool {
+    parse_runtime_version(value).is_some_and(|version| version >= MINIMUM_RUNTIME_VERSION)
 }
 
 fn parse_auth_class(output: &Output) -> RuntimeAuthClass {
@@ -656,23 +708,175 @@ fn schema_contains_string(value: &Value, expected: &str) -> bool {
     }
 }
 
+fn schema_method_has_params(
+    schema: &Value,
+    union: &str,
+    method: &str,
+    params_definition: &str,
+) -> bool {
+    let Some(variants) = schema
+        .pointer(&format!("/definitions/{union}/oneOf"))
+        .and_then(Value::as_array)
+    else {
+        return false;
+    };
+    let expected_ref = format!("#/definitions/{params_definition}");
+    variants.iter().any(|variant| {
+        variant
+            .pointer("/properties/method/enum")
+            .and_then(Value::as_array)
+            .is_some_and(|values| values.len() == 1 && values[0].as_str() == Some(method))
+            && variant
+                .pointer("/properties/params/$ref")
+                .and_then(Value::as_str)
+                == Some(expected_ref.as_str())
+    })
+}
+
+fn definition_has_properties(schema: &Value, definition: &str, fields: &[&str]) -> bool {
+    schema
+        .pointer(&format!("/definitions/{definition}/properties"))
+        .and_then(Value::as_object)
+        .is_some_and(|properties| fields.iter().all(|field| properties.contains_key(*field)))
+}
+
+fn definition_property_allows_type(
+    schema: &Value,
+    definition: &str,
+    field: &str,
+    expected: &str,
+) -> bool {
+    let Some(value) = schema.pointer(&format!(
+        "/definitions/{definition}/properties/{field}/type"
+    )) else {
+        return false;
+    };
+    match value {
+        Value::String(value) => value == expected,
+        Value::Array(values) => values
+            .iter()
+            .any(|candidate| candidate.as_str() == Some(expected)),
+        _ => false,
+    }
+}
+
+fn definition_requires_fields(schema: &Value, definition: &str, fields: &[&str]) -> bool {
+    schema
+        .pointer(&format!("/definitions/{definition}/required"))
+        .and_then(Value::as_array)
+        .is_some_and(|required| {
+            fields.iter().all(|field| {
+                required
+                    .iter()
+                    .any(|candidate| candidate.as_str() == Some(field))
+            })
+        })
+}
+
+fn definition_contains_string(schema: &Value, definition: &str, expected: &str) -> bool {
+    schema
+        .pointer(&format!("/definitions/{definition}"))
+        .is_some_and(|value| schema_contains_string(value, expected))
+}
+
 fn schema_proves_runtime(schema: &Value) -> Result<(), StableRuntimeReason> {
-    if !REQUIRED_METHODS
+    if !REQUIRED_REQUESTS
         .iter()
-        .all(|method| schema_contains_string(schema, method))
+        .all(|(method, params)| schema_method_has_params(schema, "ClientRequest", method, params))
+        || !REQUIRED_NOTIFICATIONS.iter().all(|(method, params)| {
+            schema_method_has_params(schema, "ServerNotification", method, params)
+        })
     {
         return Err(StableRuntimeReason::ProtocolUnsupported);
     }
-    for field in [
-        "environments",
-        "dynamicTools",
-        "selectedCapabilityRoots",
-        "runtimeWorkspaceRoots",
-        "outputSchema",
+    for (definition, fields) in [
+        (
+            "ThreadStartParams",
+            &[
+                "approvalPolicy",
+                "baseInstructions",
+                "cwd",
+                "developerInstructions",
+                "dynamicTools",
+                "environments",
+                "runtimeWorkspaceRoots",
+                "sandbox",
+                "selectedCapabilityRoots",
+            ][..],
+        ),
+        (
+            "ThreadResumeParams",
+            &[
+                "approvalPolicy",
+                "baseInstructions",
+                "cwd",
+                "developerInstructions",
+                "runtimeWorkspaceRoots",
+                "sandbox",
+                "threadId",
+            ][..],
+        ),
+        (
+            "TurnStartParams",
+            &[
+                "approvalPolicy",
+                "cwd",
+                "environments",
+                "input",
+                "outputSchema",
+                "runtimeWorkspaceRoots",
+                "sandboxPolicy",
+                "threadId",
+            ][..],
+        ),
+        (
+            "TurnSteerParams",
+            &["expectedTurnId", "input", "threadId"][..],
+        ),
+        ("TurnInterruptParams", &["threadId", "turnId"][..]),
     ] {
-        if !schema_contains_string(schema, field) {
+        if !definition_has_properties(schema, definition, fields) {
             return Err(StableRuntimeReason::ProtocolUnsupported);
         }
+    }
+    for (definition, field) in [
+        ("ThreadStartParams", "dynamicTools"),
+        ("ThreadStartParams", "environments"),
+        ("ThreadStartParams", "runtimeWorkspaceRoots"),
+        ("ThreadStartParams", "selectedCapabilityRoots"),
+        ("TurnStartParams", "environments"),
+        ("TurnStartParams", "input"),
+        ("TurnStartParams", "runtimeWorkspaceRoots"),
+        ("TurnSteerParams", "input"),
+    ] {
+        if !definition_property_allows_type(schema, definition, field, "array") {
+            return Err(StableRuntimeReason::ProtocolUnsupported);
+        }
+    }
+    for (definition, fields) in [
+        (
+            "ErrorNotification",
+            &["error", "threadId", "turnId", "willRetry"][..],
+        ),
+        (
+            "AgentMessageDeltaNotification",
+            &["delta", "threadId", "turnId"][..],
+        ),
+        ("TurnCompletedNotification", &["threadId", "turn"][..]),
+    ] {
+        if !definition_requires_fields(schema, definition, fields) {
+            return Err(StableRuntimeReason::ProtocolUnsupported);
+        }
+    }
+    if !definition_has_properties(schema, "Turn", &["error", "id", "items", "status"])
+        || !definition_contains_string(schema, "TurnStatus", "completed")
+        || !definition_contains_string(schema, "TurnStatus", "failed")
+        || !definition_contains_string(schema, "TurnStatus", "interrupted")
+        || !definition_contains_string(schema, "AskForApproval", "never")
+        || !definition_contains_string(schema, "SandboxMode", "read-only")
+        || !definition_contains_string(schema, "SandboxPolicy", "readOnly")
+    {
+        return Err(StableRuntimeReason::ProtocolUnsupported);
     }
     Ok(())
 }
@@ -740,24 +944,33 @@ fn hash_text(parts: &[&str]) -> String {
     format!("{:x}", digest.finalize())
 }
 
-fn read_execution(root: &Path, version: &str) -> RuntimeExecutionEvidence {
+fn read_execution(
+    root: &Path,
+    version: &str,
+) -> (RuntimeExecutionEvidence, Option<StableTurnFailureReason>) {
     let path = root.join("execution.json");
     let Ok(metadata) = fs::symlink_metadata(&path) else {
-        return RuntimeExecutionEvidence::Unproven;
+        return (RuntimeExecutionEvidence::Unproven, None);
     };
     if !metadata.file_type().is_file() || metadata.len() > 16 * 1024 {
-        return RuntimeExecutionEvidence::Stale;
+        return (RuntimeExecutionEvidence::Stale, None);
     }
     let Ok(bytes) = fs::read(path) else {
-        return RuntimeExecutionEvidence::Stale;
+        return (RuntimeExecutionEvidence::Stale, None);
     };
     let Ok(receipt) = serde_json::from_slice::<ExecutionStore>(&bytes) else {
-        return RuntimeExecutionEvidence::Stale;
+        return (RuntimeExecutionEvidence::Stale, None);
     };
     if receipt.version != "cutout.codex-execution.v1" || receipt.runtime_version != version {
-        RuntimeExecutionEvidence::Stale
-    } else {
-        receipt.execution
+        return (RuntimeExecutionEvidence::Stale, None);
+    }
+    match (receipt.execution, receipt.last_failure) {
+        (RuntimeExecutionEvidence::Failed, reason) => (
+            RuntimeExecutionEvidence::Failed,
+            Some(reason.unwrap_or(StableTurnFailureReason::RuntimeFailed)),
+        ),
+        (execution, None) => (execution, None),
+        (_, Some(_)) => (RuntimeExecutionEvidence::Stale, None),
     }
 }
 
@@ -765,11 +978,19 @@ fn write_execution(
     root: &Path,
     version: &str,
     execution: RuntimeExecutionEvidence,
+    last_failure: Option<StableTurnFailureReason>,
 ) -> Result<(), CodexRuntimeError> {
+    let last_failure = match execution {
+        RuntimeExecutionEvidence::Failed => {
+            Some(last_failure.unwrap_or(StableTurnFailureReason::RuntimeFailed))
+        }
+        _ => None,
+    };
     let value = ExecutionStore {
         version: "cutout.codex-execution.v1".into(),
         runtime_version: version.into(),
         execution,
+        last_failure,
         updated_at: now_seconds(),
     };
     atomic_write_json(&root.join("execution.json"), &value)
@@ -807,7 +1028,11 @@ fn probe_sync<R: Runtime>(app: &AppHandle<R>) -> PlanningRuntimeEvidence {
         auth,
         RuntimeAuthClass::Chatgpt | RuntimeAuthClass::ApiKey | RuntimeAuthClass::AccessToken
     );
-    if evidence.version.as_deref() != Some(SUPPORTED_VERSION) {
+    if evidence
+        .version
+        .as_deref()
+        .is_none_or(|version| !runtime_version_supported(version))
+    {
         evidence.reason = Some(StableRuntimeReason::RuntimeVersionUnsupported);
         return evidence;
     }
@@ -819,13 +1044,28 @@ fn probe_sync<R: Runtime>(app: &AppHandle<R>) -> PlanningRuntimeEvidence {
         evidence.reason = Some(reason);
         return evidence;
     }
+    if original_codex_home()
+        .and_then(|home| reviewed_runtime_model_route(&home).map(|_| ()))
+        .is_err()
+    {
+        evidence.reason = Some(StableRuntimeReason::ExecutionAdapterUnavailable);
+        return evidence;
+    }
     if !evidence.authenticated {
         evidence.reason = Some(StableRuntimeReason::AuthenticationRequired);
         return evidence;
     }
     evidence.capability = RuntimeCapabilityEvidence::Proven;
     evidence.reason = None;
-    evidence.execution = read_execution(&root, SUPPORTED_VERSION);
+    let (execution, last_failure) = read_execution(
+        &root,
+        evidence
+            .version
+            .as_deref()
+            .expect("validated runtime version"),
+    );
+    evidence.execution = execution;
+    evidence.last_failure = last_failure;
     evidence
 }
 
@@ -887,16 +1127,108 @@ fn original_codex_home() -> Result<PathBuf, CodexRuntimeError> {
     Ok(home.join(".codex"))
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct RuntimeModelRoute {
+    model: Option<String>,
+}
+
+fn safe_model_id(value: &str) -> bool {
+    !value.is_empty()
+        && value.len() <= 160
+        && value.bytes().all(|byte| {
+            byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b':' | b'/' | b'-')
+        })
+}
+
+fn reviewed_runtime_model_route(
+    owner_home: &Path,
+) -> Result<Option<RuntimeModelRoute>, CodexRuntimeError> {
+    let Some(raw) = read_exact_config(&owner_home.join("config.toml"))
+        .map_err(|_| CodexRuntimeError::NotReady)?
+    else {
+        return Ok(None);
+    };
+    let config: toml::Value = toml::from_str(&raw).map_err(|_| CodexRuntimeError::NotReady)?;
+    let root = config.as_table().ok_or(CodexRuntimeError::NotReady)?;
+    let Some(selected) = root.get("model_provider").and_then(toml::Value::as_str) else {
+        return Ok(None);
+    };
+    if selected == "openai" && !root.contains_key("model_providers") {
+        return Ok(None);
+    }
+    let provider = root
+        .get("model_providers")
+        .and_then(toml::Value::as_table)
+        .and_then(|providers| providers.get(selected))
+        .and_then(toml::Value::as_table)
+        .ok_or(CodexRuntimeError::NotReady)?;
+    let reviewed_keys = [
+        "name",
+        "base_url",
+        "wire_api",
+        "requires_openai_auth",
+        // CC Switch may persist its own bearer material here. The isolated
+        // runtime deliberately discards it and continues to reference only
+        // the Codex-owned auth file.
+        "experimental_bearer_token",
+    ];
+    if provider
+        .keys()
+        .any(|key| !reviewed_keys.contains(&key.as_str()))
+        || provider.get("base_url").and_then(toml::Value::as_str)
+            != Some(REVIEWED_CC_SWITCH_BASE_URL)
+        || provider.get("wire_api").and_then(toml::Value::as_str) != Some("responses")
+        || provider
+            .get("requires_openai_auth")
+            .and_then(toml::Value::as_bool)
+            != Some(true)
+    {
+        return Err(CodexRuntimeError::NotReady);
+    }
+    let model = root
+        .get("model")
+        .and_then(toml::Value::as_str)
+        .map(str::to_owned);
+    if model.as_deref().is_some_and(|value| !safe_model_id(value)) {
+        return Err(CodexRuntimeError::NotReady);
+    }
+    Ok(Some(RuntimeModelRoute { model }))
+}
+
+fn runtime_config(route: Option<&RuntimeModelRoute>) -> String {
+    let Some(route) = route else {
+        return ZERO_TOOL_CONFIG.into();
+    };
+    let model = route
+        .model
+        .as_ref()
+        .map(|model| format!("model = \"{model}\"\n"))
+        .unwrap_or_default();
+    format!(
+        "model_provider = \"cutout_cc_switch\"\n{model}{ZERO_TOOL_CONFIG}\n\
+[model_providers.cutout_cc_switch]\n\
+name = \"CC Switch\"\n\
+base_url = \"{REVIEWED_CC_SWITCH_BASE_URL}\"\n\
+wire_api = \"responses\"\n\
+requires_openai_auth = true\n"
+    )
+}
+
 fn prepare_runtime_home(root: &Path) -> Result<PathBuf, CodexRuntimeError> {
+    let owner_home = original_codex_home()?;
+    let model_route = reviewed_runtime_model_route(&owner_home)?;
     let home = root.join("codex-home");
     fs::create_dir_all(&home).map_err(|_| CodexRuntimeError::Transport)?;
     let config_path = home.join("config.toml");
     if fs::symlink_metadata(&config_path).is_ok_and(|metadata| !metadata.file_type().is_file()) {
         return Err(CodexRuntimeError::NotReady);
     }
-    write_private_file(&config_path, ZERO_TOOL_CONFIG.as_bytes())?;
+    write_private_file(
+        &config_path,
+        runtime_config(model_route.as_ref()).as_bytes(),
+    )?;
 
-    let source = original_codex_home()?.join("auth.json");
+    let source = owner_home.join("auth.json");
     let source_metadata = fs::symlink_metadata(&source).map_err(|_| CodexRuntimeError::NotReady)?;
     if !source_metadata.file_type().is_file() {
         return Err(CodexRuntimeError::NotReady);
@@ -1000,6 +1332,7 @@ fn invalidate_stale_binding(
     state: &RuntimeStateInner,
     key: &str,
     expected_thread_id: &str,
+    runtime_version: &str,
 ) -> Result<(), CodexRuntimeError> {
     let _guard = state
         .binding_io
@@ -1015,7 +1348,7 @@ fn invalidate_stale_binding(
     }
     store.bindings.remove(key);
     save_bindings(root, &store)?;
-    write_execution(root, SUPPORTED_VERSION, RuntimeExecutionEvidence::Stale)
+    write_execution(root, runtime_version, RuntimeExecutionEvidence::Stale, None)
 }
 
 fn prepare_context(
@@ -1154,13 +1487,20 @@ fn rpc_request(
                 .cloned()
                 .ok_or(CodexRuntimeError::Protocol);
         }
-        if value.get("id").is_some() && value.get("method").is_some() {
-            return Err(CodexRuntimeError::UnexpectedTool);
-        }
-        if value.get("method").is_none() {
-            return Err(CodexRuntimeError::Protocol);
-        }
+        validate_rpc_interleaved_message(&value)?;
     }
+}
+
+fn validate_rpc_interleaved_message(value: &Value) -> Result<(), CodexRuntimeError> {
+    let method = value.get("method").and_then(Value::as_str);
+    if value.get("id").is_some() && method.is_some() {
+        return Err(CodexRuntimeError::UnexpectedTool);
+    }
+    let method = method.ok_or(CodexRuntimeError::Protocol)?;
+    if tool_event(method, value) {
+        return Err(CodexRuntimeError::UnexpectedTool);
+    }
+    Ok(())
 }
 
 fn spawn_app_server(
@@ -1364,6 +1704,97 @@ fn retry_reason(value: &Value) -> &'static str {
     }
 }
 
+fn reviewed_upstream_status(details: &serde_json::Map<String, Value>) -> bool {
+    details.get("httpStatusCode").and_then(Value::as_u64) == Some(503)
+}
+
+fn turn_error_failure_reason(error: Option<&Value>) -> StableTurnFailureReason {
+    let info = error.and_then(|value| value.get("codexErrorInfo"));
+    if matches!(
+        info.and_then(Value::as_str),
+        Some("serverOverloaded" | "internalServerError")
+    ) {
+        return StableTurnFailureReason::UpstreamUnavailable;
+    }
+    let Some(info) = info.and_then(Value::as_object) else {
+        return StableTurnFailureReason::RuntimeFailed;
+    };
+    for kind in [
+        "httpConnectionFailed",
+        "responseStreamConnectionFailed",
+        "responseStreamDisconnected",
+        "responseTooManyFailedAttempts",
+    ] {
+        if info
+            .get(kind)
+            .and_then(Value::as_object)
+            .is_some_and(reviewed_upstream_status)
+        {
+            return StableTurnFailureReason::UpstreamUnavailable;
+        }
+    }
+    StableTurnFailureReason::RuntimeFailed
+}
+
+fn observe_retryable_upstream_failure(value: &Value, observed: &mut bool) {
+    if value.get("method").and_then(Value::as_str) == Some("error")
+        && value.pointer("/params/willRetry").and_then(Value::as_bool) == Some(true)
+        && turn_error_failure_reason(value.pointer("/params/error"))
+            == StableTurnFailureReason::UpstreamUnavailable
+    {
+        *observed = true;
+    }
+}
+
+fn terminal_turn_failure_reason(
+    value: &Value,
+    retryable_upstream_observed: bool,
+) -> StableTurnFailureReason {
+    if value.get("method").and_then(Value::as_str) != Some("turn/completed")
+        || value.pointer("/params/turn/status").and_then(Value::as_str) != Some("failed")
+    {
+        return StableTurnFailureReason::RuntimeFailed;
+    }
+    let error = value.pointer("/params/turn/error");
+    let reason = turn_error_failure_reason(error);
+    let terminal_error_is_generic = match error.and_then(|error| error.get("codexErrorInfo")) {
+        None | Some(Value::Null) => true,
+        Some(Value::String(info)) => info == "other",
+        _ => false,
+    };
+    if reason == StableTurnFailureReason::RuntimeFailed
+        && retryable_upstream_observed
+        && terminal_error_is_generic
+    {
+        StableTurnFailureReason::UpstreamUnavailable
+    } else {
+        reason
+    }
+}
+
+fn failure_reason_for_error(error: &CodexRuntimeError) -> StableTurnFailureReason {
+    match error {
+        CodexRuntimeError::UpstreamUnavailable | CodexRuntimeError::Timeout => {
+            StableTurnFailureReason::UpstreamUnavailable
+        }
+        CodexRuntimeError::OutputInvalid => StableTurnFailureReason::ModelOutputInvalid,
+        _ => StableTurnFailureReason::RuntimeFailed,
+    }
+}
+
+fn send_failed_event(
+    on_event: &Channel<CodexPlanningEvent>,
+    request_id: &str,
+    turn_id: &str,
+    reason: StableTurnFailureReason,
+) {
+    let _ = on_event.send(CodexPlanningEvent::Failed {
+        request_id: request_id.to_owned(),
+        turn_id: turn_id.to_owned(),
+        reason,
+    });
+}
+
 fn validate_output(schema: &Value, text: &str) -> Result<Value, CodexRuntimeError> {
     if text.len() > MAX_OUTPUT_BYTES {
         return Err(CodexRuntimeError::Overflow);
@@ -1406,6 +1837,27 @@ fn begin_active(
     Ok(())
 }
 
+fn register_active_process(
+    state: &RuntimeStateInner,
+    request_id: &str,
+    pid: u32,
+) -> Result<(), CodexRuntimeError> {
+    let mut active = state
+        .active
+        .lock()
+        .map_err(|_| CodexRuntimeError::Transport)?;
+    let runtime = active
+        .as_mut()
+        .filter(|runtime| runtime.request_id == request_id)
+        .ok_or(CodexRuntimeError::Interrupted)?;
+    if runtime.interrupted {
+        terminate_process_group(pid);
+        return Err(CodexRuntimeError::Interrupted);
+    }
+    runtime.pid = Some(pid);
+    Ok(())
+}
+
 fn update_active(
     state: &RuntimeStateInner,
     request_id: &str,
@@ -1426,7 +1878,10 @@ fn update_active(
         terminate_process_group(pid);
         return Err(CodexRuntimeError::Interrupted);
     }
-    runtime.pid = Some(pid);
+    if runtime.pid != Some(pid) {
+        terminate_process_group(pid);
+        return Err(CodexRuntimeError::Interrupted);
+    }
     runtime.writer = Some(writer);
     runtime.thread_id = Some(thread_id);
     runtime.turn_id = Some(turn_id);
@@ -1458,9 +1913,44 @@ fn ensure_request_active(
     }
 }
 
+fn active_turn_id(state: &RuntimeStateInner, request_id: &str) -> Option<String> {
+    state
+        .active
+        .lock()
+        .ok()?
+        .as_ref()
+        .filter(|runtime| runtime.request_id == request_id)
+        .and_then(|runtime| runtime.turn_id.clone())
+}
+
+fn normalize_interrupted_result<T>(
+    state: &RuntimeStateInner,
+    request_id: &str,
+    result: Result<T, CodexRuntimeError>,
+) -> Result<T, CodexRuntimeError> {
+    if result.is_ok() || matches!(result, Err(CodexRuntimeError::Interrupted)) {
+        return result;
+    }
+    let interrupted_or_replaced = state
+        .active
+        .lock()
+        .map(|active| {
+            active
+                .as_ref()
+                .is_none_or(|runtime| runtime.request_id != request_id || runtime.interrupted)
+        })
+        .unwrap_or(false);
+    if interrupted_or_replaced {
+        Err(CodexRuntimeError::Interrupted)
+    } else {
+        result
+    }
+}
+
 fn run_turn(
     identity: ExecutableIdentity,
     root: PathBuf,
+    runtime_version: String,
     state: Arc<RuntimeStateInner>,
     input: CodexTurnStartInput,
     on_event: Channel<CodexPlanningEvent>,
@@ -1479,6 +1969,10 @@ fn run_turn(
         };
         let (mut child, writer, stdout, overflow) =
             spawn_app_server(&identity, &runtime_home, &cwd)?;
+        if let Err(error) = register_active_process(&state, &input.request_id, child.id()) {
+            terminate_child(&mut child);
+            return Err(error);
+        }
         let receiver = spawn_protocol_reader(stdout, overflow.clone());
         let turn_result = (|| {
             initialize_app_server(&writer, &receiver, &overflow)?;
@@ -1527,6 +2021,7 @@ fn run_turn(
             let mut output = String::new();
             let mut events = 0_usize;
             let mut retry_attempt = 0_u32;
+            let mut retryable_upstream_observed = false;
             let deadline = Instant::now() + TURN_TIMEOUT;
             loop {
                 events += 1;
@@ -1592,21 +2087,30 @@ fn run_turn(
                         }
                         match value.pointer("/params/turn/status").and_then(Value::as_str) {
                             Some("completed") => {
-                                if output.is_empty() {
-                                    output = terminal_agent_message(
-                                        value
-                                            .pointer("/params/turn")
-                                            .ok_or(CodexRuntimeError::Protocol)?,
-                                    )
-                                    .ok_or(CodexRuntimeError::OutputInvalid)?;
-                                }
-                                let parsed = validate_output(&input.output_schema, &output)?;
+                                let parsed = (|| {
+                                    if output.is_empty() {
+                                        output = terminal_agent_message(
+                                            value
+                                                .pointer("/params/turn")
+                                                .ok_or(CodexRuntimeError::Protocol)?,
+                                        )
+                                        .ok_or(CodexRuntimeError::OutputInvalid)?;
+                                    }
+                                    validate_output(&input.output_schema, &output)
+                                })();
+                                let parsed = match parsed {
+                                    Ok(parsed) => parsed,
+                                    Err(error @ CodexRuntimeError::OutputInvalid) => {
+                                        return Err(error);
+                                    }
+                                    Err(error) => return Err(error),
+                                };
                                 let output_bytes = serde_json::to_vec(&parsed)
                                     .map_err(|_| CodexRuntimeError::OutputInvalid)?;
                                 let receipt = CodexExecutionReceipt {
                                     protocol: "cutout.codex-execution.v1",
                                     runtime_id: RUNTIME_ID,
-                                    runtime_version: SUPPORTED_VERSION.into(),
+                                    runtime_version: runtime_version.clone(),
                                     binding_id: projected_binding_id,
                                     request_id: input.request_id.clone(),
                                     turn_id: turn_id.clone(),
@@ -1633,8 +2137,9 @@ fn run_turn(
                                     save_bindings(&root, &store)?;
                                     write_execution(
                                         &root,
-                                        SUPPORTED_VERSION,
+                                        &runtime_version,
                                         RuntimeExecutionEvidence::Succeeded,
+                                        None,
                                     )?;
                                 }
                                 on_event
@@ -1656,7 +2161,18 @@ fn run_turn(
                                 });
                                 return Err(CodexRuntimeError::Interrupted);
                             }
-                            Some("failed") => return Err(CodexRuntimeError::Protocol),
+                            Some("failed") => {
+                                let reason = terminal_turn_failure_reason(
+                                    &value,
+                                    retryable_upstream_observed,
+                                );
+                                return Err(match reason {
+                                    StableTurnFailureReason::UpstreamUnavailable => {
+                                        CodexRuntimeError::UpstreamUnavailable
+                                    }
+                                    _ => CodexRuntimeError::Protocol,
+                                });
+                            }
                             _ => return Err(CodexRuntimeError::Protocol),
                         }
                     }
@@ -1666,6 +2182,10 @@ fn run_turn(
                         {
                             return Err(CodexRuntimeError::Protocol);
                         }
+                        observe_retryable_upstream_failure(
+                            &value,
+                            &mut retryable_upstream_observed,
+                        );
                         if value.pointer("/params/willRetry").and_then(Value::as_bool) == Some(true)
                         {
                             retry_attempt = retry_attempt.saturating_add(1);
@@ -1678,8 +2198,6 @@ fn run_turn(
                                     reason: retry_reason(&value),
                                 })
                                 .map_err(|_| CodexRuntimeError::Channel)?;
-                        } else {
-                            return Err(CodexRuntimeError::Protocol);
                         }
                     }
                     _ => {}
@@ -1688,8 +2206,14 @@ fn run_turn(
         })();
         let turn_result = if matches!(&turn_result, Err(CodexRuntimeError::StaleThread)) {
             match binding.as_ref() {
-                Some(binding) => invalidate_stale_binding(&root, &state, &key, &binding.thread_id)
-                    .and(Err(CodexRuntimeError::StaleThread)),
+                Some(binding) => invalidate_stale_binding(
+                    &root,
+                    &state,
+                    &key,
+                    &binding.thread_id,
+                    &runtime_version,
+                )
+                .and(Err(CodexRuntimeError::StaleThread)),
                 None => Err(CodexRuntimeError::Protocol),
             }
         } else {
@@ -1698,13 +2222,25 @@ fn run_turn(
         terminate_child(&mut child);
         turn_result
     })();
+    let result = normalize_interrupted_result(&state, &input.request_id, result);
     if result.is_err()
         && !matches!(
             result,
             Err(CodexRuntimeError::Interrupted | CodexRuntimeError::StaleThread)
         )
     {
-        let _ = write_execution(&root, SUPPORTED_VERSION, RuntimeExecutionEvidence::Failed);
+        let last_failure = result.as_ref().err().map(failure_reason_for_error);
+        if let (Some(turn_id), Some(reason)) =
+            (active_turn_id(&state, &input.request_id), last_failure)
+        {
+            send_failed_event(&on_event, &input.request_id, &turn_id, reason);
+        }
+        let _ = write_execution(
+            &root,
+            &runtime_version,
+            RuntimeExecutionEvidence::Failed,
+            last_failure,
+        );
     }
     finish_active(&state, &input.request_id);
     result
@@ -1712,7 +2248,7 @@ fn run_turn(
 
 fn resolve_turn_runtime<R: Runtime>(
     app: &AppHandle<R>,
-) -> Result<(ExecutableIdentity, PathBuf), CodexRuntimeError> {
+) -> Result<(ExecutableIdentity, PathBuf, String), CodexRuntimeError> {
     let root = runtime_root(app).map_err(|_| CodexRuntimeError::Transport)?;
     let identity = resolve_codex(std::env::var_os("PATH").as_deref())
         .map_err(|_| CodexRuntimeError::NotReady)?
@@ -1721,10 +2257,15 @@ fn resolve_turn_runtime<R: Runtime>(
     let version = fixed_command(&identity, &["--version"], &root)
         .ok()
         .and_then(|output| parse_version(&output));
-    if version.as_deref() != Some(SUPPORTED_VERSION) {
+    let version = version.filter(|version| runtime_version_supported(version));
+    let Some(version) = version else {
         return Err(CodexRuntimeError::NotReady);
-    }
-    Ok((identity, root))
+    };
+    validate_platform_identity(&identity).map_err(|_| CodexRuntimeError::NotReady)?;
+    generate_and_read_schema(&identity, &root)
+        .and_then(|schema| schema_proves_runtime(&schema))
+        .map_err(|_| CodexRuntimeError::NotReady)?;
+    Ok((identity, root, version))
 }
 
 #[tauri::command]
@@ -1743,7 +2284,7 @@ pub async fn codex_system_turn_start(
             .await
             .map_err(|_| CodexRuntimeError::NotReady)
     };
-    let (identity, root) = match resolved {
+    let (identity, root, runtime_version) = match resolved {
         Ok(Ok(resolved)) => resolved,
         Ok(Err(error)) | Err(error) => {
             finish_active(&state, &input.request_id);
@@ -1754,9 +2295,11 @@ pub async fn codex_system_turn_start(
         finish_active(&state, &input.request_id);
         return Err(error);
     }
-    tauri::async_runtime::spawn_blocking(move || run_turn(identity, root, state, input, on_event))
-        .await
-        .map_err(|_| CodexRuntimeError::Transport)?
+    tauri::async_runtime::spawn_blocking(move || {
+        run_turn(identity, root, runtime_version, state, input, on_event)
+    })
+    .await
+    .map_err(|_| CodexRuntimeError::Transport)?
 }
 
 fn control_active(
@@ -1890,6 +2433,76 @@ pub async fn codex_system_conversation_reset(
 mod tests {
     use super::*;
 
+    fn schema_method(method: &str, params: &str) -> Value {
+        json!({
+            "properties": {
+                "method": { "enum": [method] },
+                "params": { "$ref": format!("#/definitions/{params}") },
+            }
+        })
+    }
+
+    fn schema_properties(fields: &[&str], required: bool) -> Value {
+        let properties = fields
+            .iter()
+            .map(|field| ((*field).to_owned(), json!({ "type": ["array", "null"] })))
+            .collect::<serde_json::Map<_, _>>();
+        let mut value = json!({ "properties": properties });
+        if required {
+            value["required"] = json!(fields);
+        }
+        value
+    }
+
+    fn compatible_runtime_schema() -> Value {
+        let requests = REQUIRED_REQUESTS
+            .iter()
+            .map(|(method, params)| schema_method(method, params))
+            .collect::<Vec<_>>();
+        let notifications = REQUIRED_NOTIFICATIONS
+            .iter()
+            .map(|(method, params)| schema_method(method, params))
+            .collect::<Vec<_>>();
+        json!({
+            "definitions": {
+                "ClientRequest": { "oneOf": requests },
+                "ServerNotification": { "oneOf": notifications },
+                "ThreadStartParams": schema_properties(&[
+                    "approvalPolicy", "baseInstructions", "cwd", "developerInstructions",
+                    "dynamicTools", "environments", "runtimeWorkspaceRoots", "sandbox",
+                    "selectedCapabilityRoots",
+                ], false),
+                "ThreadResumeParams": schema_properties(&[
+                    "approvalPolicy", "baseInstructions", "cwd", "developerInstructions",
+                    "runtimeWorkspaceRoots", "sandbox", "threadId",
+                ], false),
+                "TurnStartParams": schema_properties(&[
+                    "approvalPolicy", "cwd", "environments", "input", "outputSchema",
+                    "runtimeWorkspaceRoots", "sandboxPolicy", "threadId",
+                ], false),
+                "TurnSteerParams": schema_properties(
+                    &["expectedTurnId", "input", "threadId"],
+                    false,
+                ),
+                "TurnInterruptParams": schema_properties(&["threadId", "turnId"], false),
+                "ErrorNotification": schema_properties(
+                    &["error", "threadId", "turnId", "willRetry"],
+                    true,
+                ),
+                "AgentMessageDeltaNotification": schema_properties(
+                    &["delta", "threadId", "turnId"],
+                    true,
+                ),
+                "TurnCompletedNotification": schema_properties(&["threadId", "turn"], true),
+                "Turn": schema_properties(&["error", "id", "items", "status"], false),
+                "TurnStatus": { "enum": ["completed", "failed", "interrupted"] },
+                "AskForApproval": { "enum": ["never"] },
+                "SandboxMode": { "enum": ["read-only"] },
+                "SandboxPolicy": { "properties": { "type": { "enum": ["readOnly"] } } },
+            }
+        })
+    }
+
     #[test]
     fn auth_projection_never_serializes_raw_login_output() {
         let output = Output {
@@ -1905,27 +2518,47 @@ mod tests {
 
     #[test]
     fn schema_requires_zero_tool_turn_controls() {
-        let schema = json!({
-            "methods": REQUIRED_METHODS,
-            "ThreadStartParams": {
-                "environments": [],
-                "dynamicTools": [],
-                "selectedCapabilityRoots": [],
-                "runtimeWorkspaceRoots": [],
-            },
-            "TurnStartParams": { "outputSchema": {} },
-        });
+        let schema = compatible_runtime_schema();
         assert_eq!(schema_proves_runtime(&schema), Ok(()));
-        let missing_environments = json!({
-            "methods": REQUIRED_METHODS,
-            "dynamicTools": [],
-            "selectedCapabilityRoots": [],
-            "outputSchema": {},
-        });
+        let mut missing_environments = schema;
+        missing_environments
+            .pointer_mut("/definitions/ThreadStartParams/properties")
+            .unwrap()
+            .as_object_mut()
+            .unwrap()
+            .remove("environments");
+        missing_environments["unreviewedCopy"] = json!({ "environments": [] });
         assert_eq!(
             schema_proves_runtime(&missing_environments),
             Err(StableRuntimeReason::ProtocolUnsupported)
         );
+
+        let mut malformed_environment_control = compatible_runtime_schema();
+        malformed_environment_control
+            .pointer_mut("/definitions/TurnStartParams/properties/environments/type")
+            .unwrap()
+            .clone_from(&json!("boolean"));
+        assert_eq!(
+            schema_proves_runtime(&malformed_environment_control),
+            Err(StableRuntimeReason::ProtocolUnsupported)
+        );
+    }
+
+    #[test]
+    fn runtime_versions_use_a_reviewed_floor_and_schema_negotiation() {
+        for version in ["0.146.0", "0.147.0", "1.0.0"] {
+            assert!(runtime_version_supported(version), "expected {version}");
+        }
+        for version in [
+            "0.145.99",
+            "0.146.0-beta.1",
+            "0.146.0+local",
+            "00.146.0",
+            "0.146",
+            "latest",
+        ] {
+            assert!(!runtime_version_supported(version), "rejected {version}");
+        }
     }
 
     #[test]
@@ -1944,6 +2577,64 @@ mod tests {
             "image_generation = false",
         ] {
             assert!(ZERO_TOOL_CONFIG.contains(required), "missing {required}");
+        }
+    }
+
+    #[test]
+    fn projects_only_the_reviewed_cc_switch_model_route_into_the_isolated_home() {
+        let owner = tempfile::tempdir_in(std::env::current_dir().unwrap()).unwrap();
+        fs::write(
+            owner.path().join("config.toml"),
+            r#"model_provider = "custom"
+model = "gpt-5.5"
+
+[model_providers.custom]
+name = "custom"
+wire_api = "responses"
+requires_openai_auth = true
+base_url = "http://127.0.0.1:15721/v1"
+experimental_bearer_token = "sentinel-never-project"
+
+[mcp_servers.untrusted]
+command = "/tmp/never-copy"
+"#,
+        )
+        .unwrap();
+
+        let route = reviewed_runtime_model_route(owner.path()).unwrap().unwrap();
+        assert_eq!(route.model.as_deref(), Some("gpt-5.5"));
+        let projected = runtime_config(Some(&route));
+        assert!(projected.contains("model_provider = \"cutout_cc_switch\""));
+        assert!(projected.contains(REVIEWED_CC_SWITCH_BASE_URL));
+        assert!(projected.contains("[orchestrator.mcp]\nenabled = false"));
+        assert!(!projected.contains("mcp_servers"));
+        assert!(!projected.contains("never-copy"));
+        assert!(!projected.contains("sentinel-never-project"));
+    }
+
+    #[test]
+    fn rejects_unreviewed_codex_model_routes_before_auth_can_be_used() {
+        for provider in [
+            r#"name = "relay"
+wire_api = "responses"
+requires_openai_auth = true
+base_url = "https://relay.example/v1""#,
+            r#"name = "local"
+wire_api = "responses"
+requires_openai_auth = true
+base_url = "http://127.0.0.1:15721/v1"
+env_key = "PRIVATE_KEY""#,
+        ] {
+            let owner = tempfile::tempdir_in(std::env::current_dir().unwrap()).unwrap();
+            fs::write(
+                owner.path().join("config.toml"),
+                format!("model_provider = \"custom\"\n[model_providers.custom]\n{provider}\n"),
+            )
+            .unwrap();
+            assert!(matches!(
+                reviewed_runtime_model_route(owner.path()),
+                Err(CodexRuntimeError::NotReady)
+            ));
         }
     }
 
@@ -1980,6 +2671,40 @@ mod tests {
             ensure_request_active(&state, &input.request_id),
             Err(CodexRuntimeError::Interrupted)
         ));
+        assert!(matches!(
+            normalize_interrupted_result::<()>(
+                &state,
+                &input.request_id,
+                Err(CodexRuntimeError::Transport),
+            ),
+            Err(CodexRuntimeError::Interrupted)
+        ));
+    }
+
+    #[test]
+    fn process_is_registered_before_the_protocol_handshake() {
+        let state = RuntimeStateInner::default();
+        let input = CodexTurnStartInput {
+            request_id: uuid::Uuid::new_v4().to_string(),
+            workspace_handle: "workspace.opaque".into(),
+            conversation_id: "conversation.opaque".into(),
+            context_revision: "revision.1".into(),
+            prompt: "Plan a restaurant site".into(),
+            context: json!({}),
+            output_schema: json!({ "type": "object" }),
+        };
+        begin_active(&state, &input).unwrap();
+        register_active_process(&state, &input.request_id, u32::MAX).unwrap();
+        assert_eq!(
+            state
+                .active
+                .lock()
+                .unwrap()
+                .as_ref()
+                .and_then(|runtime| runtime.pid),
+            Some(u32::MAX)
+        );
+        finish_active(&state, &input.request_id);
     }
 
     #[test]
@@ -2004,12 +2729,14 @@ mod tests {
         save_bindings(root.path(), &store).unwrap();
         write_execution(
             root.path(),
-            SUPPORTED_VERSION,
+            "0.147.0",
             RuntimeExecutionEvidence::Succeeded,
+            None,
         )
         .unwrap();
 
-        invalidate_stale_binding(root.path(), &state, &stale_key, "thread.stale").unwrap();
+        invalidate_stale_binding(root.path(), &state, &stale_key, "thread.stale", "0.147.0")
+            .unwrap();
 
         let stored = load_bindings(root.path()).unwrap();
         assert!(!stored.bindings.contains_key(&stale_key));
@@ -2021,8 +2748,8 @@ mod tests {
             Some("thread.live")
         );
         assert_eq!(
-            read_execution(root.path(), SUPPORTED_VERSION),
-            RuntimeExecutionEvidence::Stale
+            read_execution(root.path(), "0.147.0"),
+            (RuntimeExecutionEvidence::Stale, None)
         );
     }
 
@@ -2044,7 +2771,7 @@ mod tests {
         save_bindings(root.path(), &store).unwrap();
 
         assert!(matches!(
-            invalidate_stale_binding(root.path(), &state, &key, "thread.stale"),
+            invalidate_stale_binding(root.path(), &state, &key, "thread.stale", "0.147.0"),
             Err(CodexRuntimeError::Protocol)
         ));
         assert_eq!(
@@ -2088,6 +2815,18 @@ mod tests {
     }
 
     #[test]
+    fn tool_notifications_fail_closed_during_rpc_handshakes() {
+        let value = json!({
+            "method": "item/completed",
+            "params": { "item": { "type": "commandExecution" } },
+        });
+        assert!(matches!(
+            validate_rpc_interleaved_message(&value),
+            Err(CodexRuntimeError::UnexpectedTool)
+        ));
+    }
+
+    #[test]
     fn retryable_transport_errors_project_only_a_stable_reason() {
         let event = json!({
             "method": "error",
@@ -2113,6 +2852,203 @@ mod tests {
         let serialized = serde_json::to_string(&projected).unwrap();
         assert!(serialized.contains("response-stream-disconnected"));
         assert!(!serialized.contains("secret-shaped"));
+    }
+
+    #[test]
+    fn structured_terminal_503_envelope_projects_only_a_closed_reason() {
+        let terminal = json!({
+            "method": "turn/completed",
+            "params": {
+                "threadId": "thread.1",
+                "turn": {
+                    "id": "turn.1",
+                    "items": [],
+                    "status": "failed",
+                    "error": {
+                        "message": "upstream response contained sk-secret-never-serialize",
+                        "additionalDetails": "private provider body",
+                        "codexErrorInfo": {
+                            "responseTooManyFailedAttempts": { "httpStatusCode": 503 }
+                        }
+                    }
+                }
+            }
+        });
+        let reason = terminal_turn_failure_reason(&terminal, false);
+        assert_eq!(reason, StableTurnFailureReason::UpstreamUnavailable);
+        let projected = CodexPlanningEvent::Failed {
+            request_id: uuid::Uuid::new_v4().to_string(),
+            turn_id: "turn.1".into(),
+            reason,
+        };
+        let serialized = serde_json::to_string(&projected).unwrap();
+        assert!(serialized.contains("\"type\":\"failed\""));
+        assert!(serialized.contains("\"reason\":\"upstream-unavailable\""));
+        assert!(!serialized.contains("secret"));
+        assert!(!serialized.contains("private provider body"));
+    }
+
+    #[test]
+    fn terminal_failure_classification_ignores_unreviewed_or_text_only_statuses() {
+        for error in [
+            json!({
+                "message": "HTTP 503 Service Unavailable",
+                "codexErrorInfo": null,
+            }),
+            json!({
+                "message": "credential rejected",
+                "codexErrorInfo": {
+                    "responseTooManyFailedAttempts": { "httpStatusCode": 401 }
+                },
+            }),
+            json!({
+                "message": "unreviewed status field",
+                "codexErrorInfo": {
+                    "responseTooManyFailedAttempts": { "statusCode": 503 }
+                },
+            }),
+        ] {
+            let terminal = json!({
+                "method": "turn/completed",
+                "params": {
+                    "threadId": "thread.1",
+                    "turn": {
+                        "id": "turn.1",
+                        "items": [],
+                        "status": "failed",
+                        "error": error,
+                    }
+                }
+            });
+            assert_eq!(
+                terminal_turn_failure_reason(&terminal, false),
+                StableTurnFailureReason::RuntimeFailed
+            );
+        }
+    }
+
+    #[test]
+    fn retryable_503_evidence_survives_a_generic_terminal_envelope() {
+        let retry = json!({
+            "method": "error",
+            "params": {
+                "threadId": "thread.1",
+                "turnId": "turn.1",
+                "willRetry": true,
+                "error": {
+                    "message": "secret-shaped upstream response",
+                    "codexErrorInfo": {
+                        "responseStreamDisconnected": { "httpStatusCode": 503 }
+                    }
+                }
+            }
+        });
+        let non_retry = json!({
+            "method": "error",
+            "params": {
+                "threadId": "thread.1",
+                "turnId": "turn.1",
+                "willRetry": false,
+                "error": {
+                    "message": "raw final error detail",
+                    "codexErrorInfo": "other"
+                }
+            }
+        });
+        let terminal = json!({
+            "method": "turn/completed",
+            "params": {
+                "threadId": "thread.1",
+                "turn": {
+                    "id": "turn.1",
+                    "items": [],
+                    "status": "failed",
+                    "error": {
+                        "message": "raw terminal detail must not cross IPC",
+                        "additionalDetails": null,
+                        "codexErrorInfo": "other"
+                    }
+                }
+            }
+        });
+
+        let mut retryable_upstream_observed = false;
+        for _ in 0..5 {
+            observe_retryable_upstream_failure(&retry, &mut retryable_upstream_observed);
+        }
+        observe_retryable_upstream_failure(&non_retry, &mut retryable_upstream_observed);
+        assert!(retryable_upstream_observed);
+        let reason = terminal_turn_failure_reason(&terminal, retryable_upstream_observed);
+        assert_eq!(reason, StableTurnFailureReason::UpstreamUnavailable);
+        let projected = serde_json::to_string(&CodexPlanningEvent::Failed {
+            request_id: uuid::Uuid::new_v4().to_string(),
+            turn_id: "turn.1".into(),
+            reason,
+        })
+        .unwrap();
+        assert!(!projected.contains("secret-shaped"));
+        assert!(!projected.contains("raw terminal detail"));
+
+        let explicit_auth_failure = json!({
+            "method": "turn/completed",
+            "params": {
+                "turn": {
+                    "status": "failed",
+                    "error": { "message": "private", "codexErrorInfo": "unauthorized" }
+                }
+            }
+        });
+        assert_eq!(
+            terminal_turn_failure_reason(&explicit_auth_failure, retryable_upstream_observed),
+            StableTurnFailureReason::RuntimeFailed
+        );
+    }
+
+    #[test]
+    fn malformed_model_output_has_a_distinct_stable_failure_reason() {
+        assert_eq!(
+            failure_reason_for_error(&CodexRuntimeError::OutputInvalid),
+            StableTurnFailureReason::ModelOutputInvalid
+        );
+        assert_eq!(
+            serde_json::to_string(&StableTurnFailureReason::ModelOutputInvalid).unwrap(),
+            "\"model-output-invalid\""
+        );
+    }
+
+    #[test]
+    fn execution_evidence_persists_only_the_sanitized_terminal_reason() {
+        let root = tempfile::tempdir().unwrap();
+        write_execution(
+            root.path(),
+            "0.147.0",
+            RuntimeExecutionEvidence::Failed,
+            Some(StableTurnFailureReason::UpstreamUnavailable),
+        )
+        .unwrap();
+        assert_eq!(
+            read_execution(root.path(), "0.147.0"),
+            (
+                RuntimeExecutionEvidence::Failed,
+                Some(StableTurnFailureReason::UpstreamUnavailable),
+            )
+        );
+        let stored = fs::read_to_string(root.path().join("execution.json")).unwrap();
+        assert!(stored.contains("\"lastFailure\":\"upstream-unavailable\""));
+
+        write_execution(
+            root.path(),
+            "0.147.0",
+            RuntimeExecutionEvidence::Succeeded,
+            Some(StableTurnFailureReason::RuntimeFailed),
+        )
+        .unwrap();
+        assert_eq!(
+            read_execution(root.path(), "0.147.0"),
+            (RuntimeExecutionEvidence::Succeeded, None)
+        );
+        let stored = fs::read_to_string(root.path().join("execution.json")).unwrap();
+        assert!(!stored.contains("lastFailure"));
     }
 
     #[test]

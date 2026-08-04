@@ -104,7 +104,6 @@ function runtimeAction(reason: StableRuntimeReason | undefined): CapabilityNextA
     case 'not-installed': return 'install-runtime'
     case 'protocol-unsupported':
     case 'runtime-version-unsupported':
-    case 'restricted-read-roots-required':
     case 'unsupported-platform':
     case 'executable-identity-rejected': return 'upgrade-runtime'
     case 'execution-adapter-unavailable': return 'update-app'

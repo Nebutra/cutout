@@ -70,7 +70,7 @@
         "authentication": { "const": "sanitized-native-status" },
         "credentialCustody": { "const": "system-runtime-owned" },
         "conversationBinding": { "const": false },
-        "executionReason": { "const": "restricted-read-roots-required" },
+        "executionReason": { "const": "packaged-turn-execution-proof-required" },
         "turnExecution": { "const": false },
         "headlessAvailable": { "const": false }
       }

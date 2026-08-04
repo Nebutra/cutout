@@ -61,12 +61,12 @@ and runtime bindings never share credential storage or auth semantics.
 
 ## Native Codex adapter
 
-The process and turn flow below is the target contract, not evidence that the
-currently installed runtime is executable. The shipped adapter stops after the
-signed executable, sanitized authentication, and generated-schema probes until
-the complete prompt-only/no-tools policy is source-reviewed and packaged-proven.
-It does not allocate a placeholder conversation binding before a real Codex
-thread exists.
+The internal process and turn flow below is implemented behind a public release
+gate. Signed executable validation, generated-schema negotiation, and the
+source-reviewed zero-tool policy permit native-owned desktop turns, but public
+conversation binding and turn execution remain false until a signed packaged
+app completes a real turn against a healthy upstream. The adapter does not
+allocate a placeholder conversation binding before a real Codex thread exists.
 
 ### Discovery and identity
 
@@ -158,9 +158,9 @@ Advanced contains:
 - credential provenance and verification evidence;
 - unsupported/policy-blocked diagnostics such as Claude.
 
-Remove the full 39-Agent matrix from the default setup component. Retain or
-delete its native inventory only according to whether another approved
-diagnostics consumer remains; do not keep it solely for compatibility.
+Remove the full 39-Agent matrix from the default setup component. No approved
+diagnostics consumer remains, so delete its native command, permission,
+frontend schema, and tests rather than retaining a compatibility surface.
 
 ## Lifecycle and recovery
 

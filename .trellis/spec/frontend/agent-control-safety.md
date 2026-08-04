@@ -44,9 +44,11 @@ receipts. `.cutout` state and provenance remain authoritative.
   approval token as authority. The native host presents an OS-level warning
   confirmation after preview and emits the receipt approval id only after the
   user approves it.
-- Desktop paid-tool requests always require explicit approval. Their budget
-  ceilings come from the matching host capability estimate, never a persisted
-  user allowance, and the desktop host policy does not project a `maxCost`.
+- Desktop paid-tool requests always require explicit approval. They carry no
+  predicted cost, budget ceiling, or persisted user allowance. A shared host
+  policy may use `auto`, but this is policy authorization rather than a
+  cost-threshold decision. Optional `receipt.charged` evidence is recorded only
+  when backed by verifiable Provider billing evidence.
 - Desktop-local `cutout` and `semantic-cutout` require only the `paid` scope;
   they never require or imply a provider credential. Semantic availability is
   checked immediately before artifact writes and approval so unsupported hosts
@@ -127,10 +129,18 @@ receipts. `.cutout` state and provenance remain authoritative.
   the effective source user turn, ignores selected-material repair context,
   emits no duplicate `intent-recorded` event, appends an immutable sibling
   `agent-message`, and selects it through a durable `branch-selected` event.
-- Durable run events and durable chat rows have different lifetimes. A
-  `step:prepare:<run-id>` lifecycle remains authoritative Git/audit evidence,
-  but the conversation projects at most one preparation activity bubble: the
-  current run's unresolved `step-started` event while work is active. An empty
+- Durable run events and durable chat rows have different lifetimes. Reviewed
+  planning boundaries use
+  `step:prepare:{context|runtime|response|validation}:<run-id>` lifecycle events;
+  each started boundary receives exactly one succeeded, failed, or cancelled
+  terminal event. These events remain authoritative Git/audit evidence, but the
+  conversation projects at most one preparation activity bubble: the current
+  run's unresolved `step-started` event while work is active. Its expandable
+  rows are projected from those same events and show only complete, running,
+  or waiting state, never an inferred percentage or ETA. A reconnect attempt
+  may update ephemeral detail on the active response row but never resets a
+  completed row. Historical `step:prepare:<run-id>` events retain the compact
+  legacy presentation without invented phases. An empty
   stream placeholder does not replace it; the first non-empty live Agent text
   does. `step-succeeded`, `step-failed`, and `step-cancelled` remain available
   to the full execution/audit projection and receipts but never become terminal
@@ -194,6 +204,9 @@ receipts. `.cutout` state and provenance remain authoritative.
 | Regenerate tool gate returns no call or selects a non-conversational tool | Revise through the conversational path; never enter asset generation |
 | Regenerate tool gate fails | Publish the new classified run failure; never resume or fall through to the asset pipeline |
 | Current run has an unresolved `step:prepare:*` start and no non-empty live Agent text | Show exactly one pending preparation activity bubble |
+| Current run has a reviewed phased preparation start | Offer one collapsed native disclosure whose four rows come from the same run events and contain exactly one active row |
+| Historical preparation uses only `step:prepare:<run-id>` | Keep the compact activity bubble and do not synthesize progress rows |
+| Codex reports a bounded reconnect attempt while awaiting its result | Update only the active response detail; preserve prior completed stages and elapsed time |
 | Live Agent label exists but streamed text is still empty | Keep the preparation activity visible; do not replace it with a blank pending bubble |
 | First non-empty live Agent text arrives | Replace the preparation activity with one live Agent message |
 | Pure preparation is unresolved | Keep the step in the full audit projection; render one chat activity bubble and zero active-dock timeline cards |
@@ -335,112 +348,3 @@ const showPreparation = working && activePreparation && !liveAgentText.trim()
 The first form confuses append-only audit durability with conversation lifetime
 and retains one row per regeneration. The second derives one ephemeral display
 state from the authoritative active-run lifecycle without deleting evidence.
-
-## Scenario: Inventory reviewed local coding Agents
-
-### 1. Scope / Trigger
-
-Use this contract when adding or changing local Agent installation discovery,
-reviewed configuration roots, capability projection, or the native-to-webview
-inventory payload. This layer discovers metadata only; credential parsing and
-authorized CLI/session delegation are separate adapters.
-
-### 2. Signatures
-
-```rust
-discover_local_agent_inventory(
-    app: AppHandle,
-) -> Result<Vec<LocalAgentInventoryRow>, String>
-```
-
-```ts
-discoverLocalAgentInventory(): Promise<LocalAgentInventoryRow[]>
-```
-
-The command is granted by the dedicated `local-agent-inventory` Tauri
-permission, not by the provider secret/network permission.
-
-### 3. Contracts
-
-- The offline registry contains exactly the pinned 39 Paseo Agent IDs in the
-  reviewed order, and `provenance.slug` equals the row `id`.
-- Executable discovery checks at most 128 absolute `PATH` entries for fixed
-  bare aliases. It may resolve an executable symlink to a regular executable,
-  but never returns the resolved path.
-- Root discovery checks only registered directories and marker filenames.
-  Every root and marker path component rejects symlinks, traversal, and
-  non-regular marker files.
-- Reviewed root overrides are host environment only and must be absolute:
-  `CODEX_HOME`, `CLAUDE_CONFIG_DIR`, `OPENCODE_CONFIG_DIR`,
-  `XDG_CONFIG_HOME`, `XDG_DATA_HOME`, `PI_CONFIG_DIR`,
-  `PI_CODING_AGENT_DIR`, `GEMINI_CLI_HOME`, `QWEN_HOME`, and `VIBE_HOME`.
-- IPC returns static `~/...` or `$ENV/...` labels, statuses, marker labels,
-  aliases, provenance, and supported/unsupported capability flags. It never
-  returns absolute host paths, file contents, API keys, OAuth/session values,
-  or credential-shaped fields.
-- Discovery never launches an Agent, installer, package manager, shell, login
-  flow, helper, or version command and never recursively scans the home folder.
-- Credential adapters are a separate native provider surface. They may parse
-  only the nine reviewed exact schemas, return sanitized candidate metadata,
-  and import an API key only through a checked native draft. The webview never
-  supplies an Agent path, field selector, or Agent-source secret.
-- OAuth, subscription, bearer, helper, keyring, and session material remains
-  display-only or unsupported. Inventory support must not be represented as
-  session delegation, a bundled coding runtime, or permission to invoke an
-  owning Agent.
-
-### 4. Validation & Error Matrix
-
-| Condition | Required behavior |
-| --- | --- |
-| Missing executable/root/marker | Return `not-installed` or `not-found` |
-| Permission denied during metadata inspection | Return `permission-required` without a host path |
-| Relative override, traversal, symlinked root/marker, or invalid file type | Return `probe-failed` without reading contents |
-| Valid executable symlink with regular executable target | Return `installed` and the registered alias only |
-| Unknown, reordered, duplicate, or incomplete Agent rows | Frontend Zod boundary rejects the payload |
-| Provenance slug, executable alias, root status, or marker label conflicts with its parent row | Frontend Zod boundary rejects the payload |
-
-### 5. Good / Base / Bad Cases
-
-- Good: Homebrew/Bun symlinks resolve to executable files, exact Codex,
-  Claude, OpenCode, Pi/OMP, Gemini, Qwen, Kimi, and Vibe roots are inspected,
-  and the frontend boundary accepts sanitized metadata for all 39 rows without
-  requiring the default AI settings page to render the inventory.
-- Base: no reviewed Agents are installed; the command still returns 39 stable
-  rows with `not-installed`, `not-found`, and truthful unsupported flags.
-- Bad: run `npx -y`, `uvx`, `--version`, or a login helper; recursively search
-  `~`; copy OAuth/session tokens; accept a webview-selected filesystem path; or
-  serialize a canonical executable path.
-
-### 6. Tests Required
-
-- Rust registry invariant: exactly 39 unique IDs in the pinned order and only
-  fixed bare aliases.
-- Rust metadata probes: direct executable, safe executable symlink, missing
-  binary, permission failure, root-component symlink, legacy Codex root,
-  reviewed override precedence, OMP `PI_CODING_AGENT_DIR`, and no secret/path
-  leakage after serialization.
-- TypeScript boundary: exact ordered catalog, duplicate/incomplete rows,
-  unknown fields, secret/path-shaped fields, provenance mismatch, unregistered
-  executable aliases, and marker/root relationship mismatch.
-- Run focused Vitest, `cargo test commands::ai::`, TypeScript, lint,
-  `cargo fmt --check`, `pnpm agent:validate`, build, and `git diff --check`.
-
-### 7. Wrong vs Correct
-
-#### Wrong
-
-```ts
-await invoke('discover_agents', { roots: userSelectedPaths, runVersion: true })
-```
-
-#### Correct
-
-```ts
-const rows = await invoke<unknown>('discover_local_agent_inventory')
-return pinnedLocalAgentInventorySchema.parse(rows)
-```
-
-The wrong form accepts arbitrary authority and executes installed software.
-The correct form uses a fixed native registry and revalidates its sanitized IPC
-projection before any UI consumes it.

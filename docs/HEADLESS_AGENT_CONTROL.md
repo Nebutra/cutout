@@ -116,14 +116,12 @@ binding does not make the default CLI/MCP host Provider-capable and does not
 execute arbitrary model-authored commands.
 
 The desktop also has a separate `codex-system` planning-runtime boundary. Its
-current native surface performs a fixed signed-executable check, projects only
-sanitized authentication/protocol evidence, and exposes no conversation or turn
-command. It does not read or import Codex session credentials. Conversation
-binding and turn execution are fail-closed because the reviewed installed app-
-server schema does not expose enforceable restricted readable roots. A global
-read-only
-sandbox is not sufficient: it would still allow model-induced reads outside
-Cutout's staged context. This probe-only desktop boundary is not available in
+native owner validates the signed executable and negotiated app-server schema,
+starts turns from isolated staged context with a closed zero-tool configuration,
+and projects only sanitized authentication and terminal evidence. It invokes
+the system runtime without importing Codex session credentials. This internal
+desktop path is not advertised as publicly execution-proven until a signed
+packaged turn succeeds against a healthy real upstream. It is not available in
 the CLI/MCP host and does not change the headless capability result.
 
 ## MCP
@@ -174,23 +172,23 @@ binary artifact bytes.
 
 `cutout.control.v1` reserves `tool.invoke` for outcome-driven tools such as
 `generate-image`, `edit-image`, and `cutout`. A request declares the intended
-result, input artifact IDs, a hard money/credit ceiling, and either
-`explicit` or `auto-within-budget` approval. It never carries an API key,
+result, input artifact IDs, and either `explicit` or host-policy `auto`
+approval. It never carries an API key,
 authorization header, provider configuration, arbitrary file bytes, or an
 executor-supplied receipt.
 
-Provider/model availability and the estimated charge are host-owned facts. The
-shared planner permits automatic execution only when paid actions are enabled,
-the estimate fits both the request ceiling and host policy, and the selected
-approval mode is satisfied. A completed executor must return an auditable
-receipt containing capability, provider/model IDs, charged amount, output
-artifact IDs, timestamps, and terminal status. Receipt schemas reject
-credential-shaped values.
+Provider/model availability is a host-owned fact. The shared planner permits
+automatic execution only when paid actions are enabled and the selected
+approval mode is satisfied. A completed executor returns an auditable receipt
+containing capability, provider/model IDs, output artifact IDs, timestamps, and
+terminal status. Actual charged amount is optional and may appear only when the
+Provider returned verifiable billing evidence; Cutout never substitutes a price
+prediction. Receipt schemas reject credential-shaped values.
 
 The current headless host intentionally has no provider executor. Its dry-run
 therefore returns a truthful `capability-required` plan, and apply returns a
 `capability-required` error without advancing the revision or recording a fake
 success. The packaged desktop host does execute assigned image Providers through
-the native credential/origin boundary, approval lease, budget, paid-tool receipt,
-and content-addressed artifact store. That executor is not exported by the
-default headless CLI/MCP process.
+the native credential/origin boundary, approval lease, paid-tool receipt, and
+content-addressed artifact store. That executor is not exported by the default
+headless CLI/MCP process.

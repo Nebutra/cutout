@@ -176,7 +176,7 @@ describe('AiSection', () => {
               {
                 capability: 'planning',
                 status: 'action-required',
-                reason: 'restricted-read-roots-required',
+                reason: 'protocol-unsupported',
                 nextAction: 'upgrade-runtime',
                 evidence: {
                   installed: true,

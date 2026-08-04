@@ -101,4 +101,18 @@ describe('Tauri capability least privilege contract', () => {
     expect(handlers).not.toContain('codex_system_bind_conversation')
     expect(permissions).not.toMatch(/codex_system_(?:exec|spawn|shell)/)
   })
+
+  it('does not expose the retired local Agent inventory as a readiness surface', async () => {
+    const [modules, handlers, permissions, desktopCapability] = await Promise.all([
+      readRepositoryFile('src-tauri/src/commands/ai/mod.rs'),
+      readRepositoryFile('src-tauri/src/lib.rs'),
+      readRepositoryFile('src-tauri/permissions/application.toml'),
+      readCapability('updater'),
+    ])
+
+    expect(modules).not.toContain('local_agent_inventory')
+    expect(handlers).not.toContain('discover_local_agent_inventory')
+    expect(permissions).not.toContain('local-agent-inventory')
+    expect(desktopCapability.permissions).not.toContain('local-agent-inventory')
+  })
 })

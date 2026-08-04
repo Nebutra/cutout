@@ -293,6 +293,19 @@ the current secret again inside Rust.
 
 - Resolve Codex from `CODEX_HOME` when present, otherwise exactly
   `<home>/.codex`.
+- Reviewed process-environment relays are closed bindings, not arbitrary custom
+  endpoints. `MOX_API_KEY` may bind only to
+  `https://aigw.mox.ktvsky.com/v1`, and `TDS_API_KEY` only to
+  `https://router.tds.cc.cd/v1`; a supplied `MOX_BASE_URL` or `TDS_BASE_URL`
+  must normalize to that exact endpoint or the candidate is omitted. Both use
+  Chat Completions, retain `gpt-5.5` only as a catalog-checked model hint, and
+  still require authenticated `GET /models` before import or routing.
+- The reviewed MOX macOS environment may install a split-DNS answer in a
+  private range. Cutout never sends the credential to that private address.
+  When and only when the exact reviewed MOX hostname resolves non-publicly,
+  native networking pins the reviewed public A record while preserving TLS
+  verification for `aigw.mox.ktvsky.com` and the no-redirect policy. Every
+  other remote hostname with a non-public answer remains rejected.
 - Read only exact supported files with the shared no-symlink, regular-file,
   1 MiB-bounded reader.
 - Codex `auth.json` is reusable only when top-level `OPENAI_API_KEY` is a
@@ -315,21 +328,27 @@ the current secret again inside Rust.
   experimental bearer/session material is never imported, and any other or
   ambiguous root-level Provider binding suppresses the public OpenAI fallback.
 - A reviewed CC Switch installation may contribute its current Codex upstream
-  as a direct `cc-switch` + Responses candidate. `cc-switch` is an explicit
-  OpenAI-shaped Provider kind: the persisted wire contract, renderer model
-  descriptors, DAG/pipeline conditioning, and native image generation/editing
-  endpoint selection must all include it through the shared
+  plus its enabled Codex failover queue as direct `openai-compatible` +
+  Responses candidates. The unique current row is first, followed by queue
+  members in `COALESCE(sort_index, 999999), id` order; a current row that is
+  also queued appears once, and discovery is bounded to 32 candidates.
+  `cc-switch` remains the explicit loopback Provider kind: the persisted wire
+  contract, renderer model descriptors, DAG/pipeline conditioning, and native
+  image generation/editing endpoint selection must all include it through the shared
   `supportsOpenAIImageEndpoints` predicate. A native executor capability alone
   is not renderer routing evidence. Cutout reads only the
   exact `<home>/.cc-switch/cc-switch.db` path with SQLite read-only/no-create
   flags, a 256 MiB bound, before/after file-identity checks, and the expected
-  `providers` schema. Exactly one `codex` row may have `is_current = 1`.
-- The CC Switch row is importable only when `settings_config` has exactly the
+  `providers` schema, including `is_current`, `in_failover_queue`, and
+  `sort_index`. At most one `codex` row may have `is_current = 1`.
+- Each selected CC Switch row is importable only when `settings_config` has exactly the
   `auth` and `config` fields, `auth` has exactly one non-empty
   `OPENAI_API_KEY`, and the embedded Codex TOML has one unambiguous public HTTPS
   `base_url` with `wire_api = "responses"`. A pathless upstream is normalized
   to `/v1`; an explicit path is preserved. The database provider id and secret
-  remain native and are never serialized.
+  remain native and are never serialized. Draft check and import re-open the
+  exact database and require the same opaque row identity, current/queue
+  eligibility, endpoint, protocol, metadata fingerprint, and secret revision.
 - The CC Switch selected `model` is only a default-model hint. Readiness still
   requires the normal authenticated `GET <direct-upstream>/models` check and
   uses only model ids returned by that response. An empty CC Switch loopback
@@ -347,7 +366,7 @@ the current secret again inside Rust.
 | Malformed supported config/auth file | Return sanitized `config-invalid` error |
 | Symlinked parent/file | Return `config-rejected` before reading |
 | File larger than 1 MiB | Return `config-rejected` before parsing |
-| Missing CC Switch database or no current Codex row | Return no CC Switch upstream candidate |
+| Missing CC Switch database or no current/queued Codex row | Return no CC Switch upstream candidate |
 | CC Switch database over 256 MiB, symlinked, replaced during read, schema-drifted, or writable-only | Reject before exposing a candidate |
 | Multiple current CC Switch Codex rows, unknown settings/auth fields, ambiguous Codex provider tables, non-Responses wire API, or unsafe upstream URL | Reject the CC Switch source without weakening other valid discovery sources |
 | Imported `cc-switch` route is absent from renderer text/image capability or OpenAI image-endpoint selection | Treat as a contract bug; keep the shared Provider-kind predicate, runtime descriptors, DAG/pipeline routing, and generation/editing transports aligned |
@@ -373,9 +392,11 @@ the current secret again inside Rust.
   auth-file API key.
 - OAuth-only and empty auth files yield no importable auth candidate.
 - Symlinked and oversized auth files fail before parsing.
-- CC Switch current-upstream discovery uses the exact read-only database,
-  normalizes a pathless HTTPS endpoint to `/v1`, re-resolves the secret, and
-  serializes no database credential or settings payload.
+- CC Switch discovery uses the exact read-only database, returns the current
+  route before its ordered failover queue, normalizes pathless HTTPS endpoints
+  to `/v1`, re-resolves each selected row's secret, and serializes no database
+  identity, credential, or settings payload. Membership or endpoint-binding
+  drift makes an earlier candidate unusable.
 - Provider-kind tests require `cc-switch` to default to Responses, remain
   eligible for reviewed text and image assignments, and use the same native
   generation, edit, and reference-conditioning path as OpenAI-shaped routes.
@@ -471,11 +492,11 @@ import_provider_draft(app: AppHandle, input: ImportDraftInput) -> Result<Provide
   endpoints are sanitized before IPC. Absolute host paths, controls,
   credential-shaped text, URL userinfo/query/fragment, and disallowed hosts
   fail closed.
-- The fixed 39-Agent inventory is a native diagnostic/provenance capability,
-  not a second AI setup workflow. Default Settings must not invoke or render
-  all 39 rows. It projects configured Providers, persisted verification
-  receipts, capability coverage, and only reviewed importable provider
-  candidates into one outcome-led setup state.
+- The retired broad local-Agent inventory is not a readiness or diagnostics
+  surface. Default Settings projects configured Providers, persisted
+  verification receipts, capability coverage, the supported system runtime,
+  and only reviewed importable provider candidates into one outcome-led setup
+  state.
 - Settings claims routing is configured only when at least one enabled Provider has a complete
   verified receipt (`status`, `model`, and `checkedAt`) and verified Providers
   cover every required task dimension. Config existence alone is never a ready
@@ -563,8 +584,9 @@ import_provider_draft(app: AppHandle, input: ImportDraftInput) -> Result<Provide
 - Good: a reviewed Kimi config binds `KIMI_API_KEY` to
   `https://api.kimi.com/coding/v1`; check succeeds, then import re-reads the
   same candidate and secret revision before atomic persistence.
-- Base: an unsupported Agent remains truthful in the native 39-Agent inventory,
-  produces no parse attempt, and adds no noise to default AI setup.
+- Base: an unsupported Agent has no inventory row and produces no parse attempt;
+  only a reviewed credential adapter or supported runtime can contribute setup
+  evidence.
 - Good: a verified full-coverage Provider produces one `AI is ready` outcome;
   successful routing coverage and the local Agent inventory are not repeated.
 - Bad: show both a configured MOX Provider and its Cutout-owned credential as a
@@ -618,7 +640,7 @@ The native registry owns the path, schema, selector, provider binding, and
 secret re-read. The webview receives only sanitized metadata and an opaque
 draft ID.
 
-## Scenario: Probe A System Planning Runtime
+## Scenario: Run The System Planning Runtime
 
 ### 1. Scope / Trigger
 
@@ -637,23 +659,32 @@ type PlanningRuntimeEvidence = {
   authClass: 'chatgpt' | 'api-key' | 'access-token' | 'unauthenticated' | 'unknown'
   capability: 'proven' | 'unsupported' | 'unknown'
   execution: 'unproven' | 'succeeded' | 'failed' | 'stale'
+  lastFailure?: 'upstream-unavailable' | 'model-output-invalid' | 'runtime-failed'
   version?: string
   reason?: StableRuntimeReason
 }
 
 probeCodexSystemRuntime(): Promise<PlanningRuntimeEvidence>
+runCodexSystemTurn(input: CodexTurnStartInput): Promise<CodexTurnResult>
+steerCodexSystemTurn(requestId: string, text: string): Promise<boolean>
+interruptCodexSystemTurn(requestId: string): Promise<boolean>
+resetCodexSystemConversation(workspaceHandle: string, conversationId: string): Promise<boolean>
 ```
 
-The renderer command has no binary, path, argv, environment, working-directory,
-account, credential, tool, or sandbox parameter.
+Renderer commands accept only opaque workspace/conversation/request identities,
+typed planning content, and the Cutout-owned output schema. They have no binary,
+path, argv, environment, working-directory, account, credential, dynamic-tool,
+or sandbox parameter.
 
 ### 3. Contracts
 
 - Native code owns executable discovery, platform identity validation, fixed
   non-billable probe commands, environment filtering, bounded output, timeout,
   and process-group termination. Raw command output is discarded natively.
-- Codex OAuth/session files and token payloads are never read, copied,
-  serialized, logged, imported, or reinterpreted as direct Provider keys.
+- Cutout code never opens, copies, serializes, logs, imports, or reinterprets
+  Codex OAuth/session payloads as direct Provider keys. The isolated runtime
+  home may reference the exact Codex-owned auth file so the owning signed
+  runtime can authenticate itself.
 - Evidence advances in order: installed, authenticated, capability-proven,
   then execution-proven. Capability evidence cannot be proven without an
   installed authenticated runtime, and terminal execution evidence cannot
@@ -664,9 +695,26 @@ account, credential, tool, or sandbox parameter.
 - Runtime selection considers both capability and latest execution health. A
   failed or stale system runtime is not silently preferred over a healthy
   verified direct-text fallback before the next turn starts.
-- The probe-only release remains `capability-required` while restricted
-  readable roots and the complete native turn adapter are unavailable. Method
-  names in a generated schema do not make turn execution implemented.
+- A turn uses a native-written strict configuration, empty environments and
+  dynamic tools, disabled MCP/skills/apps/plugins/web/image/Agent surfaces,
+  staged context under a native-owned root, read-only sandboxing, `never`
+  approval, schema-bound output, bounded protocol parsing, and fail-closed tool
+  event detection. Generated method names alone are insufficient; the complete
+  reviewed zero-tool field set must be present before capability is proven.
+- Opaque thread bindings are persisted only after a schema-valid completed
+  turn. A stale resume invalidates only the matching binding. Terminal failures
+  expose and persist only a closed `lastFailure` reason.
+- Terminal failure classification is turn-scoped, not event-local. Preserve
+  only reviewed structured retry evidence for the active thread and turn until
+  `turn/completed`; if Codex later collapses the terminal `codexErrorInfo` to
+  `other` or null, that evidence may recover the closed failure reason. An
+  explicit terminal reason always takes precedence.
+- Never infer a failure kind from `message`, `additionalDetails`, app-server
+  stderr, or the Codex log database. Those surfaces may contain Provider or
+  credential-shaped text and are not stable protocol authority.
+- Public `conversationBinding` and `turnExecution` remain false until a signed
+  packaged app completes a real turn against a healthy upstream. This release
+  gate does not turn an internal desktop execution path into a headless claim.
 - The desktop runtime is distinct from the CLI/MCP headless host. Public
   manifest and documentation claims must preserve `headlessAvailable: false`
   and must not imply a bundled headless system-Agent executor.
@@ -680,22 +728,30 @@ account, credential, tool, or sandbox parameter.
 | Executable absent | Return sanitized `not-installed` evidence |
 | Unsupported platform or rejected executable identity | Return a closed unsupported reason without running further probes |
 | Raw auth output contains account or secret-shaped text | Project only the closed auth class; expose none of the raw text |
-| Generated protocol schema omits a required method or restricted-root contract | Return `protocol-unsupported` or `restricted-read-roots-required` |
+| Generated protocol schema omits a required method or zero-tool control | Return `protocol-unsupported` before starting a turn |
 | Latest system execution is failed or stale and a verified direct route exists | Select the direct route before starting a new turn |
 | Renderer supplies a path, argv, environment, working directory, or generic app-server request | No such IPC command or field exists |
-| Turn execution is not fully implemented and confinement-proven | Keep capability and public contract fail-closed |
+| Runtime emits a tool request/event, oversized/malformed protocol data, or schema-invalid output | Terminate the owned process group and fail with sanitized evidence |
+| Retry events carry a reviewed upstream status but the terminal event reports generic `other`/null | Use the same-turn structured retry evidence; expose only `upstream-unavailable` |
+| Terminal event reports an explicit auth, policy, or other non-upstream reason after retries | Preserve the explicit terminal classification; never overwrite it from earlier retry evidence |
+| Signed packaged turn proof has not succeeded | Keep public conversation/turn capability false without disabling truthful internal diagnostics |
 
 ### 5. Tests Required
 
 - Frontend schema rejects unknown fields, contradictory auth state, skipped
-  progressive evidence, and execution evidence without capability proof.
+  progressive evidence, failure reasons without failed execution, and execution
+  evidence without capability proof.
 - Planning selection prefers healthy capability-proven Codex, uses the direct
   fallback for unsupported/failed/stale Codex evidence, and returns no route
   when neither adapter is eligible.
 - Native tests cover platform identity, command timeout/output overflow,
-  sanitized auth projection, required protocol methods, restricted-root
-  detection, and absence of renderer-controlled process/path authority.
-- Tauri permission tests keep the allowlist to the fixed sanitized probe until
-  a separately reviewed turn contract is implemented.
+  sanitized auth projection, required protocol methods and zero-tool fields,
+  cancellation during handshake/turn execution, stale binding isolation,
+  output-schema validation, multi-event retry exhaustion, explicit-terminal
+  precedence, closed terminal failures, and absence of renderer-controlled
+  process/path authority.
+- Tauri permission tests keep the allowlist to the fixed probe, turn, steer,
+  interrupt, and conversation-reset commands and reject generic process or
+  app-server authority.
 - Run `pnpm agent:validate`, `pnpm lint`, TypeScript, focused Vitest and Rust
   tests, `cargo fmt --check`, production build, and `git diff --check`.

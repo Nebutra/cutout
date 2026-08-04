@@ -33,13 +33,13 @@ describe('planning runtime boundary', () => {
   it('prefers capability-proven Codex and otherwise uses a direct route', () => {
     const direct = { providerId: 'openai', model: 'gpt-5' }
     expect(selectPlanningRuntime({ codex: proven, direct })).toMatchObject({ runtimeId: 'codex-system' })
-    expect(selectPlanningRuntime({ codex: { ...proven, capability: 'unsupported', reason: 'restricted-read-roots-required' }, direct }))
+    expect(selectPlanningRuntime({ codex: { ...proven, capability: 'unsupported', reason: 'protocol-unsupported' }, direct }))
       .toEqual({ runtimeId: 'direct-provider', ...direct })
-    expect(selectPlanningRuntime({ codex: { ...proven, execution: 'failed' }, direct }))
+    expect(selectPlanningRuntime({ codex: { ...proven, execution: 'failed', lastFailure: 'upstream-unavailable' }, direct }))
       .toEqual({ runtimeId: 'direct-provider', ...direct })
     expect(selectPlanningRuntime({ codex: { ...proven, execution: 'stale' } })).toBeUndefined()
     expect(selectPlanningRuntime({
-      codex: { ...proven, execution: 'failed' },
+      codex: { ...proven, execution: 'failed', lastFailure: 'upstream-unavailable' },
       direct,
       retryCodex: true,
     })).toMatchObject({ runtimeId: 'codex-system' })
@@ -60,8 +60,21 @@ describe('planning runtime boundary', () => {
       ...proven,
       capability: 'unsupported',
       execution: 'failed',
-      reason: 'restricted-read-roots-required',
+      reason: 'protocol-unsupported',
     }).success).toBe(false)
+    expect(planningRuntimeEvidenceSchema.safeParse({
+      ...proven,
+      lastFailure: 'upstream-unavailable',
+    }).success).toBe(false)
+    expect(planningRuntimeEvidenceSchema.safeParse({
+      ...proven,
+      execution: 'failed',
+    }).success).toBe(false)
+    expect(planningRuntimeEvidenceSchema.safeParse({
+      ...proven,
+      execution: 'failed',
+      lastFailure: 'upstream-unavailable',
+    }).success).toBe(true)
   })
 
   it('accepts only sanitized native evidence', async () => {
@@ -92,7 +105,7 @@ describe('planning runtime boundary', () => {
         receipt: {
           protocol: 'cutout.codex-execution.v1',
           runtimeId: 'codex-system',
-          runtimeVersion: '0.146.0',
+          runtimeVersion: '0.200.0',
           bindingId: 'codex:binding',
           requestId: '00000000-0000-4000-8000-000000000001',
           turnId: 'turn.1',
@@ -117,6 +130,59 @@ describe('planning runtime boundary', () => {
     })
     expect(events).toHaveLength(2)
     expect(events[1]).toMatchObject({ type: 'retrying', attempt: 1 })
+  })
+
+  it('decodes only closed sanitized terminal failure reasons', async () => {
+    invokeMock.mockImplementationOnce((_command: string, args: {
+      onEvent: { onmessage: (payload: unknown) => void }
+    }) => {
+      args.onEvent.onmessage({
+        type: 'failed',
+        requestId: '00000000-0000-4000-8000-000000000004',
+        turnId: 'turn.4',
+        reason: 'upstream-unavailable',
+      })
+      return Promise.reject(new Error('planning runtime upstream is unavailable'))
+    })
+    const events: unknown[] = []
+    await expect(runCodexSystemTurn({
+      requestId: '00000000-0000-4000-8000-000000000004',
+      workspaceHandle: 'workspace.1',
+      conversationId: 'conversation.1',
+      contextRevision: 'revision.1',
+      prompt: 'Plan this product.',
+      context: {},
+      outputSchema: { type: 'object' },
+    }, { onEvent: (event) => events.push(event) })).rejects.toThrow('upstream')
+    expect(events).toEqual([expect.objectContaining({
+      type: 'failed',
+      reason: 'upstream-unavailable',
+    })])
+  })
+
+  it('rejects unsanitized negotiated runtime versions in receipts', async () => {
+    const receipt = {
+      protocol: 'cutout.codex-execution.v1',
+      runtimeId: 'codex-system',
+      runtimeVersion: '0.200.0\nsecret',
+      bindingId: 'codex:binding',
+      requestId: '00000000-0000-4000-8000-000000000001',
+      turnId: 'turn.1',
+      contextRevision: 'revision.1',
+      contextDigest: 'a'.repeat(64),
+      outputDigest: 'b'.repeat(64),
+      completedAt: 1,
+    }
+    invokeMock.mockResolvedValueOnce({ output: {}, receipt })
+    await expect(runCodexSystemTurn({
+      requestId: receipt.requestId,
+      workspaceHandle: 'workspace.1',
+      conversationId: 'conversation.1',
+      contextRevision: 'revision.1',
+      prompt: 'Plan this product.',
+      context: {},
+      outputSchema: { type: 'object' },
+    })).rejects.toThrow()
   })
 
   it('propagates abort, steering and reset through only opaque ids', async () => {

@@ -13114,7 +13114,7 @@ var paidToolCapabilitySchema = _enum([
 	"cutout",
 	"semantic-cutout"
 ]);
-var moneyEstimateSchema = object({
+var moneyAmountSchema = object({
 	currency: string().regex(/^[A-Z]{3}$/),
 	amount: number().nonnegative().finite(),
 	credits: number().nonnegative().finite().optional()
@@ -13126,23 +13126,19 @@ var paidToolRequestSchema = object({
 	intent: safeText$1.min(1).max(paidToolIntentMaxLength),
 	prompt: safeText$1.min(1).max(paidToolPromptMaxLength),
 	inputArtifactIds: array(safeText$1.min(1).max(300)).max(32).default([]),
-	budgetCeiling: moneyEstimateSchema,
-	approvalPolicy: _enum(["explicit", "auto-within-budget"]).default("auto-within-budget")
+	approvalPolicy: _enum(["explicit", "auto"]).default("auto")
 }).strict();
 object({
 	capability: paidToolCapabilitySchema,
 	providerId: safeText$1.min(1).max(160),
 	model: safeText$1.min(1).max(300),
-	available: boolean(),
-	estimatedCost: moneyEstimateSchema
+	available: boolean()
 }).strict();
 function planPaidTool(request, capability, policy, hasExplicitApproval) {
 	const base = {
 		capability: request.capability,
 		providerId: capability?.providerId ?? request.providerId,
 		model: capability?.model ?? request.model,
-		estimatedCost: capability?.estimatedCost,
-		budgetCeiling: request.budgetCeiling,
 		approvalPolicy: request.approvalPolicy
 	};
 	if (!capability?.available) return {
@@ -13157,12 +13153,6 @@ function planPaidTool(request, capability, policy, hasExplicitApproval) {
 		executable: false,
 		reason: "Paid actions are disabled by host policy."
 	};
-	if (!sameCurrency(request.budgetCeiling, capability.estimatedCost) || capability.estimatedCost.amount > request.budgetCeiling.amount || exceedsCredits(capability.estimatedCost, request.budgetCeiling) || policy.maxCost && exceeds(capability.estimatedCost, policy.maxCost)) return {
-		...base,
-		status: "budget-exceeded",
-		executable: false,
-		reason: "The host estimate exceeds the approved budget ceiling."
-	};
 	if (request.approvalPolicy === "explicit" && !hasExplicitApproval) return {
 		...base,
 		status: "authorization-required",
@@ -13175,15 +13165,6 @@ function planPaidTool(request, capability, policy, hasExplicitApproval) {
 		executable: true
 	};
 }
-function sameCurrency(left, right) {
-	return left.currency === right.currency;
-}
-function exceedsCredits(cost, ceiling) {
-	return cost.credits !== void 0 && ceiling.credits !== void 0 && cost.credits > ceiling.credits;
-}
-function exceeds(cost, ceiling) {
-	return !sameCurrency(cost, ceiling) || cost.amount > ceiling.amount || exceedsCredits(cost, ceiling);
-}
 var paidToolReceiptSchema = object({
 	receiptId: safeText$1.min(1).max(160),
 	requestId: safeText$1.min(1).max(160),
@@ -13195,7 +13176,7 @@ var paidToolReceiptSchema = object({
 		"failed",
 		"cancelled"
 	]),
-	charged: moneyEstimateSchema,
+	charged: moneyAmountSchema.optional(),
 	outputArtifactIds: array(safeText$1.min(1).max(300)).max(128),
 	startedAt: number().int().nonnegative(),
 	completedAt: number().int().nonnegative()
@@ -13300,8 +13281,7 @@ var agentRunEventSchema = discriminatedUnion("type", [
 			providerId: eventText,
 			model: eventText
 		}).strict().optional(),
-		budgetCeiling: moneyEstimateSchema,
-		approvalPolicy: _enum(["explicit", "auto-within-budget"]),
+		approvalPolicy: _enum(["explicit", "auto"]),
 		reason: eventText,
 		/** True only when a human must approve before the tool can run. */
 		pendingApproval: boolean()
@@ -13559,7 +13539,6 @@ function reduceActiveRun(run, event) {
 					status: "running",
 					outputRefs: [],
 					requestId: event.requestId,
-					budgetCeiling: event.budgetCeiling,
 					approvalPolicy: event.approvalPolicy,
 					approvalReason: event.reason,
 					approvalStatus: "required"
@@ -13629,7 +13608,6 @@ function reduceActiveRun(run, event) {
 						outputRefs: event.type === "tool-succeeded" ? event.outputRefs : [],
 						requestId: existing?.requestId,
 						previousRequestId: existing?.previousRequestId,
-						budgetCeiling: existing?.budgetCeiling,
 						approvalPolicy: existing?.approvalPolicy,
 						approvalReason: existing?.approvalReason,
 						approvalStatus: existing?.approvalStatus,

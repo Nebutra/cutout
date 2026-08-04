@@ -344,7 +344,7 @@ export function AiSetupOverview({
     switch (row.nextAction) {
       case 'authorize-runtime': return t({ id: 'settings.authorize_codex_action', message: 'Sign in with the Codex CLI, then retry.' })
       case 'install-runtime': return t({ id: 'settings.install_codex_action', message: 'Install the signed Codex CLI, then retry.' })
-      case 'upgrade-runtime': return t({ id: 'settings.upgrade_codex_action', message: 'Update Codex to a version with restricted readable roots.' })
+      case 'upgrade-runtime': return t({ id: 'settings.upgrade_codex_action', message: 'Update Codex to a supported signed version.' })
       case 'update-app': return t({ id: 'settings.update_cutout_runtime_action', message: 'Update Cutout to enable the proven Codex runtime contract.' })
       case 'verify-provider': return t({ id: 'settings.verify_provider_action', message: 'Verify the configured provider and model catalog.' })
       case 'configure-route': return t({ id: 'settings.configure_route_action', message: 'Choose a model with exact capability evidence.' })
@@ -435,6 +435,7 @@ function PlanningRuntimeDiagnostics({
           </p>
         ) : null}
         {evidence?.reason ? <p className="mt-1 break-words text-amber-700 dark:text-amber-300">{evidence.reason}</p> : null}
+        {evidence?.lastFailure ? <p className="mt-1 break-words text-amber-700 dark:text-amber-300">{evidence.lastFailure}</p> : null}
       </div>
       <p className="text-xs text-muted-foreground">
         <Trans id="settings.claude_policy_diagnostic">Claude Code execution remains unavailable pending vendor policy review.</Trans>

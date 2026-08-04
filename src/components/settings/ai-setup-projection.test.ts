@@ -96,13 +96,13 @@ describe('capability-first AI setup projection', () => {
   })
 
   it('uses a verified direct text route when Codex execution is not safely supported', () => {
-    const restricted: PlanningRuntimeEvidence = {
+    const unsupported: PlanningRuntimeEvidence = {
       ...codex,
       capability: 'unsupported',
-      reason: 'restricted-read-roots-required',
+      reason: 'protocol-unsupported',
     }
     const result = projectAiSetup(input({
-      runtime: restricted,
+      runtime: unsupported,
       providers: [openai],
       verifications: { openai: verified },
       bindings,
@@ -149,12 +149,12 @@ describe('capability-first AI setup projection', () => {
       runtime: {
         ...codex,
         capability: 'unsupported',
-        reason: 'restricted-read-roots-required',
+        reason: 'protocol-unsupported',
       },
     }))
     expect(result.rows[0]).toMatchObject({
       status: 'action-required',
-      reason: 'restricted-read-roots-required',
+      reason: 'protocol-unsupported',
       nextAction: 'upgrade-runtime',
       evidence: { installed: true, authenticated: true, execution: 'unproven' },
     })

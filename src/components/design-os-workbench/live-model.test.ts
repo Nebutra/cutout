@@ -43,7 +43,7 @@ describe('live Design OS workbench model', () => {
 
   it('restores only Delivery Center plans bound to the current Design IR revision', () => {
     const current = document()
-    const plan = { protocol: 'cutout.delivery-center.v1' as const, id: 'delivery:plan', requestId: 'delivery:request', outcomeId: 'outcome:one', outcomeRevision: 'run:one', designRevision: { documentId: current.meta.id, revisionId: current.revision.id, revisionNumber: current.revision.number }, targets: [], totalEstimatedCostUsd: 0, currency: 'USD' as const, requiresApproval: true as const, createdAt: timestamp }
+    const plan = { protocol: 'cutout.delivery-center.v1' as const, id: 'delivery:plan', requestId: 'delivery:request', outcomeId: 'outcome:one', outcomeRevision: 'run:one', designRevision: { documentId: current.meta.id, revisionId: current.revision.id, revisionNumber: current.revision.number }, targets: [], requiresApproval: true as const, createdAt: timestamp }
     expect(buildLiveDesignOsWorkbenchModel(current, {}, { deliveryPlan: plan }).delivery?.plan?.id).toBe('delivery:plan')
     expect(buildLiveDesignOsWorkbenchModel(current, {}, { deliveryPlan: { ...plan, designRevision: { ...plan.designRevision, revisionId: 'revision:old' } } }).delivery?.plan).toBeUndefined()
   })

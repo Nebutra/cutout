@@ -17,6 +17,7 @@ describe("classifyGenerationError", () => {
     "Another planning turn is already active",
     "Planning runtime transport failed",
     "Planning runtime timed out",
+    "Planning runtime upstream is unavailable",
     "The saved planning conversation is stale",
     "Planning runtime output did not match the required schema",
   ])("marks transient provider failures as retryable: %s", (message) => {

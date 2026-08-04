@@ -11,11 +11,17 @@ export const stableRuntimeReasonSchema = z.enum([
   'authentication-required',
   'protocol-unsupported',
   'runtime-version-unsupported',
-  'restricted-read-roots-required',
   'execution-adapter-unavailable',
   'probe-failed',
 ])
 export type StableRuntimeReason = z.infer<typeof stableRuntimeReasonSchema>
+
+export const planningRuntimeFailureReasonSchema = z.enum([
+  'upstream-unavailable',
+  'model-output-invalid',
+  'runtime-failed',
+])
+export type PlanningRuntimeFailureReason = z.infer<typeof planningRuntimeFailureReasonSchema>
 
 export const planningRuntimeEvidenceSchema = z.object({
   runtimeId: z.literal('codex-system'),
@@ -24,6 +30,7 @@ export const planningRuntimeEvidenceSchema = z.object({
   authClass: z.enum(['chatgpt', 'api-key', 'access-token', 'unauthenticated', 'unknown']),
   capability: z.enum(['proven', 'unsupported', 'unknown']),
   execution: z.enum(['unproven', 'succeeded', 'failed', 'stale']),
+  lastFailure: planningRuntimeFailureReasonSchema.optional(),
   version: z.string().regex(/^\d[0-9A-Za-z.+-]{0,39}$/).optional(),
   reason: stableRuntimeReasonSchema.optional(),
 }).strict().superRefine((value, context) => {
@@ -41,6 +48,12 @@ export const planningRuntimeEvidenceSchema = z.object({
   }
   if (value.execution !== 'unproven' && value.capability !== 'proven') {
     context.addIssue({ code: 'custom', path: ['execution'], message: 'Execution evidence requires a capability-proven runtime.' })
+  }
+  if (value.lastFailure !== undefined && value.execution !== 'failed') {
+    context.addIssue({ code: 'custom', path: ['lastFailure'], message: 'A runtime failure reason requires failed execution evidence.' })
+  }
+  if (value.execution === 'failed' && value.lastFailure === undefined) {
+    context.addIssue({ code: 'custom', path: ['lastFailure'], message: 'Failed execution evidence requires a sanitized failure reason.' })
   }
   if (value.capability === 'unsupported' && value.reason === undefined) {
     context.addIssue({ code: 'custom', path: ['reason'], message: 'Unsupported runtime evidence requires a reason.' })
@@ -88,13 +101,19 @@ export const codexPlanningEventSchema = z.discriminatedUnion('type', [
     requestId: z.uuid(),
     turnId: opaqueIdSchema,
   }).strict(),
+  z.object({
+    type: z.literal('failed'),
+    requestId: z.uuid(),
+    turnId: opaqueIdSchema,
+    reason: planningRuntimeFailureReasonSchema,
+  }).strict(),
 ])
 export type CodexPlanningEvent = z.infer<typeof codexPlanningEventSchema>
 
 export const codexExecutionReceiptSchema = z.object({
   protocol: z.literal('cutout.codex-execution.v1'),
   runtimeId: z.literal('codex-system'),
-  runtimeVersion: z.literal('0.146.0'),
+  runtimeVersion: z.string().regex(/^\d+\.\d+\.\d+$/),
   bindingId: opaqueIdSchema,
   requestId: z.uuid(),
   turnId: opaqueIdSchema,
