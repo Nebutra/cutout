@@ -12566,21 +12566,33 @@ var prototypeReviewVerdictSchema = object({
 var prototypePageReviewRecordSchema = object({
 	version: literal("prototype-page-review.v1"),
 	artifactSha256: sha256Schema$6,
-	reviewer: routeSchema,
+	reviewer: routeSchema.nullable(),
 	verdict: prototypeReviewVerdictSchema,
 	reviewedAt: string().datetime()
-}).strict();
+}).strict().superRefine((record, context) => {
+	if (record.verdict.unavailable === true !== (record.reviewer === null)) context.addIssue({
+		code: "custom",
+		path: ["reviewer"],
+		message: record.verdict.unavailable === true ? "Unavailable visual QA cannot claim a reviewer." : "Completed visual QA requires its reviewer route."
+	});
+});
 var prototypeResourceReviewRecordSchema = object({
 	version: literal("prototype-resource-review.v1"),
 	artifactId: string().min(1).max(240),
-	reviewer: routeSchema,
+	reviewer: routeSchema.nullable(),
 	verdict: prototypeReviewVerdictSchema,
 	observationalIssues: array(object({
 		code: string().min(1).max(120),
 		message: string().min(1).max(2e3)
 	}).strict()),
 	reviewedAt: string().datetime()
-}).strict();
+}).strict().superRefine((record, context) => {
+	if (record.verdict.unavailable === true !== (record.reviewer === null)) context.addIssue({
+		code: "custom",
+		path: ["reviewer"],
+		message: record.verdict.unavailable === true ? "Unavailable visual QA cannot claim a reviewer." : "Completed visual QA requires its reviewer route."
+	});
+});
 //#endregion
 //#region src/prototype/design-system-validation.ts
 function designSystemMarkdownValidationError(designMarkdown) {

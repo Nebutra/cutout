@@ -218,4 +218,20 @@ describe('automatic AI setup', () => {
     expect(mocks.configure).toHaveBeenCalledTimes(1)
     expect(mocks.configure).toHaveBeenCalledWith(candidates[0]!.id)
   })
+
+  it('preserves a bounded message from a structured native rejection', async () => {
+    const candidate = {
+      id: `provider-candidate:${'a'.repeat(64)}`,
+      source: 'codex', sourceLabel: 'Codex', kind: 'openai-compatible', label: 'Codex',
+      baseUrl: 'https://relay.example/v1', wireProtocol: 'responses',
+      credential: { sourceType: 'config-literal', available: true, importable: true }, warnings: [],
+    } as ProviderDiscoveryCandidate
+    mocks.configure.mockRejectedValue({
+      code: 'credential-unavailable',
+      message: 'The native credential is no longer available.',
+    })
+
+    await expect(configureAutomaticAi([candidate]))
+      .rejects.toThrow('The native credential is no longer available.')
+  })
 })

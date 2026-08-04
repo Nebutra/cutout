@@ -62,6 +62,7 @@ export interface PackagedE2eOutcome {
   readonly prototypeSuites: readonly PackagedE2eSuiteOutcome[]
   readonly selectedSuiteId: string
   readonly selectedVisibleSliceCount: number
+  readonly codexPlanningTurnCount: number
   readonly plannedImageCallCount: number
   readonly imageCallCount: number
 }
@@ -187,24 +188,21 @@ export async function runPackagedE2e(): Promise<void> {
     await waitFor(() => {
       const setup = document.querySelector<HTMLElement>('[data-ai-setup-status]')
       const status = setup?.dataset.aiSetupStatus
-      if (status === 'unavailable' || status === 'needs-provider') {
-        terminalSetupGapSince ??= performance.now()
-        if (performance.now() - terminalSetupGapSince > 10_000) {
-          throw new JourneyFailure(
-            'ai-configured',
-            status === 'needs-provider' ? 'capability-missing' : 'run-failed',
-          )
-        }
-      } else {
-        terminalSetupGapSince = undefined
-      }
-      if (status === 'needs-capabilities' && setup?.dataset.aiAutomaticBusy !== 'true') {
+      if (status === 'action-required' && setup?.dataset.aiAutomaticBusy !== 'true') {
         capabilityGapSince ??= performance.now()
         if (performance.now() - capabilityGapSince > 5_000) {
           throw new JourneyFailure('ai-configured', 'capability-missing')
         }
       } else {
         capabilityGapSince = undefined
+      }
+      if (status && !['checking', 'ready', 'action-required'].includes(status)) {
+        terminalSetupGapSince ??= performance.now()
+        if (performance.now() - terminalSetupGapSince > 10_000) {
+          throw new JourneyFailure('ai-configured', 'run-failed')
+        }
+      } else {
+        terminalSetupGapSince = undefined
       }
       return status === 'ready'
         && setup?.dataset.aiAutomaticBusy === 'false'
@@ -249,7 +247,11 @@ export async function runPackagedE2e(): Promise<void> {
     await waitForJourney(() => {
       const workspace = workspaceRoot()
       rejectFailedWorkspacePhase(workspace, 'provider-response')
-      return hasSettledFreshAgentResponse(workspace, initialAgentMessageCount)
+      const settled = hasSettledFreshAgentResponse(workspace, initialAgentMessageCount)
+      if (settled && numberData(workspace, 'packagedE2eCodexPlanningTurnCount') < 1) {
+        throw new JourneyFailure('provider-response', 'capability-missing')
+      }
+      return settled
     }, 300_000)
     await pass('provider-response')
 
@@ -276,9 +278,13 @@ export async function runPackagedE2e(): Promise<void> {
     await waitForJourney(() => {
       const workspace = workspaceRoot()
       rejectFailedWorkspacePhase(workspace, 'design-candidates-ready')
-      return numberData(workspace, 'designCandidateCount') === 3
+      const ready = numberData(workspace, 'designCandidateCount') === 3
         && numberData(workspace, 'designCandidateReadyCount') === 3
         && workspace.dataset.workflowPhase === 'design-system-selection'
+      if (ready && numberData(workspace, 'packagedE2eCodexPlanningTurnCount') < 2) {
+        throw new JourneyFailure('design-candidates-ready', 'capability-missing')
+      }
+      return ready
     }, 45 * 60_000)
     await pass('design-candidates-ready')
 
@@ -558,6 +564,12 @@ export function collectPackagedE2eOutcome(workspace: HTMLElement): PackagedE2eOu
     selectedSuite.resourceAssetCount,
     selectedSuite.resourceAssetCount,
   )
+  const codexPlanningTurnCount = readCount(
+    workspace,
+    'packagedE2eCodexPlanningTurnCount',
+    2,
+    256,
+  )
   const plannedImageCallCount = readCount(
     workspace,
     'packagedE2ePlannedImageCallCount',
@@ -576,6 +588,7 @@ export function collectPackagedE2eOutcome(workspace: HTMLElement): PackagedE2eOu
     prototypeSuites,
     selectedSuiteId,
     selectedVisibleSliceCount,
+    codexPlanningTurnCount,
     plannedImageCallCount,
     imageCallCount,
   }

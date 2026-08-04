@@ -43,6 +43,7 @@ import {
   X,
 } from "lucide-react";
 import { toast } from "sonner";
+import { z } from "zod";
 import { getStoreState, useStore } from "@/store";
 import type { SliceInput } from "@/store/types";
 import {
@@ -83,6 +84,12 @@ import {
   type LockedComposerChatRoute,
   type LockedComposerRoute,
 } from "@/agent-runtime/composer-execution";
+import {
+  probeCodexSystemRuntime,
+  runCodexSystemTurn,
+  selectPlanningRuntime,
+  steerCodexSystemTurn,
+} from "@/services/ai/planning-runtime";
 import { recordRuntimeDiagnostic } from "@/services/runtime-diagnostics";
 import {
   classifyGenerationError,
@@ -223,15 +230,25 @@ import {
   proceedWithGenerationTool,
 } from "@/agent-runtime/tool-registry";
 import { createClarificationBridge } from "@/agent-runtime/clarification-bridge";
-import type { RegenerationDecision } from "@/prototype/regeneration-tool";
+import {
+  regenerationDecisionSchema,
+  type RegenerationDecision,
+} from "@/prototype/regeneration-tool";
 import {
   GENERATION_DECISION_MAX_OUTPUT_TOKENS,
+  generationDecisionSchema,
   type GenerationDecision,
 } from "@/prototype/generation-tool";
 import type { PageTargetingDecision } from "@/prototype/page-targeting-tool";
 import type { ConversationalReplyInput } from "@/prototype/conversational-reply-tool";
-import type { AskClarifyingQuestionInput } from "@/prototype/ask-clarifying-question-tool";
-import type { ProcessUploadedMaterialDecision } from "@/material-processing/process-uploaded-material-tool";
+import {
+  askClarifyingQuestionInputSchema,
+  type AskClarifyingQuestionInput,
+} from "@/prototype/ask-clarifying-question-tool";
+import {
+  processUploadedMaterialDecisionSchema,
+  type ProcessUploadedMaterialDecision,
+} from "@/material-processing/process-uploaded-material-tool";
 import { CanvasBackgroundPicker } from "./CanvasBackgroundPicker";
 import { readCanvasBackground, writeCanvasBackground } from "./canvas-background";
 import {
@@ -303,6 +320,47 @@ const PROTOTYPE_QA_MAX_RETRIES = 0;
 const PROTOTYPE_GENERATION_CONCURRENCY = 3;
 const PROTOTYPE_QA_CONCURRENCY = 3;
 const PROTOTYPE_BOARD_GROUP_CONCURRENCY_PER_PAGE = 1;
+const CODEX_SYSTEM_ASSIGNMENT: ModelAssignment = {
+  providerId: "codex-system",
+  model: "0.146.0",
+};
+type WorkspaceComposerRoute = Omit<LockedComposerRoute, "chatPolicy"> & {
+  readonly planningRuntime: "codex-system" | "direct-provider";
+  readonly chatPolicy?: LockedComposerRoute["chatPolicy"];
+};
+
+const codexToolGateDecisionSchema = z.object({
+  action: z.enum(["reply", "proceed", "clarify", "material"]),
+  reply: z.string().min(1).nullable(),
+  generation: generationDecisionSchema.nullable(),
+  clarification: askClarifyingQuestionInputSchema.nullable(),
+  material: processUploadedMaterialDecisionSchema.nullable(),
+  regeneration: regenerationDecisionSchema.nullable(),
+  targetPageNames: z.array(z.string().min(1)).nullable(),
+}).strict().superRefine((decision, context) => {
+  const required = {
+    reply: decision.reply,
+    proceed: decision.generation,
+    clarify: decision.clarification,
+    material: decision.material,
+  }[decision.action];
+  if (!required) {
+    context.addIssue({
+      code: "custom",
+      path: [decision.action],
+      message: `The ${decision.action} action is missing its required payload.`,
+    });
+  }
+});
+
+function planningOpaqueId(prefix: string, value: string): string {
+  const normalized = value.replace(/[^A-Za-z0-9._:-]/g, "-").slice(0, 140);
+  return `${prefix}:${normalized || "default"}`;
+}
+
+function isCodexSystemAssignment(assignment: ModelAssignment): boolean {
+  return assignment.providerId === CODEX_SYSTEM_ASSIGNMENT.providerId;
+}
 import {
   persistReferenceAttachment,
   useReferenceAttachments,
@@ -334,6 +392,7 @@ import { consumeComposerDraft } from "./composer-draft";
 import {
   createAgentRunRetryControl,
   resolveAgentRunError,
+  type RetryPlanningRuntime,
 } from "./agent-run-retry";
 import {
   collectLiveText,
@@ -431,8 +490,10 @@ interface PrototypeSuiteRetryFrontier {
 }
 export function IntentWorkspace({
   onOpenDesignOs = () => {},
+  projectId,
 }: {
   readonly onOpenDesignOs?: (tab?: "overview" | "delivery" | "specimen") => void;
+  readonly projectId?: string | null;
 }) {
   const { t } = useLingui();
   const services = useServices();
@@ -482,7 +543,13 @@ export function IntentWorkspace({
   const [executionNotices, setExecutionNotices] = useState<readonly string[]>(
     [],
   );
-  const lockedRouteRef = useRef<LockedComposerRoute | null>(null);
+  const lockedRouteRef = useRef<WorkspaceComposerRoute | null>(null);
+  const activeCodexRequestRef = useRef<string | null>(null);
+  const planningWorkspaceHandle = planningOpaqueId(
+    "workspace",
+    projectId ?? "unsaved",
+  );
+  const planningConversationId = planningOpaqueId("conversation", "primary");
   const personalizedGenerationRef = useRef(services.generation);
   const [runStartedAt, setRunStartedAt] = useState<number | null>(null);
   const [initialPrototypeArtifacts] = useState(() =>
@@ -524,6 +591,8 @@ export function IntentWorkspace({
     prototypeSuiteCandidates?.set.selection,
   );
   const [packagedE2eRetryImageCallCount, setPackagedE2eRetryImageCallCount] =
+    useState(0);
+  const [packagedE2eCodexPlanningTurnCount, setPackagedE2eCodexPlanningTurnCount] =
     useState(0);
   const packagedE2ePlannedImageCallCount = useMemo(() => {
     if (
@@ -797,6 +866,8 @@ export function IntentWorkspace({
   const [retryableRunBrief, setRetryableRunBrief] = useState<string | null>(
     null,
   );
+  const [retryPlanningRuntime, setRetryPlanningRuntime] =
+    useState<RetryPlanningRuntime | null>(null);
   const [packagedE2eRetryStartCount, setPackagedE2eRetryStartCount] =
     useState(0);
   const [namingStatus, setNamingStatus] = useState<NamingStatus>(
@@ -1207,6 +1278,7 @@ export function IntentWorkspace({
         (candidate) => candidate.status === "failed" || candidate.status === "cancelled",
       ),
       retryableBrief: retryableRunBrief,
+      retryPlanningRuntime: retryPlanningRuntime ?? undefined,
       currentError: currentAgentRunError,
       projectBrief: brief,
     },
@@ -1448,6 +1520,7 @@ export function IntentWorkspace({
     packagedE2eRunDiagnosticRef.current = "unknown";
     setRunError(null);
     setRetryableRunBrief(null);
+    setRetryPlanningRuntime(null);
     setLiveAgentOutput("");
     setLiveAgentLabel(null);
     setNamingStatus((status) =>
@@ -1472,6 +1545,17 @@ export function IntentWorkspace({
       ...instructions.map((instruction, index) => `${index + 1}. ${instruction}`),
       "Apply these instructions to remaining work. Do not redo completed work unless explicitly requested.",
     ].join("\n");
+  }
+
+  function forwardActiveCodexSteer(instruction: string): void {
+    const requestId = activeCodexRequestRef.current;
+    if (!requestId) return;
+    void steerCodexSystemTurn(requestId, instruction).catch((error) => {
+      setExecutionNotices((current) => [
+        ...current,
+        `Codex could not apply the live direction: ${errorMessage(error)}`,
+      ]);
+    });
   }
 
   function finishActiveRun(lease: AgentRunLease): void {
@@ -1632,6 +1716,8 @@ export function IntentWorkspace({
       resumeDesignSystemCandidates?: PrototypeDesignSystemCandidateSet;
       /** Incomplete alternatives from the same failed run; ready siblings remain authoritative. */
       resumePrototypeSuiteCandidates?: PrototypeSuiteCandidateSet;
+      /** Re-run the failed planning boundary instead of resuming after it. */
+      retryPlanningRuntime?: RetryPlanningRuntime;
     } = {},
   ): Promise<void> {
     const baseText = (options.briefOverride ?? brief).trim();
@@ -1716,57 +1802,71 @@ export function IntentWorkspace({
     );
     const assignmentTable = assignments.data ?? {};
     const providerList = providers.data ?? (await services.providers.list());
-    // Auto routing is fail-closed on provider verification. Installs that
-    // predate verification receipts have assigned providers with no record —
-    // settle those with one probe here instead of blocking the run.
-    try {
-      await Promise.all(
-        [assignmentTable.chat]
-          .filter((assignment): assignment is ModelAssignment => Boolean(
-            assignment && providerList.some(
-              (provider) => provider.id === assignment.providerId && provider.enabled,
-            ),
-          ))
-          .map((assignment) =>
-            ensureProviderVerification(assignment.providerId, async () => {
-              const result = await services.providers.test(assignment.providerId);
-              if (isErr(result)) throw new Error(result.error);
-              return result.data;
-            }, undefined, assignment.model),
-          ),
-      );
-    } catch (error) {
-      recordPreflightFailure(errorMessage(error));
-      return;
-    }
     const routePolicy = await import("@/agent-runtime/route-policy");
     const routePreferences = routePolicy.routePreferencesFromPolicy(
       routePolicy.loadRoutePolicy(),
     );
-    let chatRoute: LockedComposerChatRoute;
-    try {
-      chatRoute = lockComposerChatRoute({
-        model: composerModelPolicy,
-        thinking: composerThinkingPolicy,
-        assignments: assignmentTable,
-        providers: providerList,
-        hasReferenceImages: attachments.length > 0,
-        routePreferences,
-      });
-      routePolicy.appendRouteReceipts(
-        [chatRoute.chatPolicy.routeReceipt]
-          .filter((receipt) => receipt !== undefined)
-          .map((receipt) => ({
-            ...receipt,
-            personalization: personalizationContext.receipt,
-          })),
-      );
-    } catch (error) {
-      recordPreflightFailure(errorMessage(error));
-      return;
+    const codexEvidence = await probeCodexSystemRuntime().catch(() => undefined);
+    const systemPlanning = selectPlanningRuntime({
+      codex: codexEvidence,
+      retryCodex:
+        options.retryPlanningRuntime === "codex-system" || mode === "repair",
+    })?.runtimeId === "codex-system";
+    let chatRoute: Pick<LockedComposerChatRoute, "chat"> &
+      Partial<Pick<LockedComposerChatRoute, "chatPolicy">>;
+    if (systemPlanning) {
+      chatRoute = { chat: CODEX_SYSTEM_ASSIGNMENT };
+    } else {
+      // Direct text fallback remains fail-closed on Provider verification.
+      // It is not touched when the authenticated system runtime owns planning.
+      try {
+        const assignedChat = assignmentTable.chat;
+        if (
+          assignedChat &&
+          providerList.some(
+            (provider) =>
+              provider.id === assignedChat.providerId && provider.enabled,
+          )
+        ) {
+          await ensureProviderVerification(
+            assignedChat.providerId,
+            async () => {
+              const result = await services.providers.test(
+                assignedChat.providerId,
+              );
+              if (isErr(result)) throw new Error(result.error);
+              return result.data;
+            },
+            undefined,
+            assignedChat.model,
+          );
+        }
+        const direct = lockComposerChatRoute({
+          model: composerModelPolicy,
+          thinking: composerThinkingPolicy,
+          assignments: assignmentTable,
+          providers: providerList,
+          hasReferenceImages: attachments.length > 0,
+          routePreferences,
+        });
+        chatRoute = direct;
+        routePolicy.appendRouteReceipts(
+          [direct.chatPolicy.routeReceipt]
+            .filter((receipt) => receipt !== undefined)
+            .map((receipt) => ({
+              ...receipt,
+              personalization: personalizationContext.receipt,
+            })),
+        );
+      } catch (error) {
+        recordPreflightFailure(errorMessage(error));
+        return;
+      }
     }
     const chatAssignment = chatRoute.chat;
-    const providerKeyError = await providerKeyPreflightMessage([chatAssignment.providerId]);
+    const providerKeyError = systemPlanning
+      ? null
+      : await providerKeyPreflightMessage([chatAssignment.providerId]);
     if (providerKeyError) {
       recordPreflightFailure(providerKeyError);
       return;
@@ -1779,6 +1879,7 @@ export function IntentWorkspace({
     packagedE2eRunDiagnosticRef.current = "unknown";
     setRunError(null);
     setRetryableRunBrief(null);
+    setRetryPlanningRuntime(null);
     getStoreState().clearGenError();
     // Set synchronously (not after tryToolGate resolves) so the composer's
     // `working`/disabled state covers the tool-gate phase too — otherwise a
@@ -1798,12 +1899,61 @@ export function IntentWorkspace({
       Boolean(options.resumeSelectedDesignSystem);
     if (mode === "create" && !requestedMaterial && !options.skipToolGate) {
       recordPackagedE2ePipelineStage("tool-gate");
-      const toolGate = await tryToolGate(text, chatAssignment, lease, {
-        regenerateTargetEventId: options.regenerateTargetEventId,
-        regenerateSourceEventId: options.regenerateSourceEventId,
-        regenerateFallbackReply: options.regenerateFallbackReply,
-        parentEventId: conversationParentEventId,
-      });
+      let toolGate;
+      try {
+        toolGate = await (systemPlanning
+          ? tryCodexToolGate(text, lease, {
+              regenerateTargetEventId: options.regenerateTargetEventId,
+              regenerateSourceEventId: options.regenerateSourceEventId,
+              regenerateFallbackReply: options.regenerateFallbackReply,
+              parentEventId: conversationParentEventId,
+            })
+          : tryToolGate(text, chatAssignment, lease, {
+              regenerateTargetEventId: options.regenerateTargetEventId,
+              regenerateSourceEventId: options.regenerateSourceEventId,
+              regenerateFallbackReply: options.regenerateFallbackReply,
+              parentEventId: conversationParentEventId,
+            }));
+      } catch (error) {
+        if (
+          isAgentRunCancelled(error) ||
+          lease.controller.signal.aborted ||
+          !agentRunCoordinatorRef.current.isActive(lease)
+        ) {
+          setRunCancelled(true);
+        } else {
+          const message = errorMessage(error);
+          const classification = classifyGenerationError(message);
+          packagedE2eRunDiagnosticRef.current =
+            packagedE2eFailureDiagnostic(message);
+          setRunError(classification.displayMessage);
+          setRetryableRunBrief(classification.retryable ? baseText : null);
+          setRetryPlanningRuntime(
+            classification.retryable
+              ? systemPlanning
+                ? "codex-system"
+                : "direct-provider"
+              : null,
+          );
+          recordRuntimeDiagnostic({
+            level: "error",
+            scope: "workspace.planning-runtime",
+            message,
+            details: {
+              displayMessage: classification.displayMessage,
+              runtime: systemPlanning ? "codex-system" : "direct-provider",
+              briefLength: text.length,
+            },
+          });
+          toast.error("Planning failed", {
+            description: classification.displayMessage,
+          });
+        }
+        finishActiveRun(lease);
+        if (activeRunRef.current === lease) activeRunRef.current = null;
+        setAgentBusy(false);
+        return;
+      }
       intentAlreadyRecorded = true;
       // A newer submission may have superseded this lease while tryToolGate
       // awaited its model call. Stop here instead of falling through into
@@ -1878,7 +2028,7 @@ export function IntentWorkspace({
       }
     }
 
-    let route: LockedComposerRoute;
+    let route: WorkspaceComposerRoute;
     try {
       const imageProviderId = assignmentTable.image?.providerId;
       if (imageProviderId && providerList.some((provider) => provider.id === imageProviderId && provider.enabled)) {
@@ -1910,7 +2060,11 @@ export function IntentWorkspace({
         hasReferenceImages: attachments.length > 0,
         routePreferences,
       });
-      route = { ...chatRoute, ...imageRoute };
+      route = {
+        ...chatRoute,
+        ...imageRoute,
+        planningRuntime: systemPlanning ? "codex-system" : "direct-provider",
+      };
       const imageProvider = providerList.find(
         (provider) => provider.id === route.image.providerId,
       );
@@ -1963,9 +2117,12 @@ export function IntentWorkspace({
 
     setRunStartedAt(Date.now());
     setLiveAgentOutput("");
-    const webSearchSupported = supportsWebSearch(chatAssignment, providerList);
+    const webSearchSupported =
+      !systemPlanning && supportsWebSearch(chatAssignment, providerList);
     setExecutionNotices([
-      ...composerRouteNotices(route),
+      ...(systemPlanning
+        ? ["Planning uses the authenticated local Codex session."]
+        : composerRouteNotices(route as LockedComposerRoute)),
       ...(webSearchEnabled && !webSearchSupported
         ? [
             "Web search is unavailable for the selected chat provider. The Agent continued without web grounding.",
@@ -1987,13 +2144,15 @@ export function IntentWorkspace({
       recordPackagedE2ePipelineStage("research-brief");
       let plannerBrief = repair || options.resumeSelectedDesignSystem
         ? text
-        : await researchedBrief(
-            clarifiedBrief ?? text,
-            chatAssignment,
-            webSearchSupported,
-            lease,
-            runId,
-          );
+        : systemPlanning
+          ? clarifiedBrief ?? text
+          : await researchedBrief(
+              clarifiedBrief ?? text,
+              chatAssignment,
+              webSearchSupported,
+              lease,
+              runId,
+            );
       plannerBrief = applyPendingSteers(lease, plannerBrief);
       let generationBrief = plannerBrief;
 
@@ -2148,6 +2307,7 @@ export function IntentWorkspace({
     packagedE2eRunDiagnosticRef.current = "unknown";
     setRunError(null);
     setRetryableRunBrief(null);
+    setRetryPlanningRuntime(null);
     getStoreState().clearGenError();
   }
 
@@ -2307,27 +2467,265 @@ export function IntentWorkspace({
   }
 
   /**
-   * Before falling into the hardcoded plan→design-system→pages sequence, let
-   * the model decide — via real tool-calling, not keyword sniffing, and in
-   * ONE central tool list per call (Claude Code's `assembleToolPool`
-   * pattern, not a chain of single-tool gates) — whether this brief is
-   * asking to compile an Astryx theme, configure how an existing prototype
-   * suite regenerates, regenerate only specific existing pages, needs a
-   * clarifying question before proceeding, or isn't a build request at all
-   * (a greeting, small talk, a question too vague to plan from). All five
-   * tools are free, local, and deterministic (`ask_clarifying_question`
-   * suspends on user input, not on a paid call) — no DAG, no paid-tool
-   * approval chain. None of them execute `generatePrototypeSuite` itself;
-   * they only decide inputs the caller feeds into that same, unmodified
-   * call — the paid generation path and its checkpoint/lease discipline are
-   * never touched.
-   *
-   * `handled: true` means a tool fully answered the turn — the caller
-   * returns immediately without falling into the fixed pipeline. Otherwise
-   * `regenerationDecision`/`pageTargetingDecision`/`clarifiedBrief` carry
-   * whatever the model decided (or null, meaning: keep today's heuristics
-   * and original text) for the caller to fold into what follows.
+   * The zero-tool Codex runtime returns one schema-bound routing decision.
+   * Cutout executes the selected local branch; the runtime cannot call a tool,
+   * mutate Design IR, choose a path, or manufacture an approval.
    */
+  async function tryCodexToolGate(
+    text: string,
+    lease: AgentRunLease,
+    options: {
+      readonly regenerateTargetEventId?: string;
+      readonly regenerateSourceEventId?: string;
+      readonly regenerateFallbackReply?: string;
+      readonly parentEventId?: string;
+    } = {},
+  ): Promise<{
+    handled: boolean;
+    regenerationDecision: RegenerationDecision | null;
+    pageTargetingDecision: PageTargetingDecision | null;
+    clarifiedBrief: string | null;
+    refinedBrief: string | null;
+    planningSeed?: PrototypePlanningSeed;
+    materialDecision?: ProcessUploadedMaterialDecision;
+    materialRunId?: string;
+  }> {
+    const runId = `workspace:tool:${crypto.randomUUID()}`;
+    startAgentRun("create", { runId });
+    const userTurnEventId =
+      options.regenerateSourceEventId ?? crypto.randomUUID();
+    if (!options.regenerateTargetEventId) {
+      emitRunEvent(
+        runId,
+        {
+          type: "intent-recorded",
+          intent: text,
+          parentEventId: options.parentEventId,
+        },
+        { eventId: userTurnEventId },
+      );
+    }
+    const stepId = `step:prepare:${runId}`;
+    emitRunEvent(runId, {
+      type: "step-started",
+      stepId,
+      label: "Preparing the run",
+      detail: "Understanding your request with the local Codex session.",
+    });
+    const requestId = crypto.randomUUID();
+    activeCodexRequestRef.current = requestId;
+    setLiveAgentLabel("Planning with Codex");
+    const targetPageNames = prototypePlan
+      ? pagesForScope(prototypePlan, prototypeScope).map((page) => page.name)
+      : [];
+    try {
+      const result = await runCodexSystemTurn(
+        {
+          requestId,
+          workspaceHandle: planningWorkspaceHandle,
+          conversationId: planningConversationId,
+          contextRevision: planningOpaqueId(
+            "revision",
+            designDocument?.revision.id ?? "unprojected",
+          ),
+          prompt: [
+            "Classify this user turn for Cutout's design-material workflow.",
+            "Return action=reply for conversation or questions; action=material only when the loaded source image itself should be foreground-extracted or split; action=clarify only when one consequential product decision cannot be responsibly inferred; otherwise return action=proceed for a clear design/build request and author the complete planning seed.",
+            "A planning seed derives suite count, route topology, and reusable non-UI materials from the actual business domain and user journeys. Never pad or truncate them to fixed counts.",
+            "Optional regeneration and targetPageNames fields apply only when the user explicitly asks to redo existing work. Use only names from availableTargetPageNames.",
+            "Do not claim that any image, file, Design IR mutation, or approval has already happened.",
+            "",
+            `User: ${text}`,
+          ].join("\n"),
+          context: {
+            version: "cutout.intent-workspace-context.v1",
+            hasSourceImage: Boolean(source.bitmap),
+            hasDesignSystem: Boolean(prototypeDesignSystem),
+            availableTargetPageNames: targetPageNames,
+            existingPlan: prototypePlan
+              ? {
+                  product: prototypePlan.product,
+                  pages: prototypePlan.pages.map((page) => ({
+                    id: page.id,
+                    name: page.name,
+                    route: page.route,
+                    purpose: page.purpose,
+                  })),
+                }
+              : null,
+          },
+          outputSchema: z.toJSONSchema(codexToolGateDecisionSchema),
+        },
+        {
+          signal: lease.controller.signal,
+          onEvent: (event) => {
+            if (event.type === "retrying") {
+              setLiveAgentLabel(`Codex reconnecting · attempt ${event.attempt}`);
+            } else if (event.type === "started") {
+              setLiveAgentLabel("Codex is planning");
+            }
+          },
+        },
+      );
+      agentRunCoordinatorRef.current.checkpoint(lease);
+      const decision = codexToolGateDecisionSchema.parse(result.output);
+      if (import.meta.env.VITE_CUTOUT_PACKAGED_E2E === "1") {
+        setPackagedE2eCodexPlanningTurnCount((count) => count + 1);
+      }
+      emitRunEvent(runId, {
+        type: "step-succeeded",
+        stepId,
+        label: "Preparing the run",
+        detail: "Request checked.",
+      });
+
+      const selectedTargetNames = decision.targetPageNames?.filter((name) =>
+        targetPageNames.includes(name),
+      ) ?? [];
+      const pageTargetingDecision: PageTargetingDecision | null =
+        selectedTargetNames.length > 0
+          ? {
+              targetPageIds: prototypePlan
+                ? pagesForScope(prototypePlan, prototypeScope)
+                    .filter((page) => selectedTargetNames.includes(page.name))
+                    .map((page) => page.id)
+                : [],
+              targetPageNames: selectedTargetNames,
+            }
+          : null;
+
+      if (options.regenerateTargetEventId && decision.action !== "reply") {
+        const reply =
+          decision.reply?.trim() ||
+          options.regenerateFallbackReply?.trim();
+        if (reply && options.regenerateSourceEventId) {
+          const responseEventId = crypto.randomUUID();
+          emitRunEvent(
+            runId,
+            {
+              type: "agent-message",
+              message: reply,
+              responseToEventId: options.regenerateSourceEventId,
+            },
+            { eventId: responseEventId },
+          );
+          emitRunEvent(runId, {
+            type: "branch-selected",
+            sourceEventId: options.regenerateSourceEventId,
+            responseEventId,
+          });
+        }
+        return {
+          handled: true,
+          regenerationDecision: null,
+          pageTargetingDecision: null,
+          clarifiedBrief: null,
+          refinedBrief: null,
+        };
+      }
+
+      if (decision.action === "reply") {
+        const responseEventId = crypto.randomUUID();
+        emitRunEvent(
+          runId,
+          {
+            type: "agent-message",
+            message: decision.reply!,
+            responseToEventId: userTurnEventId,
+          },
+          { eventId: responseEventId },
+        );
+        if (
+          options.regenerateTargetEventId &&
+          options.regenerateSourceEventId
+        ) {
+          emitRunEvent(runId, {
+            type: "branch-selected",
+            sourceEventId: options.regenerateSourceEventId,
+            responseEventId,
+          });
+        }
+        return {
+          handled: true,
+          regenerationDecision: null,
+          pageTargetingDecision: null,
+          clarifiedBrief: null,
+          refinedBrief: null,
+        };
+      }
+
+      if (decision.action === "clarify") {
+        const input = decision.clarification!;
+        const answer = await clarificationBridge.ask(
+          runId,
+          { mode: "ask", ...input },
+          lease.controller.signal,
+        );
+        return {
+          handled: false,
+          regenerationDecision: decision.regeneration,
+          pageTargetingDecision,
+          clarifiedBrief: composeHumanLoopRequirement(
+            text,
+            { mode: "ask", ...input },
+            answer,
+          ),
+          refinedBrief: null,
+        };
+      }
+
+      if (decision.action === "material") {
+        return {
+          handled: false,
+          regenerationDecision: null,
+          pageTargetingDecision: null,
+          clarifiedBrief: null,
+          refinedBrief: null,
+          materialDecision: decision.material!,
+          materialRunId: runId,
+        };
+      }
+
+      return {
+        handled: false,
+        regenerationDecision: decision.regeneration,
+        pageTargetingDecision,
+        clarifiedBrief: null,
+        refinedBrief:
+          decision.action === "proceed"
+            ? decision.generation!.refinedBrief
+            : null,
+        planningSeed:
+          decision.action === "proceed"
+            ? decision.generation!.planningSeed
+            : undefined,
+      };
+    } catch (error) {
+      emitRunEvent(
+        runId,
+        lease.controller.signal.aborted
+          ? {
+              type: "step-cancelled",
+              stepId,
+              label: "Preparing the run",
+              detail: "Request checking was cancelled.",
+            }
+          : {
+              type: "step-failed",
+              stepId,
+              label: "Preparing the run",
+              detail: errorMessage(error),
+            },
+      );
+      throw error;
+    } finally {
+      if (activeCodexRequestRef.current === requestId) {
+        activeCodexRequestRef.current = null;
+      }
+      setLiveAgentLabel(null);
+    }
+  }
+
   async function tryToolGate(
     text: string,
     chat: ModelAssignment,
@@ -2968,7 +3366,7 @@ export function IntentWorkspace({
   async function generatePrototypeSuiteAlternatives(
     text: string,
     plan: PrototypePlan,
-    route: LockedComposerRoute,
+    route: WorkspaceComposerRoute,
     options: Parameters<typeof generateSinglePrototypeSuite>[3],
     lease: AgentRunLease,
   ): Promise<void> {
@@ -3235,7 +3633,7 @@ export function IntentWorkspace({
   async function generateSinglePrototypeSuite(
     text: string,
     plan: PrototypePlan,
-    route: LockedComposerRoute,
+    route: WorkspaceComposerRoute,
     options: {
       readonly startFresh?: boolean;
       readonly repair?: PrototypeRepairPlan;
@@ -3728,14 +4126,20 @@ export function IntentWorkspace({
               generatedAsset = asset;
               return asset.bytes;
             },
-            review: (bytes, signal) =>
-              reviewGeneratedImage(
-                personalizedGenerationRef.current,
-                route.chat,
-                bytes,
-                prototypeDirectAssetChecklist(task),
-                signal,
-              ),
+            review: isCodexSystemAssignment(route.chat)
+              ? async () => ({
+                  pass: false,
+                  failures: ["Visual QA is unavailable."],
+                  unavailable: true,
+                })
+              : (bytes, signal) =>
+                  reviewGeneratedImage(
+                    personalizedGenerationRef.current,
+                    route.chat,
+                    bytes,
+                    prototypeDirectAssetChecklist(task),
+                    signal,
+                  ),
             maxRetries: PROTOTYPE_QA_MAX_RETRIES,
             signal: lease.controller.signal,
           });
@@ -3856,16 +4260,19 @@ export function IntentWorkspace({
             decode: (bytes) => decodeImage(bytesToBlob(bytes, "image/png")),
             slice: (bitmap, regionId, pageId, signal) =>
               sliceRegionBoardBitmap(bitmap, cutoutParams, regionId, pageId, signal),
-            nameRegion: (boardBytes, slices, context, signal) =>
-              nameRegionSlices(
-                personalizedGenerationRef.current,
-                route.chat,
-                boardBytes,
-                slices,
-                context,
-                signal,
-              ),
-            reviewBoard: PROTOTYPE_QA_ENABLED
+            nameRegion: isCodexSystemAssignment(route.chat)
+              ? undefined
+              : (boardBytes, slices, context, signal) =>
+                  nameRegionSlices(
+                    personalizedGenerationRef.current,
+                    route.chat,
+                    boardBytes,
+                    slices,
+                    context,
+                    signal,
+                  ),
+            reviewBoard:
+              PROTOTYPE_QA_ENABLED && !isCodexSystemAssignment(route.chat)
               ? (boardBytes, checklist, signal) =>
                   reviewGeneratedImage(
                     personalizedGenerationRef.current,
@@ -4448,6 +4855,7 @@ export function IntentWorkspace({
     lease: AgentRunLease,
     capabilityContext: string,
   ): Promise<string> {
+    if (isCodexSystemAssignment(chat)) return fallbackReply;
     const liveOutput = createLiveTextBatcher(setLiveAgentOutput);
     setLiveAgentLabel("Agent is responding");
     setLiveAgentOutput("");
@@ -4489,6 +4897,10 @@ export function IntentWorkspace({
     direction?: CandidateDirection,
     candidateId?: string,
   ): Promise<string | null> {
+    // The prompt-only system runtime receives bounded structured text context,
+    // not arbitrary image bytes. Do not imply that it visually inspected the
+    // reference; the caller uses the deterministic DESIGN.md projection.
+    if (isCodexSystemAssignment(chat)) return null;
     const runId = `workspace:${lease.id}`;
     const stepId = `step:${lease.id}:design-markdown${candidateId ? `:${candidateId}` : ":selected"}`;
     emitRunEvent(
@@ -4752,7 +5164,7 @@ export function IntentWorkspace({
     lease: AgentRunLease,
   ): Promise<PrototypePageArtifact> {
     agentRunCoordinatorRef.current.checkpoint(lease);
-    const verdict = PROTOTYPE_QA_ENABLED
+    const verdict = PROTOTYPE_QA_ENABLED && !isCodexSystemAssignment(chat)
       ? await reviewGeneratedImage(
           personalizedGenerationRef.current,
           chat,
@@ -4770,7 +5182,9 @@ export function IntentWorkspace({
     const review: PrototypePageReviewRecord = {
       version: "prototype-page-review.v1",
       artifactSha256: await sha256Bytes(artifact.bytes),
-      reviewer: { providerId: chat.providerId, model: chat.model },
+      reviewer: verdict.unavailable === true
+        ? null
+        : { providerId: chat.providerId, model: chat.model },
       verdict: { ...verdict, failures: [...verdict.failures] },
       reviewedAt: new Date().toISOString(),
     };
@@ -5003,6 +5417,11 @@ export function IntentWorkspace({
       data-packaged-e2e-retry-image-call-count={
         import.meta.env.VITE_CUTOUT_PACKAGED_E2E === "1"
           ? packagedE2eRetryImageCallCount
+          : undefined
+      }
+      data-packaged-e2e-codex-planning-turn-count={
+        import.meta.env.VITE_CUTOUT_PACKAGED_E2E === "1"
+          ? packagedE2eCodexPlanningTurnCount
           : undefined
       }
       data-packaged-e2e-run-diagnostic={
@@ -5288,6 +5707,7 @@ export function IntentWorkspace({
                         agentRunEvents.events,
                       )?.eventId,
                     });
+                    forwardActiveCodexSteer(consumed.submitted);
                     return;
                   }
                   setBrief(consumed.submitted);
@@ -5398,6 +5818,7 @@ export function IntentWorkspace({
                   }
                   setBrief(message);
                   emitRunEvent(runId, { type: "message-revised", targetEventId, message });
+                  forwardActiveCodexSteer(message);
                   return;
                 }
                 setBrief(message);

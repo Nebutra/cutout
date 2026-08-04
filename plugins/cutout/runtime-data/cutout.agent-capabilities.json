@@ -31,6 +31,18 @@
     "workflow": ["submit outcome and material/source references", "preview", "explicit approval when required", "apply", "observe or cancel", "read verified deliverables"],
     "sandboxOwnership": "The external Agent owns its coding sandbox. Cutout owns only its project state, managed exports and policy checks."
   },
+  "desktopPlanningRuntime": {
+    "runtimeId": "codex-system",
+    "surface": "desktop-only",
+    "status": "capability-required",
+    "discovery": "signed-executable-and-generated-schema-probe",
+    "authentication": "sanitized-native-status",
+    "credentialCustody": "system-runtime-owned",
+    "conversationBinding": false,
+    "executionReason": "restricted-read-roots-required",
+    "turnExecution": false,
+    "headlessAvailable": false
+  },
   "integrations": {
     "role": "Product, knowledge, design and prototype apps connected through their documented APIs or SDKs; integrations are not external controllers.",
     "available": ["figma-authorized-snapshot"],
@@ -108,6 +120,7 @@
     "No cloud collaboration or remote project service.",
     "No arbitrary command execution, process spawning, absolute-path scans or arbitrary export destinations.",
     "No provider executor or bundled Coding workspace is available in the default CLI/MCP headless host; coding.* requires injected controlled adapters and tool.invoke returns capability-required.",
+    "The desktop codex-system adapter performs only signed executable, sanitized authentication and generated app-server schema probes. Conversation binding and turn execution remain capability-required until restricted readable roots are feature-proven and enforced.",
     "The desktop app has an internal durable local Agent Host, a native-routed Provider executor, and a bounded static-site Coding backend under an opaque host-managed workspace. Those desktop lifecycle bindings are not exposed through cutout.control.v1, CLI, or MCP, and no arbitrary-shell executor is provided.",
     "CPU hard limits are capability-required; the Node command host currently enforces wall-clock and output-byte limits, not a kernel CPU quota.",
     "General Node network isolation is capability-required; provider network traffic is instead constrained by the Rust proxy boundary.",

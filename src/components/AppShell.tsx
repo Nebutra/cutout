@@ -2221,6 +2221,7 @@ export function AppShell() {
                   <Suspense fallback={<DeferredSurfaceFallback label="Loading project workspace" />}>
                     <PipelineCanvas
                       key={projectVersion}
+                      projectId={activeProjectId}
                       onOpenDesignOs={openDesignOs}
                     />
                   </Suspense>

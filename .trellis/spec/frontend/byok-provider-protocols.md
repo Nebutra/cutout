@@ -307,6 +307,13 @@ the current secret again inside Rust.
 - Imported secrets are persisted through Cutout's native OS credential vault;
   on macOS this is Keychain. The renderer receives only key status and may use
   platform-neutral visible copy such as `Cutout local credentials`.
+- A Codex root-level CC Switch profile is importable only when `base_url` is
+  exactly `http://127.0.0.1:15721/v1`, `wire_api` is exactly `responses`, the
+  auth file contains a non-empty top-level `OPENAI_API_KEY`, and neither
+  `model_provider` nor `model_providers` is present. It projects a fixed
+  `cc-switch` candidate and re-reads only the auth-file API key. Root-level
+  experimental bearer/session material is never imported, and any other or
+  ambiguous root-level Provider binding suppresses the public OpenAI fallback.
 - A reviewed CC Switch installation may contribute its current Codex upstream
   as a direct `cc-switch` + Responses candidate. `cc-switch` is an explicit
   OpenAI-shaped Provider kind: the persisted wire contract, renderer model
@@ -377,6 +384,10 @@ the current secret again inside Rust.
   drift fail closed. A model hint with an empty checked catalog remains an
   error.
 - Existing custom-provider environment discovery remains covered.
+- Root-level Codex CC Switch discovery accepts only the exact loopback Responses
+  profile, stays bound to the auth-file API key, ignores experimental bearer
+  material, rejects ambiguous Provider tables, and never rebinds another
+  root-level upstream credential to public OpenAI.
 
 ### 7. Wrong vs Correct
 
@@ -606,3 +617,85 @@ persist_provider_and_key_with_rollback(provider, secret)?;
 The native registry owns the path, schema, selector, provider binding, and
 secret re-read. The webview receives only sanitized metadata and an opaque
 draft ID.
+
+## Scenario: Probe A System Planning Runtime
+
+### 1. Scope / Trigger
+
+Use this contract when changing desktop system-Agent discovery, sanitized
+authentication evidence, planning-runtime selection, readiness projection, or
+public capability claims. A system runtime is a planning adapter, never a
+`ProviderConfig` or a source of direct Provider credentials.
+
+### 2. Signatures
+
+```ts
+type PlanningRuntimeEvidence = {
+  runtimeId: 'codex-system'
+  installed: boolean
+  authenticated: boolean
+  authClass: 'chatgpt' | 'api-key' | 'access-token' | 'unauthenticated' | 'unknown'
+  capability: 'proven' | 'unsupported' | 'unknown'
+  execution: 'unproven' | 'succeeded' | 'failed' | 'stale'
+  version?: string
+  reason?: StableRuntimeReason
+}
+
+probeCodexSystemRuntime(): Promise<PlanningRuntimeEvidence>
+```
+
+The renderer command has no binary, path, argv, environment, working-directory,
+account, credential, tool, or sandbox parameter.
+
+### 3. Contracts
+
+- Native code owns executable discovery, platform identity validation, fixed
+  non-billable probe commands, environment filtering, bounded output, timeout,
+  and process-group termination. Raw command output is discarded natively.
+- Codex OAuth/session files and token payloads are never read, copied,
+  serialized, logged, imported, or reinterpreted as direct Provider keys.
+- Evidence advances in order: installed, authenticated, capability-proven,
+  then execution-proven. Capability evidence cannot be proven without an
+  installed authenticated runtime, and terminal execution evidence cannot
+  exist without capability evidence.
+- Background discovery and Settings refresh may inspect sanitized auth and
+  protocol capability without starting a model turn. Only a completed
+  user-started turn can establish successful execution evidence.
+- Runtime selection considers both capability and latest execution health. A
+  failed or stale system runtime is not silently preferred over a healthy
+  verified direct-text fallback before the next turn starts.
+- The probe-only release remains `capability-required` while restricted
+  readable roots and the complete native turn adapter are unavailable. Method
+  names in a generated schema do not make turn execution implemented.
+- The desktop runtime is distinct from the CLI/MCP headless host. Public
+  manifest and documentation claims must preserve `headlessAvailable: false`
+  and must not imply a bundled headless system-Agent executor.
+- Claude session execution remains `policy-review-required`; technical CLI
+  availability alone is not product authorization.
+
+### 4. Validation & Error Matrix
+
+| Condition | Required behavior |
+| --- | --- |
+| Executable absent | Return sanitized `not-installed` evidence |
+| Unsupported platform or rejected executable identity | Return a closed unsupported reason without running further probes |
+| Raw auth output contains account or secret-shaped text | Project only the closed auth class; expose none of the raw text |
+| Generated protocol schema omits a required method or restricted-root contract | Return `protocol-unsupported` or `restricted-read-roots-required` |
+| Latest system execution is failed or stale and a verified direct route exists | Select the direct route before starting a new turn |
+| Renderer supplies a path, argv, environment, working directory, or generic app-server request | No such IPC command or field exists |
+| Turn execution is not fully implemented and confinement-proven | Keep capability and public contract fail-closed |
+
+### 5. Tests Required
+
+- Frontend schema rejects unknown fields, contradictory auth state, skipped
+  progressive evidence, and execution evidence without capability proof.
+- Planning selection prefers healthy capability-proven Codex, uses the direct
+  fallback for unsupported/failed/stale Codex evidence, and returns no route
+  when neither adapter is eligible.
+- Native tests cover platform identity, command timeout/output overflow,
+  sanitized auth projection, required protocol methods, restricted-root
+  detection, and absence of renderer-controlled process/path authority.
+- Tauri permission tests keep the allowlist to the fixed sanitized probe until
+  a separately reviewed turn contract is implemented.
+- Run `pnpm agent:validate`, `pnpm lint`, TypeScript, focused Vitest and Rust
+  tests, `cargo fmt --check`, production build, and `git diff --check`.

@@ -46,6 +46,14 @@ const desktopHarness = vi.hoisted(() => ({
   successfulAlternativePlannerCalls: 0,
   plannerPrompts: [] as string[],
   plannerFailure: null as null | ((call: number, prompt: string) => string | null),
+  providerTests: 0,
+  directToolGateCalls: 0,
+  directTextCalls: 0,
+}))
+
+const codexHarness = vi.hoisted(() => ({
+  enabled: false,
+  turns: 0,
 }))
 
 function artifactId(sequence: number): string {
@@ -101,10 +109,94 @@ vi.mock('@/services/ai/model-assignment.local', () => ({
 }))
 
 vi.mock('@tauri-apps/api/core', () => ({
-  invoke: async () => {
-    throw new Error('Tauri invoke is not available in this component E2E test')
+  invoke: async (command: string, args?: {
+    input?: { requestId?: string; contextRevision?: string }
+  }) => {
+    if (!codexHarness.enabled) {
+      throw new Error('Tauri invoke is not available in this component E2E test')
+    }
+    if (command === 'codex_system_probe') {
+      return {
+        runtimeId: 'codex-system',
+        installed: true,
+        authenticated: true,
+        authClass: 'chatgpt',
+        capability: 'proven',
+        execution: 'unproven',
+        version: '0.146.0',
+      }
+    }
+    if (command !== 'codex_system_turn_start') {
+      throw new Error(`Unexpected native command: ${command}`)
+    }
+    codexHarness.turns += 1
+    return {
+      output: {
+        action: 'proceed',
+        reply: null,
+        generation: {
+          refinedBrief: 'A focused field-notes route with one reusable illustrated marker.',
+          planningSeed: {
+            product: {
+              name: 'Field Notes',
+              projectName: 'Field Notes',
+              summary: 'A route journal for documenting urban walks.',
+              audience: 'Independent walkers',
+              primaryGoal: 'Turn observations into a reusable route story.',
+              platform: 'responsive web app',
+            },
+            rationale: 'One focused route is the complete product surface for this field-note concept.',
+            suites: [{
+              direction: {
+                id: 'field-guide',
+                label: 'Field guide',
+                thesis: 'Place identity and observations drive the experience.',
+                vary: ['material density'],
+                preserve: ['route accuracy'],
+              },
+              pages: [{
+                id: 'route-story',
+                name: 'Route story',
+                route: '/routes/story',
+                purpose: 'Read one route and reuse its illustrated place marker.',
+                viewport: {
+                  platform: 'desktop',
+                  width: 1440,
+                  height: 1000,
+                  scroll: 'long-scroll',
+                },
+                materials: [{
+                  id: 'place-marker',
+                  name: 'Place marker',
+                  description: 'A reusable illustrated marker for the route.',
+                  production: 'direct-generate',
+                }],
+              }],
+            }],
+          },
+        },
+        clarification: null,
+        material: null,
+        regeneration: null,
+        targetPageNames: null,
+      },
+      receipt: {
+        protocol: 'cutout.codex-execution.v1',
+        runtimeId: 'codex-system',
+        runtimeVersion: '0.146.0',
+        bindingId: 'codex:field-notes',
+        requestId: args?.input?.requestId,
+        turnId: 'turn.field-notes',
+        contextRevision: args?.input?.contextRevision,
+        contextDigest: 'a'.repeat(64),
+        outputDigest: 'b'.repeat(64),
+        completedAt: 1,
+      },
+    }
   },
-  Channel: class {},
+  Channel: class {
+    onmessage = (_payload: unknown) => {}
+  },
 }))
 
 vi.mock('@/agent-runtime/use-desktop-tool-loop', () => ({
@@ -569,10 +661,16 @@ function fakeRegistry(): ServiceRegistry {
       setKey: notUsed,
       status: async () => ({ hasKey: true }),
       statuses: async (ids) => Object.fromEntries(ids.map((id) => [id, true])),
-      test: async () => ok({ model: CHAT_MODEL, models: [CHAT_MODEL, IMAGE_MODEL, EDIT_MODEL] }),
+      test: async () => {
+        desktopHarness.providerTests += 1
+        return ok({ model: CHAT_MODEL, models: [CHAT_MODEL, IMAGE_MODEL, EDIT_MODEL] })
+      },
     },
     generation: {
-      generateText: async () => ok(DESIGN_MARKDOWN),
+      generateText: async () => {
+        desktopHarness.directTextCalls += 1
+        return ok(DESIGN_MARKDOWN)
+      },
       streamText: async function* () {
         yield DESIGN_MARKDOWN
       },
@@ -600,7 +698,10 @@ function fakeRegistry(): ServiceRegistry {
       },
       research: async () => err('not used in this test'),
       generateObject,
-      generateWithTools: async () => ok({ text: '', toolCalls: [] }),
+      generateWithTools: async () => {
+        desktopHarness.directToolGateCalls += 1
+        return ok({ text: '', toolCalls: [] })
+      },
     },
     prompts: {
       list: async () => [],
@@ -667,6 +768,11 @@ describe('brief → every planned route — rendered IntentWorkspace', () => {
     desktopHarness.successfulAlternativePlannerCalls = 0
     desktopHarness.plannerPrompts.length = 0
     desktopHarness.plannerFailure = null
+    desktopHarness.providerTests = 0
+    desktopHarness.directToolGateCalls = 0
+    desktopHarness.directTextCalls = 0
+    codexHarness.enabled = false
+    codexHarness.turns = 0
     if (!i18n.locale) await activateLocale('en')
   })
 
@@ -704,6 +810,57 @@ describe('brief → every planned route — rendered IntentWorkspace', () => {
     })
     return host
   }
+
+  it('uses Codex planning output with the direct image route and truthful unavailable QA', async () => {
+    codexHarness.enabled = true
+    const node = mount()
+    const textarea = await waitFor(
+      () => node.querySelector<HTMLTextAreaElement>('[aria-label="Message the Agent"]'),
+    )
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 50))
+    })
+    act(() => {
+      const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!
+      setter.call(textarea, 'Create a focused field-notes experience and produce its reusable visual material.')
+      textarea!.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    await act(async () => {
+      node.querySelector<HTMLButtonElement>('[aria-label="Send"]')!.click()
+    })
+
+    const snapshot = await waitFor(() => {
+      const current = getStoreState().workspaceSnapshot
+      return current?.prototypePages.length === 1 && current.workflowPhase === 'idle'
+        ? current
+        : null
+    }, 30_000)
+
+    expect(snapshot).toBeTruthy()
+    expect(codexHarness.turns).toBe(1)
+    expect(desktopHarness.directToolGateCalls).toBe(0)
+    expect(desktopHarness.plannerCalls).toBe(0)
+    expect(desktopHarness.directTextCalls).toBe(0)
+    expect(desktopHarness.providerTests).toBeGreaterThan(0)
+    expect(desktopHarness.imageToolCallIds).toEqual(expect.arrayContaining([
+      expect.stringMatching(/:design-system:/),
+      expect.stringMatching(/:prototype-page:/),
+    ]))
+    expect(desktopHarness.boardPrompts).toEqual([
+      expect.stringContaining('A reusable illustrated marker for the route.'),
+    ])
+    const productionRuns = Object.values(getStoreState().assetProduction.runs)
+    expect(productionRuns).toHaveLength(1)
+    expect(Object.values(productionRuns[0]!.tasks)).toEqual([
+      expect.objectContaining({ status: 'ready' }),
+    ])
+    expect(snapshot!.prototypePages[0]!.review).toMatchObject({
+      reviewer: null,
+      verdict: { unavailable: true },
+    })
+    expect(snapshot!.prototypePlan?.pages.map((page) => page.route))
+      .toEqual(['/routes/story'])
+  }, 30_000)
 
   it('selects one of three Design Systems, then completes every route and attributable asset', async () => {
     const node = mount()

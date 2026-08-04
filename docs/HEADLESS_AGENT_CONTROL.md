@@ -115,6 +115,17 @@ structured patch, and applies that same patch only after review. This desktop
 binding does not make the default CLI/MCP host Provider-capable and does not
 execute arbitrary model-authored commands.
 
+The desktop also has a separate `codex-system` planning-runtime boundary. Its
+current native surface performs a fixed signed-executable check, projects only
+sanitized authentication/protocol evidence, and exposes no conversation or turn
+command. It does not read or import Codex session credentials. Conversation
+binding and turn execution are fail-closed because the reviewed installed app-
+server schema does not expose enforceable restricted readable roots. A global
+read-only
+sandbox is not sufficient: it would still allow model-induced reads outside
+Cutout's staged context. This probe-only desktop boundary is not available in
+the CLI/MCP host and does not change the headless capability result.
+
 ## MCP
 
 Use the stdio server from the project root:

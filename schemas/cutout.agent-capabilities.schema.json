@@ -4,7 +4,7 @@
   "title": "Cutout Agent Capability Manifest",
   "type": "object",
   "additionalProperties": false,
-  "required": ["version", "product", "protocol", "discovery", "externalControllers", "integrations", "operations", "cli", "mcp", "policy", "paths", "formats", "limitations"],
+  "required": ["version", "product", "protocol", "discovery", "externalControllers", "desktopPlanningRuntime", "integrations", "operations", "cli", "mcp", "policy", "paths", "formats", "limitations"],
   "properties": {
     "$schema": { "type": "string" },
     "version": { "const": "cutout.agent-capabilities.v1" },
@@ -56,6 +56,23 @@
         "progressiveDisclosure": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "pattern": "^cutout_[a-z0-9_]+$" } },
         "workflow": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
         "sandboxOwnership": { "type": "string", "minLength": 1 }
+      }
+    },
+    "desktopPlanningRuntime": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["runtimeId", "surface", "status", "discovery", "authentication", "credentialCustody", "conversationBinding", "executionReason", "turnExecution", "headlessAvailable"],
+      "properties": {
+        "runtimeId": { "const": "codex-system" },
+        "surface": { "const": "desktop-only" },
+        "status": { "const": "capability-required" },
+        "discovery": { "const": "signed-executable-and-generated-schema-probe" },
+        "authentication": { "const": "sanitized-native-status" },
+        "credentialCustody": { "const": "system-runtime-owned" },
+        "conversationBinding": { "const": false },
+        "executionReason": { "const": "restricted-read-roots-required" },
+        "turnExecution": { "const": false },
+        "headlessAvailable": { "const": false }
       }
     },
     "integrations": {

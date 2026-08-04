@@ -86,6 +86,7 @@ function completeOutcomeWorkspace(): HTMLElement {
   )
   workspace.dataset.packagedE2eSelectedSuiteId = 'suite-2'
   workspace.dataset.packagedE2eVisibleSliceCount = '11'
+  workspace.dataset.packagedE2eCodexPlanningTurnCount = '2'
   workspace.dataset.packagedE2ePlannedImageCallCount = '23'
   workspace.dataset.packagedE2eImageCallCount = '23'
   return workspace
@@ -622,6 +623,7 @@ describe('packaged E2E outcome evidence', () => {
     expect(outcome).toMatchObject({
       selectedSuiteId: 'suite-2',
       selectedVisibleSliceCount: 11,
+      codexPlanningTurnCount: 2,
       plannedImageCallCount: 23,
       imageCallCount: 23,
     })
@@ -632,6 +634,12 @@ describe('packaged E2E outcome evidence', () => {
   it('rejects hidden paid-image amplification beyond the benchmark DAG', () => {
     const workspace = completeOutcomeWorkspace()
     workspace.dataset.packagedE2eImageCallCount = '24'
+    expect(() => collectPackagedE2eOutcome(workspace)).toThrow(JourneyFailure)
+  })
+
+  it('rejects completion without both real Codex planning turns', () => {
+    const workspace = completeOutcomeWorkspace()
+    workspace.dataset.packagedE2eCodexPlanningTurnCount = '1'
     expect(() => collectPackagedE2eOutcome(workspace)).toThrow(JourneyFailure)
   })
 

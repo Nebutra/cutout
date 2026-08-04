@@ -160,6 +160,11 @@ msgid "team.host_required_description"
 msgstr "需要一个桌面协作主机才能进行评审或创建只读分享。"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.action_required"
+msgstr "需要操作"
+
+#. js-lingui-explicit-id
 #: src/components/settings/sections/SpeechSection.tsx
 msgid "settings.speech.activation"
 msgstr "激活方式"
@@ -178,6 +183,11 @@ msgstr "根据任务与期望结果自适应。"
 #: src/components/settings/ProviderDirectory.tsx
 msgid "settings.adapter_available"
 msgstr "适配器可用"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ModelSlot.tsx
+msgid "settings.image_route_adapter_required"
+msgstr "需要适配器"
 
 #. js-lingui-explicit-id
 #: src/components/settings/ProviderForm.tsx
@@ -232,13 +242,8 @@ msgstr "AI"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
-msgid "settings.ai_setup_ready"
-msgstr "AI 路由已配置"
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.ai_setup_action_required"
-msgstr "AI 设置需要处理"
+msgid "settings.ai_ready"
+msgstr "AI 已就绪"
 
 #. js-lingui-explicit-id
 #: src/components/settings/AboutFooter.tsx
@@ -427,6 +432,14 @@ msgid "home.attach_reference"
 msgstr "添加参考物料"
 
 #. js-lingui-explicit-id
+#. placeholder {0}: evidence.authClass
+#. placeholder {1}: evidence.capability
+#. placeholder {2}: evidence.execution
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.runtime_evidence_detail"
+msgstr "身份验证：{0}。能力：{1}。执行：{2}。"
+
+#. js-lingui-explicit-id
 #: src/components/settings/sections/RecoverySection.tsx
 msgid "settings.recovery.host_unauthorized"
 msgstr "请先授权一个工作区，再使用主机恢复。"
@@ -477,11 +490,6 @@ msgid "settings.speech.auto_play_aria"
 msgstr "自动播放 TTS 回复"
 
 #. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.ai_setup_unavailable"
-msgstr "自动 AI 设置不可用"
-
-#. js-lingui-explicit-id
 #: src/components/home/ProjectHome.tsx
 msgid "home.nav_back"
 msgstr "后退"
@@ -516,11 +524,6 @@ msgstr "品牌 VI"
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.tab_brand_kits"
 msgstr "品牌套件"
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.browse_providers"
-msgstr "浏览提供商"
 
 #. js-lingui-explicit-id
 #: src/components/library/GlobalLibraryView.tsx
@@ -609,8 +612,18 @@ msgstr "立即检查"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
+msgid "settings.checking"
+msgstr "检查中"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
 msgid "settings.ai_setup_checking"
 msgstr "正在检查 AI 设置"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.capability_checking"
+msgstr "正在检查可用性"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/UpdatesSection.tsx
@@ -621,6 +634,11 @@ msgstr "正在检查更新…"
 #: src/components/settings/sections/RecoverySection.tsx
 msgid "settings.recovery.host_checking"
 msgstr "正在检查主机状态..."
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.ai_setup_checking_description"
+msgstr "正在检查已配置的提供商和此设备上的可复用凭据。"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/UpdatesSection.tsx
@@ -649,13 +667,18 @@ msgstr "选择一个方向"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
-msgid "settings.ai_setup_connect_description"
-msgstr "选择提供商并验证其凭据。"
+msgid "settings.configure_route_action"
+msgstr "选择具有明确能力证据的模型。"
 
 #. js-lingui-explicit-id
 #: src/components/workspace/IntentWorkspace.tsx
 msgid "workspace.human_loop_instruction"
 msgstr "选择一个方向。你也可以在下方补充说明，然后点击箭头继续。"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.claude_policy_diagnostic"
+msgstr "在供应商政策审核完成前，Claude Code 执行仍不可用。"
 
 #. js-lingui-explicit-id
 #: src/components/library/GlobalLibraryView.tsx
@@ -714,6 +737,11 @@ msgid "settings.integrations.authorizing"
 msgstr "请在提供方窗口中完成授权。"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.action_required_description"
+msgstr "请完成下方缺失能力所需的操作。"
+
+#. js-lingui-explicit-id
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.tab_components"
 msgstr "组件"
@@ -766,16 +794,6 @@ msgid "settings.configured_providers"
 msgstr "已配置的提供商"
 
 #. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.ai_setup_verification_description"
-msgstr "配置的提供商必须启用并通过验证，Cutout 才能使用。"
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.configuring"
-msgstr "正在配置"
-
-#. js-lingui-explicit-id
 #: src/components/library/KitLibraryInspector.tsx
 msgid "kit_library.audit_conflicts"
 msgstr "冲突"
@@ -793,13 +811,13 @@ msgstr "连接 {0}"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
-msgid "settings.connect_a_provider"
-msgstr "连接一个提供方"
+msgid "settings.connect_image_provider_action"
+msgstr "连接兼容的直连提供商。"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
-msgid "settings.ai_setup_connect_title"
-msgstr "连接 AI 以开始使用"
+msgid "settings.connect_a_provider"
+msgstr "连接一个提供方"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
@@ -923,11 +941,6 @@ msgid "settings.dimension_tts_description"
 msgstr "生成语音音频。"
 
 #. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.ai_setup_ready_description"
-msgstr "凭据和目录路由已配置。图片生成会在首张图片实际完成后得到验证。"
-
-#. js-lingui-explicit-id
 #: src/components/settings/sections/IntegrationsSection.tsx
 msgid "settings.integrations.description"
 msgstr "凭证保留在桌面主机中。Cutout 仅存储不透明、可撤销的会话句柄。"
@@ -975,30 +988,10 @@ msgid "updates.notification.available_detail"
 msgstr "Cutout {0} 已在{channelLabel}渠道推出。"
 
 #. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.ai_setup_credentials_auto_description"
-msgstr "Cutout 可以自动验证并配置这些本地凭据。"
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.ai_setup_discovery_unavailable_description"
-msgstr "Cutout 无法检查此设备上的可复用凭据。请重试或手动连接提供商。"
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.ai_setup_configuration_unavailable_description"
-msgstr "Cutout 无法加载当前 AI 配置。请重试。"
-
-#. js-lingui-explicit-id
 #. placeholder {0}: state.preferences.channel
 #: src/components/settings/sections/UpdatesSection.tsx
 msgid "settings.updates.up_to_date"
 msgstr "Cutout 在 {0} 通道上已是最新。"
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.provider_source_keychain"
-msgstr "Cutout 本地凭据"
 
 #. js-lingui-explicit-id
 #: src/components/home/SidebarAccount.tsx
@@ -1218,6 +1211,11 @@ msgstr "输入 API 密钥"
 #: src/components/settings/ProviderForm.tsx
 msgid "settings.enter_model_manually"
 msgstr "手动输入模型 ID"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.execution_confirmed"
+msgstr "执行已确认"
 
 #. js-lingui-explicit-id
 #: src/components/library/KitLibraryInspector.tsx
@@ -1486,6 +1484,11 @@ msgid "settings.updates.install_restart"
 msgstr "安装并重启"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.install_codex_action"
+msgstr "安装已签名的 Codex CLI，然后重试。"
+
+#. js-lingui-explicit-id
 #: src/components/settings/sections/PersonalizationSection.tsx
 msgid "settings.personalization.instructions_saved_toast"
 msgstr "指令已保存"
@@ -1618,8 +1621,8 @@ msgstr "已锁定"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
-msgid "settings.manage_providers"
-msgstr "管理提供商"
+msgid "settings.manage"
+msgstr "管理"
 
 #. js-lingui-explicit-id
 #: src/components/library/GlobalLibraryView.tsx
@@ -1681,11 +1684,6 @@ msgstr "填写模型，或留空以自动选择"
 #: src/components/home/ProjectHome.tsx
 msgid "home.more_actions_named"
 msgstr "{0} 的更多操作"
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.ai_setup_capabilities_title"
-msgstr "还需要更多 AI 能力"
 
 #. js-lingui-explicit-id
 #: src/components/library/GlobalLibraryView.tsx
@@ -1792,6 +1790,11 @@ msgstr "未配置"
 #: src/components/settings/sections/IntegrationsSection.tsx
 msgid "settings.integrations.not_connected"
 msgstr "未连接。"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.not_installed"
+msgstr "未安装"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/SpeechSection.tsx
@@ -1934,6 +1937,21 @@ msgid "settings.dimension_webdev_description"
 msgstr "规划并实现网页界面。"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.capability_planning"
+msgstr "规划与对话"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.ai_ready_description"
+msgstr "此设备上的规划和图像路由均可用。"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.planning_runtime"
+msgstr "规划运行时"
+
+#. js-lingui-explicit-id
 #: src/components/settings/sections/IntegrationsSection.tsx
 msgid "settings.integrations.handshake_note"
 msgstr "插件、MCP、CLI 与本地保险库集成仅在主机握手验证通过后可用。"
@@ -1988,11 +2006,6 @@ msgstr "预览诊断信息"
 #: src/components/library/RegistryInstallPanel.tsx
 msgid "registry_install.preview_install"
 msgstr "预览安装"
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.provider_source_environment"
-msgstr "进程环境变量"
 
 #. js-lingui-explicit-id
 #: src/components/settings/VectorizerPanel.tsx
@@ -2107,6 +2120,11 @@ msgid "home.status_ready"
 msgstr "已就绪"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.ready_for_first_use"
+msgstr "可供首次使用"
+
+#. js-lingui-explicit-id
 #: src/components/home/ProjectHome.tsx
 msgid "home.recent_heading"
 msgstr "最近"
@@ -2120,6 +2138,11 @@ msgstr "最近关闭"
 #: src/components/settings/ProviderDirectory.tsx
 msgid "settings.provider_category_recommended"
 msgstr "推荐"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ModelSlot.tsx
+msgid "settings.image_route_recommended"
+msgstr "推荐用于高保真输出"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/RecoverySection.tsx
@@ -2317,8 +2340,8 @@ msgstr "重试"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
-msgid "settings.ai_setup_credentials_found"
-msgstr "发现可复用凭据"
+msgid "settings.retry_capability_action"
+msgstr "重试能力检查。"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/PersonalizationSection.tsx
@@ -2345,11 +2368,6 @@ msgstr "评审评论"
 #: src/components/settings/sections/UpdatesSection.tsx
 msgid "settings.updates.whats_new_hint"
 msgstr "查看 Cutout {0} 的更新亮点。"
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.ai_setup_checking_description"
-msgstr "正在检查已配置的提供商和此设备上的可复用凭据。"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/IntegrationsSection.tsx
@@ -2435,11 +2453,6 @@ msgid "settings.integrations.expired"
 msgstr "会话已过期。请刷新或重新连接。"
 
 #. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.setup_automatically"
-msgstr "自动设置"
-
-#. js-lingui-explicit-id
 #: src/components/home/SidebarAccount.tsx
 #: src/components/settings/SettingsDialog.tsx
 msgid "settings.menu_label"
@@ -2470,6 +2483,11 @@ msgstr "快捷键"
 #: src/components/settings/VectorizerPanel.tsx
 msgid "settings.key_show"
 msgstr "显示"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.authorize_codex_action"
+msgstr "使用 Codex CLI 登录，然后重试。"
 
 #. js-lingui-explicit-id
 #: src/components/inspector/SliceDimensions.tsx
@@ -2564,6 +2582,11 @@ msgstr "结构化且正式。"
 #: src/components/help/HelpMenu.tsx
 msgid "help.submit_feedback"
 msgstr "提交反馈"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ModelSlot.tsx
+msgid "settings.image_route_supported"
+msgstr "支持"
 
 #. js-lingui-explicit-id
 #: src/components/inspector/ExportBar.tsx
@@ -2803,6 +2826,16 @@ msgid "settings.updates.channel_aria"
 msgstr "更新通道"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.upgrade_codex_action"
+msgstr "将 Codex 更新到支持受限可读根目录的版本。"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.update_cutout_runtime_action"
+msgstr "更新 Cutout 以启用已验证的 Codex 运行时协议。"
+
+#. js-lingui-explicit-id
 #: src/components/settings/sections/UpdatesSection.tsx
 msgid "settings.updates.download_progress_aria"
 msgstr "更新下载进度"
@@ -2891,19 +2924,24 @@ msgid "global_library.bytes_not_available"
 msgstr "本地没有可用的已验证字节数据。"
 
 #. js-lingui-explicit-id
+#: src/components/settings/ModelSlot.tsx
+msgid "settings.image_route_evidence_required"
+msgstr "需要已验证的能力证据"
+
+#. js-lingui-explicit-id
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.asset_preview_description"
 msgstr "经过验证的本地预览、来源信息，以及具备能力感知的素材操作。"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.verify_provider_action"
+msgstr "验证已配置的提供商和模型目录。"
+
+#. js-lingui-explicit-id
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.verifying_component_blobs"
 msgstr "正在验证组件源文件…"
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.ai_setup_configuring_description"
-msgstr "正在验证本地凭据并配置所需的模型路由。"
 
 #. js-lingui-explicit-id
 #: src/components/library/GlobalLibraryView.tsx
@@ -3020,8 +3058,3 @@ msgstr "打开的标签页和最近关闭的标签页会显示在这里"
 #: src/components/home/ProjectHome.tsx
 msgid "home.your_projects"
 msgstr "你的项目"
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.ai_setup_capabilities_description"
-msgstr "已验证的提供商尚未涵盖所有必需任务。"

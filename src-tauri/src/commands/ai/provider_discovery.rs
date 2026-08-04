@@ -220,9 +220,13 @@ impl Serialize for DiscoveryError {
             Self::Conflict => "conflict",
             Self::Persistence(_) => "persistence-failed",
         };
+        let message = match self {
+            Self::Request(_) => "provider request failed".to_owned(),
+            _ => self.to_string(),
+        };
         let mut state = serializer.serialize_struct("ProviderDiscoveryError", 2)?;
         state.serialize_field("code", code)?;
-        state.serialize_field("message", &self.to_string())?;
+        state.serialize_field("message", &message)?;
         state.end()
     }
 }
@@ -571,7 +575,48 @@ fn discover_codex_at_with_legacy(
         .and_then(|value| value.get("model_providers"))
         .and_then(toml::Value::as_table);
     let mut out = Vec::new();
-    let mut has_openai_provider = false;
+    let root = config.as_ref().and_then(toml::Value::as_table);
+    let root_base_url = root
+        .and_then(|value| value.get("base_url"))
+        .and_then(toml::Value::as_str);
+    let root_has_provider_binding = root_base_url.is_some();
+    let root_cc_switch = root.is_some_and(|value| {
+        root_base_url == Some(CC_SWITCH_BASE_URL)
+            && value.get("wire_api").and_then(toml::Value::as_str) == Some("responses")
+            && !value.contains_key("model_provider")
+            && !value.contains_key("model_providers")
+    });
+    let mut has_openai_provider = root_has_provider_binding;
+    if root_cc_switch && auth_key_available {
+        has_openai_provider = true;
+        out.push(ProviderCandidate {
+            id: candidate_id(&["codex", "cc-switch-root", CC_SWITCH_BASE_URL]),
+            source: "codex".into(),
+            source_label: "Codex".into(),
+            agent_id: Some("codex".into()),
+            schema_id: Some(
+                if using_legacy_auth {
+                    "codex-root-cc-switch-legacy-auth-v1"
+                } else {
+                    "codex-root-cc-switch-v1"
+                }
+                .into(),
+            ),
+            config_location: Some(auth_location.clone()),
+            kind: "cc-switch".into(),
+            label: "CC Switch".into(),
+            base_url: Some(CC_SWITCH_BASE_URL.into()),
+            wire_protocol: Some("responses".into()),
+            model_hint: model_hint.clone(),
+            credential: CredentialPreview {
+                source_type: "config-literal".into(),
+                reference: Some("OPENAI_API_KEY".into()),
+                available: true,
+                importable: true,
+            },
+            warnings: vec![],
+        });
+    }
     if let Some(table) = table {
         for (provider_id, entry) in table {
             let Some(provider) = entry.as_table() else {
@@ -1146,24 +1191,42 @@ fn discover_environment() -> Vec<ProviderCandidate> {
         .collect()
 }
 
-fn discover_cutout_keychain<R: Runtime>(app: &AppHandle<R>) -> Vec<ProviderCandidate> {
-    let Ok(path) = app
-        .path()
-        .app_config_dir()
-        .map(|dir| dir.join("providers.json"))
-    else {
-        return vec![];
-    };
-    let Ok(Some(raw)) = read_exact_config(&path) else {
-        return vec![];
-    };
-    let Ok(rows) = serde_json::from_str::<Vec<serde_json::Value>>(&raw) else {
-        return vec![];
-    };
-    rows.into_iter()
+const PROVIDER_REGISTRY_FILE: &str = "providers.json";
+const PACKAGED_E2E_PROVIDER_DISCOVERY_FILE: &str = "provider-discovery.json";
+
+fn cutout_provider_metadata_paths(
+    config_dir: &Path,
+    include_packaged_e2e_discovery: bool,
+) -> Vec<PathBuf> {
+    let mut paths = vec![config_dir.join(PROVIDER_REGISTRY_FILE)];
+    if include_packaged_e2e_discovery {
+        paths.push(config_dir.join(PACKAGED_E2E_PROVIDER_DISCOVERY_FILE));
+    }
+    paths
+}
+
+fn cutout_provider_rows_at(
+    config_dir: &Path,
+    include_packaged_e2e_discovery: bool,
+) -> Vec<serde_json::Value> {
+    cutout_provider_metadata_paths(config_dir, include_packaged_e2e_discovery)
+        .into_iter()
+        .filter_map(|path| read_exact_config(&path).ok().flatten())
+        .filter_map(|raw| serde_json::from_str::<Vec<serde_json::Value>>(&raw).ok())
+        .flatten()
+        .collect()
+}
+
+fn discover_cutout_keychain_at(
+    config_dir: &Path,
+    include_packaged_e2e_discovery: bool,
+    has_key: impl Fn(&str) -> bool,
+) -> Vec<ProviderCandidate> {
+    cutout_provider_rows_at(config_dir, include_packaged_e2e_discovery)
+        .into_iter()
         .filter_map(|row| {
             let id = row.get("id")?.as_str()?;
-            if !keys::has_key_exact(id) {
+            if !has_key(id) {
                 return None;
             }
             Some(ProviderCandidate {
@@ -1199,24 +1262,51 @@ fn discover_cutout_keychain<R: Runtime>(app: &AppHandle<R>) -> Vec<ProviderCandi
         .collect()
 }
 
+fn discover_cutout_keychain<R: Runtime>(app: &AppHandle<R>) -> Vec<ProviderCandidate> {
+    let Ok(config_dir) = app.path().app_config_dir() else {
+        return vec![];
+    };
+    discover_cutout_keychain_at(
+        &config_dir,
+        crate::commands::packaged_e2e::enabled(),
+        keys::has_key_exact,
+    )
+}
+
+fn cutout_source_id_at(
+    config_dir: &Path,
+    selected_candidate_id: &str,
+    include_packaged_e2e_discovery: bool,
+) -> Result<String, DiscoveryError> {
+    for path in cutout_provider_metadata_paths(config_dir, include_packaged_e2e_discovery) {
+        let Some(raw) = read_exact_config(&path)? else {
+            continue;
+        };
+        let rows: Vec<serde_json::Value> =
+            serde_json::from_str(&raw).map_err(|error| DiscoveryError::Parse(error.to_string()))?;
+        if let Some(id) = rows.into_iter().find_map(|row| {
+            let id = row.get("id")?.as_str()?;
+            (candidate_id(&["cutout-keychain", id]) == selected_candidate_id).then(|| id.to_owned())
+        }) {
+            return Ok(id);
+        }
+    }
+    Err(DiscoveryError::CandidateMissing)
+}
+
 fn cutout_source_id<R: Runtime>(
     app: &AppHandle<R>,
     selected_candidate_id: &str,
 ) -> Result<String, DiscoveryError> {
-    let path = app
+    let config_dir = app
         .path()
         .app_config_dir()
-        .map_err(|error| DiscoveryError::Read(error.to_string()))?
-        .join("providers.json");
-    let raw = read_exact_config(&path)?.ok_or(DiscoveryError::CandidateMissing)?;
-    let rows: Vec<serde_json::Value> =
-        serde_json::from_str(&raw).map_err(|error| DiscoveryError::Parse(error.to_string()))?;
-    rows.into_iter()
-        .find_map(|row| {
-            let id = row.get("id")?.as_str()?;
-            (candidate_id(&["cutout-keychain", id]) == selected_candidate_id).then(|| id.to_owned())
-        })
-        .ok_or(DiscoveryError::CandidateMissing)
+        .map_err(|error| DiscoveryError::Read(error.to_string()))?;
+    cutout_source_id_at(
+        &config_dir,
+        selected_candidate_id,
+        crate::commands::packaged_e2e::enabled(),
+    )
 }
 
 #[tauri::command]
@@ -1353,6 +1443,32 @@ fn candidate_effective_base_url(candidate: &ProviderCandidate) -> Option<&str> {
     })
 }
 
+fn normalize_protocol_base_url(
+    value: &str,
+    wire_protocol: Option<ProviderWireProtocol>,
+) -> Result<String, DiscoveryError> {
+    let trimmed = value.trim().trim_end_matches('/');
+    let mut parsed = reqwest::Url::parse(trimmed)
+        .map_err(|_| DiscoveryError::Parse("provider candidate has an invalid endpoint".into()))?;
+    let default_path = match wire_protocol {
+        Some(ProviderWireProtocol::GoogleGenerateContent) => Some("/v1beta"),
+        Some(
+            ProviderWireProtocol::Responses
+            | ProviderWireProtocol::ChatCompletions
+            | ProviderWireProtocol::AnthropicMessages,
+        ) => Some("/v1"),
+        None => None,
+    };
+    if parsed.path().trim_end_matches('/').is_empty() {
+        if let Some(default_path) = default_path {
+            parsed.set_path(default_path);
+            parsed.set_query(None);
+            parsed.set_fragment(None);
+        }
+    }
+    Ok(parsed.to_string().trim_end_matches('/').to_owned())
+}
+
 fn validate_existing_provider_binding<R: Runtime>(
     app: &AppHandle<R>,
     provider_id: &str,
@@ -1471,6 +1587,21 @@ fn validate_candidate(candidate: &ProviderCandidate) -> Result<(), DiscoveryErro
 fn candidate_secret(candidate: &ProviderCandidate, home: &Path) -> Result<String, DiscoveryError> {
     let (codex_home, _) = codex_location(home);
     candidate_secret_at(candidate, home, &codex_home)
+}
+
+fn candidate_secret_for_app<R: Runtime>(
+    app: &AppHandle<R>,
+    candidate: &ProviderCandidate,
+) -> Result<String, DiscoveryError> {
+    if candidate.source == "cutout-keychain" {
+        let source_id = cutout_source_id(app, &candidate.id)?;
+        let secret = keys::read_secret(&source_id)
+            .map_err(|error| DiscoveryError::Keychain(error.to_string()))?;
+        crate::commands::packaged_e2e::native_checkpoint("ai-native-cutout-keychain-readable");
+        return Ok(secret);
+    }
+    let home = app.path().home_dir().map_err(|_| DiscoveryError::Home)?;
+    candidate_secret(candidate, &home)
 }
 
 fn model_ids(body: &str) -> Result<Vec<String>, DiscoveryError> {
@@ -1598,14 +1729,7 @@ async fn resolve_draft_secret<R: Runtime>(
                 return Err(DiscoveryError::CandidateMissing);
             }
         }
-        let secret = if candidate.source == "cutout-keychain" {
-            let source_id = cutout_source_id(app, id)?;
-            keys::read_secret(&source_id)
-                .map_err(|error| DiscoveryError::Keychain(error.to_string()))?
-        } else {
-            let home = app.path().home_dir().map_err(|_| DiscoveryError::Home)?;
-            candidate_secret(candidate, &home)?
-        };
+        let secret = candidate_secret_for_app(app, candidate)?;
         if let Some(expected) = draft.candidate_secret_revision.as_deref() {
             if secret_revision(&secret) != expected {
                 return Err(DiscoveryError::CandidateMissing);
@@ -1657,7 +1781,7 @@ async fn check_draft<R: Runtime>(
         &secret,
     )
     .await
-    .map_err(|error| DiscoveryError::Request(error.to_string()))?;
+    .map_err(discovery_request_error)?;
     let models = match response.status {
         200..=299 => model_ids(&response.body),
         401 | 403 => Err(DiscoveryError::Http(response.status)),
@@ -1805,6 +1929,68 @@ fn checkpoint_automatic_error(error: &DiscoveryError) {
     crate::commands::packaged_e2e::native_checkpoint(phase);
 }
 
+fn transport_failure_cause(message: &str) -> &'static str {
+    let lower = message.to_ascii_lowercase();
+    if lower.contains("timed out") || lower.contains("timeout") {
+        "timeout"
+    } else if lower.contains("dns")
+        || lower.contains("failed to lookup")
+        || lower.contains("name or service not known")
+        || lower.contains("nodename nor servname")
+    {
+        "dns"
+    } else if lower.contains("tls") || lower.contains("ssl") || lower.contains("certificate") {
+        "tls"
+    } else if lower.contains("connect")
+        || lower.contains("connection refused")
+        || lower.contains("network is unreachable")
+    {
+        "connect"
+    } else {
+        "other"
+    }
+}
+
+fn discovery_request_error(error: ai_proxy::ProxyError) -> DiscoveryError {
+    let cause = match error {
+        ai_proxy::ProxyError::Request(message) => transport_failure_cause(&message),
+        ai_proxy::ProxyError::DisallowedHost => "host-policy",
+        ai_proxy::ProxyError::BadUrl => "bad-url",
+        ai_proxy::ProxyError::ProviderBinding
+        | ai_proxy::ProxyError::ProviderNotConfigured
+        | ai_proxy::ProxyError::ProviderDisabled
+        | ai_proxy::ProxyError::UnknownKind
+        | ai_proxy::ProxyError::UnsupportedWireProtocol(_) => "binding",
+        ai_proxy::ProxyError::BadMethod | ai_proxy::ProxyError::BadHeader => "request-shape",
+        ai_proxy::ProxyError::NoKey | ai_proxy::ProxyError::Keychain => "credential-vault",
+        ai_proxy::ProxyError::Cancelled => "cancelled",
+        _ => "other",
+    };
+    DiscoveryError::Request(cause.into())
+}
+
+fn request_failure_cause(error: &DiscoveryError) -> &str {
+    match error {
+        DiscoveryError::Request(cause) => cause,
+        _ => "other",
+    }
+}
+
+fn checkpoint_cutout_keychain_catalog_error(error: &DiscoveryError, ordinal: usize) {
+    let suffix = match error {
+        DiscoveryError::Http(401 | 403) => "unauthorized".to_owned(),
+        DiscoveryError::Http(_) => "http-failed".to_owned(),
+        DiscoveryError::CatalogMalformed | DiscoveryError::CatalogUnsupported => {
+            "invalid".to_owned()
+        }
+        DiscoveryError::Request(_) => format!("request-{}", request_failure_cause(error)),
+        _ => "failed".to_owned(),
+    };
+    crate::commands::packaged_e2e::native_checkpoint(&format!(
+        "ai-native-cutout-keychain-{ordinal}-catalog-{suffix}"
+    ));
+}
+
 async fn checked_automatic_draft<R: Runtime>(
     app: &AppHandle<R>,
     draft: &ProviderDraftSession,
@@ -1828,8 +2014,13 @@ pub async fn auto_configure_provider_candidate<R: Runtime>(
     app: AppHandle<R>,
     input: AutoConfigureCandidateInput,
 ) -> Result<AutoConfiguredProvider, DiscoveryError> {
-    let candidate = discover_provider_candidates(app.clone())
-        .await?
+    let candidates = discover_provider_candidates(app.clone()).await?;
+    let cutout_keychain_ordinal = candidates
+        .iter()
+        .filter(|candidate| candidate.source == "cutout-keychain")
+        .position(|candidate| candidate.id == input.candidate_id)
+        .map(|index| index + 1);
+    let candidate = candidates
         .into_iter()
         .find(|candidate| candidate.id == input.candidate_id)
         .ok_or(DiscoveryError::CandidateMissing)?;
@@ -1854,6 +2045,7 @@ pub async fn auto_configure_provider_candidate<R: Runtime>(
             })
             .transpose()?,
     )?;
+    let base_url = normalize_protocol_base_url(&base_url, wire_protocol)?;
     crate::commands::packaged_e2e::native_checkpoint("ai-native-binding-normalized");
     let provider_id = automatic_provider_id(&candidate.id)?;
     let configured = providers::load_providers_sync(&app)
@@ -1883,15 +2075,33 @@ pub async fn auto_configure_provider_candidate<R: Runtime>(
             candidate_secret_revision: None,
             checked_models: None,
         };
-        let models = checked_automatic_draft(&app, &draft).await?;
+        let models = match checked_automatic_draft(&app, &draft).await {
+            Ok(models) => models,
+            Err(error) => {
+                if let Some(ordinal) = cutout_keychain_ordinal {
+                    checkpoint_cutout_keychain_catalog_error(&error, ordinal);
+                }
+                return Err(error);
+            }
+        };
+        if let Some(ordinal) = cutout_keychain_ordinal {
+            crate::commands::packaged_e2e::native_checkpoint(&format!(
+                "ai-native-cutout-keychain-{ordinal}-catalog-checked"
+            ));
+        }
         return Ok(AutoConfiguredProvider {
             provider: existing.clone(),
             models,
         });
     }
 
-    let home = app.path().home_dir().map_err(|_| DiscoveryError::Home)?;
-    let secret = candidate_secret(&candidate, &home)?;
+    let secret = match candidate_secret_for_app(&app, &candidate) {
+        Ok(secret) => secret,
+        Err(error) => {
+            checkpoint_automatic_error(&error);
+            return Err(error);
+        }
+    };
     crate::commands::packaged_e2e::native_checkpoint("ai-native-secret-resolved");
     let draft = ProviderDraftSession {
         created_at: Instant::now(),
@@ -1905,7 +2115,20 @@ pub async fn auto_configure_provider_candidate<R: Runtime>(
         candidate_secret_revision: None,
         checked_models: None,
     };
-    let models = checked_automatic_draft(&app, &draft).await?;
+    let models = match checked_automatic_draft(&app, &draft).await {
+        Ok(models) => models,
+        Err(error) => {
+            if let Some(ordinal) = cutout_keychain_ordinal {
+                checkpoint_cutout_keychain_catalog_error(&error, ordinal);
+            }
+            return Err(error);
+        }
+    };
+    if let Some(ordinal) = cutout_keychain_ordinal {
+        crate::commands::packaged_e2e::native_checkpoint(&format!(
+            "ai-native-cutout-keychain-{ordinal}-catalog-checked"
+        ));
+    }
     let provider = ProviderConfig {
         id: provider_id.clone(),
         kind,
@@ -1941,6 +2164,52 @@ mod tests {
         );
         assert!(automatic_provider_id("candidate:/local/path").is_err());
     }
+
+    #[test]
+    fn packaged_e2e_provider_discovery_is_isolated_from_the_canonical_registry() {
+        let config_dir = tempdir().unwrap();
+        let canonical = config_dir.path().join(PROVIDER_REGISTRY_FILE);
+        let discovery = config_dir.path().join(PACKAGED_E2E_PROVIDER_DISCOVERY_FILE);
+        std::fs::write(&canonical, "[]").unwrap();
+        std::fs::write(
+            &discovery,
+            serde_json::json!([{
+                "id": "mox",
+                "kind": "openai-compatible",
+                "label": "MOX",
+                "baseUrl": "https://relay.example/v1",
+                "wireProtocol": "chat-completions",
+                "defaultModel": "gpt-image-2",
+                "enabled": true
+            }])
+            .to_string(),
+        )
+        .unwrap();
+
+        assert_eq!(
+            cutout_provider_metadata_paths(config_dir.path(), false),
+            vec![canonical.clone()]
+        );
+        assert!(discover_cutout_keychain_at(config_dir.path(), false, |_| true).is_empty());
+
+        let candidates = discover_cutout_keychain_at(config_dir.path(), true, |id| id == "mox");
+        assert_eq!(candidates.len(), 1);
+        assert_eq!(candidates[0].source, "cutout-keychain");
+        assert_eq!(candidates[0].label, "MOX");
+        assert_eq!(
+            cutout_source_id_at(config_dir.path(), &candidates[0].id, true).unwrap(),
+            "mox"
+        );
+        assert!(matches!(
+            cutout_source_id_at(config_dir.path(), &candidates[0].id, false),
+            Err(DiscoveryError::CandidateMissing)
+        ));
+        assert_eq!(std::fs::read_to_string(canonical).unwrap(), "[]");
+        assert!(!serde_json::to_string(&candidates)
+            .unwrap()
+            .contains("credential-sentinel-must-not-serialize"));
+    }
+
     use tempfile::TempDir;
 
     fn tempdir() -> std::io::Result<TempDir> {
@@ -2369,6 +2638,105 @@ wire_api = "responses"
     }
 
     #[test]
+    fn codex_root_cc_switch_profile_reuses_only_the_auth_file_api_key() {
+        let home = tempdir().unwrap();
+        let codex_home = home.path().join(".codex");
+        std::fs::create_dir(&codex_home).unwrap();
+        std::fs::write(
+            codex_home.join("config.toml"),
+            r#"
+base_url = "http://127.0.0.1:15721/v1"
+wire_api = "responses"
+model = "gpt-image-2"
+experimental_bearer_token = "session-material-must-not-import"
+"#,
+        )
+        .unwrap();
+        std::fs::write(
+            codex_home.join("auth.json"),
+            r#"{"OPENAI_API_KEY":"root-cc-switch-api-key"}"#,
+        )
+        .unwrap();
+
+        let rows = discover_codex_at(&codex_home, "~/.codex").unwrap();
+        assert_eq!(rows.len(), 1);
+        let candidate = &rows[0];
+        assert_eq!(candidate.kind, "cc-switch");
+        assert_eq!(
+            candidate.schema_id.as_deref(),
+            Some("codex-root-cc-switch-v1")
+        );
+        assert_eq!(candidate.base_url.as_deref(), Some(CC_SWITCH_BASE_URL));
+        assert_eq!(candidate.wire_protocol.as_deref(), Some("responses"));
+        assert_eq!(candidate.model_hint.as_deref(), Some("gpt-image-2"));
+        assert_eq!(
+            candidate_secret_at(candidate, home.path(), &codex_home).unwrap(),
+            "root-cc-switch-api-key"
+        );
+        let serialized = serde_json::to_string(&rows).unwrap();
+        assert!(!serialized.contains("root-cc-switch-api-key"));
+        assert!(!serialized.contains("session-material-must-not-import"));
+    }
+
+    #[test]
+    fn codex_root_provider_binding_never_falls_back_to_public_openai() {
+        let home = tempdir().unwrap();
+        let codex_home = home.path().join(".codex");
+        std::fs::create_dir(&codex_home).unwrap();
+        std::fs::write(
+            codex_home.join("config.toml"),
+            r#"
+base_url = "http://127.0.0.1:15721/v1"
+wire_api = "responses"
+model_provider = "relay"
+[model_providers.relay]
+base_url = "https://relay.example/v1"
+wire_api = "responses"
+"#,
+        )
+        .unwrap();
+        std::fs::write(
+            codex_home.join("auth.json"),
+            r#"{"OPENAI_API_KEY":"must-not-bind-to-public-openai"}"#,
+        )
+        .unwrap();
+
+        let rows = discover_codex_at(&codex_home, "~/.codex").unwrap();
+        assert!(rows
+            .iter()
+            .all(|candidate| candidate.schema_id.as_deref() != Some("codex-root-cc-switch-v1")));
+        assert!(rows.iter().all(|candidate| candidate.kind != "openai"));
+        assert!(!serde_json::to_string(&rows)
+            .unwrap()
+            .contains("must-not-bind-to-public-openai"));
+    }
+
+    #[test]
+    fn codex_root_wire_protocol_without_a_base_keeps_the_openai_default() {
+        let home = tempdir().unwrap();
+        let codex_home = home.path().join(".codex");
+        std::fs::create_dir(&codex_home).unwrap();
+        std::fs::write(
+            codex_home.join("config.toml"),
+            "wire_api = \"responses\"\nmodel = \"gpt-default\"\n",
+        )
+        .unwrap();
+        std::fs::write(
+            codex_home.join("auth.json"),
+            r#"{"OPENAI_API_KEY":"default-openai-api-key"}"#,
+        )
+        .unwrap();
+
+        let rows = discover_codex_at(&codex_home, "~/.codex").unwrap();
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].kind, "openai");
+        assert_eq!(rows[0].model_hint.as_deref(), Some("gpt-default"));
+        assert!(!serde_json::to_string(&rows)
+            .unwrap()
+            .contains("default-openai-api-key"));
+    }
+
+    #[test]
     fn codex_cc_switch_name_does_not_authorize_an_unreviewed_endpoint() {
         let home = tempdir().unwrap();
         let codex_home = home.path().join(".codex");
@@ -2609,6 +2977,34 @@ wire_api = "legacy-completions"
     }
 
     #[test]
+    fn automatic_setup_normalizes_protocol_base_paths_like_the_renderer() {
+        assert_eq!(
+            normalize_protocol_base_url(
+                "https://relay.example/",
+                Some(ProviderWireProtocol::ChatCompletions)
+            )
+            .unwrap(),
+            "https://relay.example/v1"
+        );
+        assert_eq!(
+            normalize_protocol_base_url(
+                "https://relay.example",
+                Some(ProviderWireProtocol::GoogleGenerateContent)
+            )
+            .unwrap(),
+            "https://relay.example/v1beta"
+        );
+        assert_eq!(
+            normalize_protocol_base_url(
+                "https://relay.example/api/openai/",
+                Some(ProviderWireProtocol::Responses)
+            )
+            .unwrap(),
+            "https://relay.example/api/openai"
+        );
+    }
+
+    #[test]
     fn candidate_sanitization_rejects_config_exfiltration_fields() {
         let base = ProviderCandidate {
             id: candidate_id(&["test"]),
@@ -2764,6 +3160,38 @@ wire_api = "legacy-completions"
         assert_eq!(
             serde_json::to_value(DiscoveryError::DraftExpired).unwrap()["code"],
             "draft-expired"
+        );
+        let request = serde_json::to_value(DiscoveryError::Request(
+            "dns error for https://private.example/v1/models".into(),
+        ))
+        .unwrap();
+        assert_eq!(request["code"], "endpoint-unreachable");
+        assert_eq!(request["message"], "provider request failed");
+        assert!(!request.to_string().contains("private.example"));
+    }
+
+    #[test]
+    fn request_failure_causes_are_closed_and_sanitized() {
+        for (message, expected) in [
+            ("operation timed out", "timeout"),
+            ("dns error: failed to lookup address", "dns"),
+            ("certificate verify failed during tls", "tls"),
+            ("client error (Connect)", "connect"),
+            ("opaque transport failure", "other"),
+        ] {
+            assert_eq!(transport_failure_cause(message), expected);
+        }
+        assert_eq!(
+            request_failure_cause(&discovery_request_error(
+                ai_proxy::ProxyError::DisallowedHost
+            )),
+            "host-policy"
+        );
+        assert_eq!(
+            request_failure_cause(&discovery_request_error(ai_proxy::ProxyError::Request(
+                "dns error for https://private.example/v1/models".into(),
+            ))),
+            "dns"
         );
     }
 

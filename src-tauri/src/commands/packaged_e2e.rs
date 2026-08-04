@@ -97,6 +97,7 @@ pub struct PackagedE2eOutcome {
     prototype_suites: Vec<PackagedE2eSuiteOutcome>,
     selected_suite_id: String,
     selected_visible_slice_count: u32,
+    codex_planning_turn_count: u32,
     planned_image_call_count: u32,
     image_call_count: u32,
 }
@@ -350,7 +351,10 @@ fn validate_outcome(outcome: &PackagedE2eOutcome) -> Result<(), String> {
             || suite.route_count as usize != suite.routes.len()
             || suite.page_count as usize != suite.routes.len()
             || suite.artifact_count != suite.resource_asset_count
-            || !matches!(suite.quality_review_status.as_str(), "passed" | "attention-required")
+            || !matches!(
+                suite.quality_review_status.as_str(),
+                "passed" | "attention-required"
+            )
             || !valid_delivery_digests(&suite.digests)
         {
             return Err("packaged-e2e-outcome-invalid".into());
@@ -376,6 +380,7 @@ fn validate_outcome(outcome: &PackagedE2eOutcome) -> Result<(), String> {
     if bound_design_ids.len() != 3
         || selected_resource_asset_count.is_none()
         || selected_resource_asset_count != Some(outcome.selected_visible_slice_count)
+        || !(2..=256).contains(&outcome.codex_planning_turn_count)
         || !(1..=4096).contains(&outcome.planned_image_call_count)
         || outcome.image_call_count != outcome.planned_image_call_count
     {
@@ -566,6 +571,7 @@ mod tests {
                 .collect(),
             selected_suite_id: "suite-2".into(),
             selected_visible_slice_count: 11,
+            codex_planning_turn_count: 2,
             planned_image_call_count: 23,
             image_call_count: 23,
         }
@@ -679,6 +685,14 @@ mod tests {
         let mut amplified = valid_result();
         amplified.outcome.as_mut().unwrap().image_call_count = 24;
         assert!(validate(&amplified).is_err());
+
+        let mut missing_codex_turn = valid_result();
+        missing_codex_turn
+            .outcome
+            .as_mut()
+            .unwrap()
+            .codex_planning_turn_count = 1;
+        assert!(validate(&missing_codex_turn).is_err());
 
         let mut false_plan = valid_result();
         false_plan
