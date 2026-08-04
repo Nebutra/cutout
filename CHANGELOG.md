@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.17 - 2026-08-03
+
+- Keep reviewed image-edit model evidence Provider-neutral by recording exact model capabilities independently from Provider adapters.
+- Route image generation and image editing independently so different verified models and Providers can serve each capability only when an implemented adapter supports the route.
+- Use reviewed quality rankings only to guide image-model recommendations; rankings do not establish generation, editing, or transport support.
+
 ## 0.1.16 - 2026-08-03
 
 - Present reviewed release highlights in English, Simplified Chinese, Japanese, French, and Spanish.

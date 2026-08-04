@@ -36,11 +36,11 @@ function catalog(entries: unknown[] = [entry()]) {
 }
 
 describe('release-note catalog', () => {
-  it('loads the reviewed v0.1.16 entry with all five shipped locales and no historical backfill', async () => {
+  it('loads the reviewed v0.1.17 entry with all five shipped locales and no historical backfill', async () => {
     const loaded = await loadReleaseNotesCatalog(undefined, { requireAllLocales: true })
-    expect(loaded.entries.map((value) => value.version)).toEqual(['0.1.16'])
-    expect(Object.keys(requireReleaseNotesEntry(loaded, '0.1.16').locales)).toEqual(RELEASE_NOTES_LOCALES)
-    expect(findReleaseNotesEntry(loaded, '0.1.15')).toBeUndefined()
+    expect(loaded.entries.map((value) => value.version)).toEqual(['0.1.17'])
+    expect(Object.keys(requireReleaseNotesEntry(loaded, '0.1.17').locales)).toEqual(RELEASE_NOTES_LOCALES)
+    expect(findReleaseNotesEntry(loaded, '0.1.16')).toBeUndefined()
   })
 
   it('validates normalized catalogs idempotently and falls back by whole locale to English', () => {
@@ -107,7 +107,7 @@ describe('release-note catalog', () => {
 
   it('renders all release inputs through the CLI from one exact entry', async () => {
     const output = await mkdtemp(join(tmpdir(), 'cutout-release-notes-'))
-    const result = spawnSync(process.execPath, ['scripts/release-notes.mjs', 'render', '--version', '0.1.16', '--output', output, '--require-all-locales'], { cwd: process.cwd(), encoding: 'utf8' })
+    const result = spawnSync(process.execPath, ['scripts/release-notes.mjs', 'render', '--version', '0.1.17', '--output', output, '--require-all-locales'], { cwd: process.cwd(), encoding: 'utf8' })
     expect(result.status, result.stderr).toBe(0)
     const [legacy, updater, bundled, github] = await Promise.all([
       readFile(join(output, 'legacy-notes.txt'), 'utf8'),
@@ -116,7 +116,8 @@ describe('release-note catalog', () => {
       readFile(join(output, 'github-release.md'), 'utf8'),
     ])
     expect(JSON.parse(updater)).toEqual(JSON.parse(bundled))
-    expect(legacy).toContain('Release highlights in your language')
-    expect(github).toContain('Cutout v0\\.1\\.16')
+    expect(legacy).toContain('Edit evidence stays Provider-neutral')
+    expect(legacy).toContain("What's New in five languages")
+    expect(github).toContain('Cutout v0\\.1\\.17')
   })
 })

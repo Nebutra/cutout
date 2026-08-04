@@ -2,106 +2,131 @@
   "protocol": "cutout.release-notes.catalog.v1",
   "entries": [
     {
-      "version": "0.1.16",
+      "version": "0.1.17",
       "releasedOn": "2026-08-03",
       "locales": {
         "en": {
-          "headline": "Know what changed before and after every update",
+          "headline": "Clearer image routing grounded in verified capabilities",
           "highlights": [
             {
-              "id": "localized-highlights",
-              "title": "Release highlights in your language",
-              "body": "Cutout now presents reviewed update highlights in English, Simplified Chinese, Japanese, French, and Spanish."
+              "id": "provider-neutral-edit-evidence",
+              "title": "Edit evidence stays Provider-neutral",
+              "body": "Reviewed image-edit evidence now records exact model IDs and capabilities independently from Provider adapters, so a listed model is never mistaken for a supported route."
             },
             {
-              "id": "review-before-installing",
-              "title": "Review before installing",
-              "body": "Updates & Support shows the available release details before you download and install it."
+              "id": "independent-image-routes",
+              "title": "Separate generation and editing routes",
+              "body": "Image generation and image editing can use different verified models and Providers, while Cutout runs only routes backed by an implemented adapter."
             },
             {
-              "id": "reopen-offline",
-              "title": "Reopen anytime",
-              "body": "After an upgrade, What's New opens once and remains available from Updates & Support without requiring a network connection."
+              "id": "rankings-recommend-only",
+              "title": "Quality rankings guide recommendations",
+              "body": "Reviewed quality rankings help Cutout prefer stronger image models, but they do not by themselves prove generation, editing, or transport support."
+            },
+            {
+              "id": "reviewed-update-details",
+              "title": "What's New in five languages",
+              "body": "Cutout now shows reviewed release highlights in English, Simplified Chinese, Japanese, French, and Spanish before installation and keeps the same details available from Updates & Support after upgrading."
             }
           ]
         },
         "zh-CN": {
-          "headline": "每次更新前后，都能清楚了解变化",
+          "headline": "基于已验证能力的更清晰图像路由",
           "highlights": [
             {
-              "id": "localized-highlights",
-              "title": "用你的语言查看更新亮点",
-              "body": "Cutout 现在会用英语、简体中文、日语、法语和西班牙语展示经过审核的更新亮点。"
+              "id": "provider-neutral-edit-evidence",
+              "title": "编辑证据与 Provider 保持解耦",
+              "body": "经审查的图像编辑证据现在只记录准确的模型 ID 和能力，并与 Provider 适配器独立，因此列出的模型不会被误认为已支持的路由。"
             },
             {
-              "id": "review-before-installing",
-              "title": "安装前先查看",
-              "body": "下载并安装更新前，可在“更新与支持”中查看可用版本的详细说明。"
+              "id": "independent-image-routes",
+              "title": "生成与编辑使用独立路由",
+              "body": "图像生成和图像编辑可以分别使用不同的已验证模型与 Provider；Cutout 只会运行已有适配器实现的路由。"
             },
             {
-              "id": "reopen-offline",
-              "title": "随时重新打开",
-              "body": "升级后，“更新说明”会自动打开一次，之后无需联网也可随时从“更新与支持”重新查看。"
+              "id": "rankings-recommend-only",
+              "title": "质量排名只用于推荐",
+              "body": "经审查的质量排名可帮助 Cutout 优先推荐更强的图像模型，但排名本身不能证明生成、编辑或传输支持。"
+            },
+            {
+              "id": "reviewed-update-details",
+              "title": "五种语言的更新说明",
+              "body": "Cutout 现在会在安装前用英语、简体中文、日语、法语和西班牙语展示经审查的版本亮点，并在升级后继续从“更新与支持”提供相同详情。"
             }
           ]
         },
         "ja": {
-          "headline": "アップデートの前後で変更内容を確認",
+          "headline": "検証済みの能力に基づく、より明確な画像ルーティング",
           "highlights": [
             {
-              "id": "localized-highlights",
-              "title": "お使いの言語でリリースの要点を表示",
-              "body": "Cutout は、確認済みのアップデート要点を英語、簡体字中国語、日本語、フランス語、スペイン語で表示するようになりました。"
+              "id": "provider-neutral-edit-evidence",
+              "title": "編集証拠を Provider から分離",
+              "body": "レビュー済みの画像編集証拠は、正確なモデル ID と能力だけを Provider アダプターとは独立して記録し、掲載モデルがサポート済みルートと誤認されることを防ぎます。"
             },
             {
-              "id": "review-before-installing",
-              "title": "インストール前に確認",
-              "body": "ダウンロードしてインストールする前に、「アップデートとサポート」で利用可能なリリースの詳細を確認できます。"
+              "id": "independent-image-routes",
+              "title": "生成と編集を別々にルーティング",
+              "body": "画像生成と画像編集には、それぞれ異なる検証済みモデルと Provider を使用できます。Cutout は実装済みアダプターに裏付けられたルートだけを実行します。"
             },
             {
-              "id": "reopen-offline",
-              "title": "いつでも再表示",
-              "body": "アップグレード後に「新機能」が一度開き、その後もネットワーク接続なしで「アップデートとサポート」から確認できます。"
+              "id": "rankings-recommend-only",
+              "title": "品質ランキングは推薦のため",
+              "body": "レビュー済みの品質ランキングは、より優れた画像モデルの推薦に役立ちますが、それ自体で生成、編集、または通信方式のサポートを証明するものではありません。"
+            },
+            {
+              "id": "reviewed-update-details",
+              "title": "5 言語で表示する「新機能」",
+              "body": "Cutout はインストール前に、レビュー済みのリリース要点を英語、簡体字中国語、日本語、フランス語、スペイン語で表示し、アップグレード後も同じ詳細を「アップデートとサポート」から確認できます。"
             }
           ]
         },
         "fr": {
-          "headline": "Comprenez les changements avant et après chaque mise à jour",
+          "headline": "Un routage d’image plus clair, fondé sur des capacités vérifiées",
           "highlights": [
             {
-              "id": "localized-highlights",
-              "title": "Les nouveautés dans votre langue",
-              "body": "Cutout présente désormais des points forts relus en anglais, chinois simplifié, japonais, français et espagnol."
+              "id": "provider-neutral-edit-evidence",
+              "title": "Des preuves d’édition indépendantes du Provider",
+              "body": "Les preuves vérifiées d’édition d’image consignent désormais uniquement l’identifiant exact du modèle et ses capacités, indépendamment des adaptateurs Provider ; un modèle répertorié n’est donc jamais confondu avec une route prise en charge."
             },
             {
-              "id": "review-before-installing",
-              "title": "Consultez les détails avant l’installation",
-              "body": "La section Mises à jour et assistance affiche les détails de la version disponible avant son téléchargement et son installation."
+              "id": "independent-image-routes",
+              "title": "Des routes distinctes pour générer et modifier",
+              "body": "La génération et la modification d’images peuvent utiliser des modèles et des Providers vérifiés différents. Cutout n’exécute que les routes couvertes par un adaptateur implémenté."
             },
             {
-              "id": "reopen-offline",
-              "title": "Rouvrez-les à tout moment",
-              "body": "Après une mise à niveau, la fenêtre Nouveautés s’ouvre une fois et reste accessible dans Mises à jour et assistance, même hors ligne."
+              "id": "rankings-recommend-only",
+              "title": "Les classements servent à recommander",
+              "body": "Les classements de qualité vérifiés aident Cutout à recommander de meilleurs modèles d’image, mais ne prouvent à eux seuls aucune prise en charge de la génération, de la modification ou du transport."
+            },
+            {
+              "id": "reviewed-update-details",
+              "title": "Les nouveautés en cinq langues",
+              "body": "Cutout affiche désormais avant l’installation des points forts vérifiés en anglais, chinois simplifié, japonais, français et espagnol, puis conserve les mêmes détails dans Mises à jour et assistance après la mise à niveau."
             }
           ]
         },
         "es": {
-          "headline": "Conoce los cambios antes y después de cada actualización",
+          "headline": "Rutas de imagen más claras, basadas en capacidades verificadas",
           "highlights": [
             {
-              "id": "localized-highlights",
-              "title": "Novedades en tu idioma",
-              "body": "Cutout ahora presenta novedades revisadas en inglés, chino simplificado, japonés, francés y español."
+              "id": "provider-neutral-edit-evidence",
+              "title": "Pruebas de edición independientes del Provider",
+              "body": "Las pruebas revisadas de edición de imágenes ahora registran solo el ID exacto del modelo y sus capacidades, independientemente de los adaptadores del Provider, para no confundir un modelo incluido con una ruta compatible."
             },
             {
-              "id": "review-before-installing",
-              "title": "Revísalas antes de instalar",
-              "body": "Actualizaciones y soporte muestra los detalles de la versión disponible antes de descargarla e instalarla."
+              "id": "independent-image-routes",
+              "title": "Rutas separadas para generar y editar",
+              "body": "La generación y la edición de imágenes pueden usar distintos modelos y Providers verificados. Cutout solo ejecuta rutas respaldadas por un adaptador implementado."
             },
             {
-              "id": "reopen-offline",
-              "title": "Vuelve a abrirlas cuando quieras",
-              "body": "Después de actualizar, Novedades se abre una vez y sigue disponible en Actualizaciones y soporte sin necesidad de conexión."
+              "id": "rankings-recommend-only",
+              "title": "Los rankings solo guían recomendaciones",
+              "body": "Los rankings de calidad revisados ayudan a Cutout a recomendar modelos de imagen más sólidos, pero por sí solos no demuestran compatibilidad con generación, edición ni transporte."
+            },
+            {
+              "id": "reviewed-update-details",
+              "title": "Novedades en cinco idiomas",
+              "body": "Cutout ahora muestra antes de instalar las novedades revisadas en inglés, chino simplificado, japonés, francés y español, y conserva los mismos detalles en Actualizaciones y soporte después de actualizar."
             }
           ]
         }

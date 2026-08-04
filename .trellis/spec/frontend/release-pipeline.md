@@ -31,6 +31,9 @@ installer version differs from their release version.
 ### 3. Contracts
 
 - Release tags are `v<semver>`; prerelease identifiers select the beta channel.
+- A pushed version tag is immutable even when its workflow never promoted a
+  public Release. If that tag is obsolete or failed, leave it at its original
+  commit and prepare the next patch version from the newly reviewed `main` SHA.
 - Before the reusable quality gate or any native build, the `validate` job must
   require one catalog entry for the exact unprefixed tag version and all five
   shipped locales (`en`, `zh-CN`, `ja`, `fr`, and `es`). Missing, mismatched,
@@ -180,7 +183,7 @@ installer version differs from their release version.
 | NSIS or MSI unexpectedly carries an Authenticode signature | Fail until the signing policy and verification contract are deliberately updated |
 | GitHub provenance attestation fails | Keep the Release unpublished |
 | Catalog-backed updater projection or deterministic GitHub body generation fails | Keep the Release unpublished |
-| Release tag already has a Release | Refuse immutable asset replacement |
+| Release tag already exists, with or without a public Release | Refuse tag movement or reuse; prepare a new patch version |
 | Upload is incomplete | Release remains a draft, not a public success |
 | Browser/dev build has no updater config | Home action remains absent |
 | Check returns no newer release | Home action remains absent |
@@ -214,6 +217,8 @@ installer version differs from their release version.
   subsequently created DMG is notarized, or validates the DMG before separately
   submitting and stapling it.
 - Bad: CI edits version manifests after checkout to make a mismatched tag pass.
+- Bad: an unpublished or failed tag is force-moved to a newer commit and reused
+  because GitHub has no public Release for it yet.
 - Bad: release CI uses `--generate-notes`, accepts a partial locale set, or
   supplies multiline/structured release notes through shell interpolation.
 
