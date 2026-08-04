@@ -2,6 +2,112 @@
   "protocol": "cutout.release-notes.catalog.v1",
   "entries": [
     {
+      "version": "0.1.19",
+      "releasedOn": "2026-08-05",
+      "locales": {
+        "en": {
+          "headline": "Readable preparation and honest paid-action decisions",
+          "highlights": [
+            {
+              "id": "planning-phases",
+              "title": "See what Agent preparation is doing",
+              "body": "Preparation now reports four named phases — context, runtime, response, and validation — inside one compact disclosure, so a long wait reads as progress instead of a single opaque spinner."
+            },
+            {
+              "id": "codex-negotiated-runtime",
+              "title": "A more tolerant Codex runtime",
+              "body": "Cutout negotiates a supported version range and generated-schema features instead of pinning one exact version, and reports a turn failure as a specific cause rather than a generic terminal error."
+            },
+            {
+              "id": "paid-actions-without-estimates",
+              "title": "Paid actions decided on facts",
+              "body": "A paid action is authorized by capability, host policy, and your explicit approval alone. A cost estimate no longer approves or refuses work, and a charged amount appears only when the Provider returns verifiable billing evidence."
+            }
+          ]
+        },
+        "zh-CN": {
+          "headline": "可读的准备过程与诚实的付费决策",
+          "highlights": [
+            {
+              "id": "planning-phases",
+              "title": "看清 Agent 正在准备什么",
+              "body": "准备过程现在以四个具名阶段呈现——上下文、运行时、响应、校验——收纳在一个紧凑的展开区里。较长的等待因此读起来是进度，而不是一个不透明的转圈。"
+            },
+            {
+              "id": "codex-negotiated-runtime",
+              "title": "更宽容的 Codex 运行时",
+              "body": "Cutout 现在协商受支持的版本区间与生成式 schema 能力，不再钉死单一版本；一次对话失败会给出具体原因，而不是笼统的终止错误。"
+            },
+            {
+              "id": "paid-actions-without-estimates",
+              "title": "付费动作依据事实决定",
+              "body": "付费动作仅由能力、宿主策略与你的显式批准来授权。费用预估不再批准或拒绝任何工作；只有当 Provider 返回可验证的账单证据时，才会记录实际扣费金额。"
+            }
+          ]
+        },
+        "ja": {
+          "headline": "読み取れる準備処理と、誠実な有料アクション判断",
+          "highlights": [
+            {
+              "id": "planning-phases",
+              "title": "Agent の準備内容が見える",
+              "body": "準備処理を「コンテキスト・ランタイム・応答・検証」という4つの名前付きフェーズとして、1つのコンパクトな開閉領域に表示します。長い待ち時間が、不透明なスピナーではなく進捗として読み取れます。"
+            },
+            {
+              "id": "codex-negotiated-runtime",
+              "title": "より寛容な Codex ランタイム",
+              "body": "厳密な1バージョンに固定するのではなく、対応バージョン範囲と生成スキーマ機能をネゴシエートします。ターンの失敗は、汎用的な終了エラーではなく具体的な原因として報告されます。"
+            },
+            {
+              "id": "paid-actions-without-estimates",
+              "title": "事実に基づく有料アクション",
+              "body": "有料アクションは、機能・ホストポリシー・明示的な承認のみで認可されます。費用見積もりが処理を承認・拒否することはなくなり、課金額は Provider が検証可能な請求証跡を返した場合にのみ記録されます。"
+            }
+          ]
+        },
+        "fr": {
+          "headline": "Une préparation lisible et des décisions payantes honnêtes",
+          "highlights": [
+            {
+              "id": "planning-phases",
+              "title": "Voir ce que prépare l'Agent",
+              "body": "La préparation présente désormais quatre phases nommées — contexte, exécution, réponse et validation — dans une seule zone dépliable compacte. Une longue attente se lit ainsi comme une progression plutôt que comme un indicateur opaque."
+            },
+            {
+              "id": "codex-negotiated-runtime",
+              "title": "Un runtime Codex plus tolérant",
+              "body": "Cutout négocie une plage de versions prise en charge et les fonctionnalités de schéma généré au lieu de figer une version exacte, et signale l'échec d'un tour par une cause précise plutôt que par une erreur terminale générique."
+            },
+            {
+              "id": "paid-actions-without-estimates",
+              "title": "Des actions payantes décidées sur des faits",
+              "body": "Une action payante est autorisée uniquement par la capacité, la politique de l'hôte et votre approbation explicite. Une estimation de coût n'approuve ni ne refuse plus aucun travail, et un montant facturé n'apparaît que si le Provider renvoie une preuve de facturation vérifiable."
+            }
+          ]
+        },
+        "es": {
+          "headline": "Preparación legible y decisiones de pago honestas",
+          "highlights": [
+            {
+              "id": "planning-phases",
+              "title": "Ver qué está preparando el Agente",
+              "body": "La preparación ahora muestra cuatro fases con nombre — contexto, entorno de ejecución, respuesta y validación — dentro de un único panel desplegable compacto, de modo que una espera larga se lee como progreso y no como un indicador opaco."
+            },
+            {
+              "id": "codex-negotiated-runtime",
+              "title": "Un entorno Codex más tolerante",
+              "body": "Cutout negocia un rango de versiones compatibles y las funciones de esquema generado en lugar de fijar una versión exacta, e informa el fallo de un turno con una causa concreta en vez de un error terminal genérico."
+            },
+            {
+              "id": "paid-actions-without-estimates",
+              "title": "Acciones de pago decididas con hechos",
+              "body": "Una acción de pago se autoriza solo por la capacidad, la política del host y tu aprobación explícita. Una estimación de coste ya no aprueba ni rechaza trabajo, y un importe cobrado aparece únicamente cuando el Provider devuelve evidencia de facturación verificable."
+            }
+          ]
+        }
+      }
+    },
+    {
       "version": "0.1.18",
       "releasedOn": "2026-08-04",
       "locales": {
