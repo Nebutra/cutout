@@ -271,7 +271,7 @@ describe("DesignOsWorkbench", () => {
           role: "requirement",
           license: "Proprietary · Project owner",
           provenance: "workspace.v1-projection",
-          detail: "cutout://legacy/61dea8f3-e271-4ae0-8b22-245241bd8b54/brief",
+          detail: "cutout://workspace/61dea8f3-e271-4ae0-8b22-245241bd8b54/brief",
         },
       ],
       ingestPreview: undefined,
@@ -279,7 +279,7 @@ describe("DesignOsWorkbench", () => {
     const view = mount(
       createElement(DesignOsWorkbench, { model: briefOnlyModel, defaultTab: "sources" }),
     );
-    expect(view.textContent).not.toContain("cutout://legacy/");
+    expect(view.textContent).not.toContain("cutout://workspace/");
     expect(view.textContent).not.toContain("workspace.v1-projection");
     expect(view.querySelector('[aria-label="Design sources"]')).toBeNull();
     expect(view.textContent).toContain("No external sources imported yet");

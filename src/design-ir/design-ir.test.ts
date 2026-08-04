@@ -48,6 +48,7 @@ function document(): DesignDocument {
     tokens: [],
     components: [],
     materials: [],
+    candidateSets: [],
     provenance: [{
       id: 'provenance:import',
       operation: 'import',
@@ -77,7 +78,7 @@ const firstRevision: Material['revisions'][number] = {
 }
 
 describe('Design IR v1', () => {
-  it('materializes token usage relations and preserves missing legacy evidence explicitly', () => {
+  it('materializes token usage relations and preserves missing evidence explicitly', () => {
     const candidate = document()
     candidate.tokens = [
       { id: 'token.primary', name: 'Primary', kind: 'color', value: '#000' },
@@ -93,8 +94,7 @@ describe('Design IR v1', () => {
   it('accepts a canonical minimal document', () => {
     const parsed = designDocumentSchema.parse(document())
     expect(validateDesignDocument(parsed)).toEqual({
-      ok: true,
-      data: { document: { ...parsed, candidateSets: [] } },
+      ok: true, data: { document: parsed },
     })
   })
 

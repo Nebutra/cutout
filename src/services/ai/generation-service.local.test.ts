@@ -34,6 +34,7 @@ const cfg = (over: Partial<ProviderConfig> = {}): ProviderConfig => ({
   defaultModel: 'chat-model',
   enabled: true,
   baseUrl: 'https://relay.example/v1',
+  wireProtocol: 'chat-completions',
   ...over,
 })
 

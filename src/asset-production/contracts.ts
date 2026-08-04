@@ -7,7 +7,6 @@ const timestamp = z.number().int().nonnegative()
 export const assetProductionRouteSchema = z.enum([
   'board-cutout',
   'direct-generate',
-  'semantic-repair',
   'import-cutout',
 ])
 export type AssetProductionRoute = z.infer<typeof assetProductionRouteSchema>
@@ -188,7 +187,6 @@ export const productionTaskStatusSchema = z.enum([
   'waived',
   'failed',
   'cancelled',
-  'legacy-ready',
 ])
 export type ProductionTaskStatus = z.infer<typeof productionTaskStatusSchema>
 
@@ -201,7 +199,7 @@ export const productionTaskStateSchema = z.object({
   issues: z.array(productionIssueSchema),
   decision: productionDecisionReceiptSchema.optional(),
   evidence: productionTaskEvidenceSchema.optional(),
-  origin: z.enum(['native', 'legacy-imported']),
+  origin: z.literal('native'),
   updatedAt: timestamp,
 }).strict()
 export type ProductionTaskState = z.infer<typeof productionTaskStateSchema>

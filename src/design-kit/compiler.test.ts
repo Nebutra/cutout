@@ -31,6 +31,7 @@ function document(): DesignDocument {
     ],
     components: [],
     materials: [],
+    candidateSets: [],
     provenance: [{
       id: 'provenance:brand', operation: 'import', sourceIds: ['source:brand'],
       actor: { kind: 'human', id: 'user:1' }, recordedAt: timestamp,

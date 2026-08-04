@@ -41,8 +41,8 @@ parseAiNativeAction(action: unknown): AiNativeAction
   deterministic worker pipeline.
 - Store state exposes no `setParam` or `resetParams` mutation API. UI and Agent
   surfaces expose no slider, reset, patch, or numeric quick-fix command.
-- `ProjectRestoreInput.params` remains optional for legacy decoding, but
-  `restoreProject` ignores its value and installs `DEFAULT_PARAMS`.
+- Project restore installs `DEFAULT_PARAMS`; persisted input cannot override
+  product-owned cutout parameters.
 - `useAutoRun` analyzes each newly loaded `autoAnalyze` source identity once.
   Agent-managed sources with `autoAnalyze: false` and restored sources that
   already contain slices do not start a duplicate worker run.
@@ -54,7 +54,6 @@ parseAiNativeAction(action: unknown): AiNativeAction
 
 | Condition | Required behavior |
 |---|---|
-| Legacy project contains custom params | Restore succeeds; runtime uses `DEFAULT_PARAMS` |
 | New product-managed source loads | Start exactly one analysis with slices |
 | Agent-managed source loads | Do not start a duplicate analysis |
 | Restored source already has slices | Preserve the restored projection; do not auto-rerun |
@@ -66,7 +65,7 @@ parseAiNativeAction(action: unknown): AiNativeAction
   presents results without asking the user to tune computer-vision values.
 - Base: a sheet produces no reusable regions; the UI suggests another source
   and leaves explicit rerun available without exposing implementation knobs.
-- Bad: a hidden CLI action, persisted legacy value, settings reset, or empty-
+- Bad: a hidden CLI action, persisted value, settings reset, or empty-
   state quick fix can mutate the worker parameters.
 
 ### 6. Tests Required
@@ -74,7 +73,7 @@ parseAiNativeAction(action: unknown): AiNativeAction
 - Static UI regression proving parameter components are absent and settings /
   empty states contain no mutation commands.
 - Store regression proving the params object is frozen, mutation actions are
-  absent, and custom legacy restore values normalize to defaults.
+  absent, and project restore always installs the product defaults.
 - Auto-run hook regressions for one run per source identity and no duplicate
   Agent-managed run.
 - Repository guidance regression covering current CLI/API documentation and
@@ -169,8 +168,6 @@ the Zustand store carries `assetProduction: AssetProductionSnapshot`.
   CV parameters, diagnostics, QA verdict, and lineage where applicable.
 - `direct-generate`, `board-cutout`, and `import-cutout` are current explicit
   routes. No executor may silently reinterpret one as another.
-- `semantic-repair` remains decode-only for historical production snapshots.
-  New planners and executors must not emit it.
 - Lifecycle composition belongs to `asset-production/coordinator.ts`. Prototype
   and manual/tool adapters may own execution strategy, but they must not
   duplicate the candidate -> review -> verify transition sequence.
@@ -179,8 +176,8 @@ the Zustand store carries `assetProduction: AssetProductionSnapshot`.
 - Content bytes are stored under `artifact:sha256:<digest>`. Concurrent writes
   of the same digest must converge on one existing record rather than failing
   with a duplicate-key transaction error.
-- Only `ready`, revision-bound `waived`, and grandfathered `legacy-ready`
-  publications are consumable. A new plan/source revision supersedes current
+- Only `ready` and revision-bound `waived` publications are consumable. A new
+  plan/source revision supersedes current
   authority without deleting immutable historical runs.
 - A board layout with exactly one planned task may represent that one logical
   material as several disconnected CV foreground crops. Assignment must retain
@@ -210,11 +207,9 @@ the Zustand store carries `assetProduction: AssetProductionSnapshot`.
 | Output changes after approval | Invalidate the old decision receipt |
 | Run is cancelled or superseded | Late results cannot publish or mark the run complete |
 | New run starts while another run is active | Mark the old run `cancelled`, preserve settled task history, then bind the new run as active |
-| New planner input requests `semantic-repair` | Reject before hashing or task binding; the route is decode-only |
-| Historical snapshot contains `semantic-repair` | Decode and restore it without treating the route as a current planner option |
 | Restore lacks projected blob but has a valid artifact id | Materialize from content-addressed storage |
 | Restore lacks both blob and recoverable artifact | Fail recovery explicitly; do not invent pixels or readiness |
-| Legacy project lacks production metadata | Add an idempotent `legacy-unverified` snapshot; do not invent QA or manifest evidence |
+| Project lacks valid production metadata | Use an empty current snapshot; do not infer readiness, QA, or manifest evidence from slices |
 | One planned board material produces several contained foreground crops | Composite them at their original relative offsets into one transparent artifact |
 | Multiple planned board materials produce ambiguous crops | Fail slot assignment; never guess or merge across task slots |
 
@@ -235,13 +230,12 @@ the Zustand store carries `assetProduction: AssetProductionSnapshot`.
   success, waiver invalidation, and authority supersession.
 - Adapter tests: prototype board/direct routes, manual worker, Agent tool,
   targeted repair, and cross-entry overwrite prevention.
-- Planner/persistence tests: current inputs reject `semantic-repair` while
-  historical snapshots containing it still decode.
+- Planner/persistence tests: retired routes and statuses fail current schema validation.
 - Coordinator tests: new-run supersession, shared publication sequence, carry
   of settled revisions, cancellation and finalize behavior.
 - Projection tests: review and failed tasks remain visible with and without an
   image artifact, and projected slices deduplicate their task blocker.
-- Persistence tests: additive legacy migration, artifact-id materialization,
+- Persistence tests: strict current snapshot parsing, artifact-id materialization,
   repeated restore, and decision/evidence round-trip into Design IR and Export.
 - Browser E2E: real canvas CV -> content-addressed writes -> task publication ->
   project restore -> current material projection -> `ready-to-deliver` Outcome.
@@ -307,8 +301,8 @@ Real gateway benchmarks are opt-in with
   `boardGroupId`; deterministic closure creates one exact-layout region per
   authored group, creates one `direct-generate` region per art-directed
   standalone material, and keeps ordinary layout regions `ignore-code-ui`.
-  Historical seeds without group ids retain their former single-group
-  projection. Closure never pads a route to a requested or benchmark count.
+  Seeds without group ids are incomplete current records and are rejected.
+  Closure never pads a route to a requested or benchmark count.
 - Compile the logical prototype graph into an explicit paid-request budget.
   Heterogeneous fixtures include pages with zero, one, and several useful
   materials and compute their expectation as Design Systems + actual pages +
@@ -391,8 +385,8 @@ Real gateway benchmarks are opt-in with
 - Region tests proving concurrency 2, per-region isolation, diagnostics-before-
   slice ordering within each region, and bitmap cleanup.
 - Planning-seed closure tests proving zero-material routes stay zero, multiple
-  authored `boardGroupId` values become multiple board regions, legacy missing
-  group ids remain compatible, and `direct-generate` materials stay standalone
+  authored `boardGroupId` values become multiple board regions, missing group
+  ids fail validation, and `direct-generate` materials stay standalone
   without any per-page quota.
 - Component coverage proving every logical page in the resolved fixture issues
   exactly one baseline page call, with one Design System reference for anchors
@@ -665,9 +659,8 @@ source and Agent run that obtained approval. Production evidence may include
   full-size transparent PNG, then sends that result through the deterministic
   worker to produce one or more slices. It never redraws source pixels.
 - Imported and provider-returned encoded bytes remain attached to `SourceState`
-  and are used for CAS persistence and material execution. Bitmap-only legacy
-  sources are explicitly normalized to PNG; they are never presented as exact
-  original encodings.
+  and are used for CAS persistence and material execution. Bitmap-only sources
+  are invalid persistence input and are never presented as exact originals.
 - The full-size Vision result is stored as mask evidence but is not projected as
   a user slice. Final PNG slices bind the original source artifact, mask
   artifact, bounds, cutout parameters, provider route, QA, and lineage.
@@ -695,7 +688,7 @@ source and Agent run that obtained approval. Production evidence may include
 | Vision returns no instances or unsafe buffer metadata | Fail closed; preserve the prior source and production state |
 | Semantic mask succeeds but deterministic slicing yields no subjects | Publish no production result; orphaned CAS evidence may remain |
 | Restored source has encoded bytes | Reuse the exact stored encoding and media type |
-| Legacy source has only an `ImageBitmap` | Normalize to PNG and mark the encoding as `normalized-png` |
+| Persisted source has only an `ImageBitmap` | Reject the incomplete source; do not invent an encoded original |
 
 ### 5. Good / Base / Bad Cases
 

@@ -112,14 +112,11 @@ function request(overrides: Record<string, unknown> = {}) {
 }
 
 describe('Design IR candidate selection', () => {
-  it('defaults legacy documents to an empty candidate-set collection', () => {
-    const legacy = { ...document() }
-    delete legacy.candidateSets
-    expect(designDocumentSchema.parse(legacy).candidateSets).toBeUndefined()
-    expect(validateDesignDocument(legacy)).toMatchObject({
-      ok: true,
-      data: { document: { candidateSets: [] } },
-    })
+  it('requires the current candidate-set collection', () => {
+    const incomplete = { ...document() } as Record<string, unknown>
+    delete incomplete.candidateSets
+    expect(designDocumentSchema.safeParse(incomplete).success).toBe(false)
+    expect(validateDesignDocument(incomplete)).toMatchObject({ ok: false })
   })
 
   it('validates candidate material and provenance references across Design IR', () => {

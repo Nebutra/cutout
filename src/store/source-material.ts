@@ -7,7 +7,7 @@ export interface ResolvedSourceMaterial {
   readonly encoding: 'original' | 'normalized-png'
 }
 
-/** Preserve encoded inputs exactly; normalize only bitmap-only legacy sources. */
+/** Preserve encoded inputs exactly; normalize bitmap-only runtime sources. */
 export async function resolveSourceMaterial(
   source: SourceState,
 ): Promise<ResolvedSourceMaterial> {

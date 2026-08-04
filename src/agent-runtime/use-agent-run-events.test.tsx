@@ -67,7 +67,7 @@ describe('useAgentRunEvents repository integration', () => {
     const local = replayRunEvents([
       createRunEvent('run.1', { type: 'run-started', mode: 'create' }, { eventId: 'start.1', at: 1 }),
       createRunEvent('run.1', { type: 'intent-recorded', intent: 'Hello' }, { eventId: 'user.1', at: 2 }),
-      createRunEvent('run.1', { type: 'agent-message', message: 'First' }, { eventId: 'agent.1', at: 3 }),
+      createRunEvent('run.1', { type: 'agent-message', message: 'First', responseToEventId: 'user.1' }, { eventId: 'agent.1', at: 3 }),
       createRunEvent('run.1', { type: 'outcome-evaluated', status: 'satisfied', missing: [] }, { eventId: 'outcome.1', at: 4 }),
     ])
     const repository = replayRunEvents([

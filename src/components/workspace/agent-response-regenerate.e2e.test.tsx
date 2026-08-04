@@ -151,7 +151,7 @@ describe('Agent response regeneration workspace flow', () => {
     const events = replayRunEvents([
       createRunEvent('run:old', { type: 'run-started', mode: 'create' }, { eventId: 'start', at: 1 }),
       createRunEvent('run:old', { type: 'intent-recorded', intent: 'Who are you?' }, { eventId: 'user', at: 2 }),
-      createRunEvent('run:old', { type: 'agent-message', message: 'Old response' }, { eventId: 'agent', at: 3 }),
+      createRunEvent('run:old', { type: 'agent-message', message: 'Old response', responseToEventId: 'user' }, { eventId: 'agent', at: 3 }),
       createRunEvent('run:old', { type: 'run-cancelled', reason: 'Previous attempt stopped.' }, { eventId: 'cancel', at: 4 }),
     ])
     getStoreState().setBrief('Who are you?')
@@ -251,7 +251,7 @@ describe('Agent response regeneration workspace flow', () => {
     const events = replayRunEvents([
       createRunEvent('run:old', { type: 'run-started', mode: 'create' }, { eventId: 'start', at: 1 }),
       createRunEvent('run:old', { type: 'intent-recorded', intent: 'Who are you?' }, { eventId: 'user', at: 2 }),
-      createRunEvent('run:old', { type: 'agent-message', message: 'Old response' }, { eventId: 'agent', at: 3 }),
+      createRunEvent('run:old', { type: 'agent-message', message: 'Old response', responseToEventId: 'user' }, { eventId: 'agent', at: 3 }),
     ])
     getStoreState().setBrief('Who are you?')
     getStoreState().setWorkspaceSnapshot(createEmptyWorkspaceSnapshot({ agentRunEvents: events }))

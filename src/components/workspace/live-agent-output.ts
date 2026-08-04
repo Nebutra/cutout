@@ -8,7 +8,7 @@ export interface CollectedLiveText {
   readonly usedBufferedFallback: boolean
 }
 
-/** Legacy workspace.v1 may contain a partial stream; it is never replayed. */
+/** Partial provider streams are ephemeral and never replayed from a snapshot. */
 export function restoreLiveAgentOutput(_persisted: string | undefined): string {
   return ''
 }

@@ -16,7 +16,7 @@ function state(): HeadlessProjectState {
       { id: 'guide-source', kind: 'document' as const, role: 'evidence' as const, title: 'Approved guide', license: { kind: 'proprietary' as const, holder: 'Brand Co' }, content: [{ id: 'guide-content', uri: `sha256:${SHA}`, sha256: SHA, mediaType: 'text/markdown' }] },
     ],
     brands: [{ id: 'brand:co', name: 'Brand Co', status: 'active' as const, provenanceId: 'logo-import' }],
-    tokens: [], components: [], materials: [],
+    tokens: [], components: [], materials: [], candidateSets: [],
     provenance: [
       { id: 'logo-import', operation: 'import' as const, sourceIds: ['logo-source'], actor: { kind: 'human' as const, id: 'designer' }, recordedAt: TIME },
       { id: 'guide-import', operation: 'import' as const, sourceIds: ['guide-source'], actor: { kind: 'human' as const, id: 'designer' }, recordedAt: TIME },

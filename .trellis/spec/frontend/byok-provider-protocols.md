@@ -34,7 +34,7 @@ interface ProviderConfig {
   kind: string
   label: string
   baseUrl?: string
-  wireProtocol?: ProviderWireProtocol
+  wireProtocol: ProviderWireProtocol
   defaultModel: string
   enabled: boolean
 }
@@ -90,8 +90,9 @@ ai_proxy_cancel(
 
 ### 3. Contracts
 
-The persisted field name is always `wireProtocol`. Existing serialized values
-must not be renamed. Records that omit the field use these effective defaults:
+The persisted field name is always `wireProtocol`. Every non-Gateway persisted
+record must contain it explicitly. The product uses these defaults only while
+creating a new draft or normalizing a reviewed discovery candidate:
 
 | Provider kind | Effective protocol |
 | --- | --- |
@@ -172,8 +173,8 @@ import.
 | --- | --- |
 | Unknown protocol string | TypeScript/Rust decoding fails closed |
 | Known protocol unsupported by `kind` | Reject before reading a secret or sending a request |
-| Missing protocol on a legacy record | Resolve the deterministic default above |
-| Missing protocol for a kind with no default | Return an actionable wire-protocol-required error |
+| Missing protocol on a persisted non-Gateway record | Reject the record with an actionable wire-protocol-required error |
+| Missing protocol on a new draft | Apply the current product default before persistence |
 | `/models` returns HTML or malformed JSON | Report endpoint/catalog misconfiguration |
 | `/models` returns 401/403 | Report credential failure |
 | `/models` returns 404/405 | Report catalog unsupported; do not fall back to generation |
@@ -186,8 +187,8 @@ import.
 - Good: `openai-compatible` + `anthropic-messages` + a custom HTTPS base URL
   selects the Anthropic SDK, adds `/v1` only when pathless, and injects
   Anthropic headers in Rust.
-- Base: a legacy `openai-compatible` record without `wireProtocol` continues as
-  Chat Completions without rewriting persisted JSON.
+- Base: a new `openai-compatible` draft defaults to Chat Completions and stores
+  that protocol explicitly before it becomes current provider state.
 - Bad: `deepseek` + `anthropic-messages` is rejected by both TypeScript and
   Rust validation before network access.
 - Bad: connection check sends a tiny `ping` generation to infer support. This
@@ -195,7 +196,7 @@ import.
 
 ### 6. Tests Required
 
-- TypeScript: schema enum/defaults, supported matrix, legacy defaulting, base
+- TypeScript: schema enum/draft defaults, supported matrix, strict persisted records, base
   URL paths, exhaustive adapter routing, buffered/stream protocol propagation,
   model-catalog parsing, and refined-schema consumers using `safeExtend` or a
   shared refined draft schema.

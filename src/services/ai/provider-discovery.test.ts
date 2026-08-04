@@ -18,7 +18,7 @@ describe('provider discovery native contract', () => {
     invokeMock.mockResolvedValueOnce({
       provider: {
         id: 'local-import-e', kind: 'openai', label: 'OpenAI',
-        defaultModel: 'gpt-5', enabled: true,
+        wireProtocol: 'responses', defaultModel: 'gpt-5', enabled: true,
       },
       models: ['gpt-5'],
     })

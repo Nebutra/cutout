@@ -44,17 +44,17 @@ describe('prototype resource-pack production authority', () => {
       .toThrow('Resource production authority is unavailable')
   })
 
-  it('retains artifact-set authority resolution for legacy unprefixed packs', async () => {
+  it('rejects unprefixed resource packs instead of inferring authority from artifacts', async () => {
     const first = await completedRun('run:first', 'artifact:first', 1)
     const second = await completedRun('run:second', 'artifact:second', 20, first)
-    const legacyPack = {
+    const unprefixedPack = {
       ...resourcePack('run:missing', 'artifact:second'),
-      id: 'legacy-resource-pack',
+      id: 'resource-pack-without-run-authority',
     }
 
-    expect(resolveResourcePackProductionRun(second, legacyPack)?.runId).toBe('run:second')
-    expect(selectResourcePackProductionAuthority(second, legacyPack).activeRunId)
-      .toBe('run:second')
+    expect(resolveResourcePackProductionRun(second, unprefixedPack)).toBeUndefined()
+    expect(() => selectResourcePackProductionAuthority(second, unprefixedPack))
+      .toThrow('Resource production authority is unavailable')
   })
 
   it('verifies every bound artifact against its completed task and stored bytes', async () => {

@@ -247,6 +247,12 @@ pub async fn save_providers<R: Runtime>(
 
 fn validate_provider_slice(providers: &[ProviderConfig]) -> Result<(), ProvidersError> {
     for provider in providers {
+        if provider.kind != ProviderKind::Gateway && provider.wire_protocol.is_none() {
+            return Err(ProvidersError::InvalidProtocol(format!(
+                "wire protocol is required for {}",
+                provider.kind.as_str()
+            )));
+        }
         provider
             .kind
             .effective_wire_protocol(provider.wire_protocol)
@@ -293,14 +299,14 @@ mod tests {
             kind: ProviderKind::Anthropic,
             label: "My Anthropic".to_string(),
             base_url: None,
-            wire_protocol: None,
+            wire_protocol: Some(ProviderWireProtocol::AnthropicMessages),
             default_model: "claude-sonnet-4-6".to_string(),
             enabled: true,
         };
         let json = serde_json::to_string(&cfg).unwrap();
         assert!(json.contains("\"defaultModel\":\"claude-sonnet-4-6\""));
         assert!(!json.contains("baseUrl"), "absent base_url must be omitted");
-        assert!(!json.contains("wireProtocol"));
+        assert!(json.contains("\"wireProtocol\":\"anthropic-messages\""));
 
         let back: ProviderConfig = serde_json::from_str(&json).unwrap();
         assert_eq!(back.id, "abc");
@@ -312,7 +318,8 @@ mod tests {
     fn config_parses_incoming_camel_case_base_url() {
         let json = r#"{
             "id":"x","kind":"openai-compatible","label":"Local",
-            "baseUrl":"https://host/v1","defaultModel":"m","enabled":false
+            "baseUrl":"https://host/v1","wireProtocol":"chat-completions",
+            "defaultModel":"m","enabled":false
         }"#;
         let cfg: ProviderConfig = serde_json::from_str(json).unwrap();
         assert_eq!(cfg.base_url.as_deref(), Some("https://host/v1"));
@@ -395,6 +402,23 @@ mod tests {
         };
         assert!(matches!(
             validate_provider_slice(&[invalid]),
+            Err(ProvidersError::InvalidProtocol(_))
+        ));
+    }
+
+    #[test]
+    fn persisted_non_gateway_configs_require_an_explicit_protocol() {
+        let missing = ProviderConfig {
+            id: "p".to_string(),
+            kind: ProviderKind::Openai,
+            label: "OpenAI".to_string(),
+            base_url: None,
+            wire_protocol: None,
+            default_model: "gpt-5.4".to_string(),
+            enabled: true,
+        };
+        assert!(matches!(
+            validate_provider_slice(&[missing]),
             Err(ProvidersError::InvalidProtocol(_))
         ));
     }

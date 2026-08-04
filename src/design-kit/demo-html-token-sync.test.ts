@@ -24,6 +24,7 @@ function document(overrides: Partial<DesignDocument> = {}): DesignDocument {
     ],
     components: [],
     materials: [],
+    candidateSets: [],
     provenance: [],
     relations: [],
     ...overrides,

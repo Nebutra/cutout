@@ -1,6 +1,6 @@
 import { act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { SettingsUIProvider } from '@/components/settings/settings-ui'
 import type { UpdateState } from '@/updater'
@@ -17,28 +17,34 @@ import { NotificationRow, SidebarAccount } from './SidebarAccount'
 
 const preferences = { channel: 'stable' as const, autoCheck: true }
 const idle: UpdateState = { phase: 'idle', preferences, downloaded: 0 }
+const NOTIFICATIONS_STORAGE_KEY = 'cutout.notifications.v1'
+const originalLocalStorage = Object.getOwnPropertyDescriptor(globalThis, 'localStorage')
+const localStorageValues = new Map<string, string>()
+const testLocalStorage = {
+  get length() { return localStorageValues.size },
+  clear: () => localStorageValues.clear(),
+  getItem: (key: string) => localStorageValues.get(key) ?? null,
+  key: (index: number) => [...localStorageValues.keys()][index] ?? null,
+  removeItem: (key: string) => { localStorageValues.delete(key) },
+  setItem: (key: string, value: string) => { localStorageValues.set(key, value) },
+} satisfies Storage
+Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: testLocalStorage })
+;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 const i18n = setupI18n()
 i18n.loadAndActivate({ locale: 'en', messages: {} })
 let root: Root | undefined
 let host: HTMLDivElement | undefined
-beforeEach(() => {
-  const values = new Map<string, string>()
-  vi.stubGlobal('localStorage', {
-    get length() { return values.size },
-    clear: () => values.clear(),
-    getItem: (key: string) => values.get(key) ?? null,
-    key: (index: number) => [...values.keys()][index] ?? null,
-    removeItem: (key: string) => { values.delete(key) },
-    setItem: (key: string, value: string) => { values.set(key, value) },
-  } satisfies Storage)
-})
+beforeEach(() => localStorage.clear())
 afterEach(() => {
   act(() => root?.unmount())
   host?.remove()
   localStorage.clear()
-  vi.unstubAllGlobals()
   root = undefined
   host = undefined
+})
+afterAll(() => {
+  if (originalLocalStorage) Object.defineProperty(globalThis, 'localStorage', originalLocalStorage)
+  else Reflect.deleteProperty(globalThis, 'localStorage')
 })
 
 function mount(initial: UpdateState) {
@@ -133,4 +139,42 @@ describe('Home update action', () => {
     expect(deferUpdateNotification).toHaveBeenCalledWith('update:stable:1.2.0')
   })
 
+})
+
+describe('Home notifications', () => {
+  it('renders only the latest current outcome state', async () => {
+    localStorage.setItem(NOTIFICATIONS_STORAGE_KEY, JSON.stringify([
+      {
+        id: 'agent:outcome',
+        source: 'agent',
+        kind: 'attention',
+        title: 'Result needs repair',
+        detail: 'Shared design system (1), Reusable materials (4)',
+        createdAt: 41,
+        read: false,
+      },
+      {
+        id: 'agent:outcome',
+        source: 'agent',
+        kind: 'attention',
+        title: 'Result needs repair',
+        detail: 'Shared design system (1), Portable DESIGN.md (1), Reusable materials (4)',
+        createdAt: 42,
+        read: false,
+      },
+    ]))
+
+    const view = mount(idle)
+    const trigger = view.host.querySelector('button[aria-haspopup="menu"][aria-label="Notifications (1)"]') as HTMLButtonElement
+    expect(trigger).not.toBeNull()
+    await act(async () => {
+      trigger.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+    })
+
+    const rows = document.body.querySelectorAll('[data-notification-kind]')
+    expect(rows).toHaveLength(1)
+    expect(rows[0]?.textContent).toContain('Result needs repair')
+    expect(rows[0]?.textContent).toContain('Shared design system (1), Portable DESIGN.md (1), Reusable materials (4)')
+    expect(rows[0]?.textContent).not.toContain('Shared design system (1), Reusable materials (4)')
+  })
 })

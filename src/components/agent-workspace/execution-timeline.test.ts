@@ -19,8 +19,8 @@ describe('projectExecutionTimeline', () => {
 
   it('groups orphan tools and exposes only unresolved explicit approval', () => {
     const timeline = projectExecutionTimeline(store([
-      { eventId: 'auto', runId: 'run', at: 2_000, type: 'tool-approval-requested', toolCallId: 'auto', requestId: 'auto-r', tool: 'image.generate', label: 'Generate reference', estimatedCost: { currency: 'USD', amount: 0.1 }, budgetCeiling: { currency: 'USD', amount: 1 }, approvalPolicy: 'auto-within-budget', reason: 'Auto within policy.' },
-      { eventId: 'explicit', runId: 'run', at: 3_000, type: 'tool-approval-requested', toolCallId: 'explicit', requestId: 'explicit-r', tool: 'image.generate', label: 'Protected export', estimatedCost: { currency: 'USD', amount: 0.1 }, budgetCeiling: { currency: 'USD', amount: 1 }, approvalPolicy: 'explicit', reason: 'User approval required.' },
+      { eventId: 'auto', runId: 'run', at: 2_000, type: 'tool-approval-requested', toolCallId: 'auto', requestId: 'auto-r', tool: 'image.generate', label: 'Generate reference', budgetCeiling: { currency: 'USD', amount: 1 }, approvalPolicy: 'auto-within-budget', reason: 'Auto within policy.', pendingApproval: false },
+      { eventId: 'explicit', runId: 'run', at: 3_000, type: 'tool-approval-requested', toolCallId: 'explicit', requestId: 'explicit-r', tool: 'image.generate', label: 'Protected export', budgetCeiling: { currency: 'USD', amount: 1 }, approvalPolicy: 'explicit', reason: 'User approval required.', pendingApproval: true },
     ]))!
     expect(timeline.steps).toHaveLength(1)
     expect(timeline.steps[0]?.id).toBe('unscoped-tools')
@@ -108,7 +108,7 @@ describe('projectExecutionTimeline', () => {
   it('keeps an explicit approval nested under preparation visible and actionable', () => {
     const timeline = projectExecutionTimeline(store([
       { eventId: 'prepare', runId: 'run', at: 2_000, type: 'step-started', stepId: 'step:prepare:run', label: 'Preparing the run' },
-      { eventId: 'approval', runId: 'run', at: 2_100, type: 'tool-approval-requested', toolCallId: 'generate', requestId: 'request', stepId: 'step:prepare:run', tool: 'image.generate', label: 'Generate hero', estimatedCost: { currency: 'USD', amount: 0.1 }, budgetCeiling: { currency: 'USD', amount: 1 }, approvalPolicy: 'explicit', reason: 'User approval required.' },
+      { eventId: 'approval', runId: 'run', at: 2_100, type: 'tool-approval-requested', toolCallId: 'generate', requestId: 'request', stepId: 'step:prepare:run', tool: 'image.generate', label: 'Generate hero', budgetCeiling: { currency: 'USD', amount: 1 }, approvalPolicy: 'explicit', reason: 'User approval required.', pendingApproval: true },
     ]))!
     const active = activeExecutionTimeline(timeline)
 

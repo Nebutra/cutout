@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { openDeliverWorkspace } from "./workspace-helpers";
 
 test("Delivery stays outcome-first and keeps preview approval real", async ({
   page,
@@ -11,7 +12,7 @@ test("Delivery stays outcome-first and keeps preview approval real", async ({
     .getByRole("textbox", { name: "Describe what you want to design..." })
     .fill("Delivery UX regression");
   await page.getByRole("button", { name: "Create from brief" }).click();
-  await page.getByRole("button", { name: "Deliver", exact: true }).click();
+  await openDeliverWorkspace(page);
   if (testInfo.project.name === "mobile-chrome") {
     await page.setViewportSize({ width: 412, height: 915 });
   }

@@ -13,12 +13,12 @@ import type { PrototypeDesignSystemArtifact } from './prototype-artifact-recover
 import type { PrototypePlan } from './prototype-plan'
 import type { DesignDocument } from '@/design-ir'
 import type { WorkspaceSnapshot } from '@/workspace/workspace-snapshot'
-import {
-  candidateMaterialId,
-  migratePersistedPrototypeDesignSystemCandidateSet,
-} from './design-system-candidate-persistence'
-
-export { candidateMaterialId } from './design-system-candidate-persistence'
+export function candidateMaterialId(
+  candidateId: string,
+  role: 'visual' | 'markdown',
+): string {
+  return `material:design-system-candidate:${candidateId}:${role}`
+}
 
 export interface PrototypeDesignSystemCandidateSet {
   readonly set: CandidateSet
@@ -61,20 +61,7 @@ export function selectedDesignMarkdownBinding(
 export function designSystemExplorationForPlan(
   plan: PrototypePlan,
 ): CandidateExplorationDecision {
-  return plan.designSystem.exploration ?? {
-    mode: 'auto',
-    decidedBy: 'fallback',
-    count: 1,
-    rationale: 'This historical plan has no exploration proposal, so Cutout uses one conservative direction.',
-    directions: [{
-      id: 'direction:default',
-      label: 'Primary direction',
-      thesis: plan.designSystem.styleSummary,
-      vary: ['visual treatment'],
-      preserve: ['product intent', 'audience', 'platform contract'],
-    }],
-    bounds: { maxCandidates: 8, maxParallelism: 2 },
-  }
+  return plan.designSystem.exploration
 }
 
 export function createPrototypeDesignSystemCandidateSet(input: {
@@ -189,59 +176,23 @@ export function persistPrototypeDesignSystemCandidateSet(
 
 export function recoverPrototypeDesignSystemCandidateSet(
   persisted: PersistedPrototypeDesignSystemCandidateSet | null | undefined,
-  legacySelected?: PersistedPrototypeDesignSystem | null,
 ): PrototypeDesignSystemCandidateSet | null {
-  if (persisted) {
-    const migrated = migratePersistedPrototypeDesignSystemCandidateSet(persisted)
-    const parsed = candidateSetSchema.safeParse(migrated.set)
-    if (!parsed.success) return null
-    const artifacts = Object.fromEntries(
-      Object.entries(migrated.artifacts ?? {}).map(([id, artifact]) => [id, restoreArtifact(artifact)]),
-    )
-    return { set: parsed.data, artifacts }
-  }
-  if (!legacySelected) return null
-  const candidateId = 'candidate:legacy-selected'
-  const baseRevisionId = 'workspace.v1:legacy-selected'
-  return {
-    set: candidateSetSchema.parse({
-      id: 'candidate-set:design-system:legacy-selected',
-      kind: 'design-system',
-      baseRevisionId,
-      proposal: {
-        mode: 'auto',
-        decidedBy: 'fallback',
-        count: 1,
-        rationale: 'Recovered the historical selected Design System as a single candidate.',
-        directions: [{
-          id: 'direction:legacy-selected',
-          label: 'Selected direction',
-          thesis: 'The previously generated and selected Design System.',
-          vary: ['historical visual treatment'],
-          preserve: ['existing prototype compatibility'],
-        }],
-        bounds: { maxCandidates: 8, maxParallelism: 2 },
-      },
-      candidates: [{
-        id: candidateId,
-        directionId: 'direction:legacy-selected',
-        status: 'ready',
-        outputs: [
-          { role: 'design-system', materialId: candidateMaterialId(candidateId, 'visual') },
-          { role: 'design-markdown', materialId: candidateMaterialId(candidateId, 'markdown') },
-        ],
-        provenanceIds: ['provenance:workspace-legacy'],
-      }],
-      selection: {
-        candidateId,
-        selectedAt: new Date(0).toISOString(),
-        actor: { kind: 'agent', id: 'workspace-legacy-recovery' },
-        baseRevisionId,
-        provenanceId: 'provenance:workspace-legacy-selection',
-      },
-    }),
-    artifacts: { [candidateId]: restoreArtifact(legacySelected) },
-  }
+  if (!persisted) return null
+  const parsed = candidateSetSchema.safeParse(persisted.set)
+  if (!parsed.success || parsed.data.kind !== 'design-system') return null
+  const hasInvalidMaterialBinding = parsed.data.candidates.some((candidate) =>
+    candidate.outputs.some((output) =>
+      (output.role === 'design-system'
+        && output.materialId !== candidateMaterialId(candidate.id, 'visual'))
+      || (output.role === 'design-markdown'
+        && output.materialId !== candidateMaterialId(candidate.id, 'markdown')),
+    ),
+  )
+  if (hasInvalidMaterialBinding) return null
+  const artifacts = Object.fromEntries(
+    Object.entries(persisted.artifacts).map(([id, artifact]) => [id, restoreArtifact(artifact)]),
+  )
+  return { set: parsed.data, artifacts }
 }
 
 export function directionForCandidate(

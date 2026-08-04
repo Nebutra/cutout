@@ -10,7 +10,6 @@ use keyring::{Entry, Error as KeyringError};
 use serde::Serialize;
 
 const SERVICE: &str = "com.nebutra.cutout";
-const LEGACY_SERVICE: &str = "com.leishi.cutout";
 
 fn account(provider_id: &str) -> String {
     format!("provider:{provider_id}")
@@ -91,18 +90,7 @@ fn cached_or_fetch(provider_id: &str) -> Result<Option<String>, KeyError> {
     }
     let secret = match entry(provider_id)?.get_password() {
         Ok(secret) => Some(secret),
-        Err(KeyringError::NoEntry) => {
-            match entry_for(LEGACY_SERVICE, provider_id)?.get_password() {
-                Ok(secret) => {
-                    entry(provider_id)?
-                        .set_password(&secret)
-                        .map_err(KeyError::from)?;
-                    Some(secret)
-                }
-                Err(KeyringError::NoEntry) => None,
-                Err(error) => return Err(KeyError::from(error)),
-            }
-        }
+        Err(KeyringError::NoEntry) => None,
         Err(error) => return Err(KeyError::from(error)),
     };
     if let Some(secret) = &secret {
@@ -132,8 +120,7 @@ fn set_key_inner(provider_id: &str, secret: &str) -> Result<(), KeyError> {
 fn key_status_inner(provider_id: &str) -> Result<bool, KeyError> {
     #[cfg(target_os = "macos")]
     {
-        return Ok(keychain_item_exists(SERVICE, provider_id)?
-            || keychain_item_exists(LEGACY_SERVICE, provider_id)?);
+        return keychain_item_exists(SERVICE, provider_id);
     }
     #[cfg(not(target_os = "macos"))]
     {

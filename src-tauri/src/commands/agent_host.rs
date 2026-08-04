@@ -1,5 +1,5 @@
 use super::registry_desktop::{authorized, RegistryDesktopState};
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use sha2::{Digest, Sha256};
 use std::{
     collections::HashMap,
@@ -15,7 +15,6 @@ use tauri::State;
 const FILE: &str = "agent-host-state.json";
 const MAX_CHECKPOINT_BYTES: u64 = 4 * 1024 * 1024;
 const MAX_ERROR_MESSAGE_CHARS: usize = 256;
-const LEGACY_MAX_ATTEMPTS: u32 = 3;
 const PROCESS_GRACE: Duration = Duration::from_millis(400);
 
 pub struct AgentHostDesktopState {
@@ -73,8 +72,19 @@ pub struct Node {
     lease: Option<Lease>,
     receipt_id: Option<String>,
     next_attempt_at: Option<u64>,
-    #[serde(default)]
-    max_attempts: Option<u32>,
+    #[serde(deserialize_with = "deserialize_positive_u32")]
+    max_attempts: u32,
+}
+
+fn deserialize_positive_u32<'de, D>(deserializer: D) -> Result<u32, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let value = u32::deserialize(deserializer)?;
+    if value == 0 {
+        return Err(serde::de::Error::custom("expected a positive integer"));
+    }
+    Ok(value)
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -936,9 +946,6 @@ fn sanitize_state(state: &mut HostFile) {
             for attempt in &mut node.attempts {
                 if let Some(error) = attempt.error.take() {
                     attempt.error = Some(sanitize_message(&error));
-                    if attempt.error_code.is_none() {
-                        attempt.error_code = Some("legacy-error".into());
-                    }
                 }
             }
         }
@@ -946,14 +953,6 @@ fn sanitize_state(state: &mut HostFile) {
     for entry in &mut state.events {
         if let Some(detail) = entry.detail.take() {
             entry.detail = Some(sanitize_message(&detail));
-            if entry.detail_code.is_none()
-                && matches!(
-                    entry.kind.as_str(),
-                    "node-failed" | "node-retry-scheduled" | "run-cancelled"
-                )
-            {
-                entry.detail_code = Some("legacy-error".into());
-            }
         }
     }
 }
@@ -1124,7 +1123,7 @@ fn recover_at(mut state: HostFile, instance: &str, at: u64) -> HostFile {
     state
 }
 fn retry_limit(node: &Node) -> u32 {
-    node.max_attempts.unwrap_or(LEGACY_MAX_ATTEMPTS).max(1)
+    node.max_attempts
 }
 fn lock_for(
     state: &AgentHostDesktopState,
@@ -1614,7 +1613,7 @@ pub async fn agent_host_run_start(
                         lease: None,
                         receipt_id: None,
                         next_attempt_at: None,
-                        max_attempts: None,
+                        max_attempts: 1,
                     },
                 )
             })
@@ -1645,6 +1644,9 @@ pub async fn agent_host_node_claim(
     lease_ms: u64,
     max_attempts: u32,
 ) -> Result<ClaimOutcome, String> {
+    if max_attempts == 0 {
+        return Err("Retry limit must be at least 1.".into());
+    }
     let mut granted = None;
     let (root, lock) = root_locked(&registry, &host, &workspace_handle).await?;
     let _guard = lock.lock().await;
@@ -1668,7 +1670,10 @@ pub async fn agent_host_node_claim(
             || node.lease.as_ref().is_some_and(|v| v.expires_at > at)
             || node.next_attempt_at.is_some_and(|value| value > at);
         if !blocked {
-            let configured_max_attempts = *node.max_attempts.get_or_insert(max_attempts.max(1));
+            if node.attempts.is_empty() {
+                node.max_attempts = max_attempts;
+            }
+            let configured_max_attempts = node.max_attempts;
             if node.attempts.len() as u32 >= configured_max_attempts {
                 node.status = "failed".into();
             } else {
@@ -1837,13 +1842,16 @@ pub async fn agent_host_node_fail(
         }
         let node = run.nodes.get_mut(&node_id).ok_or("Unknown node.")?;
         validate_grant(node, &grant, at)?;
+        if max_attempts != node.max_attempts {
+            return Err("Retry limit does not match the claimed node policy.".into());
+        }
         if let Some(attempt) = node.attempts.last_mut() {
             attempt.completed_at = Some(at);
             attempt.error = Some(error.clone());
             attempt.error_code = Some("effect-failed".into())
         }
         node.lease = None;
-        let configured_max_attempts = *node.max_attempts.get_or_insert(max_attempts.max(1));
+        let configured_max_attempts = node.max_attempts;
         if node.attempts.len() as u32 >= configured_max_attempts {
             node.status = "failed".into();
             run.status = "failed".into();
@@ -2015,7 +2023,7 @@ mod tests {
         }
     }
 
-    fn running_node(expires_at: u64, max_attempts: Option<u32>) -> Node {
+    fn running_node(expires_at: u64, max_attempts: u32) -> Node {
         Node {
             id: "node".into(),
             effect_key: None,
@@ -2074,7 +2082,7 @@ mod tests {
                             lease: None,
                             receipt_id: None,
                             next_attempt_at: None,
-                            max_attempts: None,
+                            max_attempts: 1,
                         },
                     ),
                     (
@@ -2092,7 +2100,7 @@ mod tests {
                             }),
                             receipt_id: None,
                             next_attempt_at: None,
-                            max_attempts: Some(3),
+                            max_attempts: 3,
                         },
                     ),
                 ]),
@@ -2128,7 +2136,7 @@ mod tests {
             }),
             receipt_id: None,
             next_attempt_at: None,
-            max_attempts: Some(3),
+            max_attempts: 3,
         };
         let grant = LeaseGrant {
             owner: "host".into(),
@@ -2155,7 +2163,7 @@ mod tests {
 
     #[test]
     fn recovery_preserves_live_leases_and_exhausts_one_attempt_nodes() {
-        let live = recover_at(state_with_node(running_node(101, Some(1))), "next", 100);
+        let live = recover_at(state_with_node(running_node(101, 1)), "next", 100);
         assert_eq!(live.runs["run"].status, "running");
         assert_eq!(live.runs["run"].nodes["node"].status, "running");
         assert_eq!(
@@ -2167,7 +2175,7 @@ mod tests {
             "lease-1"
         );
 
-        let expired = recover_at(state_with_node(running_node(100, Some(1))), "next", 100);
+        let expired = recover_at(state_with_node(running_node(100, 1)), "next", 100);
         let node = &expired.runs["run"].nodes["node"];
         assert_eq!(expired.runs["run"].status, "failed");
         assert_eq!(node.status, "failed");
@@ -2177,7 +2185,7 @@ mod tests {
             Some("lease-expired")
         );
 
-        let retryable = recover_at(state_with_node(running_node(100, Some(2))), "next", 100);
+        let retryable = recover_at(state_with_node(running_node(100, 2)), "next", 100);
         let node = &retryable.runs["run"].nodes["node"];
         assert_eq!(retryable.runs["run"].status, "recovering");
         assert_eq!(node.status, "queued");
@@ -2189,18 +2197,30 @@ mod tests {
     }
 
     #[test]
-    fn legacy_retry_limit_migrates_without_overriding_explicit_one_attempt_policy() {
-        let legacy = running_node(100, None);
-        assert_eq!(retry_limit(&legacy), LEGACY_MAX_ATTEMPTS);
-        let session = running_node(100, Some(1));
+    fn retry_limit_round_trips_without_inventing_a_missing_policy() {
+        let session = running_node(100, 1);
         assert_eq!(retry_limit(&session), 1);
         let persisted = serde_json::to_vec(&state_with_node(session.clone())).unwrap();
         let restored: HostFile = serde_json::from_slice(&persisted).unwrap();
-        assert_eq!(restored.runs["run"].nodes["node"].max_attempts, Some(1));
+        assert_eq!(restored.runs["run"].nodes["node"].max_attempts, 1);
         assert_eq!(
             recover_at(state_with_node(session), "next", 100).runs["run"].status,
             "failed"
         );
+    }
+
+    #[test]
+    fn retry_limit_rejects_missing_or_zero_persisted_policy() {
+        let mut missing = serde_json::to_value(state_with_node(running_node(100, 1))).unwrap();
+        missing["runs"]["run"]["nodes"]["node"]
+            .as_object_mut()
+            .unwrap()
+            .remove("maxAttempts");
+        assert!(serde_json::from_value::<HostFile>(missing).is_err());
+
+        let mut zero = serde_json::to_value(state_with_node(running_node(100, 1))).unwrap();
+        zero["runs"]["run"]["nodes"]["node"]["maxAttempts"] = serde_json::json!(0);
+        assert!(serde_json::from_value::<HostFile>(zero).is_err());
     }
 
     #[test]
@@ -2443,7 +2463,7 @@ mod tests {
         )
         .unwrap();
         let expired_child = registered_child(&host, directory.path(), "run", "node");
-        let state = state_with_node(running_node(20, Some(1)));
+        let state = state_with_node(running_node(20, 1));
         cancel_expired_processes(&host, directory.path(), &state, 20)
             .await
             .unwrap();
@@ -2480,7 +2500,7 @@ mod tests {
         let child = spawn_process_group();
         register_process_group(&host, directory.path(), "run", "node", &grant, child).unwrap();
         let child = registered_child(&host, directory.path(), "run", "node");
-        let mut state = state_with_node(running_node(20, Some(1)));
+        let mut state = state_with_node(running_node(20, 1));
         assert!(validate_grant(&state.runs["run"].nodes["node"], &grant, 20).is_err());
         cancel_registered_lease(&host, directory.path(), "run", "node", &grant.lease_id)
             .await

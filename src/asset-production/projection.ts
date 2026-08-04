@@ -18,7 +18,6 @@ export interface ProductionMaterialProjection {
   readonly status: ProductionTaskStatus
   readonly artifact: ProductionArtifactRef
   readonly issues: readonly ProductionIssue[]
-  readonly legacyUnverified: boolean
 }
 
 export interface ProductionReviewProjection {
@@ -58,7 +57,6 @@ export function projectProductionMaterials(
       status: state.status,
       artifact,
       issues: state.issues,
-      legacyUnverified: state.status === 'legacy-ready',
     }]
   })
 }

@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { openDeliverWorkspace } from "./workspace-helpers";
 
 test("Components stays outcome-first and preserves the explicit-declaration gate", async ({
   page,
@@ -11,7 +12,7 @@ test("Components stays outcome-first and preserves the explicit-declaration gate
   if (testInfo.project.name === "mobile-chrome") {
     await page.setViewportSize({ width: 1024, height: 915 });
   }
-  await page.getByRole("button", { name: "Deliver", exact: true }).click();
+  await openDeliverWorkspace(page);
   if (testInfo.project.name === "mobile-chrome") {
     await page.setViewportSize({ width: 412, height: 915 });
   }

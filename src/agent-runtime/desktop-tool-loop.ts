@@ -264,10 +264,6 @@ export function createDesktopToolLoop(
           model: capability
             ? { providerId: capability.providerId, model: capability.model }
             : undefined,
-          estimatedCost: capability?.estimatedCost ?? {
-            currency: input.request.budgetCeiling.currency,
-            amount: 0,
-          },
           budgetCeiling: input.request.budgetCeiling,
           approvalPolicy: input.request.approvalPolicy,
           reason: plan.executable
@@ -421,6 +417,7 @@ export function createDesktopToolLoop(
             request: {
               capability: "generate-image",
               intent: "Unknown tool call",
+              prompt: "Unknown tool call",
               inputArtifactIds: [],
               budgetCeiling: { currency: "USD", amount: 0 },
               approvalPolicy: "explicit",

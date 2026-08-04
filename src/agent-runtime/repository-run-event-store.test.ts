@@ -118,14 +118,14 @@ describe('repository Agent run-event reconciliation', () => {
     ]))
   })
 
-  it('deduplicates an identical legacy linear transcript', () => {
-    const legacy = replayRunEvents([
-      createRunEvent('legacy', { type: 'run-started', mode: 'create' }, { eventId: 'start', at: 1 }),
-      createRunEvent('legacy', { type: 'intent-recorded', intent: 'Hello' }, { eventId: 'user', at: 2 }),
-      createRunEvent('legacy', { type: 'agent-message', message: 'Hi' }, { eventId: 'agent', at: 3 }),
+  it('deduplicates an identical linear transcript', () => {
+    const transcript = replayRunEvents([
+      createRunEvent('run', { type: 'run-started', mode: 'create' }, { eventId: 'start', at: 1 }),
+      createRunEvent('run', { type: 'intent-recorded', intent: 'Hello' }, { eventId: 'user', at: 2 }),
+      createRunEvent('run', { type: 'agent-message', message: 'Hi', responseToEventId: 'user' }, { eventId: 'agent', at: 3 }),
     ])
 
-    expect(reconcileAgentRunEventStores(legacy, legacy).events).toEqual(legacy.events)
+    expect(reconcileAgentRunEventStores(transcript, transcript).events).toEqual(transcript.events)
   })
 
   it('treats omitted optional fields and JSON-dropped undefined fields as identical', () => {

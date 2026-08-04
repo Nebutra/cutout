@@ -108,9 +108,8 @@ function projectPrototypeDeliveryProgress(input: {
 - New `board-cutout` materials declare a stable route-local `boardGroupId`.
   Materials share a board only when the Agent determines they are a coherent,
   legible atomic family; one route may have zero, one, or multiple board
-  groups. The Agent generation boundary rejects a missing group id, while the
-  persisted compatibility decoder accepts historical seeds without group ids
-  and projects them into their former single compatibility group.
+  groups. Both generated and persisted planning boundaries reject a missing
+  group id; production never invents grouping for an incomplete seed.
 - The conversational generation decision owns an output-token ceiling large
   enough for its complete multi-suite route/material seed. That ceiling is a
   transport guard, never a suite, page, or per-route material quota. Truncation
@@ -141,11 +140,11 @@ function projectPrototypeDeliveryProgress(input: {
   reference, and the validated `designSystem.designMarkdown` is the final text
   contract. The pre-synthesis imported/correction context is only an input to
   design-system creation and must not bypass the resulting document.
-- New Agent-authored plans resolve `designSystem.exploration` before visual
+- Agent-authored plans resolve `designSystem.exploration` before visual
   generation. `count` must equal `directions.length`, remain within declared
   runtime bounds, and each direction declares a thesis, varied axes, and
-  preserved constraints. Historical plans cross one compatibility boundary
-  into a single conservative direction.
+  preserved constraints. A plan without this decision is incomplete and fails
+  validation.
 - A candidate count greater than one is a resumable workflow boundary. Generate
   and persist every candidate's visual plus image-grounded `DESIGN.md`, retain
   failed siblings, set `workflowPhase = 'design-system-selection'`, and return
@@ -168,7 +167,7 @@ function projectPrototypeDeliveryProgress(input: {
   incidental material selection left by completed siblings, retains ready
   suite artifacts, and resumes only the failed suite's missing pages before
   continuing cancelled/unstarted alternatives. Generic outcome repair must not
-  collapse this retry into one legacy singular suite.
+  collapse this retry into one singular suite.
 - A material-production retry resolves the latest same-plan run by `planHash`,
   derives target regions only from its failed tasks, and carries consumable
   tasks through `carryAssetProductionTask`. Starting the new run supersedes the
@@ -308,9 +307,9 @@ function projectPrototypeDeliveryProgress(input: {
 - Planner prompt test: asserts dynamic IA ownership, platform-native route meta
   rules, complete route coverage, and no fixed template instruction.
 - Planning-seed tests: explicit zero materials, multiple board groups on one
-  route, historical missing-group compatibility, standalone direct materials,
-  and duplicate route-local material ids; no benchmark count becomes a
-  production default.
+  route, rejection of missing group ids, standalone direct materials, and
+  duplicate route-local material ids; no benchmark count becomes a production
+  default.
 - Plan validation test: duplicate route identities fail while arbitrary Agent
   route names remain valid.
 - Page-set unit test: all pages are generated, progress stays in plan order,
@@ -324,7 +323,7 @@ function projectPrototypeDeliveryProgress(input: {
   failures separately from deterministic product regressions.
 - Candidate contract tests: dynamic bounds, exact direction counts, ready-only
   selection, human selection for multi-direction proposals, stale revision
-  rejection, and legacy one-candidate recovery.
+  rejection, and strict current candidate-set recovery.
 - Persistence test: candidate visuals/Markdown, selection, provenance, and
   selected token projection survive workspace -> Design IR -> workspace.
 - Rendered comparison test: cards have stable media dimensions, failed siblings

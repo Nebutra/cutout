@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { composerRouteToPaidToolRequest, desktopPaidToolCapabilities, paidToolExecutionPrompt, paidToolPromptMaxLength, paidToolReceiptSchema, paidToolRequestSchema, planPaidTool } from './paid-tool-contract'
 
 const request = paidToolRequestSchema.parse({
-  capability: 'generate-image', intent: 'Create the approved hero visual', inputArtifactIds: [],
+  capability: 'generate-image', intent: 'Create the approved hero visual', prompt: 'Render the approved hero visual.', inputArtifactIds: [],
   budgetCeiling: { currency: 'USD', amount: 0.25, credits: 2 }, approvalPolicy: 'auto-within-budget',
 })
 const capability = {
@@ -40,7 +40,7 @@ describe('paid tool boundaries', () => {
     const parsed = paidToolRequestSchema.parse({ ...request, prompt })
     expect(parsed.intent).toBe('Create the approved hero visual')
     expect(paidToolExecutionPrompt(parsed)).toBe(prompt)
-    expect(paidToolExecutionPrompt(request)).toBe(request.intent)
+    expect(() => paidToolRequestSchema.parse({ ...request, prompt: undefined })).toThrow()
     expect(() => paidToolRequestSchema.parse({ ...request, prompt: 'x'.repeat(paidToolPromptMaxLength + 1) })).toThrow()
   })
 
@@ -57,7 +57,7 @@ describe('paid tool boundaries', () => {
   it('maps desktop assignments to a non-secret shared capability declaration', () => {
     const assignment = { providerId: 'provider-1', model: 'image-model' }
     expect(desktopPaidToolCapabilities(
-      [{ id: 'provider-1', kind: 'openai', label: 'OpenAI', defaultModel: 'chat', enabled: true }],
+      [{ id: 'provider-1', kind: 'openai', label: 'OpenAI', wireProtocol: 'responses', defaultModel: 'chat', enabled: true }],
       { image: assignment },
       {
         descriptors: [{
@@ -80,7 +80,7 @@ describe('paid tool boundaries', () => {
 
   it('advertises no paid image capability without exact model evidence', () => {
     expect(desktopPaidToolCapabilities(
-      [{ id: 'provider-1', kind: 'openai', label: 'OpenAI', defaultModel: 'chat', enabled: true }],
+      [{ id: 'provider-1', kind: 'openai', label: 'OpenAI', wireProtocol: 'responses', defaultModel: 'chat', enabled: true }],
       { image: { providerId: 'provider-1', model: 'image-model' } },
     )).toEqual([])
   })
@@ -90,8 +90,8 @@ describe('paid tool boundaries', () => {
     const edit = { providerId: 'provider-2', model: 'edit-model' }
     expect(desktopPaidToolCapabilities(
       [
-        { id: 'provider-1', kind: 'openai', label: 'OpenAI A', defaultModel: 'chat', enabled: true },
-        { id: 'provider-2', kind: 'openai-compatible', label: 'OpenAI B', baseUrl: 'https://relay.example/v1', defaultModel: 'chat', enabled: true },
+        { id: 'provider-1', kind: 'openai', label: 'OpenAI A', wireProtocol: 'responses', defaultModel: 'chat', enabled: true },
+        { id: 'provider-2', kind: 'openai-compatible', label: 'OpenAI B', baseUrl: 'https://relay.example/v1', wireProtocol: 'chat-completions', defaultModel: 'chat', enabled: true },
       ],
       { image: generation },
       {

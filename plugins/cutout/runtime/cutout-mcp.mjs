@@ -4301,324 +4301,6 @@ function superRefine(fn, params) {
 	return /* @__PURE__ */ _superRefine(fn, params);
 }
 //#endregion
-//#region src/services/ai/model-assignment-types.ts
-/**
-* Model assignment (design spec §5a) — which model serves each output modality.
-*
-* Two slots, bucketed by output modality: `chat` (text + reasoning + vision, one
-* multimodal model) and `image` (image generation). This is the concrete landing
-* table for prompt-management's `modality → (providerId, model)` resolution:
-* `text`/`vision` prompts resolve to `chat`, `image-generation` to `image`.
-*
-* Non-secret; persisted via `@tauri-apps/plugin-store` (see `model-assignment.local`).
-*/
-var modelAssignmentSchema = object({
-	providerId: string().min(1),
-	model: string().min(1),
-	fallbackModel: string().min(1).optional(),
-	effort: _enum([
-		"low",
-		"medium",
-		"high"
-	]).optional(),
-	reasoningProtocol: _enum([
-		"openai",
-		"anthropic",
-		"google"
-	]).optional()
-});
-object({
-	chat: modelAssignmentSchema.optional(),
-	image: modelAssignmentSchema.optional()
-});
-//#endregion
-//#region src/services/ai/model-capabilities.ts
-var modelCapabilitySchema = _enum([
-	"text",
-	"vision",
-	"reasoning",
-	"tools",
-	"web-search",
-	"image-generation",
-	"image-edit",
-	"asr",
-	"tts",
-	"video-generation",
-	"video-edit"
-]);
-var modelCatalogSourceSchema = _enum([
-	"provider",
-	"remote-catalog",
-	"verified-catalog",
-	"user-declared",
-	"legacy-migration"
-]);
-var modelCapabilityEvidenceSchema = object({
-	capability: modelCapabilitySchema,
-	sourceId: string().min(1),
-	kind: _enum([
-		"declared",
-		"observed",
-		"verified"
-	]),
-	capturedAt: string().datetime().optional(),
-	reference: string().url().optional()
-}).strict();
-var modelDescriptorSchema = object({
-	providerId: string().min(1),
-	model: string().min(1),
-	capabilities: array(modelCapabilitySchema).default([]),
-	source: modelCatalogSourceSchema,
-	evidence: array(modelCapabilityEvidenceSchema).default([]),
-	verifiedAt: string().datetime().optional(),
-	metadata: object({
-		contextWindow: number().int().positive().optional(),
-		inputMediaTypes: array(string().min(1)).default([]),
-		outputMediaTypes: array(string().min(1)).default([])
-	}).strict().optional()
-}).strict();
-var modelTaskKindSchema = _enum([
-	"text",
-	"vision",
-	"research",
-	"image-generation",
-	"image-edit",
-	"asr",
-	"tts",
-	"video-generation",
-	"video-edit",
-	"webdev",
-	"image-to-webdev"
-]);
-object({
-	version: literal("model-assignments.v2"),
-	bindings: partialRecord(modelTaskKindSchema, modelAssignmentSchema).default({}),
-	descriptors: array(modelDescriptorSchema).default([]),
-	legacy: object({
-		chat: modelAssignmentSchema.optional(),
-		image: modelAssignmentSchema.optional()
-	}).strict().optional()
-}).strict();
-object({
-	version: literal("model-catalog-cache.v1"),
-	generatedAt: string().datetime(),
-	expiresAt: string().datetime(),
-	descriptors: array(modelDescriptorSchema)
-}).strict();
-//#endregion
-//#region src/services/ai/provider-types.ts
-/**
-* BYOK provider model (spec §4) — the non-secret shape.
-*
-* A `ProviderConfig` is a user-configured connection. It is stored as plain JSON
-* in the app-config dir (via the Rust `load_providers`/`save_providers`
-* commands) and carries **no key**: the secret lives only in the OS keychain,
-* referenced by `id`. Gateway is modeled as "just a provider" (`kind:'gateway'`).
-*
-* Field casing is the on-the-wire shape the Rust `providers.rs` serde struct
-* uses (`#[serde(rename_all="camelCase")]`), so `baseUrl` here maps 1:1 to the
-* persisted JSON. (The AI SDK factory option is spelled `baseURL`; the mapping
-* happens in `generation-service.local.ts`.)
-*/
-var providerWireProtocolSchema = _enum([
-	"responses",
-	"chat-completions",
-	"anthropic-messages",
-	"google-generate-content"
-]);
-function isOpenAIShapedProvider(kind) {
-	return kind === "openai" || kind === "openai-compatible" || kind === "cc-switch" || [
-		"dashscope",
-		"deepseek",
-		"zhipu",
-		"moonshot",
-		"volcengine",
-		"siliconflow",
-		"openrouter",
-		"together",
-		"groq",
-		"fireworks",
-		"xai",
-		"mistral",
-		"ollama",
-		"vllm",
-		"lm-studio"
-	].includes(kind);
-}
-/** Effective wire default for old records that predate the persisted field. */
-function defaultProviderWireProtocol(kind) {
-	if (kind === "openai" || kind === "cc-switch") return "responses";
-	if (kind === "anthropic") return "anthropic-messages";
-	if (kind === "google") return "google-generate-content";
-	if (isOpenAIShapedProvider(kind)) return "chat-completions";
-}
-function supportedProviderWireProtocols(kind) {
-	if (kind === "openai" || kind === "cc-switch") return ["responses", "chat-completions"];
-	if (kind === "anthropic") return ["anthropic-messages"];
-	if (kind === "google") return ["google-generate-content"];
-	if (kind === "openai-compatible") return [
-		"responses",
-		"chat-completions",
-		"anthropic-messages",
-		"google-generate-content"
-	];
-	if (isOpenAIShapedProvider(kind)) return ["chat-completions"];
-	return [];
-}
-function isProviderWireProtocolSupported(kind, protocol) {
-	const supported = supportedProviderWireProtocols(kind);
-	return protocol === void 0 ? supported.length === 0 : supported.includes(protocol);
-}
-/** The ordered, user-selectable kinds (drives the Settings `Select`). */
-var PROVIDER_KINDS = [
-	"anthropic",
-	"openai",
-	"google",
-	"gateway",
-	"openai-compatible",
-	"cc-switch",
-	"dashscope",
-	"deepseek",
-	"zhipu",
-	"moonshot",
-	"volcengine",
-	"siliconflow",
-	"openrouter",
-	"together",
-	"groq",
-	"fireworks",
-	"xai",
-	"mistral",
-	"ollama",
-	"vllm",
-	"lm-studio"
-];
-var providerConfigFields = {
-	kind: string().min(1).max(120).regex(/^[a-z0-9][a-z0-9._-]*$/),
-	label: string().min(1),
-	baseUrl: string().min(1).optional(),
-	wireProtocol: providerWireProtocolSchema.optional(),
-	defaultModel: string().min(1),
-	enabled: boolean()
-};
-function unsupportedWireProtocolMessage(config) {
-	if (PROVIDER_KINDS.includes(config.kind) && !isProviderWireProtocolSupported(config.kind, config.wireProtocol ?? defaultProviderWireProtocol(config.kind))) return `${config.wireProtocol ?? "no wire protocol"} is not supported for ${config.kind}`;
-}
-function addWireProtocolIssue(config, context) {
-	const message = unsupportedWireProtocolMessage(config);
-	if (message) context.addIssue({
-		code: "custom",
-		path: ["wireProtocol"],
-		message
-	});
-}
-object({
-	id: string().min(1),
-	...providerConfigFields
-}).superRefine(addWireProtocolIssue);
-object({
-	id: string().min(1).optional(),
-	...providerConfigFields
-}).superRefine(addWireProtocolIssue);
-//#endregion
-//#region src/control-protocol/paid-tool-contract.ts
-var CREDENTIAL_VALUE = /(?:\b(?:sk|rk|pk)-[A-Za-z0-9_-]{8,}\b|\bBearer\s+[A-Za-z0-9._~+/-]+\b)/i;
-var safeText$2 = string().refine((value) => !CREDENTIAL_VALUE.test(value), "Credential-shaped values are not accepted.");
-var paidToolIntentMaxLength = 2e4;
-var paidToolPromptMaxLength = 2e5;
-var paidToolCapabilitySchema = _enum([
-	"generate-image",
-	"edit-image",
-	"cutout",
-	"semantic-cutout"
-]);
-var moneyEstimateSchema = object({
-	currency: string().regex(/^[A-Z]{3}$/),
-	amount: number().nonnegative().finite(),
-	credits: number().nonnegative().finite().optional()
-}).strict();
-var paidToolRequestSchema = object({
-	capability: paidToolCapabilitySchema,
-	providerId: safeText$2.min(1).max(160).optional(),
-	model: safeText$2.min(1).max(300).optional(),
-	intent: safeText$2.min(1).max(paidToolIntentMaxLength),
-	prompt: safeText$2.min(1).max(paidToolPromptMaxLength).optional(),
-	inputArtifactIds: array(safeText$2.min(1).max(300)).max(32).default([]),
-	budgetCeiling: moneyEstimateSchema,
-	approvalPolicy: _enum(["explicit", "auto-within-budget"]).default("auto-within-budget")
-}).strict();
-object({
-	capability: paidToolCapabilitySchema,
-	providerId: safeText$2.min(1).max(160),
-	model: safeText$2.min(1).max(300),
-	available: boolean(),
-	estimatedCost: moneyEstimateSchema
-}).strict();
-function planPaidTool(request, capability, policy, hasExplicitApproval) {
-	const base = {
-		capability: request.capability,
-		providerId: capability?.providerId ?? request.providerId,
-		model: capability?.model ?? request.model,
-		estimatedCost: capability?.estimatedCost,
-		budgetCeiling: request.budgetCeiling,
-		approvalPolicy: request.approvalPolicy
-	};
-	if (!capability?.available) return {
-		...base,
-		status: "capability-required",
-		executable: false,
-		reason: "No host executor is available for this capability."
-	};
-	if (!policy.allowPaid) return {
-		...base,
-		status: "authorization-required",
-		executable: false,
-		reason: "Paid actions are disabled by host policy."
-	};
-	if (!sameCurrency(request.budgetCeiling, capability.estimatedCost) || capability.estimatedCost.amount > request.budgetCeiling.amount || exceedsCredits(capability.estimatedCost, request.budgetCeiling) || policy.maxCost && exceeds(capability.estimatedCost, policy.maxCost)) return {
-		...base,
-		status: "budget-exceeded",
-		executable: false,
-		reason: "The host estimate exceeds the approved budget ceiling."
-	};
-	if (request.approvalPolicy === "explicit" && !hasExplicitApproval) return {
-		...base,
-		status: "authorization-required",
-		executable: false,
-		reason: "This request requires explicit approval."
-	};
-	return {
-		...base,
-		status: "ready",
-		executable: true
-	};
-}
-function sameCurrency(left, right) {
-	return left.currency === right.currency;
-}
-function exceedsCredits(cost, ceiling) {
-	return cost.credits !== void 0 && ceiling.credits !== void 0 && cost.credits > ceiling.credits;
-}
-function exceeds(cost, ceiling) {
-	return !sameCurrency(cost, ceiling) || cost.amount > ceiling.amount || exceedsCredits(cost, ceiling);
-}
-var paidToolReceiptSchema = object({
-	receiptId: safeText$2.min(1).max(160),
-	requestId: safeText$2.min(1).max(160),
-	capability: paidToolCapabilitySchema,
-	providerId: safeText$2.min(1).max(160),
-	model: safeText$2.min(1).max(300),
-	status: _enum([
-		"succeeded",
-		"failed",
-		"cancelled"
-	]),
-	charged: moneyEstimateSchema,
-	outputArtifactIds: array(safeText$2.min(1).max(300)).max(128),
-	startedAt: number().int().nonnegative(),
-	completedAt: number().int().nonnegative()
-}).strict();
-//#endregion
 //#region src/services/types.ts
 var ok$1 = (data) => ({
 	ok: true,
@@ -4668,8 +4350,7 @@ var candidateExplorationDecisionSchema = object({
 	count: number().int().positive(),
 	rationale: candidateTextSchema,
 	directions: array(candidateDirectionSchema).min(1),
-	bounds: candidateExplorationBoundsSchema,
-	estimate: moneyEstimateSchema.optional()
+	bounds: candidateExplorationBoundsSchema
 }).strict().superRefine((decision, context) => {
 	if (decision.count > decision.bounds.maxCandidates) context.addIssue({
 		code: "custom",
@@ -4932,8 +4613,7 @@ var prototypeDesignSystemSchema = object({
 	spacing: string().min(1),
 	componentPrinciples: array(string().min(1)).min(1),
 	assetDirection: string().min(1),
-	/** Historical plans omit this; every newly generated plan must resolve it. */
-	exploration: candidateExplorationDecisionSchema.optional()
+	exploration: candidateExplorationDecisionSchema
 });
 var prototypePlanningMaterialIdentityShape = {
 	id: string().min(1),
@@ -4941,21 +4621,9 @@ var prototypePlanningMaterialIdentityShape = {
 	description: string().min(1)
 };
 var prototypePlanningBoardGroupIdSchema = string().trim().min(1).max(80);
-var prototypePlanningMaterialSchema = object({
-	...prototypePlanningMaterialIdentityShape,
-	production: _enum(["board-cutout", "direct-generate"]),
-	boardGroupId: prototypePlanningBoardGroupIdSchema.optional().describe("Stable route-local group for board-cutout materials that belong on one coherent board. Omitted only by historical planning seeds.")
-}).strict().superRefine((material, context) => {
-	if (material.production === "direct-generate" && material.boardGroupId) context.addIssue({
-		code: "custom",
-		path: ["boardGroupId"],
-		message: "direct-generate materials cannot declare a boardGroupId."
-	});
-});
-/** The generated shape is structural so Provider tool schemas expose the
-* conditional requirement before execution, rather than only rejecting it in
-* an invisible post-call refinement. */
-var generatedPrototypePlanningMaterialSchema = discriminatedUnion("production", [object({
+/** The shape is structural so Provider tool schemas expose the conditional
+* requirement before execution. */
+var prototypePlanningMaterialSchema = discriminatedUnion("production", [object({
 	...prototypePlanningMaterialIdentityShape,
 	production: literal("board-cutout"),
 	boardGroupId: prototypePlanningBoardGroupIdSchema.describe("Required route-local id for the coherent atomic family sharing this board.")
@@ -4984,7 +4652,6 @@ var prototypePlanningRouteSchema = prototypePageSchema.pick({
 		materialIds.add(material.id);
 	}
 });
-var generatedPrototypePlanningRouteSchema = prototypePlanningRouteSchema.safeExtend({ materials: array(generatedPrototypePlanningMaterialSchema).describe("Zero or more non-UI visual materials genuinely worth reusing on this route. Do not include cards, forms, navigation, buttons, tables, or other code-reproducible UI.") });
 var prototypePlanningSeedSchema = object({
 	product: object({
 		name: string().min(1),
@@ -5055,10 +4722,6 @@ var prototypePlanningSeedSchema = object({
 		routeGraphs.add(graph);
 	}
 });
-prototypePlanningSeedSchema.safeExtend({ suites: array(object({
-	direction: candidateDirectionSchema,
-	pages: array(generatedPrototypePlanningRouteSchema).min(1).max(12)
-}).strict()).min(1).max(8) });
 var prototypePlanSchema = object({
 	version: literal("prototype-plan.v0"),
 	product: object({
@@ -5072,17 +4735,13 @@ var prototypePlanSchema = object({
 	designSystem: prototypeDesignSystemSchema,
 	pages: array(prototypePageSchema).min(1).max(12),
 	flows: array(prototypeFlowSchema).min(1),
-	reviewDocument: prototypeReviewDocumentSchema.optional(),
+	reviewDocument: prototypeReviewDocumentSchema,
 	/** Agent-authored compact input used to derive corresponding suite alternatives. */
 	planningSeed: prototypePlanningSeedSchema.optional(),
 	humanLoop: prototypeHumanLoopSchema.default({
 		mode: "continue",
 		rationale: "The requirement is clear enough to proceed."
 	})
-});
-prototypePlanSchema.extend({
-	designSystem: prototypeDesignSystemSchema.extend({ exploration: candidateExplorationDecisionSchema }),
-	reviewDocument: prototypeReviewDocumentSchema
 });
 function validatePrototypePlan(plan) {
 	const pageIds = /* @__PURE__ */ new Set();
@@ -5350,7 +5009,7 @@ var designTokenSchema = object({
 	value: string().min(1),
 	mode: string().min(1).optional(),
 	provenanceId: idSchema$2.optional(),
-	/** Absent means "flat", the historical default — a specimen view groups only when present. */
+	/** Absent means flat; a specimen view groups only when present. */
 	tier: _enum([
 		"primitive",
 		"semantic",
@@ -5406,8 +5065,7 @@ var materialProductionEvidenceSchema = object({
 		"needs-review",
 		"waived",
 		"failed",
-		"cancelled",
-		"legacy-ready"
+		"cancelled"
 	]),
 	included: boolean(),
 	bounds: object({
@@ -5664,8 +5322,7 @@ var designDocumentSchema = object({
 	components: array(componentSchema).default([]),
 	prototype: prototypeSubtreeSchema.optional(),
 	materials: array(materialSchema).default([]),
-	/** Historical Design IR documents omit this additive collection; validation normalizes it to `[]`. */
-	candidateSets: array(candidateSetSchema).optional(),
+	candidateSets: array(candidateSetSchema),
 	provenance: array(provenanceSchema).default([]),
 	relations: array(relationSchema).default([])
 }).strict();
@@ -5786,7 +5443,7 @@ function hasEntity(entityIds, relation, endpoint) {
 	const reference = relation[endpoint];
 	return entityIds[reference.kind]?.has(reference.id) ?? false;
 }
-/** Deterministic migration boundary for old IR and generators that only declared component.tokenIds. */
+/** Derives explicit token-usage relations from the current component contract. */
 function materializeTokenUsageGraph(input) {
 	const relations = [...input.relations];
 	const relationKeys = new Set(relations.map((relation) => `${relation.kind}:${relation.from.id}:${relation.to.id}`));
@@ -5811,7 +5468,6 @@ function materializeTokenUsageGraph(input) {
 	relations.sort((a, b) => a.id.localeCompare(b.id));
 	return {
 		...input,
-		candidateSets: input.candidateSets ?? [],
 		relations
 	};
 }
@@ -12761,7 +12417,7 @@ function hasExportableTokens(model) {
 //#endregion
 //#region src/coding-runtime/contracts.ts
 var CODING_TASK_VERSION = "cutout.coding-task.v1";
-var safeText$1 = string().min(1).max(1e5).refine((value) => !/(?:\b(?:sk|rk)-[A-Za-z0-9_-]{8,}\b|\bBearer\s+[A-Za-z0-9._~+/-]+\b)/i.test(value), "Credential-shaped values are not accepted.");
+var safeText$2 = string().min(1).max(1e5).refine((value) => !/(?:\b(?:sk|rk)-[A-Za-z0-9_-]{8,}\b|\bBearer\s+[A-Za-z0-9._~+/-]+\b)/i.test(value), "Credential-shaped values are not accepted.");
 var codingRelativePathSchema = string().min(1).max(500).refine((value) => {
 	if (value.includes("\0") || value.startsWith("/") || value.startsWith("\\") || /^[A-Za-z]:[\\/]/.test(value)) return false;
 	return value.replaceAll("\\", "/").split("/").every((part) => part.length > 0 && part !== "." && part !== "..");
@@ -12774,18 +12430,18 @@ var codingTaskSchema = object({
 		"review",
 		"repair"
 	]),
-	goal: safeText$1.max(2e4),
-	acceptanceCriteria: array(safeText$1.max(4e3)).min(1).max(100),
+	goal: safeText$2.max(2e4),
+	acceptanceCriteria: array(safeText$2.max(4e3)).min(1).max(100),
 	repo: object({
-		snapshotId: safeText$1.max(160),
-		ref: safeText$1.max(300).optional()
+		snapshotId: safeText$2.max(160),
+		ref: safeText$2.max(300).optional()
 	}).strict(),
 	inputs: object({
-		designDocumentRef: safeText$1.max(300),
-		brandKitRefs: array(safeText$1.max(300)).max(100),
-		designKitRefs: array(safeText$1.max(300)).max(100),
-		prototypeRefs: array(safeText$1.max(300)).max(100),
-		imageAssetRefs: array(safeText$1.max(300)).max(1e3)
+		designDocumentRef: safeText$2.max(300),
+		brandKitRefs: array(safeText$2.max(300)).max(100),
+		designKitRefs: array(safeText$2.max(300)).max(100),
+		prototypeRefs: array(safeText$2.max(300)).max(100),
+		imageAssetRefs: array(safeText$2.max(300)).max(1e3)
 	}).strict(),
 	target: object({
 		stack: _enum([
@@ -12843,10 +12499,10 @@ var codingPatchSchema = object({
 	taskId: string().min(1),
 	baseSnapshotId: string().min(1),
 	files: array(codingFilePatchSchema).min(1).max(2e3),
-	rationale: safeText$1.max(2e4),
+	rationale: safeText$2.max(2e4),
 	provenance: object({
-		backend: safeText$1.max(160),
-		inputRefs: array(safeText$1.max(300)).max(2e3)
+		backend: safeText$2.max(160),
+		inputRefs: array(safeText$2.max(300)).max(2e3)
 	}).strict()
 }).strict();
 var evidenceSchema = object({
@@ -12937,7 +12593,232 @@ function designSystemMarkdownValidationError(designMarkdown) {
 	return null;
 }
 //#endregion
-//#region src/design-ir/legacy-projection.ts
+//#region src/asset-production/contracts.ts
+var id$2 = string().min(1).max(240);
+var sha256$3 = string().regex(/^[a-f0-9]{64}$/);
+var timestamp = number().int().nonnegative();
+var assetProductionRouteSchema = _enum([
+	"board-cutout",
+	"direct-generate",
+	"import-cutout"
+]);
+var productionArtifactRefSchema = object({
+	artifactId: id$2,
+	sha256: sha256$3,
+	mediaType: string().min(1).max(120),
+	width: number().int().positive(),
+	height: number().int().positive()
+}).strict();
+var sourceRevisionSchema = object({
+	projectRevisionId: id$2,
+	designSystemArtifactId: id$2.optional(),
+	pageArtifacts: array(object({
+		pageId: id$2,
+		artifactId: id$2,
+		sha256: sha256$3
+	}).strict())
+}).strict();
+var assetProductionTaskSchema = object({
+	taskId: id$2,
+	manifestItemId: id$2,
+	pageId: id$2,
+	regionId: id$2,
+	route: assetProductionRouteSchema,
+	required: boolean(),
+	output: object({
+		mediaType: literal("image/png"),
+		subjectCount: literal(1),
+		transparent: boolean()
+	}).strict(),
+	boardGroupId: id$2.optional(),
+	label: string().min(1).max(240).optional(),
+	description: string().min(1).max(2e3).optional()
+}).strict();
+var boardLayoutManifestSchema = object({
+	version: literal("asset-board-layout.v1"),
+	boardGroupId: id$2,
+	taskIds: array(id$2).min(1),
+	slots: array(object({
+		taskId: id$2,
+		normalizedBounds: object({
+			x: number().min(0).max(1),
+			y: number().min(0).max(1),
+			width: number().positive().max(1),
+			height: number().positive().max(1)
+		}).strict()
+	}).strict()).min(1)
+}).strict().superRefine((manifest, context) => {
+	const taskIds = new Set(manifest.taskIds);
+	const slotIds = manifest.slots.map((slot) => slot.taskId);
+	if (taskIds.size !== manifest.taskIds.length) context.addIssue({
+		code: "custom",
+		message: "Board task ids must be unique."
+	});
+	if (new Set(slotIds).size !== slotIds.length) context.addIssue({
+		code: "custom",
+		message: "Board slot task ids must be unique."
+	});
+	if (slotIds.length !== manifest.taskIds.length || slotIds.some((taskId) => !taskIds.has(taskId))) context.addIssue({
+		code: "custom",
+		message: "Board slots must cover every board task exactly once."
+	});
+	for (const slot of manifest.slots) if (slot.normalizedBounds.x + slot.normalizedBounds.width > 1 || slot.normalizedBounds.y + slot.normalizedBounds.height > 1) context.addIssue({
+		code: "custom",
+		message: `Board slot ${slot.taskId} exceeds normalized bounds.`
+	});
+});
+var assetProductionPlanSchema = object({
+	version: literal("asset-production-plan.v1"),
+	planId: id$2,
+	planHash: sha256$3,
+	sourceRevision: sourceRevisionSchema,
+	tasks: array(assetProductionTaskSchema),
+	boardLayouts: array(boardLayoutManifestSchema),
+	ignoredManifestItemIds: array(id$2),
+	createdAt: timestamp
+}).strict().superRefine((plan, context) => {
+	const taskIds = plan.tasks.map((task) => task.taskId);
+	const manifestIds = plan.tasks.map((task) => task.manifestItemId);
+	if (new Set(taskIds).size !== taskIds.length) context.addIssue({
+		code: "custom",
+		message: "Asset production task ids must be unique."
+	});
+	if (new Set(manifestIds).size !== manifestIds.length) context.addIssue({
+		code: "custom",
+		message: "Manifest items must map to one production task."
+	});
+	const boardTaskIds = new Set(plan.boardLayouts.flatMap((layout) => layout.taskIds));
+	for (const task of plan.tasks) {
+		if (task.route === "board-cutout" && (!task.boardGroupId || !boardTaskIds.has(task.taskId))) context.addIssue({
+			code: "custom",
+			message: `Board task ${task.taskId} has no board layout.`
+		});
+		if (task.route !== "board-cutout" && task.boardGroupId) context.addIssue({
+			code: "custom",
+			message: `Non-board task ${task.taskId} cannot declare a board group.`
+		});
+	}
+});
+var productionIssueSchema = object({
+	code: string().min(1).max(120),
+	kind: _enum([
+		"integrity",
+		"quality",
+		"warning"
+	]),
+	message: string().min(1).max(2e3),
+	waivable: boolean(),
+	source: _enum([
+		"runtime",
+		"deterministic-check",
+		"model-review",
+		"user"
+	]),
+	recordedAt: timestamp
+}).strict().superRefine((issue, context) => {
+	if (issue.kind === "integrity" && issue.waivable) context.addIssue({
+		code: "custom",
+		message: "Integrity issues cannot be waivable."
+	});
+});
+var productionTaskEvidenceSchema = object({
+	sourceArtifactId: id$2.optional(),
+	maskArtifactId: id$2.optional(),
+	bounds: object({
+		x: number().nonnegative(),
+		y: number().nonnegative(),
+		width: number().positive(),
+		height: number().positive()
+	}).strict().optional(),
+	cutoutParams: object({
+		threshold: number(),
+		minArea: number(),
+		mergeGap: number(),
+		padding: number()
+	}).strict().optional(),
+	boardDiagnostics: object({
+		borderWhiteRatio: number().min(0).max(1),
+		whiteRatio: number().min(0).max(1),
+		compliant: boolean()
+	}).strict().optional(),
+	qaVerdict: object({
+		pass: boolean(),
+		failures: array(string().min(1).max(2e3)),
+		unavailable: boolean().optional()
+	}).strict().optional(),
+	providerRoute: string().min(1).max(240).optional(),
+	lineage: object({
+		previousRunId: id$2,
+		previousTaskId: id$2,
+		previousArtifactSha256: sha256$3
+	}).strict().optional()
+}).strict();
+var productionDecisionReceiptSchema = object({
+	version: literal("asset-production-decision.v1"),
+	receiptId: id$2,
+	taskId: id$2,
+	artifactSha256: sha256$3,
+	projectRevisionId: id$2,
+	decision: _enum(["approve", "waive"]),
+	issueCodes: array(string().min(1)).min(1),
+	actor: object({
+		kind: _enum(["human", "agent"]),
+		id: id$2
+	}).strict(),
+	decidedAt: timestamp
+}).strict();
+var productionTaskStateSchema = object({
+	taskId: id$2,
+	status: _enum([
+		"queued",
+		"generating",
+		"candidate-ready",
+		"reviewing",
+		"accepted",
+		"cutting",
+		"verifying",
+		"ready",
+		"needs-review",
+		"waived",
+		"failed",
+		"cancelled"
+	]),
+	attempt: number().int().nonnegative(),
+	candidate: productionArtifactRefSchema.optional(),
+	output: productionArtifactRefSchema.optional(),
+	issues: array(productionIssueSchema),
+	decision: productionDecisionReceiptSchema.optional(),
+	evidence: productionTaskEvidenceSchema.optional(),
+	origin: literal("native"),
+	updatedAt: timestamp
+}).strict();
+var assetProductionRunSchema = object({
+	runId: id$2,
+	planId: id$2,
+	planHash: sha256$3,
+	status: _enum([
+		"planned",
+		"running",
+		"partial",
+		"needs-review",
+		"completed",
+		"failed",
+		"cancelled"
+	]),
+	tasks: record(string(), productionTaskStateSchema),
+	startedAt: timestamp,
+	completedAt: timestamp.optional()
+}).strict();
+object({
+	version: literal("asset-production-snapshot.v1"),
+	revision: number().int().nonnegative(),
+	plans: record(string(), assetProductionPlanSchema),
+	runs: record(string(), assetProductionRunSchema),
+	activePlanId: id$2.optional(),
+	activeRunId: id$2.optional()
+}).strict();
+//#endregion
+//#region src/design-ir/workspace-projection.ts
 var PROTOTYPE_SUITE_MATERIAL_VERSION = "cutout.prototype-suite-material.v1";
 var RESOURCE_PACK_MATERIAL_VERSION = "cutout.resource-pack-material.v1";
 var RESOURCE_ASSET_MATERIAL_VERSION = "cutout.resource-asset-material.v1";
@@ -12990,6 +12871,322 @@ object({
 	selectedAt: datetime({ offset: true }),
 	actor: candidateSelectionSchema.shape.actor,
 	provenanceId: selectionIdSchema
+}).strict();
+//#endregion
+//#region src/services/ai/model-assignment-types.ts
+/**
+* Model assignment (design spec §5a) — which model serves each output modality.
+*
+* `ModelAssignment` is the atomic value persisted inside current capability
+* bindings. `ModelAssignments` is only the derived two-slot view still consumed
+* by primary chat/image runtime surfaces; it is not a persistence schema.
+*/
+var modelAssignmentSchema = object({
+	providerId: string().min(1),
+	model: string().min(1),
+	fallbackModel: string().min(1).optional(),
+	effort: _enum([
+		"low",
+		"medium",
+		"high"
+	]).optional(),
+	reasoningProtocol: _enum([
+		"openai",
+		"anthropic",
+		"google"
+	]).optional()
+}).strict();
+//#endregion
+//#region src/services/ai/model-capabilities.ts
+var modelCapabilitySchema = _enum([
+	"text",
+	"vision",
+	"reasoning",
+	"tools",
+	"web-search",
+	"image-generation",
+	"image-edit",
+	"asr",
+	"tts",
+	"video-generation",
+	"video-edit"
+]);
+var modelCatalogSourceSchema = _enum([
+	"provider",
+	"remote-catalog",
+	"verified-catalog",
+	"user-declared"
+]);
+var modelCapabilityEvidenceSchema = object({
+	capability: modelCapabilitySchema,
+	sourceId: string().min(1),
+	kind: _enum([
+		"declared",
+		"observed",
+		"verified"
+	]),
+	capturedAt: string().datetime().optional(),
+	reference: string().url().optional()
+}).strict();
+var modelDescriptorSchema = object({
+	providerId: string().min(1),
+	model: string().min(1),
+	capabilities: array(modelCapabilitySchema).default([]),
+	source: modelCatalogSourceSchema,
+	evidence: array(modelCapabilityEvidenceSchema).default([]),
+	verifiedAt: string().datetime().optional(),
+	metadata: object({
+		contextWindow: number().int().positive().optional(),
+		inputMediaTypes: array(string().min(1)).default([]),
+		outputMediaTypes: array(string().min(1)).default([])
+	}).strict().optional()
+}).strict();
+var modelTaskKindSchema = _enum([
+	"text",
+	"vision",
+	"research",
+	"image-generation",
+	"image-edit",
+	"asr",
+	"tts",
+	"video-generation",
+	"video-edit",
+	"webdev",
+	"image-to-webdev"
+]);
+var capabilityModelAssignmentSchema = modelAssignmentSchema.strict();
+object({
+	version: literal("model-assignments.v2"),
+	bindings: partialRecord(modelTaskKindSchema, capabilityModelAssignmentSchema).default({}),
+	descriptors: array(modelDescriptorSchema).default([])
+}).strict();
+object({
+	version: literal("model-catalog-cache.v1"),
+	generatedAt: string().datetime(),
+	expiresAt: string().datetime(),
+	descriptors: array(modelDescriptorSchema)
+}).strict();
+//#endregion
+//#region src/services/ai/provider-types.ts
+/**
+* BYOK provider model (spec §4) — the non-secret shape.
+*
+* A `ProviderConfig` is a user-configured connection. It is stored as plain JSON
+* in the app-config dir (via the Rust `load_providers`/`save_providers`
+* commands) and carries **no key**: the secret lives only in the OS keychain,
+* referenced by `id`. Gateway is modeled as "just a provider" (`kind:'gateway'`).
+*
+* Field casing is the on-the-wire shape the Rust `providers.rs` serde struct
+* uses (`#[serde(rename_all="camelCase")]`), so `baseUrl` here maps 1:1 to the
+* persisted JSON. (The AI SDK factory option is spelled `baseURL`; the mapping
+* happens in `generation-service.local.ts`.)
+*/
+var providerWireProtocolSchema = _enum([
+	"responses",
+	"chat-completions",
+	"anthropic-messages",
+	"google-generate-content"
+]);
+function isOpenAIShapedProvider(kind) {
+	return kind === "openai" || kind === "openai-compatible" || kind === "cc-switch" || [
+		"dashscope",
+		"deepseek",
+		"zhipu",
+		"moonshot",
+		"volcengine",
+		"siliconflow",
+		"openrouter",
+		"together",
+		"groq",
+		"fireworks",
+		"xai",
+		"mistral",
+		"ollama",
+		"vllm",
+		"lm-studio"
+	].includes(kind);
+}
+/** Product default used only while creating a new provider draft. */
+function defaultProviderWireProtocol(kind) {
+	if (kind === "openai" || kind === "cc-switch") return "responses";
+	if (kind === "anthropic") return "anthropic-messages";
+	if (kind === "google") return "google-generate-content";
+	if (isOpenAIShapedProvider(kind)) return "chat-completions";
+}
+function supportedProviderWireProtocols(kind) {
+	if (kind === "openai" || kind === "cc-switch") return ["responses", "chat-completions"];
+	if (kind === "anthropic") return ["anthropic-messages"];
+	if (kind === "google") return ["google-generate-content"];
+	if (kind === "openai-compatible") return [
+		"responses",
+		"chat-completions",
+		"anthropic-messages",
+		"google-generate-content"
+	];
+	if (isOpenAIShapedProvider(kind)) return ["chat-completions"];
+	return [];
+}
+function isProviderWireProtocolSupported(kind, protocol) {
+	const supported = supportedProviderWireProtocols(kind);
+	return protocol === void 0 ? supported.length === 0 : supported.includes(protocol);
+}
+/** The ordered, user-selectable kinds (drives the Settings `Select`). */
+var PROVIDER_KINDS = [
+	"anthropic",
+	"openai",
+	"google",
+	"gateway",
+	"openai-compatible",
+	"cc-switch",
+	"dashscope",
+	"deepseek",
+	"zhipu",
+	"moonshot",
+	"volcengine",
+	"siliconflow",
+	"openrouter",
+	"together",
+	"groq",
+	"fireworks",
+	"xai",
+	"mistral",
+	"ollama",
+	"vllm",
+	"lm-studio"
+];
+var providerConfigFields = {
+	kind: string().min(1).max(120).regex(/^[a-z0-9][a-z0-9._-]*$/),
+	label: string().min(1),
+	baseUrl: string().min(1).optional(),
+	wireProtocol: providerWireProtocolSchema.optional(),
+	defaultModel: string().min(1),
+	enabled: boolean()
+};
+function providerWireProtocolMessage(config) {
+	if (config.kind !== "gateway" && !config.wireProtocol) return `wire protocol is required for ${config.kind}`;
+	if (PROVIDER_KINDS.includes(config.kind) && !isProviderWireProtocolSupported(config.kind, config.wireProtocol)) return `${config.wireProtocol ?? "no wire protocol"} is not supported for ${config.kind}`;
+}
+function addWireProtocolIssue(config, context) {
+	const message = providerWireProtocolMessage(config);
+	if (message) context.addIssue({
+		code: "custom",
+		path: ["wireProtocol"],
+		message
+	});
+}
+object({
+	id: string().min(1),
+	...providerConfigFields
+}).superRefine(addWireProtocolIssue);
+function addDraftWireProtocolIssue(config, context) {
+	const protocol = config.wireProtocol ?? defaultProviderWireProtocol(config.kind);
+	if (!isProviderWireProtocolSupported(config.kind, protocol)) context.addIssue({
+		code: "custom",
+		path: ["wireProtocol"],
+		message: `${protocol ?? "no wire protocol"} is not supported for ${config.kind}`
+	});
+}
+object({
+	id: string().min(1).optional(),
+	...providerConfigFields
+}).superRefine(addDraftWireProtocolIssue);
+//#endregion
+//#region src/control-protocol/paid-tool-contract.ts
+var CREDENTIAL_VALUE = /(?:\b(?:sk|rk|pk)-[A-Za-z0-9_-]{8,}\b|\bBearer\s+[A-Za-z0-9._~+/-]+\b)/i;
+var safeText$1 = string().refine((value) => !CREDENTIAL_VALUE.test(value), "Credential-shaped values are not accepted.");
+var paidToolIntentMaxLength = 2e4;
+var paidToolPromptMaxLength = 2e5;
+var paidToolCapabilitySchema = _enum([
+	"generate-image",
+	"edit-image",
+	"cutout",
+	"semantic-cutout"
+]);
+var moneyEstimateSchema = object({
+	currency: string().regex(/^[A-Z]{3}$/),
+	amount: number().nonnegative().finite(),
+	credits: number().nonnegative().finite().optional()
+}).strict();
+var paidToolRequestSchema = object({
+	capability: paidToolCapabilitySchema,
+	providerId: safeText$1.min(1).max(160).optional(),
+	model: safeText$1.min(1).max(300).optional(),
+	intent: safeText$1.min(1).max(paidToolIntentMaxLength),
+	prompt: safeText$1.min(1).max(paidToolPromptMaxLength),
+	inputArtifactIds: array(safeText$1.min(1).max(300)).max(32).default([]),
+	budgetCeiling: moneyEstimateSchema,
+	approvalPolicy: _enum(["explicit", "auto-within-budget"]).default("auto-within-budget")
+}).strict();
+object({
+	capability: paidToolCapabilitySchema,
+	providerId: safeText$1.min(1).max(160),
+	model: safeText$1.min(1).max(300),
+	available: boolean(),
+	estimatedCost: moneyEstimateSchema
+}).strict();
+function planPaidTool(request, capability, policy, hasExplicitApproval) {
+	const base = {
+		capability: request.capability,
+		providerId: capability?.providerId ?? request.providerId,
+		model: capability?.model ?? request.model,
+		estimatedCost: capability?.estimatedCost,
+		budgetCeiling: request.budgetCeiling,
+		approvalPolicy: request.approvalPolicy
+	};
+	if (!capability?.available) return {
+		...base,
+		status: "capability-required",
+		executable: false,
+		reason: "No host executor is available for this capability."
+	};
+	if (!policy.allowPaid) return {
+		...base,
+		status: "authorization-required",
+		executable: false,
+		reason: "Paid actions are disabled by host policy."
+	};
+	if (!sameCurrency(request.budgetCeiling, capability.estimatedCost) || capability.estimatedCost.amount > request.budgetCeiling.amount || exceedsCredits(capability.estimatedCost, request.budgetCeiling) || policy.maxCost && exceeds(capability.estimatedCost, policy.maxCost)) return {
+		...base,
+		status: "budget-exceeded",
+		executable: false,
+		reason: "The host estimate exceeds the approved budget ceiling."
+	};
+	if (request.approvalPolicy === "explicit" && !hasExplicitApproval) return {
+		...base,
+		status: "authorization-required",
+		executable: false,
+		reason: "This request requires explicit approval."
+	};
+	return {
+		...base,
+		status: "ready",
+		executable: true
+	};
+}
+function sameCurrency(left, right) {
+	return left.currency === right.currency;
+}
+function exceedsCredits(cost, ceiling) {
+	return cost.credits !== void 0 && ceiling.credits !== void 0 && cost.credits > ceiling.credits;
+}
+function exceeds(cost, ceiling) {
+	return !sameCurrency(cost, ceiling) || cost.amount > ceiling.amount || exceedsCredits(cost, ceiling);
+}
+var paidToolReceiptSchema = object({
+	receiptId: safeText$1.min(1).max(160),
+	requestId: safeText$1.min(1).max(160),
+	capability: paidToolCapabilitySchema,
+	providerId: safeText$1.min(1).max(160),
+	model: safeText$1.min(1).max(300),
+	status: _enum([
+		"succeeded",
+		"failed",
+		"cancelled"
+	]),
+	charged: moneyEstimateSchema,
+	outputArtifactIds: array(safeText$1.min(1).max(300)).max(128),
+	startedAt: number().int().nonnegative(),
+	completedAt: number().int().nonnegative()
 }).strict();
 //#endregion
 //#region src/agent-runtime/run-events.ts
@@ -13091,12 +13288,11 @@ var agentRunEventSchema = discriminatedUnion("type", [
 			providerId: eventText,
 			model: eventText
 		}).strict().optional(),
-		estimatedCost: moneyEstimateSchema,
 		budgetCeiling: moneyEstimateSchema,
 		approvalPolicy: _enum(["explicit", "auto-within-budget"]),
 		reason: eventText,
-		/** True only when a human must approve before the tool can run. Optional so previously persisted events still parse. */
-		pendingApproval: boolean().optional()
+		/** True only when a human must approve before the tool can run. */
+		pendingApproval: boolean()
 	}).strict(),
 	runEventBaseSchema.extend({
 		type: _enum(["tool-approved", "tool-denied"]),
@@ -13154,7 +13350,7 @@ var agentRunEventSchema = discriminatedUnion("type", [
 	runEventBaseSchema.extend({
 		type: literal("agent-message"),
 		message: eventText,
-		responseToEventId: eventText.optional(),
+		responseToEventId: eventText,
 		action: object({
 			type: literal("proceed-anyway"),
 			label: eventText,
@@ -13190,24 +13386,13 @@ function createRunEventStore() {
 function replayRunEvents(events) {
 	return events.reduce(appendRunEvent, createRunEventStore());
 }
-/** Resolve explicit response links first, then infer the nearest preceding
-* user turn for legacy linear transcripts. */
+/** Resolve an Agent response through its explicit user-turn link. */
 function resolveAgentResponseSource(events, response) {
 	const responseIndex = events.findIndex((event) => event.eventId === response.eventId);
 	if (responseIndex < 0) return null;
-	if (response.responseToEventId) {
-		const explicit = events.find((event, index) => index < responseIndex && event.eventId === response.responseToEventId && (event.type === "intent-recorded" || event.type === "steer-recorded"));
-		if (explicit) return explicit;
-	}
-	for (let index = responseIndex - 1; index >= 0; index -= 1) {
-		const event = events[index];
-		if (event?.type === "intent-recorded" || event?.type === "steer-recorded") return event;
-	}
-	return null;
+	return events.find((event, index) => index < responseIndex && event.eventId === response.responseToEventId && (event.type === "intent-recorded" || event.type === "steer-recorded")) ?? null;
 }
-/** Group immutable sibling responses and replay the latest valid explicit
-* selection. With no selection event, the latest response is the legacy
-* linear fallback. */
+/** Group immutable sibling responses and replay the latest valid selection. */
 function projectAgentResponseBranches(events) {
 	const users = events.filter((event) => event.type === "intent-recorded" || event.type === "steer-recorded");
 	const responsesBySource = /* @__PURE__ */ new Map();
@@ -13362,7 +13547,6 @@ function reduceActiveRun(run, event) {
 					status: "running",
 					outputRefs: [],
 					requestId: event.requestId,
-					estimatedCost: event.estimatedCost,
 					budgetCeiling: event.budgetCeiling,
 					approvalPolicy: event.approvalPolicy,
 					approvalReason: event.reason,
@@ -13433,7 +13617,6 @@ function reduceActiveRun(run, event) {
 						outputRefs: event.type === "tool-succeeded" ? event.outputRefs : [],
 						requestId: existing?.requestId,
 						previousRequestId: existing?.previousRequestId,
-						estimatedCost: existing?.estimatedCost,
 						budgetCeiling: existing?.budgetCeiling,
 						approvalPolicy: existing?.approvalPolicy,
 						approvalReason: existing?.approvalReason,

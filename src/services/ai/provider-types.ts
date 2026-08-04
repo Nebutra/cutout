@@ -42,7 +42,7 @@ export function supportsOpenAIImageEndpoints(
   return protocol === 'responses' || protocol === 'chat-completions'
 }
 
-/** Effective wire default for old records that predate the persisted field. */
+/** Product default used only while creating a new provider draft. */
 export function defaultProviderWireProtocol(kind: ProviderKind): ProviderWireProtocol | undefined {
   if (kind === 'openai' || kind === 'cc-switch') return 'responses'
   if (kind === 'anthropic') return 'anthropic-messages'
@@ -72,7 +72,11 @@ export function supportedProviderWireProtocols(
 export function effectiveProviderWireProtocol(
   config: Pick<ProviderConfig, 'kind' | 'wireProtocol'>,
 ): ProviderWireProtocol | undefined {
-  return config.wireProtocol ?? defaultProviderWireProtocol(config.kind)
+  if (config.kind === 'gateway') return undefined
+  if (!config.wireProtocol) {
+    throw new Error(`wire protocol is required for ${config.kind}`)
+  }
+  return config.wireProtocol
 }
 
 export function isProviderWireProtocolSupported(
@@ -105,7 +109,7 @@ export interface ProviderConfig {
   readonly label: string
   /** Required for `openai-compatible`; optional override for other kinds. */
   readonly baseUrl?: string
-  /** Explicit generation wire protocol. Old records may omit it. */
+  /** Explicit generation wire protocol. Gateway is the only kind that omits it. */
   readonly wireProtocol?: ProviderWireProtocol
   /** Default model slug, e.g. `claude-sonnet-4.6` or `anthropic/claude-sonnet-4.6`. */
   readonly defaultModel: string
@@ -131,15 +135,15 @@ const providerConfigFields = {
   enabled: z.boolean(),
 }
 
-function unsupportedWireProtocolMessage(
+function providerWireProtocolMessage(
   config: Pick<ProviderConfig, 'kind' | 'wireProtocol'>,
 ): string | undefined {
+  if (config.kind !== 'gateway' && !config.wireProtocol) {
+    return `wire protocol is required for ${config.kind}`
+  }
   if (
     PROVIDER_KINDS.includes(config.kind) &&
-    !isProviderWireProtocolSupported(
-      config.kind,
-      config.wireProtocol ?? defaultProviderWireProtocol(config.kind),
-    )
+    !isProviderWireProtocolSupported(config.kind, config.wireProtocol)
   ) {
     return `${config.wireProtocol ?? 'no wire protocol'} is not supported for ${config.kind}`
   }
@@ -150,7 +154,7 @@ function addWireProtocolIssue(
   config: Pick<ProviderConfig, 'kind' | 'wireProtocol'>,
   context: { addIssue(issue: { code: 'custom'; path: string[]; message: string }): void },
 ): void {
-  const message = unsupportedWireProtocolMessage(config)
+  const message = providerWireProtocolMessage(config)
   if (message) {
     context.addIssue({
       code: 'custom',
@@ -165,10 +169,24 @@ export const providerConfigSchema = z.object({
   ...providerConfigFields,
 }).superRefine(addWireProtocolIssue)
 
+function addDraftWireProtocolIssue(
+  config: Pick<ProviderConfig, 'kind' | 'wireProtocol'>,
+  context: { addIssue(issue: { code: 'custom'; path: string[]; message: string }): void },
+): void {
+  const protocol = config.wireProtocol ?? defaultProviderWireProtocol(config.kind)
+  if (!isProviderWireProtocolSupported(config.kind, protocol)) {
+    context.addIssue({
+      code: 'custom',
+      path: ['wireProtocol'],
+      message: `${protocol ?? 'no wire protocol'} is not supported for ${config.kind}`,
+    })
+  }
+}
+
 export const providerDraftSchema = z.object({
   id: z.string().min(1).optional(),
   ...providerConfigFields,
-}).superRefine(addWireProtocolIssue)
+}).superRefine(addDraftWireProtocolIssue)
 
 /** Parse an unknown array (e.g. `load_providers` result) into typed configs. */
 export const providerConfigsSchema = z.array(providerConfigSchema)

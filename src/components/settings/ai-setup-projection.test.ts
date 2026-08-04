@@ -12,6 +12,7 @@ const openai: ProviderConfig = {
   id: 'openai',
   kind: 'openai',
   label: 'OpenAI',
+  wireProtocol: 'responses',
   defaultModel: 'gpt-5',
   enabled: true,
 }
@@ -20,6 +21,7 @@ const deepseek: ProviderConfig = {
   id: 'deepseek',
   kind: 'deepseek',
   label: 'DeepSeek',
+  wireProtocol: 'chat-completions',
   defaultModel: 'deepseek-chat',
   enabled: true,
 }

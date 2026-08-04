@@ -19,8 +19,8 @@ const assignments: ModelAssignments = {
   image: { providerId: 'openai', model: 'gpt-image-1' },
 }
 const providers: ProviderConfig[] = [
-  { id: 'claude', kind: 'anthropic', label: 'Claude', defaultModel: 'claude-sonnet', enabled: true },
-  { id: 'openai', kind: 'openai', label: 'OpenAI', defaultModel: 'gpt-image-1', enabled: true },
+  { id: 'claude', kind: 'anthropic', label: 'Claude', wireProtocol: 'anthropic-messages', defaultModel: 'claude-sonnet', enabled: true },
+  { id: 'openai', kind: 'openai', label: 'OpenAI', wireProtocol: 'responses', defaultModel: 'gpt-image-1', enabled: true },
 ]
 const verifiedCatalog: ModelDescriptor[] = [
   { providerId: 'claude', model: 'claude-sonnet', slot: 'chat', capabilities: ['text', 'vision', 'reasoning', 'tools'], quality: .8, cost: .5, speed: .7, region: 'global', available: true },
@@ -94,6 +94,7 @@ describe('composer execution adapter', () => {
       id: 'cc',
       kind: 'cc-switch',
       label: 'CC Switch',
+      wireProtocol: 'responses',
       defaultModel: 'gpt-5.6-sol',
       enabled: true,
     }]

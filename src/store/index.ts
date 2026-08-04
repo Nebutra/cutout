@@ -90,8 +90,7 @@ export const useStore = create<Store>()((set, get, api) => ({
             autoAnalyze: (input.source as { autoAnalyze?: boolean }).autoAnalyze ?? true,
           }
         : INITIAL_SOURCE,
-      // Legacy records may carry user-tuned params. They remain decodable, but
-      // runtime analysis always uses the current product-owned defaults.
+      // Runtime analysis always uses the current product-owned defaults.
       params: DEFAULT_PARAMS,
       analysis: {
         ...INITIAL_ANALYSIS,

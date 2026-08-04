@@ -99,7 +99,7 @@ export interface DesktopToolInvocation {
   readonly label: string
   readonly capability: PaidToolCapability
   readonly intent: string
-  readonly prompt?: string
+  readonly prompt: string
   readonly image: ModelAssignment
   readonly inputs?: readonly { readonly id: string; readonly mediaType: string; readonly bytes: Uint8Array }[]
   readonly signal?: AbortSignal
@@ -109,7 +109,7 @@ export interface DesktopToolInvocation {
 export function createExplicitDesktopPaidToolRequest(input: {
   readonly capability: PaidToolCapability
   readonly intent: string
-  readonly prompt?: string
+  readonly prompt: string
   readonly image: ModelAssignment
   readonly inputArtifactIds?: readonly string[]
   readonly capabilities: readonly PaidToolExecutorCapability[]

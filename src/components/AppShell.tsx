@@ -85,7 +85,7 @@ import { bootstrapHomeDraftProject } from "@/workspace/home-draft-bootstrap";
 import {
   loadWorkspaceNavigation,
   enterWorkspaceSurface,
-  migrateLegacyDesignOsView,
+  navigationForWorkbenchTab,
   projectDeliverReturnControl,
   projectWorkspaceSurface,
   returnFromDeliver,
@@ -114,7 +114,6 @@ import { projectDurableHostEvents } from "@/agent-host/run-event-projection";
 import { createRunEventStore } from "@/agent-runtime/run-events";
 import { createDesktopUpdateOrchestrator } from "@/updater/service";
 import { startUpdateAutoCheckScheduler } from "@/updater/auto-check-scheduler";
-import { readPersistedUpdateNotificationVersion } from "@/updater/update-notifications";
 import {
   BUNDLED_CURRENT_RELEASE_NOTES,
   dismissReleaseNotes,
@@ -452,7 +451,6 @@ export function AppShell() {
       storage: localStorage,
       currentVersion: PRODUCT_VERSION,
       bundledNotes: BUNDLED_CURRENT_RELEASE_NOTES,
-      updateNotificationVersion: readPersistedUpdateNotificationVersion(localStorage),
     });
     if (!decision.shouldOpen || !BUNDLED_CURRENT_RELEASE_NOTES) return;
     const localized = selectLocalizedReleaseNotes(BUNDLED_CURRENT_RELEASE_NOTES, i18n.locale);
@@ -760,7 +758,7 @@ export function AppShell() {
     useState<DesignOsWorkbenchTab>("overview");
   const openDesignOs = useCallback(
     (tab: DesignOsWorkbenchTab = "overview") => {
-      const navigation = migrateLegacyDesignOsView(tab);
+      const navigation = navigationForWorkbenchTab(tab);
       const surface = projectWorkspaceSurface(navigation);
       if (surface.surface === "inline-main") {
         const action = tab === "delivery" ? "deliver" : tab === "kits" || tab === "components" || tab === "starter" ? tab : "deliver";
@@ -2580,7 +2578,7 @@ function workspaceAutosaveFingerprint(
       slice.productionTaskId ?? "",
       slice.productionRunId ?? "",
       slice.outputArtifactId ?? "",
-      slice.readiness ?? "legacy-unverified",
+      slice.readiness ?? "untracked",
     ].join(":"))
     .join(",");
   const mockup = state.mockup

@@ -1,9 +1,9 @@
 import { z } from 'zod'
-import { modelAssignmentSchema, type ModelAssignment, type ModelAssignments } from './model-assignment-types'
+import { modelAssignmentSchema, type ModelAssignments } from './model-assignment-types'
 
 export const modelCapabilitySchema=z.enum(['text','vision','reasoning','tools','web-search','image-generation','image-edit','asr','tts','video-generation','video-edit'])
 export type ModelCapability=z.infer<typeof modelCapabilitySchema>
-export const modelCatalogSourceSchema=z.enum(['provider','remote-catalog','verified-catalog','user-declared','legacy-migration'])
+export const modelCatalogSourceSchema=z.enum(['provider','remote-catalog','verified-catalog','user-declared'])
 export const modelCapabilityEvidenceSchema=z.object({capability:modelCapabilitySchema,sourceId:z.string().min(1),kind:z.enum(['declared','observed','verified']),capturedAt:z.string().datetime().optional(),reference:z.string().url().optional()}).strict()
 export const modelDescriptorSchema=z.object({providerId:z.string().min(1),model:z.string().min(1),capabilities:z.array(modelCapabilitySchema).default([]),source:modelCatalogSourceSchema,evidence:z.array(modelCapabilityEvidenceSchema).default([]),verifiedAt:z.string().datetime().optional(),metadata:z.object({contextWindow:z.number().int().positive().optional(),inputMediaTypes:z.array(z.string().min(1)).default([]),outputMediaTypes:z.array(z.string().min(1)).default([])}).strict().optional()}).strict()
 export type ModelDescriptor=z.infer<typeof modelDescriptorSchema>
@@ -15,8 +15,7 @@ const profiles:Record<ModelTaskKind,ModelTaskProfile>={text:{kind:'text',require
 export function modelTaskProfile(kind:ModelTaskKind):ModelTaskProfile{return profiles[modelTaskKindSchema.parse(kind)]}
 export function descriptorSupports(descriptor:ModelDescriptor,profile:ModelTaskProfile){const capabilities=new Set(descriptor.capabilities);return profile.required.every(capability=>capabilities.has(capability))}
 
-export const capabilityBindingsSchema=z.object({version:z.literal('model-assignments.v2'),bindings:z.partialRecord(modelTaskKindSchema,modelAssignmentSchema).default({}),descriptors:z.array(modelDescriptorSchema).default([]),legacy:z.object({chat:modelAssignmentSchema.optional(),image:modelAssignmentSchema.optional()}).strict().optional()}).strict()
+const capabilityModelAssignmentSchema=modelAssignmentSchema.strict()
+export const capabilityBindingsSchema=z.object({version:z.literal('model-assignments.v2'),bindings:z.partialRecord(modelTaskKindSchema,capabilityModelAssignmentSchema).default({}),descriptors:z.array(modelDescriptorSchema).default([])}).strict()
 export type CapabilityBindings=z.infer<typeof capabilityBindingsSchema>
-export function migrateLegacyAssignments(input:ModelAssignments):CapabilityBindings{const bindings:Partial<Record<ModelTaskKind,ModelAssignment>>={};if(input.chat)bindings.text=input.chat;if(input.image)bindings['image-generation']=input.image;return capabilityBindingsSchema.parse({version:'model-assignments.v2',bindings,legacy:{...(input.chat?{chat:input.chat}:{}),...(input.image?{image:input.image}:{})}})}
-export function mergeLegacyRouteBindings(current:CapabilityBindings,input:unknown):CapabilityBindings{if(!input||typeof input!=='object'||Array.isArray(input))return current;const bindings={...current.bindings};for(const[rawTask,rawRoute]of Object.entries(input)){const task=modelTaskKindSchema.safeParse(rawTask);if(!task.success||!rawRoute||typeof rawRoute!=='object')continue;const route=rawRoute as Record<string,unknown>,assignment=modelAssignmentSchema.safeParse({providerId:route.providerId,model:route.model,...(typeof route.fallback==='string'&&route.fallback.trim()?{fallbackModel:route.fallback.trim()}:{})});if(assignment.success)bindings[task.data]=assignment.data}return capabilityBindingsSchema.parse({...current,bindings})}
-export function projectLegacyAssignments(input:CapabilityBindings):ModelAssignments{const chat=input.bindings.text??input.bindings.vision??input.bindings.webdev??input.bindings['image-to-webdev']??input.legacy?.chat,image=input.bindings['image-generation']??input.bindings['image-edit']??input.legacy?.image;return{...(chat?{chat}:{}),...(image?{image}:{})}}
+export function projectPrimaryAssignments(input:CapabilityBindings):ModelAssignments{const chat=input.bindings.text??input.bindings.vision??input.bindings.webdev??input.bindings['image-to-webdev'],image=input.bindings['image-generation']??input.bindings['image-edit'];return{...(chat?{chat}:{}),...(image?{image}:{})}}

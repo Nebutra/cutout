@@ -1,6 +1,5 @@
 import type { AgentRunEvent, AgentRunEventStore } from '@/agent-runtime/run-events'
 import { CHAT_SURFACE_TOOLS } from '@/agent-runtime/tool-loop'
-import type { MoneyEstimate } from '@/control-protocol'
 
 export type ExecutionStatus = 'running' | 'waiting' | 'succeeded' | 'failed' | 'cancelled'
 
@@ -16,7 +15,6 @@ export interface ExecutionTimelineTool {
   readonly receiptId?: string
   readonly outputRefs: readonly string[]
   readonly policy?: string
-  readonly estimatedCost?: MoneyEstimate
   readonly approval?: { readonly toolCallId: string; readonly requestId: string }
 }
 
@@ -97,7 +95,6 @@ export function projectExecutionTimeline(store: AgentRunEventStore | null | unde
         outputRefs: existing?.outputRefs ?? [],
         route: event.model ? `${event.model.providerId}/${event.model.model}` : existing?.route,
         policy: event.type === 'tool-approval-requested' ? event.reason : existing?.policy,
-        estimatedCost: event.type === 'tool-approval-requested' ? event.estimatedCost : existing?.estimatedCost,
         requestId: event.type === 'tool-approval-requested' ? event.requestId : existing?.requestId,
         approvalPolicy: event.type === 'tool-approval-requested' ? event.approvalPolicy : existing?.approvalPolicy,
         approval: event.type === 'tool-approval-requested' && event.approvalPolicy === 'explicit'
@@ -134,7 +131,6 @@ export function projectExecutionTimeline(store: AgentRunEventStore | null | unde
         receiptId: event.receipt?.receiptId ?? existing?.receiptId,
         outputRefs: event.type === 'tool-succeeded' ? [...event.outputRefs] : existing?.outputRefs ?? [],
         policy: existing?.policy,
-        estimatedCost: existing?.estimatedCost,
         requestId: existing?.requestId,
         approvalPolicy: existing?.approvalPolicy,
         approval: undefined,

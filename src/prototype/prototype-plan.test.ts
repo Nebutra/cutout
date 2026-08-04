@@ -9,6 +9,7 @@ import {
   validatePrototypePlan,
   type PrototypePlan,
 } from './prototype-plan'
+import { currentPrototypeExploration, currentPrototypeReviewDocument } from './prototype-plan.test-fixture'
 
 const validPlan: PrototypePlan = {
   version: 'prototype-plan.v0',
@@ -26,6 +27,7 @@ const validPlan: PrototypePlan = {
     spacing: '8px base grid with dense dashboard surfaces.',
     componentPrinciples: ['calm hierarchy', 'consistent cards'],
     assetDirection: 'Only generate brand marks and data illustrations.',
+    exploration: currentPrototypeExploration,
   },
   pages: [
     {
@@ -128,6 +130,7 @@ const validPlan: PrototypePlan = {
     mode: 'continue',
     rationale: 'The SaaS visitor flow is clear enough to proceed.',
   },
+  reviewDocument: currentPrototypeReviewDocument,
 }
 
 describe('PrototypePlan', () => {
@@ -139,7 +142,7 @@ describe('PrototypePlan', () => {
     expect(result.ok && result.data.reachablePageIds).toEqual(['home', 'pricing'])
   })
 
-  it('defaults to continue when old planner output omits humanLoop', () => {
+  it('applies the current continue default when a planner omits humanLoop', () => {
     const raw = structuredClone(validPlan)
     delete (raw as Partial<PrototypePlan>).humanLoop
 
@@ -151,41 +154,17 @@ describe('PrototypePlan', () => {
     })
   })
 
-  it('accepts legacy plans without a review artifact and validates authored scope documents', () => {
-    const legacy = prototypePlanSchema.parse(structuredClone(validPlan))
-    expect(legacy.reviewDocument).toBeUndefined()
-
-    const authored = prototypePlanSchema.parse({
-      ...structuredClone(validPlan),
-      designSystem: {
-        ...structuredClone(validPlan.designSystem),
-        exploration: {
-          mode: 'auto',
-          decidedBy: 'agent',
-          count: 1,
-          rationale: 'The requirement already establishes one clear visual direction.',
-          directions: [{
-            id: 'direction:primary',
-            label: 'Primary direction',
-            thesis: 'Preserve the requested product identity.',
-            vary: ['visual treatment'],
-            preserve: ['product intent'],
-          }],
-          bounds: { maxCandidates: 8, maxParallelism: 2 },
-        },
-      },
-      reviewDocument: {
-        format: 'markdown',
-        primaryFlow: '# Primary flow\n\nA focused review.',
-        fullPlan: '# Full plan\n\n| Page | Purpose |\n| --- | --- |\n| Home | Convert |',
-      },
-    })
-    expect(authored.reviewDocument?.primaryFlow).toContain('focused review')
-    expect(() => generatedPrototypePlanSchema.parse(legacy)).toThrow()
-    expect(generatedPrototypePlanSchema.parse(authored).reviewDocument.fullPlan).toContain('Full plan')
+  it('requires current exploration and review artifacts', () => {
+    const missingReview = structuredClone(validPlan) as Partial<PrototypePlan>
+    delete missingReview.reviewDocument
+    expect(prototypePlanSchema.safeParse(missingReview).success).toBe(false)
+    const missingExploration = structuredClone(validPlan)
+    delete (missingExploration.designSystem as Partial<PrototypePlan['designSystem']>).exploration
+    expect(prototypePlanSchema.safeParse(missingExploration).success).toBe(false)
+    expect(generatedPrototypePlanSchema.parse(validPlan).reviewDocument.fullPlan).toContain('Current fixture')
   })
 
-  it('defaults old region output to board-cutout when assetRoute is omitted', () => {
+  it('applies the current board-cutout route default when a region omits assetRoute', () => {
     const raw = structuredClone(validPlan)
     delete (raw.pages[0].regions[0] as Partial<PrototypePlan['pages'][number]['regions'][number]>).assetRoute
 
@@ -257,7 +236,10 @@ describe('PrototypePlan', () => {
       'board-cutout',
       'direct-generate',
     ])
-    expect(parsed.suites[0]!.pages[1]!.materials[0]!.boardGroupId).toBe('route-markers')
+    const boardMaterial = parsed.suites[0]!.pages[1]!.materials[0]!
+    expect(boardMaterial.production).toBe('board-cutout')
+    if (boardMaterial.production !== 'board-cutout') throw new Error('Expected a board material.')
+    expect(boardMaterial.boardGroupId).toBe('route-markers')
 
     const missing = structuredClone(seed)
     delete (missing.suites[0]!.pages[0] as { materials?: unknown }).materials
@@ -271,19 +253,14 @@ describe('PrototypePlan', () => {
     invalidDirectGroup.suites[0]!.pages[1]!.materials[1]!.boardGroupId = 'not-a-board'
     expect(prototypePlanningSeedSchema.safeParse(invalidDirectGroup).success).toBe(false)
 
-    const historicalMissingGroup = structuredClone(seed)
-    delete (historicalMissingGroup.suites[0]!.pages[1]!.materials[0] as {
+    const missingGroup = structuredClone(seed)
+    delete (missingGroup.suites[0]!.pages[1]!.materials[0] as {
       boardGroupId?: string
     }).boardGroupId
-    expect(prototypePlanningSeedSchema.safeParse(historicalMissingGroup).success).toBe(true)
-    const generatedMissingGroup = generatedPrototypePlanningSeedSchema.safeParse(
-      historicalMissingGroup,
-    )
-    expect(generatedMissingGroup.success).toBe(false)
-    if (generatedMissingGroup.success) {
-      throw new Error('Expected newly generated board materials to require a group id.')
-    }
-    expect(generatedMissingGroup.error.issues[0]).toMatchObject({
+    const missingGroupResult = prototypePlanningSeedSchema.safeParse(missingGroup)
+    expect(missingGroupResult.success).toBe(false)
+    if (missingGroupResult.success) throw new Error('Expected board materials to require a group id.')
+    expect(missingGroupResult.error.issues[0]).toMatchObject({
       path: ['suites', 0, 'pages', 1, 'materials', 0, 'boardGroupId'],
       message: 'Invalid input: expected string, received undefined',
     })
@@ -375,6 +352,7 @@ describe('PrototypePlan', () => {
               name: 'Marker board',
               description: 'A board of route markers.',
               production: 'board-cutout',
+              boardGroupId: 'route-markers',
             },
           ],
         }],

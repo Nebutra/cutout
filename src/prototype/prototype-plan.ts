@@ -127,8 +127,7 @@ export const prototypeDesignSystemSchema = z.object({
   spacing: z.string().min(1),
   componentPrinciples: z.array(z.string().min(1)).min(1),
   assetDirection: z.string().min(1),
-  /** Historical plans omit this; every newly generated plan must resolve it. */
-  exploration: candidateExplorationDecisionSchema.optional(),
+  exploration: candidateExplorationDecisionSchema,
 })
 
 const prototypePlanningMaterialIdentityShape = {
@@ -139,27 +138,9 @@ const prototypePlanningMaterialIdentityShape = {
 
 const prototypePlanningBoardGroupIdSchema = z.string().trim().min(1).max(80)
 
-export const prototypePlanningMaterialSchema = z.object({
-  ...prototypePlanningMaterialIdentityShape,
-  production: z.enum(['board-cutout', 'direct-generate']),
-  boardGroupId: prototypePlanningBoardGroupIdSchema.optional().describe(
-    'Stable route-local group for board-cutout materials that belong on one coherent board. '
-      + 'Omitted only by historical planning seeds.',
-  ),
-}).strict().superRefine((material, context) => {
-  if (material.production === 'direct-generate' && material.boardGroupId) {
-    context.addIssue({
-      code: 'custom',
-      path: ['boardGroupId'],
-      message: 'direct-generate materials cannot declare a boardGroupId.',
-    })
-  }
-})
-
-/** The generated shape is structural so Provider tool schemas expose the
- * conditional requirement before execution, rather than only rejecting it in
- * an invisible post-call refinement. */
-export const generatedPrototypePlanningMaterialSchema = z.discriminatedUnion(
+/** The shape is structural so Provider tool schemas expose the conditional
+ * requirement before execution. */
+export const prototypePlanningMaterialSchema = z.discriminatedUnion(
   'production',
   [
     z.object({
@@ -175,6 +156,7 @@ export const generatedPrototypePlanningMaterialSchema = z.discriminatedUnion(
     }).strict(),
   ],
 )
+export const generatedPrototypePlanningMaterialSchema = prototypePlanningMaterialSchema
 
 export const prototypePlanningRouteSchema = prototypePageSchema.pick({
   id: true,
@@ -199,13 +181,6 @@ export const prototypePlanningRouteSchema = prototypePageSchema.pick({
     }
     materialIds.add(material.id)
   }
-})
-
-const generatedPrototypePlanningRouteSchema = prototypePlanningRouteSchema.safeExtend({
-  materials: z.array(generatedPrototypePlanningMaterialSchema).describe(
-    'Zero or more non-UI visual materials genuinely worth reusing on this route. '
-      + 'Do not include cards, forms, navigation, buttons, tables, or other code-reproducible UI.',
-  ),
 })
 
 export const prototypePlanningSeedSchema = z.object({
@@ -266,14 +241,7 @@ export const prototypePlanningSeedSchema = z.object({
   }
 })
 
-/** Historical persisted seeds may omit boardGroupId and retain their former
- * single-board projection. New Agent output authors grouping structurally. */
-export const generatedPrototypePlanningSeedSchema = prototypePlanningSeedSchema.safeExtend({
-  suites: z.array(z.object({
-    direction: candidateDirectionSchema,
-    pages: z.array(generatedPrototypePlanningRouteSchema).min(1).max(12),
-  }).strict()).min(1).max(8),
-})
+export const generatedPrototypePlanningSeedSchema = prototypePlanningSeedSchema
 
 export const prototypePlanSchema = z.object({
   version: z.literal('prototype-plan.v0'),
@@ -288,7 +256,7 @@ export const prototypePlanSchema = z.object({
   designSystem: prototypeDesignSystemSchema,
   pages: z.array(prototypePageSchema).min(1).max(12),
   flows: z.array(prototypeFlowSchema).min(1),
-  reviewDocument: prototypeReviewDocumentSchema.optional(),
+  reviewDocument: prototypeReviewDocumentSchema,
   /** Agent-authored compact input used to derive corresponding suite alternatives. */
   planningSeed: prototypePlanningSeedSchema.optional(),
   humanLoop: prototypeHumanLoopSchema.default({
@@ -297,14 +265,7 @@ export const prototypePlanSchema = z.object({
   }),
 })
 
-/** New planner runs must author both review artifacts. The persisted schema
- * above stays backward-compatible with workspace records from older builds. */
-export const generatedPrototypePlanSchema = prototypePlanSchema.extend({
-  designSystem: prototypeDesignSystemSchema.extend({
-    exploration: candidateExplorationDecisionSchema,
-  }),
-  reviewDocument: prototypeReviewDocumentSchema,
-})
+export const generatedPrototypePlanSchema = prototypePlanSchema
 
 export type PrototypeAction = z.infer<typeof prototypeActionSchema>
 export type PrototypeInteraction = z.infer<typeof prototypeInteractionSchema>

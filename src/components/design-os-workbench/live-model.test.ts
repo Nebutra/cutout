@@ -17,7 +17,7 @@ function document(): DesignDocument {
     }],
     brands: [],
     tokens: [{ id: 'token:primary', name: 'Primary', kind: 'color', value: '#00875a' }],
-    components: [], materials: [], provenance: [], relations: [],
+    components: [], materials: [], candidateSets: [], provenance: [], relations: [],
   }
 }
 

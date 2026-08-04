@@ -8,20 +8,44 @@ describe("workspace rail source contract", () => {
     "utf8",
   );
 
-  it("toggles Design as a mutually exclusive workspace drawer", () => {
-    expect(source).toMatch(
-      /onOpenDesign=\{\(\) => \{\s*setDesignDockVisible\(\(visible\) => !visible\);\s*setAgentDockVisible\(false\);\s*setFilesDockVisible\(false\);\s*setGitDockVisible\(false\);/,
+  it("owns workspace drawer selection in one explicit state", () => {
+    expect(source).toContain(
+      'type WorkspacePanel = "agent" | "files" | "git" | "design" | "deliver";',
     );
-    expect(source).toContain("inspectorActive={designDockVisible}");
+    expect(source).toContain(
+      'useState<WorkspacePanel | null>("agent")',
+    );
+    expect(source).toContain(
+      "setActiveWorkspacePanel((current) => (current === panel ? null : panel))",
+    );
+    expect(source).not.toMatch(/agentDockVisible|filesDockVisible|designDockVisible|gitDockVisible/);
   });
 
-  it("clears drawers for Assets while preserving them across Deliver", () => {
-    expect(source).toMatch(
-      /onOpenAssets=\{\(\) => \{\s*setAgentDockVisible\(false\);\s*setFilesDockVisible\(false\);\s*setDesignDockVisible\(false\);\s*setGitDockVisible\(false\);\s*library\.open\(\);/,
+  it("toggles Design and Deliver through the same drawer contract", () => {
+    expect(source).toContain(
+      'onOpenDesign={() => toggleWorkspacePanel("design")}',
     );
-    expect(source).toMatch(
-      /onOpenDeliver=\{\(\) => \{\s*onOpenDesignOs\("delivery"\);\s*\}\}/,
+    expect(source).toContain(
+      'onOpenDeliver={() => toggleWorkspacePanel("deliver")}',
     );
+    expect(source).toContain(
+      'inspectorActive={activeWorkspacePanel === "design"}',
+    );
+    expect(source).toContain(
+      'deliverActive={activeWorkspacePanel === "deliver"}',
+    );
+    expect(source).toContain('<DeliveryWorkspaceDock');
+    expect(source).toContain('data-workspace-panel={');
+  });
+
+  it("keeps detailed surfaces secondary to their workspace drawers", () => {
+    expect(source).toMatch(
+      /onOpenAssets=\{\(\) => \{\s*setActiveWorkspacePanel\(null\);\s*library\.open\(\);/,
+    );
+    expect(source).toContain('Open delivery workspace');
+    expect(source).toContain('onOpenDesignOs("delivery")');
+    expect(source).toContain('Open system inspector');
+    expect(source).toContain('<WorkspaceDockHeader');
   });
 
   it("keeps one accessible, focus-visible RailItem treatment", () => {

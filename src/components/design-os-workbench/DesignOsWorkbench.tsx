@@ -1,10 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { AuthoringKind } from "@/design-os-operations";
 import {
-  legacyTabForNavigation,
-  migrateLegacyDesignOsView,
-} from "@/workspace/navigation";
-import {
   Boxes,
   ArrowLeft,
   Check,
@@ -272,9 +268,7 @@ export function DesignOsWorkbench({
   backLabel = "Back to workspace",
   backMobileLabel = "Back",
 }: DesignOsWorkbenchProps) {
-  const [tab, setTab] = useState<DesignOsWorkbenchTab>(() =>
-    legacyTabForNavigation(migrateLegacyDesignOsView(defaultTab)),
-  );
+  const [tab, setTab] = useState<DesignOsWorkbenchTab>(defaultTab);
   return (
     <section
       aria-label={surfaceMode === "deliver" ? "Deliver" : "System inspector"}
@@ -1425,7 +1419,7 @@ function Sources({
                     </p>
                     <Badge variant="outline">{source.kind}</Badge>
                   </div>
-                  {source.detail && !source.detail.startsWith("cutout://legacy/") ? (
+                  {source.detail ? (
                     <p className="mt-1 break-words text-xs text-muted-foreground">
                       {source.detail}
                     </p>

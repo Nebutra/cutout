@@ -9,12 +9,5 @@ export const personalizationSettingsSchema=z.object({version:z.literal(PERSONALI
 export type PersonalizationSettings=z.infer<typeof personalizationSettingsSchema>
 export const defaultPersonalizationSettings:PersonalizationSettings={version:PERSONALIZATION_VERSION,personality:'auto',customInstructions:'',memoryEnabled:false,toolAssistedMemory:false}
 
-export function migratePersonalizationSettings(input:unknown):PersonalizationSettings{
-  const current=personalizationSettingsSchema.safeParse(input);if(current.success)return current.data
-  if(!input||typeof input!=='object')return defaultPersonalizationSettings
-  const legacy=input as Record<string,unknown>,candidate={version:PERSONALIZATION_VERSION,personality:legacy.personality??legacy.tone??'auto',customInstructions:legacy.customInstructions??legacy.instructions??'',memoryEnabled:legacy.memoryEnabled??legacy.memory??false,toolAssistedMemory:legacy.toolAssistedMemory??false}
-  const migrated=personalizationSettingsSchema.safeParse(candidate);return migrated.success?migrated.data:defaultPersonalizationSettings
-}
-
 export interface PersonalizationControlStatus{readonly protocol:'cutout.personalization-status.v1';readonly personality:PersonalizationSettings['personality'];readonly hasCustomInstructions:boolean;readonly memoryEnabled:boolean;readonly toolAssistedMemory:boolean}
 export function personalizationControlStatus(value:PersonalizationSettings):PersonalizationControlStatus{return{protocol:'cutout.personalization-status.v1',personality:value.personality,hasCustomInstructions:Boolean(value.customInstructions.trim()),memoryEnabled:value.memoryEnabled,toolAssistedMemory:value.toolAssistedMemory}}

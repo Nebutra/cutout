@@ -9,6 +9,10 @@ import {
 } from './design-system-candidates'
 import { prototypePlanSchema, type PrototypePlan } from './prototype-plan'
 import {
+  currentPrototypeExploration,
+  currentPrototypeReviewDocument,
+} from './prototype-plan.test-fixture'
+import {
   cancelUnstartedPrototypeSuiteCandidates,
   createPrototypeSuiteCandidateSet,
   projectSelectedPrototypeSuiteToWorkspace,
@@ -49,7 +53,7 @@ describe('persisted prototype suite candidates', () => {
     ])
   })
 
-  it('persists three complete alternatives and projects only the human-selected suite to legacy fields', () => {
+  it('persists three complete alternatives and projects only the human-selected suite to workspace fields', () => {
     const designSystems = readyDesignSystems()
     let suites = createPrototypeSuiteCandidateSet({
       designSystemCandidates: designSystems,
@@ -127,6 +131,19 @@ describe('persisted prototype suite candidates', () => {
       },
       designSystems,
     )).toThrow(/requires 4 attributable assets/i)
+
+    expect(() => updatePrototypeSuiteCandidate(
+      suites,
+      candidateId,
+      {
+        status: 'ready',
+        artifact: {
+          ...complete,
+          resourcePack: { ...complete.resourcePack, id: 'pack-without-run-authority' },
+        },
+      },
+      designSystems,
+    )).toThrow(/must name its production run/i)
 
     const otherDirection = designSystems.set.candidates[1]!
     expect(() => updatePrototypeSuiteCandidate(
@@ -304,6 +321,7 @@ function planFor(route: string): PrototypePlan {
       spacing: '8px',
       componentPrinciples: ['Clear hierarchy'],
       assetDirection: 'Crisp image-led assets',
+      exploration: currentPrototypeExploration,
     },
     pages: [
       {
@@ -341,6 +359,7 @@ function planFor(route: string): PrototypePlan {
       startPageId: `${route}-home`,
       steps: [{ fromPageId: `${route}-home`, interactionId: 'open-detail', toPageId: `${route}-detail` }],
     }],
+    reviewDocument: currentPrototypeReviewDocument,
   })
 }
 

@@ -94,6 +94,7 @@ describe("provider definition registry", () => {
         id: "p",
         kind: "future-provider",
         label: "Future",
+        wireProtocol: "chat-completions",
         defaultModel: "m",
         enabled: false,
       }),

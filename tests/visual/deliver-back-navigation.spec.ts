@@ -1,8 +1,9 @@
 import { expect, test, type Page, type TestInfo } from "@playwright/test";
+import { openDeliverWorkspace } from "./workspace-helpers";
 
 async function enterDeliver(page: Page, testInfo: TestInfo) {
   if (testInfo.project.name === "mobile-chrome") await page.setViewportSize({ width: 1024, height: 915 });
-  await page.getByRole("button", { name: "Deliver", exact: true }).click();
+  await openDeliverWorkspace(page);
   if (testInfo.project.name === "mobile-chrome") await page.setViewportSize({ width: 412, height: 915 });
   const deliver = page.locator('[data-slot="design-os-workbench"][aria-label="Deliver"]');
   await expect(deliver).toBeVisible();

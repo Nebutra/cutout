@@ -560,6 +560,7 @@ function fakeRegistry(): ServiceRegistry {
         id: PROVIDER_ID,
         kind: 'openai',
         label: 'E2E provider',
+        wireProtocol: 'responses',
         defaultModel: CHAT_MODEL,
         enabled: true,
       }],
@@ -766,7 +767,7 @@ describe('brief → every planned route — rendered IntentWorkspace', () => {
       .filter((button) => button.textContent?.includes('Use this direction'))
     expect(selectionButtons).toHaveLength(3)
     expect(
-      node.querySelector<HTMLElement>('[data-workspace-panel="agent-drawer"]')
+      node.querySelector<HTMLElement>('[data-testid="workspace-drawer"]')
         ?.classList.contains('hidden'),
     ).toBe(true)
     await act(async () => {

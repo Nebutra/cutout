@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import releaseNotesCatalog from "@/release-notes/catalog.json";
 import type { LocalizedReleaseNotes } from "./contracts";
 import {
-  FIRST_RELEASE_NOTES_MIGRATION_VERSION,
   RELEASE_NOTES_READ_STATE_STORAGE_KEY,
   compareSemanticVersions,
   dismissReleaseNotes,
@@ -53,7 +52,7 @@ describe("release notes model", () => {
     }, "fr")).toMatchObject({
       version: "0.1.17",
       releasedOn: "2026-08-04",
-      highlights: [{ id: "legacy-notes", body: "Readable English fallback." }],
+      highlights: [{ id: "release-notes-fallback", body: "Readable English fallback." }],
     });
   });
 
@@ -88,7 +87,7 @@ describe("release notes model", () => {
       localizedNotes: { ...bundled, remoteUrl: "https://example.test" } as LocalizedReleaseNotes,
       notes: "Readable English fallback.",
     }, "fr")).toMatchObject({
-      highlights: [{ id: "legacy-notes", body: "Readable English fallback." }],
+      highlights: [{ id: "release-notes-fallback", body: "Readable English fallback." }],
     });
   });
 
@@ -115,25 +114,17 @@ describe("release notes local lifecycle", () => {
     expect(result.state?.pendingVersion).toBeUndefined();
   });
 
-  it("uses the existing notification ledger only for the first OTA migration", () => {
+  it("does not infer release-note state from the update notification ledger", () => {
     const storage = memoryStorage();
     const result = initializeReleaseNotesLifecycle({
       storage,
-      currentVersion: FIRST_RELEASE_NOTES_MIGRATION_VERSION,
+      currentVersion: "0.1.16",
       bundledNotes: bundled,
-      updateNotificationVersion: FIRST_RELEASE_NOTES_MIGRATION_VERSION,
     });
     expect(result).toMatchObject({
-      shouldOpen: true,
-      state: { observedVersion: "0.1.16", pendingVersion: "0.1.16" },
+      shouldOpen: false,
+      state: { observedVersion: "0.1.16" },
     });
-
-    const later = memoryStorage();
-    expect(initializeReleaseNotesLifecycle({
-      storage: later,
-      currentVersion: "0.1.17",
-      updateNotificationVersion: "0.1.17",
-    }).shouldOpen).toBe(false);
   });
 
   it("reopens pending notes after a crash and stops after dismissal", () => {
@@ -209,7 +200,6 @@ describe("release notes local lifecycle", () => {
       storage: corrupt,
       currentVersion: "0.1.16",
       bundledNotes: bundled,
-      updateNotificationVersion: "0.1.16",
     }).shouldOpen).toBe(false);
   });
 
@@ -241,13 +231,11 @@ describe("release notes local lifecycle", () => {
       storage,
       currentVersion: "0.1.16",
       bundledNotes: bundled,
-      updateNotificationVersion: "0.1.16",
     })).not.toThrow();
     expect(initializeReleaseNotesLifecycle({
       storage,
       currentVersion: "0.1.16",
       bundledNotes: bundled,
-      updateNotificationVersion: "0.1.16",
     }).shouldOpen).toBe(false);
     expect(() => dismissReleaseNotes(storage, "0.1.16")).not.toThrow();
   });

@@ -13,17 +13,15 @@ import {
   type IntegrationResult,
 } from '@/integration-sdk'
 
-interface CompatibilityOptions {
+interface IntegrationAdapterOptions {
   readonly provider: IntegrationManifest['provider']
   readonly product: IntegrationManifest['product']
   readonly domains: readonly IntegrationDataDomain[]
 }
 
-/**
- * Compatibility lives on the legacy side so the Integration SDK never imports
- * connector or provider implementation details.
- */
-export function legacyConnectorAsIntegration(connector: Connector, options: CompatibilityOptions): IntegrationAdapter {
+/** Projects the bounded Connector contract into the current Integration SDK
+ * without making the SDK depend on provider implementation details. */
+export function connectorAsIntegration(connector: Connector, options: IntegrationAdapterOptions): IntegrationAdapter {
   const operations = connector.manifest.capabilities.map((item) => item.operation)
   const manifest: IntegrationManifest = {
     protocol: INTEGRATION_SDK_PROTOCOL,
@@ -57,8 +55,8 @@ export function legacyConnectorAsIntegration(connector: Connector, options: Comp
     base: request.base,
     now: context.now,
     signal: context.signal,
-    // Only the opaque handle is exposed. Legacy adapters requiring actual
-    // credentials must be invoked by their host, never by this bridge.
+    // Only the opaque handle is exposed. Adapters requiring actual credentials
+    // must be invoked by their host, never by this bridge.
     ...(context.session.secretHandle ? { auth: { secretHandle: context.session.secretHandle.id } } : {}),
   })
 

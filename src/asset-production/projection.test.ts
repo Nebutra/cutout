@@ -1,31 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { emptyAssetProductionSnapshot } from './contracts'
-import { migrateLegacySlicesToAssetProduction } from './migration'
 import { compileAssetProductionPlan } from './planner'
-import { projectProductionMaterials, projectProductionReviewQueue } from './projection'
+import { projectProductionReviewQueue } from './projection'
 import { integrityIssue, qualityIssue } from './quality-policy'
-import { reduceAssetProduction, supersedeActiveProduction } from './reducer'
+import { reduceAssetProduction } from './reducer'
 
 describe('asset production projections', () => {
-  it('projects grandfathered legacy output honestly and omits non-consumable tasks', async () => {
-    const snapshot = await migrateLegacySlicesToAssetProduction({
-      projectId: 'project:1', projectRevisionId: 'revision:1', createdAt: 1,
-      slices: [{
-        id: 'slice:1', name: 'hero.png', blob: new Blob(['hero'], { type: 'image/png' }),
-        width: 20, height: 20, box: { x: 0, y: 0, width: 20, height: 20 },
-        assetManifestItemId: 'asset:hero', pageId: 'home', regionId: 'hero',
-      }],
-    })
-    expect(projectProductionMaterials(snapshot)).toEqual([
-      expect.objectContaining({
-        manifestItemId: 'asset:hero', status: 'legacy-ready', legacyUnverified: true,
-      }),
-    ])
-    expect(projectProductionReviewQueue(snapshot)).toEqual([])
-    const superseded = supersedeActiveProduction(snapshot, 2)
-    expect(projectProductionMaterials(superseded)).toEqual([])
-  })
-
   it('projects review and failed tasks even when no image can be projected', async () => {
     const plan = await compileAssetProductionPlan({
       sourceRevision: { projectRevisionId: 'revision:1', pageArtifacts: [] },

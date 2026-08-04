@@ -9,7 +9,7 @@ import {
   type ConnectorPreview,
   type ConnectorResult,
 } from '@/connectors'
-import { legacyConnectorAsIntegration } from '../integration-compat'
+import { connectorAsIntegration } from '../integration-compat'
 import {
   canonicalJson,
   type DesignComponent,
@@ -31,7 +31,7 @@ const CONNECTOR_ID = 'figma.snapshot'
 const CONNECTOR_VERSION = '1.0.0'
 
 export function createFigmaIntegration() {
-  return legacyConnectorAsIntegration(createFigmaConnector(), {
+  return connectorAsIntegration(createFigmaConnector(), {
     provider: { id: 'figma', name: 'Figma' },
     product: { id: 'figma', name: 'Figma' },
     domains: ['design-files', 'design-tokens', 'components'],

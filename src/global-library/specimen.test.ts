@@ -10,7 +10,7 @@ const document = {
   version: 'design-ir.v1',
   meta: { id: 'project.trace', title: 'Trace Console', createdAt: at, updatedAt: at },
   revision: { id: 'revision.3', number: 3, createdAt: at, author: { kind: 'human', id: 'user' } },
-  needs: [], sources: [], brands: [], tokens: [], components: [], materials: [], provenance: [], relations: [],
+  needs: [], sources: [], brands: [], tokens: [], components: [], materials: [], candidateSets: [], provenance: [], relations: [],
 } satisfies DesignDocument
 
 const files = [

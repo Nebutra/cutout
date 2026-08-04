@@ -21,6 +21,7 @@ import {
 import { selectExportPayload } from '@/store/selectors'
 import { createRunEvent, projectAgentResponseBranches, replayRunEvents } from '@/agent-runtime/run-events'
 import { createPrototypeAssetManifest } from '@/prototype/asset-manifest'
+import { currentPrototypeExploration, currentPrototypeReviewDocument } from '@/prototype/prototype-plan.test-fixture'
 import type { WorkspaceSnapshot } from '@/workspace/workspace-snapshot'
 
 const pngBlob = (byte = 1) =>
@@ -32,7 +33,7 @@ function makeRepo() {
   return createLocalProjectRepository({ idb: new IDBFactory() })
 }
 
-async function putRawLegacyRecord(
+async function putRawRecord(
   idb: IDBFactory,
   record: LocalProjectRecord,
 ): Promise<void> {
@@ -83,6 +84,7 @@ describe('project-repository.local', () => {
           spacing: '8px grid',
           componentPrinciples: ['One primary action'],
           assetDirection: 'Brand visuals',
+          exploration: currentPrototypeExploration,
         },
         pages: [
           {
@@ -142,6 +144,7 @@ describe('project-repository.local', () => {
             },
           ],
         },
+        reviewDocument: currentPrototypeReviewDocument,
       },
       humanLoopChoiceId: 'commerce',
       humanLoopCustomAnswer: '',
@@ -508,40 +511,58 @@ describe('project-repository.local', () => {
       .toBe('receipt:repository-suite')
   })
 
-  it('backfills a raw legacy IndexedDB record without a version upgrade and remains idempotent', async () => {
+  it('drops an incomplete workspace instead of guessing it into the current contract', async () => {
     const idb = new IDBFactory()
     const repo = createLocalProjectRepository({ idb })
-    const legacy = {
+    const incomplete = {
       ...createEmptyProjectRecord(310),
-      name: 'Legacy project',
-      brief: 'legacy brief',
+      name: 'Incomplete project',
+      brief: 'incomplete brief',
       status: 'Draft' as const,
-      // This is deliberately incomplete to model workspace.v1 records written
-      // before durable preferences/runtime fields existed.
       workspace: {
         version: 'workspace.v1' as const,
         prototypePlan: planningSnapshot().prototypePlan,
       } as unknown as LocalProjectRecord['workspace'],
     }
-    await putRawLegacyRecord(idb, legacy)
+    await putRawRecord(idb, incomplete)
 
-    const migrated = await repo.load(legacy.id)
-    expect(migrated.ok).toBe(true)
-    if (!migrated.ok) return
-    expect(migrated.data.designDocument?.version).toBe('design-ir.v1')
-    expect(migrated.data.designDocumentContentHash).toMatch(/^[a-f0-9]{64}$/)
-    expect(migrated.data.workspace?.prototypeScope).toBe('primary-flow')
+    const normalized = await repo.load(incomplete.id)
+    expect(normalized.ok).toBe(true)
+    if (!normalized.ok) return
+    expect(normalized.data.workspace).toBeNull()
+    expect(normalized.data.assetProduction).toEqual(emptyAssetProductionSnapshot())
+    expect(normalized.data.designDocument?.version).toBe('design-ir.v1')
+    expect(normalized.data.designDocumentContentHash).toMatch(/^[a-f0-9]{64}$/)
 
-    const loadedAgain = await repo.load(legacy.id)
+    const loadedAgain = await repo.load(incomplete.id)
     expect(loadedAgain.ok).toBe(true)
     if (!loadedAgain.ok) return
     expect(loadedAgain.data.designDocumentContentHash).toBe(
-      migrated.data.designDocumentContentHash,
+      normalized.data.designDocumentContentHash,
     )
-    expect(loadedAgain.data.workspace).toEqual(migrated.data.workspace)
+    expect(loadedAgain.data.workspace).toBeNull()
   })
 
-  it('prefers validated Design IR when its representable workspace conflicts with legacy fields', async () => {
+  it('rejects unknown workspace fields at the persistence boundary', async () => {
+    const idb = new IDBFactory()
+    const repo = createLocalProjectRepository({ idb })
+    const record = {
+      ...createEmptyProjectRecord(312),
+      workspace: {
+        ...planningSnapshot(),
+        retiredSurface: true,
+      } as unknown as WorkspaceSnapshot,
+    }
+    await putRawRecord(idb, record)
+
+    const loaded = await repo.load(record.id)
+
+    expect(loaded.ok).toBe(true)
+    if (!loaded.ok) return
+    expect(loaded.data.workspace).toBeNull()
+  })
+
+  it('prefers validated Design IR when its representable workspace conflicts with current fields', async () => {
     const idb = new IDBFactory()
     const repo = createLocalProjectRepository({ idb })
     const canonical = {
@@ -556,7 +577,7 @@ describe('project-repository.local', () => {
     expect(saved.ok).toBe(true)
     if (!saved.ok || !saved.data.designDocument) return
 
-    await putRawLegacyRecord(idb, {
+    await putRawRecord(idb, {
       ...saved.data,
       workspace: {
         ...planningSnapshot(),
@@ -860,18 +881,8 @@ describe('project-repository.local', () => {
       const heroRevision = record.designDocument?.materials
         .find((material) => material.id === 'material:cutout-slice:slice-hero')
         ?.revisions[0]
-      expect(heroRevision?.production).toMatchObject({
-        manifestItemId: 'page-1-region-hero-1',
-        pageId: 'page-1',
-        regionId: 'region-hero',
-        readiness: 'legacy-ready',
-        bounds: { x: 0, y: 0, width: 8, height: 8 },
-        issues: [expect.objectContaining({ code: 'legacy-unverified' })],
-      })
-      expect(heroRevision?.production?.artifactSha256).toBe(
-        heroRevision?.content.sha256,
-      )
-      expect(heroRevision?.provenanceId).toMatch(/^provenance:asset-task:/)
+      expect(heroRevision?.production).toBeUndefined()
+      expect(record.assetProduction).toEqual(emptyAssetProductionSnapshot())
 
       // Restore round-trip preserves it in the live store.
       const restoreInput = await createRestoreInputFromProject(record)
@@ -981,7 +992,7 @@ describe('project-repository.local', () => {
       bytes, mediaType: 'image/png', source: 'cutout', runId: 'output',
     })
     const snapshot = await publishToolCutoutProduction({
-      snapshot: createEmptyProjectRecord(1).assetProduction!,
+      snapshot: createEmptyProjectRecord(1).assetProduction,
       projectRevisionId: 'revision:1',
       sourceArtifactId,
       sourceSha256: parseArtifactId(sourceArtifactId)!,

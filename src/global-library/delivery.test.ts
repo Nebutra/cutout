@@ -5,7 +5,7 @@ import { buildDeliveryLibraryItem } from './delivery'
 import { globalLibraryItemSchema } from './contracts'
 
 const at = '2026-07-15T00:00:00.000Z'
-const document = { version:'design-ir.v1',meta:{id:'project.alpha',title:'Alpha',createdAt:at,updatedAt:at},revision:{id:'revision.2',number:2,createdAt:at,author:{kind:'human',id:'user'}},needs:[],sources:[],brands:[],tokens:[],components:[],materials:[],provenance:[],relations:[] } satisfies DesignDocument
+const document = { version:'design-ir.v1',meta:{id:'project.alpha',title:'Alpha',createdAt:at,updatedAt:at},revision:{id:'revision.2',number:2,createdAt:at,author:{kind:'human',id:'user'}},needs:[],sources:[],brands:[],tokens:[],components:[],materials:[],candidateSets:[],provenance:[],relations:[] } satisfies DesignDocument
 async function digest(content:string){const value=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(content));return[...new Uint8Array(value)].map(byte=>byte.toString(16).padStart(2,'0')).join('')}
 function sink(){return{async put(bytes:Uint8Array){const value=await crypto.subtle.digest('SHA-256',bytes as BufferSource);return{sha256:[...new Uint8Array(value)].map(byte=>byte.toString(16).padStart(2,'0')).join(''),size:bytes.byteLength}}}}
 

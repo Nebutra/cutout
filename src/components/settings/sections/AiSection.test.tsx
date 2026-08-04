@@ -8,6 +8,7 @@ const provider = {
   id: 'openai',
   kind: 'openai',
   label: 'Team OpenAI',
+  wireProtocol: 'responses' as const,
   defaultModel: 'gpt-5',
   enabled: true,
 }

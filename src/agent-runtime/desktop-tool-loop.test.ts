@@ -32,6 +32,7 @@ function input(
       providerId: "p",
       model: "m",
       intent: "hero",
+      prompt: "Render the approved hero.",
       inputArtifactIds: [],
       budgetCeiling: { currency: "USD", amount: 0.2 },
       approvalPolicy: "auto-within-budget",
@@ -143,6 +144,7 @@ describe("desktop tool loop", () => {
     expect(h.batches.flat().map((e) => e.type)).toEqual([
       "tool-approval-requested",
     ]);
+    expect(h.batches.flat()[0]).not.toHaveProperty("estimatedCost");
     await h.loop.approve("tool", "request");
     expect(h.execute).toHaveBeenCalledOnce();
     expect(h.batches.flat().map((event) => event.type)).toContain("tool-started");
@@ -253,7 +255,7 @@ describe("desktop tool loop", () => {
     const h = harness();
     await h.loop.request(
       input({
-        request: {
+            request: {
           ...input().request,
           budgetCeiling: { currency: "USD", amount: 0.01 },
         },

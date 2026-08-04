@@ -166,7 +166,7 @@ describe('AgentWorkspaceDock', () => {
       viewModel: {
         ...draftModel,
         summary: { status: 'running', title: 'Waiting for approval', detail: 'One paid tool is paused.', intent: 'Generate hero', elapsedLabel: '0:02' },
-        feed: [{ id: 'approval', type: 'tool', status: 'waiting', title: 'Generate hero', detail: 'Tool: image.generate', provenance: 'runtime', toolCallId: 'tool-1', requestId: 'request-1', providerModel: 'openai/gpt-image-1', estimatedCost: { currency: 'USD', amount: 0.08, credits: 8 }, approval: { status: 'required', reason: 'Explicit approval is required.' }, actions: ['approve', 'deny'] }],
+        feed: [{ id: 'approval', type: 'tool', status: 'waiting', title: 'Generate hero', detail: 'Tool: image.generate', provenance: 'runtime', toolCallId: 'tool-1', requestId: 'request-1', providerModel: 'openai/gpt-image-1', approval: { status: 'required', reason: 'Explicit approval is required.' }, actions: ['approve', 'deny'] }],
       },
       composer: { value: '', disabled: true, onChange: vi.fn(), onSubmit: vi.fn() },
       onApproveTool,
@@ -283,7 +283,7 @@ describe('AgentWorkspaceDock', () => {
       createRunEvent('run', { type: 'run-started', mode: 'create' }, { eventId: 'start', at: 1 }),
       createRunEvent('run', { type: 'intent-recorded', intent: 'hi' }, { eventId: 'user', at: 2 }),
       createRunEvent('run', { type: 'step-started', stepId: 'step:prepare:run', label: 'Preparing the run' }, { eventId: 'prepare', at: 3 }),
-      createRunEvent('run', { type: 'tool-approval-requested', toolCallId: 'generate', requestId: 'request', stepId: 'step:prepare:run', tool: 'image.generate', label: 'Generate hero', estimatedCost: { currency: 'USD', amount: 0.1 }, budgetCeiling: { currency: 'USD', amount: 1 }, approvalPolicy: 'explicit', reason: 'User approval required.' }, { eventId: 'approval', at: 4 }),
+      createRunEvent('run', { type: 'tool-approval-requested', toolCallId: 'generate', requestId: 'request', stepId: 'step:prepare:run', tool: 'image.generate', label: 'Generate hero', budgetCeiling: { currency: 'USD', amount: 1 }, approvalPolicy: 'explicit', reason: 'User approval required.', pendingApproval: true }, { eventId: 'approval', at: 4 }),
     ])
     const html = renderToStaticMarkup(createElement(AgentWorkspaceDock, {
       viewModel: model,
@@ -541,7 +541,7 @@ describe('AgentWorkspaceDock', () => {
         ...stoppedModel,
         feed: [
           ...stoppedModel.feed,
-          { id: 'stale-approval', type: 'tool', status: 'waiting', title: 'Generate design system', detail: 'Old approval', provenance: 'runtime', toolCallId: 'tool-stale', requestId: 'request-stale', estimatedCost: { currency: 'USD', amount: 0.08 }, actions: ['approve', 'deny'] },
+          { id: 'stale-approval', type: 'tool', status: 'waiting', title: 'Generate design system', detail: 'Old approval', provenance: 'runtime', toolCallId: 'tool-stale', requestId: 'request-stale', actions: ['approve', 'deny'] },
         ],
       },
       composer: { value: '', onChange: vi.fn(), onSubmit: vi.fn() },

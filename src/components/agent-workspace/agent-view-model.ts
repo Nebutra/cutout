@@ -97,7 +97,6 @@ export type AgentFeedItem =
       readonly toolName?: string
       readonly requestId?: string
       readonly providerModel?: string
-      readonly estimatedCost?: MoneyEstimate
       readonly charged?: MoneyEstimate
       readonly approval?: {
         readonly status: 'required' | 'approved' | 'denied' | 'automatic'
@@ -389,7 +388,7 @@ function latestMessageRevisions(events: readonly AgentRunEvent[]): ReadonlyMap<s
 /**
  * A retry may create a new run, but it does not create a new conversational
  * turn. Preserve repeated text after an Agent reply while collapsing identical
- * intents that have no intervening reply (including legacy failed-run logs).
+ * intents that have no intervening reply, including failed-run retries.
  */
 function collapseRepeatedIntentTurns(
   events: readonly (Extract<AgentRunEvent, { type: 'intent-recorded' | 'steer-recorded' | 'agent-message' }>)[],
@@ -580,7 +579,6 @@ function feedItemFromRunEvent(event: AgentRunEvent): readonly AgentFeedItem[] {
         toolName: event.tool,
         requestId: event.requestId,
         providerModel: event.model ? `${event.model.providerId}/${event.model.model}` : undefined,
-        estimatedCost: event.estimatedCost,
         approval: { status: 'required', reason: event.reason },
         actions: ['approve', 'deny'],
       }]

@@ -14,17 +14,20 @@ estimates (`estimates X USD`, amounts, currencies presented as charges).
 **Why**: Users bring their own provider keys; showing USD estimates implies the app
 is billing them. Provider billing is the only source of truth.
 
-**Boundary**: Budget guardrails stay *internal*. `estimatedCost` / `budgetCeiling`
-remain in the `tool-approval-requested` event schema (`src/agent-runtime/run-events.ts`)
-and the paid-tool contract (`src/control-protocol/paid-tool-contract.ts`). The
-desktop app does not expose a billing or cost-management preference: desktop
-paid requests require explicit approval and use host-derived capability estimates
-as execution ceilings. External controllers may still use the shared protocol's
-bounded auto-approval policy.
+**Boundary**: Provider capability estimates stay inside paid-tool planning and
+budget enforcement. They are not copied into Agent run events, view models, or
+execution timelines. `budgetCeiling` remains in the `tool-approval-requested`
+event schema (`src/agent-runtime/run-events.ts`) and paid-tool contract
+(`src/control-protocol/paid-tool-contract.ts`) because it is an enforceable
+execution limit rather than a predicted charge. A factual `receipt.charged`
+value may be recorded after execution. The desktop app does not expose a billing
+or cost-management preference: desktop paid requests require explicit approval
+and use host-derived capability estimates as execution ceilings. External
+controllers may still use the shared protocol's bounded auto-approval policy.
 
 ```ts
-// Wrong (old copy)
-detail: safe(`${event.label} estimates ${event.estimatedCost.amount} ${event.estimatedCost.currency}.`, 500)
+// Wrong (predicted billing copy)
+detail: safe(`${event.label} has an estimated provider charge of $0.08.`, 500)
 
 // Correct
 detail: safe(`${event.label} requires your approval before it can run.`, 500)
@@ -32,8 +35,7 @@ detail: safe(`${event.label} requires your approval before it can run.`, 500)
 
 ## Contract: Approval notifications gate on `pendingApproval`
 
-- `tool-approval-requested` events carry optional `pendingApproval?: boolean`
-  (optional so persisted event logs still parse).
+- `tool-approval-requested` events require `pendingApproval: boolean`.
 - `src/agent-runtime/desktop-tool-loop.ts` sets
   `pendingApproval: !(plan.executable && Boolean(capability))` — true only when the
   auto-approve path will NOT immediately approve.

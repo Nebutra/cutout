@@ -1,22 +1,18 @@
 import { describe, expect, it } from 'vitest'
-import { migrateGlobalLibraryCatalog, previewGlobalLibraryDowngrade } from '@/global-library/store'
-import { migrateWorkflowPack, previewWorkflowPackDowngrade, workflowPackSchema } from '@/agent-workflow-packs/contracts'
-import { migratePaidToolReceipt, previewPaidToolReceiptDowngrade } from '@/control-protocol/paid-tool-contract'
+import { globalLibraryCatalogSchema } from '@/global-library/contracts'
+import { workflowPackSchema } from '@/agent-workflow-packs/contracts'
+import { paidToolReceiptSchema } from '@/control-protocol/paid-tool-contract'
 import { importLottie } from '@/motion-ir/lottie'
 import { figmaPatchPlanSchema } from '@/integration-sdk/figma-plugin'
 import { parseBrandBook } from '@/global-library/brand-book-ingest'
 import { createVideoTimeline } from '@/agent-runtime/video-reference'
 
 const at='2026-07-12T00:00:00.000Z',hash='a'.repeat(64)
-describe('offline compatibility and limit corpus',()=>{
-  it('upgrades and loss-reports old Library, Workflow Pack and receipt documents',()=>{
-    const library=migrateGlobalLibraryCatalog({revision:4,items:[],collections:[],updatedAt:at},at)
-    expect(library).toMatchObject({protocol:'cutout.global-library.v1',revision:4,projectReferences:[]})
-    expect(previewGlobalLibraryDowngrade(library).losses).toEqual([])
-    const workflow=migrateWorkflowPack({id:'brand.book',version:'1.0.0',title:'Brand Book',description:'Offline',cutoutRange:'^0.1.0',capabilities:['export.brand-kit'],steps:[{id:'export',operation:'export.brand-kit',dependsOn:[],effect:'managed-export',approval:'explicit'}],evalCard:{datasetId:'brand.book',metrics:[{id:'schema',threshold:1,weight:1}],minimumScore:1},provenance:{producer:'cutout',capturedAt:at,contentSha256:hash}})
-    expect(workflow.skillRefs).toEqual([]);expect(previewWorkflowPackDowngrade(workflow).losses).toEqual([])
-    const receipt=migratePaidToolReceipt({receiptId:'r',requestId:'q',capability:'generate-image',providerId:'p',model:'m',status:'succeeded',charged:{currency:'USD',amount:1},outputs:['a','b'],startedAt:1,completedAt:2})
-    expect(receipt.outputArtifactIds).toEqual(['a','b']);expect(previewPaidToolReceiptDowngrade(receipt).losses).toHaveLength(1)
+describe('offline current-schema and limit corpus',()=>{
+  it('rejects protocol-less Library, Workflow Pack and retired receipt fields',()=>{
+    expect(globalLibraryCatalogSchema.safeParse({revision:4,items:[],collections:[],updatedAt:at}).success).toBe(false)
+    expect(workflowPackSchema.safeParse({id:'brand.book',version:'1.0.0',title:'Brand Book',description:'Offline',cutoutRange:'^0.1.0',capabilities:['export.brand-kit'],steps:[],evalCard:{},provenance:{}}).success).toBe(false)
+    expect(paidToolReceiptSchema.safeParse({receiptId:'r',requestId:'q',capability:'generate-image',providerId:'p',model:'m',status:'succeeded',charged:{currency:'USD',amount:1},outputs:['a','b'],startedAt:1,completedAt:2}).success).toBe(false)
   })
   it('accepts a complex 1000-step acyclic Brand Book workflow and rejects a cycle',()=>{
     const steps=Array.from({length:1000},(_,index)=>({id:`s.${index}`,operation:'export.brand-kit',dependsOn:index?[`s.${index-1}`]:[],effect:'managed-export' as const,approval:'explicit' as const}))

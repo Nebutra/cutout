@@ -1,5 +1,6 @@
 import { IDBFactory } from 'fake-indexeddb'
 import { describe, expect, it } from 'vitest'
+import { emptyAssetProductionSnapshot } from '@/asset-production/contracts'
 import type { LocalProjectRecord, LocalProjectRepository } from '@/services/local/project-repository.local'
 import { createIndexedDbRecoveryBackend } from './indexeddb-backend'
 import { checkpointProjectForRecovery, createProjectProjectionAdapter } from './project-checkpoint'
@@ -10,7 +11,8 @@ function record(): LocalProjectRecord {
   return {
     id: 'project-1', name: 'Project', brief: 'Outcome', assetCount: 1,
     hasDesignMarkdown: false, status: 'Draft', createdAt: now, updatedAt: now,
-    params: {} as LocalProjectRecord['params'], designMarkdown: null, workspace: null, slices: [],
+    designMarkdown: null, workspace: null, slices: [],
+    assetProduction: emptyAssetProductionSnapshot(),
     source: { name: 'source.png', blob: new Blob([Uint8Array.of(1, 2, 3)], { type: 'image/png' }), width: 1, height: 1 },
     designDocument: { protocol: 'design-ir.v1', projectId: 'project-1', revision: 1, createdAt: now, updatedAt: now, tokens: [], components: [], pages: [], assets: [{ id: 'asset-1', name: 'bytes', mediaType: 'application/octet-stream', width: 1, height: 1, content: { kind: 'inline', bytes: Uint8Array.of(4, 5) } }] } as unknown as LocalProjectRecord['designDocument'],
   }

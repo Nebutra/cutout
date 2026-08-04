@@ -11,13 +11,20 @@ import {
 } from './image-route-assessment'
 import type { ProviderConfig } from './provider-types'
 
-const provider = (kind: string, wireProtocol?: ProviderConfig['wireProtocol']): ProviderConfig => ({
+const provider = (
+  kind: string,
+  wireProtocol: ProviderConfig['wireProtocol'] = kind === 'openai'
+    ? 'responses'
+    : kind === 'google'
+      ? 'google-generate-content'
+      : 'chat-completions',
+): ProviderConfig => ({
   id: `provider:${kind}`,
   kind,
   label: kind,
   defaultModel: 'model',
   enabled: true,
-  ...(wireProtocol ? { wireProtocol } : {}),
+  wireProtocol,
 })
 const descriptor = (
   providerId: string,

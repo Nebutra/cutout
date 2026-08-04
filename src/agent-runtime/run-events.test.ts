@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  agentRunEventSchema,
   appendRunEvent,
   createRunEvent,
   createToolRetryEvent,
@@ -114,8 +115,8 @@ describe('agent run events', () => {
       createRunEvent('run-paid', { type: 'run-started', mode: 'create' }, { eventId: 'start', at: 1 }),
       createRunEvent('run-paid', {
         type: 'tool-approval-requested', toolCallId: 'tool-1', requestId: 'request-1', tool: 'image.generate', label: 'Generate hero',
-        model: { providerId: 'openai', model: 'gpt-image-1' }, estimatedCost: { currency: 'USD', amount: 0.08, credits: 8 },
-        budgetCeiling: { currency: 'USD', amount: 0.2, credits: 20 }, approvalPolicy: 'explicit', reason: 'Explicit approval is required.',
+        model: { providerId: 'openai', model: 'gpt-image-1' },
+        budgetCeiling: { currency: 'USD', amount: 0.2, credits: 20 }, approvalPolicy: 'explicit', reason: 'Explicit approval is required.', pendingApproval: true,
       }, { eventId: 'approval', at: 2 }),
       createRunEvent('run-paid', { type: 'tool-approved', toolCallId: 'tool-1', requestId: 'request-1', reason: 'Approved by user.' }, { eventId: 'approved', at: 3 }),
       createRunEvent('run-paid', { type: 'tool-retry-linked', toolCallId: 'tool-1', previousRequestId: 'request-1', requestId: 'request-2' }, { eventId: 'retry', at: 4 }),
@@ -129,6 +130,28 @@ describe('agent run events', () => {
     const projection = replayRunEvents(events).activeRun?.tools['tool-1']
     expect(projection).toMatchObject({ requestId: 'request-2', previousRequestId: 'request-1', approvalStatus: 'required' })
     expect(projection?.receipt).toMatchObject({ receiptId: 'receipt-1', charged: { amount: 0.07 } })
+  })
+  it('rejects predicted cost fields on approval events', () => {
+    const approval = {
+      eventId: 'approval',
+      runId: 'run-paid',
+      at: 2,
+      type: 'tool-approval-requested',
+      toolCallId: 'tool-1',
+      requestId: 'request-1',
+      tool: 'image.generate',
+      label: 'Generate hero',
+      budgetCeiling: { currency: 'USD', amount: 0.2 },
+      approvalPolicy: 'explicit',
+      reason: 'Explicit approval is required.',
+      pendingApproval: true,
+    } as const
+
+    expect(agentRunEventSchema.safeParse(approval).success).toBe(true)
+    expect(agentRunEventSchema.safeParse({
+      ...approval,
+      estimatedCost: { currency: 'USD', amount: 0.08 },
+    }).success).toBe(false)
   })
   it('replays observable run state without executing side effects', () => {
     const events: AgentRunEvent[] = [

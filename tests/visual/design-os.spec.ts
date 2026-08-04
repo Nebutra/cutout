@@ -1,4 +1,5 @@
 import { expect, test, type Page, type TestInfo } from '@playwright/test'
+import { openDeliverWorkspace } from './workspace-helpers'
 
 async function stabilize(page: Page) {
   await page.addInitScript(() => {
@@ -37,11 +38,6 @@ async function createEmptyProject(page: Page) {
   await expect(page.getByPlaceholder(/Describe a result, correction, or next step/)).toBeVisible()
   await expect(page.locator('[data-slot="user-message"]')).toContainText('Components UX regression')
   await documentFontsReady(page)
-}
-
-async function openDesignOs(page: Page) {
-  await page.getByRole('button', { name: 'Design', exact: true }).click()
-  await page.getByRole('button',{name:'Open system inspector'}).click()
 }
 
 async function openHomeProjects(page: Page) {
@@ -128,39 +124,6 @@ test('empty project agent workspace', async ({ page }) => {
   await expect(page).toHaveScreenshot('empty-project.png', { fullPage: true })
 })
 
-test('Canvas Figma snapshot surface', async ({ page }, testInfo) => {
-  test.skip(true, 'The legacy Canvas inspector is no longer a user-reachable workspace surface')
-  await createEmptyProject(page)
-  await openDesignOs(page)
-  const workbench = page.getByRole('region', { name: 'Canvas inspector' })
-  await expect(workbench).toBeVisible()
-  await workbench.getByRole('tab', { name: 'Figma' }).click()
-  await expect(workbench.getByText('Figma Snapshot', { exact: true })).toBeVisible()
-  await expect(workbench.getByText('Offline only', { exact: true })).toBeVisible()
-  await expect(page).toHaveScreenshot('design-os-figma.png', {
-    fullPage: true,
-    mask: testInfo.project.name === 'mobile-chrome'
-      ? [workbench.locator('p[title^="design-document:"]')]
-      : [],
-  })
-})
-
-test('Canvas production plan is navigable and approval-gated', async ({ page }, testInfo) => {
-  test.skip(true, 'The legacy Canvas inspector is no longer a user-reachable workspace surface')
-  await createEmptyProject(page)
-  await openDesignOs(page)
-  const workbench = page.getByRole('region', { name: 'Canvas inspector' })
-  await workbench.getByRole('tab', { name: 'Production' }).click()
-  await expect(workbench.getByText('Production plan', { exact: true })).toBeVisible()
-  await expect(workbench.getByRole('button', { name: 'Run', exact: true })).toBeDisabled()
-  if (testInfo.project.name === 'mobile-chrome') await expect(workbench.getByLabel('Production category')).toBeVisible()
-  else await expect(workbench.getByRole('navigation', { name: 'Production categories' })).toBeVisible()
-  const firstNode = workbench.getByRole('listitem').first()
-  await firstNode.getByRole('button', { expanded: false }).click()
-  await expect(firstNode.getByText('Reference locks', { exact: true })).toBeVisible()
-  await expect(page).toHaveScreenshot('design-os-production.png', { fullPage: true })
-})
-
 test('Unified Delivery Center exposes only real host capabilities', async ({ page }, testInfo) => {
   const invalidSvgWarnings: string[] = []
   page.on('console', (message) => {
@@ -171,7 +134,7 @@ test('Unified Delivery Center exposes only real host capabilities', async ({ pag
   await createEmptyProject(page)
   const viewport = page.viewportSize()!
   if (viewport.width < 768) await page.setViewportSize({ width: 1024, height: viewport.height })
-  await page.getByRole('button', { name: 'Deliver', exact: true }).click()
+  await openDeliverWorkspace(page)
   if (viewport.width < 768) await page.setViewportSize(viewport)
   const workbench = page.getByRole('region', { name: 'Deliver' })
   await expect(workbench.getByText('Deliver results', { exact: true })).toBeVisible()

@@ -1,6 +1,6 @@
 export * from './schema'
 export * from './validate'
 export * from './fingerprint'
-export * from './legacy-projection'
+export * from './workspace-projection'
 export * from './candidate-selection'
 export * from '@/candidate-selection/contracts'

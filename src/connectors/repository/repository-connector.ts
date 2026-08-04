@@ -2,7 +2,7 @@ import type { SourceLicense, SourceRole } from '@/design-ir'
 import { ingestEverything, type RepositorySnapshotInput } from '@/ingestion/everything-inbox'
 import type { RepositoryScanResult } from '@/ingestion/repo-scanner'
 import { CONNECTOR_PROTOCOL, type Connector, type ConnectorError, type ConnectorInput, type ConnectorResult } from '../contracts'
-import { legacyConnectorAsIntegration } from '../integration-compat'
+import { connectorAsIntegration } from '../integration-compat'
 
 export const REPOSITORY_CONNECTOR_ID = 'cutout.repository'
 const MAX_PENDING_REVIEWS = 32
@@ -103,7 +103,7 @@ export function createRepositoryConnector(host: RepositoryHostAdapter): Connecto
 }
 
 export function createRepositoryIntegration(host: RepositoryHostAdapter) {
-  return legacyConnectorAsIntegration(createRepositoryConnector(host), {
+  return connectorAsIntegration(createRepositoryConnector(host), {
     provider: { id: 'local', name: 'Local host' },
     product: { id: 'repository', name: 'Repository' },
     domains: ['repositories'],

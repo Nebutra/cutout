@@ -32,8 +32,8 @@ function RichText(props: {
 
 - New planner results use `generatedPrototypePlanSchema`, which requires both
   non-empty Markdown documents and limits each to 40,000 characters.
-- Persisted records use `prototypePlanSchema`, where `reviewDocument` remains
-  optional so legacy workspaces still parse.
+- Persisted records use `prototypePlanSchema`, which requires both authored
+  review documents. Incomplete records fail validation.
 - Scope switching selects an authored document. It never parses or slices
   Markdown in the frontend.
 - Copy and Download consume the exact string passed to the artifact renderer.
@@ -47,8 +47,8 @@ function RichText(props: {
 | Condition | Required behavior |
 | --- | --- |
 | New planner omits either scope document | Schema validation fails |
-| Persisted legacy plan has no document | Render deterministic Markdown projection |
-| Authored document is whitespace-only | Use legacy projection |
+| Persisted plan has no document | Reject the incomplete current plan |
+| Authored document is whitespace-only | Reject the incomplete current plan |
 | Markdown contains raw HTML | Omit the HTML node; never execute it |
 | Link uses `javascript:`, `data:`, or a relative URL | Render label without a link |
 | User switches scope | Render the matching persisted document |
@@ -57,17 +57,15 @@ function RichText(props: {
 
 - Good: the model authors a table-led Chinese review for a Chinese brief and
   the artifact surface renders it unchanged.
-- Base: an older plan opens through the compatibility projection and remains
-  readable without migrating storage.
+- Base: a current plan opens with both authored scope documents unchanged.
 - Bad: a component renders fixed Overview, Flow, Palette, and Asset cards from
   `PrototypePlan`; this couples presentation to schema fields and blocks AI
   authored document structure.
 
 ## 6. Tests Required
 
-- Schema: legacy plans parse; generated plans without both documents fail.
-- Projection: each scope returns its exact authored string; legacy scope still
-  filters pages through `pagesForScope`.
+- Schema: persisted and generated plans without both documents fail.
+- Projection: each scope returns its exact authored string.
 - Renderer: headings, GFM tables, lists, and code render in message and artifact
   variants; raw HTML and unsafe URLs stay inert.
 - Artifact shell: arbitrary heading order renders without Review context or

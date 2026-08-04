@@ -7,6 +7,7 @@ import { promisify } from 'node:util'
 import { compileComponentCandidates, type ComponentManifest } from '@/components-compiler'
 import { compileDesignKit, type DesignKit, type DesignKitInput } from '@/design-kit'
 import { fingerprint, type DesignDocument } from '@/design-ir'
+import { currentPrototypeExploration, currentPrototypeReviewDocument } from '@/prototype/prototype-plan.test-fixture'
 import {
   compileStarter,
   type StarterCompilerInput,
@@ -33,7 +34,7 @@ function document(): DesignDocument {
       plan: {
         version: 'prototype-plan.v0',
         product: { name: 'Starter Studio', summary: 'A starter', audience: 'Makers', primaryGoal: 'Ship', platform: 'web' },
-        designSystem: { styleSummary: 'Clean', palette: ['#0ea5e9'], typography: 'Sans', spacing: 'Loose', componentPrinciples: ['Clear'], assetDirection: 'Minimal' },
+        designSystem: { styleSummary: 'Clean', palette: ['#0ea5e9'], typography: 'Sans', spacing: 'Loose', componentPrinciples: ['Clear'], assetDirection: 'Minimal', exploration: currentPrototypeExploration },
         pages: [{
           id: 'page:home', name: 'Home', route: '/', purpose: 'Landing',
           viewport: { platform: 'web', width: 1440, height: 900, scroll: 'single-screen' },
@@ -41,6 +42,7 @@ function document(): DesignDocument {
           overlays: [], states: [], interactions: [],
         }],
         flows: [{ id: 'flow:main', name: 'Main', goal: 'Ship', startPageId: 'page:home', steps: [] }],
+        reviewDocument: currentPrototypeReviewDocument,
         humanLoop: { mode: 'continue', rationale: 'Clear' },
       },
     },
@@ -48,6 +50,7 @@ function document(): DesignDocument {
       id: 'material:logo', kind: 'image', name: 'Logo', currentRevisionId: 'revision:logo:1',
       revisions: [{ id: 'revision:logo:1', ordinal: 1, createdAt: timestamp, content: { id: 'content:logo', uri: 'sha256:aaaaaaaa', mediaType: 'image/png', sha256: 'a'.repeat(64) } }],
     }],
+    candidateSets: [],
     provenance: [],
     relations: [
       { id: 'relation:hero:brand', kind: 'component-uses-token', from: { kind: 'component', id: 'component:hero' }, to: { kind: 'token', id: 'token:brand' } },

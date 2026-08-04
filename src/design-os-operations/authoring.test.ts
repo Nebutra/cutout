@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { DesignDocument } from '@/design-ir'
+import { currentPrototypeExploration, currentPrototypeReviewDocument } from '@/prototype/prototype-plan.test-fixture'
 import { applyAuthoring, authoringForDocument, prepareAuthoring } from './authoring'
 
 const timestamp = '2026-07-11T12:00:00.000Z'
@@ -14,11 +15,11 @@ function document(): DesignDocument {
     components: [{ id: 'component:button', name: 'Button', status: 'ready', tokenIds: ['token:primary'] }],
     prototype: { id: 'prototype:1', plan: {
       version: 'prototype-plan.v0', product: { name: 'Authoring', summary: 'Test', audience: 'Designers', primaryGoal: 'Test', platform: 'web' },
-      designSystem: { styleSummary: 'Direct', palette: ['#00875a'], typography: 'Inter', spacing: '4px', componentPrinciples: ['Explicit'], assetDirection: 'None' },
+      designSystem: { styleSummary: 'Direct', palette: ['#00875a'], typography: 'Inter', spacing: '4px', componentPrinciples: ['Explicit'], assetDirection: 'None', exploration: currentPrototypeExploration },
       pages: [{ id: 'page:home', name: 'Home', route: '/', purpose: 'Test', viewport: { platform: 'web', width: 1440, height: 900, scroll: 'single-screen' }, regions: [{ id: 'region:main', name: 'Main', role: 'content', summary: 'Main content', complexity: 'low', decompositionStrategy: 'direct', assetRoute: 'board-cutout', assetOpportunities: [] }], interactions: [], overlays: [], states: [] }],
-      flows: [{ id: 'flow:home', name: 'Home', goal: 'View home', startPageId: 'page:home', steps: [] }], humanLoop: { mode: 'continue', rationale: 'Explicit fixture.' },
+      flows: [{ id: 'flow:home', name: 'Home', goal: 'View home', startPageId: 'page:home', steps: [] }], reviewDocument: currentPrototypeReviewDocument, humanLoop: { mode: 'continue', rationale: 'Explicit fixture.' },
     } },
-    materials: [], provenance: [], relations: [
+    materials: [], candidateSets: [], provenance: [], relations: [
       { id: 'relation:token', kind: 'component-uses-token', from: { kind: 'component', id: 'component:button' }, to: { kind: 'token', id: 'token:primary' } },
       { id: 'relation:prototype', kind: 'prototype-uses-component', from: { kind: 'prototype', id: 'prototype:1' }, to: { kind: 'component', id: 'component:button' } },
     ],

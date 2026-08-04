@@ -17,6 +17,7 @@ import {
   type PrototypePlanningSeed,
 } from './prototype-plan'
 import { prototypePageAssetCount } from './asset-manifest'
+import { currentPrototypeExploration } from './prototype-plan.test-fixture'
 
 type GenObjectFn = <T>(
   input: GenerateInput,
@@ -80,6 +81,7 @@ const samplePlan: PrototypePlan = {
     spacing: 'Tight mobile rhythm with 8px increments.',
     componentPrinciples: ['clear CTA hierarchy', 'consistent nightlife cards'],
     assetDirection: 'Generate venue covers, VIP badges, and avatar artwork.',
+    exploration: currentPrototypeExploration,
   },
   pages: [
     {

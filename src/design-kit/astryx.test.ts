@@ -13,7 +13,7 @@ const document: DesignDocument = {
     { id: 'radius:control', name: 'Control radius', kind: 'radius', value: '8px' },
   ],
   components: [{ id: 'component:button', name: 'Button', status: 'ready', tokenIds: ['color:accent:light', 'radius:control'] }],
-  materials: [], provenance: [], relations: [],
+  materials: [], candidateSets: [], provenance: [], relations: [],
 }
 
 const input = {

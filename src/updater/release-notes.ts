@@ -7,7 +7,6 @@ import type {
 } from "./contracts";
 
 export const RELEASE_NOTES_READ_STATE_STORAGE_KEY = "cutout.release-notes.read-state.v1";
-export const FIRST_RELEASE_NOTES_MIGRATION_VERSION = "0.1.16";
 
 const RELEASE_NOTES_PROTOCOL = "cutout.release-notes.v1";
 const STATE_PROTOCOL = "cutout.release-notes.read-state.v1";
@@ -236,34 +235,31 @@ export function resolveUpdateReleaseNotes(
   return {
     version: release.version,
     ...(releasedOn ? { releasedOn } : {}),
-    highlights: [{ id: "legacy-notes", body: fallback }],
+    highlights: [{ id: "release-notes-fallback", body: fallback }],
   };
 }
 
-function readState(storage: Pick<Storage, "getItem">): {
-  readonly exists: boolean;
-  readonly state?: ReleaseNotesReadStateV1;
-} {
+function readState(storage: Pick<Storage, "getItem">): ReleaseNotesReadStateV1 | undefined {
   let raw: string | null;
   try {
     raw = storage.getItem(RELEASE_NOTES_READ_STATE_STORAGE_KEY);
   } catch {
-    return { exists: true };
+    return undefined;
   }
-  if (raw === null) return { exists: false };
+  if (raw === null) return undefined;
   try {
     const value = JSON.parse(raw) as Record<string, unknown>;
-    if (!value || typeof value !== "object" || Array.isArray(value)) return { exists: true };
+    if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
     const keys = Object.keys(value);
-    if (keys.some((key) => !["protocol", "observedVersion", "pendingVersion", "dismissedVersion"].includes(key))) return { exists: true };
-    if (value.protocol !== STATE_PROTOCOL || typeof value.observedVersion !== "string" || !parseSemanticVersion(value.observedVersion)) return { exists: true };
+    if (keys.some((key) => !["protocol", "observedVersion", "pendingVersion", "dismissedVersion"].includes(key))) return undefined;
+    if (value.protocol !== STATE_PROTOCOL || typeof value.observedVersion !== "string" || !parseSemanticVersion(value.observedVersion)) return undefined;
     for (const optional of ["pendingVersion", "dismissedVersion"] as const) {
       const candidate = value[optional];
-      if (candidate !== undefined && (typeof candidate !== "string" || !parseSemanticVersion(candidate))) return { exists: true };
+      if (candidate !== undefined && (typeof candidate !== "string" || !parseSemanticVersion(candidate))) return undefined;
     }
-    return { exists: true, state: value as unknown as ReleaseNotesReadStateV1 };
+    return value as unknown as ReleaseNotesReadStateV1;
   } catch {
-    return { exists: true };
+    return undefined;
   }
 }
 
@@ -279,31 +275,25 @@ export function initializeReleaseNotesLifecycle(input: {
   readonly storage: ReleaseNotesStorage;
   readonly currentVersion: string;
   readonly bundledNotes?: LocalizedReleaseNotes;
-  readonly updateNotificationVersion?: string;
 }): ReleaseNotesLifecycleDecision {
   if (!parseSemanticVersion(input.currentVersion)) return { shouldOpen: false };
   const stored = readState(input.storage);
-  if (!stored.state) {
-    const migrated = !stored.exists
-      && input.currentVersion === FIRST_RELEASE_NOTES_MIGRATION_VERSION
-      && input.updateNotificationVersion === input.currentVersion
-      && input.bundledNotes?.version === input.currentVersion;
+  if (!stored) {
     const state: ReleaseNotesReadStateV1 = {
       protocol: STATE_PROTOCOL,
       observedVersion: input.currentVersion,
-      ...(migrated ? { pendingVersion: input.currentVersion } : {}),
     };
     writeState(input.storage, state);
-    return { shouldOpen: migrated, state };
+    return { shouldOpen: false, state };
   }
 
-  const comparison = compareSemanticVersions(input.currentVersion, stored.state.observedVersion);
-  if (comparison === undefined || comparison < 0) return { shouldOpen: false, state: stored.state };
+  const comparison = compareSemanticVersions(input.currentVersion, stored.observedVersion);
+  if (comparison === undefined || comparison < 0) return { shouldOpen: false, state: stored };
   if (comparison === 0) {
     return {
-      shouldOpen: stored.state.pendingVersion === input.currentVersion
+      shouldOpen: stored.pendingVersion === input.currentVersion
         && input.bundledNotes?.version === input.currentVersion,
-      state: stored.state,
+      state: stored,
     };
   }
 
@@ -312,7 +302,7 @@ export function initializeReleaseNotesLifecycle(input: {
     protocol: STATE_PROTOCOL,
     observedVersion: input.currentVersion,
     ...(hasNotes ? { pendingVersion: input.currentVersion } : {}),
-    ...(stored.state.dismissedVersion ? { dismissedVersion: stored.state.dismissedVersion } : {}),
+    ...(stored.dismissedVersion ? { dismissedVersion: stored.dismissedVersion } : {}),
   };
   writeState(input.storage, state);
   return { shouldOpen: hasNotes, state };
@@ -320,7 +310,7 @@ export function initializeReleaseNotesLifecycle(input: {
 
 export function dismissReleaseNotes(storage: ReleaseNotesStorage, version: string): void {
   if (!parseSemanticVersion(version)) return;
-  const stored = readState(storage).state;
+  const stored = readState(storage);
   if (!stored || stored.pendingVersion !== version) return;
   writeState(storage, {
     protocol: STATE_PROTOCOL,

@@ -174,18 +174,6 @@ pub fn run() {
                 commands::packaged_e2e::native_checkpoint("webview-renderable");
             }
 
-            // Migrate the retired plaintext store only after every entry reaches
-            // the OS credential vault. No secret or account metadata is logged.
-            {
-                let dir = app
-                    .path()
-                    .app_config_dir()
-                    .expect("app config dir must resolve for secret storage");
-                commands::secret_store::init_dir(dir);
-                if let Err(error) = commands::secret_store::migrate_to_keychain() {
-                    log::warn!("Legacy credential migration was deferred: {error}");
-                }
-            }
             #[cfg(desktop)]
             {
                 app.handle().plugin(tauri_plugin_notification::init())?;

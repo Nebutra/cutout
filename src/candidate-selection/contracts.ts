@@ -1,5 +1,4 @@
 import { z } from 'zod'
-import { moneyEstimateSchema } from '@/control-protocol/paid-tool-contract'
 import { err, ok, type Result } from '@/services/types'
 
 const candidateIdSchema = z.string().min(1).max(160)
@@ -45,7 +44,6 @@ export const candidateExplorationDecisionSchema = z.object({
   rationale: candidateTextSchema,
   directions: z.array(candidateDirectionSchema).min(1),
   bounds: candidateExplorationBoundsSchema,
-  estimate: moneyEstimateSchema.optional(),
 }).strict().superRefine((decision, context) => {
   if (decision.count > decision.bounds.maxCandidates) {
     context.addIssue({
