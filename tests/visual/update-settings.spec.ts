@@ -21,13 +21,13 @@ test("Updates stays truthful and configurable without a desktop runtime", async 
   await expect(updates.getByRole("status")).toContainText("available only in the Cutout desktop app");
   await expect(updates.getByRole("button", { name: "Check now" })).toBeDisabled();
   await expect(updates.getByText("What's New", { exact: true })).toBeVisible();
-  await expect(updates.getByText("Review the highlights for Cutout 0.1.18.")).toBeVisible();
+  await expect(updates.getByText("Review the highlights for Cutout 0.1.19.")).toBeVisible();
   const openReleaseNotes = updates.getByRole("button", { name: "Open" });
   await expect(openReleaseNotes).toBeEnabled();
   await openReleaseNotes.click();
-  const releaseNotes = page.getByRole("dialog").filter({ hasText: "Cutout v0.1.18" });
-  await expect(releaseNotes).toContainText("Clearer local AI readiness and actionable failures");
-  await expect(releaseNotes).toContainText("Errors you can act on");
+  const releaseNotes = page.getByRole("dialog").filter({ hasText: "Cutout v0.1.19" });
+  await expect(releaseNotes).toContainText("Readable preparation and honest paid-action decisions");
+  await expect(releaseNotes).toContainText("A more tolerant Codex runtime");
   await page.keyboard.press("Escape");
 
   // Browser builds have no compiled updater endpoints, so they must not offer
