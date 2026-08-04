@@ -1358,3 +1358,36 @@ Added a five-locale versioned release-note catalog, backward-compatible updater 
 ### Next Steps
 
 - None - task complete
+
+
+## Session 41: Remove legacy compatibility surfaces
+
+**Date**: 2026-08-04
+**Task**: Remove legacy compatibility surfaces
+**Branch**: `main`
+
+### Summary
+
+Removed Cutout-owned legacy persistence, protocol aliases, inferred recovery, stale defaults, and approval cost estimates; preserved internal budget enforcement and factual charged receipts; synchronized Agent plugin/contracts/specs and passed full TypeScript, Rust, build, and validation gates.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `b374771` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
