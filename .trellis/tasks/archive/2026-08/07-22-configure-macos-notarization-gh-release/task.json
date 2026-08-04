@@ -1,0 +1,29 @@
+{
+  "id": "configure-macos-notarization-gh-release",
+  "name": "configure-macos-notarization-gh-release",
+  "title": "Configure macOS notarization and GitHub release signing",
+  "description": "Issue and install Developer ID credentials, configure Apple notarization and Tauri updater signing in the protected GitHub release environment, and verify Cutout's update release path.",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P1",
+  "creator": "tseka",
+  "assignee": "tseka",
+  "createdAt": "2026-07-22",
+  "completedAt": "2026-08-05",
+  "branch": "release/macos-notarization",
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": "fef31444d12b1cc6d05a8671de25f868d44cf4d3",
+  "pr_url": "https://github.com/Nebutra/cutout/pull/13",
+  "subtasks": [],
+  "children": [
+    "07-22-verify-release-credentials",
+    "07-22-publish-v0-1-2"
+  ],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "Protected release run 29893617632 proved Apple notarization and stapling for both app and DMG on arm64 and x86_64, plus updater metadata generation and validation. Publication intentionally stopped because immutable Release v0.1.1 already exists.",
+  "meta": {}
+}
