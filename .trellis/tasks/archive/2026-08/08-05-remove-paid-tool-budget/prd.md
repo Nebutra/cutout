@@ -46,17 +46,22 @@ recorded evidence after the fact.
 - [x] Specs no longer describe a budget ceiling or an in-budget auto-approval
 - [x] Full suite green (verified: 2038 vitest tests pass)
 
-## Known consequence — needs a decision
+## Known consequence — assessed, no action needed
 
-`src/visual-generation/executor.ts:80` previously ran a **pre-flight plan-vs-ceiling
-spend guard** for a whole visual DAG. It was deleted with no replacement. Total spend
-for one DAG is now bounded only by `maxAttemptsPerNode` plus per-request explicit
-approval — there is no longer any aggregate ceiling across a multi-node run.
+`src/visual-generation/executor.ts` previously ran a **pre-flight plan-vs-ceiling
+spend guard** for a whole visual DAG, and it was deleted with no replacement.
 
-This is a real behavioural regression in spend containment, even though removing the
-*authorization* dependency on a guess was correct. A node-count or attempt-budget
-ceiling should replace it. Tracked in
-[08-05-converge-v0-1-19-rc](../08-05-converge-v0-1-19-rc/implement.md) step 5.3.
+Assessed 2026-08-05: **spend is still structurally bounded**, so this is not the
+regression it first appeared to be. `contracts.ts:67` caps variant `count` at 8 and
+`contracts.ts:111` caps `maxAttemptsPerNode` at 4, both enforced by a `.strict()`
+schema. A single task therefore cannot exceed a fixed, small number of paid calls
+regardless of any budget input.
+
+That bound is also the *better* one under this task's own principle: it is a
+verifiable count derived from the validated plan, not a prediction of price. The
+deleted guard compared a guess against a caller-supplied ceiling; the surviving
+bound counts real work. Replacing a price guard with a count bound was the correct
+trade, not an oversight.
 
 ## Out of scope
 

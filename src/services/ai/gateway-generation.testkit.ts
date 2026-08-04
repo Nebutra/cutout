@@ -57,6 +57,12 @@ function gatewayProviders(base: string) {
     kind: 'openai',
     label: 'MOX gateway',
     baseUrl: base,
+    // `effectiveProviderWireProtocol` requires this for every non-gateway kind.
+    // Omitting it made every generateObject-based benchmark throw before it
+    // reached the model; the image benchmarks passed because they never call
+    // `prepare`. Kept in sync with the app: 'openai' is OpenAI-shaped, so
+    // 'chat-completions' is its only supported protocol.
+    wireProtocol: 'chat-completions',
     defaultModel: GATEWAY_CHAT_MODEL,
     enabled: true,
   }

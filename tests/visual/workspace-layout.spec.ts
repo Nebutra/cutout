@@ -73,6 +73,6 @@ test("workspace modes use stable non-overlapping geometry", async ({
           document.documentElement.clientWidth,
       ),
     ).toBe(true);
-    await page.getByRole("button", { name: /Back to Canvas|Back/ }).first().click();
+    await page.getByRole("button", { name: /^Back( to (Agent|Canvas))?$/ }).first().click();
   }
 });

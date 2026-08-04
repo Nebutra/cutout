@@ -57,6 +57,24 @@ vi.mock('@/services/ai/model-assignment.local', () => ({
     image: { providerId: GATEWAY_PROVIDER_ID, model: GATEWAY_IMAGE_MODEL },
   }),
   setAssignment: async () => ({}),
+  // `useCapabilityBindings` (hooks/queries/ai-settings.ts) reads these three.
+  // Routing here comes from `loadAssignments` above, so the binding table stays
+  // empty; it only has to be a schema-valid `model-assignments.v2` value.
+  loadCapabilityBindings: async () => ({
+    version: 'model-assignments.v2' as const,
+    bindings: {},
+    descriptors: [],
+  }),
+  setCapabilityBinding: async () => ({
+    version: 'model-assignments.v2' as const,
+    bindings: {},
+    descriptors: [],
+  }),
+  clearCapabilityBinding: async () => ({
+    version: 'model-assignments.v2' as const,
+    bindings: {},
+    descriptors: [],
+  }),
 }))
 
 // The gateway generation service transitively imports the Tauri proxy fetch;
@@ -116,7 +134,10 @@ function fakeRegistry(key: string, base: string): ServiceRegistry {
     },
     providers: {
       list: async () => [
-        { id: GATEWAY_PROVIDER_ID, kind: 'openai', label: 'MOX', defaultModel: GATEWAY_CHAT_MODEL, enabled: true },
+        // `wireProtocol` is mandatory for every non-gateway kind
+        // (services/ai/provider-types.ts:76). 'openai' is OpenAI-shaped, so
+        // 'chat-completions' is its only supported protocol.
+        { id: GATEWAY_PROVIDER_ID, kind: 'openai', label: 'MOX', wireProtocol: 'chat-completions', defaultModel: GATEWAY_CHAT_MODEL, enabled: true },
       ],
       upsert: notUsed,
       remove: notUsed,

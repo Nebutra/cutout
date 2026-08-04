@@ -606,14 +606,14 @@ function renderDemoHtml(
   const radii = tokens.filter((token) => token.category === 'radius')
   const shadows = tokens.filter((token) => token.category === 'shadow')
   const typography = tokens.filter((token) => token.category === 'typography')
-  const pick = <T>(list: readonly T[], index: number, fallback: T): T => list.length ? list[index % list.length]! : fallback
-  const accent = pick(colors, 0, undefined as unknown as ResolvedToken)
+  const pick = <T>(list: readonly T[], index: number, fallback?: T): T | undefined => list.length ? list[index % list.length]! : fallback
+  const accent = pick(colors, 0)
   const surface = pick(colors, 1, accent)
   const ink = pick(colors, 2, accent)
-  const gap = pick(spacing, 2, undefined as unknown as ResolvedToken)
-  const radius = pick(radii, 0, undefined as unknown as ResolvedToken)
-  const shadow = pick(shadows, 0, undefined as unknown as ResolvedToken)
-  const font = pick(typography, 0, undefined as unknown as ResolvedToken)
+  const gap = pick(spacing, 2)
+  const radius = pick(radii, 0)
+  const shadow = pick(shadows, 0)
+  const font = pick(typography, 0)
 
   const css = renderTokensCss(tokens)
   const varOr = (token: ResolvedToken | undefined, fallback: string) => token ? `var(${cssVariable(token)})` : fallback
