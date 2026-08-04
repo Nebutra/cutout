@@ -78,6 +78,13 @@ jobs:
         run: pnpm exec playwright install chromium
       - run: pnpm agent:validate
       - run: pnpm lint
+      # Locale drift otherwise stays invisible until a tag is pushed, because
+      # `release-notes:validate --require-all-locales` is a hard release gate
+      # but nothing checks the message catalogs on the way in. Run once: the
+      # check is platform-independent and `--clean` rewrites tracked files.
+      - name: Validate message catalogs are current
+        if: matrix.os == 'ubuntu-latest' && matrix.node == 22
+        run: pnpm i18n:ci
       - run: pnpm test
       - run: pnpm build
 
