@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.18 - 2026-08-04
+
+- Present one capability-first AI readiness view for planning, image generation, and image editing while keeping runtime and Provider evidence distinct.
+- Decode bounded structured native failures into actionable messages without rendering `[object Object]`, serializing arbitrary payloads, or exposing credential-shaped values.
+- Strengthen signed packaged E2E discovery with isolated Provider metadata, native Keychain reuse, closed diagnostics, and truthful capability gates.
+
 ## 0.1.17 - 2026-08-03
 
 - Keep reviewed image-edit model evidence Provider-neutral by recording exact model capabilities independently from Provider adapters.

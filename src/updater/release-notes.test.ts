@@ -34,8 +34,8 @@ const migrationBundled: LocalizedReleaseNotes = {
 
 describe("release notes model", () => {
   it("bundles exact-version notes and applies whole-locale English fallback", () => {
-    expect(bundled.version).toBe("0.1.17");
-    expect(selectLocalizedReleaseNotes(bundled, "zh-CN")?.headline).toContain("图像路由");
+    expect(bundled.version).toBe("0.1.18");
+    expect(selectLocalizedReleaseNotes(bundled, "zh-CN")?.headline).toContain("本地 AI");
     expect(selectLocalizedReleaseNotes(bundled, "de-DE")?.headline).toBe(
       bundled.locales.en.headline,
     );
@@ -44,17 +44,17 @@ describe("release notes model", () => {
 
   it("prefers typed localized updater notes and safely falls back to plain text", () => {
     expect(resolveUpdateReleaseNotes({
-      version: "0.1.17",
+      version: "0.1.18",
       localizedNotes: bundled,
       notes: "English fallback",
-    }, "ja")?.headline).toContain("画像ルーティング");
+    }, "ja")?.headline).toContain("ローカル AI");
     expect(resolveUpdateReleaseNotes({
-      version: "0.1.18",
+      version: "0.1.19",
       localizedNotes: bundled,
       notes: "Readable English fallback.",
       publishedAt: "2026-08-04T10:00:00Z",
     }, "fr")).toMatchObject({
-      version: "0.1.18",
+      version: "0.1.19",
       releasedOn: "2026-08-04",
       highlights: [{ id: "release-notes-fallback", body: "Readable English fallback." }],
     });

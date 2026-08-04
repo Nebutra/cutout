@@ -2,131 +2,106 @@
   "protocol": "cutout.release-notes.catalog.v1",
   "entries": [
     {
-      "version": "0.1.17",
-      "releasedOn": "2026-08-03",
+      "version": "0.1.18",
+      "releasedOn": "2026-08-04",
       "locales": {
         "en": {
-          "headline": "Clearer image routing grounded in verified capabilities",
+          "headline": "Clearer local AI readiness and actionable failures",
           "highlights": [
             {
-              "id": "provider-neutral-edit-evidence",
-              "title": "Edit evidence stays Provider-neutral",
-              "body": "Reviewed image-edit evidence now records exact model IDs and capabilities independently from Provider adapters, so a listed model is never mistaken for a supported route."
+              "id": "capability-first-readiness",
+              "title": "One AI readiness view",
+              "body": "Cutout now reports planning, image generation, and image editing as separate required capabilities, while keeping system runtime and direct Provider evidence truthful and distinct."
             },
             {
-              "id": "independent-image-routes",
-              "title": "Separate generation and editing routes",
-              "body": "Image generation and image editing can use different verified models and Providers, while Cutout runs only routes backed by an implemented adapter."
+              "id": "safe-structured-errors",
+              "title": "Errors you can act on",
+              "body": "Structured native failures are decoded into bounded messages instead of [object Object], without serializing arbitrary payloads or exposing credential-shaped values."
             },
             {
-              "id": "rankings-recommend-only",
-              "title": "Quality rankings guide recommendations",
-              "body": "Reviewed quality rankings help Cutout prefer stronger image models, but they do not by themselves prove generation, editing, or transport support."
-            },
-            {
-              "id": "reviewed-update-details",
-              "title": "What's New in five languages",
-              "body": "Cutout now shows reviewed release highlights in English, Simplified Chinese, Japanese, French, and Spanish before installation and keeps the same details available from Updates & Support after upgrading."
+              "id": "signed-local-discovery",
+              "title": "Stronger packaged discovery",
+              "body": "Signed packaged checks now reuse approved local Keychain credentials through isolated non-secret Provider metadata and report closed, actionable failure causes when a route is unavailable."
             }
           ]
         },
         "zh-CN": {
-          "headline": "基于已验证能力的更清晰图像路由",
+          "headline": "更清晰的本地 AI 就绪状态与可处理错误",
           "highlights": [
             {
-              "id": "provider-neutral-edit-evidence",
-              "title": "编辑证据与 Provider 保持解耦",
-              "body": "经审查的图像编辑证据现在只记录准确的模型 ID 和能力，并与 Provider 适配器独立，因此列出的模型不会被误认为已支持的路由。"
+              "id": "capability-first-readiness",
+              "title": "统一的 AI 就绪视图",
+              "body": "Cutout 现在分别呈现规划、图像生成和图像编辑三项必需能力，并如实区分系统运行时证据与直连 Provider 证据。"
             },
             {
-              "id": "independent-image-routes",
-              "title": "生成与编辑使用独立路由",
-              "body": "图像生成和图像编辑可以分别使用不同的已验证模型与 Provider；Cutout 只会运行已有适配器实现的路由。"
+              "id": "safe-structured-errors",
+              "title": "真正可处理的错误",
+              "body": "结构化原生错误现在会转换为有界提示，不再显示 [object Object]，也不会序列化任意载荷或暴露凭据形态的内容。"
             },
             {
-              "id": "rankings-recommend-only",
-              "title": "质量排名只用于推荐",
-              "body": "经审查的质量排名可帮助 Cutout 优先推荐更强的图像模型，但排名本身不能证明生成、编辑或传输支持。"
-            },
-            {
-              "id": "reviewed-update-details",
-              "title": "五种语言的更新说明",
-              "body": "Cutout 现在会在安装前用英语、简体中文、日语、法语和西班牙语展示经审查的版本亮点，并在升级后继续从“更新与支持”提供相同详情。"
+              "id": "signed-local-discovery",
+              "title": "更可靠的打包发现链路",
+              "body": "签名应用现在通过隔离的非敏感 Provider 元数据复用已批准的本地 Keychain 凭据，并在路由不可用时给出封闭且可处理的失败原因。"
             }
           ]
         },
         "ja": {
-          "headline": "検証済みの能力に基づく、より明確な画像ルーティング",
+          "headline": "より明確なローカル AI の準備状況と対処可能なエラー",
           "highlights": [
             {
-              "id": "provider-neutral-edit-evidence",
-              "title": "編集証拠を Provider から分離",
-              "body": "レビュー済みの画像編集証拠は、正確なモデル ID と能力だけを Provider アダプターとは独立して記録し、掲載モデルがサポート済みルートと誤認されることを防ぎます。"
+              "id": "capability-first-readiness",
+              "title": "AI の準備状況を一つの画面に集約",
+              "body": "Cutout は計画、画像生成、画像編集を個別の必須機能として表示し、システムランタイムと直接接続 Provider の証拠を正確に区別します。"
             },
             {
-              "id": "independent-image-routes",
-              "title": "生成と編集を別々にルーティング",
-              "body": "画像生成と画像編集には、それぞれ異なる検証済みモデルと Provider を使用できます。Cutout は実装済みアダプターに裏付けられたルートだけを実行します。"
+              "id": "safe-structured-errors",
+              "title": "対処できるエラー表示",
+              "body": "構造化されたネイティブエラーを制限付きメッセージへ変換し、[object Object] の表示、任意データの直列化、認証情報らしい値の露出を防ぎます。"
             },
             {
-              "id": "rankings-recommend-only",
-              "title": "品質ランキングは推薦のため",
-              "body": "レビュー済みの品質ランキングは、より優れた画像モデルの推薦に役立ちますが、それ自体で生成、編集、または通信方式のサポートを証明するものではありません。"
-            },
-            {
-              "id": "reviewed-update-details",
-              "title": "5 言語で表示する「新機能」",
-              "body": "Cutout はインストール前に、レビュー済みのリリース要点を英語、簡体字中国語、日本語、フランス語、スペイン語で表示し、アップグレード後も同じ詳細を「アップデートとサポート」から確認できます。"
+              "id": "signed-local-discovery",
+              "title": "署名済みアプリの検出を強化",
+              "body": "署名済みパッケージは分離された非機密 Provider メタデータを介して承認済み Keychain 認証情報を再利用し、利用不能なルートには限定された原因を表示します。"
             }
           ]
         },
         "fr": {
-          "headline": "Un routage d’image plus clair, fondé sur des capacités vérifiées",
+          "headline": "Un état de préparation IA local plus clair et des erreurs exploitables",
           "highlights": [
             {
-              "id": "provider-neutral-edit-evidence",
-              "title": "Des preuves d’édition indépendantes du Provider",
-              "body": "Les preuves vérifiées d’édition d’image consignent désormais uniquement l’identifiant exact du modèle et ses capacités, indépendamment des adaptateurs Provider ; un modèle répertorié n’est donc jamais confondu avec une route prise en charge."
+              "id": "capability-first-readiness",
+              "title": "Une vue unique de l’état de l’IA",
+              "body": "Cutout présente séparément la planification, la génération d’images et la modification d’images, tout en distinguant fidèlement les preuves du runtime système et celles des Providers directs."
             },
             {
-              "id": "independent-image-routes",
-              "title": "Des routes distinctes pour générer et modifier",
-              "body": "La génération et la modification d’images peuvent utiliser des modèles et des Providers vérifiés différents. Cutout n’exécute que les routes couvertes par un adaptateur implémenté."
+              "id": "safe-structured-errors",
+              "title": "Des erreurs réellement exploitables",
+              "body": "Les erreurs natives structurées deviennent des messages bornés au lieu de [object Object], sans sérialiser de charge arbitraire ni exposer de valeur ressemblant à un identifiant secret."
             },
             {
-              "id": "rankings-recommend-only",
-              "title": "Les classements servent à recommander",
-              "body": "Les classements de qualité vérifiés aident Cutout à recommander de meilleurs modèles d’image, mais ne prouvent à eux seuls aucune prise en charge de la génération, de la modification ou du transport."
-            },
-            {
-              "id": "reviewed-update-details",
-              "title": "Les nouveautés en cinq langues",
-              "body": "Cutout affiche désormais avant l’installation des points forts vérifiés en anglais, chinois simplifié, japonais, français et espagnol, puis conserve les mêmes détails dans Mises à jour et assistance après la mise à niveau."
+              "id": "signed-local-discovery",
+              "title": "Une détection renforcée dans l’application signée",
+              "body": "Les vérifications signées réutilisent les identifiants Keychain approuvés via des métadonnées Provider non sensibles et isolées, puis signalent des causes fermées et exploitables lorsqu’une route est indisponible."
             }
           ]
         },
         "es": {
-          "headline": "Rutas de imagen más claras, basadas en capacidades verificadas",
+          "headline": "Preparación de IA local más clara y errores accionables",
           "highlights": [
             {
-              "id": "provider-neutral-edit-evidence",
-              "title": "Pruebas de edición independientes del Provider",
-              "body": "Las pruebas revisadas de edición de imágenes ahora registran solo el ID exacto del modelo y sus capacidades, independientemente de los adaptadores del Provider, para no confundir un modelo incluido con una ruta compatible."
+              "id": "capability-first-readiness",
+              "title": "Una sola vista del estado de la IA",
+              "body": "Cutout muestra por separado la planificación, la generación de imágenes y la edición de imágenes, manteniendo diferenciadas las pruebas del runtime del sistema y las de Providers directos."
             },
             {
-              "id": "independent-image-routes",
-              "title": "Rutas separadas para generar y editar",
-              "body": "La generación y la edición de imágenes pueden usar distintos modelos y Providers verificados. Cutout solo ejecuta rutas respaldadas por un adaptador implementado."
+              "id": "safe-structured-errors",
+              "title": "Errores que se pueden resolver",
+              "body": "Los fallos nativos estructurados se convierten en mensajes limitados en vez de [object Object], sin serializar cargas arbitrarias ni exponer valores con forma de credencial."
             },
             {
-              "id": "rankings-recommend-only",
-              "title": "Los rankings solo guían recomendaciones",
-              "body": "Los rankings de calidad revisados ayudan a Cutout a recomendar modelos de imagen más sólidos, pero por sí solos no demuestran compatibilidad con generación, edición ni transporte."
-            },
-            {
-              "id": "reviewed-update-details",
-              "title": "Novedades en cinco idiomas",
-              "body": "Cutout ahora muestra antes de instalar las novedades revisadas en inglés, chino simplificado, japonés, francés y español, y conserva los mismos detalles en Actualizaciones y soporte después de actualizar."
+              "id": "signed-local-discovery",
+              "title": "Detección reforzada en la aplicación firmada",
+              "body": "Las comprobaciones firmadas reutilizan credenciales aprobadas del Keychain mediante metadatos de Provider aislados y no secretos, e informan causas cerradas y accionables cuando una ruta no está disponible."
             }
           ]
         }
