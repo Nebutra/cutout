@@ -391,6 +391,7 @@ import { resolveActiveConversationHead } from "@/agent-runtime/run-events";
 import { consumeComposerDraft } from "./composer-draft";
 import {
   createAgentRunRetryControl,
+  retryPlanningRuntimeAfterFailure,
   resolveAgentRunError,
   type RetryPlanningRuntime,
 } from "./agent-run-retry";
@@ -728,6 +729,7 @@ export function IntentWorkspace({
   }, [approvedDeliverables]);
   const [activeWorkspacePanel, setActiveWorkspacePanel] =
     useState<WorkspacePanel | null>("agent");
+  const deliveryReturnPanelRef = useRef<WorkspacePanel | null>("agent");
   const [gitReview, setGitReview] = useState<GitWorkspaceReview>();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const designSystemSelectionRequired = Boolean(
@@ -1334,6 +1336,7 @@ export function IntentWorkspace({
       ...(agentRunEventsRepositoryNotice ? [agentRunEventsRepositoryNotice] : []),
     ],
     runEvents: agentRunEvents,
+    preparationDetail: liveAgentLabel,
     liveAgentMessage: liveAgentLabel
       ? {
           id: `runtime:stream:${agentRunEvents.activeRunId ?? "design-markdown"}`,
@@ -1928,11 +1931,24 @@ export function IntentWorkspace({
             packagedE2eFailureDiagnostic(message);
           setRunError(classification.displayMessage);
           setRetryableRunBrief(classification.retryable ? baseText : null);
+          const directChat = assignmentTable.chat;
+          const directFallbackReady = Boolean(
+            directChat &&
+              providerList.some(
+                (provider) =>
+                  provider.id === directChat.providerId && provider.enabled,
+              ) &&
+              providerVerificationIsVerified(
+                loadProviderVerifications()[directChat.providerId],
+                directChat.model,
+              ),
+          );
           setRetryPlanningRuntime(
             classification.retryable
-              ? systemPlanning
-                ? "codex-system"
-                : "direct-provider"
+              ? retryPlanningRuntimeAfterFailure(
+                  systemPlanning ? "codex-system" : "direct-provider",
+                  directFallbackReady,
+                )
               : null,
           );
           recordRuntimeDiagnostic({
@@ -2505,80 +2521,185 @@ export function IntentWorkspace({
         { eventId: userTurnEventId },
       );
     }
-    const stepId = `step:prepare:${runId}`;
-    emitRunEvent(runId, {
-      type: "step-started",
-      stepId,
-      label: "Preparing the run",
-      detail: "Understanding your request with the local Codex session.",
-    });
+    const preparationPhases = {
+      context: {
+        stepId: `step:prepare:context:${runId}`,
+        label: "Prepare bounded context",
+      },
+      runtime: {
+        stepId: `step:prepare:runtime:${runId}`,
+        label: "Connect planning runtime",
+      },
+      response: {
+        stepId: `step:prepare:response:${runId}`,
+        label: "Await planning result",
+      },
+      validation: {
+        stepId: `step:prepare:validation:${runId}`,
+        label: "Validate structured response",
+      },
+    } as const;
+    type PreparationPhaseId = keyof typeof preparationPhases;
+    let activePreparationPhase: PreparationPhaseId | null = null;
+    const startPreparationPhase = (
+      phaseId: PreparationPhaseId,
+      detail: string,
+    ) => {
+      const phase = preparationPhases[phaseId];
+      activePreparationPhase = phaseId;
+      emitRunEvent(runId, {
+        type: "step-started",
+        stepId: phase.stepId,
+        label: phase.label,
+        detail,
+      });
+    };
+    const finishActivePreparationPhase = (
+      status: "succeeded" | "failed" | "cancelled",
+      detail: string,
+    ) => {
+      if (!activePreparationPhase) return;
+      const phase = preparationPhases[activePreparationPhase];
+      emitRunEvent(
+        runId,
+        status === "succeeded"
+          ? {
+              type: "step-succeeded",
+              stepId: phase.stepId,
+              label: phase.label,
+              detail,
+            }
+          : status === "cancelled"
+            ? {
+                type: "step-cancelled",
+                stepId: phase.stepId,
+                label: phase.label,
+                detail,
+              }
+            : {
+                type: "step-failed",
+                stepId: phase.stepId,
+                label: phase.label,
+                detail,
+              },
+      );
+      activePreparationPhase = null;
+    };
     const requestId = crypto.randomUUID();
     activeCodexRequestRef.current = requestId;
-    setLiveAgentLabel("Planning with Codex");
-    const targetPageNames = prototypePlan
-      ? pagesForScope(prototypePlan, prototypeScope).map((page) => page.name)
-      : [];
+    let targetPageNames: string[] = [];
+    startPreparationPhase(
+      "context",
+      "Building a bounded brief from the current workspace.",
+    );
+    setLiveAgentLabel("Preparing bounded context");
     try {
-      const result = await runCodexSystemTurn(
-        {
-          requestId,
-          workspaceHandle: planningWorkspaceHandle,
-          conversationId: planningConversationId,
-          contextRevision: planningOpaqueId(
-            "revision",
-            designDocument?.revision.id ?? "unprojected",
-          ),
-          prompt: [
-            "Classify this user turn for Cutout's design-material workflow.",
-            "Return action=reply for conversation or questions; action=material only when the loaded source image itself should be foreground-extracted or split; action=clarify only when one consequential product decision cannot be responsibly inferred; otherwise return action=proceed for a clear design/build request and author the complete planning seed.",
-            "A planning seed derives suite count, route topology, and reusable non-UI materials from the actual business domain and user journeys. Never pad or truncate them to fixed counts.",
-            "Optional regeneration and targetPageNames fields apply only when the user explicitly asks to redo existing work. Use only names from availableTargetPageNames.",
-            "Do not claim that any image, file, Design IR mutation, or approval has already happened.",
-            "",
-            `User: ${text}`,
-          ].join("\n"),
-          context: {
-            version: "cutout.intent-workspace-context.v1",
-            hasSourceImage: Boolean(source.bitmap),
-            hasDesignSystem: Boolean(prototypeDesignSystem),
-            availableTargetPageNames: targetPageNames,
-            existingPlan: prototypePlan
-              ? {
-                  product: prototypePlan.product,
-                  pages: prototypePlan.pages.map((page) => ({
-                    id: page.id,
-                    name: page.name,
-                    route: page.route,
-                    purpose: page.purpose,
-                  })),
-                }
-              : null,
-          },
-          outputSchema: z.toJSONSchema(codexToolGateDecisionSchema),
+      targetPageNames = prototypePlan
+        ? pagesForScope(prototypePlan, prototypeScope).map((page) => page.name)
+        : [];
+      const turnInput = {
+        requestId,
+        workspaceHandle: planningWorkspaceHandle,
+        conversationId: planningConversationId,
+        contextRevision: planningOpaqueId(
+          "revision",
+          designDocument?.revision.id ?? "unprojected",
+        ),
+        prompt: [
+          "Classify this user turn for Cutout's design-material workflow.",
+          "Return action=reply for conversation or questions; action=material only when the loaded source image itself should be foreground-extracted or split; action=clarify only when one consequential product decision cannot be responsibly inferred; otherwise return action=proceed for a clear design/build request and author the complete planning seed.",
+          "A planning seed derives suite count, route topology, and reusable non-UI materials from the actual business domain and user journeys. Never pad or truncate them to fixed counts.",
+          "Optional regeneration and targetPageNames fields apply only when the user explicitly asks to redo existing work. Use only names from availableTargetPageNames.",
+          "Do not claim that any image, file, Design IR mutation, or approval has already happened.",
+          "",
+          `User: ${text}`,
+        ].join("\n"),
+        context: {
+          version: "cutout.intent-workspace-context.v1",
+          hasSourceImage: Boolean(source.bitmap),
+          hasDesignSystem: Boolean(prototypeDesignSystem),
+          availableTargetPageNames: targetPageNames,
+          existingPlan: prototypePlan
+            ? {
+                product: prototypePlan.product,
+                pages: prototypePlan.pages.map((page) => ({
+                  id: page.id,
+                  name: page.name,
+                  route: page.route,
+                  purpose: page.purpose,
+                })),
+              }
+            : null,
         },
+        outputSchema: z.toJSONSchema(codexToolGateDecisionSchema),
+      };
+      finishActivePreparationPhase("succeeded", "Bounded context ready.");
+      startPreparationPhase(
+        "runtime",
+        "Opening the reviewed local Codex planning runtime.",
+      );
+      setLiveAgentLabel("Connecting local Codex");
+      const enterResponsePhase = () => {
+        if (activePreparationPhase === "runtime") {
+          finishActivePreparationPhase("succeeded", "Planning runtime connected.");
+        }
+        if (activePreparationPhase === null) {
+          startPreparationPhase(
+            "response",
+            "Waiting for the schema-bound planning result.",
+          );
+        }
+      };
+      const enterValidationPhase = () => {
+        if (activePreparationPhase === "validation") return;
+        enterResponsePhase();
+        if (activePreparationPhase === "response") {
+          finishActivePreparationPhase("succeeded", "Planning result received.");
+        }
+        if (activePreparationPhase === null) {
+          startPreparationPhase(
+            "validation",
+            "Checking the returned decision against Cutout's schema.",
+          );
+        }
+      };
+      const result = await runCodexSystemTurn(
+        turnInput,
         {
           signal: lease.controller.signal,
           onEvent: (event) => {
             if (event.type === "retrying") {
+              enterResponsePhase();
               setLiveAgentLabel(`Codex reconnecting · attempt ${event.attempt}`);
             } else if (event.type === "started") {
+              enterResponsePhase();
               setLiveAgentLabel("Codex is planning");
+            } else if (event.type === "delta") {
+              enterResponsePhase();
+              setLiveAgentLabel("Codex is planning");
+            } else if (event.type === "completed") {
+              enterValidationPhase();
+              setLiveAgentLabel("Validating Codex response");
+            } else if (event.type === "failed") {
+              setLiveAgentLabel(
+                event.reason === "upstream-unavailable"
+                  ? "Codex provider unavailable"
+                  : event.reason === "model-output-invalid"
+                    ? "Codex response could not be processed"
+                    : "Codex planning failed",
+              );
             }
           },
         },
       );
       agentRunCoordinatorRef.current.checkpoint(lease);
+      enterValidationPhase();
+      setLiveAgentLabel("Validating Codex response");
       const decision = codexToolGateDecisionSchema.parse(result.output);
+      finishActivePreparationPhase("succeeded", "Structured response validated.");
       if (import.meta.env.VITE_CUTOUT_PACKAGED_E2E === "1") {
         setPackagedE2eCodexPlanningTurnCount((count) => count + 1);
       }
-      emitRunEvent(runId, {
-        type: "step-succeeded",
-        stepId,
-        label: "Preparing the run",
-        detail: "Request checked.",
-      });
-
       const selectedTargetNames = decision.targetPageNames?.filter((name) =>
         targetPageNames.includes(name),
       ) ?? [];
@@ -2701,21 +2822,11 @@ export function IntentWorkspace({
             : undefined,
       };
     } catch (error) {
-      emitRunEvent(
-        runId,
+      finishActivePreparationPhase(
+        lease.controller.signal.aborted ? "cancelled" : "failed",
         lease.controller.signal.aborted
-          ? {
-              type: "step-cancelled",
-              stepId,
-              label: "Preparing the run",
-              detail: "Request checking was cancelled.",
-            }
-          : {
-              type: "step-failed",
-              stepId,
-              label: "Preparing the run",
-              detail: errorMessage(error),
-            },
+          ? "Request checking was cancelled."
+          : errorMessage(error),
       );
       throw error;
     } finally {
@@ -5501,7 +5612,13 @@ export function IntentWorkspace({
           inspectorActive={activeWorkspacePanel === "design"}
           drawerControlsDisabled={designSystemSelectionRequired}
           deliverActive={activeWorkspacePanel === "deliver"}
-          onOpenDeliver={() => toggleWorkspacePanel("deliver")}
+          onOpenDeliver={() => {
+            setActiveWorkspacePanel((current) => {
+              if (current === "deliver") return null;
+              deliveryReturnPanelRef.current = current;
+              return "deliver";
+            });
+          }}
           onCollapseSidebar={() => setSidebarCollapsed(true)}
         />
       </div>
@@ -5536,7 +5653,7 @@ export function IntentWorkspace({
             hasDesignSystem={Boolean(prototypeDesignSystem)}
             prototypePageCount={prototypePages.length}
             onOpenWorkspace={() => {
-              setActiveWorkspacePanel(null);
+              setActiveWorkspacePanel(deliveryReturnPanelRef.current);
               onOpenDesignOs("delivery");
             }}
             onClose={() => setActiveWorkspacePanel(null)}
