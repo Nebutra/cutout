@@ -1,5 +1,0 @@
-{"file":".trellis/tasks/07-27-local-agent-credential-discovery/research/paseo-39-agent-discovery-matrix.md","reason":"Tier A roots, schema discriminants, provider sources, and import/delegation boundaries"}
-{"file":".trellis/tasks/07-27-local-agent-credential-discovery/design.md","reason":"Parent registry, native read, authorization, and phased rollout architecture"}
-{"file":".trellis/spec/frontend/byok-provider-protocols.md","reason":"Closed provider kind/protocol mapping, Rust-owned credentials, and connection-check contract"}
-{"file":".trellis/spec/frontend/agent-control-safety.md","reason":"Exact-path, no-helper, secret-redaction, and local Agent inventory safety contracts"}
-{"file":"cutout.agent-capabilities.json","reason":"Do not overclaim session delegation or a bundled provider executor"}
