@@ -14,6 +14,7 @@ const provider = (
   id: kind,
   kind,
   label: kind,
+  wireProtocol: kind === 'openai' ? 'responses' : 'chat-completions',
   defaultModel: 'chat-model',
   enabled: true,
   ...overrides,

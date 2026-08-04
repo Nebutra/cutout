@@ -377,12 +377,14 @@ contract, keep progress facts separate from terminal status:
       `satisfied` / `needs-repair` until the lifecycle has settled.
 - [ ] Treat a partial contract during production as `running`, not as a failed
       final result.
-- [ ] Make state-like notifications use a stable identity per run and concern,
-      so `needs-repair` -> `ready` replaces stale status instead of appending.
+- [ ] Make state-like notifications use a stable semantic identity for the
+      concern across lifecycle runs, so create -> repair -> ready replaces stale
+      status instead of appending.
 - [ ] Add regressions for both transition directions: partial -> complete and
       partial -> terminal failure.
-- [ ] Verify notification history contains one current outcome per run, while
-      the append-only event ledger may retain all evidence facts.
+- [ ] Verify notification history contains one current outcome for the active
+      concern across create and repair runs, while the append-only event ledger
+      retains each run's evidence facts.
 
 **Real-world example**: Cutout recomputed its prototype outcome after every
 design-system, DESIGN.md, page, and reusable-material update. The projection was
@@ -390,7 +392,9 @@ correct, but each intermediate `needs-repair` evaluation was published as a
 user notification with a unique event ID. Normal progress appeared as repeated
 failure, and eventual success could not replace the stale alerts. The fix was
 to emit terminal evaluation only after work settled and key outcome
-notifications by run rather than event.
+notifications by semantic concern rather than event or run. The canonical
+Agent outcome notification uses `agent:outcome`; load and append normalization
+collapse legacy per-event and per-run IDs so Retry cannot leave stale status.
 
 ### Retry Budgets Must Match Workflow Topology
 

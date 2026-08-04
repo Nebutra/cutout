@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { PrototypePlan } from '@/prototype/prototype-plan'
+import { currentPrototypeExploration, currentPrototypeReviewDocument } from '@/prototype/prototype-plan.test-fixture'
 import { projectPrototypeOutcome, prototypeOutcomeContract } from './prototype-outcome'
 
 const plan = {
@@ -18,6 +19,7 @@ const plan = {
     spacing: '8px',
     componentPrinciples: ['Clear hierarchy'],
     assetDirection: 'Product imagery',
+    exploration: currentPrototypeExploration,
   },
   pages: [
     page('cart', 'Cart', 'board-cutout', ['product', 'coupon']),
@@ -33,6 +35,7 @@ const plan = {
     },
   ],
   humanLoop: { mode: 'continue', rationale: 'Clear request' },
+  reviewDocument: currentPrototypeReviewDocument,
 } satisfies PrototypePlan
 
 describe('prototype outcome projection', () => {

@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 40
-- **Last Active**: 2026-08-03
+- **Total Sessions**: 41
+- **Last Active**: 2026-08-04
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~1360 | Active |
+| `journal-1.md` | ~1393 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 41 | 2026-08-04 | Remove legacy compatibility surfaces | `b374771` | `main` |
 | 40 | 2026-08-03 | Localized release notes experience | `f7ab625` | `feat/release-notes-experience` |
 | 39 | 2026-08-03 | Publish and install Cutout v0.1.15 | `543c22a`, `1c8d457` | `chore/finish-v0.1.15` |
 | 38 | 2026-08-02 | Overlap independent prototype page QA | `eaabb00` | `fix/converge-production-next` |

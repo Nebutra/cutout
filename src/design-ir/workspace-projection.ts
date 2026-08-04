@@ -7,17 +7,17 @@ import type {
 } from './schema'
 import { validateDesignDocument } from './validate'
 import { err, isOk, ok, type Result } from '@/services/types'
-import type {
-  PersistedPrototypeDesignSystem,
-  PersistedPrototypeSuiteCandidate,
-  PersistedPrototypeSuiteCandidateSet,
-  WorkspaceSnapshot,
+import {
+  createEmptyWorkspaceSnapshot,
+  type PersistedPrototypeDesignSystem,
+  type PersistedPrototypeSuiteCandidate,
+  type PersistedPrototypeSuiteCandidateSet,
+  type WorkspaceSnapshot,
 } from '@/workspace/workspace-snapshot'
 import type { LocalProjectRecord } from '@/services/local/project-repository.local'
 import { readRasterDimensions } from '@/lib/raster-dimensions'
 import { parseEditableDesignMarkdown } from '@/prototype/design-md'
 import { projectDesignMarkdownTokens } from '@/prototype/design-md-export'
-import { migratePersistedPrototypeDesignSystemCandidateSet } from '@/prototype/design-system-candidate-persistence'
 import { validatePrototypeSuiteCandidateSet } from '@/prototype/prototype-suite-candidates'
 import { codingReceiptSchema, type CodingReceipt } from '@/coding-runtime/contracts'
 import { prototypePlanSchema } from '@/prototype/prototype-plan'
@@ -27,7 +27,7 @@ import {
 } from '@/prototype/review-evidence'
 import { z } from 'zod'
 
-const LEGACY_ACTOR_ID = 'cutout-legacy-workspace'
+const WORKSPACE_ACTOR_ID = 'cutout-workspace'
 const PROTOTYPE_SUITE_MATERIAL_VERSION = 'cutout.prototype-suite-material.v1' as const
 const RESOURCE_PACK_MATERIAL_VERSION = 'cutout.resource-pack-material.v1' as const
 const RESOURCE_ASSET_MATERIAL_VERSION = 'cutout.resource-asset-material.v1' as const
@@ -74,7 +74,7 @@ const resourceAssetMaterialSchema = z.object({
   review: prototypeResourceReviewRecordSchema.optional(),
 }).strict()
 
-export interface LegacyProjectIdentity {
+export interface ProjectIdentity {
   readonly id: string
   readonly name: string
   readonly brief: string
@@ -82,8 +82,8 @@ export interface LegacyProjectIdentity {
   readonly updatedAt: number
 }
 
-/** Binary values remain in the legacy persistence store; Design IR carries refs. */
-export interface LegacySliceArtifact {
+/** Binary values remain in the workspace persistence store; Design IR carries refs. */
+export interface WorkspaceSliceArtifact {
   readonly id: string
   readonly index: number
   readonly name: string
@@ -98,7 +98,7 @@ export interface LegacySliceArtifact {
   }
 }
 
-export interface LegacySourceArtifact {
+export interface WorkspaceSourceArtifact {
   readonly id: string
   readonly kind: 'photo' | 'document'
   readonly role: 'reference' | 'implementation' | 'evidence'
@@ -108,20 +108,12 @@ export interface LegacySourceArtifact {
 }
 
 export interface WorkspaceToDesignDocumentInput {
-  readonly project: LegacyProjectIdentity
-  readonly workspace: WorkspaceSnapshot | LegacyWorkspaceV1Input | null | undefined
-  readonly slices?: readonly LegacySliceArtifact[]
-  readonly sources?: readonly LegacySourceArtifact[]
+  readonly project: ProjectIdentity
+  readonly workspace: WorkspaceSnapshot | null | undefined
+  readonly slices?: readonly WorkspaceSliceArtifact[]
+  readonly sources?: readonly WorkspaceSourceArtifact[]
   readonly designMarkdown?: { readonly name: string; readonly content: string } | null
 }
-
-/**
- * Shape accepted from IndexedDB records written before optional workspace.v1
- * preferences and durable runtime fields existed.
- */
-export type LegacyWorkspaceV1Input =
-  & Partial<WorkspaceSnapshot>
-  & { readonly version: 'workspace.v1' }
 
 export interface ContentResolver {
   readonly resolveContent: (reference: ContentReference) => Uint8Array | null | undefined
@@ -133,94 +125,71 @@ export interface DesignDocumentToWorkspaceProjection {
   readonly designMarkdown: { readonly name: string; readonly content: string } | null
 }
 
-/**
- * Normalize old workspace.v1 payloads without changing their schema version or
- * manufacturing runtime activity. Calling this twice produces the same value.
- */
-export function migrateWorkspaceV1(input: LegacyWorkspaceV1Input): WorkspaceSnapshot {
-  const prototypeDesignSystem = input.prototypeDesignSystem
-    ? normalizeDesignSystemBytes(input.prototypeDesignSystem)
-    : null
-  const prototypeDesignSystemCandidates = input.prototypeDesignSystemCandidates
-    ? migratePersistedPrototypeDesignSystemCandidateSet({
-        ...input.prototypeDesignSystemCandidates,
-        artifacts: Object.fromEntries(
-          Object.entries(input.prototypeDesignSystemCandidates.artifacts).map(([id, artifact]) => [
-            id,
-            normalizeDesignSystemBytes(artifact),
-          ]),
-        ),
-      })
-    : null
-  const prototypeSuiteCandidates = input.prototypeSuiteCandidates
-    ? {
-        ...input.prototypeSuiteCandidates,
-        artifacts: Object.fromEntries(
-          Object.entries(input.prototypeSuiteCandidates.artifacts).map(([id, artifact]) => [id, {
-            ...artifact,
-            designSystem: {
-              ...artifact.designSystem,
-              artifact: normalizeDesignSystemBytes(artifact.designSystem.artifact),
-            },
-            pages: artifact.pages.map(normalizePrototypePageBytes),
-          }]),
-        ),
-      }
-    : null
-  const optional = {
-    ...('composerModelPolicy' in input && input.composerModelPolicy !== undefined
-      ? { composerModelPolicy: input.composerModelPolicy }
-      : {}),
-    ...('composerThinkingPolicy' in input && input.composerThinkingPolicy !== undefined
-      ? { composerThinkingPolicy: input.composerThinkingPolicy }
-      : {}),
-    ...('outcome' in input && input.outcome !== undefined ? { outcome: input.outcome } : {}),
-    ...('agentRunEvents' in input && input.agentRunEvents !== undefined
-      ? { agentRunEvents: input.agentRunEvents }
-      : {}),
-    ...('designDocument' in input && input.designDocument !== undefined
-      ? { designDocument: input.designDocument }
-      : {}),
-    ...('designOsAuthoring' in input && input.designOsAuthoring !== undefined ? { designOsAuthoring: input.designOsAuthoring } : {}),
-    ...('creativeBoard' in input && input.creativeBoard !== undefined ? { creativeBoard: input.creativeBoard } : {}),
-    ...('deliveryRequest' in input && input.deliveryRequest !== undefined ? { deliveryRequest: input.deliveryRequest } : {}),
-    ...('deliveryPlan' in input && input.deliveryPlan !== undefined ? { deliveryPlan: input.deliveryPlan } : {}),
-    ...('deliveryReceipt' in input && input.deliveryReceipt !== undefined ? { deliveryReceipt: input.deliveryReceipt } : {}),
-    ...('codingReceipts' in input && input.codingReceipts !== undefined
-      ? { codingReceipts: input.codingReceipts }
-      : {}),
-  }
-
+/** Materializes typed bytes returned by the IndexedDB structured-clone realm. */
+export function normalizeWorkspaceContentBytes(
+  workspace: WorkspaceSnapshot,
+): WorkspaceSnapshot {
   return {
-    version: 'workspace.v1',
-    workflowPhase: input.workflowPhase ?? 'idle',
-    prototypePlan: input.prototypePlan ?? null,
-    prototypeScope: input.prototypeScope ?? 'primary-flow',
-    humanLoopChoiceId: input.humanLoopChoiceId ?? null,
-    humanLoopCustomAnswer: input.humanLoopCustomAnswer ?? '',
-    prototypeDesignSystem,
-    prototypeDesignSystemCandidates,
-    prototypeSuiteCandidates,
-    prototypePages: (input.prototypePages ?? []).map(normalizePrototypePageBytes),
-    selectedPrototypePageId: input.selectedPrototypePageId ?? null,
-    runError: input.runError ?? null,
-    namingStatus: input.namingStatus ?? 'idle',
-    liveAgentOutput: input.liveAgentOutput ?? '',
-    attachments: (input.attachments ?? []).map((attachment) => ({
+    ...workspace,
+    prototypeDesignSystem: workspace.prototypeDesignSystem
+      ? normalizeDesignSystemBytes(workspace.prototypeDesignSystem)
+      : null,
+    prototypeDesignSystemCandidates: workspace.prototypeDesignSystemCandidates
+      ? {
+          ...workspace.prototypeDesignSystemCandidates,
+          artifacts: Object.fromEntries(
+            Object.entries(workspace.prototypeDesignSystemCandidates.artifacts).map(
+              ([id, artifact]) => [id, normalizeDesignSystemBytes(artifact)],
+            ),
+          ),
+        }
+      : workspace.prototypeDesignSystemCandidates,
+    prototypeSuiteCandidates: workspace.prototypeSuiteCandidates
+      ? {
+          ...workspace.prototypeSuiteCandidates,
+          artifacts: Object.fromEntries(
+            Object.entries(workspace.prototypeSuiteCandidates.artifacts).map(([id, artifact]) => [id, {
+              ...artifact,
+              designSystem: {
+                ...artifact.designSystem,
+                artifact: normalizeDesignSystemBytes(artifact.designSystem.artifact),
+              },
+              pages: artifact.pages.map((page) => ({ ...page, bytes: localBytes(page.bytes) })),
+            }]),
+          ),
+        }
+      : workspace.prototypeSuiteCandidates,
+    prototypePages: workspace.prototypePages.map((page) => ({
+      ...page,
+      bytes: localBytes(page.bytes),
+    })),
+    attachments: workspace.attachments.map((attachment) => ({
       ...attachment,
       bytes: localBytes(attachment.bytes),
     })),
-    webSearchEnabled: input.webSearchEnabled ?? false,
-    ...optional,
   }
 }
 
-/** Rebuilds content bytes for structured suite/Coding references stored inside workspace.v1. */
-export function legacyWorkspaceSupplementalContent(
+function normalizeDesignSystemBytes(
+  artifact: PersistedPrototypeDesignSystem,
+): PersistedPrototypeDesignSystem {
+  return { ...artifact, bytes: localBytes(artifact.bytes) }
+}
+
+function localBytes(bytes: Uint8Array): Uint8Array {
+  if (bytes instanceof Uint8Array) return bytes
+  if (Object.prototype.toString.call(bytes) !== '[object Uint8Array]') {
+    throw new TypeError('Workspace binary content must be a Uint8Array.')
+  }
+  return new Uint8Array(bytes)
+}
+
+/** Rebuilds content bytes for structured suite and Coding references in the current workspace. */
+export function workspaceSupplementalContent(
   projectId: string,
-  input: WorkspaceSnapshot | LegacyWorkspaceV1Input,
+  input: WorkspaceSnapshot,
 ): ReadonlyMap<string, Uint8Array> {
-  const workspace = migrateWorkspaceV1(input)
+  const workspace = normalizeWorkspaceContentBytes(input)
   const designCandidates = workspace.prototypeDesignSystemCandidates
   const suiteState = validatedPrototypeSuiteState(
     workspace.prototypeSuiteCandidates,
@@ -229,10 +198,10 @@ export function legacyWorkspaceSupplementalContent(
   const codingReceipts = validatedCodingReceipts(workspace.codingReceipts, suiteState)
   const content = new Map<string, Uint8Array>()
   const add = (path: string, bytes: Uint8Array) => {
-    content.set(legacyUri(projectId, path), bytes)
+    content.set(workspaceUri(projectId, path), bytes)
   }
   for (const page of workspace.prototypePages) {
-    if (page.review) add(pageReviewLegacyPath(page.page.id), jsonBytes(page.review))
+    if (page.review) add(pageReviewPath(page.page.id), jsonBytes(page.review))
   }
   for (const candidate of suiteState?.set.candidates ?? []) {
     const artifact = suiteState?.artifacts[candidate.id]
@@ -260,45 +229,27 @@ export function legacyWorkspaceSupplementalContent(
       markdownMaterialId,
     })
     artifact.pages.forEach((page, index) => {
-      add(suiteLegacyPath(candidate.id, `pages/${index + 1}`), page.bytes)
+      add(suitePath(candidate.id, `pages/${index + 1}`), page.bytes)
     })
     projection.assets.forEach((asset, index) => {
       add(
-        suiteLegacyPath(candidate.id, `resource-pack/assets/${index + 1}.json`),
+        suitePath(candidate.id, `resource-pack/assets/${index + 1}.json`),
         jsonBytes(asset),
       )
     })
     add(
-      suiteLegacyPath(candidate.id, 'resource-pack/manifest.json'),
+      suitePath(candidate.id, 'resource-pack/manifest.json'),
       jsonBytes(projection.resourcePack),
     )
     add(
-      suiteLegacyPath(candidate.id, 'suite.json'),
+      suitePath(candidate.id, 'suite.json'),
       jsonBytes(projection.suite),
     )
   }
   for (const receipt of codingReceipts) {
-    add(codingReceiptLegacyPath(receipt.receiptId), jsonBytes(receipt))
+    add(codingReceiptPath(receipt.receiptId), jsonBytes(receipt))
   }
   return content
-}
-
-function normalizeDesignSystemBytes(
-  artifact: PersistedPrototypeDesignSystem,
-): PersistedPrototypeDesignSystem {
-  const bytes = localBytes(artifact.bytes)
-  return bytes === artifact.bytes ? artifact : { ...artifact, bytes }
-}
-
-function normalizePrototypePageBytes(
-  artifact: WorkspaceSnapshot['prototypePages'][number],
-): WorkspaceSnapshot['prototypePages'][number] {
-  const bytes = localBytes(artifact.bytes)
-  return bytes === artifact.bytes ? artifact : { ...artifact, bytes }
-}
-
-function localBytes(bytes: Uint8Array): Uint8Array {
-  return bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes)
 }
 
 /**
@@ -322,7 +273,7 @@ export async function projectRecordToDesignDocument(
       production: productionEvidenceForSlice(record, slice),
     }))),
     record.source
-      ? record.source.blob.arrayBuffer().then((buffer): LegacySourceArtifact => ({
+      ? record.source.blob.arrayBuffer().then((buffer): WorkspaceSourceArtifact => ({
           id: 'project-source',
           kind: 'photo' as const,
           role: 'reference' as const,
@@ -332,7 +283,7 @@ export async function projectRecordToDesignDocument(
         }))
       : Promise.resolve(null),
     record.mockup
-      ? record.mockup.blob.arrayBuffer().then((buffer): LegacySourceArtifact => ({
+      ? record.mockup.blob.arrayBuffer().then((buffer): WorkspaceSourceArtifact => ({
           id: 'project-mockup',
           kind: 'photo' as const,
           role: 'evidence' as const,
@@ -352,7 +303,7 @@ export async function projectRecordToDesignDocument(
     },
     workspace: record.workspace,
     slices,
-    sources: [source, mockup].filter((item): item is LegacySourceArtifact => item !== null),
+    sources: [source, mockup].filter((item): item is WorkspaceSourceArtifact => item !== null),
     designMarkdown: record.designMarkdown,
   })
 }
@@ -360,7 +311,7 @@ export async function projectRecordToDesignDocument(
 function productionEvidenceForSlice(
   record: LocalProjectRecord,
   slice: LocalProjectRecord['slices'][number],
-): LegacySliceArtifact['production'] {
+): WorkspaceSliceArtifact['production'] {
   const snapshot = record.assetProduction
   if (!snapshot) return undefined
   const runs = Object.values(snapshot.runs).sort(
@@ -372,8 +323,10 @@ function productionEvidenceForSlice(
     if (!plan) continue
     const task = plan.tasks.find((candidate) => {
       if (slice.productionTaskId) return candidate.taskId === slice.productionTaskId
-      const manifestItemId = slice.assetManifestItemId ?? `legacy:${slice.id}`
-      return candidate.manifestItemId === manifestItemId
+      return Boolean(
+        slice.assetManifestItemId
+        && candidate.manifestItemId === slice.assetManifestItemId,
+      )
     })
     if (!task) continue
     const state = run.tasks[task.taskId]
@@ -426,20 +379,20 @@ function productionEvidenceForSlice(
 }
 
 /**
- * Pure-in-effect legacy adapter: it reads caller-provided values only and emits
+ * Pure-in-effect workspace adapter: it reads caller-provided values only and emits
  * no binary payloads. All binary/text content is represented by a stable URI
- * and SHA-256 reference that the legacy store can resolve later.
+ * and SHA-256 reference that the workspace store can resolve later.
  */
 export async function projectWorkspaceSnapshotToDesignDocument(
   input: WorkspaceToDesignDocumentInput,
 ): Promise<DesignDocument> {
   const workspace = input.workspace
-    ? migrateWorkspaceV1(input.workspace)
-    : emptyWorkspace()
+    ? normalizeWorkspaceContentBytes(input.workspace)
+    : createEmptyWorkspaceSnapshot()
   const project = input.project
   const projectSourceId = `source:${project.id}`
-  const provenanceId = `provenance:legacy:${project.id}`
-  const projectUri = legacyUri(project.id, 'brief')
+  const provenanceId = `provenance:workspace:${project.id}`
+  const projectUri = workspaceUri(project.id, 'brief')
   const projectSource = {
     id: projectSourceId,
     kind: 'idea' as const,
@@ -459,7 +412,7 @@ export async function projectWorkspaceSnapshotToDesignDocument(
     id: provenanceId,
     operation: 'import' as const,
     sourceIds: [projectSourceId],
-    actor: { kind: 'system' as const, id: LEGACY_ACTOR_ID },
+    actor: { kind: 'system' as const, id: WORKSPACE_ACTOR_ID },
     recordedAt: toIso(project.updatedAt),
     tool: 'workspace.v1-projection',
   }
@@ -474,7 +427,7 @@ export async function projectWorkspaceSnapshotToDesignDocument(
       content: [
         await contentReference(
           `content:attachment:${attachment.id}`,
-          legacyUri(project.id, `attachments/${attachment.id}`),
+          workspaceUri(project.id, `attachments/${attachment.id}`),
           attachment.mediaType,
           attachment.bytes,
         ),
@@ -483,15 +436,15 @@ export async function projectWorkspaceSnapshotToDesignDocument(
   )
   const recordSources = await Promise.all(
     (input.sources ?? []).map(async (source) => ({
-      id: `source:legacy:${source.id}`,
+      id: `source:workspace:${source.id}`,
       kind: source.kind,
       role: source.role,
       title: source.title,
       license: { kind: 'proprietary' as const, holder: 'Project owner' },
       content: [
         await contentReference(
-          `content:legacy:${source.id}`,
-          legacyUri(project.id, `sources/${source.id}`),
+          `content:workspace:${source.id}`,
+          workspaceUri(project.id, `sources/${source.id}`),
           source.mediaType,
           source.bytes,
         ),
@@ -505,7 +458,7 @@ export async function projectWorkspaceSnapshotToDesignDocument(
     candidateState,
   )
   const codingReceipts = validatedCodingReceipts(workspace.codingReceipts, suiteState)
-  const materials = await legacyMaterials({
+  const materials = await workspaceMaterials({
     projectId: project.id,
     workspace,
     suiteState,
@@ -609,7 +562,7 @@ export async function projectWorkspaceSnapshotToDesignDocument(
       id: `design-revision:${project.id}:1`,
       number: 1,
       createdAt: toIso(project.updatedAt),
-      author: { kind: 'import', id: LEGACY_ACTOR_ID },
+      author: { kind: 'import', id: WORKSPACE_ACTOR_ID },
     },
     needs: project.brief.trim()
       ? [{
@@ -648,7 +601,7 @@ export async function projectWorkspaceSnapshotToDesignDocument(
     relations: [],
   }
   const validation = validateDesignDocument(document)
-  if (!isOk(validation)) throw new Error(`Legacy Design IR projection failed: ${validation.error}`)
+  if (!isOk(validation)) throw new Error(`Workspace Design IR projection failed: ${validation.error}`)
   return validation.data.document
 }
 
@@ -742,14 +695,20 @@ export async function designDocumentToWorkspaceSnapshot(
       const markdownId = candidate.outputs.find((output) => output.role === 'design-markdown')?.materialId
       const visual = visualId ? valid.materials.find((material) => material.id === visualId) : null
       const markdown = markdownId ? valid.materials.find((material) => material.id === markdownId) : null
-      if (!visual || !markdown) continue
+      if (!visualId || !markdownId || !visual || !markdown) {
+        return err(`Ready Design System candidate "${candidate.id}" has incomplete materials.`)
+      }
       const [bytes, content] = await Promise.all([
         resolveBytes(visual, resolver),
         resolveText(markdown, resolver),
       ])
-      if (!bytes || content === null) continue
+      if (!bytes || content === null) {
+        return err(`Ready Design System candidate "${candidate.id}" has unresolved content.`)
+      }
       const size = currentContent(visual).pixelSize ?? readRasterDimensions(bytes)
-      if (!size) continue
+      if (!size) {
+        return err(`Ready Design System candidate "${candidate.id}" has no intrinsic dimensions.`)
+      }
       candidateArtifacts[candidate.id] = {
         name: visual.name,
         designMarkdown: content,
@@ -761,10 +720,7 @@ export async function designDocumentToWorkspaceSnapshot(
     }
   }
   const persistedCandidateState = candidateSet
-    ? migratePersistedPrototypeDesignSystemCandidateSet({
-        set: candidateSet,
-        artifacts: candidateArtifacts,
-      })
+    ? { set: candidateSet, artifacts: candidateArtifacts }
     : null
   const codingReceipts = await recoverCodingReceipts(valid.materials, resolver)
   if (!codingReceipts.ok) return codingReceipts
@@ -783,7 +739,7 @@ export async function designDocumentToWorkspaceSnapshot(
   if (!suiteState.ok) return suiteState
 
   const snapshot: WorkspaceSnapshot = {
-    ...emptyWorkspace(),
+    ...createEmptyWorkspaceSnapshot(),
     prototypePlan: valid.prototype?.plan ?? null,
     prototypeDesignSystem: designSystem && designImage
       ? {
@@ -807,27 +763,6 @@ export async function designDocumentToWorkspaceSnapshot(
       ? null
       : { name: designMarkdown.name, content: markdownContent },
   })
-}
-
-function emptyWorkspace(): WorkspaceSnapshot {
-  return {
-    version: 'workspace.v1',
-    workflowPhase: 'idle',
-    prototypePlan: null,
-    prototypeScope: 'primary-flow',
-    humanLoopChoiceId: null,
-    humanLoopCustomAnswer: '',
-    prototypeDesignSystem: null,
-    prototypeDesignSystemCandidates: null,
-    prototypeSuiteCandidates: null,
-    prototypePages: [],
-    selectedPrototypePageId: null,
-    runError: null,
-    namingStatus: 'idle',
-    liveAgentOutput: '',
-    attachments: [],
-    webSearchEnabled: false,
-  }
 }
 
 async function recoverCodingReceipts(
@@ -1045,12 +980,12 @@ async function recoverPrototypeSuiteState(input: {
   return ok(validation.data)
 }
 
-async function legacyMaterials(input: {
+async function workspaceMaterials(input: {
   readonly projectId: string
   readonly workspace: WorkspaceSnapshot
   readonly suiteState: PersistedPrototypeSuiteCandidateSet | null
   readonly codingReceipts: readonly CodingReceipt[]
-  readonly slices: readonly LegacySliceArtifact[]
+  readonly slices: readonly WorkspaceSliceArtifact[]
   readonly designMarkdown?: { readonly name: string; readonly content: string } | null
   readonly provenanceId: string
   readonly createdAt: string
@@ -1063,7 +998,7 @@ async function legacyMaterials(input: {
       kind: 'design-system',
       name: system.name,
       referenceId: 'content:design-system:image',
-      uri: legacyUri(input.projectId, 'workspace/design-system/image'),
+      uri: workspaceUri(input.projectId, 'workspace/design-system/image'),
       mediaType: system.mediaType,
       bytes: system.bytes,
       pixelSize: intrinsicSize(system.width, system.height, system.bytes),
@@ -1080,7 +1015,7 @@ async function legacyMaterials(input: {
       kind: 'design-markdown',
       name: designMarkdown.name,
       referenceId: 'content:design-markdown',
-      uri: legacyUri(input.projectId, 'workspace/DESIGN.md'),
+      uri: workspaceUri(input.projectId, 'workspace/DESIGN.md'),
       mediaType: 'text/markdown',
       bytes: textBytes(designMarkdown.content),
       provenanceId: input.provenanceId,
@@ -1104,7 +1039,7 @@ async function legacyMaterials(input: {
         kind: 'design-system',
         name: direction?.label ?? artifact.name,
         referenceId: `content:${visualId}:image`,
-        uri: legacyUri(input.projectId, `workspace/design-system-candidates/${candidate.id}/image`),
+        uri: workspaceUri(input.projectId, `workspace/design-system-candidates/${candidate.id}/image`),
         mediaType: artifact.mediaType,
         bytes: artifact.bytes,
         pixelSize: intrinsicSize(artifact.width, artifact.height, artifact.bytes),
@@ -1116,7 +1051,7 @@ async function legacyMaterials(input: {
         kind: 'design-markdown',
         name: `${direction?.label ?? artifact.name} DESIGN.md`,
         referenceId: `content:${markdownId}`,
-        uri: legacyUri(input.projectId, `workspace/design-system-candidates/${candidate.id}/DESIGN.md`),
+        uri: workspaceUri(input.projectId, `workspace/design-system-candidates/${candidate.id}/DESIGN.md`),
         mediaType: 'text/markdown',
         bytes: textBytes(artifact.designMarkdown),
         provenanceId: candidate.provenanceIds[0] ?? input.provenanceId,
@@ -1166,9 +1101,9 @@ async function legacyMaterials(input: {
           kind: 'prototype-page',
           name: `${page.page.name} (${candidate.id})`,
           referenceId: suiteContentReferenceId(candidate.id, `page:${index + 1}`),
-          uri: legacyUri(
+          uri: workspaceUri(
             input.projectId,
-            suiteLegacyPath(candidate.id, `pages/${index + 1}`),
+            suitePath(candidate.id, `pages/${index + 1}`),
           ),
           mediaType: page.mediaType,
           bytes: page.bytes,
@@ -1184,9 +1119,9 @@ async function legacyMaterials(input: {
           id: binding.materialId,
           name: `Resource asset binding ${index + 1} (${candidate.id})`,
           value: projection.assets[index],
-          uri: legacyUri(
+          uri: workspaceUri(
             input.projectId,
-            suiteLegacyPath(candidate.id, `resource-pack/assets/${index + 1}.json`),
+            suitePath(candidate.id, `resource-pack/assets/${index + 1}.json`),
           ),
           provenanceId: asset.provenanceIds[0]!,
           createdAt: input.createdAt,
@@ -1196,9 +1131,9 @@ async function legacyMaterials(input: {
         id: resourcePackOutputId,
         name: `Resource pack (${candidate.id})`,
         value: projection.resourcePack,
-        uri: legacyUri(
+        uri: workspaceUri(
           input.projectId,
-          suiteLegacyPath(candidate.id, 'resource-pack/manifest.json'),
+          suitePath(candidate.id, 'resource-pack/manifest.json'),
         ),
         provenanceId: artifact.resourcePack.manifestProvenanceId,
         createdAt: input.createdAt,
@@ -1207,9 +1142,9 @@ async function legacyMaterials(input: {
         id: suiteOutputId,
         name: `Prototype suite (${candidate.id})`,
         value: projection.suite,
-        uri: legacyUri(
+        uri: workspaceUri(
           input.projectId,
-          suiteLegacyPath(candidate.id, 'suite.json'),
+          suitePath(candidate.id, 'suite.json'),
         ),
         provenanceId: artifact.provenanceIds[0]!,
         createdAt: input.createdAt,
@@ -1222,9 +1157,9 @@ async function legacyMaterials(input: {
       kind: 'code',
       name: `Coding receipt ${receipt.receiptId}`,
       value: receipt,
-      uri: legacyUri(
+      uri: workspaceUri(
         input.projectId,
-        codingReceiptLegacyPath(receipt.receiptId),
+        codingReceiptPath(receipt.receiptId),
       ),
       provenanceId: codingReceiptProvenanceId(receipt.receiptId),
       createdAt: input.createdAt,
@@ -1236,7 +1171,7 @@ async function legacyMaterials(input: {
       kind: 'prototype-page',
       name: artifact.page.name,
       referenceId: `content:prototype-page:${artifact.page.id}`,
-      uri: legacyUri(input.projectId, `workspace/pages/${artifact.page.id}`),
+      uri: workspaceUri(input.projectId, `workspace/pages/${artifact.page.id}`),
       mediaType: artifact.mediaType,
       bytes: artifact.bytes,
       pixelSize: intrinsicSize(artifact.width, artifact.height, artifact.bytes),
@@ -1248,7 +1183,7 @@ async function legacyMaterials(input: {
         id: pageReviewMaterialId(artifact.page.id),
         name: `${artifact.page.name} review`,
         value: artifact.review,
-        uri: legacyUri(input.projectId, pageReviewLegacyPath(artifact.page.id)),
+        uri: workspaceUri(input.projectId, pageReviewPath(artifact.page.id)),
         provenanceId: input.provenanceId,
         createdAt: input.createdAt,
       }))
@@ -1260,7 +1195,7 @@ async function legacyMaterials(input: {
       kind: 'cutout-slice',
       name: slice.name,
       referenceId: `content:cutout-slice:${slice.id}`,
-      uri: legacyUri(input.projectId, `slices/${slice.id}`),
+      uri: workspaceUri(input.projectId, `slices/${slice.id}`),
       mediaType: slice.mediaType,
       bytes: slice.bytes,
       pixelSize: intrinsicSize(slice.width, slice.height, slice.bytes),
@@ -1449,7 +1384,7 @@ function pageReviewMaterialId(pageId: string): string {
   return relatedDesignIrId('material:prototype-page-review:', pageId)
 }
 
-function pageReviewLegacyPath(pageId: string): string {
+function pageReviewPath(pageId: string): string {
   return `workspace/pages/${pageId}/review.json`
 }
 
@@ -1476,11 +1411,11 @@ function jsonBytes(value: unknown): Uint8Array {
   return textBytes(JSON.stringify(value))
 }
 
-function suiteLegacyPath(candidateId: string, suffix: string): string {
+function suitePath(candidateId: string, suffix: string): string {
   return `workspace/prototype-suite-candidates/${encodeURIComponent(candidateId)}/${suffix}`
 }
 
-function codingReceiptLegacyPath(receiptId: string): string {
+function codingReceiptPath(receiptId: string): string {
   return `workspace/coding-receipts/${encodeURIComponent(receiptId)}.json`
 }
 
@@ -1588,8 +1523,8 @@ async function resolveReference(
   return bytes
 }
 
-function legacyUri(projectId: string, path: string): string {
-  return `cutout://legacy/${encodeURIComponent(projectId)}/${path.split('/').map(encodeURIComponent).join('/')}`
+function workspaceUri(projectId: string, path: string): string {
+  return `cutout://workspace/${encodeURIComponent(projectId)}/${path.split('/').map(encodeURIComponent).join('/')}`
 }
 
 function textBytes(text: string): Uint8Array {

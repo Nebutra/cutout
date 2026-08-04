@@ -34,7 +34,7 @@ interface ProviderConfig {
   kind: string
   label: string
   baseUrl?: string
-  wireProtocol?: ProviderWireProtocol
+  wireProtocol: ProviderWireProtocol
   defaultModel: string
   enabled: boolean
 }
@@ -90,8 +90,9 @@ ai_proxy_cancel(
 
 ### 3. Contracts
 
-The persisted field name is always `wireProtocol`. Existing serialized values
-must not be renamed. Records that omit the field use these effective defaults:
+The persisted field name is always `wireProtocol`. Every non-Gateway persisted
+record must contain it explicitly. The product uses these defaults only while
+creating a new draft or normalizing a reviewed discovery candidate:
 
 | Provider kind | Effective protocol |
 | --- | --- |
@@ -172,8 +173,8 @@ import.
 | --- | --- |
 | Unknown protocol string | TypeScript/Rust decoding fails closed |
 | Known protocol unsupported by `kind` | Reject before reading a secret or sending a request |
-| Missing protocol on a legacy record | Resolve the deterministic default above |
-| Missing protocol for a kind with no default | Return an actionable wire-protocol-required error |
+| Missing protocol on a persisted non-Gateway record | Reject the record with an actionable wire-protocol-required error |
+| Missing protocol on a new draft | Apply the current product default before persistence |
 | `/models` returns HTML or malformed JSON | Report endpoint/catalog misconfiguration |
 | `/models` returns 401/403 | Report credential failure |
 | `/models` returns 404/405 | Report catalog unsupported; do not fall back to generation |
@@ -186,8 +187,8 @@ import.
 - Good: `openai-compatible` + `anthropic-messages` + a custom HTTPS base URL
   selects the Anthropic SDK, adds `/v1` only when pathless, and injects
   Anthropic headers in Rust.
-- Base: a legacy `openai-compatible` record without `wireProtocol` continues as
-  Chat Completions without rewriting persisted JSON.
+- Base: a new `openai-compatible` draft defaults to Chat Completions and stores
+  that protocol explicitly before it becomes current provider state.
 - Bad: `deepseek` + `anthropic-messages` is rejected by both TypeScript and
   Rust validation before network access.
 - Bad: connection check sends a tiny `ping` generation to infer support. This
@@ -195,7 +196,7 @@ import.
 
 ### 6. Tests Required
 
-- TypeScript: schema enum/defaults, supported matrix, legacy defaulting, base
+- TypeScript: schema enum/draft defaults, supported matrix, strict persisted records, base
   URL paths, exhaustive adapter routing, buffered/stream protocol propagation,
   model-catalog parsing, and refined-schema consumers using `safeExtend` or a
   shared refined draft schema.
@@ -306,6 +307,13 @@ the current secret again inside Rust.
 - Imported secrets are persisted through Cutout's native OS credential vault;
   on macOS this is Keychain. The renderer receives only key status and may use
   platform-neutral visible copy such as `Cutout local credentials`.
+- A Codex root-level CC Switch profile is importable only when `base_url` is
+  exactly `http://127.0.0.1:15721/v1`, `wire_api` is exactly `responses`, the
+  auth file contains a non-empty top-level `OPENAI_API_KEY`, and neither
+  `model_provider` nor `model_providers` is present. It projects a fixed
+  `cc-switch` candidate and re-reads only the auth-file API key. Root-level
+  experimental bearer/session material is never imported, and any other or
+  ambiguous root-level Provider binding suppresses the public OpenAI fallback.
 - A reviewed CC Switch installation may contribute its current Codex upstream
   as a direct `cc-switch` + Responses candidate. `cc-switch` is an explicit
   OpenAI-shaped Provider kind: the persisted wire contract, renderer model
@@ -376,6 +384,10 @@ the current secret again inside Rust.
   drift fail closed. A model hint with an empty checked catalog remains an
   error.
 - Existing custom-provider environment discovery remains covered.
+- Root-level Codex CC Switch discovery accepts only the exact loopback Responses
+  profile, stays bound to the auth-file API key, ignores experimental bearer
+  material, rejects ambiguous Provider tables, and never rebinds another
+  root-level upstream credential to public OpenAI.
 
 ### 7. Wrong vs Correct
 
@@ -605,3 +617,85 @@ persist_provider_and_key_with_rollback(provider, secret)?;
 The native registry owns the path, schema, selector, provider binding, and
 secret re-read. The webview receives only sanitized metadata and an opaque
 draft ID.
+
+## Scenario: Probe A System Planning Runtime
+
+### 1. Scope / Trigger
+
+Use this contract when changing desktop system-Agent discovery, sanitized
+authentication evidence, planning-runtime selection, readiness projection, or
+public capability claims. A system runtime is a planning adapter, never a
+`ProviderConfig` or a source of direct Provider credentials.
+
+### 2. Signatures
+
+```ts
+type PlanningRuntimeEvidence = {
+  runtimeId: 'codex-system'
+  installed: boolean
+  authenticated: boolean
+  authClass: 'chatgpt' | 'api-key' | 'access-token' | 'unauthenticated' | 'unknown'
+  capability: 'proven' | 'unsupported' | 'unknown'
+  execution: 'unproven' | 'succeeded' | 'failed' | 'stale'
+  version?: string
+  reason?: StableRuntimeReason
+}
+
+probeCodexSystemRuntime(): Promise<PlanningRuntimeEvidence>
+```
+
+The renderer command has no binary, path, argv, environment, working-directory,
+account, credential, tool, or sandbox parameter.
+
+### 3. Contracts
+
+- Native code owns executable discovery, platform identity validation, fixed
+  non-billable probe commands, environment filtering, bounded output, timeout,
+  and process-group termination. Raw command output is discarded natively.
+- Codex OAuth/session files and token payloads are never read, copied,
+  serialized, logged, imported, or reinterpreted as direct Provider keys.
+- Evidence advances in order: installed, authenticated, capability-proven,
+  then execution-proven. Capability evidence cannot be proven without an
+  installed authenticated runtime, and terminal execution evidence cannot
+  exist without capability evidence.
+- Background discovery and Settings refresh may inspect sanitized auth and
+  protocol capability without starting a model turn. Only a completed
+  user-started turn can establish successful execution evidence.
+- Runtime selection considers both capability and latest execution health. A
+  failed or stale system runtime is not silently preferred over a healthy
+  verified direct-text fallback before the next turn starts.
+- The probe-only release remains `capability-required` while restricted
+  readable roots and the complete native turn adapter are unavailable. Method
+  names in a generated schema do not make turn execution implemented.
+- The desktop runtime is distinct from the CLI/MCP headless host. Public
+  manifest and documentation claims must preserve `headlessAvailable: false`
+  and must not imply a bundled headless system-Agent executor.
+- Claude session execution remains `policy-review-required`; technical CLI
+  availability alone is not product authorization.
+
+### 4. Validation & Error Matrix
+
+| Condition | Required behavior |
+| --- | --- |
+| Executable absent | Return sanitized `not-installed` evidence |
+| Unsupported platform or rejected executable identity | Return a closed unsupported reason without running further probes |
+| Raw auth output contains account or secret-shaped text | Project only the closed auth class; expose none of the raw text |
+| Generated protocol schema omits a required method or restricted-root contract | Return `protocol-unsupported` or `restricted-read-roots-required` |
+| Latest system execution is failed or stale and a verified direct route exists | Select the direct route before starting a new turn |
+| Renderer supplies a path, argv, environment, working directory, or generic app-server request | No such IPC command or field exists |
+| Turn execution is not fully implemented and confinement-proven | Keep capability and public contract fail-closed |
+
+### 5. Tests Required
+
+- Frontend schema rejects unknown fields, contradictory auth state, skipped
+  progressive evidence, and execution evidence without capability proof.
+- Planning selection prefers healthy capability-proven Codex, uses the direct
+  fallback for unsupported/failed/stale Codex evidence, and returns no route
+  when neither adapter is eligible.
+- Native tests cover platform identity, command timeout/output overflow,
+  sanitized auth projection, required protocol methods, restricted-root
+  detection, and absence of renderer-controlled process/path authority.
+- Tauri permission tests keep the allowlist to the fixed sanitized probe until
+  a separately reviewed turn contract is implemented.
+- Run `pnpm agent:validate`, `pnpm lint`, TypeScript, focused Vitest and Rust
+  tests, `cargo fmt --check`, production build, and `git diff --check`.

@@ -65,7 +65,7 @@ describe('buildAgentViewModel', () => {
   it('reconciles a matching receipt so the stale approval is no longer actionable', () => {
     const runEvents = replayRunEvents([
       { eventId: 'start-paid', runId: 'paid', at: 1, type: 'run-started', mode: 'create' },
-      { eventId: 'approval-paid', runId: 'paid', at: 2, type: 'tool-approval-requested', toolCallId: 'image-1', requestId: 'request-1', tool: 'image.generate', label: 'Generate hero', model: { providerId: 'openai', model: 'gpt-image-1' }, estimatedCost: { currency: 'USD', amount: 0.08, credits: 8 }, budgetCeiling: { currency: 'USD', amount: 0.2, credits: 20 }, approvalPolicy: 'explicit', reason: 'Explicit approval is required.' },
+      { eventId: 'approval-paid', runId: 'paid', at: 2, type: 'tool-approval-requested', toolCallId: 'image-1', requestId: 'request-1', tool: 'image.generate', label: 'Generate hero', model: { providerId: 'openai', model: 'gpt-image-1' }, budgetCeiling: { currency: 'USD', amount: 0.2, credits: 20 }, approvalPolicy: 'explicit', reason: 'Explicit approval is required.', pendingApproval: true },
       { eventId: 'receipt-paid', runId: 'paid', at: 3, type: 'tool-receipt-recorded', toolCallId: 'image-1', receipt: { receiptId: 'receipt-1', requestId: 'request-1', capability: 'generate-image', providerId: 'openai', model: 'gpt-image-1', status: 'succeeded', charged: { currency: 'USD', amount: 0.07, credits: 7 }, outputArtifactIds: ['hero.png'], startedAt: 2, completedAt: 3 } },
     ])
     const model = buildAgentViewModel({ brief: 'Hero', workflowPhase: 'planning', stages: [], outcome: null, working: true, elapsedSeconds: 1, runError: null, runEvents })
@@ -78,7 +78,7 @@ describe('buildAgentViewModel', () => {
       createRunEvent('approval', { type: 'run-started', mode: 'create' }, { eventId: 'start', at: 1 }),
       createRunEvent('approval', {
         type: 'tool-approval-requested', toolCallId: 'call', requestId: 'request', tool: 'generate-image', label: 'Generate design system',
-        estimatedCost: { currency: 'USD', amount: 0.1 }, budgetCeiling: { currency: 'USD', amount: 0.2 }, approvalPolicy: 'explicit', reason: 'Explicit approval is required.',
+        budgetCeiling: { currency: 'USD', amount: 0.2 }, approvalPolicy: 'explicit', reason: 'Explicit approval is required.', pendingApproval: true,
       }, { eventId: 'approval', at: 2 }),
     ])
     const model = buildAgentViewModel({ brief: 'Kit', workflowPhase: 'design-system', stages: [], outcome: null, working: true, elapsedSeconds: 1, runError: null, runEvents })
@@ -91,7 +91,7 @@ describe('buildAgentViewModel', () => {
       createRunEvent('auto', { type: 'run-started', mode: 'create' }, { eventId: 'start', at: 1 }),
       createRunEvent('auto', {
         type: 'tool-approval-requested', toolCallId: 'call', requestId: 'request', tool: 'generate-image', label: 'Generate design system',
-        estimatedCost: { currency: 'USD', amount: 0.1 }, budgetCeiling: { currency: 'USD', amount: 0.2 }, approvalPolicy: 'auto-within-budget', reason: 'Eligible for automatic approval within budget.',
+        budgetCeiling: { currency: 'USD', amount: 0.2 }, approvalPolicy: 'auto-within-budget', reason: 'Eligible for automatic approval within budget.', pendingApproval: false,
       }, { eventId: 'approval', at: 2 }),
       createRunEvent('auto', { type: 'tool-approved', toolCallId: 'call', requestId: 'request', reason: 'Automatically approved within the configured budget.' }, { eventId: 'approved', at: 3 }),
       createRunEvent('auto', { type: 'tool-started', toolCallId: 'call', tool: 'generate-image', label: 'Generate design system' }, { eventId: 'started', at: 4 }),
@@ -107,7 +107,7 @@ describe('buildAgentViewModel', () => {
       createRunEvent(runId, { type: 'run-started', mode: 'create' }, { eventId: `${runId}:start`, at: 1 }),
       createRunEvent(runId, {
         type: 'tool-approval-requested', toolCallId: 'call', requestId: 'request', tool: 'generate-image', label: 'Generate design system',
-        estimatedCost: { currency: 'USD', amount: 0.1 }, budgetCeiling: { currency: 'USD', amount: 0.2 }, approvalPolicy: 'explicit', reason: 'Explicit approval is required.',
+        budgetCeiling: { currency: 'USD', amount: 0.2 }, approvalPolicy: 'explicit', reason: 'Explicit approval is required.', pendingApproval: true,
       }, { eventId: `${runId}:approval`, at: 2 }),
       createRunEvent(runId, { type: resolution, toolCallId: 'call', requestId: 'request', reason: resolution === 'tool-approved' ? 'Approved by user.' : 'Denied by user.' }, { eventId: `${runId}:resolution`, at: 3 }),
     ])
@@ -122,13 +122,13 @@ describe('buildAgentViewModel', () => {
       createRunEvent('retry', { type: 'run-started', mode: 'create' }, { eventId: 'start', at: 1 }),
       createRunEvent('retry', {
         type: 'tool-approval-requested', toolCallId: 'call', requestId: 'old', tool: 'generate-image', label: 'Generate design system',
-        estimatedCost: { currency: 'USD', amount: 0.1 }, budgetCeiling: { currency: 'USD', amount: 0.2 }, approvalPolicy: 'explicit', reason: 'Explicit approval is required.',
+        budgetCeiling: { currency: 'USD', amount: 0.2 }, approvalPolicy: 'explicit', reason: 'Explicit approval is required.', pendingApproval: true,
       }, { eventId: 'old-approval', at: 2 }),
       createRunEvent('retry', { type: 'tool-denied', toolCallId: 'call', requestId: 'old', reason: 'Denied by user.' }, { eventId: 'old-denied', at: 3 }),
       createRunEvent('retry', { type: 'tool-retry-linked', toolCallId: 'call', previousRequestId: 'old', requestId: 'fresh' }, { eventId: 'retry-linked', at: 4 }),
       createRunEvent('retry', {
         type: 'tool-approval-requested', toolCallId: 'call', requestId: 'fresh', tool: 'generate-image', label: 'Generate design system',
-        estimatedCost: { currency: 'USD', amount: 0.1 }, budgetCeiling: { currency: 'USD', amount: 0.2 }, approvalPolicy: 'explicit', reason: 'Explicit approval is required.',
+        budgetCeiling: { currency: 'USD', amount: 0.2 }, approvalPolicy: 'explicit', reason: 'Explicit approval is required.', pendingApproval: true,
       }, { eventId: 'fresh-approval', at: 5 }),
     ])
     const model = buildAgentViewModel({ brief: 'Kit', workflowPhase: 'design-system', stages: [], outcome: null, working: true, elapsedSeconds: 1, runError: null, runEvents })
@@ -137,16 +137,16 @@ describe('buildAgentViewModel', () => {
     expect(approvals).toEqual([expect.objectContaining({ id: 'fresh-approval', requestId: 'fresh' })])
   })
 
-  it('uses a later legacy terminal event to close an unresolved approval', () => {
+  it('uses a later terminal event to close an unresolved approval', () => {
     for (const terminal of ['tool-succeeded', 'tool-failed', 'tool-cancelled'] as const) {
       const terminalEvent = terminal === 'tool-succeeded'
         ? { type: terminal, toolCallId: 'call', tool: 'generate-image', label: 'Generate design system', outputRefs: [] } as const
-        : { type: terminal, toolCallId: 'call', tool: 'generate-image', label: 'Generate design system', detail: 'Legacy terminal state.' } as const
+        : { type: terminal, toolCallId: 'call', tool: 'generate-image', label: 'Generate design system', detail: 'Terminal state.' } as const
       const runEvents = replayRunEvents([
         createRunEvent(terminal, { type: 'run-started', mode: 'create' }, { eventId: `${terminal}:start`, at: 1 }),
         createRunEvent(terminal, {
           type: 'tool-approval-requested', toolCallId: 'call', requestId: 'request', tool: 'generate-image', label: 'Generate design system',
-          estimatedCost: { currency: 'USD', amount: 0.1 }, budgetCeiling: { currency: 'USD', amount: 0.2 }, approvalPolicy: 'explicit', reason: 'Explicit approval is required.',
+          budgetCeiling: { currency: 'USD', amount: 0.2 }, approvalPolicy: 'explicit', reason: 'Explicit approval is required.', pendingApproval: true,
         }, { eventId: `${terminal}:approval`, at: 2 }),
         createRunEvent(terminal, terminalEvent, { eventId: `${terminal}:terminal`, at: 3 }),
       ])
@@ -468,11 +468,13 @@ describe('buildAgentViewModel', () => {
     const runId = 'run:conversation'
     const runEvents = replayRunEvents([
       createRunEvent(runId, { type: 'run-started', mode: 'create' }, { eventId: 'start', at: 1 }),
+      createRunEvent(runId, { type: 'intent-recorded', intent: 'hi' }, { eventId: 'intent', at: 2 }),
       createRunEvent(runId, {
         type: 'agent-message',
         message: 'Tell me what you would like to design.',
+        responseToEventId: 'intent',
         action: { type: 'proceed-anyway', label: 'Build it anyway', brief: 'hi' },
-      }, { eventId: 'reply', at: 2 }),
+      }, { eventId: 'reply', at: 3 }),
     ])
     const model = buildAgentViewModel({
       brief: 'hi',
@@ -485,23 +487,23 @@ describe('buildAgentViewModel', () => {
       runEvents,
     })
 
-    expect(model.feed).toEqual([expect.objectContaining({
+    expect(model.feed).toContainEqual(expect.objectContaining({
       id: 'reply',
       type: 'message',
       role: 'agent',
       detail: 'Tell me what you would like to design.',
       action: { type: 'proceed-anyway', label: 'Build it anyway', brief: 'hi' },
-    })])
+    }))
   })
 
   it('resolves the latest Agent reply to the effective revised user turn', () => {
     const events = [
       createRunEvent('run:1', { type: 'run-started', mode: 'create' }, { eventId: 's1', at: 1 }),
       createRunEvent('run:1', { type: 'intent-recorded', intent: 'Make it blue' }, { eventId: 'u1', at: 2 }),
-      createRunEvent('run:1', { type: 'agent-message', message: 'First reply' }, { eventId: 'a1', at: 3 }),
+      createRunEvent('run:1', { type: 'agent-message', message: 'First reply', responseToEventId: 'u1' }, { eventId: 'a1', at: 3 }),
       createRunEvent('run:2', { type: 'run-started', mode: 'create' }, { eventId: 's2', at: 4 }),
       createRunEvent('run:2', { type: 'steer-recorded', instruction: 'Use green instead' }, { eventId: 'u2', at: 5 }),
-      createRunEvent('run:2', { type: 'agent-message', message: 'Second reply' }, { eventId: 'a2', at: 6 }),
+      createRunEvent('run:2', { type: 'agent-message', message: 'Second reply', responseToEventId: 'u2' }, { eventId: 'a2', at: 6 }),
       createRunEvent('run:2', { type: 'message-revised', targetEventId: 'u2', message: 'Use forest green instead' }, { eventId: 'r-u2', at: 7 }),
       createRunEvent('run:2', { type: 'message-revised', targetEventId: 'a2', message: 'Revised second reply' }, { eventId: 'r-a2', at: 8 }),
     ]
@@ -673,7 +675,7 @@ describe('buildAgentViewModel', () => {
     const runEvents = replayRunEvents([
       createRunEvent('run', { type: 'run-started', mode: 'create' }, { eventId: 'start', at: 1 }),
       createRunEvent('run', { type: 'intent-recorded', intent: 'Who are you?' }, { eventId: 'user', at: 2 }),
-      createRunEvent('run', { type: 'agent-message', message: 'I am Cutout.' }, { eventId: 'agent', at: 3 }),
+      createRunEvent('run', { type: 'agent-message', message: 'I am Cutout.', responseToEventId: 'user' }, { eventId: 'agent', at: 3 }),
     ])
     const model = buildAgentViewModel({
       brief: 'Who are you?', workflowPhase: 'idle', stages: [], outcome: null,
@@ -690,6 +692,7 @@ describe('buildAgentViewModel', () => {
       createRunEvent('run:1', {
         type: 'agent-message',
         message: '你好！想让我帮你设计或搭建什么原型吗？',
+        responseToEventId: 'u1',
       }, { eventId: 'a1', at: 3 }),
       createRunEvent('run:2', { type: 'run-started', mode: 'create' }, { eventId: 's2', at: 4 }),
       createRunEvent('run:2', { type: 'intent-recorded', intent: '做一个 landing page' }, { eventId: 'u2', at: 5 }),
@@ -740,7 +743,7 @@ describe('buildAgentViewModel', () => {
     const runEvents = replayRunEvents([
       createRunEvent('run:1', { type: 'run-started', mode: 'create' }, { eventId: 's1', at: 1 }),
       createRunEvent('run:1', { type: 'intent-recorded', intent: '继续' }, { eventId: 'u1', at: 2 }),
-      createRunEvent('run:1', { type: 'agent-message', message: '请确认继续。' }, { eventId: 'a1', at: 3 }),
+      createRunEvent('run:1', { type: 'agent-message', message: '请确认继续。', responseToEventId: 'u1' }, { eventId: 'a1', at: 3 }),
       createRunEvent('run:2', { type: 'run-started', mode: 'create' }, { eventId: 's2', at: 4 }),
       createRunEvent('run:2', { type: 'intent-recorded', intent: '继续' }, { eventId: 'u2', at: 5 }),
     ])
@@ -800,29 +803,31 @@ describe('buildAgentViewModel', () => {
     expect(tools.some((item) => item.status === 'running')).toBe(false)
   })
 
-  it('hides reply_conversationally tool rows so only the agent message remains', () => {
+  it('hides reply_conversationally tool rows while preserving the conversation', () => {
     const runId = 'run:chat'
     const longDescription =
       'Call this INSTEAD of any other tool when the message is not a request to build'
     const runEvents = replayRunEvents([
       createRunEvent(runId, { type: 'run-started', mode: 'create' }, { eventId: 'start', at: 1 }),
+      createRunEvent(runId, { type: 'intent-recorded', intent: '你是谁' }, { eventId: 'user', at: 2 }),
       createRunEvent(runId, {
         type: 'tool-started',
         toolCallId: 'call:reply',
         tool: 'reply_conversationally',
         label: longDescription,
-      }, { eventId: 'tool-start', at: 2 }),
+      }, { eventId: 'tool-start', at: 3 }),
       createRunEvent(runId, {
         type: 'tool-succeeded',
         toolCallId: 'call:reply',
         tool: 'reply_conversationally',
         label: longDescription,
         outputRefs: [],
-      }, { eventId: 'tool-done', at: 3 }),
+      }, { eventId: 'tool-done', at: 4 }),
       createRunEvent(runId, {
         type: 'agent-message',
         message: '我是你的设计工具 Agent。',
-      }, { eventId: 'reply', at: 4 }),
+        responseToEventId: 'user',
+      }, { eventId: 'reply', at: 5 }),
     ])
     const model = buildAgentViewModel({
       brief: '你是谁',
@@ -835,11 +840,10 @@ describe('buildAgentViewModel', () => {
       runEvents,
     })
 
-    expect(model.feed).toEqual([expect.objectContaining({
-      type: 'message',
-      role: 'agent',
-      detail: '我是你的设计工具 Agent。',
-    })])
+    expect(model.feed).toEqual([
+      expect.objectContaining({ type: 'message', role: 'user', detail: '你是谁' }),
+      expect.objectContaining({ type: 'message', role: 'agent', detail: '我是你的设计工具 Agent。' }),
+    ])
     expect(JSON.stringify(model.feed)).not.toMatch(/Call this INSTEAD|reply_conversationally/)
   })
 

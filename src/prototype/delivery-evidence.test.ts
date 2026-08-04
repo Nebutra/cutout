@@ -5,6 +5,7 @@ import { sha256Bytes } from '@/asset-production/hash'
 import { projectPrototypeDeliveryEvidence } from './delivery-evidence'
 import type { VerifiedResourcePackArtifact } from './resource-pack-production'
 import { prototypePlanSchema } from './prototype-plan'
+import { currentPrototypeExploration } from './prototype-plan.test-fixture'
 
 const markdown = '---\ntokens:\n  color:\n    primary: "#123456"\n  spacing:\n    medium: "16px"\n---\n# Design'
 
@@ -127,6 +128,7 @@ async function candidateSet(): Promise<PersistedPrototypeSuiteCandidateSet> {
     designSystem: {
       styleSummary: 'Quiet editorial', palette: ['#123456'], typography: 'Sans',
       spacing: '8px', componentPrinciples: ['Clear hierarchy'], assetDirection: 'Crisp',
+      exploration: currentPrototypeExploration,
     },
     pages: [{
       id: 'atlas-home', name: 'Atlas', route: '/atlas', purpose: 'Plan a trip',

@@ -57,7 +57,6 @@ export function isSliceConsumable(slice: Slice): boolean {
   return slice.readiness === null
     || slice.readiness === 'ready'
     || slice.readiness === 'waived'
-    || slice.readiness === 'legacy-ready'
 }
 
 /** Snapshot of every slice as an export payload (default/renamed names applied). */

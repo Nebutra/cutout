@@ -12,6 +12,7 @@ const cfg = (over: Partial<ProviderConfig> = {}): ProviderConfig => ({
   defaultModel: 'gpt-image-1',
   enabled: true,
   baseUrl: 'https://relay.example/v1',
+  wireProtocol: 'chat-completions',
   ...over,
 })
 
@@ -124,7 +125,7 @@ describe('GenerationService.editImage', () => {
 
   it('errors (without invoking) for a non-OpenAI-shaped provider', async () => {
     const gen = createLocalGenerationService(
-      providersWith([cfg({ kind: 'anthropic', baseUrl: undefined })]),
+      providersWith([cfg({ kind: 'anthropic', baseUrl: undefined, wireProtocol: 'anthropic-messages' })]),
     )
     const result = await gen.editImage({
       providerId: 'p1',

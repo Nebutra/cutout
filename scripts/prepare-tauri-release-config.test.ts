@@ -53,4 +53,5 @@ describe('Tauri release config preparation', () => {
     expect(result.status).not.toBe(0)
     expect(result.stderr).toContain(message)
   })
+
 })

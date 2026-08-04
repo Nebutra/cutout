@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { createPrototypeAssetManifest } from '@/prototype/asset-manifest'
 import type { PrototypePlan } from '@/prototype/prototype-plan'
+import { currentPrototypeExploration, currentPrototypeReviewDocument } from '@/prototype/prototype-plan.test-fixture'
 import { emptyAssetProductionSnapshot } from '../contracts'
 import { observationalIssue, qualityIssue } from '../quality-policy'
 import {
@@ -19,7 +20,7 @@ import { integrityIssue } from '../quality-policy'
 const prototypePlan: PrototypePlan = {
   version: 'prototype-plan.v0',
   product: { name: 'Product', summary: 'Summary', audience: 'Users', primaryGoal: 'Use it', platform: 'web' },
-  designSystem: { styleSummary: 'Clear', palette: ['white'], typography: 'Sans', spacing: '8px', componentPrinciples: ['Simple'], assetDirection: 'Icons' },
+  designSystem: { styleSummary: 'Clear', palette: ['white'], typography: 'Sans', spacing: '8px', componentPrinciples: ['Simple'], assetDirection: 'Icons', exploration: currentPrototypeExploration },
   pages: [{
     id: 'home', name: 'Home', route: '/', purpose: 'Start',
     viewport: { platform: 'web', width: 100, height: 100, scroll: 'single-screen' },
@@ -29,7 +30,7 @@ const prototypePlan: PrototypePlan = {
     ],
     overlays: [], states: [], interactions: [],
   }],
-  flows: [], humanLoop: { mode: 'continue', rationale: 'Ready' },
+  flows: [], reviewDocument: currentPrototypeReviewDocument, humanLoop: { mode: 'continue', rationale: 'Ready' },
 }
 
 describe('prototype production adapter', () => {

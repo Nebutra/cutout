@@ -298,6 +298,11 @@ export function createLocalPrototypePlan(
         steps: [],
       },
     ],
+    reviewDocument: {
+      format: 'markdown',
+      primaryFlow: `# ${name}\n\n${summary}\n\n## Primary flow\n\n${goal}`,
+      fullPlan: `# ${name}\n\n${summary}\n\n## Core experience\n\n${goal}`,
+    },
     humanLoop: {
       mode: 'continue',
       rationale:
@@ -359,21 +364,16 @@ export function createPrototypePlanFromSeed(
     const boardGroups = new Map<string, typeof materials>()
     for (const material of materials) {
       if (material.production !== 'board-cutout') continue
-      const groupId = material.boardGroupId ?? 'legacy-default'
+      const groupId = material.boardGroupId
       boardGroups.set(groupId, [...(boardGroups.get(groupId) ?? []), material])
     }
     const directMaterials = materials.filter((material) =>
       material.production === 'direct-generate')
     const boardRegions = [...boardGroups.entries()].map(
       ([groupId, groupedMaterials], groupIndex) => {
-        const legacySingleGroup = groupId === 'legacy-default' && boardGroups.size === 1
         return {
-          id: legacySingleGroup
-            ? `${page.id}-reusable-materials`
-            : `${page.id}-reusable-materials-${groupIndex + 1}`,
-          name: groupId === 'legacy-default'
-            ? 'Reusable visual materials'
-            : `Reusable visual materials: ${groupId}`,
+          id: `${page.id}-reusable-materials-${groupIndex + 1}`,
+          name: `Reusable visual materials: ${groupId}`,
           role: 'visual-materials',
           summary: `Reusable non-UI visual materials for ${page.name}`,
           complexity: 'medium' as const,

@@ -21,7 +21,7 @@ function document(overrides: Partial<DesignDocument> = {}): DesignDocument {
     version: 'design-ir.v1',
     meta: { id: 'project:operations', title: 'Operations', createdAt: timestamp, updatedAt: timestamp },
     revision: { id: 'revision:1', number: 1, createdAt: timestamp, author: { kind: 'human', id: 'user:1' } },
-    needs: [], sources: [], brands: [], tokens: [], components: [], materials: [], provenance: [], relations: [],
+    needs: [], sources: [], brands: [], tokens: [], components: [], materials: [], candidateSets: [], provenance: [], relations: [],
     ...overrides,
   }
 }

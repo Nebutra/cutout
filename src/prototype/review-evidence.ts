@@ -16,29 +16,49 @@ export const prototypeReviewVerdictSchema = z.object({
 export const prototypePageReviewRecordSchema = z.object({
   version: z.literal('prototype-page-review.v1'),
   artifactSha256: sha256Schema,
-  reviewer: routeSchema,
+  reviewer: routeSchema.nullable(),
   verdict: prototypeReviewVerdictSchema,
   reviewedAt: z.string().datetime(),
-}).strict()
+}).strict().superRefine((record, context) => {
+  if ((record.verdict.unavailable === true) !== (record.reviewer === null)) {
+    context.addIssue({
+      code: 'custom',
+      path: ['reviewer'],
+      message: record.verdict.unavailable === true
+        ? 'Unavailable visual QA cannot claim a reviewer.'
+        : 'Completed visual QA requires its reviewer route.',
+    })
+  }
+})
 export type PrototypePageReviewRecord = z.infer<typeof prototypePageReviewRecordSchema>
 
 export const prototypeResourceReviewRecordSchema = z.object({
   version: z.literal('prototype-resource-review.v1'),
   artifactId: z.string().min(1).max(240),
-  reviewer: routeSchema,
+  reviewer: routeSchema.nullable(),
   verdict: prototypeReviewVerdictSchema,
   observationalIssues: z.array(z.object({
     code: z.string().min(1).max(120),
     message: z.string().min(1).max(2_000),
   }).strict()),
   reviewedAt: z.string().datetime(),
-}).strict()
+}).strict().superRefine((record, context) => {
+  if ((record.verdict.unavailable === true) !== (record.reviewer === null)) {
+    context.addIssue({
+      code: 'custom',
+      path: ['reviewer'],
+      message: record.verdict.unavailable === true
+        ? 'Unavailable visual QA cannot claim a reviewer.'
+        : 'Completed visual QA requires its reviewer route.',
+    })
+  }
+})
 export type PrototypeResourceReviewRecord = z.infer<typeof prototypeResourceReviewRecordSchema>
 
 export function projectPrototypeResourceReviewRecord(input: {
   readonly artifactId: string
   readonly task: ProductionTaskState
-  readonly reviewer: { readonly providerId: string; readonly model: string }
+  readonly reviewer: { readonly providerId: string; readonly model: string } | null
 }): PrototypeResourceReviewRecord {
   const verdict = input.task.evidence?.qaVerdict ?? {
     pass: false,
@@ -48,7 +68,7 @@ export function projectPrototypeResourceReviewRecord(input: {
   return prototypeResourceReviewRecordSchema.parse({
     version: 'prototype-resource-review.v1',
     artifactId: input.artifactId,
-    reviewer: input.reviewer,
+    reviewer: verdict.unavailable === true ? null : input.reviewer,
     verdict,
     observationalIssues: input.task.issues
       .filter((issue) => issue.kind !== 'integrity')

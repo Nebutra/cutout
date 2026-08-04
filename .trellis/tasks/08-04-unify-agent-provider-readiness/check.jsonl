@@ -1,0 +1,4 @@
+{"file":".trellis/spec/frontend/byok-provider-protocols.md","reason":"Verify system login never becomes imported Provider auth and direct image secrets remain native-only."}
+{"file":".trellis/tasks/08-04-unify-agent-provider-readiness/research/runtime-readiness-evidence.md","reason":"Check capability claims against current official/runtime evidence and keep unsupported surfaces truthful."}
+{"file":".trellis/tasks/08-04-unify-agent-provider-readiness/design.md","reason":"Review implementation against native path/argv authority, restricted context, progressive evidence, fallback, and headless boundaries."}
+{"file":".trellis/tasks/07-27-agent-session-delegation/research/runtime-contracts.md","reason":"Ensure the prior host-security and Claude policy risks are not accidentally discarded while updating the Codex design."}

@@ -160,6 +160,11 @@ msgid "team.host_required_description"
 msgstr "Se requiere un host de colaboración de escritorio para revisar o crear un enlace de solo lectura."
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.action_required"
+msgstr "Acción necesaria"
+
+#. js-lingui-explicit-id
 #: src/components/settings/sections/SpeechSection.tsx
 msgid "settings.speech.activation"
 msgstr "Activación"
@@ -178,6 +183,11 @@ msgstr "Se adapta a la tarea y al resultado solicitado."
 #: src/components/settings/ProviderDirectory.tsx
 msgid "settings.adapter_available"
 msgstr "Adaptador disponible"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ModelSlot.tsx
+msgid "settings.image_route_adapter_required"
+msgstr "Se requiere un adaptador"
 
 #. js-lingui-explicit-id
 #: src/components/settings/ProviderForm.tsx
@@ -232,13 +242,8 @@ msgstr "IA"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
-msgid "settings.ai_setup_ready"
-msgstr "Las rutas de IA están configuradas"
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.ai_setup_action_required"
-msgstr "La configuración de IA requiere atención"
+msgid "settings.ai_ready"
+msgstr "IA lista"
 
 #. js-lingui-explicit-id
 #: src/components/settings/AboutFooter.tsx
@@ -427,6 +432,14 @@ msgid "home.attach_reference"
 msgstr "Adjuntar una referencia"
 
 #. js-lingui-explicit-id
+#. placeholder {0}: evidence.authClass
+#. placeholder {1}: evidence.capability
+#. placeholder {2}: evidence.execution
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.runtime_evidence_detail"
+msgstr "Autenticación: {0}. Capacidad: {1}. Ejecución: {2}."
+
+#. js-lingui-explicit-id
 #: src/components/settings/sections/RecoverySection.tsx
 msgid "settings.recovery.host_unauthorized"
 msgstr "Autoriza un espacio de trabajo antes de usar la recuperación del host."
@@ -477,11 +490,6 @@ msgid "settings.speech.auto_play_aria"
 msgstr "Reproducir automáticamente respuestas TTS"
 
 #. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.ai_setup_unavailable"
-msgstr "La configuración automática de IA no está disponible"
-
-#. js-lingui-explicit-id
 #: src/components/home/ProjectHome.tsx
 msgid "home.nav_back"
 msgstr "Atrás"
@@ -516,11 +524,6 @@ msgstr "Kit de marca"
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.tab_brand_kits"
 msgstr "Kits de marca"
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.browse_providers"
-msgstr "Explorar proveedores"
 
 #. js-lingui-explicit-id
 #: src/components/library/GlobalLibraryView.tsx
@@ -609,8 +612,18 @@ msgstr "Comprobar ahora"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
+msgid "settings.checking"
+msgstr "Comprobando"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
 msgid "settings.ai_setup_checking"
 msgstr "Comprobando la configuración de IA"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.capability_checking"
+msgstr "Comprobando disponibilidad"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/UpdatesSection.tsx
@@ -621,6 +634,11 @@ msgstr "Buscando actualizaciones..."
 #: src/components/settings/sections/RecoverySection.tsx
 msgid "settings.recovery.host_checking"
 msgstr "Comprobando el estado del host..."
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.ai_setup_checking_description"
+msgstr "Comprobando los proveedores configurados y las credenciales reutilizables de este dispositivo."
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/UpdatesSection.tsx
@@ -649,13 +667,18 @@ msgstr "Elegir una dirección"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
-msgid "settings.ai_setup_connect_description"
-msgstr "Elige un proveedor y verifica sus credenciales."
+msgid "settings.configure_route_action"
+msgstr "Elige un modelo con evidencia exacta de capacidad."
 
 #. js-lingui-explicit-id
 #: src/components/workspace/IntentWorkspace.tsx
 msgid "workspace.human_loop_instruction"
 msgstr "Elige una dirección. Añade contexto opcional abajo y pulsa la flecha para continuar."
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.claude_policy_diagnostic"
+msgstr "La ejecución de Claude Code no está disponible mientras se revisa la política del proveedor."
 
 #. js-lingui-explicit-id
 #: src/components/library/GlobalLibraryView.tsx
@@ -714,6 +737,11 @@ msgid "settings.integrations.authorizing"
 msgstr "Completa la autorización en la ventana del proveedor."
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.action_required_description"
+msgstr "Completa las acciones de las capacidades que faltan."
+
+#. js-lingui-explicit-id
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.tab_components"
 msgstr "Componentes"
@@ -766,16 +794,6 @@ msgid "settings.configured_providers"
 msgstr "Proveedores configurados"
 
 #. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.ai_setup_verification_description"
-msgstr "Los proveedores configurados deben estar activados y verificados antes de que Cutout pueda usarlos."
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.configuring"
-msgstr "Configurando"
-
-#. js-lingui-explicit-id
 #: src/components/library/KitLibraryInspector.tsx
 msgid "kit_library.audit_conflicts"
 msgstr "Conflictos"
@@ -793,13 +811,13 @@ msgstr "Conectar {0}"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
-msgid "settings.connect_a_provider"
-msgstr "Conectar un proveedor"
+msgid "settings.connect_image_provider_action"
+msgstr "Conecta un proveedor directo compatible."
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
-msgid "settings.ai_setup_connect_title"
-msgstr "Conecta la IA para empezar"
+msgid "settings.connect_a_provider"
+msgstr "Conectar un proveedor"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
@@ -923,11 +941,6 @@ msgid "settings.dimension_tts_description"
 msgstr "Crear audio hablado."
 
 #. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.ai_setup_ready_description"
-msgstr "Las credenciales y rutas del catálogo están configuradas. La generación de imágenes se verifica al completar la primera imagen."
-
-#. js-lingui-explicit-id
 #: src/components/settings/sections/IntegrationsSection.tsx
 msgid "settings.integrations.description"
 msgstr "Las credenciales permanecen en el host de escritorio. Cutout solo almacena identificadores de sesión opacos y revocables."
@@ -975,30 +988,10 @@ msgid "updates.notification.available_detail"
 msgstr "Cutout {0} está disponible en el canal {channelLabel}."
 
 #. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.ai_setup_credentials_auto_description"
-msgstr "Cutout puede verificar y configurar estas credenciales locales automáticamente."
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.ai_setup_discovery_unavailable_description"
-msgstr "Cutout no pudo comprobar las credenciales reutilizables de este dispositivo. Inténtalo de nuevo o conecta un proveedor manualmente."
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.ai_setup_configuration_unavailable_description"
-msgstr "Cutout no pudo cargar la configuración actual de IA. Inténtalo de nuevo."
-
-#. js-lingui-explicit-id
 #. placeholder {0}: state.preferences.channel
 #: src/components/settings/sections/UpdatesSection.tsx
 msgid "settings.updates.up_to_date"
 msgstr "Cutout está actualizado en el canal {0}."
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.provider_source_keychain"
-msgstr "Credenciales locales de Cutout"
 
 #. js-lingui-explicit-id
 #: src/components/home/SidebarAccount.tsx
@@ -1218,6 +1211,11 @@ msgstr "Introduce el secreto de API"
 #: src/components/settings/ProviderForm.tsx
 msgid "settings.enter_model_manually"
 msgstr "Enter model ID manually"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.execution_confirmed"
+msgstr "Ejecución confirmada"
 
 #. js-lingui-explicit-id
 #: src/components/library/KitLibraryInspector.tsx
@@ -1486,6 +1484,11 @@ msgid "settings.updates.install_restart"
 msgstr "Instalar y reiniciar"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.install_codex_action"
+msgstr "Instala la CLI de Codex firmada y vuelve a intentarlo."
+
+#. js-lingui-explicit-id
 #: src/components/settings/sections/PersonalizationSection.tsx
 msgid "settings.personalization.instructions_saved_toast"
 msgstr "Instrucciones guardadas"
@@ -1618,8 +1621,8 @@ msgstr "Bloqueado"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
-msgid "settings.manage_providers"
-msgstr "Gestionar proveedores"
+msgid "settings.manage"
+msgstr "Gestionar"
 
 #. js-lingui-explicit-id
 #: src/components/library/GlobalLibraryView.tsx
@@ -1681,11 +1684,6 @@ msgstr "Modelo o dejar en blanco para Automático"
 #: src/components/home/ProjectHome.tsx
 msgid "home.more_actions_named"
 msgstr "Más acciones para {0}"
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.ai_setup_capabilities_title"
-msgstr "Se necesitan más capacidades de IA"
 
 #. js-lingui-explicit-id
 #: src/components/library/GlobalLibraryView.tsx
@@ -1792,6 +1790,11 @@ msgstr "No configurado"
 #: src/components/settings/sections/IntegrationsSection.tsx
 msgid "settings.integrations.not_connected"
 msgstr "No conectado."
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.not_installed"
+msgstr "No instalado"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/SpeechSection.tsx
@@ -1934,6 +1937,21 @@ msgid "settings.dimension_webdev_description"
 msgstr "Planificar e implementar interfaces web."
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.capability_planning"
+msgstr "Planificación y conversación"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.ai_ready_description"
+msgstr "Las rutas de planificación e imagen están disponibles en este dispositivo."
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.planning_runtime"
+msgstr "Runtime de planificación"
+
+#. js-lingui-explicit-id
 #: src/components/settings/sections/IntegrationsSection.tsx
 msgid "settings.integrations.handshake_note"
 msgstr "Las integraciones de plugin, MCP, CLI y bóveda local solo están disponibles tras verificar el handshake del host."
@@ -1988,11 +2006,6 @@ msgstr "Vista previa de diagnósticos"
 #: src/components/library/RegistryInstallPanel.tsx
 msgid "registry_install.preview_install"
 msgstr "Vista previa de instalación"
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.provider_source_environment"
-msgstr "Process environment"
 
 #. js-lingui-explicit-id
 #: src/components/settings/VectorizerPanel.tsx
@@ -2107,6 +2120,11 @@ msgid "home.status_ready"
 msgstr "Listo"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.ready_for_first_use"
+msgstr "Listo para el primer uso"
+
+#. js-lingui-explicit-id
 #: src/components/home/ProjectHome.tsx
 msgid "home.recent_heading"
 msgstr "Recientes"
@@ -2120,6 +2138,11 @@ msgstr "Cerradas recientemente"
 #: src/components/settings/ProviderDirectory.tsx
 msgid "settings.provider_category_recommended"
 msgstr "Recomendado"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ModelSlot.tsx
+msgid "settings.image_route_recommended"
+msgstr "Recomendado para alta fidelidad"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/RecoverySection.tsx
@@ -2317,8 +2340,8 @@ msgstr "Reintentar"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
-msgid "settings.ai_setup_credentials_found"
-msgstr "Se encontraron credenciales reutilizables"
+msgid "settings.retry_capability_action"
+msgstr "Reintenta la comprobación de capacidad."
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/PersonalizationSection.tsx
@@ -2345,11 +2368,6 @@ msgstr "Comentario de revisión"
 #: src/components/settings/sections/UpdatesSection.tsx
 msgid "settings.updates.whats_new_hint"
 msgstr "Consulta las novedades de Cutout {0}."
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.ai_setup_checking_description"
-msgstr "Comprobando los proveedores configurados y las credenciales reutilizables de este dispositivo."
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/IntegrationsSection.tsx
@@ -2435,11 +2453,6 @@ msgid "settings.integrations.expired"
 msgstr "La sesión caducó. Actualiza o vuelve a conectar."
 
 #. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.setup_automatically"
-msgstr "Configurar automáticamente"
-
-#. js-lingui-explicit-id
 #: src/components/home/SidebarAccount.tsx
 #: src/components/settings/SettingsDialog.tsx
 msgid "settings.menu_label"
@@ -2470,6 +2483,11 @@ msgstr "Atajo"
 #: src/components/settings/VectorizerPanel.tsx
 msgid "settings.key_show"
 msgstr "Mostrar"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.authorize_codex_action"
+msgstr "Inicia sesión con la CLI de Codex y vuelve a intentarlo."
 
 #. js-lingui-explicit-id
 #: src/components/inspector/SliceDimensions.tsx
@@ -2564,6 +2582,11 @@ msgstr "Estructurada y formal."
 #: src/components/help/HelpMenu.tsx
 msgid "help.submit_feedback"
 msgstr "Enviar comentarios"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ModelSlot.tsx
+msgid "settings.image_route_supported"
+msgstr "Compatible"
 
 #. js-lingui-explicit-id
 #: src/components/inspector/ExportBar.tsx
@@ -2803,6 +2826,16 @@ msgid "settings.updates.channel_aria"
 msgstr "Canal de actualización"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.upgrade_codex_action"
+msgstr "Actualiza Codex a una versión con raíces legibles restringidas."
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.update_cutout_runtime_action"
+msgstr "Actualiza Cutout para habilitar el contrato de runtime de Codex verificado."
+
+#. js-lingui-explicit-id
 #: src/components/settings/sections/UpdatesSection.tsx
 msgid "settings.updates.download_progress_aria"
 msgstr "Progreso de descarga de la actualización"
@@ -2891,19 +2924,24 @@ msgid "global_library.bytes_not_available"
 msgstr "Los bytes verificados no están disponibles localmente."
 
 #. js-lingui-explicit-id
+#: src/components/settings/ModelSlot.tsx
+msgid "settings.image_route_evidence_required"
+msgstr "Se requiere evidencia de capacidad verificada"
+
+#. js-lingui-explicit-id
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.asset_preview_description"
 msgstr "Vista previa local verificada, procedencia y acciones de recurso según sus capacidades."
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.verify_provider_action"
+msgstr "Verifica el proveedor configurado y el catálogo de modelos."
+
+#. js-lingui-explicit-id
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.verifying_component_blobs"
 msgstr "Verificando blobs de componentes de origen…"
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.ai_setup_configuring_description"
-msgstr "Verificando las credenciales locales y configurando las rutas de modelos necesarias."
 
 #. js-lingui-explicit-id
 #: src/components/library/GlobalLibraryView.tsx
@@ -3020,8 +3058,3 @@ msgstr "Aquí aparecerán tus pestañas abiertas y las cerradas recientemente"
 #: src/components/home/ProjectHome.tsx
 msgid "home.your_projects"
 msgstr "Tus proyectos"
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.ai_setup_capabilities_description"
-msgstr "Tus proveedores verificados aún no cubren todas las tareas necesarias."

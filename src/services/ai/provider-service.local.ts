@@ -15,6 +15,7 @@ import {
   providerConfigsSchema,
   defaultProviderWireProtocol,
   effectiveProviderWireProtocol,
+  providerDraftSchema,
   type ProviderConfig,
   type ProviderDraft,
 } from './provider-types'
@@ -80,12 +81,7 @@ function validateModelsResponse(body: string): Result<string[]> {
 async function loadProviders(): Promise<ProviderConfig[]> {
   if (!isTauriHost()) return []
   const raw = await invoke<unknown>('load_providers')
-  return providerConfigsSchema.parse(raw).map((provider) => ({
-    ...provider,
-    ...(provider.wireProtocol
-      ? {}
-      : { wireProtocol: defaultProviderWireProtocol(provider.kind) }),
-  }))
+  return providerConfigsSchema.parse(raw)
 }
 
 /** Persist the full provider list (non-secret JSON). */
@@ -96,15 +92,17 @@ async function saveProviders(providers: readonly ProviderConfig[]): Promise<void
 
 /** Normalize a draft into a stored config (id generated on create). */
 function materialize(draft: ProviderDraft): ProviderConfig {
+  const current = providerDraftSchema.parse(draft)
+  const wireProtocol = current.wireProtocol ?? defaultProviderWireProtocol(current.kind)
   return {
-    id: draft.id ?? crypto.randomUUID(),
-    kind: draft.kind,
-    label: draft.label,
-    defaultModel: draft.defaultModel,
-    enabled: draft.enabled,
+    id: current.id ?? crypto.randomUUID(),
+    kind: current.kind,
+    label: current.label,
+    defaultModel: current.defaultModel,
+    enabled: current.enabled,
     // Omit `baseUrl` entirely when absent (matches Rust's serde skip).
-    ...(draft.baseUrl ? { baseUrl: draft.baseUrl } : {}),
-    ...(draft.wireProtocol ? { wireProtocol: draft.wireProtocol } : {}),
+    ...(current.baseUrl ? { baseUrl: current.baseUrl } : {}),
+    ...(wireProtocol ? { wireProtocol } : {}),
   }
 }
 

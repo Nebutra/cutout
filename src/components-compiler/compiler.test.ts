@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { DesignDocument } from '@/design-ir'
+import { currentPrototypeExploration, currentPrototypeReviewDocument } from '@/prototype/prototype-plan.test-fixture'
 import {
   compileComponentCandidates,
   componentCandidateInputSchema,
@@ -32,7 +33,7 @@ function document(): DesignDocument {
         product: { name: 'Components', summary: 'A component test.', audience: 'Designers', primaryGoal: 'Test', platform: 'web' },
         designSystem: {
           styleSummary: 'Simple', palette: ['#0284c7'], typography: 'Inter', spacing: '4px scale',
-          componentPrinciples: ['Accessible'], assetDirection: 'Minimal',
+          componentPrinciples: ['Accessible'], assetDirection: 'Minimal', exploration: currentPrototypeExploration,
         },
         pages: [{
           id: 'page:home', name: 'Home', route: '/', purpose: 'Landing',
@@ -44,10 +45,12 @@ function document(): DesignDocument {
           interactions: [], overlays: [], states: [],
         }],
         flows: [{ id: 'flow:home', name: 'Home', goal: 'Land', startPageId: 'page:home', steps: [] }],
+        reviewDocument: currentPrototypeReviewDocument,
         humanLoop: { mode: 'continue', rationale: 'The test fixture is explicit.' },
       },
     },
     materials: [],
+    candidateSets: [],
     provenance: [],
     relations: [
       {

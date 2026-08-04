@@ -79,4 +79,26 @@ describe('Tauri capability least privilege contract', () => {
     expect(permissions).toContain('identifier = "foreground-segmentation"')
     expect(desktopCapability.permissions).toContain('foreground-segmentation')
   })
+
+  it('registers the closed Codex planning runtime without generic process authority', async () => {
+    const [modules, handlers, permissions, desktopCapability] = await Promise.all([
+      readRepositoryFile('src-tauri/src/commands/ai/mod.rs'),
+      readRepositoryFile('src-tauri/src/lib.rs'),
+      readRepositoryFile('src-tauri/permissions/application.toml'),
+      readCapability('updater'),
+    ])
+
+    expect(modules).toContain('pub mod codex_system;')
+    expect(handlers).toContain('codex_system_probe')
+    expect(permissions).toContain('identifier = "codex-system-runtime"')
+    expect(handlers).toContain('codex_system_turn_start')
+    expect(handlers).toContain('codex_system_turn_steer')
+    expect(handlers).toContain('codex_system_turn_interrupt')
+    expect(handlers).toContain('codex_system_conversation_reset')
+    expect(permissions).toContain('"codex_system_turn_start"')
+    expect(permissions).toContain('"codex_system_turn_interrupt"')
+    expect(desktopCapability.permissions).toContain('codex-system-runtime')
+    expect(handlers).not.toContain('codex_system_bind_conversation')
+    expect(permissions).not.toMatch(/codex_system_(?:exec|spawn|shell)/)
+  })
 })

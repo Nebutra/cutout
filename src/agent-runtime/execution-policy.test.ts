@@ -13,6 +13,7 @@ const providers: readonly ProviderConfig[] = [
     id: 'anthropic',
     kind: 'anthropic',
     label: 'Anthropic',
+    wireProtocol: 'anthropic-messages',
     defaultModel: 'claude-sonnet',
     enabled: true,
   },
@@ -20,6 +21,7 @@ const providers: readonly ProviderConfig[] = [
     id: 'openai',
     kind: 'openai',
     label: 'OpenAI',
+    wireProtocol: 'responses',
     defaultModel: 'gpt-image',
     enabled: true,
   },
@@ -89,7 +91,7 @@ describe('routeExecutionPolicy', () => {
   })
 
   it('uses verified compatible reasoning protocol evidence and rejects undeclared compatible thinking', () => {
-    const mox = { id: 'mox', kind: 'openai-compatible', label: 'MOX', defaultModel: 'gpt-5.5', enabled: true }
+    const mox = { id: 'mox', kind: 'openai-compatible', label: 'MOX', wireProtocol: 'chat-completions' as const, defaultModel: 'gpt-5.5', enabled: true }
     const verified = routeExecutionPolicy({ model: { mode: 'auto' }, thinking: 'auto', task: { stage: 'plan', multimodal: false, paidAction: 'none' }, assignments: { chat: { providerId: 'mox', model: 'gpt-5.5' } }, providers: [mox], modelCatalog: [{ providerId: 'mox', model: 'gpt-5.5', slot: 'chat', capabilities: ['text', 'reasoning'], reasoningProtocol: 'openai', quality: .9, cost: .5, speed: .7, region: 'global', available: true }] })
     expect(verified).toMatchObject({ status: 'ready', reasoningEffort: 'medium', assignment: { providerId: 'mox', model: 'gpt-5.5', reasoningProtocol: 'openai' } })
     expect(verified.routeReceipt?.effort).toMatchObject({ selected: 'medium', manualOverride: false })

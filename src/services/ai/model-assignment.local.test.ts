@@ -46,7 +46,10 @@ describe('model-assignment.local', () => {
   })
 
   it('an invalid persisted blob degrades to {}', async () => {
-    mem.set('ai.modelAssignments', { chat: { bogus: true } })
+    mem.set('ai.capabilityBindings', {
+      version: 'model-assignments.v2',
+      bindings: { text: { bogus: true } },
+    })
     expect(await loadAssignments()).toEqual({})
   })
 

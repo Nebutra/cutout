@@ -17,7 +17,7 @@ function document(): DesignDocument {
   return {
     version: 'design-ir.v1', meta: { id: 'project:1', title: 'Product', createdAt: now, updatedAt: now },
     revision: { id: 'revision:1', number: 1, createdAt: now, author: { kind: 'human', id: 'user:1' } },
-    needs: [], sources: [], brands: [], tokens: [], components: [], materials: [], provenance: [], relations: [],
+    needs: [], sources: [], brands: [], tokens: [], components: [], materials: [], candidateSets: [], provenance: [], relations: [],
   }
 }
 

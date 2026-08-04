@@ -1,7 +1,6 @@
 import type { Box } from '@/algorithm/types'
 import type {
   DesignMarkdownAsset,
-  Params,
   ProjectRestoreInput,
   SliceInput,
   Store,
@@ -10,10 +9,9 @@ import {
   isWorkspaceSnapshotEmpty,
   type WorkspaceSnapshot,
 } from '@/workspace/workspace-snapshot'
-import { DEFAULT_PARAMS } from '@/store/slices/params'
 import {
+  assetProductionSnapshotSchema,
   emptyAssetProductionSnapshot,
-  migrateLegacySlicesToAssetProduction,
   type AssetProductionSnapshot,
 } from '@/asset-production'
 import { bytesToBlob, decodeImage } from '@/lib/image'
@@ -23,10 +21,10 @@ import { ContentAddressedDesktopArtifactStore } from '@/services/content-address
 import {
   designDocumentToWorkspaceSnapshot,
   fingerprint,
-  legacyWorkspaceSupplementalContent,
-  migrateWorkspaceV1,
+  normalizeWorkspaceContentBytes,
   projectRecordToDesignDocument,
   validateDesignDocument,
+  workspaceSupplementalContent,
   type ContentReference,
   type ContentResolver,
   type DesignDocument,
@@ -36,6 +34,55 @@ import { openDb, promisify, txDone } from './idb'
 const DB_NAME = 'cutout-projects'
 const DB_VERSION = 1
 const STORE = 'projects'
+const WORKSPACE_KEYS = new Set([
+  'version',
+  'workflowPhase',
+  'prototypePlan',
+  'prototypeScope',
+  'humanLoopChoiceId',
+  'humanLoopCustomAnswer',
+  'prototypeDesignSystem',
+  'prototypeDesignSystemCandidates',
+  'prototypeSuiteCandidates',
+  'prototypePages',
+  'selectedPrototypePageId',
+  'runError',
+  'namingStatus',
+  'liveAgentOutput',
+  'attachments',
+  'webSearchEnabled',
+  'composerModelPolicy',
+  'composerThinkingPolicy',
+  'outcome',
+  'agentRunEvents',
+  'designDocument',
+  'designOsAuthoring',
+  'creativeBoard',
+  'deliveryRequest',
+  'deliveryPlan',
+  'deliveryReceipt',
+  'approvedDeliverables',
+  'brandViRun',
+  'canvasAnnotations',
+  'capabilityReceipts',
+  'codingReceipts',
+])
+const WORKSPACE_PHASES = new Set([
+  'idle',
+  'planning',
+  'review',
+  'design-system',
+  'design-system-selection',
+  'generating-suite',
+])
+const WORKSPACE_NAMING_STATUSES = new Set([
+  'idle',
+  'pending',
+  'running',
+  'done',
+  'skipped',
+  'error',
+])
 
 export type LocalProjectStatus = 'Empty' | 'Draft' | 'Running' | 'Ready'
 
@@ -73,7 +120,7 @@ interface StoredSlice {
   readonly included?: boolean
   readonly confidence?: number | null
   readonly reviewIssues?: readonly string[]
-  /** page⊃region⊃slice linkage from the per-region breakdown; null for legacy/flat slices. */
+  /** page-region-slice linkage from the per-region breakdown. */
   readonly regionId?: string | null
   readonly pageId?: string | null
   readonly assetManifestItemId?: string | null
@@ -84,16 +131,15 @@ interface StoredSlice {
 }
 
 export interface LocalProjectRecord extends LocalProjectSummary {
-  readonly params: Params
   readonly sourceImageId?: string
   readonly source?: StoredImage
   readonly mockup?: StoredImage
   readonly designMarkdown: DesignMarkdownAsset | null
   readonly workspace: WorkspaceSnapshot | null
   readonly slices: readonly StoredSlice[]
-  /** Versioned slicing authority. Older records omit it and migrate additively. */
-  readonly assetProduction?: AssetProductionSnapshot
-  /** Optional canonical IR. Old IndexedDB records omit it safely. */
+  /** Versioned slicing authority. */
+  readonly assetProduction: AssetProductionSnapshot
+  /** Optional canonical IR while an empty project has not produced one yet. */
   readonly designDocument?: DesignDocument
   /** Stable IR content hash, excluding projection timestamps. */
   readonly designDocumentContentHash?: string
@@ -293,7 +339,6 @@ export function createEmptyProjectRecord(now = Date.now()): LocalProjectRecord {
     createdAt: now,
     updatedAt: now,
     archivedAt: undefined,
-    params: DEFAULT_PARAMS,
     designMarkdown: null,
     workspace: null,
     slices: [],
@@ -346,17 +391,7 @@ export async function createProjectRecordFromStore(input: {
     readiness: slice.readiness,
   }))
   const brief = state.brief.trim()
-  const assetProduction = Object.keys(state.assetProduction.runs).length > 0
-    ? state.assetProduction
-    : await migrateLegacySlicesToAssetProduction({
-        projectId: input.id,
-        projectRevisionId:
-          state.workspaceSnapshot?.designDocument?.revision.id
-          ?? input.previous?.designDocument?.revision.id
-          ?? `project-revision:${input.id}`,
-        slices,
-        createdAt: input.createdAt,
-      })
+  const assetProduction = state.assetProduction
   const thumbnail =
     slices[0]?.blob ??
     mockup?.blob ??
@@ -381,7 +416,6 @@ export async function createProjectRecordFromStore(input: {
     metadataUpdatedAt: input.previous?.metadataUpdatedAt,
     customName: input.previous?.customName,
     thumbnail,
-    params: state.params,
     sourceImageId: state.source.imageId || undefined,
     source,
     mockup,
@@ -415,12 +449,11 @@ export async function createRestoreInputFromProject(
 
   return {
     brief: record.brief,
-    params: record.params,
     source,
     mockup,
     designMarkdown: record.designMarkdown,
     workspace: record.workspace ?? null,
-    assetProduction: record.assetProduction ?? emptyAssetProductionSnapshot(),
+    assetProduction: record.assetProduction,
     slices: record.slices,
   }
 }
@@ -498,50 +531,43 @@ interface NormalizedProjectRecord {
   readonly didChange: boolean
 }
 
-/**
- * Adds optional IR data to a schemaless IndexedDB record without changing its
- * object-store version. The migration is idempotent: after a successful write,
- * the next load returns the same document, content hash, and workspace.
- */
+/** Enforces the current project contract at the schemaless IndexedDB boundary. */
 async function normalizeProjectRecord(
   input: LocalProjectRecord,
   idb: IDBFactory | undefined = globalThis.indexedDB,
 ): Promise<NormalizedProjectRecord> {
   const materialized = await materializeProjectSliceBlobs(input, idb)
-  const migratedWorkspace = materialized.workspace
-    ? migrateWorkspaceV1(materialized.workspace)
+  const workspace = isCurrentWorkspaceSnapshot(materialized.workspace)
+    ? normalizeWorkspaceContentBytes(materialized.workspace)
     : null
-  let record: LocalProjectRecord = migratedWorkspace
-    ? { ...materialized, workspace: migratedWorkspace }
-    : materialized
-  let didChange = materialized !== input || workspaceWasMigrated(input.workspace)
-  if (!record.assetProduction) {
-    record = {
-      ...record,
-      assetProduction: await migrateLegacySlicesToAssetProduction({
-        projectId: record.id,
-        projectRevisionId: record.designDocument?.revision.id ?? `project-revision:${record.id}`,
-        slices: record.slices,
-        createdAt: record.createdAt,
-      }),
-    }
-    didChange = true
+  const parsedProduction = assetProductionSnapshotSchema.safeParse(materialized.assetProduction)
+  let record: LocalProjectRecord = {
+    ...materialized,
+    workspace,
+    assetProduction: parsedProduction.success
+      ? parsedProduction.data
+      : emptyAssetProductionSnapshot(),
   }
-  const validated = input.designDocument
-    ? validateDesignDocument(input.designDocument)
+  let didChange = materialized !== input
+    || (materialized.workspace !== null && workspace === null)
+    || !parsedProduction.success
+  const validated = record.designDocument
+    ? validateDesignDocument(record.designDocument)
     : null
 
   if (validated?.ok) {
     const projection = await designDocumentToWorkspaceSnapshot(
       validated.data.document,
-      await createLegacyContentResolver(record),
+      await createWorkspaceContentResolver(record),
     )
     if (projection.ok) {
-      const workspace = mergeWorkspaceProjection(record.workspace, projection.data.snapshot)
+      const workspace = record.workspace || !isWorkspaceSnapshotEmpty(projection.data.snapshot)
+        ? mergeWorkspaceProjection(record.workspace, projection.data.snapshot)
+        : null
       const projectedMarkdown = projection.data.designMarkdown
       // Design IR deliberately carries portable content, not the UI-only import
       // timestamp. Preserve it when the material did not change; otherwise use
-      // the persisted record time as a deterministic migration timestamp.
+      // the persisted record time as the deterministic projection timestamp.
       const designMarkdown = projectedMarkdown
         ? {
             ...projectedMarkdown,
@@ -569,13 +595,9 @@ async function normalizeProjectRecord(
       return { record, didChange }
     }
 
-    // A valid portable IR may intentionally reference content that this local
-    // IndexedDB adapter cannot resolve yet (for example a repo or cloud URI).
-    // Preserve it rather than overwriting it with a lossy legacy projection.
-    // Legacy URIs are different: their bytes are expected to live in this
-    // record, so an unresolved one means the old fields changed and must be
-    // reprojected to refresh their content hashes.
-    if (!designDocumentUsesLegacyContent(validated.data.document, record.id)) {
+    // Portable IR may reference content owned outside this local repository.
+    // Preserve it unless its current workspace references are stale.
+    if (!designDocumentUsesWorkspaceContent(validated.data.document, record.id)) {
       const contentHash = await designDocumentContentFingerprint(validated.data.document)
       if (record.designDocumentContentHash !== contentHash) {
         record = {
@@ -589,8 +611,7 @@ async function normalizeProjectRecord(
     }
   }
 
-  // Invalid or unresolvable IR must never strand a legacy project. Its older
-  // workspace/blob record is still recoverable, so re-project and backfill it.
+  // The current workspace and project media are the only local projection input.
   const designDocument = await projectRecordToDesignDocument(record)
   return {
     record: {
@@ -640,7 +661,10 @@ function productionArtifactIdForSlice(
     const task = plan?.tasks.find((candidate) =>
       slice.productionTaskId
         ? candidate.taskId === slice.productionTaskId
-        : candidate.manifestItemId === (slice.assetManifestItemId ?? `legacy:${slice.id}`),
+        : Boolean(
+            slice.assetManifestItemId
+            && candidate.manifestItemId === slice.assetManifestItemId,
+          ),
     )
     if (!task) continue
     const state = run.tasks[task.taskId]
@@ -650,32 +674,33 @@ function productionArtifactIdForSlice(
   return undefined
 }
 
-function workspaceWasMigrated(workspace: WorkspaceSnapshot | null): boolean {
-  if (!workspace) return false
-  return (
-    workspace.workflowPhase === undefined
-    || workspace.prototypePlan === undefined
-    || workspace.prototypeScope === undefined
-    || workspace.humanLoopChoiceId === undefined
-    || workspace.humanLoopCustomAnswer === undefined
-    || workspace.prototypeDesignSystem === undefined
-    || workspace.prototypeDesignSystemCandidates === undefined
-    || workspace.prototypeSuiteCandidates === undefined
-    || workspace.prototypePages === undefined
-    || workspace.selectedPrototypePageId === undefined
-    || workspace.runError === undefined
-    || workspace.namingStatus === undefined
-    || workspace.liveAgentOutput === undefined
-    || workspace.attachments === undefined
-    || workspace.webSearchEnabled === undefined
-  )
+function isCurrentWorkspaceSnapshot(input: unknown): input is WorkspaceSnapshot {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return false
+  const workspace = input as Record<string, unknown>
+  return workspace.version === 'workspace.v1'
+    && Object.keys(workspace).every((key) => WORKSPACE_KEYS.has(key))
+    && typeof workspace.workflowPhase === 'string'
+    && WORKSPACE_PHASES.has(workspace.workflowPhase)
+    && 'prototypePlan' in workspace
+    && (workspace.prototypeScope === 'primary-flow' || workspace.prototypeScope === 'full-plan')
+    && 'humanLoopChoiceId' in workspace
+    && typeof workspace.humanLoopCustomAnswer === 'string'
+    && 'prototypeDesignSystem' in workspace
+    && Array.isArray(workspace.prototypePages)
+    && 'selectedPrototypePageId' in workspace
+    && 'runError' in workspace
+    && typeof workspace.namingStatus === 'string'
+    && WORKSPACE_NAMING_STATUSES.has(workspace.namingStatus)
+    && typeof workspace.liveAgentOutput === 'string'
+    && Array.isArray(workspace.attachments)
+    && typeof workspace.webSearchEnabled === 'boolean'
 }
 
 function mergeWorkspaceProjection(
-  legacy: WorkspaceSnapshot | null,
+  current: WorkspaceSnapshot | null,
   projected: WorkspaceSnapshot,
 ): WorkspaceSnapshot {
-  const base = legacy ?? projected
+  const base = current ?? projected
   return {
     ...base,
     prototypePlan: projected.prototypePlan,
@@ -694,7 +719,7 @@ function mergeWorkspaceProjection(
  * a route/region/name-only change is still persisted on the first load.
  */
 function sameRepresentableWorkspace(
-  left: WorkspaceSnapshot,
+  left: WorkspaceSnapshot | null,
   right: WorkspaceSnapshot | null,
 ): boolean {
   const describe = (workspace: WorkspaceSnapshot | null) => workspace
@@ -778,12 +803,12 @@ function sameDesignMarkdown(
   return left?.name === right?.name && left?.content === right?.content
 }
 
-async function createLegacyContentResolver(
+async function createWorkspaceContentResolver(
   record: LocalProjectRecord,
 ): Promise<ContentResolver> {
   const content = new Map<string, Uint8Array>()
   const add = (path: string, bytes: Uint8Array) => {
-    content.set(legacyContentUri(record.id, path), bytes)
+    content.set(workspaceContentUri(record.id, path), bytes)
   }
   add('brief', new TextEncoder().encode(record.brief))
 
@@ -811,7 +836,7 @@ async function createLegacyContentResolver(
     add(`workspace/pages/${page.page.id}`, page.bytes)
   }
   if (record.workspace) {
-    for (const [uri, bytes] of legacyWorkspaceSupplementalContent(record.id, record.workspace)) {
+    for (const [uri, bytes] of workspaceSupplementalContent(record.id, record.workspace)) {
       content.set(uri, bytes)
     }
   }
@@ -832,18 +857,18 @@ async function createLegacyContentResolver(
   }
 }
 
-function legacyContentUri(projectId: string, path: string): string {
-  return `cutout://legacy/${encodeURIComponent(projectId)}/${path
+function workspaceContentUri(projectId: string, path: string): string {
+  return `cutout://workspace/${encodeURIComponent(projectId)}/${path
     .split('/')
     .map(encodeURIComponent)
     .join('/')}`
 }
 
-function designDocumentUsesLegacyContent(
+function designDocumentUsesWorkspaceContent(
   document: DesignDocument,
   projectId: string,
 ): boolean {
-  const prefix = `cutout://legacy/${encodeURIComponent(projectId)}/`
+  const prefix = `cutout://workspace/${encodeURIComponent(projectId)}/`
   return [
     ...document.sources.flatMap((source) => source.content),
     ...document.materials.flatMap((material) =>

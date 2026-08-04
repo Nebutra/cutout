@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { PrototypePlan } from './prototype-plan'
+import { currentPrototypeExploration, currentPrototypeReviewDocument } from './prototype-plan.test-fixture'
 import {
   DEFAULT_PROTOTYPE_SUITE_SCOPE,
   pagesForScope,
@@ -28,6 +29,7 @@ const plan: PrototypePlan = {
     spacing: '8px grid',
     componentPrinciples: ['clear commerce hierarchy'],
     assetDirection: 'Product photos and banner art',
+    exploration: currentPrototypeExploration,
   },
   pages: [
     {
@@ -120,6 +122,7 @@ const plan: PrototypePlan = {
     mode: 'continue',
     rationale: 'The commerce plan is specific enough to proceed.',
   },
+  reviewDocument: currentPrototypeReviewDocument,
 }
 
 describe('prototype suite generation helpers', () => {

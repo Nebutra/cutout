@@ -1,7 +1,7 @@
 import type { Locator, Page, TestInfo } from '@playwright/test'
 import { expect, test } from './local-state.fixture'
 import { fingerprint } from '../../src/design-ir/fingerprint'
-import { projectWorkspaceSnapshotToDesignDocument } from '../../src/design-ir/legacy-projection'
+import { projectWorkspaceSnapshotToDesignDocument } from '../../src/design-ir/workspace-projection'
 import type { WorkspaceSnapshot } from '../../src/workspace/workspace-snapshot'
 
 const VAGUE_GOAL = 'Create a distinctive launch identity for our new product.'
@@ -313,7 +313,7 @@ function interruptedApprovalWorkspace() {
     { eventId: 'run', runId: 'run-1', at: 1, type: 'run-started', mode: 'create' },
     { eventId: 'intent', runId: 'run-1', at: 2, type: 'intent-recorded', intent: 'Produce a launch campaign.' },
     { eventId: 'tool', runId: 'run-1', at: 3, type: 'tool-started', toolCallId: 'image-1', tool: 'image.generate', label: 'Create launch visuals' },
-    { eventId: 'approval', runId: 'run-1', at: 4, type: 'tool-approval-requested', toolCallId: 'image-1', requestId: 'request-1', tool: 'image.generate', label: 'Create launch visuals', estimatedCost: { currency: 'USD', amount: 0.8 }, budgetCeiling: { currency: 'USD', amount: 0.25 }, approvalPolicy: 'explicit', pendingApproval: true, reason: 'This action requires approval before it can run.' },
+    { eventId: 'approval', runId: 'run-1', at: 4, type: 'tool-approval-requested', toolCallId: 'image-1', requestId: 'request-1', tool: 'image.generate', label: 'Create launch visuals', budgetCeiling: { currency: 'USD', amount: 0.25 }, approvalPolicy: 'explicit', pendingApproval: true, reason: 'This action requires approval before it can run.' },
   ]
   return baseWorkspace({
     agentRunEvents: { version: 'agent-run-events.v1', activeRunId: 'run-1', activeRun: null, events },

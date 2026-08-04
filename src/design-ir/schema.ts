@@ -165,7 +165,7 @@ export const designTokenSchema = z.object({
   value: z.string().min(1),
   mode: z.string().min(1).optional(),
   provenanceId: idSchema.optional(),
-  /** Absent means "flat", the historical default — a specimen view groups only when present. */
+  /** Absent means flat; a specimen view groups only when present. */
   tier: z.enum(['primitive', 'semantic', 'alias']).optional(),
   /** Must reference another token id in the same document; validated, not enforced by the schema itself. */
   aliasOf: idSchema.optional(),
@@ -208,7 +208,7 @@ export const materialProductionEvidenceSchema = z.object({
   readiness: z.enum([
     'queued', 'generating', 'candidate-ready', 'reviewing', 'accepted',
     'cutting', 'verifying', 'ready', 'needs-review', 'waived', 'failed',
-    'cancelled', 'legacy-ready',
+    'cancelled',
   ]),
   included: z.boolean(),
   bounds: z.object({
@@ -390,17 +390,13 @@ export const designDocumentSchema = z.object({
   components: z.array(componentSchema).default([]),
   prototype: prototypeSubtreeSchema.optional(),
   materials: z.array(materialSchema).default([]),
-  /** Historical Design IR documents omit this additive collection; validation normalizes it to `[]`. */
-  candidateSets: z.array(candidateSetSchema).optional(),
+  candidateSets: z.array(candidateSetSchema),
   provenance: z.array(provenanceSchema).default([]),
   relations: z.array(relationSchema).default([]),
 }).strict()
 
 export type DesignDocument = z.infer<typeof designDocumentSchema>
-/** Cross-collection consumers use the validated shape, where additive defaults are materialized. */
-export type NormalizedDesignDocument = Omit<DesignDocument, 'candidateSets'> & {
-  candidateSets: NonNullable<DesignDocument['candidateSets']>
-}
+export type NormalizedDesignDocument = DesignDocument
 export type DesignDocumentMeta = z.infer<typeof designDocumentMetaSchema>
 export type DesignDocumentRevision = z.infer<typeof designDocumentRevisionSchema>
 export type DesignNeed = z.infer<typeof needSchema>

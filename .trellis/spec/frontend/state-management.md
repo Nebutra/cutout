@@ -92,7 +92,7 @@ if (designSystemMarkdownValidationError(artifact.designMarkdown)) return null
 - A ready visual with unhealthy documentation remains selectable and visible. The UI may show
   a non-blocking health message; it must not represent the visual as queued or missing.
 - Design IR projections must preserve intrinsic raster dimensions. Never manufacture `0x0`;
-  store dimensions on content references and recover older references from raster headers.
+  current content references carry dimensions and references without them fail validation.
 - If dependent outputs survive but an upstream artifact is genuinely missing, preserve the
   outputs as evidence and mark the outcome incomplete. Do not delete valid bytes to make the
   graph appear consistent.
@@ -104,7 +104,7 @@ Every recovery change must cover:
 - valid media + valid companion document;
 - valid media + invalid/missing companion document;
 - invalid media + valid dependent artifacts;
-- round-trip compatibility with existing `workspace.v1` records;
+- strict current `workspace.v1` round trips and rejection of incomplete records;
 - at least one consumer assertion proving UI/outcome/repair uses the shared projection.
 
 This contract prevents the historical state where restart recovery discarded a design-system
@@ -115,7 +115,7 @@ visual for invalid YAML while independently restoring prototype pages as ready.
 ### 1. Scope / Trigger
 
 Apply whenever Design System candidate generation, workspace persistence,
-legacy Design IR projection, candidate selection, or Design Kit consumption
+Design IR projection, candidate selection, or Design Kit consumption
 changes.
 
 ### 2. Signatures
@@ -123,26 +123,21 @@ changes.
 ```ts
 interface WorkspaceSnapshot {
   readonly prototypeDesignSystem: PersistedPrototypeDesignSystem | null
-  readonly prototypeDesignSystemCandidates?: {
+  readonly prototypeDesignSystemCandidates: {
     readonly set: CandidateSet
     readonly artifacts: Readonly<Record<string, PersistedPrototypeDesignSystem>>
   } | null
 }
 
 function recoverPrototypeDesignSystemCandidateSet(
-  persisted: PersistedPrototypeDesignSystemCandidateSet | null | undefined,
-  legacySelected?: PersistedPrototypeDesignSystem | null,
+  persisted: PersistedPrototypeDesignSystemCandidateSet | null,
 ): PrototypeDesignSystemCandidateSet | null
-
-function migratePersistedPrototypeDesignSystemCandidateSet(
-  persisted: PersistedPrototypeDesignSystemCandidateSet,
-): PersistedPrototypeDesignSystemCandidateSet
 ```
 
 ### 3. Contracts
 
 - `prototypeDesignSystemCandidates.set` is the generic grouping/selection
-  contract. `artifacts` is a workspace compatibility cache for binary bytes;
+  contract. `artifacts` is the current workspace binary projection;
   Design IR materials and content references remain authoritative.
 - `prototypeDesignSystem` remains the selected singular projection consumed by
   existing page and production code. It must never point at an unselected
@@ -153,22 +148,15 @@ function migratePersistedPrototypeDesignSystemCandidateSet(
 - Only the selected candidate's validated `DESIGN.md` projects to Design IR
   tokens. Design Kit receives the exact selected Markdown material binding;
   CSS, Tailwind, JSON, and theme outputs derive from the corresponding tokens.
-- Historical singular workspaces recover as one selected candidate without
-  rewriting their image, Markdown, pages, or current downstream behavior.
-- Early candidate-aware workspaces may persist the compatibility candidate with
-  canonical `material:design-system` / `material:design-markdown` output aliases.
-  Normalize that exact historical shape at the persistence recovery boundary to
-  candidate-scoped material IDs before runtime recovery or Design IR projection.
-  Current candidate generation must never emit the canonical aliases.
-- The migration must be narrow and idempotent: only the known legacy set,
-  revision, candidate, selection, and output-role combination is rewritten.
-  Malformed or unrelated candidate sets remain subject to normal schema failure
-  and must not be guessed into a valid state.
+- Candidate outputs always use candidate-scoped material IDs. Canonical
+  `material:design-system` / `material:design-markdown` aliases are invalid.
+- The candidate collection is mandatory. No candidate work is represented by
+  an explicit `[]`; missing or malformed entries fail validation and are never
+  guessed, wrapped, or rewritten into a valid state.
 - Compilers and persisted-manifest validators compute document fingerprints
   from `validateDesignDocument(...).data.document`, because additive defaults
-  such as `candidateSets: []` are part of the normalized cross-compiler
-  contract. Semantic declaration checks may still inspect the caller-authored
-  relation set when legacy materialization would hide a missing declaration.
+  such as `candidateSets` are part of the cross-compiler contract. Semantic
+  declaration checks inspect the caller-authored relation set directly.
 
 ### 4. Validation & Error Matrix
 
@@ -178,9 +166,8 @@ function migratePersistedPrototypeDesignSystemCandidateSet(
 | Ready candidate lacks artifact bytes | do not expose it as selectable |
 | Candidate output references missing material/provenance | Design IR validation fails closed |
 | Selected Markdown hash/revision differs from material | Design Kit compilation fails closed |
-| Legacy singular system exists without candidate field | wrap as one selected compatibility candidate |
-| Early persisted compatibility candidate uses canonical material aliases | rewrite both outputs to candidate-scoped IDs before projection; preserve artifacts and selection |
-| Unrelated candidate uses a canonical-looking material ID | do not apply the historical migration; validate/fail through the normal contract |
+| Candidate collection is absent | reject the incomplete current document |
+| Candidate uses canonical material aliases | reject; current outputs must be candidate-scoped |
 | Unselected multi-direction set reloads | restore `design-system-selection`, not `idle` |
 | Two compilers fingerprint raw vs normalized IR | reject as drift; update both to fingerprint the validated normalized document |
 
@@ -188,11 +175,8 @@ function migratePersistedPrototypeDesignSystemCandidateSet(
 
 - Good: two candidates persist, one is selected, tokens and exports bind to its
   Markdown, and both directions remain inspectable after reload.
-- Base: an old project with one system restores exactly as before through a
-  one-candidate selected wrapper.
-- Base: an early persisted wrapper using canonical aliases restores with one
-  canonical selected projection plus distinct candidate materials, with no
-  duplicate IDs and unchanged artifact bytes.
+- Base: a current one-candidate set restores without changing its selection or
+  artifact bytes.
 - Bad: the UI stores candidate bytes but Design IR still contains only a
   mutable alias with no grouping, provenance, or selected token lineage.
 
@@ -200,11 +184,10 @@ function migratePersistedPrototypeDesignSystemCandidateSet(
 
 - Candidate runtime unit tests for status updates and human/Agent selection.
 - Workspace fingerprint and repository round-trip coverage for candidate state.
-- Legacy projection coverage for candidate materials, selection provenance,
+- Workspace projection coverage for candidate materials, selection provenance,
   selected tokens, and workspace reconstruction.
-- Persistence-boundary coverage for the exact early canonical-alias record,
-  idempotent round trips, distinct candidate material IDs, and a Design IR
-  uniqueness assertion proving the canonical selected material appears once.
+- Persistence-boundary rejection coverage for absent, malformed, and
+  canonical-alias state, plus current round trips and distinct material IDs.
 - Compiler coverage proving exact selected `DESIGN.md` emission and SHA/revision
   rejection.
 
@@ -214,7 +197,7 @@ function migratePersistedPrototypeDesignSystemCandidateSet(
 // Wrong: every generated direction becomes downstream authority.
 tokens = candidates.flatMap(projectTokens)
 
-// Wrong: let a persisted compatibility candidate reuse canonical material IDs.
+// Wrong: let a persisted candidate reuse canonical material IDs.
 const unsafeRecovered = persistedCandidateSet
 
 // Correct: selection controls the singular projection and token lineage.
@@ -223,8 +206,8 @@ tokens = projectDesignMarkdownTokens(parseEditableDesignMarkdown(artifact.design
   provenanceId: candidateSet.selection.provenanceId,
 })
 
-// Correct: normalize historical aliases once before any consumer projects them.
-const recovered = migratePersistedPrototypeDesignSystemCandidateSet(persistedCandidateSet)
+// Correct: parse the complete current shape once at the persistence boundary.
+const recovered = persistedPrototypeDesignSystemCandidateSetSchema.parse(persistedCandidateSet)
 ```
 
 ## Scenario: Retiring A Persisted UI Capability
@@ -232,13 +215,13 @@ const recovered = migratePersistedPrototypeDesignSystemCandidateSet(persistedCan
 ### 1. Scope / Trigger
 
 Use this contract when a localStorage-backed preference, route, inspector, or capability is
-removed from the product UI. Compatibility belongs at the persistence boundary; removed state
-must not remain in React props, component branches, or current runtime types.
+removed from the product UI. Retired state must not remain in persistence decoders, React props,
+component branches, or current runtime types.
 
 ### 2. Signatures
 
 ```ts
-migrateWorkspaceNavigation(input: unknown): WorkspaceNavigation
+parseWorkspaceNavigation(input: unknown): WorkspaceNavigation
 saveWorkspaceNavigation(
   value: WorkspaceNavigation,
   storage?: Pick<Storage, "setItem">,
@@ -250,29 +233,27 @@ saveWorkspaceNavigation(
 - `cutout.workspace-navigation.v2` stores only the current `WorkspaceNavigation` schema.
 - The current shape is `{ version: 2, mode, inspector? }`; removed capability flags are not
   optional compatibility fields on the runtime type.
-- `migrateWorkspaceNavigation` may recognize retired fields or route names as input only, then
-  returns a current value that cannot reopen the removed surface.
-- The next normal save rewrites migrated state in the current schema.
+- `parseWorkspaceNavigation` accepts only the strict current shape and returns
+  the default Canvas navigation for any other input.
 
 ### 4. Validation & Error Matrix
 
 - Current valid value -> preserve the value.
-- Retired boolean capability with a current route -> drop the boolean and preserve the route.
-- Retired inspector or route -> return the normal Canvas navigation.
+- Retired boolean capability, inspector, or route -> return the normal Canvas navigation.
 - Malformed JSON or unknown mode -> return the normal Canvas navigation.
 - Attempt to save a retired or extra field -> current Zod schema rejects it.
 
 ### 5. Good/Base/Bad Cases
 
 - Good: `{ version: 2, mode: "canvas", inspector: "figma" }` round-trips unchanged.
-- Base: `{ version: 2, mode: "agent", advanced: true }` migrates to Agent without `advanced`.
+- Base: `{ version: 2, mode: "agent", advanced: true }` is rejected to Canvas.
 - Bad: `{ version: 2, mode: "canvas", inspector: "receipts", advanced: true }` must not expose
-  a hidden audit surface; it migrates to Canvas without an inspector.
+  a hidden audit surface; it is rejected to Canvas without an inspector.
 
 ### 6. Tests Required
 
-- Unit-test current round trips, retired flag removal, every retired inspector, malformed JSON,
-  and invalid modes at the shared migration boundary.
+- Unit-test current round trips plus rejection of extra fields, every retired inspector,
+  malformed JSON, and invalid modes at the shared parse boundary.
 - Assert serialized output contains only current fields.
 - Update component and visual tests so no removed control, route, or dialog remains reachable.
 
@@ -280,8 +261,8 @@ saveWorkspaceNavigation(
 
 Wrong: keep `advanced?: boolean` in `WorkspaceNavigation` and let each component ignore it.
 
-Correct: remove `advanced` from the current schema and normalize old records once in
-`migrateWorkspaceNavigation`.
+Correct: remove `advanced` from the current schema and reject non-current records in
+`parseWorkspaceNavigation`.
 
 ## Scenario: Atomic Project Transitions With Native View Transitions
 
@@ -365,4 +346,70 @@ await withViewTransitionApplied(() => {
   dispatchProjectShell({ type: 'create-project', project })
 })
 getStoreState().setBrief(brief)
+```
+
+## Scenario: Current Agent Outcome Notifications
+
+### 1. Scope / Trigger
+
+Apply this contract when an append-only Agent run event is projected into the
+local notification menu. `outcome-evaluated` describes the current deliverable
+state; it is not a historical activity item.
+
+### 2. Signatures
+
+- Source: `AgentRunEvent` with `type: "outcome-evaluated"`.
+- Projection owner: `notificationFromAgentEvent(event)`.
+- Storage normalization owners: `loadLocalNotifications()` and
+  `appendLocalNotification(notification)`.
+- Canonical notification identity: `agent:outcome`.
+
+### 3. Contracts
+
+- Durable run events remain append-only and retain their original `runId` and
+  `eventId`.
+- The notification projection uses the semantic identity `agent:outcome`, so a
+  create run, repair run, and later successful run replace the same visible
+  status.
+- Load and append accept only the current `agent:outcome` semantic identity.
+  Retired per-run or per-event outcome IDs make the persisted payload invalid;
+  the loader returns the normal empty history instead of migrating it.
+- Approval, failure, decision, and delivery notifications keep their own IDs,
+  ordering, read state, and bounded history.
+
+### 4. Validation & Error Matrix
+
+| Condition | Required behavior |
+| --- | --- |
+| Two outcome events use different run IDs | Keep only the newer outcome notification |
+| A retired per-event or per-run outcome ID is loaded | Reject the payload to empty current history |
+| A ready event follows a repair event | Replace repair with `Result ready` |
+| Unrelated notification IDs coexist | Preserve them without changing their semantics |
+| Persisted payload fails schema validation | Return the existing empty-history fallback |
+
+### 5. Good/Base/Bad Cases
+
+- Good: a repair retry adds `Portable DESIGN.md (1)` to the latest missing
+  summary and the older summary disappears immediately.
+- Base: repeated evaluation inside one run updates the same visible outcome.
+- Bad: deduplicating by `runId`, because Retry intentionally creates a new run
+  and leaves the prior result looking current.
+
+### 6. Tests Required
+
+- Append two repair evaluations with distinct run IDs and assert only the
+  second detail remains.
+- Load a retired outcome ID and assert the persisted payload is rejected.
+- Append a satisfied outcome after current repair data and assert it replaces
+  the repair while unrelated Agent and delivery notifications remain.
+- Run focused notification tests, TypeScript, lint, and `pnpm agent:validate`.
+
+### 7. Wrong vs Correct
+
+```ts
+// Wrong: run identity turns current state into stale history after Retry.
+id: `agent:${event.runId}:outcome`
+
+// Correct: semantic identity replaces outcome state across runs.
+id: 'agent:outcome'
 ```

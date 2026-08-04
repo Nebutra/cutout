@@ -1,4 +1,5 @@
 import { expect, test, type Locator } from "@playwright/test";
+import { openDeliverWorkspace } from "./workspace-helpers";
 
 test("Deliver tabs share the product visual language without becoming forms", async ({ page }, testInfo) => {
   await page.goto("/");
@@ -6,7 +7,7 @@ test("Deliver tabs share the product visual language without becoming forms", as
   await page.getByRole("button", { name: "Create from brief" }).click();
   await expect(page.getByRole("complementary", { name: "Agent workspace" })).toBeVisible();
   if (testInfo.project.name === "mobile-chrome") await page.setViewportSize({ width: 1024, height: 915 });
-  await page.getByRole("button", { name: "Deliver", exact: true }).click();
+  await openDeliverWorkspace(page);
   if (testInfo.project.name === "mobile-chrome") await page.setViewportSize({ width: 412, height: 915 });
 
   const deliver = page.locator('[data-slot="design-os-workbench"][aria-label="Deliver"]');

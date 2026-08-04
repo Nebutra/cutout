@@ -10,6 +10,7 @@
     "project-files",
     "packaged-e2e",
     "provider-secrets-network",
+    "codex-system-runtime",
     "local-agent-inventory",
     "git-version-control",
     "registry-and-agent-host",

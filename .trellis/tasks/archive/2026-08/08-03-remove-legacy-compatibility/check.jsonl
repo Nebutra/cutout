@@ -1,0 +1,3 @@
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Repository quality gates and dependency conventions."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Cross-layer schema/protocol verification guidance."}
+{"file":"cutout.agent-capabilities.json","reason":"Validate synchronized Agent protocol surfaces with pnpm agent:validate."}

@@ -169,6 +169,7 @@ export async function compileAstryxThemeFromDesignMarkdown(
     tokens,
     components: [],
     materials: [],
+    candidateSets: [],
     provenance: [],
     relations: [],
   }

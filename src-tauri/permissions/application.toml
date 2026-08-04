@@ -24,6 +24,11 @@ description = "Allows bounded, metadata-only discovery of reviewed local coding 
 commands.allow = ["discover_local_agent_inventory"]
 
 [[permission]]
+identifier = "codex-system-runtime"
+description = "Allows the fixed signed Codex planning runtime: sanitized probing plus opaque conversation turns, steering, interruption and reset. No generic process, credential or path authority is exposed."
+commands.allow = ["codex_system_probe", "codex_system_turn_start", "codex_system_turn_steer", "codex_system_turn_interrupt", "codex_system_conversation_reset"]
+
+[[permission]]
 identifier = "git-version-control"
 description = "Allows read and explicitly-previewed mutation of the authorized project git repository."
 commands.allow = ["git_capability", "git_status", "git_log", "git_commit_files", "git_commit_diff", "git_branches", "git_branch_compare", "git_diff", "git_stage", "git_unstage", "git_preview_mutation", "git_apply_mutation", "git_commit", "git_create_branch", "git_switch_branch", "git_push_preview", "git_push"]

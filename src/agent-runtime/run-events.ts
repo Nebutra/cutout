@@ -45,12 +45,11 @@ export const agentRunEventSchema = z.discriminatedUnion('type', [
     label: eventText,
     stepId: eventText.optional(),
     model: z.object({ providerId: eventText, model: eventText }).strict().optional(),
-    estimatedCost: moneyEstimateSchema,
     budgetCeiling: moneyEstimateSchema,
     approvalPolicy: z.enum(['explicit', 'auto-within-budget']),
     reason: eventText,
-    /** True only when a human must approve before the tool can run. Optional so previously persisted events still parse. */
-    pendingApproval: z.boolean().optional(),
+    /** True only when a human must approve before the tool can run. */
+    pendingApproval: z.boolean(),
   }).strict(),
   runEventBaseSchema.extend({ type: z.enum(['tool-approved', 'tool-denied']), toolCallId: eventText, requestId: eventText, reason: eventText }).strict(),
   runEventBaseSchema.extend({ type: z.literal('tool-retry-linked'), toolCallId: eventText, previousRequestId: eventText, requestId: eventText }).strict(),
@@ -64,7 +63,7 @@ export const agentRunEventSchema = z.discriminatedUnion('type', [
   runEventBaseSchema.extend({
     type: z.literal('agent-message'),
     message: eventText,
-    responseToEventId: eventText.optional(),
+    responseToEventId: eventText,
     action: z.object({
       type: z.literal('proceed-anyway'),
       label: eventText,
@@ -151,11 +150,10 @@ export type AgentRunEvent =
       readonly label: string
       readonly stepId?: string
       readonly model?: AgentModelRef
-      readonly estimatedCost: MoneyEstimate
       readonly budgetCeiling: MoneyEstimate
       readonly approvalPolicy: 'explicit' | 'auto-within-budget'
       readonly reason: string
-      readonly pendingApproval?: boolean
+      readonly pendingApproval: boolean
     })
   | (RunEventBase & {
       readonly type: 'tool-approved' | 'tool-denied'
@@ -213,7 +211,7 @@ export type AgentRunEvent =
   | (RunEventBase & {
       readonly type: 'agent-message'
       readonly message: string
-      readonly responseToEventId?: string
+      readonly responseToEventId: string
       readonly action?: {
         readonly type: 'proceed-anyway'
         readonly label: string
@@ -262,7 +260,6 @@ export interface AgentToolProjection {
   readonly outputRefs: readonly string[]
   readonly requestId?: string
   readonly previousRequestId?: string
-  readonly estimatedCost?: MoneyEstimate
   readonly budgetCeiling?: MoneyEstimate
   readonly approvalPolicy?: 'explicit' | 'auto-within-budget'
   readonly approvalReason?: string
@@ -337,31 +334,20 @@ export interface AgentResponseBranch {
   readonly selectedIndex: number
 }
 
-/** Resolve explicit response links first, then infer the nearest preceding
- * user turn for legacy linear transcripts. */
+/** Resolve an Agent response through its explicit user-turn link. */
 export function resolveAgentResponseSource(
   events: readonly AgentRunEvent[],
   response: AgentResponseEvent,
 ): AgentUserTurnEvent | null {
   const responseIndex = events.findIndex((event) => event.eventId === response.eventId)
   if (responseIndex < 0) return null
-  if (response.responseToEventId) {
-    const explicit = events.find((event, index): event is AgentUserTurnEvent =>
-      index < responseIndex
-      && event.eventId === response.responseToEventId
-      && (event.type === 'intent-recorded' || event.type === 'steer-recorded'))
-    if (explicit) return explicit
-  }
-  for (let index = responseIndex - 1; index >= 0; index -= 1) {
-    const event = events[index]
-    if (event?.type === 'intent-recorded' || event?.type === 'steer-recorded') return event
-  }
-  return null
+  return events.find((event, index): event is AgentUserTurnEvent =>
+    index < responseIndex
+    && event.eventId === response.responseToEventId
+    && (event.type === 'intent-recorded' || event.type === 'steer-recorded')) ?? null
 }
 
-/** Group immutable sibling responses and replay the latest valid explicit
- * selection. With no selection event, the latest response is the legacy
- * linear fallback. */
+/** Group immutable sibling responses and replay the latest valid selection. */
 export function projectAgentResponseBranches(
   events: readonly AgentRunEvent[],
 ): readonly AgentResponseBranch[] {
@@ -418,11 +404,6 @@ export function projectActiveConversation(
     }
   }
   const includedIds = new Set(result.map((event) => event.eventId))
-  for (const event of events) {
-    if (event.type === 'agent-message' && !resolveAgentResponseSource(events, event)) {
-      includedIds.add(event.eventId)
-    }
-  }
   return events.filter((event): event is AgentUserTurnEvent | AgentResponseEvent =>
     includedIds.has(event.eventId)
     && (event.type === 'intent-recorded' || event.type === 'steer-recorded' || event.type === 'agent-message'))
@@ -441,7 +422,7 @@ export function resolveActiveConversationHead(
 }
 
 /** A renderer restart cannot resume in-memory provider calls. Close any
- * persisted running lifecycle so historical timers do not keep advancing. */
+ * persisted running lifecycle so interrupted timers do not keep advancing. */
 export function recoverInterruptedRunEvents(
   store: Pick<AgentRunEventStore, 'events'>,
   at = Date.now(),
@@ -645,7 +626,6 @@ function reduceActiveRun(
             status: 'running',
             outputRefs: [],
             requestId: event.requestId,
-            estimatedCost: event.estimatedCost,
             budgetCeiling: event.budgetCeiling,
             approvalPolicy: event.approvalPolicy,
             approvalReason: event.reason,
@@ -713,7 +693,6 @@ function reduceActiveRun(
             outputRefs: event.type === 'tool-succeeded' ? event.outputRefs : [],
             requestId: existing?.requestId,
             previousRequestId: existing?.previousRequestId,
-            estimatedCost: existing?.estimatedCost,
             budgetCeiling: existing?.budgetCeiling,
             approvalPolicy: existing?.approvalPolicy,
             approvalReason: existing?.approvalReason,

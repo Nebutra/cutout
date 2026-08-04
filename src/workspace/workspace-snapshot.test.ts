@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { OutcomeRuntimeState } from '@/agent-runtime/outcome-runtime'
 import { createRunEventStore, replayRunEvents } from '@/agent-runtime/run-events'
+import { currentPrototypeExploration, currentPrototypeReviewDocument } from '@/prototype/prototype-plan.test-fixture'
 import {
   createEmptyWorkspaceSnapshot,
   isWorkspaceSnapshotEmpty,
@@ -119,6 +120,7 @@ describe('workspace snapshot helpers', () => {
         needs: [],
         sources: [],
         materials: [],
+        candidateSets: [],
         provenance: [],
         brands: [],
         tokens: [],
@@ -138,9 +140,10 @@ describe('workspace snapshot helpers', () => {
       prototypePlan: {
         version: 'prototype-plan.v0',
         product: { name: 'Acme', projectName: 'Acme', summary: 'First', audience: 'Buyer', primaryGoal: 'Buy', platform: 'web' },
-        designSystem: { styleSummary: 'Calm', palette: [], typography: 'Sans', spacing: '8px', componentPrinciples: [], assetDirection: 'Clean' },
+        designSystem: { styleSummary: 'Calm', palette: [], typography: 'Sans', spacing: '8px', componentPrinciples: [], assetDirection: 'Clean', exploration: currentPrototypeExploration },
         pages: [],
         flows: [],
+        reviewDocument: currentPrototypeReviewDocument,
         humanLoop: { mode: 'continue', rationale: 'Clear' },
       },
       prototypePages: [{

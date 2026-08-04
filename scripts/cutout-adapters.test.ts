@@ -36,6 +36,7 @@ function state(): HeadlessProjectState {
       brands: [{ id: 'brand:adapter', name: 'Adapter Co', status: 'active', provenanceId: 'logo-import' }],
       tokens: [{ id: 'color-primary', name: 'color.primary', kind: 'color', value: '#111111' }],
       components: [],
+      candidateSets: [],
       materials: [{
         id: 'page-home', kind: 'prototype-page', name: 'Home', currentRevisionId: 'page-home-r1',
         revisions: [{ id: 'page-home-r1', ordinal: 1, createdAt: '2026-07-10T00:00:00.000Z', content: { id: 'page-content', uri: `sha256:${'c'.repeat(64)}`, sha256: 'c'.repeat(64), mediaType: 'image/png' } }],
@@ -126,18 +127,25 @@ function journeyState(): HeadlessProjectState {
           designSystem: {
             styleSummary: 'Quiet and direct', palette: ['#111111'], typography: 'System UI', spacing: '4px scale',
             componentPrinciples: ['Accessible'], assetDirection: 'Use only approved evidence.',
+            exploration: {
+              mode: 'auto', decidedBy: 'agent', count: 1,
+              rationale: 'The fixture requires one coherent direction.',
+              directions: [{ id: 'direction:journey', label: 'Journey', thesis: 'Quiet and direct', vary: ['visual treatment'], preserve: ['product intent'] }],
+              bounds: { maxCandidates: 8, maxParallelism: 2 },
+            },
           },
           pages: [{
             id: 'page:home', name: 'Home', route: '/', purpose: 'Primary workspace',
             viewport: { platform: 'web', width: 1440, height: 900, scroll: 'single-screen' },
             regions: [{
               id: 'region:main', name: 'Main', role: 'content', summary: 'Primary content', complexity: 'low',
-              decompositionStrategy: 'direct', assetRoute: 'board-cutout', assetOpportunities: [],
+              decompositionStrategy: 'direct', assetRoute: 'board-cutout', boardGroupId: 'board:main', assetOpportunities: [],
             }],
             interactions: [], overlays: [], states: [],
           }],
           flows: [{ id: 'flow:home', name: 'Home', goal: 'Create', startPageId: 'page:home', steps: [] }],
           humanLoop: { mode: 'continue', rationale: 'All fixture declarations are explicit.' },
+          reviewDocument: { format: 'markdown', primaryFlow: '# Primary flow\n\nJourney fixture.', fullPlan: '# Full plan\n\nJourney fixture.' },
         },
       },
       relations: [

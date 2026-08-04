@@ -1,11 +1,11 @@
 import { z } from 'zod'
 
 const safe=z.string().min(1).max(240).refine((v)=>!/(?:token|secret|api[-_]?key|authorization)\s*[:=]/i.test(v)), path=z.string().min(1).max(512).refine((v)=>!v.startsWith('/')&&!v.includes('\\')&&v.split('/').every((p)=>p&&p!=='.'&&p!=='..')), sha=z.string().regex(/^[a-f0-9]{64}$/)
-const penSurfaceKinds=['pen-mcp','pen-cli','pencil-mcp','pencil-cli'] as const
+const penSurfaceKinds=['pen-mcp','pen-cli'] as const
 type PenSurfaceKind=(typeof penSurfaceKinds)[number]
 const penSurfaceKindSchema=z.enum(penSurfaceKinds)
 const isPenSurfaceKind=(kind:string):kind is PenSurfaceKind=>penSurfaceKindSchema.safeParse(kind).success
-export const externalSurfaceKindSchema=z.enum(['obsidian-vault-plugin','pen-mcp','pen-cli','pencil-mcp','pencil-cli','paper-desktop-mcp','framer-editor-plugin','canva-apps-sdk','canva-connect-api'])
+export const externalSurfaceKindSchema=z.enum(['obsidian-vault-plugin','pen-mcp','pen-cli','paper-desktop-mcp','framer-editor-plugin','canva-apps-sdk','canva-connect-api'])
 export const surfaceHandshakeSchema=z.object({protocol:z.literal('cutout.surface-handshake.v1'),hostId:safe,kind:externalSurfaceKindSchema,sessionId:safe,foreground:z.boolean(),capabilities:z.array(z.enum(['read','preview','write','export','stage','publish','migrate'])),expiresAt:z.string().datetime(),hostVersion:safe}).strict().superRefine((v,ctx)=>{if(['obsidian-vault-plugin','paper-desktop-mcp','framer-editor-plugin','canva-apps-sdk'].includes(v.kind)&&!v.foreground)ctx.addIssue({code:'custom',message:`${v.kind} requires a foreground host.`});if(v.kind==='canva-apps-sdk'&&v.capabilities.includes('publish'))ctx.addIssue({code:'custom',message:'Canva Apps SDK editor sessions must not impersonate Connect API publishing.'})})
 export type SurfaceHandshake=z.infer<typeof surfaceHandshakeSchema>
 export const surfacePlanSchema=z.discriminatedUnion('kind',[

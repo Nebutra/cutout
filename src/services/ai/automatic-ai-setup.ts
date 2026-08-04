@@ -18,6 +18,7 @@ import {
   reviewedCatalogImageDescriptors,
 } from './image-route-assessment'
 import { mergeModelDescriptors } from './model-catalog'
+import { aiDisplayErrorMessage } from './display-error-message'
 
 const TEXT_MODEL = /(?:gpt|claude|gemini|qwen|deepseek|kimi|moonshot|mistral|llama|codex|chat)/i
 const REQUIRED_AUTOMATIC_TASKS = [
@@ -93,7 +94,7 @@ export async function configureAutomaticAi(
       const bindings = automaticBindingsFor(configured)
       if (REQUIRED_AUTOMATIC_TASKS.every((task) => bindings[task])) break
     } catch (error) {
-      failures.push(error instanceof Error ? error.message : String(error))
+      failures.push(aiDisplayErrorMessage(error))
     }
   }
   if (configured.length === 0) {

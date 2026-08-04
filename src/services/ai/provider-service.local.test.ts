@@ -19,6 +19,7 @@ const cfg = (over: Partial<ProviderConfig> = {}): ProviderConfig => ({
   defaultModel: 'chat-model',
   enabled: true,
   baseUrl: 'https://relay.example.com',
+  wireProtocol: 'chat-completions',
   ...over,
 })
 
@@ -48,6 +49,27 @@ describe('LocalProviderService host boundary', () => {
 
     await expect(createLocalProviderService().upsert(cfg())).rejects.toThrow('requires the desktop host')
     expect(invokeMock).not.toHaveBeenCalled()
+  })
+
+  it('rejects persisted non-Gateway records without an explicit protocol', async () => {
+    invokeMock.mockResolvedValueOnce([{
+      id: 'old', kind: 'openai', label: 'Incomplete', defaultModel: 'gpt-5', enabled: true,
+    }])
+
+    await expect(createLocalProviderService().list()).rejects.toThrow('wire protocol is required')
+  })
+
+  it('materializes the current draft default before persistence', async () => {
+    invokeMock.mockResolvedValueOnce([]).mockResolvedValueOnce(undefined)
+
+    const provider = await createLocalProviderService().upsert({
+      kind: 'openai', label: 'OpenAI', defaultModel: 'gpt-5', enabled: true,
+    })
+
+    expect(provider).toMatchObject({ kind: 'openai', wireProtocol: 'responses' })
+    expect(invokeMock).toHaveBeenLastCalledWith('save_providers', {
+      providers: [expect.objectContaining({ kind: 'openai', wireProtocol: 'responses' })],
+    })
   })
 })
 
@@ -132,7 +154,7 @@ describe('LocalProviderService.test', () => {
   it('uses the first-party catalog URL without issuing a generation request', async () => {
     mockProviderTest(
       { status: 200, body: JSON.stringify({ data: [{ id: 'gpt-5.4' }] }) },
-      cfg({ kind: 'openai', baseUrl: undefined, wireProtocol: undefined, defaultModel: 'gpt-5.4' }),
+      cfg({ kind: 'openai', baseUrl: undefined, wireProtocol: 'responses', defaultModel: 'gpt-5.4' }),
     )
 
     await expect(createLocalProviderService().test('p1')).resolves.toEqual(ok({

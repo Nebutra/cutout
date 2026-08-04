@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { openDeliverWorkspace } from "./workspace-helpers";
 
 const navigationKey = "cutout.workspace-navigation.v2";
 
@@ -49,7 +50,7 @@ test("Agent, Design and Deliver retain their consumers in the workspace panel ra
   await expect(page.getByLabel("Message the Agent")).toBeVisible();
   const viewport = page.viewportSize()!;
   if (viewport.width < 768) await page.setViewportSize({ width: 1024, height: viewport.height });
-  await page.getByRole("button", { name: "Deliver", exact: true }).click();
+  await openDeliverWorkspace(page);
   if (viewport.width < 768) await page.setViewportSize(viewport);
   const deliver = page.getByRole("region", { name: "Deliver" });
   await expect(deliver).toBeVisible();

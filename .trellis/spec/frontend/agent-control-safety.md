@@ -140,8 +140,8 @@ receipts. `.cutout` state and provenance remain authoritative.
   approvals nested under preparation remain actionable without repeating the
   preparation label.
 - User turns may link to the selected Agent response with `parentEventId`, and
-  Agent responses may link to their source turn with `responseToEventId`.
-  Legacy unlinked transcripts replay linearly. Branch selection remains
+  Agent responses must link to their source turn with `responseToEventId`.
+  Unlinked responses fail the current event schema. Branch selection remains
   appendable after a run reaches a terminal or cancelled state.
 - Desktop repository history binds only through the current opaque authorized
   workspace handle. It reconciles `workspace.v1` and `.cutout/run-events.json`
@@ -258,8 +258,8 @@ receipts. `.cutout` state and provenance remain authoritative.
   separation from tool-level retry callbacks.
 - Message regeneration: active-head eligibility, icon accessibility, source
   resolution, immutable sibling projection, durable previous/next selection,
-  no duplicate user turns, selected-material isolation, restart/legacy
-  recovery, no-call/non-conversational fail-closed behavior, and stale-error
+  no duplicate user turns, selected-material isolation, restart recovery,
+  no-call/non-conversational fail-closed behavior, and stale-error
   clearing before the awaited tool-gate boundary.
 - Preparation activity: historical and current runs, empty versus non-empty
   live stream state, succeeded/failed/cancelled terminals, repeated
@@ -268,7 +268,7 @@ receipts. `.cutout` state and provenance remain authoritative.
   preservation, and proof that terminal preparation evidence remains persisted
   and visible through the full execution/audit projection.
 - Repository history: authorization after mount, opaque-handle read/write,
-  deterministic ordered union, identical legacy deduplication, branch
+  deterministic ordered union, identical current-transcript deduplication, branch
   selection restoration, divergent-ID rejection, CAS conflict, credential
   rejection, local-state preservation, and sanitized in-product failure copy.
 - Uploaded material: semantic capability preflight before approval, paid-only

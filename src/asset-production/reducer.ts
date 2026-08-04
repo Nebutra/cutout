@@ -263,7 +263,7 @@ export function deriveRunStatus(
 }
 
 function taskIsConsumable(task: ProductionTaskState): boolean {
-  return task.status === 'ready' || task.status === 'waived' || task.status === 'legacy-ready'
+  return task.status === 'ready' || task.status === 'waived'
 }
 
 function taskIsSettled(task: ProductionTaskState): boolean {

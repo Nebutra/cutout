@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { PrototypePlan } from './prototype-plan'
+import { currentPrototypeExploration, currentPrototypeReviewDocument } from './prototype-plan.test-fixture'
 import {
   fallbackPrototypeSliceNames,
   isGenericSliceFilename,
@@ -21,6 +22,7 @@ const plan: PrototypePlan = {
     spacing: '8px',
     componentPrinciples: [],
     assetDirection: 'Dessert art and cafe ornaments.',
+    exploration: currentPrototypeExploration,
   },
   pages: [
     {
@@ -80,6 +82,7 @@ const plan: PrototypePlan = {
   ],
   flows: [],
   humanLoop: { mode: 'continue', rationale: 'Specific enough.' },
+  reviewDocument: currentPrototypeReviewDocument,
 }
 
 describe('prototype asset names', () => {

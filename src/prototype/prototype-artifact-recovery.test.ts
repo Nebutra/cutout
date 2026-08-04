@@ -43,7 +43,7 @@ describe('prototype artifact recovery', () => {
     expect(recovered.documentation.status).toBe('missing-artifact')
   })
 
-  it('repairs zeroed legacy dimensions from persisted PNG headers', () => {
+  it('rejects persisted media with zero dimensions even when bytes contain a PNG header', () => {
     const artifact = designSystem(validMarkdown)
     const bytes = new Uint8Array(24)
     bytes.set([0x89, 0x50, 0x4e, 0x47], 0)
@@ -55,8 +55,8 @@ describe('prototype artifact recovery', () => {
       pages: [],
     })
 
-    expect(recovered.designSystem).toMatchObject({ width: 640, height: 480 })
-    expect(recovered.designSystemMediaError).toBeNull()
+    expect(recovered.designSystem).toBeNull()
+    expect(recovered.designSystemMediaError).toContain('invalid dimensions')
   })
 
   it('derives documentation evidence from the current artifact', () => {

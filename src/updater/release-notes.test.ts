@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import releaseNotesCatalog from "@/release-notes/catalog.json";
 import type { LocalizedReleaseNotes } from "./contracts";
 import {
-  FIRST_RELEASE_NOTES_MIGRATION_VERSION,
   RELEASE_NOTES_READ_STATE_STORAGE_KEY,
   compareSemanticVersions,
   dismissReleaseNotes,
@@ -30,13 +29,13 @@ const bundled: LocalizedReleaseNotes = {
 };
 const migrationBundled: LocalizedReleaseNotes = {
   ...bundled,
-  version: FIRST_RELEASE_NOTES_MIGRATION_VERSION,
+  version: "0.1.16",
 };
 
 describe("release notes model", () => {
   it("bundles exact-version notes and applies whole-locale English fallback", () => {
-    expect(bundled.version).toBe("0.1.17");
-    expect(selectLocalizedReleaseNotes(bundled, "zh-CN")?.headline).toContain("图像路由");
+    expect(bundled.version).toBe("0.1.18");
+    expect(selectLocalizedReleaseNotes(bundled, "zh-CN")?.headline).toContain("本地 AI");
     expect(selectLocalizedReleaseNotes(bundled, "de-DE")?.headline).toBe(
       bundled.locales.en.headline,
     );
@@ -45,19 +44,19 @@ describe("release notes model", () => {
 
   it("prefers typed localized updater notes and safely falls back to plain text", () => {
     expect(resolveUpdateReleaseNotes({
-      version: "0.1.17",
+      version: "0.1.18",
       localizedNotes: bundled,
       notes: "English fallback",
-    }, "ja")?.headline).toContain("画像ルーティング");
+    }, "ja")?.headline).toContain("ローカル AI");
     expect(resolveUpdateReleaseNotes({
-      version: "0.1.18",
+      version: "0.1.19",
       localizedNotes: bundled,
       notes: "Readable English fallback.",
       publishedAt: "2026-08-04T10:00:00Z",
     }, "fr")).toMatchObject({
-      version: "0.1.18",
+      version: "0.1.19",
       releasedOn: "2026-08-04",
-      highlights: [{ id: "legacy-notes", body: "Readable English fallback." }],
+      highlights: [{ id: "release-notes-fallback", body: "Readable English fallback." }],
     });
   });
 
@@ -92,7 +91,7 @@ describe("release notes model", () => {
       localizedNotes: { ...bundled, remoteUrl: "https://example.test" } as LocalizedReleaseNotes,
       notes: "Readable English fallback.",
     }, "fr")).toMatchObject({
-      highlights: [{ id: "legacy-notes", body: "Readable English fallback." }],
+      highlights: [{ id: "release-notes-fallback", body: "Readable English fallback." }],
     });
   });
 
@@ -119,25 +118,17 @@ describe("release notes local lifecycle", () => {
     expect(result.state?.pendingVersion).toBeUndefined();
   });
 
-  it("uses the existing notification ledger only for the first OTA migration", () => {
+  it("does not infer release-note state from the update notification ledger", () => {
     const storage = memoryStorage();
     const result = initializeReleaseNotesLifecycle({
       storage,
-      currentVersion: FIRST_RELEASE_NOTES_MIGRATION_VERSION,
+      currentVersion: "0.1.16",
       bundledNotes: migrationBundled,
-      updateNotificationVersion: FIRST_RELEASE_NOTES_MIGRATION_VERSION,
     });
     expect(result).toMatchObject({
-      shouldOpen: true,
-      state: { observedVersion: "0.1.16", pendingVersion: "0.1.16" },
+      shouldOpen: false,
+      state: { observedVersion: "0.1.16" },
     });
-
-    const later = memoryStorage();
-    expect(initializeReleaseNotesLifecycle({
-      storage: later,
-      currentVersion: "0.1.17",
-      updateNotificationVersion: "0.1.17",
-    }).shouldOpen).toBe(false);
   });
 
   it("reopens pending notes after a crash and stops after dismissal", () => {
@@ -213,7 +204,6 @@ describe("release notes local lifecycle", () => {
       storage: corrupt,
       currentVersion: "0.1.16",
       bundledNotes: migrationBundled,
-      updateNotificationVersion: "0.1.16",
     }).shouldOpen).toBe(false);
   });
 
@@ -245,13 +235,11 @@ describe("release notes local lifecycle", () => {
       storage,
       currentVersion: "0.1.16",
       bundledNotes: migrationBundled,
-      updateNotificationVersion: "0.1.16",
     })).not.toThrow();
     expect(initializeReleaseNotesLifecycle({
       storage,
       currentVersion: "0.1.16",
       bundledNotes: migrationBundled,
-      updateNotificationVersion: "0.1.16",
     }).shouldOpen).toBe(false);
     expect(() => dismissReleaseNotes(storage, "0.1.16")).not.toThrow();
   });

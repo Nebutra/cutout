@@ -1,0 +1,4 @@
+{"file":".trellis/spec/frontend/byok-provider-protocols.md","reason":"Preserve native secret custody and direct Provider protocol verification while separating system runtime auth."}
+{"file":".trellis/tasks/08-04-unify-agent-provider-readiness/research/runtime-readiness-evidence.md","reason":"Use current official app-server and local runtime evidence instead of the obsolete probe-only assumption."}
+{"file":".trellis/tasks/08-04-unify-agent-provider-readiness/design.md","reason":"Implement the capability graph, native Codex boundary, context staging, and truthful readiness architecture."}
+{"file":".trellis/tasks/07-27-agent-session-delegation/research/runtime-contracts.md","reason":"Retain the earlier threat model and Claude policy boundary; supersede only the Codex restricted-read conclusion with current evidence."}

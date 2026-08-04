@@ -19,6 +19,7 @@ function document(overrides: Partial<DesignDocument> = {}): DesignDocument {
     tokens: [],
     components: [{ id: 'component:table', name: 'Runs table', status: 'ready', tokenIds: [] }],
     materials: [],
+    candidateSets: [],
     provenance: [],
     relations: [],
     ...overrides,

@@ -18,12 +18,13 @@ describe('provider wire protocol', () => {
     expect(defaultProviderWireProtocol('gateway')).toBeUndefined()
   })
 
-  it('accepts old and new protocol values while rejecting invented values', () => {
+  it('requires the current protocol while rejecting invented values', () => {
     const base = { id: 'p', kind: 'openai-compatible', label: 'Relay', defaultModel: 'm', enabled: true }
-    expect(providerConfigSchema.parse(base).wireProtocol).toBeUndefined()
+    expect(() => providerConfigSchema.parse(base)).toThrow('wire protocol is required')
     expect(providerConfigSchema.parse({ ...base, wireProtocol: 'anthropic-messages' }).wireProtocol).toBe('anthropic-messages')
     expect(providerConfigSchema.parse({ ...base, wireProtocol: 'google-generate-content' }).wireProtocol).toBe('google-generate-content')
     expect(() => providerConfigSchema.parse({ ...base, wireProtocol: 'completion' })).toThrow()
+    expect(providerConfigSchema.parse({ ...base, kind: 'gateway' }).wireProtocol).toBeUndefined()
   })
 
   it('defines the supported kind/protocol matrix explicitly', () => {

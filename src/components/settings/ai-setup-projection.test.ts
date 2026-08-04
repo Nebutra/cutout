@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import type { PlanningRuntimeEvidence } from '@/services/ai/planning-runtime'
 import type { ProviderDiscoveryCandidate } from '@/services/ai/provider-discovery'
 import type { ProviderConfig } from '@/services/ai/provider-types'
 import { capabilityBindingsSchema } from '@/services/ai/model-capabilities'
@@ -12,15 +13,8 @@ const openai: ProviderConfig = {
   id: 'openai',
   kind: 'openai',
   label: 'OpenAI',
+  wireProtocol: 'responses',
   defaultModel: 'gpt-5',
-  enabled: true,
-}
-
-const deepseek: ProviderConfig = {
-  id: 'deepseek',
-  kind: 'deepseek',
-  label: 'DeepSeek',
-  defaultModel: 'deepseek-chat',
   enabled: true,
 }
 
@@ -31,11 +25,20 @@ const verified = {
   checkedAt: '2026-07-28T00:00:00.000Z',
 }
 
-const fullOpenAiBindings = capabilityBindingsSchema.parse({
+const codex: PlanningRuntimeEvidence = {
+  runtimeId: 'codex-system',
+  installed: true,
+  authenticated: true,
+  authClass: 'chatgpt',
+  capability: 'proven',
+  execution: 'unproven',
+  version: '0.200.0',
+}
+
+const bindings = capabilityBindingsSchema.parse({
   version: 'model-assignments.v2',
   bindings: {
     text: { providerId: 'openai', model: 'gpt-5' },
-    vision: { providerId: 'openai', model: 'gpt-5' },
     'image-generation': { providerId: 'openai', model: 'gpt-image-2' },
     'image-edit': { providerId: 'openai', model: 'gpt-image-2' },
   },
@@ -59,6 +62,7 @@ const candidate: ProviderDiscoveryCandidate = {
 
 function input(overrides: Partial<AiSetupProjectionInput> = {}): AiSetupProjectionInput {
   return {
+    runtimeState: 'success',
     providersState: 'success',
     providers: [],
     verifications: {},
@@ -69,104 +73,159 @@ function input(overrides: Partial<AiSetupProjectionInput> = {}): AiSetupProjecti
   }
 }
 
-describe('AI setup projection', () => {
-  it('stays checking while provider or binding authority is loading', () => {
-    expect(projectAiSetup(input({ providersState: 'pending' })).status).toBe('checking')
-    expect(projectAiSetup(input({ bindingsState: 'pending' })).status).toBe('checking')
-    expect(projectAiSetup(input({ discoveryState: 'pending' })).status).toBe('checking')
-  })
-
-  it('claims ready only for enabled verified providers with full coverage', () => {
-    expect(projectAiSetup(input({
-      providers: [openai],
-      verifications: { openai: verified },
-      bindings: fullOpenAiBindings,
-      discoveryState: 'error',
-    }))).toMatchObject({ status: 'ready', verifiedProviders: [openai] })
-
-    expect(projectAiSetup(input({
-      providers: [{ ...openai, enabled: false }],
-      verifications: { openai: verified },
-      bindings: fullOpenAiBindings,
-    })).status).toBe('needs-verification')
-
-    expect(projectAiSetup(input({
-      providers: [openai],
-      verifications: { openai: { status: 'verified' } },
-      bindings: fullOpenAiBindings,
-    })).status).toBe('needs-verification')
-  })
-
-  it('keeps configured unverified and failed providers actionable', () => {
-    expect(projectAiSetup(input({ providers: [openai] }))).toMatchObject({
-      status: 'needs-verification',
-    })
-    expect(projectAiSetup(input({
-      providers: [openai],
-      verifications: { openai: { status: 'failed' } },
-      discoveryState: 'error',
-    }))).toMatchObject({ status: 'needs-verification' })
-  })
-
-  it('shows only missing capabilities when verified providers have gaps', () => {
-    const result = projectAiSetup(input({
-      providers: [deepseek],
-      verifications: { deepseek: verified },
-    }))
-    expect(result.status).toBe('needs-capabilities')
-    if (result.status !== 'needs-capabilities') return
-    expect(result.missing.map((item) => item.task)).toEqual([
-      'text',
-      'vision',
-      'webdev',
-      'image-to-webdev',
+describe('capability-first AI setup projection', () => {
+  it('returns exactly the three workflow capability rows', () => {
+    expect(projectAiSetup(input()).rows.map((row) => row.capability)).toEqual([
+      'planning',
       'image-generation',
       'image-edit',
     ])
   })
 
-  it('prioritizes explicit import actions when no verified setup exists', () => {
-    expect(projectAiSetup(input({
-      candidates: [candidate],
-    }))).toMatchObject({ status: 'discovered-credentials', candidates: [candidate] })
+  it('reports ready only when planning and both exact image routes are proven', () => {
+    const result = projectAiSetup(input({
+      runtime: codex,
+      providers: [openai],
+      verifications: { openai: verified },
+      bindings,
+    }))
+    expect(result.status).toBe('ready')
+    expect(result.rows.map((row) => row.status)).toEqual(['ready', 'ready', 'ready'])
+    expect(result.rows[0]?.adapter).toMatchObject({ id: 'codex-system', kind: 'system-runtime' })
+    expect(result.rows[1]?.adapter?.label).toContain('gpt-image-2')
+  })
+
+  it('uses a verified direct text route when Codex execution is not safely supported', () => {
+    const restricted: PlanningRuntimeEvidence = {
+      ...codex,
+      capability: 'unsupported',
+      reason: 'restricted-read-roots-required',
+    }
+    const result = projectAiSetup(input({
+      runtime: restricted,
+      providers: [openai],
+      verifications: { openai: verified },
+      bindings,
+    }))
+    expect(result.rows[0]).toMatchObject({
+      capability: 'planning',
+      status: 'ready',
+      adapter: { id: 'openai', kind: 'direct-provider' },
+    })
+  })
+
+  it('does not treat a non-text binding as a planning fallback', () => {
+    const visionOnly = capabilityBindingsSchema.parse({
+      version: 'model-assignments.v2',
+      bindings: { vision: { providerId: 'openai', model: 'gpt-5' } },
+    })
+    const result = projectAiSetup(input({
+      providers: [openai],
+      verifications: { openai: verified },
+      bindings: visionOnly,
+    }))
+    expect(result.rows[0]).toMatchObject({
+      capability: 'planning',
+      status: 'action-required',
+    })
+  })
+
+  it('keeps planning usable while identifying only missing image capabilities', () => {
+    const textOnly = capabilityBindingsSchema.parse({
+      version: 'model-assignments.v2',
+      bindings: { text: { providerId: 'openai', model: 'gpt-5' } },
+    })
+    const result = projectAiSetup(input({ runtime: codex, bindings: textOnly }))
+    expect(result.status).toBe('action-required')
+    expect(result.rows.map((row) => [row.capability, row.status])).toEqual([
+      ['planning', 'ready'],
+      ['image-generation', 'action-required'],
+      ['image-edit', 'action-required'],
+    ])
+  })
+
+  it('surfaces the stable runtime reason when no planning fallback exists', () => {
+    const result = projectAiSetup(input({
+      runtime: {
+        ...codex,
+        capability: 'unsupported',
+        reason: 'restricted-read-roots-required',
+      },
+    }))
+    expect(result.rows[0]).toMatchObject({
+      status: 'action-required',
+      reason: 'restricted-read-roots-required',
+      nextAction: 'upgrade-runtime',
+      evidence: { installed: true, authenticated: true, execution: 'unproven' },
+    })
+  })
+
+  it('directs an unsupported Codex version to upgrade instead of retrying the same binary', () => {
+    const result = projectAiSetup(input({
+      runtime: {
+        ...codex,
+        capability: 'unsupported',
+        reason: 'runtime-version-unsupported',
+      },
+    }))
+    expect(result.rows[0]).toMatchObject({
+      status: 'action-required',
+      reason: 'runtime-version-unsupported',
+      nextAction: 'upgrade-runtime',
+    })
+  })
+
+  it('does not confuse catalog verification with execution proof', () => {
+    const result = projectAiSetup(input({
+      runtime: codex,
+      providers: [openai],
+      verifications: { openai: verified },
+      bindings,
+    }))
+    expect(result.rows.every((row) => row.evidence.execution === 'unproven')).toBe(true)
+  })
+
+  it('stays checking while a required authority is loading', () => {
+    expect(projectAiSetup(input({ runtimeState: 'pending' })).status).toBe('checking')
+    expect(projectAiSetup(input({ providersState: 'pending' })).status).toBe('checking')
+    expect(projectAiSetup(input({ bindingsState: 'pending' })).status).toBe('checking')
+  })
+
+  it('keeps only missing direct image capabilities checking while discovery is pending', () => {
+    const result = projectAiSetup(input({ runtime: codex, discoveryState: 'pending' }))
+    expect(result.rows.map((row) => [row.capability, row.status])).toEqual([
+      ['planning', 'ready'],
+      ['image-generation', 'checking'],
+      ['image-edit', 'checking'],
+    ])
+  })
+
+  it('does not block already-proven image routes on pending discovery', () => {
+    const result = projectAiSetup(input({
+      runtime: codex,
+      providers: [openai],
+      verifications: { openai: verified },
+      bindings,
+      discoveryState: 'pending',
+    }))
+    expect(result.status).toBe('ready')
+  })
+
+  it('does not call an unrelated or disabled provider installed evidence', () => {
+    const disabled = { ...openai, enabled: false }
+    const result = projectAiSetup(input({ providers: [disabled] }))
+    expect(result.rows[1]?.evidence.installed).toBe(false)
+    expect(result.rows[2]?.evidence.installed).toBe(false)
+  })
+
+  it('keeps reviewed importable API-key candidates separate from runtime auth', () => {
+    const result = projectAiSetup(input({ candidates: [candidate], runtime: codex }))
+    expect(result.importableCandidates).toEqual([candidate])
+    expect(result.rows[0].adapter?.id).toBe('codex-system')
   })
 
   it('does not offer a discovered credential as a duplicate configured connection', () => {
     expect(discoveredCandidateMatchesProvider(candidate, openai)).toBe(true)
-    expect(projectAiSetup(input({
-      providers: [openai],
-      candidates: [candidate],
-    }))).toMatchObject({ status: 'needs-verification', providers: [openai] })
-
-    expect(discoveredCandidateMatchesProvider(
-      { ...candidate, kind: 'openai-compatible', baseUrl: 'https://relay.example/v1/' },
-      {
-        ...openai,
-        kind: 'openai-compatible',
-        baseUrl: 'https://relay.example/v1',
-        wireProtocol: 'responses',
-      },
-    )).toBe(true)
-  })
-
-  it('offers the provider directory when discovery succeeds without importable credentials', () => {
-    expect(projectAiSetup(input()).status).toBe('needs-provider')
-  })
-
-  it('surfaces sanitized unavailability only when initial setup is blocked', () => {
-    expect(projectAiSetup(input({ providersState: 'error' }))).toEqual({
-      status: 'unavailable',
-      reason: 'configuration',
-    })
-    expect(projectAiSetup(input({ discoveryState: 'error' }))).toEqual({
-      status: 'unavailable',
-      reason: 'discovery',
-    })
-    expect(projectAiSetup(input({
-      providers: [openai],
-      verifications: { openai: verified },
-      bindings: fullOpenAiBindings,
-      discoveryState: 'error',
-    })).status).toBe('ready')
+    expect(projectAiSetup(input({ providers: [openai], candidates: [candidate] })).importableCandidates).toEqual([])
   })
 })

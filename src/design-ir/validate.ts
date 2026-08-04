@@ -161,13 +161,13 @@ function hasEntity(
 /** Concise alias for agent/CLI consumers. */
 export const validate = validateDesignDocument
 
-/** Deterministic migration boundary for old IR and generators that only declared component.tokenIds. */
+/** Derives explicit token-usage relations from the current component contract. */
 export function materializeTokenUsageGraph(input: DesignDocument): NormalizedDesignDocument {
   const relations=[...input.relations]
   const relationKeys=new Set(relations.map((relation)=>`${relation.kind}:${relation.from.id}:${relation.to.id}`))
   for(const component of input.components)for(const tokenId of component.tokenIds){const key=`component-uses-token:${component.id}:${tokenId}`;if(!relationKeys.has(key)){relations.push({id:`relation.token-usage.${stableId(component.id)}.${stableId(tokenId)}`,kind:'component-uses-token',from:{kind:'component',id:component.id},to:{kind:'token',id:tokenId}});relationKeys.add(key)}}
   relations.sort((a,b)=>a.id.localeCompare(b.id))
-  return {...input,candidateSets:input.candidateSets??[],relations}
+  return {...input,relations}
 }
 
 export function tokenUsageGraph(input:DesignDocument){const document=materializeTokenUsageGraph(input);return document.tokens.map((token)=>{const relations=document.relations.filter((relation)=>(relation.kind==='component-uses-token'||relation.kind==='brand-defines-token')&&relation.to.id===token.id);return{tokenId:token.id,status:relations.length?'verified' as const:'evidence-missing' as const,componentIds:relations.filter((relation)=>relation.from.kind==='component').map((relation)=>relation.from.id).sort(),relationIds:relations.map(({id})=>id).sort(),...(relations.length?{}:{reason:'No component or brand usage relation was declared.'})}})}

@@ -34,19 +34,20 @@ export const paidToolRequestSchema = z.object({
   providerId: safeText.min(1).max(160).optional(),
   model: safeText.min(1).max(300).optional(),
   intent: safeText.min(1).max(paidToolIntentMaxLength),
-  prompt: safeText.min(1).max(paidToolPromptMaxLength).optional(),
+  prompt: safeText.min(1).max(paidToolPromptMaxLength),
   inputArtifactIds: z.array(safeText.min(1).max(300)).max(32).default([]),
   budgetCeiling: moneyEstimateSchema,
   approvalPolicy: z.enum(['explicit', 'auto-within-budget']).default('auto-within-budget'),
 }).strict()
 export type PaidToolRequest = z.infer<typeof paidToolRequestSchema>
 
-/** The bounded intent is for approval and audit. Only this projection crosses
- * into provider execution, preserving legacy requests without a prompt. */
+/** The bounded intent is for approval and audit. The execution prompt is the
+ * complete provider instruction authored for the current request. */
 export function paidToolExecutionPrompt(
   request: Pick<PaidToolRequest, 'intent' | 'prompt'>,
 ): string {
-  return request.prompt ?? request.intent
+  if (!request.prompt) throw new Error('A provider execution prompt is required.')
+  return request.prompt
 }
 
 /** Host-owned declaration. It contains routing metadata, never credentials. */
@@ -135,8 +136,6 @@ export const paidToolReceiptSchema = z.object({
   completedAt: z.number().int().nonnegative(),
 }).strict()
 export type PaidToolReceipt = z.infer<typeof paidToolReceiptSchema>
-export function migratePaidToolReceipt(input:unknown):PaidToolReceipt{const value=input as Record<string,unknown>,{outputs:legacyOutputs,...current}=value;return paidToolReceiptSchema.parse({...current,outputArtifactIds:Array.isArray(value?.outputArtifactIds)?value.outputArtifactIds:Array.isArray(legacyOutputs)?legacyOutputs:[]})}
-export function previewPaidToolReceiptDowngrade(input:unknown){const receipt=paidToolReceiptSchema.parse(input);return{target:'cutout.paid-tool-receipt.v0' as const,data:{...receipt,outputs:receipt.outputArtifactIds},losses:receipt.outputArtifactIds.length>1?[{path:'outputArtifactIds',count:receipt.outputArtifactIds.length-1,reason:'Some v0 consumers read only the first output.'}]:[]}}
 
 /** Maps desktop BYOK configuration to the same non-secret routing contract. */
 export function desktopPaidToolCapabilities(
@@ -182,7 +181,7 @@ export function desktopPaidToolCapabilities(
 export function composerRouteToPaidToolRequest(input: {
   readonly capability: PaidToolCapability
   readonly intent: string
-  readonly prompt?: string
+  readonly prompt: string
   readonly image: ModelAssignment
   readonly inputArtifactIds?: readonly string[]
   readonly budgetCeiling: MoneyEstimate
@@ -193,7 +192,7 @@ export function composerRouteToPaidToolRequest(input: {
     providerId: input.image.providerId,
     model: input.image.model,
     intent: input.intent,
-    ...(input.prompt !== undefined ? { prompt: input.prompt } : {}),
+    prompt: input.prompt,
     inputArtifactIds: input.inputArtifactIds ?? [],
     budgetCeiling: input.budgetCeiling,
     approvalPolicy: input.approvalPolicy ?? 'auto-within-budget',

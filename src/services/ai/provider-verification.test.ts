@@ -21,9 +21,9 @@ function memory() {
 }
 
 describe('provider verification receipt', () => {
-  it('keeps legacy and failed providers out of Auto until a successful probe', () => {
+  it('keeps unverified and failed providers out of Auto until a successful probe', () => {
     const store = memory()
-    expect(providerEligibleForAuto('legacy', store)).toBe(false)
+    expect(providerEligibleForAuto('unverified', store)).toBe(false)
     setProviderVerification('p', { status: 'unverified' }, store)
     expect(providerVerified('p', store)).toBe(false)
     expect(providerEligibleForAuto('p', store)).toBe(false)
@@ -54,16 +54,16 @@ describe('provider verification receipt', () => {
   })
 })
 
-describe('ensureProviderVerification (legacy lazy migration)', () => {
+describe('ensureProviderVerification', () => {
   it('probes a provider with no record and persists verified', async () => {
     const store = memory()
     let probes = 0
-    expect(await ensureProviderVerification('legacy', async () => {
+    expect(await ensureProviderVerification('unverified', async () => {
       probes += 1
       return { model: 'm' }
     }, store)).toBe('verified')
     expect(probes).toBe(1)
-    expect(providerEligibleForAuto('legacy', store)).toBe(true)
+    expect(providerEligibleForAuto('unverified', store)).toBe(true)
   })
 
   it('re-probes an inconclusive unverified record', async () => {

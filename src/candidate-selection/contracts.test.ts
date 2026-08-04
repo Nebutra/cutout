@@ -19,7 +19,6 @@ function decision(count = 2, maxCandidates = 8) {
       preserve: ['product brief', 'platform constraints'],
     })),
     bounds: { maxCandidates, maxParallelism: 3 },
-    estimate: { currency: 'USD', amount: count * 0.08, credits: count * 8 },
   }
 }
 
@@ -39,6 +38,13 @@ describe('candidate exploration contracts', () => {
     expect(parsed.count).toBe(7)
     expect(parsed.directions).toHaveLength(7)
     expect(parsed.bounds).toEqual({ maxCandidates: 9, maxParallelism: 3 })
+  })
+
+  it('rejects provider cost estimates from the current exploration contract', () => {
+    expect(candidateExplorationDecisionSchema.safeParse({
+      ...decision(),
+      estimate: { currency: 'USD', amount: 0.16 },
+    }).success).toBe(false)
   })
 
   it('rejects malformed, unsupported, mismatched, and duplicated direction plans', () => {

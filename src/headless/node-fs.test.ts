@@ -27,7 +27,7 @@ function state(): HeadlessProjectState {
       version: 'design-ir.v1',
       meta: { id: 'project', title: 'Project', createdAt: '2026-07-10T00:00:00.000Z', updatedAt: '2026-07-10T00:00:00.000Z' },
       revision: { id: 'r1', number: 1, createdAt: '2026-07-10T00:00:00.000Z', author: { kind: 'human', id: 'human' } },
-      needs: [], sources: [], brands: [], tokens: [], components: [], materials: [], provenance: [], relations: [],
+      needs: [], sources: [], brands: [], tokens: [], components: [], materials: [], candidateSets: [], provenance: [], relations: [],
     },
     designMarkdown: '# Project',
     artifactIndex: { version: 'cutout.artifacts.v1', artifacts: [{ sha256: DIGEST, mediaType: 'text/plain', byteLength: 0 }] },
@@ -324,7 +324,7 @@ function brandInput(): BrandKitInput {
       { id: 'guide-source', kind: 'document', role: 'evidence', title: 'Guide', license: { kind: 'proprietary', holder: 'Brand Co' }, content: [{ id: 'guide-content', uri: `sha256:${DIGEST}`, sha256: DIGEST, mediaType: 'text/markdown' }] },
     ],
     brands: [{ id: 'brand:co', name: 'Brand Co', status: 'active', provenanceId: 'logo-import' }],
-    tokens: [], components: [], materials: [],
+    tokens: [], components: [], materials: [], candidateSets: [],
     provenance: [
       { id: 'logo-import', operation: 'import', sourceIds: ['logo-source'], actor: { kind: 'human', id: 'designer' }, recordedAt: time },
       { id: 'guide-import', operation: 'import', sourceIds: ['guide-source'], actor: { kind: 'human', id: 'designer' }, recordedAt: time },

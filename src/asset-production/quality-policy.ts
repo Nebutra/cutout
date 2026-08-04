@@ -89,7 +89,7 @@ export function assertDecisionMatches(
 }
 
 export function isConsumableTask(task: ProductionTaskState): boolean {
-  return task.status === 'ready' || task.status === 'waived' || task.status === 'legacy-ready'
+  return task.status === 'ready' || task.status === 'waived'
 }
 
 function decisionArtifact(task: ProductionTaskState): ProductionArtifactRef | undefined {

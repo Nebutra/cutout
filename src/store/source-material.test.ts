@@ -28,7 +28,7 @@ describe('resolveSourceMaterial', () => {
     expect(result.bytes).toEqual(bytes)
   })
 
-  it('explicitly normalizes bitmap-only legacy sources to PNG', async () => {
+  it('normalizes current bitmap-only runtime sources to PNG', async () => {
     const convertToBlob = vi.fn(async () => new Blob([Uint8Array.of(9, 8, 7)], {
       type: 'image/png',
     }))

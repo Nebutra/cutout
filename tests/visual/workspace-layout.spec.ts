@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { openDeliverWorkspace } from "./workspace-helpers";
 async function project(page: import("@playwright/test").Page) {
   const viewport = page.viewportSize();
   if (viewport && viewport.width < 768) {
@@ -55,7 +56,7 @@ test("workspace modes use stable non-overlapping geometry", async ({
       { mask: [output.locator(":scope > *")] },
     );
     if (viewport.width < 768) await page.setViewportSize({ width: 1024, height: viewport.height });
-    await page.getByRole("button", { name: "Deliver", exact: true }).click();
+    await openDeliverWorkspace(page);
     if (viewport.width < 768) await page.setViewportSize(viewport);
     const deliver = page.getByRole("region", { name: "Deliver" });
     await expect(deliver).toBeVisible();

@@ -62,13 +62,13 @@ export interface Slice {
   /**
    * When this slice was cut from a per-region board (the breakdown pipeline),
    * the plan region + page it belongs to — the reversible page⊃region⊃slice
-   * tree. `null` for slices from the legacy whole-page board or manual imports.
+   * tree. `null` for whole-page board slices or manual imports.
    */
   readonly regionId: string | null
   readonly pageId: string | null
-  /** Exact originating manifest item; null for legacy/manual slices. */
+  /** Exact originating manifest item; null for manual or unplanned slices. */
   readonly assetManifestItemId: string | null
-  /** Stable production identity. Null only for legacy/unmigrated UI projections. */
+  /** Stable production identity. Null for manual or unplanned UI projections. */
   readonly productionTaskId: string | null
   readonly productionRunId: string | null
   readonly outputArtifactId: string | null
@@ -120,12 +120,11 @@ export interface SliceInput {
 /** A persisted project restore payload decoded back into live browser objects. */
 export interface ProjectRestoreInput {
   readonly brief: string
-  readonly params?: Params
   readonly intent?: IntentProfile | null
   readonly source?: {
     readonly bitmap: ImageBitmap
     readonly name: string
-    /** Present for current records; absent for bitmap-only legacy restore inputs. */
+    /** Exact encoded source when persistence or import has one. */
     readonly encodedImage?: Blob
   }
   readonly mockup?: MockupArtifact | null
@@ -302,7 +301,7 @@ export interface StoreActions {
   loadImage(input: {
     bitmap: ImageBitmap
     name: string
-    /** Exact uploaded/provider-returned encoding. Omit only for bitmap-only legacy callers. */
+    /** Exact uploaded/provider-returned encoding when the caller has one. */
     encodedImage?: Blob
     /** Defaults to true. Agent-managed cutout flows set false to avoid a duplicate run. */
     autoAnalyze?: boolean

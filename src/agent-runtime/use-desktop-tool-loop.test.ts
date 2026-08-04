@@ -11,6 +11,7 @@ describe('desktop paid tool request', () => {
     const request = createExplicitDesktopPaidToolRequest({
       capability: 'generate-image',
       intent: 'Generate the approved hero',
+      prompt: 'Render the approved hero.',
       image: { providerId: 'provider', model: 'image-model' },
       capabilities: [
         { capability: 'generate-image', providerId: 'other', model: 'image-model', available: true, estimatedCost: { currency: 'USD', amount: 2 } },
@@ -28,6 +29,7 @@ describe('desktop paid tool request', () => {
     const request = createExplicitDesktopPaidToolRequest({
       capability: 'edit-image',
       intent: 'Edit the approved image',
+      prompt: 'Edit the approved image.',
       image: { providerId: 'provider', model: 'missing-model' },
       capabilities: [],
     })

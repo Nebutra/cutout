@@ -1,7 +1,7 @@
 /**
  * Per-region "breakdown-then-deconstruct" slicing.
  *
- * The legacy path asks one image call to redraw an ENTIRE page as a single
+ * A whole-page board asks one image call to redraw an ENTIRE page as a single
  * flat cutout board, then segments it once — so a dense page reliably drops
  * assets (an attention/coverage limit of one call redrawing dozens of
  * elements) and the CV flood-fill has to separate everything at once.
@@ -311,8 +311,8 @@ export interface RegionBreakdownResult {
 
 /**
  * Generate + slice each board-cutout region of a page, streaming slices out
- * per region. Provider routing (openai edit vs generate) mirrors the legacy
- * whole-page path. A region whose board or CV fails is skipped (reported via
+ * per region. Provider routing (OpenAI edit vs generate) follows the shared
+ * image route. A region whose board or CV fails is skipped (reported via
  * `onRegionError`) rather than aborting the whole page.
  */
 export async function runRegionBreakdown(

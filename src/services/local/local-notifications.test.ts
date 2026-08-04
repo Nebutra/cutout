@@ -30,50 +30,93 @@ describe('local notification projection', () => {
     expect(notificationFromAgentEvent(event({ type: 'tool-failed', toolCallId: 't', tool: 'image', label: 'Generate image', detail: 'Provider unavailable' }))).toMatchObject({ kind: 'failure', detail: 'Provider unavailable' })
   })
 
-  it('replaces outcome status within one run instead of accumulating stale repair alerts', () => {
+  it('replaces repair summaries across runs instead of accumulating stale alerts', () => {
     const storage = memory()
-    const repair = event({ type: 'outcome-evaluated', status: 'needs-repair', missing: [{ kind: 'prototype-page', count: 1, label: 'Planned prototype pages' }] })
-    const ready = { ...event({ type: 'outcome-evaluated', status: 'satisfied', missing: [] }), eventId: 'event:outcome-ready', at: 43 }
+    const firstRepair = event({
+      type: 'outcome-evaluated',
+      status: 'needs-repair',
+      missing: [
+        { kind: 'design-system', count: 1, label: 'Shared design system' },
+        { kind: 'cutout-slice', count: 4, label: 'Reusable materials' },
+      ],
+    })
+    const latestRepair = {
+      ...event({
+        type: 'outcome-evaluated',
+        status: 'needs-repair',
+        missing: [
+          { kind: 'design-system', count: 1, label: 'Shared design system' },
+          { kind: 'design-markdown', count: 1, label: 'Portable DESIGN.md' },
+          { kind: 'cutout-slice', count: 4, label: 'Reusable materials' },
+        ],
+      }),
+      eventId: 'event:outcome-latest',
+      runId: 'run.two',
+      at: 43,
+    }
 
-    const repairNotification = notificationFromAgentEvent(repair)!
-    const readyNotification = notificationFromAgentEvent(ready)!
-    expect(repairNotification.id).toBe('agent:run.one:outcome')
-    expect(readyNotification.id).toBe(repairNotification.id)
+    const firstNotification = notificationFromAgentEvent(firstRepair)!
+    const latestNotification = notificationFromAgentEvent(latestRepair)!
+    expect(firstNotification.id).toBe('agent:outcome')
+    expect(latestNotification.id).toBe(firstNotification.id)
 
-    appendLocalNotification(repairNotification, storage)
-    appendLocalNotification(readyNotification, storage)
+    appendLocalNotification(firstNotification, storage)
     expect(loadLocalNotifications(storage)).toEqual([
-      expect.objectContaining({ id: 'agent:run.one:outcome', kind: 'success', title: 'Result ready' }),
+      expect.objectContaining({ id: 'agent:outcome', detail: 'Shared design system (1), Reusable materials (4)' }),
+    ])
+    appendLocalNotification(latestNotification, storage)
+    expect(loadLocalNotifications(storage)).toEqual([
+      expect.objectContaining({
+        id: 'agent:outcome',
+        kind: 'attention',
+        title: 'Result needs repair',
+        detail: 'Shared design system (1), Portable DESIGN.md (1), Reusable materials (4)',
+      }),
     ])
   })
 
-  it('collapses legacy per-event outcome notifications already stored for the same run', () => {
+  it('rejects retired outcome IDs instead of migrating them', () => {
     const storage = memory()
     storage.setItem('cutout.notifications.v1', JSON.stringify([
       { id: 'agent:run.one:outcome:needs-repair:design-system:1', source: 'agent', kind: 'attention', title: 'Result needs repair', detail: 'Shared design system (1)', createdAt: 41, read: false },
-      { id: 'agent:run.one:outcome:needs-repair:prototype-page:1', source: 'agent', kind: 'attention', title: 'Result needs repair', detail: 'Planned prototype pages (1)', createdAt: 42, read: false },
-      { id: 'agent:run.two:outcome:satisfied:', source: 'agent', kind: 'success', title: 'Result ready', detail: 'Complete', createdAt: 40, read: false },
-      { id: 'agent:event:tool-failed', source: 'agent', kind: 'failure', title: 'Generate failed', detail: 'Provider unavailable', createdAt: 39, read: false },
+      { id: 'agent:event:approval', source: 'agent', kind: 'attention', title: 'Approval needed', detail: 'Approve export.', createdAt: 40, read: false },
     ]))
 
-    expect(loadLocalNotifications(storage).map((item) => item.id)).toEqual([
-      'agent:run.one:outcome:needs-repair:prototype-page:1',
-      'agent:run.two:outcome:satisfied:',
-      'agent:event:tool-failed',
+    expect(loadLocalNotifications(storage)).toEqual([])
+  })
+
+  it('preserves unrelated ordering and read state while normalizing loaded history', () => {
+    const storage = memory()
+    storage.setItem('cutout.notifications.v1', JSON.stringify([
+      { id: 'agent:outcome', source: 'agent', kind: 'success', title: 'Result ready', detail: 'Complete', createdAt: 40, read: false },
+      { id: 'agent:event:approval', source: 'agent', kind: 'attention', title: 'Approval needed', detail: 'Newest approval state.', createdAt: 44, read: true },
+      { id: 'agent:outcome', source: 'agent', kind: 'attention', title: 'Result needs repair', detail: 'Shared design system (1)', createdAt: 45, read: true },
+      { id: 'delivery:receipt.one', source: 'delivery', kind: 'failure', title: 'Delivery needs attention', detail: '0 of 1 destinations delivered.', createdAt: 43, read: false },
+      { id: 'agent:event:approval', source: 'agent', kind: 'attention', title: 'Approval needed', detail: 'Stale duplicate.', createdAt: 39, read: false },
+    ]))
+
+    expect(loadLocalNotifications(storage).map((item) => ({
+      id: item.id,
+      detail: item.detail,
+      read: item.read,
+    }))).toEqual([
+      { id: 'agent:outcome', detail: 'Shared design system (1)', read: true },
+      { id: 'agent:event:approval', detail: 'Newest approval state.', read: true },
+      { id: 'delivery:receipt.one', detail: '0 of 1 destinations delivered.', read: false },
     ])
   })
 
-  it('migrates legacy records without action metadata and accepts actionable update records', () => {
+  it('loads current records without action metadata and accepts actionable update records', () => {
     const storage = memory()
     storage.setItem('cutout.notifications.v1', JSON.stringify([
-      { id: 'agent:legacy', source: 'agent', kind: 'success', title: 'Done', detail: 'Complete', createdAt: 41, read: true },
+      { id: 'agent:event:done', source: 'agent', kind: 'success', title: 'Done', detail: 'Complete', createdAt: 41, read: true },
       { id: 'update:stable:1.2.0', source: 'update', kind: 'attention', title: 'Update available', detail: 'Cutout 1.2.0 is available.', createdAt: 42, read: false, action: { type: 'open-settings', section: 'updates-support', anchor: 'updates' } },
     ]))
 
     const loaded = loadLocalNotifications(storage)
     expect(loaded).toEqual([
       expect.objectContaining({ id: 'update:stable:1.2.0', action: { type: 'open-settings', section: 'updates-support', anchor: 'updates' } }),
-      expect.objectContaining({ id: 'agent:legacy' }),
+      expect.objectContaining({ id: 'agent:event:done' }),
     ])
     expect(loaded[1]).not.toHaveProperty('action')
   })
@@ -85,13 +128,12 @@ describe('local notification projection', () => {
       requestId: 'r',
       tool: 'image',
       label: 'Generate design system',
-      estimatedCost: { currency: 'USD' as const, amount: 0 },
       budgetCeiling: { currency: 'USD' as const, amount: 1 },
       approvalPolicy: 'auto-within-budget' as const,
       reason: 'Eligible for automatic approval within budget.',
+      pendingApproval: false,
     }
     expect(notificationFromAgentEvent(event(approval))).toBeNull()
-    expect(notificationFromAgentEvent(event({ ...approval, pendingApproval: false }))).toBeNull()
 
     const pending = notificationFromAgentEvent(event({ ...approval, approvalPolicy: 'explicit', reason: 'Explicit approval is required.', pendingApproval: true }))
     expect(pending).toMatchObject({ kind: 'attention', title: 'Approval needed' })

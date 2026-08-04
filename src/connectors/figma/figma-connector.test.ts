@@ -116,6 +116,7 @@ describe('Figma connector v1', () => {
       tokens: [...patch.tokens],
       components: [...patch.components],
       materials: [],
+      candidateSets: [],
       provenance: [...(result.data.sourcePatch?.provenance ?? [])],
       relations: [...patch.relations],
     }

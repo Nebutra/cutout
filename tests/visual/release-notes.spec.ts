@@ -1,4 +1,13 @@
 import { expect, test } from "@playwright/test";
+import { readFileSync } from "node:fs";
+
+const releaseNotesCatalog = JSON.parse(
+  readFileSync(new URL("../../src/release-notes/catalog.json", import.meta.url), "utf8"),
+) as {
+  entries: Array<{
+    locales: Record<string, { highlights: unknown[] }>;
+  }>;
+};
 
 const scenarios = [
   { name: "compact light Chinese", width: 390, height: 700, locale: "zh-CN", theme: "light" },
@@ -30,7 +39,9 @@ for (const scenario of scenarios) {
     expect(geometry.right).toBeLessThanOrEqual(scenario.width);
     expect(geometry.bottom).toBeLessThanOrEqual(scenario.height);
     expect(geometry.scrollWidth).toBeLessThanOrEqual(geometry.clientWidth);
-    await expect(dialog.locator("ol > li")).toHaveCount(4);
+    await expect(dialog.locator("ol > li")).toHaveCount(
+      releaseNotesCatalog.entries[0]!.locales[scenario.locale].highlights.length,
+    );
   });
 }
 

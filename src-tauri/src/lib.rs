@@ -11,7 +11,8 @@ pub fn run() {
         })
         .manage(commands::registry_desktop::RegistryDesktopState::default())
         .manage(commands::agent_host::AgentHostDesktopState::default())
-        .manage(commands::ai::ai_proxy::AiProxyCancellationState::default());
+        .manage(commands::ai::ai_proxy::AiProxyCancellationState::default())
+        .manage(commands::ai::codex_system::CodexSystemRuntimeState::default());
     #[cfg(desktop)]
     let builder = builder.manage(commands::updater::UpdateRuntimeState::default());
     #[cfg(desktop)]
@@ -58,6 +59,11 @@ pub fn run() {
             // BYOK: non-secret provider-config persistence
             commands::ai::providers::load_providers,
             commands::ai::providers::save_providers,
+            commands::ai::codex_system::codex_system_probe,
+            commands::ai::codex_system::codex_system_turn_start,
+            commands::ai::codex_system::codex_system_turn_steer,
+            commands::ai::codex_system::codex_system_turn_interrupt,
+            commands::ai::codex_system::codex_system_conversation_reset,
             commands::ai::local_agent_inventory::discover_local_agent_inventory,
             commands::ai::provider_discovery::discover_provider_candidates,
             commands::ai::provider_discovery::auto_configure_provider_candidate,
@@ -174,18 +180,6 @@ pub fn run() {
                 commands::packaged_e2e::native_checkpoint("webview-renderable");
             }
 
-            // Migrate the retired plaintext store only after every entry reaches
-            // the OS credential vault. No secret or account metadata is logged.
-            {
-                let dir = app
-                    .path()
-                    .app_config_dir()
-                    .expect("app config dir must resolve for secret storage");
-                commands::secret_store::init_dir(dir);
-                if let Err(error) = commands::secret_store::migrate_to_keychain() {
-                    log::warn!("Legacy credential migration was deferred: {error}");
-                }
-            }
             #[cfg(desktop)]
             {
                 app.handle().plugin(tauri_plugin_notification::init())?;

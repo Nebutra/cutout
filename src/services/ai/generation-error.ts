@@ -63,6 +63,7 @@ const CONFIGURATION_PATTERNS = [
   /invalid (?:provider )?base url/i,
   /base url (?:is )?invalid/i,
   /unsupported (?:api )?protocol/i,
+  /planning runtime protocol is unsupported/i,
   /unsupported model/i,
   /(?:unknown|invalid) model/i,
   /model .*not found/i,
@@ -76,6 +77,18 @@ const CONFIGURATION_PATTERNS = [
   /invalid json/i,
   /json (?:parse|parsing|decode|decoding|response|syntax)/i,
   /capability-required/i,
+];
+
+// These are closed native Codex turn failures whose authority is the current
+// request, not Provider configuration. Keep the match exact so protocol,
+// version, authentication, context-limit, and unavailable-tool failures remain
+// non-retryable.
+const RETRYABLE_PLANNING_RUNTIME_PATTERNS = [
+  /^another planning turn is already active$/i,
+  /^planning runtime transport failed$/i,
+  /^planning runtime timed out$/i,
+  /^the saved planning conversation is stale$/i,
+  /^planning runtime output did not match the required schema$/i,
 ];
 
 const TRANSIENT_PATTERNS = [
@@ -139,6 +152,15 @@ export function classifyGenerationError(
       kind: "policy",
       displayMessage: normalized || "The request was denied by policy.",
       retryable: false,
+    };
+  }
+
+  if (matchesAny(normalized, RETRYABLE_PLANNING_RUNTIME_PATTERNS)) {
+    return {
+      kind: "transient",
+      displayMessage:
+        "The planning Agent could not finish this turn. Try again to continue.",
+      retryable: true,
     };
   }
 

@@ -30,6 +30,37 @@ if [[ "$host_arch" != "$bundle_arch" ]]; then
   exit 0
 fi
 
+if [[ "${CUTOUT_PACKAGED_E2E:-0}" == "1" ]]; then
+  codesign --verify --deep --strict --verbose=2 "$app"
+  bundle_signature="$(codesign -dvvv "$app" 2>&1)"
+  bundle_identifier="$(sed -n 's/^Identifier=//p' <<<"$bundle_signature")"
+  bundle_team="$(sed -n 's/^TeamIdentifier=//p' <<<"$bundle_signature")"
+  [[ "$bundle_identifier" == "com.nebutra.cutout.packaged-e2e" ]] || {
+    echo "Packaged E2E blocked: bundle identifier is not isolated." >&2
+    exit 1
+  }
+  [[ "$bundle_team" =~ ^[A-Z0-9]{10}$ ]] || {
+    echo "Packaged E2E blocked: bundle has no Developer ID Team." >&2
+    exit 1
+  }
+
+  expected_team="${CUTOUT_PACKAGED_E2E_TEAM_ID:-}"
+  if [[ -z "$expected_team" ]]; then
+    installed_app="/Applications/Cutout.app"
+    [[ -d "$installed_app" ]] || {
+      echo "Packaged E2E blocked: CUTOUT_PACKAGED_E2E_TEAM_ID is required when production Cutout is not installed." >&2
+      exit 1
+    }
+    codesign --verify --deep --strict "$installed_app"
+    installed_signature="$(codesign -dvvv "$installed_app" 2>&1)"
+    expected_team="$(sed -n 's/^TeamIdentifier=//p' <<<"$installed_signature")"
+  fi
+  [[ "$expected_team" =~ ^[A-Z0-9]{10}$ && "$bundle_team" == "$expected_team" ]] || {
+    echo "Packaged E2E blocked: bundle Team does not match trusted production Cutout." >&2
+    exit 1
+  }
+fi
+
 log_file="${RUNNER_TEMP:-/tmp}/cutout-package-smoke.log"
 result_root="/private/tmp/cutout-packaged-e2e"
 result_file="$result_root/result.json"
@@ -44,6 +75,11 @@ if [[ "${CUTOUT_PACKAGED_E2E:-0}" == "1" ]]; then
       mv "$state_path" "$state_archive/$(basename "$(dirname "$state_path")")"
     fi
   done
+  # The E2E bundle uses an isolated application id, while production Cutout's
+  # Keychain service is intentionally stable. Project only strict, non-secret
+  # Provider metadata into the clean harness so native discovery can re-check
+  # the matching local credentials without copying or exposing key material.
+  node scripts/stage-packaged-e2e-provider-registry.mjs
 fi
 rm -f -- "$result_file"
 rm -f -- "$progress_file"

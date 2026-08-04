@@ -5,6 +5,7 @@ import type { CompositeDeliveryReceipt } from '@/delivery-center/contracts'
 const STORAGE_KEY = 'cutout.notifications.v1'
 const CHANGE_EVENT = 'cutout:notifications-changed'
 const MAX_ITEMS = 50
+const OUTCOME_NOTIFICATION_ID = 'agent:outcome'
 
 const notificationActionSchema = z.object({
   type: z.literal('open-settings'),
@@ -22,7 +23,19 @@ const notificationSchema = z.object({
   read: z.boolean(),
   action: notificationActionSchema.optional(),
   deferredUntil: z.number().int().nonnegative().optional(),
-}).strict()
+}).strict().superRefine((notification, context) => {
+  if (
+    notification.source === 'agent'
+    && notification.id.includes(':outcome')
+    && notification.id !== OUTCOME_NOTIFICATION_ID
+  ) {
+    context.addIssue({
+      code: 'custom',
+      path: ['id'],
+      message: 'Agent outcome notifications must use the current semantic id.',
+    })
+  }
+})
 
 const notificationListSchema = z.array(notificationSchema).max(MAX_ITEMS)
 export type LocalNotification = z.infer<typeof notificationSchema>
@@ -38,38 +51,32 @@ function safe(value: string, limit: number): string {
   return normalized.slice(0, limit) || 'No additional detail.'
 }
 
-function outcomeNotificationRunId(id: string): string | null {
-  if (!id.startsWith('agent:')) return null
-  const marker = id.lastIndexOf(':outcome')
-  if (marker < 'agent:'.length) return null
-  const suffix = id.slice(marker + ':outcome'.length)
-  if (suffix !== '' && !suffix.startsWith(':')) return null
-  return id.slice('agent:'.length, marker)
-}
-
-function collapseOutcomeHistory(items: readonly LocalNotification[]): readonly LocalNotification[] {
-  const seenRuns = new Set<string>()
+function normalizeNotificationHistory(items: readonly LocalNotification[]): readonly LocalNotification[] {
+  const seenIds = new Set<string>()
   return [...items]
     .sort((a, b) => b.createdAt - a.createdAt)
     .filter((item) => {
-      const runId = outcomeNotificationRunId(item.id)
-      if (!runId) return true
-      if (seenRuns.has(runId)) return false
-      seenRuns.add(runId)
+      if (seenIds.has(item.id)) return false
+      seenIds.add(item.id)
       return true
     })
+    .slice(0, MAX_ITEMS)
 }
 
 function loadStoredLocalNotifications(storage?: Pick<Storage, 'getItem'>): readonly LocalNotification[] {
   try {
-    return notificationListSchema.parse(JSON.parse((storage ?? host())?.getItem(STORAGE_KEY) ?? '[]'))
+    return normalizeNotificationHistory(
+      notificationListSchema.parse(JSON.parse((storage ?? host())?.getItem(STORAGE_KEY) ?? '[]')),
+    )
   } catch {
     return []
   }
 }
 
 function visibleNotifications(items: readonly LocalNotification[], now: number): readonly LocalNotification[] {
-  return collapseOutcomeHistory(items.filter((item) => !item.deferredUntil || item.deferredUntil <= now))
+  return normalizeNotificationHistory(
+    items.filter((item) => !item.deferredUntil || item.deferredUntil <= now),
+  )
 }
 
 function notifyChanged(storage?: NotificationStorage): void {
@@ -88,9 +95,7 @@ export function appendLocalNotification(notification: LocalNotification, storage
   if (!target) return []
   const parsed = notificationSchema.parse(notification)
   const current = loadStoredLocalNotifications(target)
-  const next = [parsed, ...current.filter((item) => item.id !== parsed.id)]
-    .sort((a, b) => b.createdAt - a.createdAt)
-    .slice(0, MAX_ITEMS)
+  const next = normalizeNotificationHistory([parsed, ...current])
   target.setItem(STORAGE_KEY, JSON.stringify(next))
   notifyChanged(storage)
   return visibleNotifications(next, Date.now())
@@ -172,10 +177,10 @@ export function notificationFromAgentEvent(event: AgentRunEvent): LocalNotificat
       return { ...base, kind: 'failure', title: event.type === 'tool-failed' ? `${safe(event.label, 120)} failed` : `${safe(event.label, 120)} needs attention`, detail: safe(event.detail, 500) }
     case 'outcome-evaluated':
       // Outcome evaluation is current state, not an append-only activity item.
-      // Keep one notification per run so repair -> ready replaces stale status.
+      // Keep one notification across runs so repair retries replace stale status.
       return event.status === 'satisfied'
-        ? { ...base, id: `agent:${event.runId}:outcome`, kind: 'success', title: 'Result ready', detail: 'The requested outcome is complete.' }
-        : { ...base, id: `agent:${event.runId}:outcome`, kind: 'attention', title: 'Result needs repair', detail: safe(event.missing.map((item) => `${item.label} (${item.count})`).join(', '), 500) }
+        ? { ...base, id: OUTCOME_NOTIFICATION_ID, kind: 'success', title: 'Result ready', detail: 'The requested outcome is complete.' }
+        : { ...base, id: OUTCOME_NOTIFICATION_ID, kind: 'attention', title: 'Result needs repair', detail: safe(event.missing.map((item) => `${item.label} (${item.count})`).join(', '), 500) }
     default:
       return null
   }

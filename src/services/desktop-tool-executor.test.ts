@@ -11,7 +11,7 @@ const imageCapability: PaidToolExecutorCapability = {
 
 function request(
   capability: 'generate-image' | 'edit-image' | 'cutout' | 'semantic-cutout' = 'generate-image',
-  prompt?: string,
+  prompt = 'Execute the approved tool request.',
 ) {
   return paidToolRequestSchema.parse({
     capability,
@@ -121,7 +121,7 @@ describe('desktop paid tool executor', () => {
     const result = await executor.execute(execution())
 
     expect(result.ok).toBe(true)
-    expect(generation.generateImages).toHaveBeenCalledWith(expect.objectContaining({ providerId: 'provider-1', model: 'image-1', prompt: 'Create the approved visual' }))
+    expect(generation.generateImages).toHaveBeenCalledWith(expect.objectContaining({ providerId: 'provider-1', model: 'image-1', prompt: 'Execute the approved tool request.' }))
     expect(artifacts.write).toHaveBeenCalledTimes(1)
     expect(result.events.map((event) => event.type)).toEqual(['tool-started', 'tool-succeeded', 'material-recorded'])
     expect(result.receipt).toMatchObject({ status: 'succeeded', charged: { currency: 'USD', amount: 0.1, credits: 1 }, outputArtifactIds: ['artifact:generate-image:1'] })

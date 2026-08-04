@@ -2,15 +2,15 @@ import { describe, expect, it } from "vitest";
 import {
   defaultWorkspaceNavigation,
   enterWorkspaceSurface,
-  legacyTabForNavigation,
   loadWorkspaceNavigation,
-  migrateLegacyDesignOsView,
-  migrateWorkspaceNavigation,
+  navigationForWorkbenchTab,
   projectDeliverReturnControl,
   projectWorkspaceOpenAction,
   projectWorkspaceSurface,
+  resolveWorkspaceNavigation,
   returnFromDeliver,
   saveWorkspaceNavigation,
+  workbenchTabForNavigation,
   type WorkspaceNavigation,
 } from "./navigation";
 
@@ -26,44 +26,25 @@ function memory(initial: string | null = null) {
 }
 
 describe("workspace navigation IA", () => {
-  it("exposes only Agent, Canvas and Deliver as first-level modes", () => {
+  it("accepts only the current Agent, Canvas and Deliver schema", () => {
     for (const mode of ["agent", "canvas", "deliver"] as const) {
       const value: WorkspaceNavigation = { version: 2, mode };
-      expect(migrateWorkspaceNavigation(value).mode).toBe(mode);
+      expect(resolveWorkspaceNavigation(value)).toEqual(value);
     }
-    expect(migrateWorkspaceNavigation({ version: 2, mode: "dag" })).toEqual(
+    expect(resolveWorkspaceNavigation({ version: 2, mode: "dag" })).toEqual(
+      defaultWorkspaceNavigation,
+    );
+    expect(resolveWorkspaceNavigation({ mode: "agent" })).toEqual(
       defaultWorkspaceNavigation,
     );
   });
 
-  it("migrates supported legacy Design OS tabs and retires developer tabs", () => {
-    expect(migrateLegacyDesignOsView("overview")).toEqual(
-      defaultWorkspaceNavigation,
-    );
-    expect(migrateLegacyDesignOsView("figma")).toMatchObject({
-      mode: "canvas",
-      inspector: "figma",
-    });
-    expect(migrateLegacyDesignOsView("delivery")).toMatchObject({
-      mode: "deliver",
-    });
-    expect(migrateLegacyDesignOsView("kits")).toMatchObject({
-      mode: "deliver",
-      inspector: "kits",
-    });
-    for (const retired of ["dag", "ir", "receipts"] as const) {
-      expect(migrateLegacyDesignOsView(retired)).toEqual(
-        defaultWorkspaceNavigation,
-      );
-    }
-  });
-
-  it("drops old developer state and persists only the current schema", () => {
+  it("rejects retired persisted shapes instead of decoding them", () => {
     expect(
       loadWorkspaceNavigation(
         memory(JSON.stringify({ designOsView: "components" })),
       ),
-    ).toMatchObject({ version: 2, mode: "deliver", inspector: "components" });
+    ).toEqual(defaultWorkspaceNavigation);
     expect(
       loadWorkspaceNavigation(
         memory(
@@ -71,62 +52,44 @@ describe("workspace navigation IA", () => {
             version: 2,
             mode: "canvas",
             inspector: "receipts",
-            advanced: true,
           }),
         ),
       ),
     ).toEqual(defaultWorkspaceNavigation);
-    expect(
-      loadWorkspaceNavigation(
-        memory(
-          JSON.stringify({
-            version: 2,
-            mode: "agent",
-            inspector: "dag",
-            advanced: true,
-          }),
-        ),
-      ),
-    ).toEqual(defaultWorkspaceNavigation);
-    expect(
-      loadWorkspaceNavigation(
-        memory(JSON.stringify({ version: 2, mode: "agent", advanced: true })),
-      ),
-    ).toEqual({ version: 2, mode: "agent" });
     expect(loadWorkspaceNavigation(memory("{bad"))).toEqual(
       defaultWorkspaceNavigation,
     );
+  });
 
+  it("round-trips only the current schema", () => {
     const store = memory();
     saveWorkspaceNavigation(
       { version: 2, mode: "canvas", inspector: "figma" },
       store,
     );
-    expect(JSON.parse(store.read()!)).toEqual({
+    expect(loadWorkspaceNavigation(store)).toEqual({
       version: 2,
       mode: "canvas",
       inspector: "figma",
     });
   });
 
-  it("maps the current IA back to existing workbench surfaces", () => {
-    expect(legacyTabForNavigation({ version: 2, mode: "agent" })).toBe(
+  it("projects current workbench tabs without a second persisted shape", () => {
+    for (const tab of [
       "overview",
-    );
-    expect(
-      legacyTabForNavigation({
-        version: 2,
-        mode: "canvas",
-        inspector: "sources",
-      }),
-    ).toBe("sources");
-    expect(
-      legacyTabForNavigation({
-        version: 2,
-        mode: "deliver",
-        inspector: "starter",
-      }),
-    ).toBe("starter");
+      "sources",
+      "specimen",
+      "figma",
+      "workflows",
+      "delivery",
+      "kits",
+      "components",
+      "starter",
+    ] as const) {
+      expect(workbenchTabForNavigation(navigationForWorkbenchTab(tab))).toBe(
+        tab,
+      );
+    }
   });
 });
 
@@ -146,14 +109,14 @@ describe("workspace surface contract", () => {
     });
   });
 
-  it("keeps deliver tabs out of Canvas inspector", () => {
-    expect(
-      projectWorkspaceSurface({
-        version: 2,
-        mode: "canvas",
-        inspector: "starter",
-      }),
-    ).toMatchObject({
+  it("keeps deliver tabs out of the current Canvas schema", () => {
+    const invalid = resolveWorkspaceNavigation({
+      version: 2,
+      mode: "canvas",
+      inspector: "starter",
+    });
+    expect(invalid).toEqual(defaultWorkspaceNavigation);
+    expect(projectWorkspaceSurface(invalid)).toMatchObject({
       surface: "canvas-inspector",
       tab: "overview",
       title: "Canvas",

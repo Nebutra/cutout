@@ -79,19 +79,16 @@ export function providerVerified(
   return providerVerificationIsVerified(loadProviderVerifications(storage)[providerId])
 }
 
-/** Auto routing is fail-closed. Legacy providers remain explicitly selectable until re-verified. */
+/** Auto routing is fail-closed. Unverified providers remain explicitly selectable. */
 export function providerEligibleForAuto(
   providerId: string,
   storage?: ReadStorage,
 ): boolean {
   return providerVerified(providerId, storage)
 }
-/**
- * Lazy migration for installs that predate verification receipts: settle a
- * provider with no conclusive record by running the probe once (same check as
- * Settings "Verify") and persisting the outcome. Conclusive records are
- * returned as-is — this never re-probes a verified or failed provider.
- */
+/** Settle a provider with no conclusive receipt by running the same probe as
+ * Settings "Verify" and persisting the outcome. Conclusive records are not
+ * re-probed unless the required model lacks authenticated catalog evidence. */
 export async function ensureProviderVerification(
   providerId: string,
   probe: () => Promise<{ model: string; models?: readonly string[] }>,

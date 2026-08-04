@@ -160,6 +160,11 @@ msgid "team.host_required_description"
 msgstr "A desktop collaboration host is required to review or create a read-only share."
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.action_required"
+msgstr "Action required"
+
+#. js-lingui-explicit-id
 #: src/components/settings/sections/SpeechSection.tsx
 msgid "settings.speech.activation"
 msgstr "Activation"
@@ -178,6 +183,11 @@ msgstr "Adapt to the task and requested result."
 #: src/components/settings/ProviderDirectory.tsx
 msgid "settings.adapter_available"
 msgstr "Adapter available"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ModelSlot.tsx
+msgid "settings.image_route_adapter_required"
+msgstr "Adapter required"
 
 #. js-lingui-explicit-id
 #: src/components/settings/ProviderForm.tsx
@@ -232,13 +242,8 @@ msgstr "AI"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
-msgid "settings.ai_setup_ready"
-msgstr "AI routes are configured"
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.ai_setup_action_required"
-msgstr "AI setup needs attention"
+msgid "settings.ai_ready"
+msgstr "AI ready"
 
 #. js-lingui-explicit-id
 #: src/components/settings/AboutFooter.tsx
@@ -427,6 +432,14 @@ msgid "home.attach_reference"
 msgstr "Attach a reference"
 
 #. js-lingui-explicit-id
+#. placeholder {0}: evidence.authClass
+#. placeholder {1}: evidence.capability
+#. placeholder {2}: evidence.execution
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.runtime_evidence_detail"
+msgstr "Authentication: {0}. Capability: {1}. Execution: {2}."
+
+#. js-lingui-explicit-id
 #: src/components/settings/sections/RecoverySection.tsx
 msgid "settings.recovery.host_unauthorized"
 msgstr "Authorize a workspace before using host recovery."
@@ -477,11 +490,6 @@ msgid "settings.speech.auto_play_aria"
 msgstr "Auto-play TTS responses"
 
 #. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.ai_setup_unavailable"
-msgstr "Automatic AI setup is unavailable"
-
-#. js-lingui-explicit-id
 #: src/components/home/ProjectHome.tsx
 msgid "home.nav_back"
 msgstr "Back"
@@ -516,11 +524,6 @@ msgstr "Brand kit"
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.tab_brand_kits"
 msgstr "Brand Kits"
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.browse_providers"
-msgstr "Browse providers"
 
 #. js-lingui-explicit-id
 #: src/components/library/GlobalLibraryView.tsx
@@ -609,8 +612,18 @@ msgstr "Check now"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
+msgid "settings.checking"
+msgstr "Checking"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
 msgid "settings.ai_setup_checking"
 msgstr "Checking AI setup"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.capability_checking"
+msgstr "Checking availability"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/UpdatesSection.tsx
@@ -621,6 +634,11 @@ msgstr "Checking for updates..."
 #: src/components/settings/sections/RecoverySection.tsx
 msgid "settings.recovery.host_checking"
 msgstr "Checking host status..."
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.ai_setup_checking_description"
+msgstr "Reviewing configured providers and reusable credentials on this device."
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/UpdatesSection.tsx
@@ -649,13 +667,18 @@ msgstr "Choose a direction"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
-msgid "settings.ai_setup_connect_description"
-msgstr "Choose a provider and verify its credentials."
+msgid "settings.configure_route_action"
+msgstr "Choose a model with exact capability evidence."
 
 #. js-lingui-explicit-id
 #: src/components/workspace/IntentWorkspace.tsx
 msgid "workspace.human_loop_instruction"
 msgstr "Choose one direction. Add optional context below, then press the arrow."
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.claude_policy_diagnostic"
+msgstr "Claude Code execution remains unavailable pending vendor policy review."
 
 #. js-lingui-explicit-id
 #: src/components/library/GlobalLibraryView.tsx
@@ -714,6 +737,11 @@ msgid "settings.integrations.authorizing"
 msgstr "Complete authorization in the provider window."
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.action_required_description"
+msgstr "Complete the missing capability actions below."
+
+#. js-lingui-explicit-id
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.tab_components"
 msgstr "Components"
@@ -766,16 +794,6 @@ msgid "settings.configured_providers"
 msgstr "Configured providers"
 
 #. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.ai_setup_verification_description"
-msgstr "Configured providers must be enabled and verified before Cutout can use them."
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.configuring"
-msgstr "Configuring"
-
-#. js-lingui-explicit-id
 #: src/components/library/KitLibraryInspector.tsx
 msgid "kit_library.audit_conflicts"
 msgstr "Conflicts"
@@ -793,13 +811,13 @@ msgstr "Connect {0}"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
-msgid "settings.connect_a_provider"
-msgstr "Connect a provider"
+msgid "settings.connect_image_provider_action"
+msgstr "Connect a compatible direct provider."
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
-msgid "settings.ai_setup_connect_title"
-msgstr "Connect AI to get started"
+msgid "settings.connect_a_provider"
+msgstr "Connect a provider"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
@@ -923,11 +941,6 @@ msgid "settings.dimension_tts_description"
 msgstr "Create spoken audio."
 
 #. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.ai_setup_ready_description"
-msgstr "Credentials and catalog routes are configured. Image generation is verified when the first image completes."
-
-#. js-lingui-explicit-id
 #: src/components/settings/sections/IntegrationsSection.tsx
 msgid "settings.integrations.description"
 msgstr "Credentials remain in the desktop host. Cutout stores only opaque, revocable session handles."
@@ -975,30 +988,10 @@ msgid "updates.notification.available_detail"
 msgstr "Cutout {0} is available on the {channelLabel} channel."
 
 #. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.ai_setup_credentials_auto_description"
-msgstr "Cutout can verify and configure these local credentials automatically."
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.ai_setup_discovery_unavailable_description"
-msgstr "Cutout could not check reusable credentials on this device. Try again or connect a provider manually."
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.ai_setup_configuration_unavailable_description"
-msgstr "Cutout could not load the current AI configuration. Try again."
-
-#. js-lingui-explicit-id
 #. placeholder {0}: state.preferences.channel
 #: src/components/settings/sections/UpdatesSection.tsx
 msgid "settings.updates.up_to_date"
 msgstr "Cutout is up to date on the {0} channel."
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.provider_source_keychain"
-msgstr "Cutout local credentials"
 
 #. js-lingui-explicit-id
 #: src/components/home/SidebarAccount.tsx
@@ -1218,6 +1211,11 @@ msgstr "Enter API Secret"
 #: src/components/settings/ProviderForm.tsx
 msgid "settings.enter_model_manually"
 msgstr "Enter model ID manually"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.execution_confirmed"
+msgstr "Execution confirmed"
 
 #. js-lingui-explicit-id
 #: src/components/library/KitLibraryInspector.tsx
@@ -1486,6 +1484,11 @@ msgid "settings.updates.install_restart"
 msgstr "Install & restart"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.install_codex_action"
+msgstr "Install the signed Codex CLI, then retry."
+
+#. js-lingui-explicit-id
 #: src/components/settings/sections/PersonalizationSection.tsx
 msgid "settings.personalization.instructions_saved_toast"
 msgstr "Instructions saved"
@@ -1618,8 +1621,8 @@ msgstr "Locked"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
-msgid "settings.manage_providers"
-msgstr "Manage providers"
+msgid "settings.manage"
+msgstr "Manage"
 
 #. js-lingui-explicit-id
 #: src/components/library/GlobalLibraryView.tsx
@@ -1681,11 +1684,6 @@ msgstr "Model or leave blank for Auto"
 #: src/components/home/ProjectHome.tsx
 msgid "home.more_actions_named"
 msgstr "More actions for {0}"
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.ai_setup_capabilities_title"
-msgstr "More AI capabilities are needed"
 
 #. js-lingui-explicit-id
 #: src/components/library/GlobalLibraryView.tsx
@@ -1792,6 +1790,11 @@ msgstr "Not configured"
 #: src/components/settings/sections/IntegrationsSection.tsx
 msgid "settings.integrations.not_connected"
 msgstr "Not connected."
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.not_installed"
+msgstr "Not installed"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/SpeechSection.tsx
@@ -1934,6 +1937,21 @@ msgid "settings.dimension_webdev_description"
 msgstr "Plan and implement web interfaces."
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.capability_planning"
+msgstr "Planning and conversation"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.ai_ready_description"
+msgstr "Planning and image routes are available on this device."
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.planning_runtime"
+msgstr "Planning runtime"
+
+#. js-lingui-explicit-id
 #: src/components/settings/sections/IntegrationsSection.tsx
 msgid "settings.integrations.handshake_note"
 msgstr "Plugin, MCP, CLI and local-vault integrations become available only after their host handshake is verified."
@@ -1988,11 +2006,6 @@ msgstr "Preview diagnostics"
 #: src/components/library/RegistryInstallPanel.tsx
 msgid "registry_install.preview_install"
 msgstr "Preview install"
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.provider_source_environment"
-msgstr "Process environment"
 
 #. js-lingui-explicit-id
 #: src/components/settings/VectorizerPanel.tsx
@@ -2107,6 +2120,11 @@ msgid "home.status_ready"
 msgstr "Ready"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.ready_for_first_use"
+msgstr "Ready for first use"
+
+#. js-lingui-explicit-id
 #: src/components/home/ProjectHome.tsx
 msgid "home.recent_heading"
 msgstr "Recent"
@@ -2120,6 +2138,11 @@ msgstr "Recently closed"
 #: src/components/settings/ProviderDirectory.tsx
 msgid "settings.provider_category_recommended"
 msgstr "Recommended"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ModelSlot.tsx
+msgid "settings.image_route_recommended"
+msgstr "Recommended for high fidelity"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/RecoverySection.tsx
@@ -2317,8 +2340,8 @@ msgstr "Retry"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
-msgid "settings.ai_setup_credentials_found"
-msgstr "Reusable credentials found"
+msgid "settings.retry_capability_action"
+msgstr "Retry the capability check."
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/PersonalizationSection.tsx
@@ -2345,11 +2368,6 @@ msgstr "Review comment"
 #: src/components/settings/sections/UpdatesSection.tsx
 msgid "settings.updates.whats_new_hint"
 msgstr "Review the highlights for Cutout {0}."
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.ai_setup_checking_description"
-msgstr "Reviewing configured providers and reusable credentials on this device."
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/IntegrationsSection.tsx
@@ -2435,11 +2453,6 @@ msgid "settings.integrations.expired"
 msgstr "Session expired. Refresh or reconnect."
 
 #. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.setup_automatically"
-msgstr "Set up automatically"
-
-#. js-lingui-explicit-id
 #: src/components/home/SidebarAccount.tsx
 #: src/components/settings/SettingsDialog.tsx
 msgid "settings.menu_label"
@@ -2470,6 +2483,11 @@ msgstr "Shortcut"
 #: src/components/settings/VectorizerPanel.tsx
 msgid "settings.key_show"
 msgstr "Show"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.authorize_codex_action"
+msgstr "Sign in with the Codex CLI, then retry."
 
 #. js-lingui-explicit-id
 #: src/components/inspector/SliceDimensions.tsx
@@ -2564,6 +2582,11 @@ msgstr "Structured and formal."
 #: src/components/help/HelpMenu.tsx
 msgid "help.submit_feedback"
 msgstr "Submit feedback"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ModelSlot.tsx
+msgid "settings.image_route_supported"
+msgstr "Supported"
 
 #. js-lingui-explicit-id
 #: src/components/inspector/ExportBar.tsx
@@ -2803,6 +2826,16 @@ msgid "settings.updates.channel_aria"
 msgstr "Update channel"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.upgrade_codex_action"
+msgstr "Update Codex to a version with restricted readable roots."
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.update_cutout_runtime_action"
+msgstr "Update Cutout to enable the proven Codex runtime contract."
+
+#. js-lingui-explicit-id
 #: src/components/settings/sections/UpdatesSection.tsx
 msgid "settings.updates.download_progress_aria"
 msgstr "Update download progress"
@@ -2891,19 +2924,24 @@ msgid "global_library.bytes_not_available"
 msgstr "Verified bytes are not available locally."
 
 #. js-lingui-explicit-id
+#: src/components/settings/ModelSlot.tsx
+msgid "settings.image_route_evidence_required"
+msgstr "Verified capability evidence required"
+
+#. js-lingui-explicit-id
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.asset_preview_description"
 msgstr "Verified local preview, provenance, and capability-aware asset actions."
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.verify_provider_action"
+msgstr "Verify the configured provider and model catalog."
+
+#. js-lingui-explicit-id
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.verifying_component_blobs"
 msgstr "Verifying component source blobs…"
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.ai_setup_configuring_description"
-msgstr "Verifying local credentials and configuring the required model routes."
 
 #. js-lingui-explicit-id
 #: src/components/library/GlobalLibraryView.tsx
@@ -3020,8 +3058,3 @@ msgstr "Your open tabs and recently closed tabs will appear here"
 #: src/components/home/ProjectHome.tsx
 msgid "home.your_projects"
 msgstr "Your projects"
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.ai_setup_capabilities_description"
-msgstr "Your verified providers do not cover every required task."

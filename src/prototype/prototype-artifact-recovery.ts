@@ -1,5 +1,4 @@
 import { bytesToBlob } from '@/lib/image'
-import { readRasterDimensions } from '@/lib/raster-dimensions'
 import type {
   PersistedPrototypeDesignSystem,
   PersistedPrototypeImage,
@@ -61,46 +60,31 @@ export function prototypeMediaValidationError(
   return null
 }
 
-/** Restore legacy/current workspace.v1 artifacts without conflating media and docs. */
+/** Restore current workspace artifacts without conflating media and docs. */
 export function recoverPrototypeArtifacts(
   input: PersistedPrototypeArtifactsInput,
 ): PrototypeArtifactProjection {
-  const normalizedDesignSystem = input.designSystem
-    ? normalizePersistedDimensions(input.designSystem)
-    : null
-  const designSystemMediaError = input.designSystem && !normalizedDesignSystem
+  const designSystemMediaError = input.designSystem
     ? prototypeMediaValidationError(input.designSystem)
     : null
-  const designSystem = normalizedDesignSystem
-    ? restoreDesignSystem(normalizedDesignSystem)
+  const designSystem = input.designSystem && !designSystemMediaError
+    ? restoreDesignSystem(input.designSystem)
     : null
   const pages: PrototypePageArtifact[] = []
   const rejectedPageIds: string[] = []
 
   for (const page of input.pages) {
-    const normalized = normalizePersistedDimensions(page)
-    if (!normalized) {
+    if (prototypeMediaValidationError(page)) {
       rejectedPageIds.push(page.page.id)
       continue
     }
-    pages.push(restorePage(normalized))
+    pages.push(restorePage(page))
   }
 
   return buildProjection({ designSystem, pages }, {
     designSystemMediaError,
     rejectedPageIds,
   })
-}
-
-function normalizePersistedDimensions<T extends PersistedPrototypeImage>(
-  artifact: T,
-): T | null {
-  if (!(artifact.bytes instanceof Uint8Array) || artifact.bytes.byteLength === 0) {
-    return null
-  }
-  if (!prototypeMediaValidationError(artifact)) return artifact
-  const recovered = readRasterDimensions(artifact.bytes)
-  return recovered ? { ...artifact, ...recovered } : null
 }
 
 /** Re-project current artifacts after generation or repair; diagnostics never drift. */

@@ -25,6 +25,7 @@ function document(): DesignDocument {
     tokens: [],
     components: [],
     materials: [],
+    candidateSets: [],
     provenance: [
       provenance('provenance:logo', 'source:logo'),
       provenance('provenance:guide', 'source:guide'),

@@ -20,6 +20,7 @@ import {
 import { createPrototypeAssetManifest } from './asset-manifest'
 import { designSystemMarkdownValidationError } from './design-system-validation'
 import { prototypeMediaValidationError } from './prototype-artifact-recovery'
+import { resourcePackRunId } from './resource-pack-production'
 import {
   prototypePageSchema,
   prototypePlanSchema,
@@ -437,6 +438,9 @@ function validateResourcePack(
 ): Result<PersistedPrototypeResourcePack> {
   if (!isRecord(input) || !isId(input.id) || !isId(input.manifestProvenanceId)) {
     return err('Prototype resource pack identity and manifest provenance are required.')
+  }
+  if (!resourcePackRunId(input.id)) {
+    return err('Prototype resource pack identity must name its production run.')
   }
   const expected = createPrototypeAssetManifest(plan, plan.pages)
   if (!deepEqual(input.manifest, expected)) {

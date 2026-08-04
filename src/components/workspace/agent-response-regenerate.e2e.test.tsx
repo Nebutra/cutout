@@ -24,6 +24,14 @@ import { installE2eLocalStorage } from './intent-workspace.e2e.testkit'
 const PROVIDER_ID = 'regeneration-provider'
 const MODEL = 'regeneration-model'
 const storage = installE2eLocalStorage()
+const { tauriInvokeMock } = vi.hoisted(() => ({ tauriInvokeMock: vi.fn() }))
+
+vi.mock('@tauri-apps/api/core', () => ({
+  invoke: tauriInvokeMock,
+  Channel: class {
+    onmessage = (_payload: unknown) => {}
+  },
+}))
 
 vi.mock('@/services/ai/model-assignment.local', () => ({
   loadCapabilityBindings: async () => ({
@@ -135,7 +143,211 @@ describe('Agent response regeneration workspace flow', () => {
   beforeEach(async () => {
     getStoreState().resetProject()
     storage.clear()
+    tauriInvokeMock.mockReset()
+    tauriInvokeMock.mockImplementation((command: string) => {
+      if (command === 'codex_system_probe') {
+        return Promise.resolve({
+          runtimeId: 'codex-system',
+          installed: false,
+          authenticated: false,
+          authClass: 'unknown',
+          capability: 'unsupported',
+          execution: 'unproven',
+          reason: 'not-installed',
+        })
+      }
+      return Promise.reject(new Error(`Unexpected native command: ${command}`))
+    })
     if (!i18n.locale) await activateLocale('en')
+  })
+
+  it('uses a ready system Codex turn before direct text Provider preflight', async () => {
+    const directToolGate = vi.fn()
+    const providerTest = vi.fn(async () => ok({ model: MODEL, models: [MODEL] }))
+    const registry = fakeRegistry(
+      directToolGate,
+      Promise.resolve(ok({ text: '', toolCalls: [] })),
+    )
+    registry.providers.test = providerTest
+    tauriInvokeMock.mockImplementation((command: string, args?: {
+      input?: { requestId?: string; contextRevision?: string }
+    }) => {
+      if (command === 'codex_system_probe') {
+        return Promise.resolve({
+          runtimeId: 'codex-system',
+          installed: true,
+          authenticated: true,
+          authClass: 'chatgpt',
+          capability: 'proven',
+          execution: 'unproven',
+          version: '0.146.0',
+        })
+      }
+      if (command === 'codex_system_turn_start') {
+        return Promise.resolve({
+          output: {
+            action: 'reply',
+            reply: 'I can help shape that idea.',
+            generation: null,
+            clarification: null,
+            material: null,
+            regeneration: null,
+            targetPageNames: null,
+          },
+          receipt: {
+            protocol: 'cutout.codex-execution.v1',
+            runtimeId: 'codex-system',
+            runtimeVersion: '0.146.0',
+            bindingId: 'codex:binding',
+            requestId: args?.input?.requestId,
+            turnId: 'turn.1',
+            contextRevision: args?.input?.contextRevision,
+            contextDigest: 'a'.repeat(64),
+            outputDigest: 'b'.repeat(64),
+            completedAt: 1,
+          },
+        })
+      }
+      return Promise.reject(new Error(`Unexpected native command: ${command}`))
+    })
+    getStoreState().setBrief('Hello, can you help me think through an idea?')
+    getStoreState().setWorkspaceSnapshot(createEmptyWorkspaceSnapshot())
+    getStoreState().requestAgentRun('create-assets')
+
+    host = document.createElement('div')
+    document.body.append(host)
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    act(() => {
+      root = createRoot(host!)
+      root.render(
+        <QueryClientProvider client={queryClient}>
+          <I18nProvider i18n={i18n}>
+            <TooltipProvider>
+              <SettingsUIProvider value={{ open: () => {} }}>
+                <LibraryUIProvider value={{ open: () => {}, openGlobal: () => {} }}>
+                  <ServiceProvider registry={registry}>
+                    <ImageImportActionsProvider value={{ openPicker: () => {} }}>
+                      <IntentWorkspace projectId="project.1" />
+                    </ImageImportActionsProvider>
+                  </ServiceProvider>
+                </LibraryUIProvider>
+              </SettingsUIProvider>
+            </TooltipProvider>
+          </I18nProvider>
+        </QueryClientProvider>,
+      )
+    })
+
+    expect(await waitFor(() => host!.textContent?.includes('I can help shape that idea.'))).toBe(true)
+    expect(directToolGate).not.toHaveBeenCalled()
+    expect(providerTest).not.toHaveBeenCalled()
+    expect(tauriInvokeMock).toHaveBeenCalledWith(
+      'codex_system_turn_start',
+      expect.objectContaining({
+        input: expect.objectContaining({
+          workspaceHandle: 'workspace:project.1',
+          conversationId: 'conversation:primary',
+        }),
+      }),
+    )
+  })
+
+  it('surfaces Retry for a transient Codex failure and retries the same runtime', async () => {
+    const directToolGate = vi.fn()
+    const providerTest = vi.fn(async () => ok({ model: MODEL, models: [MODEL] }))
+    const registry = fakeRegistry(
+      directToolGate,
+      Promise.resolve(ok({ text: '', toolCalls: [] })),
+    )
+    registry.providers.test = providerTest
+    let probeCount = 0
+    let turnCount = 0
+    tauriInvokeMock.mockImplementation((command: string, args?: {
+      input?: { requestId?: string; contextRevision?: string }
+    }) => {
+      if (command === 'codex_system_probe') {
+        probeCount += 1
+        return Promise.resolve({
+          runtimeId: 'codex-system',
+          installed: true,
+          authenticated: true,
+          authClass: 'chatgpt',
+          capability: 'proven',
+          execution: probeCount === 1 ? 'unproven' : 'failed',
+          version: '0.146.0',
+        })
+      }
+      if (command === 'codex_system_turn_start') {
+        turnCount += 1
+        if (turnCount === 1) {
+          return Promise.reject(new Error('planning runtime transport failed'))
+        }
+        return Promise.resolve({
+          output: {
+            action: 'reply',
+            reply: 'The planning Agent recovered.',
+            generation: null,
+            clarification: null,
+            material: null,
+            regeneration: null,
+            targetPageNames: null,
+          },
+          receipt: {
+            protocol: 'cutout.codex-execution.v1',
+            runtimeId: 'codex-system',
+            runtimeVersion: '0.146.0',
+            bindingId: 'codex:binding',
+            requestId: args?.input?.requestId,
+            turnId: 'turn.2',
+            contextRevision: args?.input?.contextRevision,
+            contextDigest: 'a'.repeat(64),
+            outputDigest: 'b'.repeat(64),
+            completedAt: 2,
+          },
+        })
+      }
+      return Promise.reject(new Error(`Unexpected native command: ${command}`))
+    })
+    getStoreState().setBrief('Help me think through a restaurant website.')
+    getStoreState().setWorkspaceSnapshot(createEmptyWorkspaceSnapshot())
+    getStoreState().requestAgentRun('create-assets')
+
+    host = document.createElement('div')
+    document.body.append(host)
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    act(() => {
+      root = createRoot(host!)
+      root.render(
+        <QueryClientProvider client={queryClient}>
+          <I18nProvider i18n={i18n}>
+            <TooltipProvider>
+              <SettingsUIProvider value={{ open: () => {} }}>
+                <LibraryUIProvider value={{ open: () => {}, openGlobal: () => {} }}>
+                  <ServiceProvider registry={registry}>
+                    <ImageImportActionsProvider value={{ openPicker: () => {} }}>
+                      <IntentWorkspace projectId="project.1" />
+                    </ImageImportActionsProvider>
+                  </ServiceProvider>
+                </LibraryUIProvider>
+              </SettingsUIProvider>
+            </TooltipProvider>
+          </I18nProvider>
+        </QueryClientProvider>,
+      )
+    })
+
+    const retry = await waitFor(() =>
+      host!.querySelector<HTMLButtonElement>('[data-agent-action="retry-run"]'))
+    expect(retry).toBeTruthy()
+    expect(host.textContent).toContain('The planning Agent could not finish this turn.')
+
+    await act(async () => retry!.click())
+
+    expect(await waitFor(() => host!.textContent?.includes('The planning Agent recovered.'))).toBe(true)
+    expect(turnCount).toBe(2)
+    expect(probeCount).toBeGreaterThanOrEqual(2)
+    expect(directToolGate).not.toHaveBeenCalled()
+    expect(providerTest).not.toHaveBeenCalled()
   })
 
   afterEach(() => {
@@ -151,7 +363,7 @@ describe('Agent response regeneration workspace flow', () => {
     const events = replayRunEvents([
       createRunEvent('run:old', { type: 'run-started', mode: 'create' }, { eventId: 'start', at: 1 }),
       createRunEvent('run:old', { type: 'intent-recorded', intent: 'Who are you?' }, { eventId: 'user', at: 2 }),
-      createRunEvent('run:old', { type: 'agent-message', message: 'Old response' }, { eventId: 'agent', at: 3 }),
+      createRunEvent('run:old', { type: 'agent-message', message: 'Old response', responseToEventId: 'user' }, { eventId: 'agent', at: 3 }),
       createRunEvent('run:old', { type: 'run-cancelled', reason: 'Previous attempt stopped.' }, { eventId: 'cancel', at: 4 }),
     ])
     getStoreState().setBrief('Who are you?')
@@ -251,7 +463,7 @@ describe('Agent response regeneration workspace flow', () => {
     const events = replayRunEvents([
       createRunEvent('run:old', { type: 'run-started', mode: 'create' }, { eventId: 'start', at: 1 }),
       createRunEvent('run:old', { type: 'intent-recorded', intent: 'Who are you?' }, { eventId: 'user', at: 2 }),
-      createRunEvent('run:old', { type: 'agent-message', message: 'Old response' }, { eventId: 'agent', at: 3 }),
+      createRunEvent('run:old', { type: 'agent-message', message: 'Old response', responseToEventId: 'user' }, { eventId: 'agent', at: 3 }),
     ])
     getStoreState().setBrief('Who are you?')
     getStoreState().setWorkspaceSnapshot(createEmptyWorkspaceSnapshot({ agentRunEvents: events }))

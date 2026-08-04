@@ -1,9 +1,40 @@
-import { describe,expect,it } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { createCapabilityBindingsRepository } from './model-assignment.local'
 
-function memory(initial:Record<string,unknown>={}){const data=new Map(Object.entries(initial));return{get:async<T>(key:string)=>data.get(key) as T|undefined,set:async(key:string,value:unknown)=>void data.set(key,value),save:async()=>{},data}}
+function memory(initial:Record<string,unknown>={}) {
+  const data=new Map(Object.entries(initial))
+  return {
+    get:async<T>(key:string)=>data.get(key) as T|undefined,
+    set:async(key:string,value:unknown)=>void data.set(key,value),
+    save:async()=>{},
+    data,
+  }
+}
 
 describe('CapabilityBindings repository',()=>{
-  it('atomically migrates plugin-store legacy slots and browser dimension routes',async()=>{const store=memory({'ai.modelAssignments':{chat:{providerId:'p',model:'chat'},image:{providerId:'p',model:'image'}}}),repo=createCapabilityBindingsRepository(store,()=>({asr:{providerId:'s',model:'asr'},webdev:{providerId:'c',model:'code'}})),bindings=await repo.load();expect(bindings.bindings).toMatchObject({text:{model:'chat'},asr:{model:'asr'},webdev:{model:'code'},'image-generation':{model:'image'}});expect(bindings.bindings.vision).toBeUndefined();expect(store.data.get('ai.capabilityBindings')).toEqual(bindings)})
-  it('uses v2 as authority and exposes legacy runtime projection',async()=>{const store=memory(),repo=createCapabilityBindingsRepository(store);await repo.set('vision',{providerId:'v',model:'vision'});await repo.set('text',{providerId:'t',model:'text'});expect(await repo.legacy()).toEqual({chat:{providerId:'t',model:'text'}});await repo.clear('text');expect(await repo.legacy()).toEqual({chat:{providerId:'v',model:'vision'}})})
+  it('returns a clean current default without rewriting invalid state',async()=>{
+    const store=memory({unrelated:{chat:{providerId:'p',model:'chat'}}})
+    const repo=createCapabilityBindingsRepository(store)
+    expect(await repo.load()).toEqual({
+      version:'model-assignments.v2',
+      bindings:{},
+      descriptors:[],
+    })
+    expect(store.data.has('ai.capabilityBindings')).toBe(false)
+  })
+
+  it('uses capability bindings as authority and exposes a derived primary view',async()=>{
+    const store=memory()
+    const repo=createCapabilityBindingsRepository(store)
+    await repo.set('vision',{providerId:'v',model:'vision'})
+    await repo.set('text',{providerId:'t',model:'text'})
+    expect(await repo.primary()).toEqual({chat:{providerId:'t',model:'text'}})
+    await repo.clear('text')
+    expect(await repo.primary()).toEqual({chat:{providerId:'v',model:'vision'}})
+    expect(store.data.get('ai.capabilityBindings')).toEqual({
+      version:'model-assignments.v2',
+      bindings:{vision:{providerId:'v',model:'vision'}},
+      descriptors:[],
+    })
+  })
 })

@@ -1,11 +1,19 @@
 import { expect, test } from "@playwright/test";
 
-test("Deliver is one inline responsive workspace while inspectors stay separate", async ({ page }, testInfo) => {
+test("Deliver uses the workspace drawer before the full delivery surface", async ({ page }, testInfo) => {
   await page.goto("/");
   await page.getByRole("textbox", { name: "Describe what you want to design..." }).fill("Inline delivery regression");
   await page.getByRole("button", { name: "Create from brief" }).click();
   if (testInfo.project.name === "mobile-chrome") await page.setViewportSize({ width: 1024, height: 915 });
-  await page.getByRole("button", { name: "Deliver", exact: true }).click();
+  const deliverButton = page.getByRole("button", { name: "Deliver", exact: true });
+  await deliverButton.click();
+  const deliverDrawer = page.getByRole("complementary", { name: "Deliver" });
+  await expect(deliverDrawer).toBeVisible();
+  await expect(deliverButton).toHaveAttribute("aria-pressed", "true");
+  await expect(deliverDrawer.getByText("Current output", { exact: true })).toBeVisible();
+  const deliverDrawerBox = await deliverDrawer.boundingBox();
+  expect(deliverDrawerBox).not.toBeNull();
+  await deliverDrawer.getByRole("button", { name: "Open delivery workspace" }).click();
   if (testInfo.project.name === "mobile-chrome") await page.setViewportSize({ width: 412, height: 915 });
 
   const deliver = page.locator('[data-slot="design-os-workbench"][aria-label="Deliver"]');
@@ -68,6 +76,9 @@ test("Deliver is one inline responsive workspace while inspectors stay separate"
   await designButton.click();
   const canvasInspector = page.getByRole("complementary", { name: "Design system" });
   await expect(canvasInspector).toBeVisible();
+  const designDrawerBox = await canvasInspector.boundingBox();
+  expect(designDrawerBox).not.toBeNull();
+  expect(designDrawerBox!.width).toBe(deliverDrawerBox!.width);
   await expect(designButton).toHaveAttribute("aria-pressed", "true");
   await designButton.click();
   await expect(canvasInspector).toHaveCount(0);

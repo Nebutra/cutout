@@ -39,6 +39,30 @@ describe("createAgentRunRetryControl", () => {
       briefOverride: "Create a checkout flow",
       skipToolGate: true,
       ignoreSelectedMaterial: true,
+      retryPlanningRuntime: undefined,
+    });
+  });
+
+  it("restarts the planning runtime when that boundary failed", () => {
+    const createAssets = vi.fn();
+    const control = createAgentRunRetryControl(
+      {
+        working: false,
+        hasRepairPlan: false,
+        retryableBrief: "Create a restaurant site",
+        retryPlanningRuntime: "codex-system",
+        currentError: "The planning Agent could not finish this turn.",
+        projectBrief: "Create a restaurant site",
+      },
+      createAssets,
+    );
+
+    control.onRetry?.();
+    expect(createAssets).toHaveBeenCalledWith("create", {
+      briefOverride: "Create a restaurant site",
+      skipToolGate: false,
+      ignoreSelectedMaterial: true,
+      retryPlanningRuntime: "codex-system",
     });
   });
 
@@ -82,6 +106,7 @@ describe("createAgentRunRetryControl", () => {
       briefOverride: "Restore the checkout flow",
       skipToolGate: true,
       ignoreSelectedMaterial: true,
+      retryPlanningRuntime: undefined,
     });
   });
 

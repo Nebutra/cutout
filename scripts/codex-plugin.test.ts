@@ -19,7 +19,7 @@ function projectState(): HeadlessProjectState {
       version: 'design-ir.v1',
       meta: { id: 'plugin-project', title: 'Plugin Project', createdAt: '2026-07-18T00:00:00.000Z', updatedAt: '2026-07-18T00:00:00.000Z' },
       revision: { id: 'plugin-r1', number: 1, createdAt: '2026-07-18T00:00:00.000Z', author: { kind: 'human', id: 'tester' } },
-      needs: [], sources: [], brands: [], tokens: [], components: [], materials: [], provenance: [], relations: [],
+      needs: [], sources: [], brands: [], tokens: [], components: [], candidateSets: [], materials: [], provenance: [], relations: [],
     },
     designMarkdown: '# Plugin Project',
     artifactIndex: { version: 'cutout.artifacts.v1', artifacts: [] },

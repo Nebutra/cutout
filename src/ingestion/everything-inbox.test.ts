@@ -17,7 +17,7 @@ function baseDocument(): DesignDocument {
       id: 'revision:1', number: 1, createdAt: capturedAt,
       author: { kind: 'human', id: 'user:example' },
     },
-    needs: [], sources: [], brands: [], tokens: [], components: [], materials: [], provenance: [], relations: [],
+    needs: [], sources: [], brands: [], tokens: [], components: [], materials: [], candidateSets: [], provenance: [], relations: [],
   }
 }
 

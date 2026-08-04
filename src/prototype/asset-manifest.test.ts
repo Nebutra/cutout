@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { PrototypePlan } from './prototype-plan'
+import { currentPrototypeExploration, currentPrototypeReviewDocument } from './prototype-plan.test-fixture'
 import { createPrototypeAssetManifest } from './asset-manifest'
 
 const plan: PrototypePlan = {
@@ -18,6 +19,7 @@ const plan: PrototypePlan = {
     spacing: '8px grid',
     componentPrinciples: ['clear commerce hierarchy'],
     assetDirection: 'Product photos and banner art',
+    exploration: currentPrototypeExploration,
   },
   pages: [
     {
@@ -77,6 +79,7 @@ const plan: PrototypePlan = {
   ],
   flows: [],
   humanLoop: { mode: 'continue', rationale: 'Specific enough.' },
+  reviewDocument: currentPrototypeReviewDocument,
 }
 
 describe('prototype asset manifest', () => {

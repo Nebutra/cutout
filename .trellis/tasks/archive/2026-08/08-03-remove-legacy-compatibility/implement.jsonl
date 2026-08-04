@@ -1,0 +1,3 @@
+{"file":".trellis/spec/frontend/state-management.md","reason":"Current persistence authority and recovery rules; user explicitly supersedes legacy compatibility requirements."}
+{"file":".trellis/spec/frontend/cutout-pipeline.md","reason":"Asset-production planner, status, and persistence contracts."}
+{"file":"cutout.agent-capabilities.json","reason":"Agent surface source of truth and limitations contract."}

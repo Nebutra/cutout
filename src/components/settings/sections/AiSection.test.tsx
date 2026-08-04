@@ -8,6 +8,7 @@ const provider = {
   id: 'openai',
   kind: 'openai',
   label: 'Team OpenAI',
+  wireProtocol: 'responses' as const,
   defaultModel: 'gpt-5',
   enabled: true,
 }
@@ -16,6 +17,7 @@ const mocks = vi.hoisted(() => ({
   providers: vi.fn(),
   bindings: vi.fn(),
   discovery: vi.fn(),
+  runtime: vi.fn(),
   verifications: vi.fn(),
   automaticSetup: vi.fn(),
   refetchQueries: vi.fn(),
@@ -27,7 +29,8 @@ vi.mock('@lingui/react/macro', () => ({
 }))
 vi.mock('@tanstack/react-query', async (importOriginal) => ({
   ...await importOriginal<typeof import('@tanstack/react-query')>(),
-  useQuery: () => mocks.discovery(),
+  useQuery: ({ queryKey }: { queryKey: readonly string[] }) =>
+    queryKey[0] === 'planning-runtime' ? mocks.runtime() : mocks.discovery(),
   useQueryClient: () => ({ refetchQueries: mocks.refetchQueries }),
 }))
 vi.mock('@/hooks/queries/providers', () => ({
@@ -56,7 +59,7 @@ vi.mock('../ModelSlot', () => ({ ModelSlot: () => <div data-model-slot /> }))
 vi.mock('../VectorizerPanel', () => ({ VectorizerPanel: () => <div data-vectorizer /> }))
 
 import { setupDuringAutomaticRefresh } from '../ai-setup-projection'
-import { AiSection } from './AiSection'
+import { AiSection, AiSetupOverview } from './AiSection'
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 const i18n = setupI18n()
@@ -85,6 +88,18 @@ describe('AiSection', () => {
       },
     })
     mocks.discovery.mockReturnValue({ ...query, data: [] })
+    mocks.runtime.mockReturnValue({
+      ...query,
+      data: {
+        runtimeId: 'codex-system',
+        installed: true,
+        authenticated: true,
+        authClass: 'chatgpt',
+        capability: 'proven',
+        execution: 'unproven',
+        version: '0.200.0',
+      },
+    })
     mocks.verifications.mockReturnValue({
       openai: {
         status: 'verified',
@@ -111,8 +126,9 @@ describe('AiSection', () => {
     ))
 
     expect(host.querySelector('[data-ai-setup-status="ready"]')).not.toBeNull()
-    expect(host.textContent).toContain('AI routes are configured')
-    expect(host.textContent).toContain('Image generation is verified when the first image completes.')
+    expect(host.textContent).toContain('AI ready')
+    expect(host.textContent).toContain('Planning and conversation')
+    expect(host.querySelectorAll('[data-ai-capability]')).toHaveLength(3)
     expect(host.textContent).not.toContain('task dimensions covered')
     expect(host.textContent).not.toContain('Local coding agents')
     expect(host.querySelectorAll('details')).toHaveLength(1)
@@ -130,9 +146,69 @@ describe('AiSection', () => {
   })
 
   it('does not project ready while automatic query refresh is still pending', () => {
-    const ready = { status: 'ready' as const, verifiedProviders: [provider] }
-    expect(setupDuringAutomaticRefresh(ready, true)).toEqual({ status: 'checking' })
+    const ready = {
+      status: 'ready' as const,
+      verifiedProviders: [provider],
+      importableCandidates: [],
+      rows: [
+        { capability: 'planning' as const, status: 'ready' as const, evidence: { installed: true, authenticated: true, capability: 'proven' as const, execution: 'unproven' as const } },
+        { capability: 'image-generation' as const, status: 'ready' as const, evidence: { installed: true, authenticated: true, capability: 'proven' as const, execution: 'unproven' as const } },
+        { capability: 'image-edit' as const, status: 'ready' as const, evidence: { installed: true, authenticated: true, capability: 'proven' as const, execution: 'unproven' as const } },
+      ],
+    }
+    expect(setupDuringAutomaticRefresh(ready, true)).toMatchObject({
+      status: 'checking',
+      rows: [{ status: 'checking' }, { status: 'checking' }, { status: 'checking' }],
+    })
     expect(setupDuringAutomaticRefresh(ready, false)).toBe(ready)
+  })
+
+  it('lets the user recheck every recoverable runtime blocker', async () => {
+    const onRetry = vi.fn()
+    await act(async () => root.render(
+      <I18nProvider i18n={i18n}>
+        <AiSetupOverview
+          setup={{
+            status: 'action-required',
+            verifiedProviders: [],
+            importableCandidates: [],
+            rows: [
+              {
+                capability: 'planning',
+                status: 'action-required',
+                reason: 'restricted-read-roots-required',
+                nextAction: 'upgrade-runtime',
+                evidence: {
+                  installed: true,
+                  authenticated: true,
+                  capability: 'unsupported',
+                  execution: 'unproven',
+                },
+              },
+              {
+                capability: 'image-generation',
+                status: 'ready',
+                evidence: { installed: true, authenticated: true, capability: 'proven', execution: 'unproven' },
+              },
+              {
+                capability: 'image-edit',
+                status: 'ready',
+                evidence: { installed: true, authenticated: true, capability: 'proven', execution: 'unproven' },
+              },
+            ],
+          }}
+          onConnect={vi.fn()}
+          onManage={vi.fn()}
+          onRetry={onRetry}
+        />
+      </I18nProvider>,
+    ))
+
+    const retry = [...host.querySelectorAll('button')]
+      .find((button) => button.textContent?.includes('Retry'))
+    expect(retry).toBeDefined()
+    await act(async () => retry?.click())
+    expect(onRetry).toHaveBeenCalledOnce()
   })
 
   it('refreshes both binding projections before automatic setup becomes idle', async () => {
@@ -202,5 +278,48 @@ describe('AiSection', () => {
     await vi.waitFor(() => {
       expect(host.querySelector('[data-ai-automatic-busy="false"]')).not.toBeNull()
     })
+  })
+
+  it('renders a bounded Tauri rejection message instead of an object coercion', async () => {
+    const query = { isPending: false, isLoading: false, isError: false, refetch: vi.fn() }
+    mocks.providers.mockReturnValue({ ...query, data: [] })
+    mocks.bindings.mockReturnValue({
+      ...query,
+      data: { version: 'model-assignments.v2', bindings: {} },
+    })
+    mocks.discovery.mockReturnValue({
+      ...query,
+      data: [{
+        id: `provider-candidate:${'a'.repeat(64)}`,
+        source: 'codex',
+        sourceLabel: 'Codex',
+        kind: 'openai-compatible',
+        label: 'Local Agent provider',
+        wireProtocol: 'responses',
+        credential: {
+          sourceType: 'config-literal',
+          available: true,
+          importable: true,
+        },
+        warnings: [],
+      }],
+    })
+    mocks.verifications.mockReturnValue({})
+    mocks.automaticSetup.mockRejectedValue({
+      code: 'credential-unavailable',
+      message: 'The native credential is no longer available.',
+    })
+
+    await act(async () => root.render(
+      <I18nProvider i18n={i18n}>
+        <AiSection />
+      </I18nProvider>,
+    ))
+
+    await vi.waitFor(() => {
+      expect(host.querySelector('[role="alert"]')?.textContent)
+        .toBe('The native credential is no longer available.')
+    })
+    expect(host.textContent).not.toContain('[object Object]')
   })
 })

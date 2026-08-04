@@ -8,6 +8,12 @@ import type { PersistedPrototypeResourcePack } from '@/workspace/workspace-snaps
 
 const RESOURCE_PACK_RUN_PREFIX = 'resource-pack:'
 
+export function resourcePackRunId(resourcePackId: string): string | undefined {
+  if (!resourcePackId.startsWith(RESOURCE_PACK_RUN_PREFIX)) return undefined
+  const runId = resourcePackId.slice(RESOURCE_PACK_RUN_PREFIX.length)
+  return runId || undefined
+}
+
 export interface VerifiedResourcePackArtifact {
   readonly manifestItemId: string
   readonly artifactId: string
@@ -22,22 +28,12 @@ export function resolveResourcePackProductionRun(
   snapshot: AssetProductionSnapshot,
   resourcePack: PersistedPrototypeResourcePack,
 ): AssetProductionRun | undefined {
-  const exactRunId = resourcePack.id.startsWith(RESOURCE_PACK_RUN_PREFIX)
-    ? resourcePack.id.slice(RESOURCE_PACK_RUN_PREFIX.length)
+  const runId = resourcePackRunId(resourcePack.id)
+  if (!runId) return undefined
+  const run = snapshot.runs[runId]
+  return run && completedRunMatchesResourcePack(run, resourcePack)
+    ? run
     : undefined
-  const exactRun = exactRunId ? snapshot.runs[exactRunId] : undefined
-  if (exactRunId !== undefined) {
-    return exactRun && completedRunMatchesResourcePack(exactRun, resourcePack)
-      ? exactRun
-      : undefined
-  }
-
-  if (resourcePack.assets.length === 0) return undefined
-  return Object.values(snapshot.runs)
-    .filter((run) => completedRunMatchesResourcePack(run, resourcePack))
-    .sort((left, right) =>
-      right.startedAt - left.startedAt || right.runId.localeCompare(left.runId),
-    )[0]
 }
 
 export function selectResourcePackProductionAuthority(

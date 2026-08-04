@@ -4,6 +4,7 @@ import {
 } from "@/services/ai/generation-error";
 
 export type AgentRunRetryMode = "create" | "repair";
+export type RetryPlanningRuntime = "codex-system" | "direct-provider";
 
 export interface AgentRunRetryControl {
   readonly label?: "Continue" | "Retry";
@@ -16,6 +17,7 @@ type CreateAssets = (
     readonly briefOverride?: string;
     readonly skipToolGate?: boolean;
     readonly ignoreSelectedMaterial?: boolean;
+    readonly retryPlanningRuntime?: RetryPlanningRuntime;
   },
 ) => void | Promise<void>;
 
@@ -32,6 +34,7 @@ export function createAgentRunRetryControl(
     readonly working: boolean;
     readonly hasRepairPlan: boolean;
     readonly retryableBrief: string | null;
+    readonly retryPlanningRuntime?: RetryPlanningRuntime;
     readonly currentError: string | null;
     readonly projectBrief: string;
   },
@@ -53,8 +56,9 @@ export function createAgentRunRetryControl(
     onRetry: () =>
       void createAssets("create", {
         briefOverride: retryableBrief,
-        skipToolGate: true,
+        skipToolGate: input.retryPlanningRuntime === undefined,
         ignoreSelectedMaterial: true,
+        retryPlanningRuntime: input.retryPlanningRuntime,
       }),
   };
 }

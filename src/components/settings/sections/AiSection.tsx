@@ -3,13 +3,11 @@ import {
   CheckCircle2,
   ChevronDown,
   CircleDashed,
-  KeyRound,
   Plus,
   RefreshCw,
   ShieldCheck,
   SlidersHorizontal,
   TriangleAlert,
-  WandSparkles,
 } from 'lucide-react'
 import { Trans, useLingui } from '@lingui/react/macro'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
@@ -20,6 +18,11 @@ import {
   type ProviderDiscoveryCandidate,
 } from '@/services/ai/provider-discovery'
 import { configureAutomaticAi } from '@/services/ai/automatic-ai-setup'
+import { aiDisplayErrorMessage } from '@/services/ai/display-error-message'
+import {
+  probeCodexSystemRuntime,
+  type PlanningRuntimeEvidence,
+} from '@/services/ai/planning-runtime'
 import {
   ensureProviderVerification,
   providerVerificationIsVerified,
@@ -39,7 +42,6 @@ import { ModelSlot } from '../ModelSlot'
 import { MODEL_DIMENSIONS } from '../model-dimensions'
 import { VectorizerPanel } from '../VectorizerPanel'
 import { ProviderDirectory } from '../ProviderDirectory'
-import { discoveredProviderSourceLabel } from '../discovered-provider-source'
 import {
   projectAiSetup,
   setupDuringAutomaticRefresh,
@@ -77,9 +79,16 @@ export function AiSection() {
     queryFn: discoverProviderCandidates,
     retry: false,
   })
+  const planningRuntime = useQuery({
+    queryKey: ['planning-runtime', 'codex-system'],
+    queryFn: probeCodexSystemRuntime,
+    retry: false,
+  })
   const verifications = useProviderVerifications()
   const list = useMemo(() => providers.data ?? [], [providers.data])
   const setup = projectAiSetup({
+    runtimeState: queryState(planningRuntime),
+    runtime: planningRuntime.data,
     providersState: queryState(providers),
     providers: providers.data,
     verifications,
@@ -112,18 +121,18 @@ export function AiSection() {
         }),
       ])
     } catch (error) {
-      setAutomaticError(error instanceof Error ? error.message : String(error))
+      setAutomaticError(aiDisplayErrorMessage(error))
     } finally {
       setAutomaticBusy(false)
     }
   }, [automaticBusy, discovery, providers, queryClient])
 
   useEffect(() => {
-    if (setup.status !== 'discovered-credentials') return
-    const key = setup.candidates.map((candidate) => candidate.id).sort().join(':')
+    if (setup.status === 'ready') return
+    const key = setup.importableCandidates.map((candidate) => candidate.id).sort().join(':')
     if (!key || automaticAttempt.current === key) return
     automaticAttempt.current = key
-    void runAutomaticSetup(setup.candidates)
+    void runAutomaticSetup(setup.importableCandidates)
   }, [runAutomaticSetup, setup])
 
   useEffect(() => {
@@ -150,7 +159,7 @@ export function AiSection() {
         throw new Error(`The authenticated provider catalog does not include ${assignment.model}.`)
       }
     })).catch((error: unknown) => {
-      setAutomaticError(error instanceof Error ? error.message : String(error))
+      setAutomaticError(aiDisplayErrorMessage(error))
     }).finally(() => setAutomaticBusy(false))
   }, [bindings.data?.bindings, list, providerService, verifications])
 
@@ -208,6 +217,7 @@ export function AiSection() {
     void providers.refetch()
     void bindings.refetch()
     void discovery.refetch()
+    void planningRuntime.refetch()
   }
 
   return (
@@ -217,7 +227,6 @@ export function AiSection() {
         onConnect={() => setView({ mode: 'add' })}
         onManage={() => setAdvanced(true)}
         onRetry={retry}
-        onSelectCandidate={(candidate) => void runAutomaticSetup([candidate])}
         automaticBusy={automaticBusy}
         automaticError={automaticError}
       />
@@ -250,6 +259,11 @@ export function AiSection() {
                 API keys are stored locally on this device and injected in the native layer - they never enter the web page.
               </Trans>
             </div>
+
+            <PlanningRuntimeDiagnostics
+              evidence={planningRuntime.data}
+              checking={planningRuntime.isPending}
+            />
 
             <section className="flex flex-col gap-2" aria-labelledby="configured-providers-heading">
               <h3 id="configured-providers-heading" className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
@@ -294,7 +308,6 @@ export function AiSetupOverview({
   onConnect,
   onManage,
   onRetry,
-  onSelectCandidate,
   automaticBusy = false,
   automaticError,
 }: {
@@ -302,173 +315,61 @@ export function AiSetupOverview({
   readonly onConnect: () => void
   readonly onManage: () => void
   readonly onRetry: () => void
-  readonly onSelectCandidate: (candidate: ProviderDiscoveryCandidate) => void
   readonly automaticBusy?: boolean
   readonly automaticError?: string
 }) {
   const { t } = useLingui()
-  const dimensionLabels: Readonly<Record<string, string>> = {
-    text: t({ id: 'settings.dimension_text_label', message: 'Text understanding' }),
-    vision: t({ id: 'settings.dimension_vision_label', message: 'Vision' }),
-    webdev: t({ id: 'settings.dimension_webdev_label', message: 'Web development' }),
-    'image-to-webdev': t({ id: 'settings.dimension_image_to_webdev_label', message: 'Image to Web' }),
+  const capabilityLabels = {
+    planning: t({ id: 'settings.capability_planning', message: 'Planning and conversation' }),
     'image-generation': t({ id: 'settings.dimension_image_generation_label', message: 'Image generation' }),
     'image-edit': t({ id: 'settings.dimension_image_edit_label', message: 'Image editing' }),
   }
-  const sourceLabel = (candidate: ProviderDiscoveryCandidate) => {
-    const source = discoveredProviderSourceLabel(candidate)
-    if (source.kind === 'environment') {
-      return t({ id: 'settings.provider_source_environment', message: 'Process environment' })
+  const title = setup.status === 'ready'
+    ? t({ id: 'settings.ai_ready', message: 'AI ready' })
+    : setup.status === 'checking'
+      ? t({ id: 'settings.ai_setup_checking', message: 'Checking AI setup' })
+      : t({ id: 'settings.action_required', message: 'Action required' })
+  const description = setup.status === 'ready'
+    ? t({ id: 'settings.ai_ready_description', message: 'Planning and image routes are available on this device.' })
+    : setup.status === 'checking'
+      ? t({ id: 'settings.ai_setup_checking_description', message: 'Checking planning and image capabilities on this device.' })
+      : t({ id: 'settings.action_required_description', message: 'Complete the missing capability actions below.' })
+  const rowDescription = (row: AiSetupProjection['rows'][number]) => {
+    if (row.status === 'checking') return t({ id: 'settings.capability_checking', message: 'Checking availability' })
+    if (row.status === 'ready') {
+      return row.evidence.execution === 'succeeded'
+        ? t({ id: 'settings.execution_confirmed', message: 'Execution confirmed' })
+        : t({ id: 'settings.ready_for_first_use', message: 'Ready for first use' })
     }
-    if (source.kind === 'cutout-keychain') {
-      return t({ id: 'settings.provider_source_keychain', message: 'Cutout local credentials' })
+    switch (row.nextAction) {
+      case 'authorize-runtime': return t({ id: 'settings.authorize_codex_action', message: 'Sign in with the Codex CLI, then retry.' })
+      case 'install-runtime': return t({ id: 'settings.install_codex_action', message: 'Install the signed Codex CLI, then retry.' })
+      case 'upgrade-runtime': return t({ id: 'settings.upgrade_codex_action', message: 'Update Codex to a version with restricted readable roots.' })
+      case 'update-app': return t({ id: 'settings.update_cutout_runtime_action', message: 'Update Cutout to enable the proven Codex runtime contract.' })
+      case 'verify-provider': return t({ id: 'settings.verify_provider_action', message: 'Verify the configured provider and model catalog.' })
+      case 'configure-route': return t({ id: 'settings.configure_route_action', message: 'Choose a model with exact capability evidence.' })
+      case 'connect-provider': return t({ id: 'settings.connect_image_provider_action', message: 'Connect a compatible direct provider.' })
+      default: return t({ id: 'settings.retry_capability_action', message: 'Retry the capability check.' })
     }
-    return source.label
   }
-
-  let icon = <TriangleAlert className="size-5 text-amber-600 dark:text-amber-300" />
-  let title = t({ id: 'settings.ai_setup_action_required', message: 'AI setup needs attention' })
-  let description = ''
-  let action: React.ReactNode = null
-  let detail: React.ReactNode = null
-
-  switch (setup.status) {
-    case 'checking':
-      icon = <CircleDashed className="size-5 animate-spin text-muted-foreground" />
-      title = t({ id: 'settings.ai_setup_checking', message: 'Checking AI setup' })
-      description = t({
-        id: 'settings.ai_setup_checking_description',
-        message: 'Reviewing configured providers and reusable credentials on this device.',
-      })
-      break
-    case 'ready':
-      icon = <CheckCircle2 className="size-5 text-emerald-600" />
-      title = t({ id: 'settings.ai_setup_ready', message: 'AI routes are configured' })
-      description = t({
-        id: 'settings.ai_setup_ready_description',
-        message: 'Credentials and catalog routes are configured. Image generation is verified when the first image completes.',
-      })
-      break
-    case 'needs-verification':
-      description = t({
-        id: 'settings.ai_setup_verification_description',
-        message: 'Configured providers must be enabled and verified before Cutout can use them.',
-      })
-      action = (
-        <Button size="sm" variant="outline" onClick={onManage}>
-          <SlidersHorizontal />
-          <Trans id="settings.manage_providers">Manage providers</Trans>
-        </Button>
-      )
-      break
-    case 'needs-capabilities':
-      title = t({ id: 'settings.ai_setup_capabilities_title', message: 'More AI capabilities are needed' })
-      description = t({
-        id: 'settings.ai_setup_capabilities_description',
-        message: 'Your verified providers do not cover every required task.',
-      })
-      detail = (
-        <div>
-          {automaticError ? <p className="mb-2 text-xs text-destructive" role="alert">{automaticError}</p> : null}
-          <div className="flex flex-wrap gap-1.5">
-            {setup.missing.map((item) => (
-              <span key={item.task} className="border border-amber-500/30 px-2 py-1 text-[11px] text-amber-700 dark:text-amber-300">
-                {dimensionLabels[item.task] ?? item.label}
-              </span>
-            ))}
-          </div>
-        </div>
-      )
-      action = (
-        <Button size="sm" variant="outline" onClick={onConnect}>
-          <Plus />
-          <Trans id="settings.connect_provider">Connect provider</Trans>
-        </Button>
-      )
-      break
-    case 'discovered-credentials':
-      icon = <WandSparkles className="size-5 text-emerald-600" />
-      title = t({ id: 'settings.ai_setup_credentials_found', message: 'Reusable credentials found' })
-      description = automaticBusy
-        ? t({
-            id: 'settings.ai_setup_configuring_description',
-            message: 'Verifying local credentials and configuring the required model routes.',
-          })
-        : t({
-            id: 'settings.ai_setup_credentials_auto_description',
-            message: 'Cutout can verify and configure these local credentials automatically.',
-          })
-      detail = (
-        <div>
-          {automaticError ? (
-            <p className="mb-2 text-xs text-destructive" role="alert">{automaticError}</p>
-          ) : null}
-          <div className="divide-y divide-border border-y border-border">
-          {setup.candidates.map((candidate) => (
-            <button
-              key={candidate.id}
-              type="button"
-              className="flex w-full items-center justify-between gap-3 py-2.5 text-left hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              onClick={() => onSelectCandidate(candidate)}
-              disabled={automaticBusy}
-            >
-              <span className="min-w-0">
-                <span className="block truncate text-sm font-medium">{candidate.label}</span>
-                <span className="block truncate text-[11px] text-muted-foreground">{sourceLabel(candidate)}</span>
-              </span>
-              <span className="shrink-0 text-xs font-medium">
-                {automaticBusy ? (
-                  <Trans id="settings.configuring">Configuring</Trans>
-                ) : (
-                  <Trans id="settings.setup_automatically">Set up automatically</Trans>
-                )}
-              </span>
-            </button>
-          ))}
-          </div>
-        </div>
-      )
-      break
-    case 'needs-provider':
-      icon = <KeyRound className="size-5 text-muted-foreground" />
-      title = t({ id: 'settings.ai_setup_connect_title', message: 'Connect AI to get started' })
-      description = t({
-        id: 'settings.ai_setup_connect_description',
-        message: 'Choose a provider and verify its credentials.',
-      })
-      action = (
-        <Button size="sm" variant="outline" onClick={onConnect}>
-          <Plus />
-          <Trans id="settings.browse_providers">Browse providers</Trans>
-        </Button>
-      )
-      break
-    case 'unavailable':
-      title = t({ id: 'settings.ai_setup_unavailable', message: 'Automatic AI setup is unavailable' })
-      description = setup.reason === 'discovery'
-        ? t({
-            id: 'settings.ai_setup_discovery_unavailable_description',
-            message: 'Cutout could not check reusable credentials on this device. Try again or connect a provider manually.',
-          })
-        : t({
-            id: 'settings.ai_setup_configuration_unavailable_description',
-            message: 'Cutout could not load the current AI configuration. Try again.',
-          })
-      action = (
-        <div className="flex flex-wrap gap-2">
-          <Button size="sm" variant="outline" onClick={onRetry}>
-            <RefreshCw />
-            <Trans id="settings.retry">Retry</Trans>
-          </Button>
-          {setup.reason === 'discovery' ? (
-            <Button size="sm" variant="ghost" onClick={onConnect}>
-              <Plus />
-              <Trans id="settings.browse_providers">Browse providers</Trans>
-            </Button>
-          ) : null}
-        </div>
-      )
-      break
+  const rowAction = (row: AiSetupProjection['rows'][number]) => {
+    if (row.status !== 'action-required') return null
+    if (row.nextAction === 'connect-provider') {
+      return <Button size="sm" variant="outline" onClick={onConnect}><Plus /><Trans id="settings.connect_provider">Connect provider</Trans></Button>
+    }
+    if (row.nextAction === 'verify-provider' || row.nextAction === 'configure-route') {
+      return <Button size="sm" variant="outline" onClick={onManage}><SlidersHorizontal /><Trans id="settings.manage">Manage</Trans></Button>
+    }
+    if (
+      row.nextAction === 'retry'
+      || row.nextAction === 'authorize-runtime'
+      || row.nextAction === 'install-runtime'
+      || row.nextAction === 'upgrade-runtime'
+      || row.nextAction === 'update-app'
+    ) {
+      return <Button size="sm" variant="outline" onClick={onRetry}><RefreshCw /><Trans id="settings.retry">Retry</Trans></Button>
+    }
+    return null
   }
 
   return (
@@ -476,19 +377,68 @@ export function AiSetupOverview({
       className="border-y border-border py-4"
       aria-live="polite"
       data-ai-setup-status={setup.status}
-      data-ai-verified-provider-count={setup.status === 'ready' ? setup.verifiedProviders.length : 0}
+      data-ai-verified-provider-count={setup.verifiedProviders.length}
       data-ai-automatic-busy={automaticBusy ? 'true' : 'false'}
-      data-ai-missing-capability-count={setup.status === 'needs-capabilities' ? setup.missing.length : 0}
+      data-ai-missing-capability-count={setup.rows.filter((row) => row.status === 'action-required').length}
     >
       <div className="flex items-start gap-3">
-        <span className="mt-0.5 shrink-0" aria-hidden>{icon}</span>
+        <span className="mt-0.5 shrink-0" aria-hidden>
+          {setup.status === 'ready' ? <CheckCircle2 className="size-5 text-emerald-600" /> : setup.status === 'checking' ? <CircleDashed className="size-5 animate-spin text-muted-foreground" /> : <TriangleAlert className="size-5 text-amber-600 dark:text-amber-300" />}
+        </span>
         <div className="min-w-0 flex-1">
           <h2 className="text-sm font-medium">{title}</h2>
           <p className="mt-1 max-w-prose text-xs text-muted-foreground">{description}</p>
-          {detail ? <div className="mt-3">{detail}</div> : null}
-          {action ? <div className="mt-3">{action}</div> : null}
+          {automaticError ? <p className="mt-2 text-xs text-destructive" role="alert">{automaticError}</p> : null}
+          <div className="mt-3 divide-y divide-border border-y border-border">
+            {setup.rows.map((row) => (
+              <div key={row.capability} data-ai-capability={row.capability} data-ai-capability-status={row.status} className="flex min-w-0 items-center gap-3 py-3">
+                <span aria-hidden className="shrink-0">
+                  {row.status === 'ready' ? <CheckCircle2 className="size-4 text-emerald-600" /> : row.status === 'checking' ? <CircleDashed className="size-4 animate-spin text-muted-foreground" /> : <TriangleAlert className="size-4 text-amber-600 dark:text-amber-300" />}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-medium">{capabilityLabels[row.capability]}</span>
+                  <span className="block break-words text-xs text-muted-foreground">{row.adapter?.label ?? rowDescription(row)}</span>
+                  {row.adapter ? <span className="block text-[11px] text-muted-foreground">{rowDescription(row)}</span> : null}
+                </span>
+                <span className="shrink-0">{rowAction(row)}</span>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
+    </section>
+  )
+}
+
+function PlanningRuntimeDiagnostics({
+  evidence,
+  checking,
+}: {
+  readonly evidence?: PlanningRuntimeEvidence
+  readonly checking: boolean
+}) {
+  return (
+    <section className="flex flex-col gap-2" aria-labelledby="planning-runtime-heading">
+      <h3 id="planning-runtime-heading" className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+        <Trans id="settings.planning_runtime">Planning runtime</Trans>
+      </h3>
+      <div className="border-y border-border py-3 text-xs text-muted-foreground">
+        <div className="flex items-center justify-between gap-3">
+          <span className="font-medium text-foreground">Codex</span>
+          <span>{checking ? <Trans id="settings.checking">Checking</Trans> : evidence?.version ?? <Trans id="settings.not_installed">Not installed</Trans>}</span>
+        </div>
+        {evidence ? (
+          <p className="mt-1 break-words">
+            <Trans id="settings.runtime_evidence_detail">
+              Authentication: {evidence.authClass}. Capability: {evidence.capability}. Execution: {evidence.execution}.
+            </Trans>
+          </p>
+        ) : null}
+        {evidence?.reason ? <p className="mt-1 break-words text-amber-700 dark:text-amber-300">{evidence.reason}</p> : null}
+      </div>
+      <p className="text-xs text-muted-foreground">
+        <Trans id="settings.claude_policy_diagnostic">Claude Code execution remains unavailable pending vendor policy review.</Trans>
+      </p>
     </section>
   )
 }

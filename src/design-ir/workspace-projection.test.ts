@@ -1,58 +1,16 @@
 import { describe, expect, it } from 'vitest'
 import type { WorkspaceSnapshot } from '@/workspace/workspace-snapshot'
-import {
-  persistPrototypeDesignSystemCandidateSet,
-  recoverPrototypeDesignSystemCandidateSet,
-} from '@/prototype/design-system-candidates'
 import { createPrototypeAssetManifest } from '@/prototype/asset-manifest'
+import { currentPrototypeExploration, currentPrototypeReviewDocument } from '@/prototype/prototype-plan.test-fixture'
 import type { CodingReceipt } from '@/coding-runtime/contracts'
 import { sha256Bytes } from '@/asset-production/hash'
 import {
   designDocumentToWorkspaceSnapshot,
-  legacyWorkspaceSupplementalContent,
-  migrateWorkspaceV1,
   projectWorkspaceSnapshotToDesignDocument,
-} from './legacy-projection'
+  workspaceSupplementalContent,
+} from './workspace-projection'
 
-describe('legacy workspace Design IR projection', () => {
-  it('migrates an old partial workspace.v1 without inventing outcome events', () => {
-    const legacy = {
-      version: 'workspace.v1',
-      workflowPhase: 'review',
-      prototypePlan: plan(),
-      prototypePages: [],
-    } as const
-
-    const migrated = migrateWorkspaceV1(legacy)
-
-    expect(migrated).toMatchObject({
-      version: 'workspace.v1',
-      prototypeScope: 'primary-flow',
-      attachments: [],
-      webSearchEnabled: false,
-      humanLoopChoiceId: null,
-      liveAgentOutput: '',
-    })
-    expect(migrated.outcome).toBeUndefined()
-    expect(migrated.agentRunEvents).toBeUndefined()
-  })
-
-  it('is idempotent for already migrated workspace.v1 records', () => {
-    const first = migrateWorkspaceV1(snapshot())
-    const second = migrateWorkspaceV1(first)
-
-    expect(second).toEqual(first)
-  })
-
-  it('preserves additive prototype suite and Coding evidence during workspace.v1 migration', () => {
-    const source = snapshotWithSuite()
-
-    const migrated = migrateWorkspaceV1(source)
-
-    expect(migrated.prototypeSuiteCandidates).toEqual(source.prototypeSuiteCandidates)
-    expect(migrated.codingReceipts).toEqual(source.codingReceipts)
-  })
-
+describe('workspace Design IR projection', () => {
   it('maps plan, artifacts, slices, markdown, and attachments to stable Design IR ids', async () => {
     const source = snapshot()
     const document = await projectWorkspaceSnapshotToDesignDocument({
@@ -84,7 +42,7 @@ describe('legacy workspace Design IR projection', () => {
       'material:cutout-slice:slice:hero',
     ])
     expect(document.provenance.map((item) => item.id)).toEqual([
-      'provenance:legacy:project:acme',
+      'provenance:workspace:project:acme',
     ])
     expect(document.materials.every((item) => item.revisions[0]?.content.sha256)).toBe(true)
     expect(
@@ -95,7 +53,7 @@ describe('legacy workspace Design IR projection', () => {
     expect(JSON.stringify(document)).not.toContain('BAUG')
   })
 
-  it('changes only the content revision hash when legacy binary content changes', async () => {
+  it('changes only the content revision hash when workspace binary content changes', async () => {
     const first = await projectWorkspaceSnapshotToDesignDocument({
       project: project(),
       workspace: snapshot(),
@@ -211,71 +169,6 @@ describe('legacy workspace Design IR projection', () => {
       .toBe('candidate:selected')
     expect(restored.data.snapshot.prototypeDesignSystemCandidates?.artifacts['candidate:selected']?.designMarkdown)
       .toBe(selectedMarkdown)
-  })
-
-  it('projects a persisted legacy selected candidate without duplicating canonical materials', async () => {
-    const source = snapshot()
-    const recovered = recoverPrototypeDesignSystemCandidateSet(
-      null,
-      source.prototypeDesignSystem,
-    )
-    expect(recovered).not.toBeNull()
-    if (!recovered) return
-    const persistedRecovery = persistPrototypeDesignSystemCandidateSet(recovered)
-    const historicalPersistedRecovery = {
-      ...persistedRecovery,
-      set: {
-        ...persistedRecovery.set,
-        candidates: persistedRecovery.set.candidates.map((candidate) => ({
-          ...candidate,
-          outputs: [
-            { role: 'design-system' as const, materialId: 'material:design-system' },
-            { role: 'design-markdown' as const, materialId: 'material:design-markdown' },
-          ],
-        })),
-      },
-    }
-    const withPersistedRecovery: WorkspaceSnapshot = {
-      ...source,
-      prototypeDesignSystemCandidates: historicalPersistedRecovery,
-    }
-
-    const document = await projectWorkspaceSnapshotToDesignDocument({
-      project: project(),
-      workspace: withPersistedRecovery,
-    })
-
-    const materialIds = document.materials.map((material) => material.id)
-    expect(new Set(materialIds).size).toBe(materialIds.length)
-    expect(materialIds.filter((id) => id === 'material:design-system')).toHaveLength(1)
-    expect(materialIds.filter((id) => id === 'material:design-markdown')).toHaveLength(1)
-    expect(materialIds).toContain(
-      'material:design-system-candidate:candidate:legacy-selected:visual',
-    )
-    expect(materialIds).toContain(
-      'material:design-system-candidate:candidate:legacy-selected:markdown',
-    )
-    expect(document.candidateSets?.[0]?.candidates[0]?.outputs).toEqual([
-      {
-        role: 'design-system',
-        materialId: 'material:design-system-candidate:candidate:legacy-selected:visual',
-      },
-      {
-        role: 'design-markdown',
-        materialId: 'material:design-system-candidate:candidate:legacy-selected:markdown',
-      },
-    ])
-
-    const content = contentByUri(withPersistedRecovery, document)
-    const restored = await designDocumentToWorkspaceSnapshot(document, {
-      resolveContent: (reference) => content.get(reference.uri),
-    })
-    expect(restored.ok).toBe(true)
-    if (!restored.ok) return
-    expect(restored.data.snapshot.prototypeDesignSystemCandidates?.set.selection?.candidateId)
-      .toBe('candidate:legacy-selected')
-    expect(restored.data.snapshot.prototypeDesignSystemCandidates?.artifacts['candidate:legacy-selected']?.bytes)
-      .toEqual(source.prototypeDesignSystem?.bytes)
   })
 
   it('round-trips complete prototype suites, resource bindings, selection, and Coding receipts', async () => {
@@ -410,57 +303,6 @@ describe('legacy workspace Design IR projection', () => {
     })
   })
 
-  it('migrates canonical candidate aliases while restoring an existing Design IR', async () => {
-    const source = snapshot()
-    const recovered = recoverPrototypeDesignSystemCandidateSet(
-      null,
-      source.prototypeDesignSystem,
-    )
-    expect(recovered).not.toBeNull()
-    if (!recovered) return
-    const persisted = persistPrototypeDesignSystemCandidateSet(recovered)
-    const document = await projectWorkspaceSnapshotToDesignDocument({
-      project: project(),
-      workspace: source,
-    })
-    const legacySet = {
-      ...persisted.set,
-      candidates: persisted.set.candidates.map((candidate) => ({
-        ...candidate,
-        outputs: [
-          { role: 'design-system' as const, materialId: 'material:design-system' },
-          { role: 'design-markdown' as const, materialId: 'material:design-markdown' },
-        ],
-      })),
-    }
-    const baseProvenance = document.provenance[0]!
-    const historicalDocument = {
-      ...document,
-      candidateSets: [legacySet],
-      provenance: [
-        ...document.provenance,
-        { ...baseProvenance, id: persisted.set.candidates[0]!.provenanceIds[0]! },
-        {
-          ...baseProvenance,
-          id: persisted.set.selection!.provenanceId,
-          actor: persisted.set.selection!.actor,
-          recordedAt: persisted.set.selection!.selectedAt,
-        },
-      ],
-    }
-
-    const content = contentByUri(source, historicalDocument)
-    const restored = await designDocumentToWorkspaceSnapshot(historicalDocument, {
-      resolveContent: (reference) => content.get(reference.uri),
-    })
-
-    if (!restored.ok) throw new Error(restored.error)
-    expect(restored.data.snapshot.prototypeDesignSystemCandidates?.set.candidates[0]?.outputs)
-      .toEqual(persisted.set.candidates[0]?.outputs)
-    expect(restored.data.snapshot.prototypeDesignSystemCandidates?.artifacts['candidate:legacy-selected']?.bytes)
-      .toEqual(source.prototypeDesignSystem?.bytes)
-  })
-
   it('does not project a prior Design IR back into itself', async () => {
     const source = snapshot()
     const first = await projectWorkspaceSnapshotToDesignDocument({
@@ -507,7 +349,7 @@ describe('legacy workspace Design IR projection', () => {
       .toBe('brand-reference.png')
   })
 
-  it('round-trips resolvable legacy workspace material bytes without reading outcome events', async () => {
+  it('round-trips resolvable workspace material bytes without reading outcome events', async () => {
     const source = snapshot()
     const document = await projectWorkspaceSnapshotToDesignDocument({
       project: project(),
@@ -534,7 +376,7 @@ describe('legacy workspace Design IR projection', () => {
     expect(restored.data.snapshot.agentRunEvents).toBeUndefined()
   })
 
-  it('recovers intrinsic size from old IR image bytes without pixel metadata', async () => {
+  it('recovers intrinsic size from current IR image bytes without pixel metadata', async () => {
     const png = new Uint8Array(24)
     png.set([0x89, 0x50, 0x4e, 0x47], 0)
     new DataView(png.buffer).setUint32(16, 640, false)
@@ -834,6 +676,7 @@ function plan() {
       spacing: '8px',
       componentPrinciples: ['Clear CTA'],
       assetDirection: 'Editorial',
+      exploration: currentPrototypeExploration,
     },
     pages: [
       {
@@ -849,13 +692,14 @@ function plan() {
       },
     ],
     flows: [{ id: 'main', name: 'Main', goal: 'Buy.', startPageId: 'home', steps: [] }],
+    reviewDocument: currentPrototypeReviewDocument,
     humanLoop: { mode: 'continue' as const, rationale: 'Clear.' },
   }
 }
 
 function contentByUri(snapshot: WorkspaceSnapshot, document: Awaited<ReturnType<typeof projectWorkspaceSnapshotToDesignDocument>>) {
   const content = new Map<string, Uint8Array>()
-  for (const [uri, bytes] of legacyWorkspaceSupplementalContent(project().id, snapshot)) {
+  for (const [uri, bytes] of workspaceSupplementalContent(project().id, snapshot)) {
     content.set(uri, bytes)
   }
   const materials = new Map(document.materials.map((material) => [material.id, material]))

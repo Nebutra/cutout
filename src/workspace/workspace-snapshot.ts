@@ -59,7 +59,7 @@ export interface PersistedPrototypeDesignSystemCandidateSet {
 
 export interface PersistedPrototypePage extends PersistedPrototypeImage {
   readonly page: PrototypePage
-  /** Additive for workspace.v1 compatibility; historical pages omit review evidence. */
+  /** Review evidence may be pending while generation or QA is still running. */
   readonly review?: PrototypePageReviewRecord
 }
 
@@ -76,7 +76,7 @@ export interface PersistedPrototypeResourcePackAsset {
   readonly manifestItemId: string
   readonly artifactId: string
   readonly provenanceIds: readonly string[]
-  /** Additive for historical resource-pack bindings. */
+  /** Review evidence may be pending while resource QA is still running. */
   readonly review?: PrototypeResourceReviewRecord
 }
 
@@ -339,8 +339,8 @@ export function workspaceSnapshotFingerprint(
     hasCreativeBoardContent(snapshot.creativeBoard) ? textFingerprint(JSON.stringify(snapshot.creativeBoard)) : '',
     // DesignDocument is normally derived from the fields above. Including it
     // here would make an otherwise unchanged snapshot look dirty when the
-    // projector publishes a new object. It is meaningful only for legacy IR-
-    // only records that have no workspace fields to project.
+    // projector publishes a new object. It is meaningful only for imported
+    // IR-only records that have no Workspace fields to project.
     hasWorkspaceProjectionInput(snapshot)
       ? ''
       : designDocumentFingerprint(snapshot.designDocument),
@@ -424,7 +424,7 @@ function agentRunEventsFingerprint(
 
 /**
  * The DesignDocument is a derived projection of this snapshot. Keep enough
- * identity in autosave for imported/legacy IR-only records, but never hash its
+ * identity in autosave for imported IR-only records, but never hash its
  * complete graph here: doing so would feed the projection back into its own
  * write trigger.
  */

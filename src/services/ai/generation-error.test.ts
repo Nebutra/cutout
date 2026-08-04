@@ -14,6 +14,11 @@ describe("classifyGenerationError", () => {
     "Upstream request failed",
     "HTTP 500 from provider",
     "HTTP 503 from provider",
+    "Another planning turn is already active",
+    "Planning runtime transport failed",
+    "Planning runtime timed out",
+    "The saved planning conversation is stale",
+    "Planning runtime output did not match the required schema",
   ])("marks transient provider failures as retryable: %s", (message) => {
     expect(classifyGenerationError(message)).toMatchObject({
       kind: "transient",
@@ -29,6 +34,11 @@ describe("classifyGenerationError", () => {
     ["Invalid configuration for provider", "configuration"],
     ["Request failed: invalid provider base URL", "configuration"],
     ["Structured output schema validation failed", "configuration"],
+    ["Planning runtime protocol is unsupported", "configuration"],
+    ["Codex runtime is not ready", "unknown"],
+    ["Planning context is too large", "unknown"],
+    ["Planning runtime output exceeded its limit", "unknown"],
+    ["Planning runtime attempted an unavailable tool", "unknown"],
   ] as const)("excludes non-retryable failure: %s", (message, kind) => {
     expect(classifyGenerationError(message)).toMatchObject({
       kind,

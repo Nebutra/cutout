@@ -13,16 +13,8 @@ describe('internal cutout params', () => {
     expect(Object.isFrozen(state.params)).toBe(true)
   })
 
-  it('normalizes legacy restored params to current defaults', () => {
-    getStoreState().restoreProject({
-      brief: 'legacy project',
-      params: {
-        threshold: 220,
-        minArea: 80,
-        mergeGap: 80,
-        padding: 40,
-      },
-    })
+  it('restores projects with the current product-owned defaults', () => {
+    getStoreState().restoreProject({ brief: 'restored project' })
 
     expect(getStoreState().params).toBe(DEFAULT_PARAMS)
   })
