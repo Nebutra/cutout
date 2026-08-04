@@ -53,6 +53,13 @@ Full detail in [`real-model-e2e-2026-08-05.md`](./real-model-e2e-2026-08-05.md).
 - **Region-primed naming.** Correct structured names with intact manifest
   lineage: `hero-submit-button`, `hero-search-icon`, `hero-user-avatar`.
 - **Tool-gate classification, 6 of 7 cases** routed correctly.
+- **The planner plans.** The main pipeline E2E, run twice, had the real model
+  produce a real 2-page prototype plan with `runError=none`, then advanced into
+  design-system generation. It did not finish inside the test's own 14-minute
+  budget (`prototype-pipeline.e2e.test.tsx:274`), identically both times.
+  Whether that stage is genuinely slow or stalled is the single most useful
+  thing to measure next — `runError=none` separates "failed" from "still
+  working", but not "working" from "hung".
 
 ## The finding that matters most
 

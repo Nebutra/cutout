@@ -29,8 +29,37 @@ blocked by gateway infrastructure returning HTTP 502, not by Cutout.
 | `components/workspace/human-loop-ask.e2e.test.tsx` | ❌ harness | ✅ 1/1 | 9.0s |
 | `agent-runtime/tool-gate-classification.integration.test.ts` | ⚠️ 6/7 | — | 57.5s |
 | `prototype/prototype-planner.integration.test.ts` | ❌ harness | ❌ gateway 502 | 90s timeout |
-| `components/workspace/prototype-pipeline.e2e.test.tsx` | ❌ harness | see below | — |
-| `visual-generation/brand-benchmark.integration.test.ts` | see below | | |
+| `components/workspace/prototype-pipeline.e2e.test.tsx` | ❌ harness | ⚠️ plans, stalls in design-system | 843s ×2 |
+| `visual-generation/brand-benchmark.integration.test.ts` | ⚠️ 2/3 | — | 73.6s |
+
+## The main pipeline proof — how far it actually gets
+
+After the harness repair, `prototype-pipeline.e2e.test.tsx` runs for the full
+14 minutes and reports, **identically across two independent runs**:
+
+```
+answeredQuestions=0  workflowPhase=design-system  runError=none
+planPresent=true     humanLoop=continue          planPages=2
+designSystem=false   pages=0
+```
+
+Read carefully, this is mostly good news:
+
+- `planPresent=true`, `planPages=2` — **the real model planned a real 2-page
+  prototype.** The planning stage works end to end through the shipping path.
+- `runError=none` — nothing failed. There is no exception, no rejected request.
+- `workflowPhase=design-system` — it advanced past planning into design-system
+  generation and was still there when the wait expired.
+
+The 843s is the test's own budget: `prototype-pipeline.e2e.test.tsx:274` sets a
+`840_000` ms deadline inside a `900_000` ms test timeout. Both runs hit it to
+within a few seconds, so this is a deadline, not a crash.
+
+**What is not yet known** is whether design-system generation is genuinely slower
+than 14 minutes on this relay, or whether it is stalled. `runError=none`
+distinguishes "still working" from "failed", but not "working" from "hung". The
+next step is to re-run with the internal deadline raised and instrument the
+per-stage timings — not to declare either outcome now.
 
 ### What genuinely works
 
@@ -136,6 +165,42 @@ failure is correct: bounded retries, then a structured error rather than a hang.
 Note also that `--testTimeout` on the CLI cannot extend this test — it declares
 `{ timeout: 90_000 }` inline at `prototype-planner.integration.test.ts:38`, which
 takes precedence.
+
+## Packaged desktop evidence
+
+A signed packaged build was produced and run with `CUTOUT_PACKAGED_E2E=1`.
+
+- `scripts/build-packaged-e2e-macos.sh` succeeded. Signed with Developer ID
+  `ZiXian Tang (2L5YC85FQ7)`, matching the Team of the installed
+  `/Applications/Cutout.app` trust anchor. `codesign` reports *valid on disk* and
+  *satisfies its Designated Requirement*. Not notarized — no Apple credentials in
+  this environment, which the script correctly reports rather than faking.
+- `stage-packaged-e2e-provider-registry.mjs` staged 2 Provider records, and
+  inspection confirms they carry **no secrets** — only id, kind, label, baseUrl,
+  wireProtocol, defaultModel, enabled.
+- The packaged app launched, survived the startup window, and really started the
+  Codex planning runtime — `planning-runtime/codex-home/` holds live sqlite state
+  and a `contexts/<sha256>/context.json` with its own `.git`.
+
+It then recorded, at
+`~/Library/Application Support/com.nebutra.cutout.packaged-e2e/planning-runtime/execution.json`:
+
+```json
+{"version":"cutout.codex-execution.v1","runtimeVersion":"0.146.0",
+ "execution":"failed","lastFailure":"runtime-failed","updatedAt":1785860708}
+```
+
+No `result.json` was produced, so the smoke script exited 1.
+
+**This is the gate working as designed, not a defect.** `conversationBinding` and
+`turnExecution` remain `false` in `cutout.agent-capabilities.json` behind
+`packaged-turn-execution-proof-required`, and this run is exactly the proof that
+has not yet been earned. The manifest is truthful: Cutout is not claiming a
+capability it cannot demonstrate.
+
+Worth noting separately: the negotiated version floor from this release accepted
+runtime `0.146.0` — the version that used to be a hard pin — so the negotiation
+change did not itself block execution.
 
 ## Reproduce
 
