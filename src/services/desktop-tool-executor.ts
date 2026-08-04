@@ -3,7 +3,6 @@ import {
   paidToolReceiptSchema,
   paidToolExecutionPrompt,
   planPaidTool,
-  type MoneyEstimate,
   type PaidToolExecutorCapability,
   type PaidToolPolicy,
   type PaidToolReceipt,
@@ -188,7 +187,7 @@ export function createDesktopToolExecutor(
             providerRoute: executionOutput.providerRoute,
           })
         }
-        const receipt = receiptFor(input, capability, 'succeeded', capability.estimatedCost, outputRefs, startedAt, now(), id())
+        const receipt = receiptFor(input, capability, 'succeeded', outputRefs, startedAt, now(), id())
         const succeeded = createRunEvent(input.runId, {
           type: 'tool-succeeded', toolCallId: input.toolCallId, tool: input.request.capability,
           label: input.label, stepId: input.stepId, outputRefs, receipt,
@@ -334,18 +333,18 @@ function defaultCutoutParams(): CutoutParams {
   return { threshold: 246, minArea: 900, mergeGap: 18, padding: 10 }
 }
 
-function receiptFor(input: DesktopToolExecution, capability: PaidToolExecutorCapability, status: PaidToolReceipt['status'], charged: MoneyEstimate, outputArtifactIds: readonly string[], startedAt: number, completedAt: number, receiptId: string): PaidToolReceipt {
-  return paidToolReceiptSchema.parse({ receiptId, requestId: input.requestId, capability: input.request.capability, providerId: capability.providerId, model: capability.model, status, charged, outputArtifactIds, startedAt, completedAt })
+function receiptFor(input: DesktopToolExecution, capability: PaidToolExecutorCapability, status: PaidToolReceipt['status'], outputArtifactIds: readonly string[], startedAt: number, completedAt: number, receiptId: string): PaidToolReceipt {
+  return paidToolReceiptSchema.parse({ receiptId, requestId: input.requestId, capability: input.request.capability, providerId: capability.providerId, model: capability.model, status, outputArtifactIds, startedAt, completedAt })
 }
 
 function failure(input: DesktopToolExecution, error: string, startedAt: number, preceding: readonly AgentRunEvent[] = [], capability?: PaidToolExecutorCapability, completedAt = startedAt, receiptId = `receipt:${input.requestId}`): DesktopToolExecutionResult {
-  const receipt = capability ? receiptFor(input, capability, 'failed', { currency: capability.estimatedCost.currency, amount: 0, credits: 0 }, [], startedAt, completedAt, receiptId) : undefined
+  const receipt = capability ? receiptFor(input, capability, 'failed', [], startedAt, completedAt, receiptId) : undefined
   const event = createRunEvent(input.runId, { type: 'tool-failed', toolCallId: input.toolCallId, tool: input.request.capability, label: input.label, stepId: input.stepId, detail: error, receipt }, { eventId: `event:${input.requestId}:tool-failed`, at: completedAt })
   return { ok: false, error, receipt, events: [...preceding, event] }
 }
 
 function cancelled(input: DesktopToolExecution, capability: PaidToolExecutorCapability, startedAt: number, completedAt: number, receiptId: string, preceding: readonly AgentRunEvent[] = []): DesktopToolExecutionResult {
-  const receipt = receiptFor(input, capability, 'cancelled', { currency: capability.estimatedCost.currency, amount: 0, credits: 0 }, [], startedAt, completedAt, receiptId)
+  const receipt = receiptFor(input, capability, 'cancelled', [], startedAt, completedAt, receiptId)
   const event = createRunEvent(input.runId, { type: 'tool-cancelled', toolCallId: input.toolCallId, tool: input.request.capability, label: input.label, stepId: input.stepId, detail: 'Tool execution was cancelled.', receipt }, { eventId: `event:${input.requestId}:tool-cancelled`, at: completedAt })
   return { ok: false, error: 'Tool execution was cancelled.', receipt, events: [...preceding, event] }
 }

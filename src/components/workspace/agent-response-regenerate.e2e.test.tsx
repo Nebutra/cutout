@@ -250,6 +250,26 @@ describe('Agent response regeneration workspace flow', () => {
         }),
       }),
     )
+    const preparationEvents = await waitFor(() => {
+      const events = getStoreState().workspaceSnapshot?.agentRunEvents?.events.filter((event) =>
+        (event.type === 'step-started'
+          || event.type === 'step-succeeded'
+          || event.type === 'step-failed'
+          || event.type === 'step-cancelled')
+        && event.stepId.startsWith('step:prepare:'),
+      ) ?? []
+      return events.length === 8 ? events : undefined
+    })
+    expect(preparationEvents?.map((event) => [event.type, 'label' in event ? event.label : null])).toEqual([
+      ['step-started', 'Prepare bounded context'],
+      ['step-succeeded', 'Prepare bounded context'],
+      ['step-started', 'Connect planning runtime'],
+      ['step-succeeded', 'Connect planning runtime'],
+      ['step-started', 'Await planning result'],
+      ['step-succeeded', 'Await planning result'],
+      ['step-started', 'Validate structured response'],
+      ['step-succeeded', 'Validate structured response'],
+    ])
   })
 
   it('surfaces Retry for a transient Codex failure and retries the same runtime', async () => {
@@ -274,6 +294,7 @@ describe('Agent response regeneration workspace flow', () => {
           authClass: 'chatgpt',
           capability: 'proven',
           execution: probeCount === 1 ? 'unproven' : 'failed',
+          ...(probeCount === 1 ? {} : { lastFailure: 'runtime-failed' }),
           version: '0.146.0',
         })
       }
@@ -340,6 +361,13 @@ describe('Agent response regeneration workspace flow', () => {
       host!.querySelector<HTMLButtonElement>('[data-agent-action="retry-run"]'))
     expect(retry).toBeTruthy()
     expect(host.textContent).toContain('The planning Agent could not finish this turn.')
+    const failedPreparation = getStoreState().workspaceSnapshot?.agentRunEvents?.events
+      .filter((event) => event.type === 'step-failed' && event.stepId.startsWith('step:prepare:'))
+      .at(-1)
+    expect(failedPreparation).toEqual(expect.objectContaining({
+      type: 'step-failed',
+      label: 'Connect planning runtime',
+    }))
 
     await act(async () => retry!.click())
 

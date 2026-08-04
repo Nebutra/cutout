@@ -2,7 +2,6 @@ import type { DesktopToolExecutionResult } from "@/services/desktop-tool-executo
 import type { DesktopToolLoop } from "@/agent-runtime/desktop-tool-loop";
 import {
   paidToolRequestSchema,
-  type MoneyEstimate,
   type PaidToolRequest,
 } from "@/control-protocol/paid-tool-contract";
 import type {
@@ -20,7 +19,7 @@ export interface VisualArtifactMetadata {
 }
 
 /**
- * Bridges the visual DAG to the existing approval/budget/cancel/idempotency tool
+ * Bridges the visual DAG to the existing approval/cancel/idempotency tool
  * loop. The loop remains the only paid-action authority; this adapter never
  * invokes a provider or reads a credential itself.
  */
@@ -30,9 +29,6 @@ export function createDesktopVisualToolInvoker(input: {
   readonly resolveArtifact: (
     artifactId: string,
   ) => Promise<VisualArtifactMetadata>;
-  readonly estimateFor: (
-    capability: "generate-image" | "edit-image",
-  ) => MoneyEstimate;
   readonly authorize?: (input: { readonly runId: string; readonly requestId: string; readonly request: PaidToolRequest }) => Promise<{ readonly capabilityLeaseId: string; readonly requestDigest: string }>;
 }): VisualToolInvoker {
   return {
@@ -46,7 +42,6 @@ export function createDesktopVisualToolInvoker(input: {
         intent: `${invocation.capability === "generate-image" ? "Generate" : "Edit"} visual for ${invocation.taskId} (${invocation.nodeId})`,
         prompt: invocation.prompt,
         inputArtifactIds: [...invocation.inputArtifactIds, ...invocation.references],
-        budgetCeiling: input.estimateFor(invocation.capability),
         approvalPolicy: "explicit",
       });
       const authorization = input.authorize ? await input.authorize({ runId: invocation.runId, requestId: invocation.requestId, request }) : {};

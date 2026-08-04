@@ -14,8 +14,11 @@ interface PaidToolRequest {
   intent: string
   prompt: string
   inputArtifactIds: string[]
-  budgetCeiling: MoneyEstimate
-  approvalPolicy: 'explicit' | 'auto-within-budget'
+  approvalPolicy: 'explicit' | 'auto'
+}
+
+interface PaidToolReceipt {
+  charged?: MoneyAmount
 }
 
 function paidToolExecutionPrompt(
@@ -35,15 +38,17 @@ function paidToolExecutionPrompt(
   `prompt`.
 - The shared `paidToolRequestSchema` owns parsing for desktop and control
   protocol paths. Consumers must not create a duplicate schema.
-- Desktop product requests always use `approvalPolicy: 'explicit'` and set
-  `budgetCeiling` from the matching host capability estimate. No desktop
+- Paid-tool requests, plans, visual DAGs, run events, and delivery previews must
+  not carry a predicted cost or budget ceiling.
+- Desktop product requests always use `approvalPolicy: 'explicit'`. No desktop
   preference or local-storage value may enable automatic continuation.
-- The desktop visual bridge enforces that policy at its boundary even if a
-  shared visual task carries `auto-within-budget`. Its task-level aggregate
-  ceiling covers generation plus editing, while each paid request receives the
-  estimate for the capability it will route.
-- `auto-within-budget` remains part of the shared protocol for external
-  controllers and other non-desktop consumers.
+- The desktop visual bridge enforces explicit approval at its boundary even if
+  an upstream shared visual task carries `approvalPolicy: 'auto'`.
+- `approvalPolicy: 'auto'` remains available to an authorized shared host
+  policy. It authorizes by host policy, never by a predicted-cost threshold.
+- `receipt.charged` is optional post-execution evidence. It may be present only
+  when the executor can bind it to verifiable Provider billing evidence; it
+  must never be copied or derived from a request, plan, model, or capability.
 
 ## 4. Validation & Error Matrix
 
@@ -54,6 +59,8 @@ function paidToolExecutionPrompt(
 | `prompt` exceeds 200,000 characters | Reject before approval |
 | Either field contains credential-shaped content | Reject before persistence or provider access |
 | `prompt` is valid | Execute with `prompt`; retain `intent` for audit |
+| Request or plan includes predicted cost or a budget ceiling | Reject as contract drift |
+| `receipt.charged` lacks verifiable Provider billing evidence | Omit `charged`; never infer a value |
 
 ## 5. Good / Base / Bad Cases
 
@@ -62,8 +69,11 @@ function paidToolExecutionPrompt(
   receives the prompt.
 - Base: a current composer request carries both a bounded `intent` and complete
   provider `prompt`.
+- Good: a Provider returns verifiable billing evidence after execution and the
+  receipt records the actual `charged` amount.
 - Bad: a caller places the full generated prompt in `intent`, causing local
   validation to stop a valid generation before provider access.
+- Bad: derive `receipt.charged` from model metadata or a preflight estimate.
 
 ## 6. Tests Required
 
@@ -73,6 +83,11 @@ function paidToolExecutionPrompt(
   shared schema.
 - Caller bridges: assert full prompts are placed in `prompt`, not `intent`.
 - Executor: assert generation and editing use `prompt` and reject its absence.
+- Contract and caller fixtures: assert predicted cost and budget-ceiling fields
+  are absent, desktop requests are explicit, and shared host policy may use
+  `auto`.
+- Receipts: assert `charged` is absent without verifiable Provider billing
+  evidence and preserves the actual amount when such evidence exists.
 - Run `pnpm agent:validate` after changing this contract.
 
 ## 7. Wrong vs Correct

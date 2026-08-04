@@ -1,8 +1,26 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   createAgentRunRetryControl,
+  retryPlanningRuntimeAfterFailure,
   resolveAgentRunError,
 } from "./agent-run-retry";
+
+describe("retryPlanningRuntimeAfterFailure", () => {
+  it("moves a failed Codex retry to a verified direct fallback", () => {
+    expect(retryPlanningRuntimeAfterFailure("codex-system", true)).toBe(
+      "direct-provider",
+    );
+  });
+
+  it("keeps the failed route when no healthier alternative exists", () => {
+    expect(retryPlanningRuntimeAfterFailure("codex-system", false)).toBe(
+      "codex-system",
+    );
+    expect(retryPlanningRuntimeAfterFailure("direct-provider", true)).toBe(
+      "direct-provider",
+    );
+  });
+});
 
 describe("resolveAgentRunError", () => {
   it("uses the persisted run error before the generation fallback", () => {

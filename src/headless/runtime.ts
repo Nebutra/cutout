@@ -54,7 +54,7 @@ export function createHeadlessRuntime(store: RuntimeStore, coding: { backend?: C
       const ledger = ledgerFromState(state)
       const preparation = applyControlRequest(ledger, request, {
         policy: {
-          // A paid request still passes through the shared budget/authorization
+          // A paid request still passes through the shared capability/authorization
           // contract. This host has no provider executor, so apply terminates as
           // capability-required rather than pretending work occurred.
           allowPaid: request.operation.type === 'tool.invoke',

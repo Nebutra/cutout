@@ -14,16 +14,15 @@ estimates (`estimates X USD`, amounts, currencies presented as charges).
 **Why**: Users bring their own provider keys; showing USD estimates implies the app
 is billing them. Provider billing is the only source of truth.
 
-**Boundary**: Provider capability estimates stay inside paid-tool planning and
-budget enforcement. They are not copied into Agent run events, view models, or
-execution timelines. `budgetCeiling` remains in the `tool-approval-requested`
-event schema (`src/agent-runtime/run-events.ts`) and paid-tool contract
-(`src/control-protocol/paid-tool-contract.ts`) because it is an enforceable
-execution limit rather than a predicted charge. A factual `receipt.charged`
-value may be recorded after execution. The desktop app does not expose a billing
-or cost-management preference: desktop paid requests require explicit approval
-and use host-derived capability estimates as execution ceilings. External
-controllers may still use the shared protocol's bounded auto-approval policy.
+**Boundary**: Paid-tool requests, plans, visual DAGs, Agent run events, and
+delivery previews carry no predicted cost or budget ceiling. The desktop app
+does not expose a billing or cost-management preference: every desktop paid
+request requires explicit approval. A shared host policy may use
+`approvalPolicy: 'auto'`, but automatic authorization is a host policy decision,
+not a cost-threshold decision. An optional `receipt.charged` value may be
+recorded only after execution and only when it is backed by verifiable Provider
+billing evidence; Cutout must never infer it from a model, capability, plan, or
+request.
 
 ```ts
 // Wrong (predicted billing copy)
@@ -37,10 +36,10 @@ detail: safe(`${event.label} requires your approval before it can run.`, 500)
 
 - `tool-approval-requested` events require `pendingApproval: boolean`.
 - `src/agent-runtime/desktop-tool-loop.ts` sets
-  `pendingApproval: !(plan.executable && Boolean(capability))` — true only when the
-  auto-approve path will NOT immediately approve.
+  `pendingApproval: !(plan.executable && Boolean(capability))` - true only when the
+  active approval policy will not immediately authorize execution.
 - `notificationFromAgentEvent` (`src/services/local/local-notifications.ts`) returns
-  `null` unless `pendingApproval === true`. Auto-approved calls must not produce an
+  `null` unless `pendingApproval === true`. Host-authorized calls must not produce an
   "Approval needed" notification.
 
 **Tests**: `src/services/local/local-notifications.test.ts` asserts auto-approved →

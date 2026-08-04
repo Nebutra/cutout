@@ -55,9 +55,8 @@ function task(
       requiredCapabilities: ["image-generate", "image-edit", "multi-reference"],
       allowCompatibleFallback: true,
     },
-    budget: {
-      ceiling: { currency: "USD", amount: 1 },
-      approvalPolicy: "auto-within-budget",
+    execution: {
+      approvalPolicy: "auto",
       maxAttemptsPerNode: 2,
     },
     publication: {
@@ -114,10 +113,7 @@ describe("visual generation contracts and planning", () => {
     expect(isRetryableVisualToolError(new DOMException("Stopped", "AbortError"))).toBe(false);
   });
   it("builds parallel variants followed by selection, edit, review and promotion", () => {
-    const plan = planVisualGeneration(task(), {
-      generate: { currency: "USD", amount: 0.05 },
-      edit: { currency: "USD", amount: 0.08 },
-    });
+    const plan = planVisualGeneration(task());
     expect(plan.nodes.map((node) => node.operation)).toEqual([
       "generate",
       "generate",
@@ -128,7 +124,13 @@ describe("visual generation contracts and planning", () => {
       "review",
       "promote",
     ]);
-    expect(plan.estimatedCost.amount).toBeCloseTo(0.28);
+    expect(Object.keys(plan).sort()).toEqual([
+      "idempotencyKey",
+      "nodes",
+      "planId",
+      "task",
+      "version",
+    ]);
   });
   it("forces generated logos and icons through raster seed, vectorization and human review", () => {
     expect(() =>
@@ -185,10 +187,6 @@ describe("visual generation contracts and planning", () => {
   it("rejects malformed executable topology before invoking paid tools", async () => {
     const valid = planVisualGeneration(
       task({ variants: { count: 1, parallelism: 1 } }),
-      {
-        generate: { currency: "USD", amount: 0.05 },
-        edit: { currency: "USD", amount: 0.08 },
-      },
     );
     const invoke = vi.fn();
     const deps = {
@@ -263,10 +261,7 @@ describe("visual generation executor", () => {
     let inFlight = 0;
     let peak = 0;
     const invocations: VisualToolInvocation[] = [];
-    const plan = planVisualGeneration(task(), {
-      generate: { currency: "USD", amount: 0.05 },
-      edit: { currency: "USD", amount: 0.08 },
-    });
+    const plan = planVisualGeneration(task());
     const result = await executeVisualGeneration("run-1", plan, {
       store: createMemoryVisualExecutionStore(),
       append: vi.fn(),
@@ -305,10 +300,7 @@ describe("visual generation executor", () => {
     await expect(
       executeVisualGeneration(
         "run-1",
-        planVisualGeneration(task({ variants: { count: 2, parallelism: 2 } }), {
-          generate: { currency: "USD", amount: 0.05 },
-          edit: { currency: "USD", amount: 0.08 },
-        }),
+        planVisualGeneration(task({ variants: { count: 2, parallelism: 2 } })),
         {
           store: createMemoryVisualExecutionStore(),
           append: vi.fn(),
@@ -337,10 +329,6 @@ describe("visual generation executor", () => {
     });
     const plan = planVisualGeneration(
       task({ variants: { count: 1, parallelism: 1 } }),
-      {
-        generate: { currency: "USD", amount: 0.05 },
-        edit: { currency: "USD", amount: 0.08 },
-      },
     );
     const deps = {
       store,
@@ -376,10 +364,6 @@ describe("visual generation executor", () => {
     const invocations: VisualToolInvocation[] = [];
     const plan = planVisualGeneration(
       task({ variants: { count: 1, parallelism: 1 } }),
-      {
-        generate: { currency: "USD", amount: 0.05 },
-        edit: { currency: "USD", amount: 0.08 },
-      },
     );
     const result = await executeVisualGeneration("run-compat", plan, {
       store: createMemoryVisualExecutionStore(),
@@ -409,16 +393,11 @@ describe("visual generation executor", () => {
     const plan = planVisualGeneration(
       task({
         variants: { count: 2, parallelism: 2 },
-        budget: {
-          ceiling: { currency: "USD", amount: 1 },
-          approvalPolicy: "auto-within-budget",
+        execution: {
+          approvalPolicy: "auto",
           maxAttemptsPerNode: 1,
         },
       }),
-      {
-        generate: { currency: "USD", amount: 0.05 },
-        edit: { currency: "USD", amount: 0.08 },
-      },
     );
     let failSecond = true;
     const invoke = vi.fn(async (input: VisualToolInvocation) => {
@@ -463,10 +442,7 @@ describe("visual generation executor", () => {
         requiresVectorization: true,
       },
     });
-    const plan = planVisualGeneration(protectedTask, {
-      generate: { currency: "USD", amount: 0.05 },
-      edit: { currency: "USD", amount: 0.08 },
-    });
+    const plan = planVisualGeneration(protectedTask);
     await expect(
       executeVisualGeneration("run-1", plan, {
         store: createMemoryVisualExecutionStore(),
@@ -482,30 +458,5 @@ describe("visual generation executor", () => {
         },
       }),
     ).rejects.toThrow(/human review/);
-  });
-  it("rejects a plan whose aggregate estimate exceeds the approved ceiling before paid work", async () => {
-    const invoke = vi.fn();
-    const plan = planVisualGeneration(
-      task({
-        budget: {
-          ceiling: { currency: "USD", amount: 0.01 },
-          approvalPolicy: "auto-within-budget",
-          maxAttemptsPerNode: 2,
-        },
-      }),
-      {
-        generate: { currency: "USD", amount: 0.05 },
-        edit: { currency: "USD", amount: 0.08 },
-      },
-    );
-    await expect(
-      executeVisualGeneration("run-1", plan, {
-        store: createMemoryVisualExecutionStore(),
-        append: vi.fn(),
-        tools: { invoke },
-        reviewer: { review: vi.fn() },
-      }),
-    ).rejects.toThrow(/budget ceiling/);
-    expect(invoke).not.toHaveBeenCalled();
   });
 });

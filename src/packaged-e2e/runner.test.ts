@@ -5,6 +5,7 @@ import {
   PACKAGED_E2E_CASUAL_PROMPT,
   PACKAGED_E2E_MAX_RETRIES_PER_FAILURE_FRONTIER,
   PACKAGED_E2E_MAX_RUN_RETRIES,
+  PACKAGED_E2E_RETRY_UI_GRACE_MS,
   PACKAGED_E2E_PER_SUITE_TIMEOUT_MS,
   PACKAGED_E2E_PROTOTYPE_SUITE_COUNT,
   approvePendingTools,
@@ -16,6 +17,7 @@ import {
   hasSettledFreshAgentResponse,
   hasVisibleDialog,
   monotonicDeadline,
+  packagedE2ePlanningReady,
   readWorkspaceFailureDiagnostic,
   readWorkspacePipelineStage,
   readWorkspacePipelineStages,
@@ -27,6 +29,7 @@ import {
   rejectFailedWorkspacePhase,
   retryFailureFrontier,
   retryPendingRun,
+  retryUiGraceStartedAt,
   prototypeSuiteProgressCheckpointEntries,
 } from './runner'
 
@@ -126,6 +129,33 @@ describe('packaged E2E provider-response boundary', () => {
     expect(PACKAGED_E2E_CASUAL_PROMPT).toContain('不要生成设计、原型或素材')
   })
 
+  it('allows conversation when planning is ready but image capabilities are missing', () => {
+    document.body.innerHTML = [
+      '<section data-ai-setup-status="action-required" data-ai-automatic-busy="false">',
+      '<div data-ai-capability="planning" data-ai-capability-status="ready"></div>',
+      '<div data-ai-capability="image-generation" data-ai-capability-status="action-required"></div>',
+      '<div data-ai-capability="image-edit" data-ai-capability-status="action-required"></div>',
+      '</section>',
+    ].join('')
+
+    expect(packagedE2ePlanningReady(document.querySelector('[data-ai-setup-status]'))).toBe(true)
+  })
+
+  it('does not enter conversation while planning is missing or setup is still changing', () => {
+    document.body.innerHTML = [
+      '<section data-ai-setup-status="action-required" data-ai-automatic-busy="false">',
+      '<div data-ai-capability="planning" data-ai-capability-status="action-required"></div>',
+      '</section>',
+    ].join('')
+    const setup = document.querySelector<HTMLElement>('[data-ai-setup-status]')
+    expect(packagedE2ePlanningReady(setup)).toBe(false)
+
+    setup!.dataset.aiAutomaticBusy = 'true'
+    setup!.querySelector<HTMLElement>('[data-ai-capability="planning"]')!
+      .dataset.aiCapabilityStatus = 'ready'
+    expect(packagedE2ePlanningReady(setup)).toBe(false)
+  })
+
   it('requires an Agent message newer than the pre-submit transcript', () => {
     document.body.innerHTML = '<div data-slot="agent-message">Earlier reply</div>'
     expect(hasFreshAgentMessage(1)).toBe(false)
@@ -187,6 +217,20 @@ describe('packaged E2E provider-response boundary', () => {
     workspace.dataset.agentWorking = 'true'
 
     expect(() => rejectFailedWorkspacePhase(workspace, 'design-candidates-ready')).not.toThrow()
+  })
+
+  it('holds a bounded failure window while React commits the Retry control', () => {
+    const workspace = document.createElement('div')
+    workspace.dataset.runFailed = 'true'
+    workspace.dataset.agentWorking = 'false'
+
+    const startedAt = retryUiGraceStartedAt(workspace, undefined, 1_000)
+    expect(startedAt).toBe(1_000)
+    expect(retryUiGraceStartedAt(workspace, startedAt, 1_000 + PACKAGED_E2E_RETRY_UI_GRACE_MS))
+      .toBe(1_000)
+
+    workspace.dataset.agentWorking = 'true'
+    expect(retryUiGraceStartedAt(workspace, startedAt, 9_000)).toBeUndefined()
   })
 
   it('waits for product acknowledgement before retrying the same failure frontier', () => {

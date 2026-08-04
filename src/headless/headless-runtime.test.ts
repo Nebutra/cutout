@@ -406,8 +406,8 @@ describe('repo-native headless runtime', () => {
       tool: {
         capability: 'generate-image', intent: 'Generate the hero asset needed by the approved outcome',
         prompt: 'Generate the approved hero asset using the reviewed design evidence.',
-        inputArtifactIds: [], budgetCeiling: { currency: 'USD', amount: 0.25 },
-        approvalPolicy: 'auto-within-budget',
+        inputArtifactIds: [],
+        approvalPolicy: 'auto',
       },
     }
 

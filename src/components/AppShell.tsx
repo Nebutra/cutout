@@ -1782,11 +1782,14 @@ export function AppShell() {
   const newProject = useCallback(async () => {
     await saveActiveProjectNow();
     const project = createEmptyProjectRecord();
+    const agentNavigation = { version: 2, mode: "agent" } as const;
 
     clearAuthorizedWorkspaceForProjectTransition(activeProjectId, project.id);
     restoringRef.current = true;
     activeRecordRef.current = project;
     lastSavedFingerprintRef.current = "";
+    workspaceReturnToRef.current = agentNavigation;
+    setWorkspaceNavigation(agentNavigation);
     await withViewTransitionApplied(() => {
       resetProject();
       dispatchProjectShell({ type: "create-project", project });

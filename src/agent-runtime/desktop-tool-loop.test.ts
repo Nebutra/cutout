@@ -15,7 +15,6 @@ const capability = {
   providerId: "p",
   model: "m",
   available: true,
-  estimatedCost: { currency: "USD", amount: 0.08 },
 };
 
 function input(
@@ -34,8 +33,7 @@ function input(
       intent: "hero",
       prompt: "Render the approved hero.",
       inputArtifactIds: [],
-      budgetCeiling: { currency: "USD", amount: 0.2 },
-      approvalPolicy: "auto-within-budget",
+      approvalPolicy: "auto",
     },
     ...overrides,
   };
@@ -144,7 +142,10 @@ describe("desktop tool loop", () => {
     expect(h.batches.flat().map((e) => e.type)).toEqual([
       "tool-approval-requested",
     ]);
-    expect(h.batches.flat()[0]).not.toHaveProperty("estimatedCost");
+    expect(h.batches.flat()[0]).toMatchObject({
+      type: "tool-approval-requested",
+      approvalPolicy: "explicit",
+    });
     await h.loop.approve("tool", "request");
     expect(h.execute).toHaveBeenCalledOnce();
     expect(h.batches.flat().map((event) => event.type)).toContain("tool-started");
@@ -200,7 +201,7 @@ describe("desktop tool loop", () => {
     await approval;
   });
 
-  it("auto approves within budget and is idempotent by request id", async () => {
+  it("auto approves by host policy and is idempotent by request id", async () => {
     const h = harness();
     await h.loop.request(input());
     await h.loop.request(input());
@@ -250,25 +251,6 @@ describe("desktop tool loop", () => {
     expect(restarted.execute).not.toHaveBeenCalled()
     expect(await restarted.loop.settled('tool', 'request')).toMatchObject({ ok: true, receipt: { receiptId: 'receipt', charged: { amount: 0.08 } } })
   })
-
-  it("does not execute over budget even after an invalid approval", async () => {
-    const h = harness();
-    await h.loop.request(
-      input({
-            request: {
-          ...input().request,
-          budgetCeiling: { currency: "USD", amount: 0.01 },
-        },
-      }),
-    );
-    expect(h.execute).not.toHaveBeenCalled();
-    await h.loop.approve("tool", "request");
-    expect(h.execute).not.toHaveBeenCalled();
-    expect(h.batches.flat().at(-1)).toMatchObject({
-      type: "tool-failed",
-      detail: expect.stringContaining("budget"),
-    });
-  });
 
   it("cancels a running executor cooperatively", async () => {
     let resolve!: (value: never) => void;
@@ -384,7 +366,7 @@ describe("desktop tool loop", () => {
     ).toBe(false);
   });
 
-  it("rejects mismatched or over-budget receipts and enforces a provider deadline", async () => {
+  it("rejects mismatched receipts and enforces a provider deadline", async () => {
     const mismatched = harness({
       ok: true,
       receipt: {
@@ -405,27 +387,6 @@ describe("desktop tool loop", () => {
     expect(await mismatched.loop.settled("tool")).toMatchObject({
       ok: false,
       error: expect.stringMatching(/different request/),
-    });
-    const over = harness({
-      ok: true,
-      receipt: {
-        receiptId: "over",
-        requestId: "request",
-        capability: "generate-image",
-        providerId: "p",
-        model: "m",
-        status: "succeeded",
-        charged: { currency: "USD", amount: 1 },
-        outputArtifactIds: [],
-        startedAt: 1,
-        completedAt: 2,
-      },
-      events: [],
-    });
-    await over.loop.request(input());
-    expect(await over.loop.settled("tool")).toMatchObject({
-      ok: false,
-      error: expect.stringMatching(/budget ceiling/),
     });
     const timed = harness(undefined, { timeoutMs: 1 });
     timed.execute.mockImplementation(async () => new Promise(() => undefined));

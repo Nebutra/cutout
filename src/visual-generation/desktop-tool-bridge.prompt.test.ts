@@ -32,7 +32,6 @@ describe('desktop visual tool prompt contract', () => {
     const invoker = createDesktopVisualToolInvoker({
       loop,
       expectedRevision: () => 1,
-      estimateFor: () => ({ currency: 'USD', amount: 0.1 }),
       resolveArtifact: vi.fn(async () => ({
         artifactId: 'artifact:out',
         sha256: 'a'.repeat(64),
@@ -54,8 +53,7 @@ describe('desktop visual tool prompt contract', () => {
       prompt,
       inputArtifactIds: [],
       references: [],
-      budgetCeiling: { currency: 'USD', amount: 1 },
-      approvalPolicy: 'auto-within-budget',
+      approvalPolicy: 'auto',
     })
 
     expect(request).toHaveBeenCalledWith(expect.objectContaining({

@@ -43,8 +43,7 @@ describe('cutout.control.v1 request schema', () => {
           intent: 'Generate the approved prototype page.',
           prompt,
           inputArtifactIds: [],
-          budgetCeiling: { currency: 'USD', amount: 1 },
-          approvalPolicy: 'auto-within-budget',
+          approvalPolicy: 'auto',
         },
       },
     }))

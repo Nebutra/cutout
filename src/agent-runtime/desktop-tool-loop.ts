@@ -264,10 +264,9 @@ export function createDesktopToolLoop(
           model: capability
             ? { providerId: capability.providerId, model: capability.model }
             : undefined,
-          budgetCeiling: input.request.budgetCeiling,
           approvalPolicy: input.request.approvalPolicy,
           reason: plan.executable
-            ? "Eligible for automatic approval within budget."
+            ? "Eligible for automatic approval by host policy."
             : (plan.reason ?? "Explicit approval is required."),
           pendingApproval: !(plan.executable && Boolean(capability)),
         },
@@ -296,7 +295,7 @@ export function createDesktopToolLoop(
               type: "tool-approved",
               toolCallId: input.toolCallId,
               requestId: input.requestId,
-              reason: "Automatically approved within the configured budget.",
+              reason: "Automatically approved by host policy.",
             },
             { eventId: `event:${input.requestId}:tool-approved`, at: now() },
           ),
@@ -419,7 +418,6 @@ export function createDesktopToolLoop(
               intent: "Unknown tool call",
               prompt: "Unknown tool call",
               inputArtifactIds: [],
-              budgetCeiling: { currency: "USD", amount: 0 },
               approvalPolicy: "explicit",
             },
           },
@@ -536,15 +534,6 @@ function validateExecutionResult(
       receipt.model !== call.capability.model)
   )
     return "Executor receipt provider or model does not match the routed capability.";
-  const ceiling = call.input.request.budgetCeiling;
-  if (
-    receipt.charged.currency !== ceiling.currency ||
-    receipt.charged.amount > ceiling.amount ||
-    (receipt.charged.credits !== undefined &&
-      ceiling.credits !== undefined &&
-      receipt.charged.credits > ceiling.credits)
-  )
-    return "Executor charge exceeds the approved budget ceiling.";
   return undefined;
 }
 

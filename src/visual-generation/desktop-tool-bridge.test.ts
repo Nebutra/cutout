@@ -25,7 +25,6 @@ describe("desktop visual tool bridge", () => {
     const invoker = createDesktopVisualToolInvoker({
       loop,
       expectedRevision: () => 1,
-      estimateFor: () => ({ currency: "USD", amount: 0.1 }),
       resolveArtifact: vi.fn(),
     });
     const result = invoker.invoke({
@@ -40,8 +39,7 @@ describe("desktop visual tool bridge", () => {
       prompt: "Refine the page",
       inputArtifactIds: ["artifact:1"],
       references: [],
-      budgetCeiling: { currency: "USD", amount: 1 },
-      approvalPolicy: "auto-within-budget",
+      approvalPolicy: "auto",
       signal: controller.signal,
     });
     await vi.waitFor(() => expect(request).toHaveBeenCalledOnce());
@@ -54,7 +52,7 @@ describe("desktop visual tool bridge", () => {
     );
   });
 
-  it("uses the routed host capability estimate for each paid request", async () => {
+  it("requires explicit approval for each paid request", async () => {
     let requested: Parameters<DesktopToolLoop["request"]>[0] | undefined;
     const loop: DesktopToolLoop = {
       request: vi.fn(async (input) => { requested = input }),
@@ -67,9 +65,6 @@ describe("desktop visual tool bridge", () => {
     const invoker = createDesktopVisualToolInvoker({
       loop,
       expectedRevision: () => 1,
-      estimateFor: (capability) => capability === "generate-image"
-        ? { currency: "USD", amount: 0.08 }
-        : { currency: "USD", amount: 0.12 },
       resolveArtifact: vi.fn(),
     });
 
@@ -85,13 +80,11 @@ describe("desktop visual tool bridge", () => {
       prompt: "Refine the page",
       inputArtifactIds: ["artifact:1"],
       references: [],
-      budgetCeiling: { currency: "USD", amount: 1 },
-      approvalPolicy: "auto-within-budget",
+      approvalPolicy: "auto",
     })).rejects.toThrow("stop");
 
     expect(requested?.request).toMatchObject({
       approvalPolicy: "explicit",
-      budgetCeiling: { currency: "USD", amount: 0.12 },
     });
   });
 });

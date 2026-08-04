@@ -143,9 +143,8 @@ describe.skipIf(!RUN)("real Brand Foundation visual benchmark", () => {
           instruction:
             "Refine the selected identity seed: simplify any weak geometry, sharpen optical balance, preserve its distinctive silhouette and exact near-black/cyan palette, keep no text and no effects.",
         },
-        budget: {
-          ceiling: { currency: "USD", amount: 8 },
-          approvalPolicy: "auto-within-budget",
+        execution: {
+          approvalPolicy: "auto",
           maxAttemptsPerNode: 1,
         },
         publication: {
@@ -163,10 +162,7 @@ describe.skipIf(!RUN)("real Brand Foundation visual benchmark", () => {
         );
       const foundation = await executeVisualGeneration(
         "benchmark:run:foundation",
-        planVisualGeneration(foundationTask, {
-          generate: { currency: "USD", amount: 1 },
-          edit: { currency: "USD", amount: 1 },
-        }),
+        planVisualGeneration(foundationTask),
         {
           tools: tool,
           reviewer,
@@ -249,9 +245,8 @@ describe.skipIf(!RUN)("real Brand Foundation visual benchmark", () => {
           instruction:
             "Finalize the avatar crop and optical centering without redesigning the locked identity.",
         },
-        budget: {
-          ceiling: { currency: "USD", amount: 4 },
-          approvalPolicy: "auto-within-budget",
+        execution: {
+          approvalPolicy: "auto",
           maxAttemptsPerNode: 1,
         },
         publication: {
@@ -262,10 +257,7 @@ describe.skipIf(!RUN)("real Brand Foundation visual benchmark", () => {
       });
       const application = await executeVisualGeneration(
         "benchmark:run:avatar",
-        planVisualGeneration(applicationTask, {
-          generate: { currency: "USD", amount: 1 },
-          edit: { currency: "USD", amount: 1 },
-        }),
+        planVisualGeneration(applicationTask),
         {
           tools: tool,
           reviewer,
@@ -715,11 +707,6 @@ function buildReport(input: {
     version: "cutout.brand-foundation-benchmark.v1",
     fictionalBrand: "Fenwick Signal",
     models: { generation: "gpt-image-2", review: "gpt-5.5" },
-    budget: {
-      ceilingUSD: 12,
-      actualCost:
-        "provider response did not expose cost; charged amounts are recorded as unknown/0 in runtime receipts",
-    },
     deadlineMs: 330000,
     rubric: RUBRIC,
     scores: [...input.scores.values()],
@@ -747,5 +734,5 @@ function buildReport(input: {
   };
 }
 function markdown(report: ReturnType<typeof buildReport>) {
-  return `# Fenwick Signal Brand Foundation Benchmark\n\n- Generation: ${report.models.generation}\n- Review: ${report.models.review}\n- Budget ceiling: USD ${report.budget.ceilingUSD}\n- Winner: ${report.selection.winnerArtifactId}\n- Reference lock verified: ${report.referenceLock.verified}\n\n## Scores\n\n${report.scores.map((item) => `- ${item.candidateId}: ${item.total}/60 — ${item.rationale}`).join("\n")}\n\n## Artifacts\n\n${report.artifacts.map((item) => `- ${item.id}: ${item.sha256}, ${item.bytes} bytes, ${item.latencyMs}ms`).join("\n")}\n`;
+  return `# Fenwick Signal Brand Foundation Benchmark\n\n- Generation: ${report.models.generation}\n- Review: ${report.models.review}\n- Winner: ${report.selection.winnerArtifactId}\n- Reference lock verified: ${report.referenceLock.verified}\n\n## Scores\n\n${report.scores.map((item) => `- ${item.candidateId}: ${item.total}/60 — ${item.rationale}`).join("\n")}\n\n## Artifacts\n\n${report.artifacts.map((item) => `- ${item.id}: ${item.sha256}, ${item.bytes} bytes, ${item.latencyMs}ms`).join("\n")}\n`;
 }

@@ -6,7 +6,6 @@ import { PermissionBroker } from '@/tool-sandbox/broker'
 
 const imageCapability: PaidToolExecutorCapability = {
   capability: 'generate-image', providerId: 'provider-1', model: 'image-1', available: true,
-  estimatedCost: { currency: 'USD', amount: 0.1, credits: 1 },
 }
 
 function request(
@@ -23,8 +22,7 @@ function request(
     intent: 'Create the approved visual',
     ...(prompt !== undefined ? { prompt } : {}),
     inputArtifactIds: capability === 'generate-image' ? [] : ['artifact:input'],
-    budgetCeiling: { currency: 'USD', amount: 0.2, credits: 2 },
-    approvalPolicy: 'auto-within-budget',
+    approvalPolicy: 'auto',
   })
 }
 
@@ -124,7 +122,8 @@ describe('desktop paid tool executor', () => {
     expect(generation.generateImages).toHaveBeenCalledWith(expect.objectContaining({ providerId: 'provider-1', model: 'image-1', prompt: 'Execute the approved tool request.' }))
     expect(artifacts.write).toHaveBeenCalledTimes(1)
     expect(result.events.map((event) => event.type)).toEqual(['tool-started', 'tool-succeeded', 'material-recorded'])
-    expect(result.receipt).toMatchObject({ status: 'succeeded', charged: { currency: 'USD', amount: 0.1, credits: 1 }, outputArtifactIds: ['artifact:generate-image:1'] })
+    expect(result.receipt).toMatchObject({ status: 'succeeded', outputArtifactIds: ['artifact:generate-image:1'] })
+    expect(result.receipt).not.toHaveProperty('charged')
     expect(JSON.stringify(result)).not.toContain('secret')
   })
 
@@ -165,15 +164,10 @@ describe('desktop paid tool executor', () => {
     )
   })
 
-  it('rejects missing key, over-budget, stale revision and explicit approval before calling a provider', async () => {
+  it('rejects missing key, stale revision and missing explicit approval before calling a provider', async () => {
     const missingKey = harness({ hasKey: false })
     expect((await missingKey.executor.execute(execution())).ok).toBe(false)
     expect(missingKey.generation.generateImages).not.toHaveBeenCalled()
-
-    const overBudget = harness()
-    const low = { ...request(), budgetCeiling: { currency: 'USD', amount: 0.01 } }
-    expect((await overBudget.executor.execute(execution(low))).ok).toBe(false)
-    expect(overBudget.generation.generateImages).not.toHaveBeenCalled()
 
     const stale = harness()
     expect((await stale.executor.execute(execution(request(), { expectedRevision: 3 }))).ok).toBe(false)
@@ -212,7 +206,7 @@ describe('desktop paid tool executor', () => {
       images: [new Uint8Array([7]), new Uint8Array([8])],
     }))
 
-    const cutoutCapability: PaidToolExecutorCapability = { capability: 'cutout', providerId: 'local', model: 'cutout-v1', available: true, estimatedCost: { currency: 'USD', amount: 0 } }
+    const cutoutCapability: PaidToolExecutorCapability = { capability: 'cutout', providerId: 'local', model: 'cutout-v1', available: true, }
     const cutout = harness({ capability: cutoutCapability, hasKey: false })
     const cutoutResult = await cutout.executor.execute(execution(request('cutout')))
     expect(cutoutResult.ok).toBe(true)
@@ -224,7 +218,7 @@ describe('desktop paid tool executor', () => {
   it('publishes a cutout exactly once through the result sink after an atomic artifact batch', async () => {
     const sink = vi.fn()
     const writeBatch = vi.fn(async () => ['artifact:cutout:1'])
-    const capability: PaidToolExecutorCapability = { capability: 'cutout', providerId: 'local', model: 'cutout-v1', available: true, estimatedCost: { currency: 'USD', amount: 0 } }
+    const capability: PaidToolExecutorCapability = { capability: 'cutout', providerId: 'local', model: 'cutout-v1', available: true, }
     const cutout = harness({ capability, sink, writeBatch })
 
     const result = await cutout.executor.execute(execution(request('cutout')))
@@ -249,7 +243,6 @@ describe('desktop paid tool executor', () => {
       providerId: 'local',
       model: 'apple-vision-foreground-v1',
       available: true,
-      estimatedCost: { currency: 'USD', amount: 0 },
     }
     const semantic = harness({ capability, sink, writeBatch })
 
@@ -274,7 +267,7 @@ describe('desktop paid tool executor', () => {
 
   it('does not publish cutout state when artifact commit fails', async () => {
     const sink = vi.fn()
-    const capability: PaidToolExecutorCapability = { capability: 'cutout', providerId: 'local', model: 'cutout-v1', available: true, estimatedCost: { currency: 'USD', amount: 0 } }
+    const capability: PaidToolExecutorCapability = { capability: 'cutout', providerId: 'local', model: 'cutout-v1', available: true, }
     const cutout = harness({ capability, sink, writeBatch: vi.fn(async () => { throw new Error('atomic write failed') }) })
 
     const result = await cutout.executor.execute(execution(request('cutout')))
@@ -284,7 +277,7 @@ describe('desktop paid tool executor', () => {
   })
 
   it('does not publish a cutout after cancellation or a revision change during artifact preparation', async () => {
-    const capability: PaidToolExecutorCapability = { capability: 'cutout', providerId: 'local', model: 'cutout-v1', available: true, estimatedCost: { currency: 'USD', amount: 0 } }
+    const capability: PaidToolExecutorCapability = { capability: 'cutout', providerId: 'local', model: 'cutout-v1', available: true, }
     const cancelledSink = vi.fn()
     const controller = new AbortController()
     const cancelled = harness({ capability, sink: cancelledSink, writeBatch: vi.fn(async () => { controller.abort(); return ['artifact:cutout:1'] }) })
