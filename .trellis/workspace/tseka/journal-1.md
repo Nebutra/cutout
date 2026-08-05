@@ -1424,3 +1424,36 @@ Removed the superseded v0.1.16 task record and obsolete Codex auth fallback, con
 ### Next Steps
 
 - None - task complete
+
+
+## Session 43: Publish and install Cutout v0.1.19
+
+**Date**: 2026-08-05
+**Task**: Publish and install Cutout v0.1.19
+**Branch**: `release/v0.1.19-rc`
+
+### Summary
+
+Published immutable v0.1.19 from protected main through the signed four-platform GitHub workflow, independently verified public updater and Apple evidence, installed the notarized arm64 app locally, and preserved v0.1.18 in Trash for recovery.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `6bbc2b3` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
