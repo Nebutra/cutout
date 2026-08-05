@@ -1,12 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
-import { collectLiveText, createLiveTextBatcher, restoreLiveAgentOutput } from './live-agent-output'
+import { collectLiveText, createLiveTextBatcher } from './live-agent-output'
 
 describe('createLiveTextBatcher', () => {
-  it('does not restore an unfinished provider stream from a legacy snapshot', () => {
-    expect(restoreLiveAgentOutput('half of a reply')).toBe('')
-    expect(restoreLiveAgentOutput(undefined)).toBe('')
-  })
-
   it('preserves long streamed output exactly and batches visible updates', () => {
     const published: string[] = []
     const frames: FrameRequestCallback[] = []

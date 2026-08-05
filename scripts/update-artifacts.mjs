@@ -23,8 +23,9 @@ if (command === 'validate') {
   const channel = args.channel ?? 'stable', output = resolve(args.output ?? 'dist/update')
   const platforms = await resolvePlatforms()
   const version = required('version')
+  if (!args['release-notes-catalog']) throw new Error('--release-notes-catalog is required for updater generation.')
   const releaseNotes = await resolveReleaseNotes(version)
-  const documents = buildReleaseDocuments({ channel, version, notes: args.notes, releaseNotes, publishedAt: args['pub-date'] ?? new Date().toISOString(), platforms, sourceRevision: args.revision ?? process.env.GITHUB_SHA ?? 'local', allowedHosts: list(args['allowed-hosts']) })
+  const documents = buildReleaseDocuments({ channel, version, releaseNotes, publishedAt: args['pub-date'] ?? new Date().toISOString(), platforms, sourceRevision: args.revision ?? process.env.GITHUB_SHA ?? 'local', allowedHosts: list(args['allowed-hosts']) })
   const directory = join(output, channel); await mkdir(directory, { recursive: true })
   const rendered = { 'latest.json': json(documents.manifest), 'sbom.spdx.json': json(documents.sbom), 'provenance.json': json(documents.provenance) }
   documents.metadata.sbom.sha256 = sha256(rendered['sbom.spdx.json'])

@@ -1,0 +1,33 @@
+{
+  "id": "converge-post-v0-1-19",
+  "name": "converge-post-v0-1-19",
+  "title": "Converge post-v0.1.19 backlog and legacy paths",
+  "description": "Remove stale planning records and runtime compatibility paths that have no current producer or consumer after v0.1.19.",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P2",
+  "creator": "tseka",
+  "assignee": "tseka",
+  "createdAt": "2026-08-05",
+  "completedAt": "2026-08-05",
+  "branch": "fix/converge-post-v0.1.19",
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [
+    "src/workspace",
+    "src/components/workspace",
+    "src/services/local/project-repository.local.ts",
+    "src-tauri/src/commands/ai/agent_credentials.rs",
+    "scripts/lib/release-notes.mjs",
+    "scripts/lib/update-artifacts.mjs"
+  ],
+  "notes": "",
+  "meta": {}
+}

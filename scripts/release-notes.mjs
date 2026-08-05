@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { mkdir, writeFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
-import { loadReleaseNotesCatalog, projectReleaseNotesEntry, requireReleaseNotesEntry, renderGitHubReleaseMarkdown, renderLegacyEnglishNotes } from './lib/release-notes.mjs'
+import { loadReleaseNotesCatalog, projectReleaseNotesEntry, requireReleaseNotesEntry, renderGitHubReleaseMarkdown, renderUpdaterPlainTextNotes } from './lib/release-notes.mjs'
 
 const [command, ...argv] = process.argv.slice(2)
 const args = Object.fromEntries(argv.map((value, index) => value.startsWith('--') ? [value.slice(2), argv[index + 1] && !argv[index + 1].startsWith('--') ? argv[index + 1] : 'true'] : null).filter(Boolean))
@@ -17,7 +17,7 @@ if (command === 'validate') {
   const output = resolve(args.output ?? join('dist', 'release-notes', version))
   await mkdir(output, { recursive: true })
   await Promise.all([
-    writeFile(join(output, 'legacy-notes.txt'), `${renderLegacyEnglishNotes(entry)}\n`),
+    writeFile(join(output, 'updater-notes.txt'), `${renderUpdaterPlainTextNotes(entry)}\n`),
     writeFile(join(output, 'updater-extension.json'), `${JSON.stringify(extension, null, 2)}\n`),
     writeFile(join(output, 'bundled-note.json'), `${JSON.stringify(extension, null, 2)}\n`),
     writeFile(join(output, 'github-release.md'), renderGitHubReleaseMarkdown(entry)),

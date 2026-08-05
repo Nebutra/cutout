@@ -153,7 +153,6 @@ describe('project-repository.local', () => {
       selectedPrototypePageId: null,
       runError: null,
       namingStatus: 'idle' as const,
-      liveAgentOutput: '',
       attachments: [],
       webSearchEnabled: false,
     }

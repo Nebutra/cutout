@@ -170,7 +170,7 @@ export function selectReleaseNotesLocale(entry, locale) {
   return normalized.locales[locale] ?? normalized.locales.en
 }
 
-export function renderLegacyEnglishNotes(entry) {
+export function renderUpdaterPlainTextNotes(entry) {
   const normalized = projectReleaseNotesEntry(entry)
   const english = normalized.locales.en
   return [english.headline, '', ...english.highlights.map((highlight) => `${highlight.title}: ${highlight.body}`)].join('\n')
@@ -189,7 +189,7 @@ export function renderGitHubReleaseMarkdown(entry) {
 
 export function renderUpdaterReleaseNotes(entry) {
   const extension = projectReleaseNotesEntry(entry)
-  return { notes: renderLegacyEnglishNotes(extension), cutoutReleaseNotes: extension }
+  return { notes: renderUpdaterPlainTextNotes(extension), cutoutReleaseNotes: extension }
 }
 
 export function projectReleaseNotesEntry(entry) {

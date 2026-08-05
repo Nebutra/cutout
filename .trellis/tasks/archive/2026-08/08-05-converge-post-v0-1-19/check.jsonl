@@ -1,0 +1,3 @@
+{"file":".trellis/spec/frontend/state-management.md","reason":"Verify current WorkspaceSnapshot remains strict and durable run/artifact evidence is preserved."}
+{"file":".trellis/spec/frontend/byok-provider-protocols.md","reason":"Verify Kimi parsing remains closed, redacted, exact-path, and drift-safe after JSON removal."}
+{"file":".trellis/spec/frontend/release-pipeline.md","reason":"Verify catalog-backed notes remain synchronized across updater, bundled app, and GitHub Release outputs."}

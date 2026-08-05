@@ -87,6 +87,9 @@ if (designSystemMarkdownValidationError(artifact.designMarkdown)) return null
 ### Single Projection Rule
 
 - Restore, canvas status, outcome evidence, and repair planning must use the same projection.
+- In-progress Provider text is component-local and ephemeral. Persist completed
+  Agent run events, materials, and artifact receipts; never persist a second
+  `liveAgentOutput` transcript that startup deliberately discards.
 - Diagnostics are derived from the current artifact and are not persisted or copied into a
   second mutable React/Zustand field.
 - A ready visual with unhealthy documentation remains selectable and visible. The UI may show

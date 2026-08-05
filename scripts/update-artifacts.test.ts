@@ -18,6 +18,23 @@ function fixture(version = '1.2.0') {
   return { artifact, signature, manifest: { version, notes: 'Fixture', pub_date: '2026-07-15T00:00:00.000Z', platforms: { 'darwin-aarch64': { url: `https://releases.example.test/Cutout-${version}.app.tar.gz`, signature } } } }
 }
 
+function reviewedNotes(version = '1.2.0') {
+  return projectReleaseNotesEntry({
+    version,
+    releasedOn: '2026-07-15',
+    locales: {
+      en: {
+        headline: 'Reviewed fixture update',
+        highlights: [{
+          id: 'verified-update',
+          title: 'Verified update',
+          body: 'The updater fixture uses reviewed release notes.',
+        }],
+      },
+    },
+  })
+}
+
 const updaterSuffix: Record<string, string> = { 'darwin-aarch64': '.app.tar.gz', 'darwin-x86_64': '.app.tar.gz', 'windows-x86_64': '.exe', 'linux-x86_64': '.AppImage' }
 
 function multiFixture(version = '1.2.0') {
@@ -59,7 +76,7 @@ describe('signed update artifact policy', () => {
   })
 
   it('generates hash, SBOM and provenance metadata from verified sidecars', () => {
-    const value = fixture(), base = { channel: 'stable', version: '1.2.0', publishedAt: '2026-07-15T00:00:00.000Z', artifactUrl: 'https://releases.example.test/Cutout.app.tar.gz', signature: value.signature, signatureFile: 'Cutout.app.tar.gz.sig', artifactDigest: sha256(value.artifact), sourceRevision: 'abc123', allowedHosts: ['releases.example.test'] }
+    const value = fixture(), base = { channel: 'stable', version: '1.2.0', publishedAt: '2026-07-15T00:00:00.000Z', artifactUrl: 'https://releases.example.test/Cutout.app.tar.gz', signature: value.signature, signatureFile: 'Cutout.app.tar.gz.sig', artifactDigest: sha256(value.artifact), sourceRevision: 'abc123', allowedHosts: ['releases.example.test'], releaseNotes: reviewedNotes() }
     const generated = buildReleaseDocuments(base)
     expect(generated).toMatchObject({ manifest: { version: '1.2.0' }, sbom: { spdxVersion: 'SPDX-2.3' }, provenance: { version: 'cutout.provenance.v1' }, metadata: { version: 'cutout.release-metadata.v2' } })
     expect(generated).not.toHaveProperty('rollout')
@@ -67,7 +84,7 @@ describe('signed update artifact policy', () => {
     expect(generated.metadata.artifact.sha256).toBe(sha256(value.artifact))
   })
 
-  it('derives readable legacy and structured updater notes from one reviewed entry', async () => {
+  it('derives readable plain text and structured updater notes from one reviewed entry', async () => {
     const value = fixture('0.1.19')
     const catalog = await loadReleaseNotesCatalog(undefined, { requireAllLocales: true })
     const releaseNotes = projectReleaseNotesEntry(requireReleaseNotesEntry(catalog, '0.1.19'))
@@ -78,10 +95,10 @@ describe('signed update artifact policy', () => {
     expect(() => validateUpdateManifest(generated.manifest, { requireReleaseNotes: true, expectedReleaseNotes: releaseNotes, allowedHosts: ['releases.example.test'] })).not.toThrow()
   })
 
-  it('keeps old manifests valid but rejects missing, mismatched, or malformed required projections', async () => {
-    const legacy = fixture().manifest
-    expect(() => validateUpdateManifest(legacy)).not.toThrow()
-    expect(() => validateUpdateManifest(legacy, { requireReleaseNotes: true })).toThrow('requires reviewed')
+  it('accepts base Tauri manifests only when reviewed notes are optional', async () => {
+    const baseManifest = fixture().manifest
+    expect(() => validateUpdateManifest(baseManifest)).not.toThrow()
+    expect(() => validateUpdateManifest(baseManifest, { requireReleaseNotes: true })).toThrow('requires reviewed')
     const catalog = await loadReleaseNotesCatalog()
     const releaseNotes = projectReleaseNotesEntry(requireReleaseNotesEntry(catalog, '0.1.19'))
     // Deliberately a different version from the catalog entry above, so the
@@ -96,7 +113,7 @@ describe('signed update artifact policy', () => {
 
   it('emits every built platform in the manifest and enumerates them in supply-chain metadata', () => {
     const { platforms } = multiFixture()
-    const generated = buildReleaseDocuments({ channel: 'stable', version: '1.2.0', publishedAt: '2026-07-15T00:00:00.000Z', platforms: platforms.map(({ key, artifactUrl, signature, artifactDigest, signatureFile }) => ({ key, artifactUrl, signature, artifactDigest, signatureFile })), allowedHosts: ['releases.example.test'] })
+    const generated = buildReleaseDocuments({ channel: 'stable', version: '1.2.0', publishedAt: '2026-07-15T00:00:00.000Z', platforms: platforms.map(({ key, artifactUrl, signature, artifactDigest, signatureFile }) => ({ key, artifactUrl, signature, artifactDigest, signatureFile })), allowedHosts: ['releases.example.test'], releaseNotes: reviewedNotes() })
     expect(Object.keys(generated.manifest.platforms)).toEqual(['darwin-aarch64', 'darwin-x86_64', 'windows-x86_64', 'linux-x86_64'])
     expect(generated.metadata.platforms.map((p: { key: string }) => p.key)).toEqual(['darwin-aarch64', 'darwin-x86_64', 'windows-x86_64', 'linux-x86_64'])
     expect(generated.sbom.packages).toHaveLength(4)
@@ -107,7 +124,7 @@ describe('signed update artifact policy', () => {
   it('requires darwin-aarch64 as the mandatory primary platform', () => {
     const { platforms } = multiFixture()
     const withoutPrimary = platforms.filter((p) => p.key !== 'darwin-aarch64').map(({ key, artifactUrl, signature, artifactDigest, signatureFile }) => ({ key, artifactUrl, signature, artifactDigest, signatureFile }))
-    expect(() => buildReleaseDocuments({ channel: 'stable', version: '1.2.0', publishedAt: '2026-07-15T00:00:00.000Z', platforms: withoutPrimary, allowedHosts: ['releases.example.test'] })).toThrow('darwin-aarch64')
+    expect(() => buildReleaseDocuments({ channel: 'stable', version: '1.2.0', publishedAt: '2026-07-15T00:00:00.000Z', platforms: withoutPrimary, allowedHosts: ['releases.example.test'], releaseNotes: reviewedNotes() })).toThrow('darwin-aarch64')
   })
 
   it('fails closed when a non-primary platform is insecure or unsigned', () => {
@@ -136,7 +153,11 @@ describe('signed update artifact policy', () => {
       await writeFile(`${artifactPath}.sig`, sign(null, artifact, privateKey).toString('base64'))
       platformArgs.push('--platform', `${spec.key}=${artifactPath}`)
     }
-    const result = spawnSync(process.execPath, ['scripts/update-artifacts.mjs', 'generate', ...platformArgs, '--artifact-base-url', 'https://releases.example.test', '--version', '1.2.0', '--channel', 'stable', '--allowed-hosts', 'releases.example.test', '--output', join(root, 'out')], { cwd: process.cwd(), encoding: 'utf8' })
+    const commonArgs = ['scripts/update-artifacts.mjs', 'generate', ...platformArgs, '--artifact-base-url', 'https://releases.example.test', '--version', '0.1.19', '--channel', 'stable', '--allowed-hosts', 'releases.example.test']
+    const missingCatalog = spawnSync(process.execPath, [...commonArgs, '--output', join(root, 'missing-catalog')], { cwd: process.cwd(), encoding: 'utf8' })
+    expect(missingCatalog.status).not.toBe(0)
+    expect(missingCatalog.stderr).toContain('--release-notes-catalog is required')
+    const result = spawnSync(process.execPath, [...commonArgs, '--release-notes-catalog', 'src/release-notes/catalog.json', '--require-all-locales', '--output', join(root, 'out')], { cwd: process.cwd(), encoding: 'utf8' })
     expect(result.status, result.stderr).toBe(0)
     const manifest = JSON.parse(await readFile(join(root, 'out', 'stable', 'latest.json'), 'utf8'))
     expect(Object.keys(manifest.platforms)).toEqual(['darwin-aarch64', 'darwin-x86_64', 'windows-x86_64', 'linux-x86_64'])
@@ -145,9 +166,9 @@ describe('signed update artifact policy', () => {
   })
 
   it('writes a self-consistent release directory through the production CLI', async () => {
-    const value = fixture(), root = await mkdtemp(join(tmpdir(), 'cutout-update-')), artifact = join(root, 'Cutout.app.tar.gz')
+    const value = fixture('0.1.19'), root = await mkdtemp(join(tmpdir(), 'cutout-update-')), artifact = join(root, 'Cutout.app.tar.gz')
     await writeFile(artifact, value.artifact); await writeFile(`${artifact}.sig`, value.signature)
-    const result = spawnSync(process.execPath, ['scripts/update-artifacts.mjs', 'generate', '--artifact', artifact, '--version', '1.2.0', '--channel', 'beta', '--artifact-url', 'https://releases.example.test/Cutout.app.tar.gz', '--allowed-hosts', 'releases.example.test', '--output', join(root, 'out')], { cwd: process.cwd(), encoding: 'utf8' })
+    const result = spawnSync(process.execPath, ['scripts/update-artifacts.mjs', 'generate', '--artifact', artifact, '--version', '0.1.19', '--channel', 'beta', '--artifact-url', 'https://releases.example.test/Cutout.app.tar.gz', '--allowed-hosts', 'releases.example.test', '--release-notes-catalog', 'src/release-notes/catalog.json', '--require-all-locales', '--output', join(root, 'out')], { cwd: process.cwd(), encoding: 'utf8' })
     expect(result.status, result.stderr).toBe(0)
     const directory = join(root, 'out', 'beta'), metadata = JSON.parse(await readFile(join(directory, 'release-metadata.json'), 'utf8'))
     expect(metadata.sbom.sha256).toBe(sha256(await readFile(join(directory, 'sbom.spdx.json'))))

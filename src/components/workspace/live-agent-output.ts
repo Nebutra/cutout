@@ -8,11 +8,6 @@ export interface CollectedLiveText {
   readonly usedBufferedFallback: boolean
 }
 
-/** Partial provider streams are ephemeral and never replayed from a snapshot. */
-export function restoreLiveAgentOutput(_persisted: string | undefined): string {
-  return ''
-}
-
 /** Collects one conversational stream without turning provider fallback into a second turn. */
 export async function collectLiveText(
   stream: AsyncIterable<string>,

@@ -35,8 +35,8 @@ describe('packaged E2E Provider registry staging', () => {
     const { source, destination } = await paths()
     await writeFile(source, JSON.stringify([
       {
-        id: 'legacy', kind: 'openai-compatible', label: 'Legacy',
-        baseUrl: 'https://legacy.example', defaultModel: 'gpt-5.5', enabled: true,
+        id: 'missing-wire-protocol', kind: 'openai-compatible', label: 'Incomplete',
+        baseUrl: 'https://incomplete.example', defaultModel: 'gpt-5.5', enabled: true,
       },
       {
         id: 'image', kind: 'openai-compatible', label: 'Image',

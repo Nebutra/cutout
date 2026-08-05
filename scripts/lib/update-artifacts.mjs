@@ -121,16 +121,16 @@ export function buildReleaseDocuments(input) {
   })
   const primary = platforms[0]
   const publishedAt = new Date(input.publishedAt).toISOString()
-  if (input.releaseNotes !== undefined && input.notes !== undefined) throw new Error('Use either reviewed release notes or legacy --notes text, not both.')
-  const releaseNotes = input.releaseNotes === undefined ? undefined : renderUpdaterReleaseNotes(validateReleaseNotesExtension(input.releaseNotes, { expectedVersion: input.version }))
+  if (input.releaseNotes === undefined) throw new Error('Reviewed release notes are required.')
+  const releaseNotes = renderUpdaterReleaseNotes(validateReleaseNotesExtension(input.releaseNotes, { expectedVersion: input.version }))
   const manifest = {
     version: input.version,
-    notes: releaseNotes?.notes ?? input.notes ?? '',
+    notes: releaseNotes.notes,
     pub_date: publishedAt,
     platforms: Object.fromEntries(platforms.map((p) => [p.key, { url: p.href, signature: p.signature }])),
-    ...(releaseNotes ? { cutoutReleaseNotes: releaseNotes.cutoutReleaseNotes } : {}),
+    cutoutReleaseNotes: releaseNotes.cutoutReleaseNotes,
   }
-  validateUpdateManifest(manifest, { expectedSignature: primary.signature, allowedHosts: input.allowedHosts, requireReleaseNotes: Boolean(releaseNotes) })
+  validateUpdateManifest(manifest, { expectedSignature: primary.signature, allowedHosts: input.allowedHosts, requireReleaseNotes: true })
   const sbom = { spdxVersion: 'SPDX-2.3', dataLicense: 'CC0-1.0', SPDXID: 'SPDXRef-DOCUMENT', name: `Cutout-${input.version}`, documentNamespace: `https://cutout.local/sbom/${input.version}/${primary.artifactDigest}`, creationInfo: { created: publishedAt, creators: ['Tool: cutout-update-artifacts'] }, packages: platforms.map((p) => ({ SPDXID: p.key === primaryPlatform ? 'SPDXRef-Package-Cutout' : `SPDXRef-Package-Cutout-${p.key}`, name: 'Cutout', versionInfo: input.version, downloadLocation: p.href, checksums: [{ algorithm: 'SHA256', checksumValue: p.artifactDigest }] })) }
   const provenance = { version: 'cutout.provenance.v1', subject: platforms.map((p) => ({ name: p.filename, digest: { sha256: p.artifactDigest } })), build: { builder: 'github-actions', source: input.sourceRevision, channel: input.channel, generatedAt: publishedAt }, signing: { scheme: 'Tauri updater signature', privateKeySource: 'CI secret only' } }
   const metadata = { version: 'cutout.release-metadata.v2', releaseVersion: input.version, channel: input.channel, artifact: { url: primary.href, sha256: primary.artifactDigest, signatureFile: primary.signatureFile }, platforms: platforms.map((p) => ({ key: p.key, url: p.href, sha256: p.artifactDigest, signatureFile: p.signatureFile })), sbom: { file: 'sbom.spdx.json', sha256: sha256(JSON.stringify(sbom)) }, provenance: { file: 'provenance.json', sha256: sha256(JSON.stringify(provenance)) } }
