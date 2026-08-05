@@ -500,11 +500,15 @@ fn normalized_draft_wire_protocol(
         .map_err(DiscoveryError::UnsupportedWireProtocol)
 }
 
-fn codex_location(home: &Path) -> (PathBuf, &'static str) {
-    match std::env::var_os("CODEX_HOME") {
-        Some(path) => (PathBuf::from(path), "$CODEX_HOME"),
+fn codex_location_from(home: &Path, configured_home: Option<PathBuf>) -> (PathBuf, &'static str) {
+    match configured_home {
+        Some(path) => (path, "$CODEX_HOME"),
         None => (home.join(".codex"), "~/.codex"),
     }
+}
+
+fn codex_location(home: &Path) -> (PathBuf, &'static str) {
+    codex_location_from(home, std::env::var_os("CODEX_HOME").map(PathBuf::from))
 }
 
 fn codex_api_key_from(path: &Path) -> Result<Option<String>, DiscoveryError> {
@@ -520,40 +524,13 @@ fn codex_api_key_from(path: &Path) -> Result<Option<String>, DiscoveryError> {
         .map(str::to_owned))
 }
 
-fn codex_auth_source(
-    codex_home: &Path,
-    legacy_auth: Option<&Path>,
-) -> Result<(Option<String>, bool), DiscoveryError> {
-    let primary = codex_home.join("auth.json");
-    if read_exact_config(&primary)?.is_some() {
-        return Ok((codex_api_key_from(&primary)?, false));
-    }
-    match legacy_auth {
-        Some(path) => Ok((codex_api_key_from(path)?, true)),
-        None => Ok((None, false)),
-    }
-}
-
-#[cfg(test)]
 fn discover_codex_at(
     codex_home: &Path,
     display_root: &str,
 ) -> Result<Vec<ProviderCandidate>, DiscoveryError> {
-    discover_codex_at_with_legacy(codex_home, display_root, None)
-}
-
-fn discover_codex_at_with_legacy(
-    codex_home: &Path,
-    display_root: &str,
-    legacy_auth: Option<&Path>,
-) -> Result<Vec<ProviderCandidate>, DiscoveryError> {
     let config_location = format!("{display_root}/config.toml");
-    let (auth_key, using_legacy_auth) = codex_auth_source(codex_home, legacy_auth)?;
-    let auth_location = if using_legacy_auth {
-        "~/.config/codex/auth.json".into()
-    } else {
-        format!("{display_root}/auth.json")
-    };
+    let auth_location = format!("{display_root}/auth.json");
+    let auth_key = codex_api_key_from(&codex_home.join("auth.json"))?;
     let config = match read_exact_config(&codex_home.join("config.toml"))? {
         Some(raw) => Some(
             toml::from_str::<toml::Value>(&raw)
@@ -595,14 +572,7 @@ fn discover_codex_at_with_legacy(
             source: "codex".into(),
             source_label: "Codex".into(),
             agent_id: Some("codex".into()),
-            schema_id: Some(
-                if using_legacy_auth {
-                    "codex-root-cc-switch-legacy-auth-v1"
-                } else {
-                    "codex-root-cc-switch-v1"
-                }
-                .into(),
-            ),
+            schema_id: Some("codex-root-cc-switch-v1".into()),
             config_location: Some(auth_location.clone()),
             kind: "cc-switch".into(),
             label: "CC Switch".into(),
@@ -663,14 +633,7 @@ fn discover_codex_at_with_legacy(
                 source: "codex".into(),
                 source_label: "Codex".into(),
                 agent_id: Some("codex".into()),
-                schema_id: Some(
-                    if use_auth_file && using_legacy_auth {
-                        "codex-config-legacy-auth-v1"
-                    } else {
-                        "codex-config-v1"
-                    }
-                    .into(),
-                ),
+                schema_id: Some("codex-config-v1".into()),
                 config_location: Some(if use_auth_file {
                     auth_location.clone()
                 } else {
@@ -718,14 +681,7 @@ fn discover_codex_at_with_legacy(
             source: "codex".into(),
             source_label: "Codex".into(),
             agent_id: Some("codex".into()),
-            schema_id: Some(
-                if using_legacy_auth {
-                    "codex-legacy-auth-v1"
-                } else {
-                    "codex-auth-v1"
-                }
-                .into(),
-            ),
+            schema_id: Some("codex-auth-v1".into()),
             config_location: Some(auth_location),
             kind: "openai".into(),
             label: "OpenAI".into(),
@@ -746,11 +702,7 @@ fn discover_codex_at_with_legacy(
 
 fn discover_codex(home: &Path) -> Result<Vec<ProviderCandidate>, DiscoveryError> {
     let (codex_home, display_root) = codex_location(home);
-    discover_codex_at_with_legacy(
-        &codex_home,
-        display_root,
-        Some(&home.join(".config/codex/auth.json")),
-    )
+    discover_codex_at(&codex_home, display_root)
 }
 
 fn cc_switch_db_error() -> DiscoveryError {
@@ -1497,18 +1449,14 @@ fn candidate_secret_at(
         ("codex", Some("OPENAI_API_KEY"))
             if candidate.credential.source_type == "config-literal" =>
         {
-            let legacy = home.join(".config/codex/auth.json");
-            let primary = codex_home.join("auth.json");
-            let source = if candidate
-                .schema_id
-                .as_deref()
-                .is_some_and(|schema| schema.contains("legacy-auth"))
-            {
-                &legacy
-            } else {
-                &primary
-            };
-            codex_api_key_from(source)?.ok_or(DiscoveryError::CandidateMissing)
+            if !matches!(
+                candidate.schema_id.as_deref(),
+                Some("codex-auth-v1" | "codex-config-v1" | "codex-root-cc-switch-v1")
+            ) {
+                return Err(DiscoveryError::CandidateMissing);
+            }
+            codex_api_key_from(&codex_home.join("auth.json"))?
+                .ok_or(DiscoveryError::CandidateMissing)
         }
         ("cc-switch", Some("OPENAI_API_KEY"))
             if candidate.credential.source_type == "cc-switch-db"
@@ -2328,6 +2276,19 @@ mod tests {
     use super::*;
 
     #[test]
+    fn codex_location_prefers_configured_home_and_defaults_to_dot_codex() {
+        let home = Path::new("/test-home");
+        assert_eq!(
+            codex_location_from(home, None),
+            (home.join(".codex"), "~/.codex")
+        );
+        assert_eq!(
+            codex_location_from(home, Some(PathBuf::from("/selected-codex"))),
+            (PathBuf::from("/selected-codex"), "$CODEX_HOME")
+        );
+    }
+
+    #[test]
     fn automatic_ids_are_stable_and_opaque() {
         let candidate = format!("provider-candidate:{}", "a".repeat(64));
         assert_eq!(
@@ -2857,6 +2818,11 @@ wire_api = "responses"
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0].kind, "openai");
         assert_eq!(rows[0].wire_protocol.as_deref(), Some("responses"));
+        assert_eq!(rows[0].schema_id.as_deref(), Some("codex-auth-v1"));
+        assert_eq!(
+            rows[0].config_location.as_deref(),
+            Some("~/.codex/auth.json")
+        );
         assert_eq!(rows[0].credential.source_type, "config-literal");
         assert_eq!(
             rows[0].credential.reference.as_deref(),
@@ -2868,6 +2834,12 @@ wire_api = "responses"
             candidate_secret_at(&rows[0], home.path(), &codex_home).unwrap(),
             "sentinel-secret-must-not-cross-ipc"
         );
+        let mut unknown_schema = rows[0].clone();
+        unknown_schema.schema_id = Some("unknown-codex-schema-v1".into());
+        assert!(matches!(
+            candidate_secret_at(&unknown_schema, home.path(), &codex_home),
+            Err(DiscoveryError::CandidateMissing)
+        ));
         let json = serde_json::to_string(&rows).unwrap();
         assert!(!json.contains("sentinel-secret-must-not-cross-ipc"));
     }
@@ -2899,6 +2871,11 @@ wire_api = "responses"
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0].label, "OpenAI from Codex");
         assert_eq!(rows[0].model_hint.as_deref(), Some("gpt-test"));
+        assert_eq!(rows[0].schema_id.as_deref(), Some("codex-config-v1"));
+        assert_eq!(
+            rows[0].config_location.as_deref(),
+            Some("~/.codex/auth.json")
+        );
         assert_eq!(rows[0].credential.source_type, "config-literal");
         assert_eq!(
             candidate_secret_at(&rows[0], home.path(), &codex_home).unwrap(),
@@ -3102,34 +3079,6 @@ wire_api = "responses"
         assert!(discover_codex_at(&codex_home, "~/.codex")
             .unwrap()
             .is_empty());
-    }
-
-    #[test]
-    fn codex_legacy_auth_is_used_only_when_primary_auth_is_absent() {
-        let home = tempdir().unwrap();
-        let codex_home = home.path().join(".codex");
-        let legacy = home.path().join(".config/codex/auth.json");
-        std::fs::create_dir(&codex_home).unwrap();
-        std::fs::create_dir_all(legacy.parent().unwrap()).unwrap();
-        std::fs::write(&legacy, r#"{"OPENAI_API_KEY":"legacy-secret"}"#).unwrap();
-
-        let rows = discover_codex_at_with_legacy(&codex_home, "~/.codex", Some(&legacy)).unwrap();
-        assert_eq!(rows[0].schema_id.as_deref(), Some("codex-legacy-auth-v1"));
-        assert_eq!(
-            candidate_secret_at(&rows[0], home.path(), &codex_home).unwrap(),
-            "legacy-secret"
-        );
-
-        std::fs::write(
-            codex_home.join("auth.json"),
-            r#"{"tokens":{"access_token":"oauth"}}"#,
-        )
-        .unwrap();
-        assert!(
-            discover_codex_at_with_legacy(&codex_home, "~/.codex", Some(&legacy))
-                .unwrap()
-                .is_empty()
-        );
     }
 
     #[test]

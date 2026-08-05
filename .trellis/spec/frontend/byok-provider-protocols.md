@@ -291,8 +291,10 @@ the current secret again inside Rust.
 
 ### 3. Contracts
 
-- Resolve Codex from `CODEX_HOME` when present, otherwise exactly
-  `<home>/.codex`.
+- Resolve the selected Codex root from `CODEX_HOME` when present, otherwise
+  exactly `<home>/.codex`. Discovery and draft secret re-resolution inspect
+  only that root's exact `auth.json` through the shared bounded reader; there
+  is no secondary Codex credential path.
 - Reviewed process-environment relays are closed bindings, not arbitrary custom
   endpoints. `MOX_API_KEY` may bind only to
   `https://aigw.mox.ktvsky.com/v1`, and `TDS_API_KEY` only to
@@ -312,6 +314,10 @@ the current secret again inside Rust.
   non-empty string. OAuth/session tokens and other fields are not API keys.
 - A valid Codex auth-file key produces an OpenAI Responses candidate even when
   `config.toml` has no explicit OpenAI provider table.
+- Codex auth-only, configured-provider, and root CC Switch candidates use the
+  current `codex-auth-v1`, `codex-config-v1`, and
+  `codex-root-cc-switch-v1` schemas respectively. Draft re-resolution remains
+  bound to that current schema and the selected root's exact `auth.json`.
 - If an explicit Codex OpenAI provider names an unavailable `env_key`, a valid
   auth-file API key is the native fallback. An available environment value
   remains authoritative for that candidate.
