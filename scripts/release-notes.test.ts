@@ -11,7 +11,7 @@ import {
   loadReleaseNotesCatalog,
   projectReleaseNotesEntry,
   renderGitHubReleaseMarkdown,
-  renderLegacyEnglishNotes,
+  renderUpdaterPlainTextNotes,
   renderUpdaterReleaseNotes,
   requireReleaseNotesEntry,
   selectReleaseNotesLocale,
@@ -86,14 +86,14 @@ describe('release-note catalog', () => {
     expect(() => validateReleaseNotesCatalog(catalog([remoteMedia]))).toThrow('known bundled')
   })
 
-  it('renders deterministic readable legacy text, a strict updater extension, and escaped Markdown', () => {
+  it('renders deterministic readable updater text, a strict extension, and escaped Markdown', () => {
     const unsafeMarkdown = entry()
     unsafeMarkdown.locales.en.headline = 'Details *without* markup'
     const rendered = renderUpdaterReleaseNotes(unsafeMarkdown)
     expect(rendered.notes).toContain('Details *without* markup')
     expect(rendered.notes).not.toContain(RELEASE_NOTES_PROTOCOL)
     expect(rendered.cutoutReleaseNotes).toMatchObject({ protocol: RELEASE_NOTES_PROTOCOL, version: '0.1.16' })
-    expect(renderLegacyEnglishNotes(unsafeMarkdown)).toBe(rendered.notes)
+    expect(renderUpdaterPlainTextNotes(unsafeMarkdown)).toBe(rendered.notes)
     expect(renderGitHubReleaseMarkdown(unsafeMarkdown)).toContain('Details \\*without\\* markup')
     expect(renderGitHubReleaseMarkdown(unsafeMarkdown)).toBe(renderGitHubReleaseMarkdown(projectReleaseNotesEntry(unsafeMarkdown)))
   })
@@ -109,15 +109,15 @@ describe('release-note catalog', () => {
     const output = await mkdtemp(join(tmpdir(), 'cutout-release-notes-'))
     const result = spawnSync(process.execPath, ['scripts/release-notes.mjs', 'render', '--version', '0.1.19', '--output', output, '--require-all-locales'], { cwd: process.cwd(), encoding: 'utf8' })
     expect(result.status, result.stderr).toBe(0)
-    const [legacy, updater, bundled, github] = await Promise.all([
-      readFile(join(output, 'legacy-notes.txt'), 'utf8'),
+    const [plainText, updater, bundled, github] = await Promise.all([
+      readFile(join(output, 'updater-notes.txt'), 'utf8'),
       readFile(join(output, 'updater-extension.json'), 'utf8'),
       readFile(join(output, 'bundled-note.json'), 'utf8'),
       readFile(join(output, 'github-release.md'), 'utf8'),
     ])
     expect(JSON.parse(updater)).toEqual(JSON.parse(bundled))
-    expect(legacy).toContain('See what Agent preparation is doing')
-    expect(legacy).toContain('A more tolerant Codex runtime')
+    expect(plainText).toContain('See what Agent preparation is doing')
+    expect(plainText).toContain('A more tolerant Codex runtime')
     expect(github).toContain('Cutout v0\\.1\\.19')
   })
 })

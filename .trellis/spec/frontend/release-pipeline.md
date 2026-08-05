@@ -21,7 +21,9 @@ installer version differs from their release version.
   `pnpm update:validate`.
 - Release-note validation/rendering is owned by
   `pnpm release-notes:validate` and `pnpm release-notes:render`, using the
-  repository catalog at `src/release-notes/catalog.json`.
+  repository catalog at `src/release-notes/catalog.json`. Rendering writes
+  standard updater text to `updater-notes.txt`; metadata generation has no
+  manual notes fallback.
 - macOS DMG notarization uses
   `xcrun notarytool submit <dmg> --key "$APPLE_API_KEY_PATH" --key-id "$APPLE_API_KEY" --issuer "$APPLE_API_ISSUER" --wait`, followed by
   `xcrun stapler staple <dmg>`.
@@ -195,7 +197,7 @@ installer version differs from their release version.
 - Good: all four matrix entries finish, collected names include their platform
   and architecture, `latest.json` carries all four platform entries, updater
   evidence validates for each, and one draft is promoted.
-- Good: one reviewed catalog entry produces readable English legacy updater
+- Good: one reviewed catalog entry produces readable English updater
   notes, the matching five-locale extension, and a deterministic GitHub body
   consumed through `--notes-file`.
 - Good: Tauri receives an Apple `Accepted` result for the app, the workflow
