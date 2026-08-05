@@ -115,8 +115,7 @@ describe('agent run events', () => {
       createRunEvent('run-paid', { type: 'run-started', mode: 'create' }, { eventId: 'start', at: 1 }),
       createRunEvent('run-paid', {
         type: 'tool-approval-requested', toolCallId: 'tool-1', requestId: 'request-1', tool: 'image.generate', label: 'Generate hero',
-        model: { providerId: 'openai', model: 'gpt-image-1' },
-        budgetCeiling: { currency: 'USD', amount: 0.2, credits: 20 }, approvalPolicy: 'explicit', reason: 'Explicit approval is required.', pendingApproval: true,
+        model: { providerId: 'openai', model: 'gpt-image-1' }, approvalPolicy: 'explicit', reason: 'Explicit approval is required.', pendingApproval: true,
       }, { eventId: 'approval', at: 2 }),
       createRunEvent('run-paid', { type: 'tool-approved', toolCallId: 'tool-1', requestId: 'request-1', reason: 'Approved by user.' }, { eventId: 'approved', at: 3 }),
       createRunEvent('run-paid', { type: 'tool-retry-linked', toolCallId: 'tool-1', previousRequestId: 'request-1', requestId: 'request-2' }, { eventId: 'retry', at: 4 }),
@@ -131,7 +130,7 @@ describe('agent run events', () => {
     expect(projection).toMatchObject({ requestId: 'request-2', previousRequestId: 'request-1', approvalStatus: 'required' })
     expect(projection?.receipt).toMatchObject({ receiptId: 'receipt-1', charged: { amount: 0.07 } })
   })
-  it('rejects predicted cost fields on approval events', () => {
+  it('rejects unrecognized prediction fields on approval events', () => {
     const approval = {
       eventId: 'approval',
       runId: 'run-paid',
@@ -141,7 +140,6 @@ describe('agent run events', () => {
       requestId: 'request-1',
       tool: 'image.generate',
       label: 'Generate hero',
-      budgetCeiling: { currency: 'USD', amount: 0.2 },
       approvalPolicy: 'explicit',
       reason: 'Explicit approval is required.',
       pendingApproval: true,
@@ -150,7 +148,7 @@ describe('agent run events', () => {
     expect(agentRunEventSchema.safeParse(approval).success).toBe(true)
     expect(agentRunEventSchema.safeParse({
       ...approval,
-      estimatedCost: { currency: 'USD', amount: 0.08 },
+      predictedCharge: { currency: 'USD', amount: 1 },
     }).success).toBe(false)
   })
   it('replays observable run state without executing side effects', () => {

@@ -24,6 +24,8 @@ import {
   Copy,
   Pencil,
   CheckCheck,
+  Circle,
+  CircleCheck,
   WandSparkles,
 } from 'lucide-react'
 import type {
@@ -498,12 +500,38 @@ function FeedRow({ item, detailsLabel, onApproveTool, onDenyTool, onCancelTool, 
                     : activity.state === 'cancelled'
                       ? <CircleStop className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
                       : <LoaderCircle className="mt-0.5 size-3.5 shrink-0 animate-spin text-muted-foreground" />}
-                <div className="min-w-0">
+                <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
                     <p className="font-medium">{activity.label}</p>
                     {activity.elapsedLabel ? <span className="text-xs tabular-nums text-muted-foreground">{activity.elapsedLabel}</span> : null}
                   </div>
                   <p className="mt-0.5 text-xs leading-4 text-muted-foreground">{item.detail}</p>
+                  {activity.progress ? (
+                    <details data-slot="agent-planning-progress" className="group/progress mt-2 border-t border-border/60 pt-1.5">
+                      <summary
+                        aria-label="View planning progress"
+                        className="flex min-h-6 cursor-pointer list-none items-center gap-1 text-xs font-medium text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 [&::-webkit-details-marker]:hidden"
+                      >
+                        <span>View progress</span>
+                        <ChevronDown className="size-3.5 transition-transform group-open/progress:rotate-180 motion-reduce:transition-none" aria-hidden="true" />
+                      </summary>
+                      <ol className="mt-1.5 space-y-1.5 pb-0.5" aria-label="Planning stages">
+                        {activity.progress.map((stage) => (
+                          <li key={stage.id} data-status={stage.status} className="flex min-h-5 items-start gap-2 text-xs">
+                            {stage.status === 'complete'
+                              ? <CircleCheck className="mt-0.5 size-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" aria-hidden="true" />
+                              : stage.status === 'running'
+                                ? <LoaderCircle className="mt-0.5 size-3.5 shrink-0 animate-spin text-foreground" aria-hidden="true" />
+                                : <Circle className="mt-0.5 size-3.5 shrink-0 text-muted-foreground/50" aria-hidden="true" />}
+                            <span className="min-w-0">
+                              <span className={cn(stage.status === 'running' ? 'font-medium text-foreground' : 'text-muted-foreground')}>{stage.label}</span>
+                              {stage.detail ? <span className="block break-words text-[11px] leading-4 text-muted-foreground">{stage.detail}</span> : null}
+                            </span>
+                          </li>
+                        ))}
+                      </ol>
+                    </details>
+                  ) : null}
                 </div>
               </div>
             ) : editing && isUser ? (

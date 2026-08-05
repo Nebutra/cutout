@@ -3,7 +3,6 @@ import { createDesktopToolLoop, type DesktopToolLoop } from './desktop-tool-loop
 import {
   composerRouteToPaidToolRequest,
   desktopPaidToolCapabilities,
-  type MoneyEstimate,
   type PaidToolCapability,
   type PaidToolExecutorCapability,
   type PaidToolPolicy,
@@ -26,7 +25,6 @@ import { createTauriAgentHostService } from '@/agent-host/tauri-service'
 import { runDurableHostEffect } from '@/agent-host/durable-effect'
 
 const DESKTOP_TOOL_TIMEOUT_MS = 300_000
-const ZERO_USD_ESTIMATE: MoneyEstimate = { currency: 'USD', amount: 0 }
 const DESKTOP_PAID_TOOL_POLICY: PaidToolPolicy = { allowPaid: true }
 const FOREGROUND_SEGMENTATION_UNAVAILABLE =
   'capability-required: foreground segmentation is unavailable on this host.'
@@ -63,36 +61,6 @@ export async function probeForegroundSegmentationCapability(
   }
 }
 
-function capabilityEstimate(
-  capabilities: readonly PaidToolExecutorCapability[],
-  capability: PaidToolCapability,
-): MoneyEstimate | undefined {
-  return capabilities.find((candidate) =>
-    candidate.capability === capability && candidate.available
-  )?.estimatedCost
-}
-
-export function createExplicitDesktopVisualBudget(
-  capabilities: readonly PaidToolExecutorCapability[],
-): { readonly ceiling: MoneyEstimate } {
-  const generate = capabilityEstimate(capabilities, 'generate-image')
-  const edit = capabilityEstimate(capabilities, 'edit-image')
-  if (!generate || !edit || generate.currency !== edit.currency) {
-    return { ceiling: ZERO_USD_ESTIMATE }
-  }
-  return {
-    ceiling: {
-      currency: generate.currency,
-      amount: generate.amount + edit.amount,
-      ...(
-        generate.credits !== undefined || edit.credits !== undefined
-          ? { credits: (generate.credits ?? 0) + (edit.credits ?? 0) }
-          : {}
-      ),
-    },
-  }
-}
-
 export interface DesktopToolInvocation {
   readonly runId: string
   readonly toolCallId: string
@@ -112,21 +80,13 @@ export function createExplicitDesktopPaidToolRequest(input: {
   readonly prompt: string
   readonly image: ModelAssignment
   readonly inputArtifactIds?: readonly string[]
-  readonly capabilities: readonly PaidToolExecutorCapability[]
 }): PaidToolRequest {
-  const budgetCeiling = input.capabilities.find((candidate) =>
-    candidate.capability === input.capability
-    && candidate.providerId === input.image.providerId
-    && candidate.model === input.image.model
-  )?.estimatedCost ?? ZERO_USD_ESTIMATE
-
   return composerRouteToPaidToolRequest({
     capability: input.capability,
     intent: input.intent,
     prompt: input.prompt,
     image: input.image,
     inputArtifactIds: input.inputArtifactIds,
-    budgetCeiling,
     approvalPolicy: 'explicit',
   })
 }
@@ -177,8 +137,8 @@ export function useDesktopToolLoop(input: {
       descriptors: bindings?.descriptors,
       bindings: bindings?.bindings,
     }),
-    { capability: 'cutout', providerId: 'local', model: 'cutout-v1', available: true, estimatedCost: ZERO_USD_ESTIMATE },
-    { capability: 'semantic-cutout', providerId: 'local', model: 'apple-vision-foreground-v1', available: semanticCutoutAvailable.current, estimatedCost: ZERO_USD_ESTIMATE },
+    { capability: 'cutout', providerId: 'local', model: 'cutout-v1', available: true },
+    { capability: 'semantic-cutout', providerId: 'local', model: 'apple-vision-foreground-v1', available: semanticCutoutAvailable.current },
   ]}, [])
   const loop = useMemo<DesktopToolLoop>(() => {
     const store = artifacts.current!
@@ -206,18 +166,13 @@ export function useDesktopToolLoop(input: {
   }, [authorize, capabilities, permissionBroker])
 
   const visualRuntime = useMemo(() => {
-    const visualCapabilities = desktopPaidToolCapabilities(input.providers, input.assignments, {
-      descriptors: input.capabilityBindings?.descriptors,
-      bindings: input.capabilityBindings?.bindings,
-    })
-    const estimate = (capability: 'generate-image' | 'edit-image') => capabilityEstimate(visualCapabilities, capability) ?? ZERO_USD_ESTIMATE
     return createVisualTaskRuntime({
-      tools: createDesktopVisualToolInvoker({ loop, expectedRevision: () => state.current.revision, estimateFor: estimate,
+      tools: createDesktopVisualToolInvoker({ loop, expectedRevision: () => state.current.revision,
         resolveArtifact: async (artifactId) => { const artifact = await artifacts.current!.read(artifactId), sha256 = parseArtifactId(artifactId); if (!artifact || !sha256) throw new Error('Promoted visual artifact is unavailable.'); return { artifactId, sha256, mediaType: artifact.mediaType, provenanceId: `provenance:${sha256}` } },
       }),
-      reviewer: approveFirstVisualCandidate('agent'), store: createStorageVisualExecutionStore(localStorage), estimates: { generate: estimate('generate-image'), edit: estimate('edit-image') }, append: (events) => state.current.append(events),
+      reviewer: approveFirstVisualCandidate('agent'), store: createStorageVisualExecutionStore(localStorage), append: (events) => state.current.append(events),
     })
-  }, [input.assignments, input.capabilityBindings, input.providers, loop])
+  }, [loop])
 
   async function invoke(invocation: DesktopToolInvocation): Promise<readonly DesktopToolArtifact[]> {
     invocation.signal?.throwIfAborted()
@@ -247,7 +202,6 @@ export function useDesktopToolLoop(input: {
           }
         : invocation.image,
       inputArtifactIds: inputIds,
-      capabilities: capabilities(),
     })
     const execute=async()=>{await loop.request({
       runId: invocation.runId,
@@ -284,7 +238,6 @@ export function useDesktopToolLoop(input: {
       if (!sha256) throw new Error('Persisted cutout artifact has an invalid content address.')
       return { artifactId, sha256 }
     },
-    visualBudget: () => createExplicitDesktopVisualBudget(capabilities()),
   }
 }
 

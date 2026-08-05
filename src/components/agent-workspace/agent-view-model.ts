@@ -14,7 +14,7 @@ import {
   resolveAgentResponseSource,
 } from '@/agent-runtime/run-events'
 import { CHAT_SURFACE_TOOLS, toolEventLabel } from '@/agent-runtime/tool-loop'
-import type { MoneyEstimate } from '@/control-protocol'
+import type { MoneyAmount } from '@/control-protocol'
 import { projectExecutionTimeline, type ExecutionTimeline } from './execution-timeline'
 
 export type AgentStageStatus = 'pending' | 'running' | 'done'
@@ -44,6 +44,15 @@ export interface AgentViewModelInput {
     readonly text: string
     readonly label: string
   } | null
+  /** Ephemeral detail for the current durable preparation phase (for example a reconnect attempt). */
+  readonly preparationDetail?: string | null
+}
+
+export interface AgentActivityProgressItem {
+  readonly id: 'context' | 'runtime' | 'response' | 'validation'
+  readonly label: string
+  readonly status: 'complete' | 'running' | 'waiting'
+  readonly detail?: string
 }
 
 export type AgentFeedItem =
@@ -68,6 +77,7 @@ export type AgentFeedItem =
         readonly label: string
         readonly elapsedLabel: string | null
         readonly state?: 'running' | 'complete' | 'failed' | 'cancelled'
+        readonly progress?: readonly AgentActivityProgressItem[]
       }
       readonly branch?: {
         readonly sourceEventId: string
@@ -97,7 +107,7 @@ export type AgentFeedItem =
       readonly toolName?: string
       readonly requestId?: string
       readonly providerModel?: string
-      readonly charged?: MoneyEstimate
+      readonly charged?: MoneyAmount
       readonly approval?: {
         readonly status: 'required' | 'approved' | 'denied' | 'automatic'
         readonly reason: string
@@ -251,6 +261,9 @@ function buildFeed(input: AgentViewModelInput): readonly AgentFeedItem[] {
         provenance: 'runtime',
       }]
     : []
+  const preparationProgress = activePreparation
+    ? projectPreparationProgress(input.runEvents, activePreparation, input.preparationDetail)
+    : undefined
   const preparationActivityItem: AgentFeedItem[] = input.working && !hasLiveAgentText && activePreparation
     ? [{
         id: activePreparation.eventId,
@@ -258,12 +271,13 @@ function buildFeed(input: AgentViewModelInput): readonly AgentFeedItem[] {
         role: 'agent',
         status: 'pending',
         title: 'Agent',
-        detail: activePreparation.detail ?? 'Checking your request…',
+        detail: input.preparationDetail ?? activePreparation.detail ?? 'Checking your request…',
         provenance: 'runtime',
         activity: {
           label: activePreparation.label,
           elapsedLabel: input.elapsedSeconds > 0 ? formatElapsed(input.elapsedSeconds) : null,
           state: 'running',
+          ...(preparationProgress ? { progress: preparationProgress } : {}),
         },
       }]
     : []
@@ -356,6 +370,13 @@ type PreparationLifecycleEvent = StepLifecycleEvent & {
   readonly stepId: `step:prepare:${string}`
 }
 
+const PREPARATION_PHASES = [
+  { id: 'context', label: 'Prepare bounded context' },
+  { id: 'runtime', label: 'Connect planning runtime' },
+  { id: 'response', label: 'Await planning result' },
+  { id: 'validation', label: 'Validate structured response' },
+] as const satisfies readonly Pick<AgentActivityProgressItem, 'id' | 'label'>[]
+
 function isPreparingStepEvent(event: AgentRunEvent): event is PreparationLifecycleEvent {
   return (event.type === 'step-started'
     || event.type === 'step-succeeded'
@@ -375,6 +396,50 @@ function selectActivePreparationEvent(
     if (event.runId === activeRunId && isPreparingStepEvent(event)) latest = event
   }
   return latest?.type === 'step-started' ? latest : null
+}
+
+function preparationPhaseId(stepId: string): AgentActivityProgressItem['id'] | null {
+  for (const phase of PREPARATION_PHASES) {
+    if (stepId.startsWith(`step:prepare:${phase.id}:`)) return phase.id
+  }
+  return null
+}
+
+function projectPreparationProgress(
+  store: AgentRunEventStore | null | undefined,
+  activeEvent: PreparationLifecycleEvent,
+  activeDetail: string | null | undefined,
+): readonly AgentActivityProgressItem[] | undefined {
+  const activeRunId = store?.activeRunId
+  const activePhaseId = preparationPhaseId(activeEvent.stepId)
+  if (!activeRunId || !activePhaseId) return undefined
+
+  const latestByPhase = new Map<AgentActivityProgressItem['id'], PreparationLifecycleEvent>()
+  for (const event of store.events) {
+    if (event.runId !== activeRunId || !isPreparingStepEvent(event)) continue
+    const phaseId = preparationPhaseId(event.stepId)
+    if (phaseId) latestByPhase.set(phaseId, event)
+  }
+
+  return PREPARATION_PHASES.map((phase) => {
+    const latest = latestByPhase.get(phase.id)
+    const status: AgentActivityProgressItem['status'] = latest?.type === 'step-succeeded'
+      ? 'complete'
+      : phase.id === activePhaseId && latest?.type === 'step-started'
+        ? 'running'
+        : 'waiting'
+    const detail = status === 'running'
+      ? activeDetail ?? latest?.detail
+      : status === 'complete'
+        ? latest?.detail
+        : undefined
+    return {
+      id: phase.id,
+      label: phase.label,
+      status,
+      ...(detail ? { detail } : {}),
+    }
+  })
 }
 
 function latestMessageRevisions(events: readonly AgentRunEvent[]): ReadonlyMap<string, string> {

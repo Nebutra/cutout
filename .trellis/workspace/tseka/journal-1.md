@@ -1391,3 +1391,36 @@ Removed Cutout-owned legacy persistence, protocol aliases, inferred recovery, st
 ### Next Steps
 
 - None - task complete
+
+
+## Session 42: Converge stale backlog and Codex auth discovery
+
+**Date**: 2026-08-05
+**Task**: Converge stale backlog and Codex auth discovery
+**Branch**: `release/v0.1.19-rc`
+
+### Summary
+
+Removed the superseded v0.1.16 task record and obsolete Codex auth fallback, constrained discovery and secret re-resolution to the selected current root and schema ids, preserved CC Switch routes, synchronized the provider spec, and passed the full quality gate.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `0edf555` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

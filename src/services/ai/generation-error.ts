@@ -87,6 +87,7 @@ const RETRYABLE_PLANNING_RUNTIME_PATTERNS = [
   /^another planning turn is already active$/i,
   /^planning runtime transport failed$/i,
   /^planning runtime timed out$/i,
+  /^planning runtime upstream is unavailable$/i,
   /^the saved planning conversation is stale$/i,
   /^planning runtime output did not match the required schema$/i,
 ];

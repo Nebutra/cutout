@@ -1,0 +1,6 @@
+{"_example": "Fill with {\"file\": \"<path>\", \"reason\": \"<why>\"}. Put spec/research files only — no code paths. Run `python3 .trellis/scripts/get_context.py --mode packages` to list available specs. Delete this line once real entries are added."}
+{"file": ".trellis/spec/frontend/byok-provider-protocols.md", "reason": "Verify provider imports and checks preserve the BYOK contract"}
+{"file": ".trellis/spec/frontend/agent-control-safety.md", "reason": "Verify path, approval, command, and secret boundaries"}
+{"file": ".trellis/tasks/07-27-local-agent-credential-discovery/research/paseo-agent-catalog-2026-07-27.md", "reason": "Verify complete pinned catalog and installer-safe probes"}
+{"file": "cutout.agent-capabilities.json", "reason": "Verify capability claims stay synchronized and truthful"}
+{"file": ".trellis/tasks/07-27-local-agent-credential-discovery/research/paseo-39-agent-discovery-matrix.md", "reason": "Verify tier boundaries and no unsupported path claims"}

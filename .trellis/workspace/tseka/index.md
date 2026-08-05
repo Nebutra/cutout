@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 41
-- **Last Active**: 2026-08-04
+- **Total Sessions**: 42
+- **Last Active**: 2026-08-05
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~1393 | Active |
+| `journal-1.md` | ~1426 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 42 | 2026-08-05 | Converge stale backlog and Codex auth discovery | `0edf555` | `release/v0.1.19-rc` |
 | 41 | 2026-08-04 | Remove legacy compatibility surfaces | `b374771` | `main` |
 | 40 | 2026-08-03 | Localized release notes experience | `f7ab625` | `feat/release-notes-experience` |
 | 39 | 2026-08-03 | Publish and install Cutout v0.1.15 | `543c22a`, `1c8d457` | `chore/finish-v0.1.15` |

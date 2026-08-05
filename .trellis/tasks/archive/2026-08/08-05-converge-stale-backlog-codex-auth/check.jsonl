@@ -1,0 +1,2 @@
+{"file":".trellis/spec/frontend/byok-provider-protocols.md","reason":"Verify exact Codex root discovery, sanitized candidate metadata, current schema ids, native secret re-resolution, and CC Switch coverage."}
+{"file":".trellis/tasks/archive/2026-08/08-03-publish-install-v0-1-17/research/release-state.md","reason":"Confirm the immutable v0.1.16 tag produced no public Release and the archived v0.1.17 task superseded the stale publication record."}

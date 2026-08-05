@@ -64,7 +64,6 @@ pub fn run() {
             commands::ai::codex_system::codex_system_turn_steer,
             commands::ai::codex_system::codex_system_turn_interrupt,
             commands::ai::codex_system::codex_system_conversation_reset,
-            commands::ai::local_agent_inventory::discover_local_agent_inventory,
             commands::ai::provider_discovery::discover_provider_candidates,
             commands::ai::provider_discovery::auto_configure_provider_candidate,
             commands::ai::provider_discovery::create_provider_draft,

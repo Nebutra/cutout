@@ -45,7 +45,7 @@ function designSystemExecutor(input: LocalDeliveryInputs, hosts: LocalDeliveryHo
     async preview(target) {
       requireManaged(target.destination.kind)
       const kit = designKitSchema.parse(select(input.designKits, metadataRef(target.metadata), 'Design System Kit'))
-      return { targetId: target.id, kind: 'design-system', destination: target.destination, effects: ['managed-export'], estimatedCostUsd: 0, currency: 'USD', files: kit.files.map(({ path, sha256 }) => ({ path, sha256 })), warnings: [] }
+      return { targetId: target.id, kind: 'design-system', destination: target.destination, effects: ['managed-export'], files: kit.files.map(({ path, sha256 }) => ({ path, sha256 })), warnings: [] }
     },
     async execute(target, context) {
       requireManaged(target.destination.kind)
@@ -65,7 +65,7 @@ function componentsExecutor(input: LocalDeliveryInputs, hosts: LocalDeliveryHost
     async preview(target) {
       requireManaged(target.destination.kind)
       const bundle = componentCompilerOutputSchema.parse(select(input.componentBundles, metadataRef(target.metadata), 'Component bundle'))
-      return { targetId: target.id, kind: 'components', destination: target.destination, effects: ['managed-export'], estimatedCostUsd: 0, currency: 'USD', files: bundle.files.map(({ path, sha256 }) => ({ path, sha256 })), warnings: ['Component source is emitted only for explicit candidates; screenshot inference is not claimed.'] }
+      return { targetId: target.id, kind: 'components', destination: target.destination, effects: ['managed-export'], files: bundle.files.map(({ path, sha256 }) => ({ path, sha256 })), warnings: ['Component source is emitted only for explicit candidates; screenshot inference is not claimed.'] }
     },
     async execute(target, context) {
       requireManaged(target.destination.kind)
@@ -84,7 +84,7 @@ function brandExecutor(input: LocalDeliveryInputs, hosts: LocalDeliveryHosts, no
     async preview(target) {
       requireManaged(target.destination.kind)
       const kit = brandKitSchema.parse(select(input.brandKits, metadataRef(target.metadata), 'Brand Kit'))
-      return { targetId: target.id, kind: 'brand-kit', destination: target.destination, effects: ['managed-export'], estimatedCostUsd: 0, currency: 'USD', files: kit.files.map(({ path, sha256 }) => ({ path, sha256 })), warnings: [] }
+      return { targetId: target.id, kind: 'brand-kit', destination: target.destination, effects: ['managed-export'], files: kit.files.map(({ path, sha256 }) => ({ path, sha256 })), warnings: [] }
     },
     async execute(target, context) {
       requireManaged(target.destination.kind)
@@ -103,7 +103,7 @@ function starterExecutor(input: LocalDeliveryInputs, hosts: LocalDeliveryHosts, 
     async preview(target) {
       requireManaged(target.destination.kind)
       const plan = starterPlanSchema.parse(select(input.starters, metadataRef(target.metadata), 'Starter'))
-      return { targetId: target.id, kind: 'starter', destination: target.destination, effects: ['managed-export'], estimatedCostUsd: 0, currency: 'USD', files: plan.files.map(({ path, sha256 }) => ({ path, sha256 })), warnings: ['This export validates the deterministic Starter plan; it does not claim a package build or publish.'] }
+      return { targetId: target.id, kind: 'starter', destination: target.destination, effects: ['managed-export'], files: plan.files.map(({ path, sha256 }) => ({ path, sha256 })), warnings: ['This export validates the deterministic Starter plan; it does not claim a package build or publish.'] }
     },
     async execute(target, context) {
       requireManaged(target.destination.kind)
@@ -121,7 +121,7 @@ function registryExecutor(input: LocalDeliveryInputs, hosts: LocalDeliveryHosts,
     async preview(target) {
       requireManaged(target.destination.kind)
       const item = RegistryItemSchema.parse(select(input.registryItems, metadataRef(target.metadata), 'Registry item'))
-      return { targetId: target.id, kind: 'registry', destination: target.destination, effects: ['managed-export'], estimatedCostUsd: 0, currency: 'USD', files: item.files.map(({ path, sha256 }) => ({ path, sha256 })), warnings: ['Install remains approval-gated and aborts on three-way conflicts.'] }
+      return { targetId: target.id, kind: 'registry', destination: target.destination, effects: ['managed-export'], files: item.files.map(({ path, sha256 }) => ({ path, sha256 })), warnings: ['Install remains approval-gated and aborts on three-way conflicts.'] }
     },
     async execute(target, context) {
       requireManaged(target.destination.kind)

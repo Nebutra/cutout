@@ -19,11 +19,6 @@ description = "Allows host-owned provider secret, discovery/draft and policy-che
 commands.allow = ["set_key", "key_status", "delete_key", "list_key_status", "load_providers", "save_providers", "discover_provider_candidates", "auto_configure_provider_candidate", "create_provider_draft", "check_provider_draft", "import_provider_draft", "cancel_provider_draft", "ai_proxy_request", "ai_proxy_stream", "ai_proxy_cancel", "ai_image_edit", "set_vectorizer_api_key", "vectorizer_key_status", "delete_vectorizer_api_key", "vectorize_local_vtracer", "vectorize_vectorizer_ai"]
 
 [[permission]]
-identifier = "local-agent-inventory"
-description = "Allows bounded, metadata-only discovery of reviewed local coding Agent installations."
-commands.allow = ["discover_local_agent_inventory"]
-
-[[permission]]
 identifier = "codex-system-runtime"
 description = "Allows the fixed signed Codex planning runtime: sanitized probing plus opaque conversation turns, steering, interruption and reset. No generic process, credential or path authority is exposed."
 commands.allow = ["codex_system_probe", "codex_system_turn_start", "codex_system_turn_steer", "codex_system_turn_interrupt", "codex_system_conversation_reset"]

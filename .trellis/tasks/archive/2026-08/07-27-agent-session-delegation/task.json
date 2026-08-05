@@ -1,0 +1,30 @@
+{
+  "id": "agent-session-delegation",
+  "name": "agent-session-delegation",
+  "title": "Controlled Agent session delegation",
+  "description": "Invoke supported local Agent runtimes through reviewed non-interactive contracts so users can use their existing authenticated subscriptions without copying session credentials.",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P2",
+  "creator": "tseka",
+  "assignee": "tseka",
+  "createdAt": "2026-07-27",
+  "completedAt": "2026-08-05",
+  "branch": null,
+  "base_branch": "feat/local-agent-credential-discovery",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [
+    "07-27-agent-session-host-hardening",
+    "07-27-codex-advisory-session-adapter",
+    "07-27-agent-session-settings-i18n"
+  ],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {}
+}

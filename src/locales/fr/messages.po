@@ -2828,7 +2828,7 @@ msgstr "Canal de mise à jour"
 #. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
 msgid "settings.upgrade_codex_action"
-msgstr "Mettez Codex à jour vers une version avec des racines lisibles restreintes."
+msgstr "Mettez Codex à jour vers une version signée compatible."
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx

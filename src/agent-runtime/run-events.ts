@@ -3,7 +3,7 @@ import type {
   MissingRequirement,
 } from './outcome-runtime'
 import { z } from 'zod'
-import { moneyEstimateSchema, paidToolReceiptSchema, type MoneyEstimate, type PaidToolReceipt } from '@/control-protocol/paid-tool-contract'
+import { paidToolReceiptSchema, type PaidToolReceipt } from '@/control-protocol/paid-tool-contract'
 import { prototypeHumanLoopChoiceSchema, type HumanLoopChoice } from '@/prototype/prototype-plan'
 
 const runEventBaseSchema = z.object({
@@ -45,8 +45,7 @@ export const agentRunEventSchema = z.discriminatedUnion('type', [
     label: eventText,
     stepId: eventText.optional(),
     model: z.object({ providerId: eventText, model: eventText }).strict().optional(),
-    budgetCeiling: moneyEstimateSchema,
-    approvalPolicy: z.enum(['explicit', 'auto-within-budget']),
+    approvalPolicy: z.enum(['explicit', 'auto']),
     reason: eventText,
     /** True only when a human must approve before the tool can run. */
     pendingApproval: z.boolean(),
@@ -150,8 +149,7 @@ export type AgentRunEvent =
       readonly label: string
       readonly stepId?: string
       readonly model?: AgentModelRef
-      readonly budgetCeiling: MoneyEstimate
-      readonly approvalPolicy: 'explicit' | 'auto-within-budget'
+      readonly approvalPolicy: 'explicit' | 'auto'
       readonly reason: string
       readonly pendingApproval: boolean
     })
@@ -260,8 +258,7 @@ export interface AgentToolProjection {
   readonly outputRefs: readonly string[]
   readonly requestId?: string
   readonly previousRequestId?: string
-  readonly budgetCeiling?: MoneyEstimate
-  readonly approvalPolicy?: 'explicit' | 'auto-within-budget'
+  readonly approvalPolicy?: 'explicit' | 'auto'
   readonly approvalReason?: string
   readonly approvalStatus?: 'required' | 'approved' | 'denied'
   readonly receipt?: PaidToolReceipt
@@ -626,7 +623,6 @@ function reduceActiveRun(
             status: 'running',
             outputRefs: [],
             requestId: event.requestId,
-            budgetCeiling: event.budgetCeiling,
             approvalPolicy: event.approvalPolicy,
             approvalReason: event.reason,
             approvalStatus: 'required',
@@ -693,7 +689,6 @@ function reduceActiveRun(
             outputRefs: event.type === 'tool-succeeded' ? event.outputRefs : [],
             requestId: existing?.requestId,
             previousRequestId: existing?.previousRequestId,
-            budgetCeiling: existing?.budgetCeiling,
             approvalPolicy: existing?.approvalPolicy,
             approvalReason: existing?.approvalReason,
             approvalStatus: existing?.approvalStatus,

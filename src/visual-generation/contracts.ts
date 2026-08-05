@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { moneyEstimateSchema } from "@/control-protocol/paid-tool-contract";
 
 const id = z.string().min(1).max(160);
 const text = z.string().min(1).max(20_000);
@@ -106,10 +105,9 @@ export const visualGenerationTaskSchema = z
         instruction:
           "Refine the selected candidate while preserving locked identity, composition, and series traits.",
       }),
-    budget: z
+    execution: z
       .object({
-        ceiling: moneyEstimateSchema,
-        approvalPolicy: z.enum(["explicit", "auto-within-budget"]),
+        approvalPolicy: z.enum(["explicit", "auto"]),
         maxAttemptsPerNode: z.number().int().min(1).max(4).default(2),
       })
       .strict(),
@@ -267,7 +265,6 @@ export const visualGenerationPlanSchema = z
     planId: id,
     task: visualGenerationTaskSchema,
     nodes: z.array(visualDagNodeSchema).min(3),
-    estimatedCost: moneyEstimateSchema,
     idempotencyKey: id,
   })
   .strict();

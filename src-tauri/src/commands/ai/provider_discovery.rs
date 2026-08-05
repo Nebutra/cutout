@@ -20,11 +20,12 @@ use super::providers::{
 
 const MAX_CONFIG_BYTES: u64 = 1024 * 1024;
 const MAX_CC_SWITCH_DB_BYTES: u64 = 256 * 1024 * 1024;
+const MAX_CC_SWITCH_CANDIDATES: usize = 32;
 const MAX_DRAFTS: usize = 32;
 const DRAFT_TTL: Duration = Duration::from_secs(10 * 60);
 const CODEX_CC_SWITCH_PROVIDER_ID: &str = "ccswitch";
 const CC_SWITCH_DB_LOCATION: &str = "~/.cc-switch/cc-switch.db";
-const CC_SWITCH_DB_SCHEMA_ID: &str = "cc-switch-db-codex-v1";
+const CC_SWITCH_DB_SCHEMA_ID: &str = "cc-switch-db-codex-failover-v1";
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -499,11 +500,15 @@ fn normalized_draft_wire_protocol(
         .map_err(DiscoveryError::UnsupportedWireProtocol)
 }
 
-fn codex_location(home: &Path) -> (PathBuf, &'static str) {
-    match std::env::var_os("CODEX_HOME") {
-        Some(path) => (PathBuf::from(path), "$CODEX_HOME"),
+fn codex_location_from(home: &Path, configured_home: Option<PathBuf>) -> (PathBuf, &'static str) {
+    match configured_home {
+        Some(path) => (path, "$CODEX_HOME"),
         None => (home.join(".codex"), "~/.codex"),
     }
+}
+
+fn codex_location(home: &Path) -> (PathBuf, &'static str) {
+    codex_location_from(home, std::env::var_os("CODEX_HOME").map(PathBuf::from))
 }
 
 fn codex_api_key_from(path: &Path) -> Result<Option<String>, DiscoveryError> {
@@ -519,40 +524,13 @@ fn codex_api_key_from(path: &Path) -> Result<Option<String>, DiscoveryError> {
         .map(str::to_owned))
 }
 
-fn codex_auth_source(
-    codex_home: &Path,
-    legacy_auth: Option<&Path>,
-) -> Result<(Option<String>, bool), DiscoveryError> {
-    let primary = codex_home.join("auth.json");
-    if read_exact_config(&primary)?.is_some() {
-        return Ok((codex_api_key_from(&primary)?, false));
-    }
-    match legacy_auth {
-        Some(path) => Ok((codex_api_key_from(path)?, true)),
-        None => Ok((None, false)),
-    }
-}
-
-#[cfg(test)]
 fn discover_codex_at(
     codex_home: &Path,
     display_root: &str,
 ) -> Result<Vec<ProviderCandidate>, DiscoveryError> {
-    discover_codex_at_with_legacy(codex_home, display_root, None)
-}
-
-fn discover_codex_at_with_legacy(
-    codex_home: &Path,
-    display_root: &str,
-    legacy_auth: Option<&Path>,
-) -> Result<Vec<ProviderCandidate>, DiscoveryError> {
     let config_location = format!("{display_root}/config.toml");
-    let (auth_key, using_legacy_auth) = codex_auth_source(codex_home, legacy_auth)?;
-    let auth_location = if using_legacy_auth {
-        "~/.config/codex/auth.json".into()
-    } else {
-        format!("{display_root}/auth.json")
-    };
+    let auth_location = format!("{display_root}/auth.json");
+    let auth_key = codex_api_key_from(&codex_home.join("auth.json"))?;
     let config = match read_exact_config(&codex_home.join("config.toml"))? {
         Some(raw) => Some(
             toml::from_str::<toml::Value>(&raw)
@@ -594,14 +572,7 @@ fn discover_codex_at_with_legacy(
             source: "codex".into(),
             source_label: "Codex".into(),
             agent_id: Some("codex".into()),
-            schema_id: Some(
-                if using_legacy_auth {
-                    "codex-root-cc-switch-legacy-auth-v1"
-                } else {
-                    "codex-root-cc-switch-v1"
-                }
-                .into(),
-            ),
+            schema_id: Some("codex-root-cc-switch-v1".into()),
             config_location: Some(auth_location.clone()),
             kind: "cc-switch".into(),
             label: "CC Switch".into(),
@@ -662,14 +633,7 @@ fn discover_codex_at_with_legacy(
                 source: "codex".into(),
                 source_label: "Codex".into(),
                 agent_id: Some("codex".into()),
-                schema_id: Some(
-                    if use_auth_file && using_legacy_auth {
-                        "codex-config-legacy-auth-v1"
-                    } else {
-                        "codex-config-v1"
-                    }
-                    .into(),
-                ),
+                schema_id: Some("codex-config-v1".into()),
                 config_location: Some(if use_auth_file {
                     auth_location.clone()
                 } else {
@@ -717,14 +681,7 @@ fn discover_codex_at_with_legacy(
             source: "codex".into(),
             source_label: "Codex".into(),
             agent_id: Some("codex".into()),
-            schema_id: Some(
-                if using_legacy_auth {
-                    "codex-legacy-auth-v1"
-                } else {
-                    "codex-auth-v1"
-                }
-                .into(),
-            ),
+            schema_id: Some("codex-auth-v1".into()),
             config_location: Some(auth_location),
             kind: "openai".into(),
             label: "OpenAI".into(),
@@ -745,11 +702,7 @@ fn discover_codex_at_with_legacy(
 
 fn discover_codex(home: &Path) -> Result<Vec<ProviderCandidate>, DiscoveryError> {
     let (codex_home, display_root) = codex_location(home);
-    discover_codex_at_with_legacy(
-        &codex_home,
-        display_root,
-        Some(&home.join(".config/codex/auth.json")),
-    )
+    discover_codex_at(&codex_home, display_root)
 }
 
 fn cc_switch_db_error() -> DiscoveryError {
@@ -781,6 +734,8 @@ fn validate_cc_switch_provider_schema(
         ("app_type", "TEXT", 1, 2),
         ("settings_config", "TEXT", 1, 0),
         ("is_current", "BOOLEAN", 1, 0),
+        ("in_failover_queue", "BOOLEAN", 1, 0),
+        ("sort_index", "INTEGER", 0, 0),
     ] {
         let Some((actual_type, actual_not_null, actual_primary_key)) = columns.get(name) else {
             return Err(DiscoveryError::Parse(
@@ -876,9 +831,9 @@ fn parse_cc_switch_settings(raw: &str) -> Result<(String, Option<String>, String
     ))
 }
 
-fn cc_switch_current_provider_at(
+fn cc_switch_provider_records_at(
     database_path: &Path,
-) -> Result<Option<CcSwitchProviderRecord>, DiscoveryError> {
+) -> Result<Vec<CcSwitchProviderRecord>, DiscoveryError> {
     fn database_identity(path: &Path) -> Result<Option<FileIdentity>, DiscoveryError> {
         let Some(metadata) = exact_path_metadata(path)? else {
             return Ok(None);
@@ -895,7 +850,7 @@ fn cc_switch_current_provider_at(
     }
 
     let Some(before_identity) = database_identity(database_path)? else {
-        return Ok(None);
+        return Ok(Vec::new());
     };
     let result = (|| {
         let connection = rusqlite::Connection::open_with_flags(
@@ -913,56 +868,89 @@ fn cc_switch_current_provider_at(
 
         let mut statement = connection
             .prepare(
-                "SELECT id, length(settings_config), \
-                        CASE WHEN length(settings_config) <= ?1 THEN settings_config END \
+                "SELECT id, length(CAST(settings_config AS BLOB)), \
+                        CASE WHEN length(CAST(settings_config AS BLOB)) <= ?1 THEN settings_config END, \
+                        is_current, in_failover_queue, sort_index \
                  FROM providers \
-                 WHERE app_type = 'codex' AND is_current = 1 LIMIT 2",
+                 WHERE app_type = 'codex' \
+                   AND (is_current = 1 OR in_failover_queue = 1) \
+                 ORDER BY is_current DESC, COALESCE(sort_index, 999999), id ASC \
+                 LIMIT ?2",
             )
             .map_err(|_| cc_switch_db_error())?;
         let mut rows = statement
-            .query([MAX_CONFIG_BYTES as i64])
+            .query(rusqlite::params![
+                MAX_CONFIG_BYTES as i64,
+                (MAX_CC_SWITCH_CANDIDATES + 1) as i64
+            ])
             .map_err(|_| cc_switch_db_error())?;
-        let Some(row) = rows.next().map_err(|_| cc_switch_db_error())? else {
-            return Ok(None);
-        };
-        let provider_id: String = row.get(0).map_err(|_| cc_switch_db_error())?;
-        let settings_length: i64 = row.get(1).map_err(|_| cc_switch_db_error())?;
-        if settings_length < 0 || settings_length as u64 > MAX_CONFIG_BYTES {
-            return Err(DiscoveryError::TooLarge(
-                "CC Switch provider settings".into(),
+        let mut selected = Vec::new();
+        let mut current_count = 0;
+        while let Some(row) = rows.next().map_err(|_| cc_switch_db_error())? {
+            let provider_id: String = row.get(0).map_err(|_| cc_switch_db_error())?;
+            let settings_length: i64 = row.get(1).map_err(|_| cc_switch_db_error())?;
+            if settings_length < 0 || settings_length as u64 > MAX_CONFIG_BYTES {
+                return Err(DiscoveryError::TooLarge(
+                    "CC Switch provider settings".into(),
+                ));
+            }
+            let settings: Option<String> = row.get(2).map_err(|_| cc_switch_db_error())?;
+            let is_current: i64 = row.get(3).map_err(|_| cc_switch_db_error())?;
+            let in_failover_queue: i64 = row.get(4).map_err(|_| cc_switch_db_error())?;
+            let sort_index: Option<i64> = row.get(5).map_err(|_| cc_switch_db_error())?;
+            if !matches!(is_current, 0 | 1)
+                || !matches!(in_failover_queue, 0 | 1)
+                || sort_index.is_some_and(|value| value < 0)
+            {
+                return Err(DiscoveryError::Parse(
+                    "CC Switch provider ordering is invalid".into(),
+                ));
+            }
+            current_count += usize::from(is_current == 1);
+            selected.push((
+                provider_id,
+                settings.ok_or_else(|| {
+                    DiscoveryError::TooLarge("CC Switch provider settings".into())
+                })?,
             ));
         }
-        let settings: String = row.get(2).map_err(|_| cc_switch_db_error())?;
-        if rows.next().map_err(|_| cc_switch_db_error())?.is_some() {
+        if selected.len() > MAX_CC_SWITCH_CANDIDATES {
+            return Err(DiscoveryError::Parse(
+                "CC Switch Codex provider queue is too large".into(),
+            ));
+        }
+        if current_count > 1 {
             return Err(DiscoveryError::Parse(
                 "CC Switch has multiple current Codex providers".into(),
             ));
         }
-        Ok(Some((provider_id, settings)))
+        Ok(selected)
     })();
     if database_identity(database_path)? != Some(before_identity) {
         return Err(DiscoveryError::Read(
             "CC Switch database identity changed during read".into(),
         ));
     };
-    let Some((provider_id, settings)) = result? else {
-        return Ok(None);
-    };
-    if provider_id.is_empty()
-        || provider_id.len() > 160
-        || provider_id.chars().any(char::is_control)
-    {
-        return Err(DiscoveryError::Parse(
-            "CC Switch current provider identity is invalid".into(),
-        ));
-    }
-    let (base_url, model_hint, secret) = parse_cc_switch_settings(&settings)?;
-    Ok(Some(CcSwitchProviderRecord {
-        provider_id,
-        base_url,
-        model_hint,
-        secret,
-    }))
+    result?
+        .into_iter()
+        .map(|(provider_id, settings)| {
+            if provider_id.is_empty()
+                || provider_id.len() > 160
+                || provider_id.chars().any(char::is_control)
+            {
+                return Err(DiscoveryError::Parse(
+                    "CC Switch provider identity is invalid".into(),
+                ));
+            }
+            let (base_url, model_hint, secret) = parse_cc_switch_settings(&settings)?;
+            Ok(CcSwitchProviderRecord {
+                provider_id,
+                base_url,
+                model_hint,
+                secret,
+            })
+        })
+        .collect()
 }
 
 fn cc_switch_candidate(record: &CcSwitchProviderRecord) -> ProviderCandidate {
@@ -978,7 +966,7 @@ fn cc_switch_candidate(record: &CcSwitchProviderRecord) -> ProviderCandidate {
         schema_id: Some(CC_SWITCH_DB_SCHEMA_ID.into()),
         config_location: Some(CC_SWITCH_DB_LOCATION.into()),
         kind: "openai-compatible".into(),
-        label: "CC Switch current Codex upstream".into(),
+        label: "CC Switch Codex upstream".into(),
         base_url: Some(record.base_url.clone()),
         wire_protocol: Some("responses".into()),
         model_hint: record.model_hint.clone(),
@@ -994,10 +982,9 @@ fn cc_switch_candidate(record: &CcSwitchProviderRecord) -> ProviderCandidate {
 
 fn discover_cc_switch(home: &Path) -> Result<Vec<ProviderCandidate>, DiscoveryError> {
     Ok(
-        cc_switch_current_provider_at(&home.join(".cc-switch/cc-switch.db"))?
-            .as_ref()
+        cc_switch_provider_records_at(&home.join(".cc-switch/cc-switch.db"))?
+            .iter()
             .map(cc_switch_candidate)
-            .into_iter()
             .collect(),
     )
 }
@@ -1140,7 +1127,9 @@ fn discover_claude(home: &Path) -> Result<Vec<ProviderCandidate>, DiscoveryError
     Ok(rows)
 }
 
-fn discover_environment() -> Vec<ProviderCandidate> {
+fn discover_environment_with(
+    read_environment: impl Fn(&str) -> Option<std::ffi::OsString>,
+) -> Vec<ProviderCandidate> {
     let definitions = [
         (
             "OPENAI_API_KEY",
@@ -1164,10 +1153,10 @@ fn discover_environment() -> Vec<ProviderCandidate> {
             Some("google-generate-content"),
         ),
     ];
-    definitions
+    let mut candidates: Vec<_> = definitions
         .into_iter()
         .filter_map(|(env, kind, label, base, wire)| {
-            std::env::var_os(env).map(|_| ProviderCandidate {
+            read_environment(env).map(|_| ProviderCandidate {
                 id: candidate_id(&["environment", env]),
                 source: "environment".into(),
                 source_label: "Process environment".into(),
@@ -1188,7 +1177,91 @@ fn discover_environment() -> Vec<ProviderCandidate> {
                 warnings: vec![],
             })
         })
-        .collect()
+        .collect();
+
+    for (env, base_env, label, expected_base, model_hint) in [
+        (
+            "MOX_API_KEY",
+            "MOX_BASE_URL",
+            "MOX",
+            "https://aigw.mox.ktvsky.com/v1",
+            "gpt-5.5",
+        ),
+        (
+            "TDS_API_KEY",
+            "TDS_BASE_URL",
+            "TDS Router",
+            "https://router.tds.cc.cd/v1",
+            "gpt-5.5",
+        ),
+    ] {
+        if read_environment(env).is_none() {
+            checkpoint_reviewed_environment_relay(env, "key-missing");
+            continue;
+        }
+        checkpoint_reviewed_environment_relay(env, "key-present");
+        let supplied_base = read_environment(base_env)
+            .and_then(|value| value.into_string().ok())
+            .unwrap_or_else(|| expected_base.to_owned());
+        let normalized_base = normalize_protocol_base_url(
+            &supplied_base,
+            Some(ProviderWireProtocol::ChatCompletions),
+        );
+        if normalized_base.ok().as_deref() != Some(expected_base) {
+            checkpoint_reviewed_environment_relay(env, "base-rejected");
+            continue;
+        }
+        checkpoint_reviewed_environment_relay(env, "candidate-created");
+        candidates.push(ProviderCandidate {
+            id: candidate_id(&["environment", env, expected_base]),
+            source: "environment".into(),
+            source_label: "Process environment".into(),
+            agent_id: None,
+            schema_id: None,
+            config_location: None,
+            kind: "openai-compatible".into(),
+            label: label.into(),
+            base_url: Some(expected_base.into()),
+            wire_protocol: Some("chat-completions".into()),
+            model_hint: Some(model_hint.into()),
+            credential: CredentialPreview {
+                source_type: "environment".into(),
+                reference: Some(env.into()),
+                available: true,
+                importable: true,
+            },
+            warnings: vec![],
+        });
+    }
+    candidates
+}
+
+fn discover_environment() -> Vec<ProviderCandidate> {
+    discover_environment_with(|name| std::env::var_os(name))
+}
+
+fn reviewed_environment_relay_id(reference: &str) -> Option<&'static str> {
+    match reference {
+        "MOX_API_KEY" => Some("mox"),
+        "TDS_API_KEY" => Some("tds"),
+        _ => None,
+    }
+}
+
+fn checkpoint_reviewed_environment_relay(reference: &str, outcome: &str) {
+    let Some(relay) = reviewed_environment_relay_id(reference) else {
+        return;
+    };
+    crate::commands::packaged_e2e::native_checkpoint(&format!(
+        "ai-native-environment-{relay}-{outcome}"
+    ));
+}
+
+fn candidate_reviewed_environment_relay(candidate: &ProviderCandidate) -> Option<&'static str> {
+    if candidate.source != "environment" {
+        return None;
+    }
+    reviewed_environment_relay_id(candidate.credential.reference.as_deref()?)
 }
 
 const PROVIDER_REGISTRY_FILE: &str = "providers.json";
@@ -1376,27 +1449,25 @@ fn candidate_secret_at(
         ("codex", Some("OPENAI_API_KEY"))
             if candidate.credential.source_type == "config-literal" =>
         {
-            let legacy = home.join(".config/codex/auth.json");
-            let primary = codex_home.join("auth.json");
-            let source = if candidate
-                .schema_id
-                .as_deref()
-                .is_some_and(|schema| schema.contains("legacy-auth"))
-            {
-                &legacy
-            } else {
-                &primary
-            };
-            codex_api_key_from(source)?.ok_or(DiscoveryError::CandidateMissing)
+            if !matches!(
+                candidate.schema_id.as_deref(),
+                Some("codex-auth-v1" | "codex-config-v1" | "codex-root-cc-switch-v1")
+            ) {
+                return Err(DiscoveryError::CandidateMissing);
+            }
+            codex_api_key_from(&codex_home.join("auth.json"))?
+                .ok_or(DiscoveryError::CandidateMissing)
         }
         ("cc-switch", Some("OPENAI_API_KEY"))
             if candidate.credential.source_type == "cc-switch-db"
                 && candidate.schema_id.as_deref() == Some(CC_SWITCH_DB_SCHEMA_ID) =>
         {
-            let record = cc_switch_current_provider_at(&home.join(".cc-switch/cc-switch.db"))?
+            let record = cc_switch_provider_records_at(&home.join(".cc-switch/cc-switch.db"))?
+                .into_iter()
+                .find(|record| cc_switch_candidate(record).id == candidate.id)
                 .ok_or(DiscoveryError::CandidateMissing)?;
-            let current = cc_switch_candidate(&record);
-            if candidate_fingerprint(&current)? != candidate_fingerprint(candidate)? {
+            let resolved = cc_switch_candidate(&record);
+            if candidate_fingerprint(&resolved)? != candidate_fingerprint(candidate)? {
                 return Err(DiscoveryError::CandidateMissing);
             }
             Ok(record.secret)
@@ -1976,6 +2047,37 @@ fn request_failure_cause(error: &DiscoveryError) -> &str {
     }
 }
 
+fn automatic_catalog_outcome(error: &DiscoveryError) -> String {
+    match error {
+        DiscoveryError::Http(401 | 403) => "unauthorized".to_owned(),
+        DiscoveryError::Http(_) => "http-failed".to_owned(),
+        DiscoveryError::CatalogMalformed | DiscoveryError::CatalogUnsupported => {
+            "invalid".to_owned()
+        }
+        DiscoveryError::Request(_) => format!("request-{}", request_failure_cause(error)),
+        DiscoveryError::CandidateMissing | DiscoveryError::NotImportable => {
+            "credential-missing".to_owned()
+        }
+        DiscoveryError::Keychain(_) => "credential-vault-failed".to_owned(),
+        _ => "configuration-failed".to_owned(),
+    }
+}
+
+fn checkpoint_reviewed_relay_catalog(
+    candidate: &ProviderCandidate,
+    error: Option<&DiscoveryError>,
+) {
+    let Some(relay) = candidate_reviewed_environment_relay(candidate) else {
+        return;
+    };
+    let outcome = error
+        .map(automatic_catalog_outcome)
+        .unwrap_or_else(|| "checked".to_owned());
+    crate::commands::packaged_e2e::native_checkpoint(&format!(
+        "ai-native-environment-{relay}-catalog-{outcome}"
+    ));
+}
+
 fn checkpoint_cutout_keychain_catalog_error(error: &DiscoveryError, ordinal: usize) {
     let suffix = match error {
         DiscoveryError::Http(401 | 403) => "unauthorized".to_owned(),
@@ -2027,6 +2129,11 @@ pub async fn auto_configure_provider_candidate<R: Runtime>(
     if !candidate.credential.available || !candidate.credential.importable {
         return Err(DiscoveryError::NotImportable);
     }
+    if let Some(relay) = candidate_reviewed_environment_relay(&candidate) {
+        crate::commands::packaged_e2e::native_checkpoint(&format!(
+            "ai-native-environment-{relay}-attempted"
+        ));
+    }
     crate::commands::packaged_e2e::native_checkpoint("ai-native-candidate-resolved");
     let base_url = candidate_effective_base_url(&candidate)
         .map(str::to_owned)
@@ -2065,7 +2172,7 @@ pub async fn auto_configure_provider_candidate<R: Runtime>(
         )?;
         let draft = ProviderDraftSession {
             created_at: Instant::now(),
-            kind: candidate.kind,
+            kind: candidate.kind.clone(),
             base_url,
             wire_protocol,
             candidate_id: None,
@@ -2076,8 +2183,12 @@ pub async fn auto_configure_provider_candidate<R: Runtime>(
             checked_models: None,
         };
         let models = match checked_automatic_draft(&app, &draft).await {
-            Ok(models) => models,
+            Ok(models) => {
+                checkpoint_reviewed_relay_catalog(&candidate, None);
+                models
+            }
             Err(error) => {
+                checkpoint_reviewed_relay_catalog(&candidate, Some(&error));
                 if let Some(ordinal) = cutout_keychain_ordinal {
                     checkpoint_cutout_keychain_catalog_error(&error, ordinal);
                 }
@@ -2116,8 +2227,12 @@ pub async fn auto_configure_provider_candidate<R: Runtime>(
         checked_models: None,
     };
     let models = match checked_automatic_draft(&app, &draft).await {
-        Ok(models) => models,
+        Ok(models) => {
+            checkpoint_reviewed_relay_catalog(&candidate, None);
+            models
+        }
         Err(error) => {
+            checkpoint_reviewed_relay_catalog(&candidate, Some(&error));
             if let Some(ordinal) = cutout_keychain_ordinal {
                 checkpoint_cutout_keychain_catalog_error(&error, ordinal);
             }
@@ -2148,12 +2263,30 @@ pub async fn auto_configure_provider_candidate<R: Runtime>(
         return Err(DiscoveryError::Persistence(error.to_string()));
     }
     crate::commands::packaged_e2e::native_checkpoint("ai-native-provider-saved");
+    if let Some(relay) = candidate_reviewed_environment_relay(&candidate) {
+        crate::commands::packaged_e2e::native_checkpoint(&format!(
+            "ai-native-environment-{relay}-provider-saved"
+        ));
+    }
     Ok(AutoConfiguredProvider { provider, models })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn codex_location_prefers_configured_home_and_defaults_to_dot_codex() {
+        let home = Path::new("/test-home");
+        assert_eq!(
+            codex_location_from(home, None),
+            (home.join(".codex"), "~/.codex")
+        );
+        assert_eq!(
+            codex_location_from(home, Some(PathBuf::from("/selected-codex"))),
+            (PathBuf::from("/selected-codex"), "$CODEX_HOME")
+        );
+    }
 
     #[test]
     fn automatic_ids_are_stable_and_opaque() {
@@ -2163,6 +2296,35 @@ mod tests {
             format!("local-import-{}", "a".repeat(24))
         );
         assert!(automatic_provider_id("candidate:/local/path").is_err());
+    }
+
+    #[test]
+    fn reviewed_relay_environment_candidates_use_fixed_origins_and_model_hints() {
+        let values = HashMap::from([
+            ("MOX_API_KEY", "available"),
+            ("MOX_BASE_URL", "https://aigw.mox.ktvsky.com"),
+            ("TDS_API_KEY", "available"),
+            ("TDS_BASE_URL", "https://unexpected.example/v1"),
+        ]);
+        let candidates =
+            discover_environment_with(|name| values.get(name).map(std::ffi::OsString::from));
+
+        let mox = candidates
+            .iter()
+            .find(|candidate| candidate.label == "MOX")
+            .unwrap();
+        assert_eq!(mox.kind, "openai-compatible");
+        assert_eq!(
+            mox.base_url.as_deref(),
+            Some("https://aigw.mox.ktvsky.com/v1")
+        );
+        assert_eq!(mox.wire_protocol.as_deref(), Some("chat-completions"));
+        assert_eq!(mox.model_hint.as_deref(), Some("gpt-5.5"));
+        assert_eq!(mox.credential.reference.as_deref(), Some("MOX_API_KEY"));
+        assert!(mox.credential.importable);
+        assert!(!candidates
+            .iter()
+            .any(|candidate| candidate.label == "TDS Router"));
     }
 
     #[test]
@@ -2229,6 +2391,8 @@ mod tests {
                     name TEXT NOT NULL,
                     settings_config TEXT NOT NULL,
                     is_current BOOLEAN NOT NULL DEFAULT 0,
+                    in_failover_queue BOOLEAN NOT NULL DEFAULT 0,
+                    sort_index INTEGER,
                     PRIMARY KEY (id, app_type)
                 );",
             )
@@ -2282,6 +2446,78 @@ mod tests {
             automatic_default_model(candidate, &[]),
             Err(DiscoveryError::CatalogMalformed)
         ));
+    }
+
+    #[test]
+    fn cc_switch_discovers_current_then_failover_queue_and_rereads_each_secret() {
+        let home = tempdir().unwrap();
+        let path = create_cc_switch_database(
+            home.path(),
+            &cc_switch_settings(
+                "https://current.example/v1",
+                "current-model",
+                "current-secret",
+            ),
+        );
+        let connection = rusqlite::Connection::open(path).unwrap();
+        for (id, sort_index, endpoint, model, secret) in [
+            (
+                "later",
+                20,
+                "https://later.example/v1",
+                "later-model",
+                "later-secret",
+            ),
+            (
+                "first",
+                10,
+                "https://first.example/v1",
+                "first-model",
+                "first-secret",
+            ),
+        ] {
+            connection
+                .execute(
+                    "INSERT INTO providers (
+                        id, app_type, name, settings_config, is_current,
+                        in_failover_queue, sort_index
+                     ) VALUES (?1, 'codex', 'Queued upstream', ?2, 0, 1, ?3)",
+                    rusqlite::params![id, cc_switch_settings(endpoint, model, secret), sort_index],
+                )
+                .unwrap();
+        }
+        drop(connection);
+
+        let candidates = discover_cc_switch(home.path()).unwrap();
+        assert_eq!(
+            candidates
+                .iter()
+                .map(|candidate| candidate.base_url.as_deref().unwrap())
+                .collect::<Vec<_>>(),
+            vec![
+                "https://current.example/v1",
+                "https://first.example/v1",
+                "https://later.example/v1",
+            ]
+        );
+        assert_eq!(
+            candidates
+                .iter()
+                .map(|candidate| candidate_secret(candidate, home.path()).unwrap())
+                .collect::<Vec<_>>(),
+            vec!["current-secret", "first-secret", "later-secret"]
+        );
+        let serialized = serde_json::to_string(&candidates).unwrap();
+        for sensitive in [
+            "current-secret",
+            "first-secret",
+            "later-secret",
+            "current\"",
+            "first\"",
+            "later\"",
+        ] {
+            assert!(!serialized.contains(sensitive));
+        }
     }
 
     #[test]
@@ -2422,6 +2658,45 @@ mod tests {
         ));
     }
 
+    #[test]
+    fn cc_switch_queue_candidate_is_reread_and_rejects_membership_drift() {
+        let home = tempdir().unwrap();
+        let path = create_cc_switch_database(
+            home.path(),
+            &cc_switch_settings("https://current.example/v1", "current", "current-secret"),
+        );
+        let queued = cc_switch_settings("https://queued.example/v1", "queued", "queued-secret");
+        let connection = rusqlite::Connection::open(&path).unwrap();
+        connection
+            .execute(
+                "INSERT INTO providers (
+                    id, app_type, name, settings_config, is_current,
+                    in_failover_queue, sort_index
+                 ) VALUES ('queued', 'codex', 'Queued', ?1, 0, 1, 10)",
+                [queued],
+            )
+            .unwrap();
+        drop(connection);
+        let candidate = discover_cc_switch(home.path()).unwrap().remove(1);
+        assert_eq!(
+            candidate_secret(&candidate, home.path()).unwrap(),
+            "queued-secret"
+        );
+
+        let connection = rusqlite::Connection::open(path).unwrap();
+        connection
+            .execute(
+                "UPDATE providers SET in_failover_queue = 0 WHERE id = 'queued' AND app_type = 'codex'",
+                [],
+            )
+            .unwrap();
+        drop(connection);
+        assert!(matches!(
+            candidate_secret(&candidate, home.path()),
+            Err(DiscoveryError::CandidateMissing)
+        ));
+    }
+
     #[cfg(unix)]
     #[test]
     fn cc_switch_database_adapter_rejects_symlinked_database() {
@@ -2543,6 +2818,11 @@ wire_api = "responses"
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0].kind, "openai");
         assert_eq!(rows[0].wire_protocol.as_deref(), Some("responses"));
+        assert_eq!(rows[0].schema_id.as_deref(), Some("codex-auth-v1"));
+        assert_eq!(
+            rows[0].config_location.as_deref(),
+            Some("~/.codex/auth.json")
+        );
         assert_eq!(rows[0].credential.source_type, "config-literal");
         assert_eq!(
             rows[0].credential.reference.as_deref(),
@@ -2554,6 +2834,12 @@ wire_api = "responses"
             candidate_secret_at(&rows[0], home.path(), &codex_home).unwrap(),
             "sentinel-secret-must-not-cross-ipc"
         );
+        let mut unknown_schema = rows[0].clone();
+        unknown_schema.schema_id = Some("unknown-codex-schema-v1".into());
+        assert!(matches!(
+            candidate_secret_at(&unknown_schema, home.path(), &codex_home),
+            Err(DiscoveryError::CandidateMissing)
+        ));
         let json = serde_json::to_string(&rows).unwrap();
         assert!(!json.contains("sentinel-secret-must-not-cross-ipc"));
     }
@@ -2585,6 +2871,11 @@ wire_api = "responses"
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0].label, "OpenAI from Codex");
         assert_eq!(rows[0].model_hint.as_deref(), Some("gpt-test"));
+        assert_eq!(rows[0].schema_id.as_deref(), Some("codex-config-v1"));
+        assert_eq!(
+            rows[0].config_location.as_deref(),
+            Some("~/.codex/auth.json")
+        );
         assert_eq!(rows[0].credential.source_type, "config-literal");
         assert_eq!(
             candidate_secret_at(&rows[0], home.path(), &codex_home).unwrap(),
@@ -2788,34 +3079,6 @@ wire_api = "responses"
         assert!(discover_codex_at(&codex_home, "~/.codex")
             .unwrap()
             .is_empty());
-    }
-
-    #[test]
-    fn codex_legacy_auth_is_used_only_when_primary_auth_is_absent() {
-        let home = tempdir().unwrap();
-        let codex_home = home.path().join(".codex");
-        let legacy = home.path().join(".config/codex/auth.json");
-        std::fs::create_dir(&codex_home).unwrap();
-        std::fs::create_dir_all(legacy.parent().unwrap()).unwrap();
-        std::fs::write(&legacy, r#"{"OPENAI_API_KEY":"legacy-secret"}"#).unwrap();
-
-        let rows = discover_codex_at_with_legacy(&codex_home, "~/.codex", Some(&legacy)).unwrap();
-        assert_eq!(rows[0].schema_id.as_deref(), Some("codex-legacy-auth-v1"));
-        assert_eq!(
-            candidate_secret_at(&rows[0], home.path(), &codex_home).unwrap(),
-            "legacy-secret"
-        );
-
-        std::fs::write(
-            codex_home.join("auth.json"),
-            r#"{"tokens":{"access_token":"oauth"}}"#,
-        )
-        .unwrap();
-        assert!(
-            discover_codex_at_with_legacy(&codex_home, "~/.codex", Some(&legacy))
-                .unwrap()
-                .is_empty()
-        );
     }
 
     #[test]

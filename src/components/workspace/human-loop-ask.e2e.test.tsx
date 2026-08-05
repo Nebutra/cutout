@@ -74,6 +74,24 @@ vi.mock('@/services/ai/model-assignment.local', () => ({
     image: { providerId: PROVIDER_ID, model: MODEL },
   }),
   setAssignment: async () => ({}),
+  // `useCapabilityBindings` (hooks/queries/ai-settings.ts) reads these three.
+  // Routing comes from `loadAssignments` above, so the binding table stays
+  // empty; it only has to be a schema-valid `model-assignments.v2` value.
+  loadCapabilityBindings: async () => ({
+    version: 'model-assignments.v2' as const,
+    bindings: {},
+    descriptors: [],
+  }),
+  setCapabilityBinding: async () => ({
+    version: 'model-assignments.v2' as const,
+    bindings: {},
+    descriptors: [],
+  }),
+  clearCapabilityBinding: async () => ({
+    version: 'model-assignments.v2' as const,
+    bindings: {},
+    descriptors: [],
+  }),
 }))
 
 function required(name: string): string {
@@ -183,7 +201,9 @@ function fakeRegistry(key: string, base: string): ServiceRegistry {
     },
     providers: {
       list: async () => [{
-        id: PROVIDER_ID, kind: 'openai', label: 'Test', defaultModel: MODEL, enabled: true,
+        // `wireProtocol` is mandatory for every non-gateway kind
+        // (services/ai/provider-types.ts:76).
+        id: PROVIDER_ID, kind: 'openai', label: 'Test', wireProtocol: 'chat-completions', defaultModel: MODEL, enabled: true,
       }],
       upsert: notUsed,
       remove: notUsed,

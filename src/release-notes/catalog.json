@@ -2,106 +2,106 @@
   "protocol": "cutout.release-notes.catalog.v1",
   "entries": [
     {
-      "version": "0.1.18",
-      "releasedOn": "2026-08-04",
+      "version": "0.1.19",
+      "releasedOn": "2026-08-05",
       "locales": {
         "en": {
-          "headline": "Clearer local AI readiness and actionable failures",
+          "headline": "Readable preparation and honest paid-action decisions",
           "highlights": [
             {
-              "id": "capability-first-readiness",
-              "title": "One AI readiness view",
-              "body": "Cutout now reports planning, image generation, and image editing as separate required capabilities, while keeping system runtime and direct Provider evidence truthful and distinct."
+              "id": "planning-phases",
+              "title": "See what Agent preparation is doing",
+              "body": "Preparation now reports four named phases — context, runtime, response, and validation — inside one compact disclosure, so a long wait reads as progress instead of a single opaque spinner."
             },
             {
-              "id": "safe-structured-errors",
-              "title": "Errors you can act on",
-              "body": "Structured native failures are decoded into bounded messages instead of [object Object], without serializing arbitrary payloads or exposing credential-shaped values."
+              "id": "codex-negotiated-runtime",
+              "title": "A more tolerant Codex runtime",
+              "body": "Cutout negotiates a supported version range and generated-schema features instead of pinning one exact version, and reports a turn failure as a specific cause rather than a generic terminal error."
             },
             {
-              "id": "signed-local-discovery",
-              "title": "Stronger packaged discovery",
-              "body": "Signed packaged checks now reuse approved local Keychain credentials through isolated non-secret Provider metadata and report closed, actionable failure causes when a route is unavailable."
+              "id": "paid-actions-without-estimates",
+              "title": "Paid actions decided on facts",
+              "body": "A paid action is authorized by capability, host policy, and your explicit approval alone. A cost estimate no longer approves or refuses work, and a charged amount appears only when the Provider returns verifiable billing evidence."
             }
           ]
         },
         "zh-CN": {
-          "headline": "更清晰的本地 AI 就绪状态与可处理错误",
+          "headline": "可读的准备过程与诚实的付费决策",
           "highlights": [
             {
-              "id": "capability-first-readiness",
-              "title": "统一的 AI 就绪视图",
-              "body": "Cutout 现在分别呈现规划、图像生成和图像编辑三项必需能力，并如实区分系统运行时证据与直连 Provider 证据。"
+              "id": "planning-phases",
+              "title": "看清 Agent 正在准备什么",
+              "body": "准备过程现在以四个具名阶段呈现——上下文、运行时、响应、校验——收纳在一个紧凑的展开区里。较长的等待因此读起来是进度，而不是一个不透明的转圈。"
             },
             {
-              "id": "safe-structured-errors",
-              "title": "真正可处理的错误",
-              "body": "结构化原生错误现在会转换为有界提示，不再显示 [object Object]，也不会序列化任意载荷或暴露凭据形态的内容。"
+              "id": "codex-negotiated-runtime",
+              "title": "更宽容的 Codex 运行时",
+              "body": "Cutout 现在协商受支持的版本区间与生成式 schema 能力，不再钉死单一版本；一次对话失败会给出具体原因，而不是笼统的终止错误。"
             },
             {
-              "id": "signed-local-discovery",
-              "title": "更可靠的打包发现链路",
-              "body": "签名应用现在通过隔离的非敏感 Provider 元数据复用已批准的本地 Keychain 凭据，并在路由不可用时给出封闭且可处理的失败原因。"
+              "id": "paid-actions-without-estimates",
+              "title": "付费动作依据事实决定",
+              "body": "付费动作仅由能力、宿主策略与你的显式批准来授权。费用预估不再批准或拒绝任何工作；只有当 Provider 返回可验证的账单证据时，才会记录实际扣费金额。"
             }
           ]
         },
         "ja": {
-          "headline": "より明確なローカル AI の準備状況と対処可能なエラー",
+          "headline": "読み取れる準備処理と、誠実な有料アクション判断",
           "highlights": [
             {
-              "id": "capability-first-readiness",
-              "title": "AI の準備状況を一つの画面に集約",
-              "body": "Cutout は計画、画像生成、画像編集を個別の必須機能として表示し、システムランタイムと直接接続 Provider の証拠を正確に区別します。"
+              "id": "planning-phases",
+              "title": "Agent の準備内容が見える",
+              "body": "準備処理を「コンテキスト・ランタイム・応答・検証」という4つの名前付きフェーズとして、1つのコンパクトな開閉領域に表示します。長い待ち時間が、不透明なスピナーではなく進捗として読み取れます。"
             },
             {
-              "id": "safe-structured-errors",
-              "title": "対処できるエラー表示",
-              "body": "構造化されたネイティブエラーを制限付きメッセージへ変換し、[object Object] の表示、任意データの直列化、認証情報らしい値の露出を防ぎます。"
+              "id": "codex-negotiated-runtime",
+              "title": "より寛容な Codex ランタイム",
+              "body": "厳密な1バージョンに固定するのではなく、対応バージョン範囲と生成スキーマ機能をネゴシエートします。ターンの失敗は、汎用的な終了エラーではなく具体的な原因として報告されます。"
             },
             {
-              "id": "signed-local-discovery",
-              "title": "署名済みアプリの検出を強化",
-              "body": "署名済みパッケージは分離された非機密 Provider メタデータを介して承認済み Keychain 認証情報を再利用し、利用不能なルートには限定された原因を表示します。"
+              "id": "paid-actions-without-estimates",
+              "title": "事実に基づく有料アクション",
+              "body": "有料アクションは、機能・ホストポリシー・明示的な承認のみで認可されます。費用見積もりが処理を承認・拒否することはなくなり、課金額は Provider が検証可能な請求証跡を返した場合にのみ記録されます。"
             }
           ]
         },
         "fr": {
-          "headline": "Un état de préparation IA local plus clair et des erreurs exploitables",
+          "headline": "Une préparation lisible et des décisions payantes honnêtes",
           "highlights": [
             {
-              "id": "capability-first-readiness",
-              "title": "Une vue unique de l’état de l’IA",
-              "body": "Cutout présente séparément la planification, la génération d’images et la modification d’images, tout en distinguant fidèlement les preuves du runtime système et celles des Providers directs."
+              "id": "planning-phases",
+              "title": "Voir ce que prépare l'Agent",
+              "body": "La préparation présente désormais quatre phases nommées — contexte, exécution, réponse et validation — dans une seule zone dépliable compacte. Une longue attente se lit ainsi comme une progression plutôt que comme un indicateur opaque."
             },
             {
-              "id": "safe-structured-errors",
-              "title": "Des erreurs réellement exploitables",
-              "body": "Les erreurs natives structurées deviennent des messages bornés au lieu de [object Object], sans sérialiser de charge arbitraire ni exposer de valeur ressemblant à un identifiant secret."
+              "id": "codex-negotiated-runtime",
+              "title": "Un runtime Codex plus tolérant",
+              "body": "Cutout négocie une plage de versions prise en charge et les fonctionnalités de schéma généré au lieu de figer une version exacte, et signale l'échec d'un tour par une cause précise plutôt que par une erreur terminale générique."
             },
             {
-              "id": "signed-local-discovery",
-              "title": "Une détection renforcée dans l’application signée",
-              "body": "Les vérifications signées réutilisent les identifiants Keychain approuvés via des métadonnées Provider non sensibles et isolées, puis signalent des causes fermées et exploitables lorsqu’une route est indisponible."
+              "id": "paid-actions-without-estimates",
+              "title": "Des actions payantes décidées sur des faits",
+              "body": "Une action payante est autorisée uniquement par la capacité, la politique de l'hôte et votre approbation explicite. Une estimation de coût n'approuve ni ne refuse plus aucun travail, et un montant facturé n'apparaît que si le Provider renvoie une preuve de facturation vérifiable."
             }
           ]
         },
         "es": {
-          "headline": "Preparación de IA local más clara y errores accionables",
+          "headline": "Preparación legible y decisiones de pago honestas",
           "highlights": [
             {
-              "id": "capability-first-readiness",
-              "title": "Una sola vista del estado de la IA",
-              "body": "Cutout muestra por separado la planificación, la generación de imágenes y la edición de imágenes, manteniendo diferenciadas las pruebas del runtime del sistema y las de Providers directos."
+              "id": "planning-phases",
+              "title": "Ver qué está preparando el Agente",
+              "body": "La preparación ahora muestra cuatro fases con nombre — contexto, entorno de ejecución, respuesta y validación — dentro de un único panel desplegable compacto, de modo que una espera larga se lee como progreso y no como un indicador opaco."
             },
             {
-              "id": "safe-structured-errors",
-              "title": "Errores que se pueden resolver",
-              "body": "Los fallos nativos estructurados se convierten en mensajes limitados en vez de [object Object], sin serializar cargas arbitrarias ni exponer valores con forma de credencial."
+              "id": "codex-negotiated-runtime",
+              "title": "Un entorno Codex más tolerante",
+              "body": "Cutout negocia un rango de versiones compatibles y las funciones de esquema generado en lugar de fijar una versión exacta, e informa el fallo de un turno con una causa concreta en vez de un error terminal genérico."
             },
             {
-              "id": "signed-local-discovery",
-              "title": "Detección reforzada en la aplicación firmada",
-              "body": "Las comprobaciones firmadas reutilizan credenciales aprobadas del Keychain mediante metadatos de Provider aislados y no secretos, e informan causas cerradas y accionables cuando una ruta no está disponible."
+              "id": "paid-actions-without-estimates",
+              "title": "Acciones de pago decididas con hechos",
+              "body": "Una acción de pago se autoriza solo por la capacidad, la política del host y tu aprobación explícita. Una estimación de coste ya no aprueba ni rechaza trabajo, y un importe cobrado aparece únicamente cuando el Provider devuelve evidencia de facturación verificable."
             }
           ]
         }

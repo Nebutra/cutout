@@ -36,10 +36,10 @@ function catalog(entries: unknown[] = [entry()]) {
 }
 
 describe('release-note catalog', () => {
-  it('loads the reviewed v0.1.18 entry with all five shipped locales and no historical backfill', async () => {
+  it('loads the reviewed v0.1.19 entry with all five shipped locales and no historical backfill', async () => {
     const loaded = await loadReleaseNotesCatalog(undefined, { requireAllLocales: true })
-    expect(loaded.entries.map((value) => value.version)).toEqual(['0.1.18'])
-    expect(Object.keys(requireReleaseNotesEntry(loaded, '0.1.18').locales)).toEqual(RELEASE_NOTES_LOCALES)
+    expect(loaded.entries.map((value) => value.version)).toEqual(['0.1.19'])
+    expect(Object.keys(requireReleaseNotesEntry(loaded, '0.1.19').locales)).toEqual(RELEASE_NOTES_LOCALES)
     expect(findReleaseNotesEntry(loaded, '0.1.16')).toBeUndefined()
   })
 
@@ -100,14 +100,14 @@ describe('release-note catalog', () => {
 
   it('rejects mismatched, malformed, and unknown-field updater extensions', () => {
     const extension = projectReleaseNotesEntry(entry())
-    expect(() => validateReleaseNotesExtension(extension, { expectedVersion: '0.1.18' })).toThrow('does not match')
+    expect(() => validateReleaseNotesExtension(extension, { expectedVersion: '0.1.19' })).toThrow('does not match')
     expect(() => validateReleaseNotesExtension({ ...extension, protocol: 'unknown' })).toThrow('protocol')
     expect(() => validateReleaseNotesExtension({ ...extension, html: '<script>' })).toThrow('unknown field')
   })
 
   it('renders all release inputs through the CLI from one exact entry', async () => {
     const output = await mkdtemp(join(tmpdir(), 'cutout-release-notes-'))
-    const result = spawnSync(process.execPath, ['scripts/release-notes.mjs', 'render', '--version', '0.1.18', '--output', output, '--require-all-locales'], { cwd: process.cwd(), encoding: 'utf8' })
+    const result = spawnSync(process.execPath, ['scripts/release-notes.mjs', 'render', '--version', '0.1.19', '--output', output, '--require-all-locales'], { cwd: process.cwd(), encoding: 'utf8' })
     expect(result.status, result.stderr).toBe(0)
     const [legacy, updater, bundled, github] = await Promise.all([
       readFile(join(output, 'legacy-notes.txt'), 'utf8'),
@@ -116,8 +116,8 @@ describe('release-note catalog', () => {
       readFile(join(output, 'github-release.md'), 'utf8'),
     ])
     expect(JSON.parse(updater)).toEqual(JSON.parse(bundled))
-    expect(legacy).toContain('One AI readiness view')
-    expect(legacy).toContain('Errors you can act on')
-    expect(github).toContain('Cutout v0\\.1\\.18')
+    expect(legacy).toContain('See what Agent preparation is doing')
+    expect(legacy).toContain('A more tolerant Codex runtime')
+    expect(github).toContain('Cutout v0\\.1\\.19')
   })
 })

@@ -2828,7 +2828,7 @@ msgstr "更新チャネル"
 #. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
 msgid "settings.upgrade_codex_action"
-msgstr "読み取り可能なルートを制限できる Codex バージョンに更新してください。"
+msgstr "サポート対象の署名済み Codex バージョンに更新してください。"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx

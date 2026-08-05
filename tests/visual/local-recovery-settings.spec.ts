@@ -6,8 +6,10 @@ async function openUpdatesAndSupport(page: Page) {
   await page.goto('/')
   await page.getByRole('button', { name: /Workspace menu|工作区菜单/ }).click()
   await page.getByRole('menuitem', { name: /Settings|设置/ }).click()
+  const dialog = page.getByRole('dialog')
+  await expect(dialog).toBeVisible()
   if (viewport) await page.setViewportSize(viewport)
-  await page.getByText('Updates & Support', { exact: true }).click()
+  await dialog.getByText('Updates & Support', { exact: true }).click()
 }
 
 test('Troubleshooting is truthful, redacted, and never deletes project data', async ({ page }) => {

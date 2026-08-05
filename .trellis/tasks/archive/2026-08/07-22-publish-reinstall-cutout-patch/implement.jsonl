@@ -1,0 +1,3 @@
+{"file":".trellis/spec/frontend/release-pipeline.md","reason":"Defines the atomic four-platform release, immutable tag, version synchronization, signing, notarization, updater, and publication contracts."}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"Requires searching and synchronizing all repeated version/config surfaces through existing repository mechanisms."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Covers package/runtime/documentation consistency across release boundaries."}

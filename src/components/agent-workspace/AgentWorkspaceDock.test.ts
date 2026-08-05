@@ -260,6 +260,30 @@ describe('AgentWorkspaceDock', () => {
     expect(html.match(/Preparing the run/g)).toHaveLength(1)
   })
 
+  it('renders collapsed, keyboard-operable planning progress with stable stage states', () => {
+    const model = preparingModel([
+      createRunEvent('run', { type: 'run-started', mode: 'create' }, { eventId: 'start', at: 1 }),
+      createRunEvent('run', { type: 'step-started', stepId: 'step:prepare:context:run', label: 'Prepare bounded context' }, { eventId: 'context-start', at: 2 }),
+      createRunEvent('run', { type: 'step-succeeded', stepId: 'step:prepare:context:run', label: 'Prepare bounded context' }, { eventId: 'context-done', at: 3 }),
+      createRunEvent('run', { type: 'step-started', stepId: 'step:prepare:runtime:run', label: 'Connect planning runtime' }, { eventId: 'runtime-start', at: 4 }),
+    ])
+    const html = renderToStaticMarkup(createElement(AgentWorkspaceDock, {
+      viewModel: model,
+      composer: { value: '', busy: true, disabled: true, onChange: vi.fn(), onSubmit: vi.fn() },
+    }))
+
+    expect(html).toContain('data-slot="agent-planning-progress"')
+    expect(html).toContain('<details data-slot="agent-planning-progress"')
+    expect(html).not.toContain('<details data-slot="agent-planning-progress" open=""')
+    expect(html).toContain('aria-label="View planning progress"')
+    expect(html).toContain('aria-label="Planning stages"')
+    expect(html.match(/data-status="complete"/g)).toHaveLength(1)
+    expect(html.match(/data-status="running"/g)).toHaveLength(1)
+    expect(html.match(/data-status="waiting"/g)).toHaveLength(2)
+    expect(html).toContain('Prepare bounded context')
+    expect(html).toContain('Validate structured response')
+  })
+
   it('shows substantive execution beside preparation without repeating preparation', () => {
     const model = preparingModel([
       createRunEvent('run', { type: 'run-started', mode: 'create' }, { eventId: 'start', at: 1 }),
@@ -283,7 +307,7 @@ describe('AgentWorkspaceDock', () => {
       createRunEvent('run', { type: 'run-started', mode: 'create' }, { eventId: 'start', at: 1 }),
       createRunEvent('run', { type: 'intent-recorded', intent: 'hi' }, { eventId: 'user', at: 2 }),
       createRunEvent('run', { type: 'step-started', stepId: 'step:prepare:run', label: 'Preparing the run' }, { eventId: 'prepare', at: 3 }),
-      createRunEvent('run', { type: 'tool-approval-requested', toolCallId: 'generate', requestId: 'request', stepId: 'step:prepare:run', tool: 'image.generate', label: 'Generate hero', budgetCeiling: { currency: 'USD', amount: 1 }, approvalPolicy: 'explicit', reason: 'User approval required.', pendingApproval: true }, { eventId: 'approval', at: 4 }),
+      createRunEvent('run', { type: 'tool-approval-requested', toolCallId: 'generate', requestId: 'request', stepId: 'step:prepare:run', tool: 'image.generate', label: 'Generate hero', approvalPolicy: 'explicit', reason: 'User approval required.', pendingApproval: true }, { eventId: 'approval', at: 4 }),
     ])
     const html = renderToStaticMarkup(createElement(AgentWorkspaceDock, {
       viewModel: model,

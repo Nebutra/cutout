@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.19 - 2026-08-05
+
+- Show Agent preparation as four named phases — context, runtime, response, validation — inside one compact disclosure, instead of a single opaque wait.
+- Negotiate a supported Codex version range and generated-schema features rather than pinning one exact version, and report turn failures as a closed set of causes instead of a generic terminal error.
+- Discover a bounded Codex Provider failover queue instead of only the current entry.
+- Decide paid actions from capability, host policy, and explicit approval alone; cost estimates no longer authorize or refuse work, and a charged amount is recorded only when the Provider returns verifiable billing evidence.
+
 ## 0.1.18 - 2026-08-04
 
 - Present one capability-first AI readiness view for planning, image generation, and image editing while keeping runtime and Provider evidence distinct.

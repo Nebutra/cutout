@@ -21,12 +21,16 @@ describe("workspace rail source contract", () => {
     expect(source).not.toMatch(/agentDockVisible|filesDockVisible|designDockVisible|gitDockVisible/);
   });
 
-  it("toggles Design and Deliver through the same drawer contract", () => {
+  it("keeps Design in the drawer contract and restores the panel behind Deliver", () => {
     expect(source).toContain(
       'onOpenDesign={() => toggleWorkspacePanel("design")}',
     );
     expect(source).toContain(
-      'onOpenDeliver={() => toggleWorkspacePanel("deliver")}',
+      'const deliveryReturnPanelRef = useRef<WorkspacePanel | null>("agent")',
+    );
+    expect(source).toContain("deliveryReturnPanelRef.current = current");
+    expect(source).toContain(
+      "setActiveWorkspacePanel(deliveryReturnPanelRef.current)",
     );
     expect(source).toContain(
       'inspectorActive={activeWorkspacePanel === "design"}',

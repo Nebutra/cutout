@@ -64,7 +64,7 @@ export function activeExecutionTimeline(timeline: ExecutionTimeline | null | und
   return steps.length > 0 ? { ...timeline, steps } : null
 }
 
-type MutableTool = Omit<ExecutionTimelineTool, 'outputRefs'> & { outputRefs: string[]; requestId?: string; approvalPolicy?: 'explicit' | 'auto-within-budget' }
+type MutableTool = Omit<ExecutionTimelineTool, 'outputRefs'> & { outputRefs: string[]; requestId?: string; approvalPolicy?: 'explicit' | 'auto' }
 type MutableStep = Omit<ExecutionTimelineStep, 'tools'> & { tools: MutableTool[] }
 
 export function projectExecutionTimeline(store: AgentRunEventStore | null | undefined): ExecutionTimeline | null {

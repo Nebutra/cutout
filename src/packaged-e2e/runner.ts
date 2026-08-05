@@ -156,6 +156,7 @@ export const PACKAGED_E2E_ALL_SUITES_TIMEOUT_MS =
   PACKAGED_E2E_PROTOTYPE_SUITE_COUNT * PACKAGED_E2E_PER_SUITE_TIMEOUT_MS
 export const PACKAGED_E2E_MAX_RETRIES_PER_FAILURE_FRONTIER = 2
 export const PACKAGED_E2E_MAX_RUN_RETRIES = PACKAGED_E2E_PROTOTYPE_SUITE_COUNT * 2
+export const PACKAGED_E2E_RETRY_UI_GRACE_MS = 5_000
 
 export interface PackagedE2eRetryTracker {
   readonly attemptsByFrontier: Map<string, number>
@@ -173,6 +174,13 @@ export function createPackagedE2eRetryTracker(): PackagedE2eRetryTracker {
 
 const runRetryTracker = createPackagedE2eRetryTracker()
 
+export function packagedE2ePlanningReady(setup: HTMLElement | null): boolean {
+  if (!setup || setup.dataset.aiAutomaticBusy !== 'false') return false
+  return setup
+    .querySelector<HTMLElement>('[data-ai-capability="planning"]')
+    ?.dataset.aiCapabilityStatus === 'ready'
+}
+
 export async function runPackagedE2e(): Promise<void> {
   try {
     await pass('bootstrap')
@@ -183,18 +191,22 @@ export async function runPackagedE2e(): Promise<void> {
     const aiSection = dialog.querySelector<HTMLButtonElement>('[data-settings-section="ai"]')
     if (!aiSection) throw new JourneyFailure('settings-opened')
     aiSection.click()
-    let capabilityGapSince: number | undefined
+    let planningGapSince: number | undefined
     let terminalSetupGapSince: number | undefined
     await waitFor(() => {
       const setup = document.querySelector<HTMLElement>('[data-ai-setup-status]')
       const status = setup?.dataset.aiSetupStatus
-      if (status === 'action-required' && setup?.dataset.aiAutomaticBusy !== 'true') {
-        capabilityGapSince ??= performance.now()
-        if (performance.now() - capabilityGapSince > 5_000) {
+      const planningReady = packagedE2ePlanningReady(setup)
+      const planningStatus = setup
+        ?.querySelector<HTMLElement>('[data-ai-capability="planning"]')
+        ?.dataset.aiCapabilityStatus
+      if (planningStatus === 'action-required' && setup?.dataset.aiAutomaticBusy !== 'true') {
+        planningGapSince ??= performance.now()
+        if (performance.now() - planningGapSince > 5_000) {
           throw new JourneyFailure('ai-configured', 'capability-missing')
         }
       } else {
-        capabilityGapSince = undefined
+        planningGapSince = undefined
       }
       if (status && !['checking', 'ready', 'action-required'].includes(status)) {
         terminalSetupGapSince ??= performance.now()
@@ -204,13 +216,10 @@ export async function runPackagedE2e(): Promise<void> {
       } else {
         terminalSetupGapSince = undefined
       }
-      return status === 'ready'
-        && setup?.dataset.aiAutomaticBusy === 'false'
-        && numberData(setup!, 'aiVerifiedProviderCount') > 0
+      return planningReady
     }, 180_000)
-    // Catalog verification proves that routes are configured, not that an
-    // image endpoint can successfully execute. That proof is checkpointed only
-    // after a Design System image has completed.
+    // Planning is independently usable before image routes are ready. The
+    // later production stages still require and execution-prove image routes.
     await pass('ai-configured')
 
     const closeSettings = dialog.querySelector<HTMLButtonElement>('[data-slot="dialog-close"]')
@@ -833,12 +842,14 @@ async function waitFor<T>(read: () => T, timeoutMs = 30_000): Promise<NonNullabl
 
 async function waitForJourney(read: () => boolean, timeoutMs: number): Promise<void> {
   const deadlineExpired = monotonicDeadline(timeoutMs)
+  let retryUiSettlingSince: number | undefined
   while (!deadlineExpired()) {
     await checkpointPipelineStage()
     await checkpointPlannerStage()
     await checkpointDesignCandidateStages()
     await checkpointPrototypeSuiteStages()
     if (retryPendingRun()) {
+      retryUiSettlingSince = undefined
       await pass('run-retried')
       await waitFor(
         () => hasRetryRunStarted(workspaceRoot()),
@@ -846,11 +857,31 @@ async function waitForJourney(read: () => boolean, timeoutMs: number): Promise<v
       )
       continue
     }
+    retryUiSettlingSince = retryUiGraceStartedAt(
+      workspaceRoot(),
+      retryUiSettlingSince,
+    )
+    if (retryUiSettlingSince !== undefined
+      && performance.now() - retryUiSettlingSince < PACKAGED_E2E_RETRY_UI_GRACE_MS) {
+      await yieldToUi()
+      continue
+    }
     if (read()) return
     approvePendingTools()
     await yieldToUi()
   }
   throw new Error('packaged-e2e-journey-timeout')
+}
+
+export function retryUiGraceStartedAt(
+  workspace: HTMLElement,
+  current: number | undefined,
+  now: number = performance.now(),
+): number | undefined {
+  return workspace.dataset.runFailed === 'true'
+    && workspace.dataset.agentWorking === 'false'
+    ? current ?? now
+    : undefined
 }
 
 export function monotonicDeadline(

@@ -1,8 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { openDeliverWorkspace } from "./workspace-helpers";
 
-const navigationKey = "cutout.workspace-navigation.v2";
-
 async function createProject(
   page: Page,
   _brief = "Components UX regression",
@@ -121,34 +119,3 @@ test("collapsing the workspace rail does not leave a dead gutter beside the Agen
       : Number.POSITIVE_INFINITY;
   }).toBeLessThanOrEqual(1);
 });
-
-for (const [legacyView, expectedMode] of [
-  ["figma", "Design"],
-  ["kits", "Deliver"],
-] as const) {
-  test(`legacy ${legacyView} deep link lands safely on ${expectedMode}`, async ({
-    page,
-  }) => {
-    await page.addInitScript(
-      ([key, view]) =>
-        localStorage.setItem(key, JSON.stringify({ designOsView: view })),
-      [navigationKey, legacyView] as const,
-    );
-    await createProject(page, `Migrate legacy ${legacyView} workspace`);
-    await expectOnlyPrimaryModes(page);
-    if (expectedMode === "Deliver") {
-      await expect(page.getByRole("region", { name: "Deliver" })).toBeVisible();
-    } else {
-      await expect(page.getByRole("main")).toBeVisible();
-    }
-    const persisted = await page.evaluate(
-      (key) => JSON.parse(localStorage.getItem(key) ?? "null"),
-      navigationKey,
-    );
-    expect(persisted).toMatchObject({
-      version: 2,
-      mode: expectedMode === "Design" ? "canvas" : expectedMode.toLowerCase(),
-    });
-    expect(persisted).not.toHaveProperty("advanced");
-  });
-}

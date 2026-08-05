@@ -33,6 +33,10 @@ test("Kits stay outcome-first and preserve gated callbacks", async ({
   const cta = kits.locator("button.w-full");
   await expect(cta).toHaveCount(1);
   await cta.click();
+  const declarationError = page.locator(".cn-toast").filter({
+    hasText: "Declaration is invalid",
+  });
+  await expect(declarationError).toBeVisible();
   await expect(kits.locator("button.w-full")).toHaveCount(1);
   await kits.getByRole("button", { name: "Advanced" }).click();
   await expect(
@@ -49,6 +53,9 @@ test("Kits stay outcome-first and preserve gated callbacks", async ({
         document.documentElement.clientWidth,
     ),
   ).toBe(true);
+  // The notification is asserted above; exclude its transient portal from the
+  // stable Kit workspace baseline.
+  await page.addStyleTag({ content: ".cn-toast { visibility: hidden !important; }" });
   for (const dark of [false, true]) {
     await page.evaluate(
       (enabled) => document.documentElement.classList.toggle("dark", enabled),

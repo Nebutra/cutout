@@ -3,10 +3,10 @@
 Every paid or remote provider execution is guarded before invocation by a versioned policy:
 
 - request/minute and concurrency quotas;
-- monthly cost ceiling and per-request estimate;
 - hard timeout and cancellation signal;
 - explicit allowed deployment region;
 - required content-safety decision and blocked categories;
+- explicit user approval or an authorized shared-host policy decision;
 - telemetry disabled unless the user opts in, never including content or credentials.
 
 ## Host security boundary

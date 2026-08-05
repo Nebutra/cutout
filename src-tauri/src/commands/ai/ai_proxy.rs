@@ -322,6 +322,46 @@ fn is_ipv6_documentation(ip: Ipv6Addr) -> bool {
     o[0] == 0x20 && o[1] == 0x01 && o[2] == 0x0d && o[3] == 0xb8
 }
 
+fn reviewed_public_split_dns_fallback(host: &str, port: u16) -> Option<Vec<SocketAddr>> {
+    match host {
+        // MOX is a closed reviewed relay. Its managed macOS profile installs a
+        // split-DNS answer in 10.60.0.0/16, which the remote Provider boundary
+        // must never receive credentials through. Pin the relay's reviewed
+        // public A record when the system answer is non-public; TLS continues
+        // to authenticate aigw.mox.ktvsky.com and redirects remain disabled.
+        "aigw.mox.ktvsky.com" => Some(vec![SocketAddr::new(
+            IpAddr::V4(Ipv4Addr::new(81, 70, 152, 201)),
+            port,
+        )]),
+        _ => None,
+    }
+}
+
+fn validated_resolved_addresses(
+    host: &str,
+    port: u16,
+    local: bool,
+    addresses: Vec<SocketAddr>,
+) -> Result<Vec<SocketAddr>, ProxyError> {
+    let invalid = addresses.is_empty()
+        || addresses.iter().any(|address| {
+            if local {
+                !normalized_ip(address.ip()).is_loopback()
+            } else {
+                is_non_public_ip(address.ip())
+            }
+        });
+    if !invalid {
+        return Ok(addresses);
+    }
+    if !local {
+        if let Some(fallback) = reviewed_public_split_dns_fallback(host, port) {
+            return Ok(fallback);
+        }
+    }
+    Err(ProxyError::DisallowedHost)
+}
+
 pub(crate) struct ResolvedTarget {
     host: String,
     addresses: Vec<SocketAddr>,
@@ -362,22 +402,10 @@ pub(crate) async fn enforce_resolved_host(
         .await
         .map_err(|_| ProxyError::DisallowedHost)?
         .collect();
-    let invalid = addresses.is_empty()
-        || addresses.iter().any(|address| {
-            if local {
-                !normalized_ip(address.ip()).is_loopback()
-            } else {
-                is_non_public_ip(address.ip())
-            }
-        });
-    if invalid {
-        Err(ProxyError::DisallowedHost)
-    } else {
-        Ok(ResolvedTarget {
-            host: host.to_string(),
-            addresses,
-        })
-    }
+    Ok(ResolvedTarget {
+        host: host.to_string(),
+        addresses: validated_resolved_addresses(host, port, local, addresses)?,
+    })
 }
 
 fn normalized_ip(ip: IpAddr) -> IpAddr {
@@ -919,6 +947,26 @@ mod tests {
         assert!(enforce_resolved_host("ollama", "http://127.0.0.1:11434/v1")
             .await
             .is_ok());
+    }
+
+    #[test]
+    fn reviewed_mox_split_dns_uses_only_its_public_pinned_address() {
+        let private = vec![SocketAddr::new(
+            IpAddr::V4(Ipv4Addr::new(10, 60, 0, 116)),
+            443,
+        )];
+        assert_eq!(
+            validated_resolved_addresses("aigw.mox.ktvsky.com", 443, false, private.clone())
+                .unwrap()
+                .iter()
+                .map(SocketAddr::ip)
+                .collect::<Vec<_>>(),
+            vec![IpAddr::V4(Ipv4Addr::new(81, 70, 152, 201))]
+        );
+        assert!(matches!(
+            validated_resolved_addresses("unreviewed.example", 443, false, private),
+            Err(ProxyError::DisallowedHost)
+        ));
     }
 
     #[test]

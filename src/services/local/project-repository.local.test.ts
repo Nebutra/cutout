@@ -592,7 +592,7 @@ describe('project-repository.local', () => {
 
   it('reloads a durable Delivery Center preview after repository restart', async () => {
     const idb = new IDBFactory()
-    const plan = { protocol: 'cutout.delivery-center.v1' as const, id: 'delivery:plan', requestId: 'delivery:request', outcomeId: 'outcome:one', outcomeRevision: 'run:one', designRevision: { documentId: 'design:one', revisionId: 'revision:one', revisionNumber: 1 }, targets: [{ targetId: 'delivery:design-system', kind: 'design-system' as const, destination: { kind: 'managed-export' as const, ref: 'native-folder-picker' }, effects: ['managed-export' as const], estimatedCostUsd: 0, currency: 'USD' as const, files: [], warnings: [] }], totalEstimatedCostUsd: 0, currency: 'USD' as const, requiresApproval: true as const, createdAt: '2026-07-12T00:00:00Z' }
+    const plan = { protocol: 'cutout.delivery-center.v1' as const, id: 'delivery:plan', requestId: 'delivery:request', outcomeId: 'outcome:one', outcomeRevision: 'run:one', designRevision: { documentId: 'design:one', revisionId: 'revision:one', revisionNumber: 1 }, targets: [{ targetId: 'delivery:design-system', kind: 'design-system' as const, destination: { kind: 'managed-export' as const, ref: 'native-folder-picker' }, effects: ['managed-export' as const], files: [], warnings: [] }], requiresApproval: true as const, createdAt: '2026-07-12T00:00:00Z' }
     const record = { ...createEmptyProjectRecord(316), workspace: { ...planningSnapshot(), deliveryPlan: plan } }
     const first = createLocalProjectRepository({ idb }); expect((await first.save(record)).ok).toBe(true)
     const restarted = createLocalProjectRepository({ idb }); const loaded = await restarted.load(record.id)

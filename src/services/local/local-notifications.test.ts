@@ -128,9 +128,8 @@ describe('local notification projection', () => {
       requestId: 'r',
       tool: 'image',
       label: 'Generate design system',
-      budgetCeiling: { currency: 'USD' as const, amount: 1 },
-      approvalPolicy: 'auto-within-budget' as const,
-      reason: 'Eligible for automatic approval within budget.',
+      approvalPolicy: 'auto' as const,
+      reason: 'Eligible for automatic approval by host policy.',
       pendingApproval: false,
     }
     expect(notificationFromAgentEvent(event(approval))).toBeNull()

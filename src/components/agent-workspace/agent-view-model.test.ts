@@ -65,7 +65,7 @@ describe('buildAgentViewModel', () => {
   it('reconciles a matching receipt so the stale approval is no longer actionable', () => {
     const runEvents = replayRunEvents([
       { eventId: 'start-paid', runId: 'paid', at: 1, type: 'run-started', mode: 'create' },
-      { eventId: 'approval-paid', runId: 'paid', at: 2, type: 'tool-approval-requested', toolCallId: 'image-1', requestId: 'request-1', tool: 'image.generate', label: 'Generate hero', model: { providerId: 'openai', model: 'gpt-image-1' }, budgetCeiling: { currency: 'USD', amount: 0.2, credits: 20 }, approvalPolicy: 'explicit', reason: 'Explicit approval is required.', pendingApproval: true },
+      { eventId: 'approval-paid', runId: 'paid', at: 2, type: 'tool-approval-requested', toolCallId: 'image-1', requestId: 'request-1', tool: 'image.generate', label: 'Generate hero', model: { providerId: 'openai', model: 'gpt-image-1' }, approvalPolicy: 'explicit', reason: 'Explicit approval is required.', pendingApproval: true },
       { eventId: 'receipt-paid', runId: 'paid', at: 3, type: 'tool-receipt-recorded', toolCallId: 'image-1', receipt: { receiptId: 'receipt-1', requestId: 'request-1', capability: 'generate-image', providerId: 'openai', model: 'gpt-image-1', status: 'succeeded', charged: { currency: 'USD', amount: 0.07, credits: 7 }, outputArtifactIds: ['hero.png'], startedAt: 2, completedAt: 3 } },
     ])
     const model = buildAgentViewModel({ brief: 'Hero', workflowPhase: 'planning', stages: [], outcome: null, working: true, elapsedSeconds: 1, runError: null, runEvents })
@@ -77,8 +77,7 @@ describe('buildAgentViewModel', () => {
     const runEvents = replayRunEvents([
       createRunEvent('approval', { type: 'run-started', mode: 'create' }, { eventId: 'start', at: 1 }),
       createRunEvent('approval', {
-        type: 'tool-approval-requested', toolCallId: 'call', requestId: 'request', tool: 'generate-image', label: 'Generate design system',
-        budgetCeiling: { currency: 'USD', amount: 0.2 }, approvalPolicy: 'explicit', reason: 'Explicit approval is required.', pendingApproval: true,
+        type: 'tool-approval-requested', toolCallId: 'call', requestId: 'request', tool: 'generate-image', label: 'Generate design system', approvalPolicy: 'explicit', reason: 'Explicit approval is required.', pendingApproval: true,
       }, { eventId: 'approval', at: 2 }),
     ])
     const model = buildAgentViewModel({ brief: 'Kit', workflowPhase: 'design-system', stages: [], outcome: null, working: true, elapsedSeconds: 1, runError: null, runEvents })
@@ -90,10 +89,9 @@ describe('buildAgentViewModel', () => {
     const runEvents = replayRunEvents([
       createRunEvent('auto', { type: 'run-started', mode: 'create' }, { eventId: 'start', at: 1 }),
       createRunEvent('auto', {
-        type: 'tool-approval-requested', toolCallId: 'call', requestId: 'request', tool: 'generate-image', label: 'Generate design system',
-        budgetCeiling: { currency: 'USD', amount: 0.2 }, approvalPolicy: 'auto-within-budget', reason: 'Eligible for automatic approval within budget.', pendingApproval: false,
+        type: 'tool-approval-requested', toolCallId: 'call', requestId: 'request', tool: 'generate-image', label: 'Generate design system', approvalPolicy: 'auto', reason: 'Eligible for automatic approval by host policy.', pendingApproval: false,
       }, { eventId: 'approval', at: 2 }),
-      createRunEvent('auto', { type: 'tool-approved', toolCallId: 'call', requestId: 'request', reason: 'Automatically approved within the configured budget.' }, { eventId: 'approved', at: 3 }),
+      createRunEvent('auto', { type: 'tool-approved', toolCallId: 'call', requestId: 'request', reason: 'Automatically approved by host policy.' }, { eventId: 'approved', at: 3 }),
       createRunEvent('auto', { type: 'tool-started', toolCallId: 'call', tool: 'generate-image', label: 'Generate design system' }, { eventId: 'started', at: 4 }),
     ])
     const model = buildAgentViewModel({ brief: 'Kit', workflowPhase: 'design-system', stages: [], outcome: null, working: true, elapsedSeconds: 1, runError: null, runEvents })
@@ -106,8 +104,7 @@ describe('buildAgentViewModel', () => {
     const base = (runId: string, resolution: 'tool-approved' | 'tool-denied') => replayRunEvents([
       createRunEvent(runId, { type: 'run-started', mode: 'create' }, { eventId: `${runId}:start`, at: 1 }),
       createRunEvent(runId, {
-        type: 'tool-approval-requested', toolCallId: 'call', requestId: 'request', tool: 'generate-image', label: 'Generate design system',
-        budgetCeiling: { currency: 'USD', amount: 0.2 }, approvalPolicy: 'explicit', reason: 'Explicit approval is required.', pendingApproval: true,
+        type: 'tool-approval-requested', toolCallId: 'call', requestId: 'request', tool: 'generate-image', label: 'Generate design system', approvalPolicy: 'explicit', reason: 'Explicit approval is required.', pendingApproval: true,
       }, { eventId: `${runId}:approval`, at: 2 }),
       createRunEvent(runId, { type: resolution, toolCallId: 'call', requestId: 'request', reason: resolution === 'tool-approved' ? 'Approved by user.' : 'Denied by user.' }, { eventId: `${runId}:resolution`, at: 3 }),
     ])
@@ -121,14 +118,12 @@ describe('buildAgentViewModel', () => {
     const runEvents = replayRunEvents([
       createRunEvent('retry', { type: 'run-started', mode: 'create' }, { eventId: 'start', at: 1 }),
       createRunEvent('retry', {
-        type: 'tool-approval-requested', toolCallId: 'call', requestId: 'old', tool: 'generate-image', label: 'Generate design system',
-        budgetCeiling: { currency: 'USD', amount: 0.2 }, approvalPolicy: 'explicit', reason: 'Explicit approval is required.', pendingApproval: true,
+        type: 'tool-approval-requested', toolCallId: 'call', requestId: 'old', tool: 'generate-image', label: 'Generate design system', approvalPolicy: 'explicit', reason: 'Explicit approval is required.', pendingApproval: true,
       }, { eventId: 'old-approval', at: 2 }),
       createRunEvent('retry', { type: 'tool-denied', toolCallId: 'call', requestId: 'old', reason: 'Denied by user.' }, { eventId: 'old-denied', at: 3 }),
       createRunEvent('retry', { type: 'tool-retry-linked', toolCallId: 'call', previousRequestId: 'old', requestId: 'fresh' }, { eventId: 'retry-linked', at: 4 }),
       createRunEvent('retry', {
-        type: 'tool-approval-requested', toolCallId: 'call', requestId: 'fresh', tool: 'generate-image', label: 'Generate design system',
-        budgetCeiling: { currency: 'USD', amount: 0.2 }, approvalPolicy: 'explicit', reason: 'Explicit approval is required.', pendingApproval: true,
+        type: 'tool-approval-requested', toolCallId: 'call', requestId: 'fresh', tool: 'generate-image', label: 'Generate design system', approvalPolicy: 'explicit', reason: 'Explicit approval is required.', pendingApproval: true,
       }, { eventId: 'fresh-approval', at: 5 }),
     ])
     const model = buildAgentViewModel({ brief: 'Kit', workflowPhase: 'design-system', stages: [], outcome: null, working: true, elapsedSeconds: 1, runError: null, runEvents })
@@ -145,8 +140,7 @@ describe('buildAgentViewModel', () => {
       const runEvents = replayRunEvents([
         createRunEvent(terminal, { type: 'run-started', mode: 'create' }, { eventId: `${terminal}:start`, at: 1 }),
         createRunEvent(terminal, {
-          type: 'tool-approval-requested', toolCallId: 'call', requestId: 'request', tool: 'generate-image', label: 'Generate design system',
-          budgetCeiling: { currency: 'USD', amount: 0.2 }, approvalPolicy: 'explicit', reason: 'Explicit approval is required.', pendingApproval: true,
+          type: 'tool-approval-requested', toolCallId: 'call', requestId: 'request', tool: 'generate-image', label: 'Generate design system', approvalPolicy: 'explicit', reason: 'Explicit approval is required.', pendingApproval: true,
         }, { eventId: `${terminal}:approval`, at: 2 }),
         createRunEvent(terminal, terminalEvent, { eventId: `${terminal}:terminal`, at: 3 }),
       ])
@@ -584,6 +578,52 @@ describe('buildAgentViewModel', () => {
     expect(model.feed.filter((item) => item.type === 'message' && item.role === 'user')).toHaveLength(1)
     expect(model.feed.filter((item) => item.type === 'message' && item.role === 'agent')).toHaveLength(2)
     expect(model.feed.some((item) => item.id.startsWith('runtime:activity:'))).toBe(false)
+  })
+
+  it('projects truthful planning phases and keeps reconnect detail on the active response', () => {
+    const runEvents = replayRunEvents([
+      createRunEvent('run', { type: 'run-started', mode: 'create' }, { eventId: 'start', at: 1 }),
+      createRunEvent('run', { type: 'step-started', stepId: 'step:prepare:context:run', label: 'Prepare bounded context' }, { eventId: 'context-start', at: 2 }),
+      createRunEvent('run', { type: 'step-succeeded', stepId: 'step:prepare:context:run', label: 'Prepare bounded context', detail: 'Bounded context ready.' }, { eventId: 'context-done', at: 3 }),
+      createRunEvent('run', { type: 'step-started', stepId: 'step:prepare:runtime:run', label: 'Connect planning runtime' }, { eventId: 'runtime-start', at: 4 }),
+      createRunEvent('run', { type: 'step-succeeded', stepId: 'step:prepare:runtime:run', label: 'Connect planning runtime', detail: 'Planning runtime connected.' }, { eventId: 'runtime-done', at: 5 }),
+      createRunEvent('run', { type: 'step-started', stepId: 'step:prepare:response:run', label: 'Await planning result', detail: 'Waiting for the schema-bound planning result.' }, { eventId: 'response-start', at: 6 }),
+    ])
+    const model = buildAgentViewModel({
+      brief: 'Create a restaurant site', workflowPhase: 'idle', stages: [], outcome: null,
+      working: true, preparing: true, elapsedSeconds: 37, runError: null, runEvents,
+      preparationDetail: 'Codex reconnecting · attempt 2',
+    })
+
+    const activity = model.feed.find((item) => item.type === 'message' && item.activity)
+    expect(activity).toEqual(expect.objectContaining({
+      id: 'response-start',
+      detail: 'Codex reconnecting · attempt 2',
+      activity: expect.objectContaining({
+        label: 'Await planning result',
+        elapsedLabel: '0:37',
+        progress: [
+          expect.objectContaining({ id: 'context', status: 'complete' }),
+          expect.objectContaining({ id: 'runtime', status: 'complete' }),
+          expect.objectContaining({ id: 'response', status: 'running', detail: 'Codex reconnecting · attempt 2' }),
+          expect.objectContaining({ id: 'validation', status: 'waiting' }),
+        ],
+      }),
+    }))
+  })
+
+  it('does not invent expanded phases for historical single-step preparation events', () => {
+    const runEvents = replayRunEvents([
+      createRunEvent('run', { type: 'run-started', mode: 'create' }, { eventId: 'start', at: 1 }),
+      createRunEvent('run', { type: 'step-started', stepId: 'step:prepare:run', label: 'Preparing the run' }, { eventId: 'prepare', at: 2 }),
+    ])
+    const model = buildAgentViewModel({
+      brief: 'Hello', workflowPhase: 'idle', stages: [], outcome: null,
+      working: true, preparing: true, elapsedSeconds: 1, runError: null, runEvents,
+    })
+
+    const activity = model.feed.find((item) => item.type === 'message' && item.activity)
+    expect(activity).not.toHaveProperty('activity.progress')
   })
 
   it('lets live Agent output supersede unresolved preparation activity', () => {

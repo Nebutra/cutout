@@ -1,0 +1,2 @@
+{"file":".trellis/spec/frontend/byok-provider-protocols.md","reason":"Keep implementation aligned with the exact selected Codex root, current schema ids, native secret custody, and CC Switch discovery contract."}
+{"file":".trellis/tasks/archive/2026-08/08-03-publish-install-v0-1-17/research/release-state.md","reason":"Use the recorded obsolete v0.1.16 run outcome without claiming the removed task's acceptance criteria passed."}

@@ -1,6 +1,5 @@
 import { createRunEvent, type AgentRunEvent } from "@/agent-runtime/run-events";
 import type {
-  MoneyEstimate,
   PaidToolCapability,
   PaidToolReceipt,
 } from "@/control-protocol/paid-tool-contract";
@@ -29,8 +28,7 @@ export interface VisualToolInvocation {
   readonly prompt: string;
   readonly inputArtifactIds: readonly string[];
   readonly references: readonly string[];
-  readonly budgetCeiling: MoneyEstimate;
-  readonly approvalPolicy: "explicit" | "auto-within-budget";
+  readonly approvalPolicy: "explicit" | "auto";
   readonly signal?: AbortSignal;
 }
 export interface VisualToolResult {
@@ -79,11 +77,6 @@ export async function executeVisualGeneration(
   const plan = validateVisualGenerationPlan(input);
   const prior = deps.store.get(plan.idempotencyKey);
   if (prior) return { ...prior, idempotent: true };
-  if (
-    plan.estimatedCost.currency !== plan.task.budget.ceiling.currency ||
-    plan.estimatedCost.amount > plan.task.budget.ceiling.amount
-  )
-    throw new Error("Visual generation plan exceeds the task budget ceiling.");
   const now = deps.now ?? Date.now;
   assertNotAborted(deps.signal);
   deps.append([
@@ -272,7 +265,7 @@ async function invokeWithRetry(
   let last: unknown;
   for (
     let attempt = 1;
-    attempt <= plan.task.budget.maxAttemptsPerNode;
+    attempt <= plan.task.execution.maxAttemptsPerNode;
     attempt += 1
   ) {
     assertNotAborted(deps.signal);
@@ -297,8 +290,7 @@ async function invokeWithRetry(
             ? [plan.task.consistency.predecessorMasterId]
             : []),
         ],
-        budgetCeiling: plan.task.budget.ceiling,
-        approvalPolicy: plan.task.budget.approvalPolicy,
+        approvalPolicy: plan.task.execution.approvalPolicy,
         signal: deps.signal,
       });
       if (
@@ -345,7 +337,7 @@ async function refineOrRegenerate(
     // Preserve the selected candidate as an immutable reference and perform one
     // separately receipted regeneration instead of retrying a rejected edit.
     return invokeWithRetry(
-      { ...plan, task: { ...plan.task, budget: { ...plan.task.budget, maxAttemptsPerNode: 1 } } },
+      { ...plan, task: { ...plan.task, execution: { ...plan.task.execution, maxAttemptsPerNode: 1 } } },
       runId,
       `${nodeId}:regenerate-fallback`,
       "generate-image",

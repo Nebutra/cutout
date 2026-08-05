@@ -2828,7 +2828,7 @@ msgstr "更新通道"
 #. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
 msgid "settings.upgrade_codex_action"
-msgstr "将 Codex 更新到支持受限可读根目录的版本。"
+msgstr "将 Codex 更新到受支持的签名版本。"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx

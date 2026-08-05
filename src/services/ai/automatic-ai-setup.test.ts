@@ -219,6 +219,45 @@ describe('automatic AI setup', () => {
     expect(mocks.configure).toHaveBeenCalledWith(candidates[0]!.id)
   })
 
+  it('continues through the reviewed CC Switch queue after the current catalog rejects auth', async () => {
+    const candidates = ['a', 'b'].map((suffix) => ({
+      id: `provider-candidate:${suffix.repeat(64)}`,
+      source: 'cc-switch', sourceLabel: 'CC Switch', kind: 'openai-compatible',
+      label: 'CC Switch Codex upstream', baseUrl: `https://${suffix}.example/v1`,
+      wireProtocol: 'responses',
+      credential: { sourceType: 'cc-switch-db', available: true, importable: true }, warnings: [],
+    })) as ProviderDiscoveryCandidate[]
+    mocks.configure
+      .mockRejectedValueOnce({ code: 'unauthorized', message: 'Provider authentication failed.' })
+      .mockResolvedValueOnce(configured(
+        'verified-queue-route',
+        'openai-compatible',
+        ['gpt-5.5', 'gpt-image-2'],
+        'gpt-5.5',
+      ))
+
+    await expect(configureAutomaticAi(candidates)).resolves.toMatchObject({
+      configured: [{ provider: { id: 'verified-queue-route' } }],
+      bindings: {
+        text: { providerId: 'verified-queue-route', model: 'gpt-5.5' },
+        'image-generation': { providerId: 'verified-queue-route', model: 'gpt-image-2' },
+        'image-edit': { providerId: 'verified-queue-route', model: 'gpt-image-2' },
+      },
+    })
+    expect(mocks.configure.mock.calls).toEqual([
+      [candidates[0]!.id],
+      [candidates[1]!.id],
+    ])
+    expect(mocks.setVerification).toHaveBeenCalledTimes(1)
+    expect(mocks.setVerification).toHaveBeenCalledWith(
+      'verified-queue-route',
+      expect.objectContaining({
+        status: 'verified',
+        models: ['gpt-5.5', 'gpt-image-2'],
+      }),
+    )
+  })
+
   it('preserves a bounded message from a structured native rejection', async () => {
     const candidate = {
       id: `provider-candidate:${'a'.repeat(64)}`,

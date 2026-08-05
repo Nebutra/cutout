@@ -2828,7 +2828,7 @@ msgstr "Update channel"
 #. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
 msgid "settings.upgrade_codex_action"
-msgstr "Update Codex to a version with restricted readable roots."
+msgstr "Update Codex to a supported signed version."
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx

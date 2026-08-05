@@ -69,8 +69,11 @@ test("Deliver uses the workspace drawer before the full delivery surface", async
     await expect(deliver).toHaveScreenshot(`deliver-inline-${dark ? "dark" : "light"}.png`);
   }
 
-  await page.getByRole("button", { name: "Back to Canvas" }).click();
+  await page.getByRole("button", { name: "Back to Agent" }).click();
   await expect(deliver).toHaveCount(0);
+  await expect(
+    page.getByRole("complementary", { name: "Agent workspace" }),
+  ).toBeVisible();
   if (testInfo.project.name === "mobile-chrome") await page.setViewportSize({ width: 1024, height: 915 });
   const designButton = page.getByRole("button", { name: "Design", exact: true });
   await designButton.click();

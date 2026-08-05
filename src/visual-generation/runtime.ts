@@ -1,5 +1,4 @@
 import type { AgentRunEvent } from '@/agent-runtime/run-events'
-import type { MoneyEstimate } from '@/control-protocol/paid-tool-contract'
 import { executeVisualGeneration, type VisualExecutionResult, type VisualExecutionStore, type VisualReviewer, type VisualToolInvoker, type VisualToolResult } from './executor'
 import { planVisualGeneration } from './planner'
 import { visualGenerationTaskSchema, type VisualGenerationPlan, type VisualGenerationTask } from './contracts'
@@ -14,14 +13,13 @@ export function createVisualTaskRuntime(input: {
   readonly tools: VisualToolInvoker
   readonly reviewer: VisualReviewer
   readonly store: VisualExecutionStore
-  readonly estimates: { readonly generate: MoneyEstimate; readonly edit: MoneyEstimate }
   readonly append: (events: readonly AgentRunEvent[]) => void
   readonly now?: () => number
 }): VisualTaskRuntime {
   const executePlan = (runId: string, plan: VisualGenerationPlan, signal?: AbortSignal) => executeVisualGeneration(runId, plan, { tools: input.tools, reviewer: input.reviewer, store: input.store, append: input.append, now: input.now, signal })
   return {
-    plan: (task) => planVisualGeneration(visualGenerationTaskSchema.parse(task), input.estimates),
-    execute: (runId, task, signal) => executePlan(runId, planVisualGeneration(visualGenerationTaskSchema.parse(task), input.estimates), signal),
+    plan: (task) => planVisualGeneration(visualGenerationTaskSchema.parse(task)),
+    execute: (runId, task, signal) => executePlan(runId, planVisualGeneration(visualGenerationTaskSchema.parse(task)), signal),
     executePlan,
   }
 }

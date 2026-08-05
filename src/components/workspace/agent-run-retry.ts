@@ -6,6 +6,15 @@ import {
 export type AgentRunRetryMode = "create" | "repair";
 export type RetryPlanningRuntime = "codex-system" | "direct-provider";
 
+export function retryPlanningRuntimeAfterFailure(
+  failedRuntime: RetryPlanningRuntime,
+  directFallbackReady: boolean,
+): RetryPlanningRuntime {
+  return failedRuntime === "codex-system" && directFallbackReady
+    ? "direct-provider"
+    : failedRuntime;
+}
+
 export interface AgentRunRetryControl {
   readonly label?: "Continue" | "Retry";
   readonly onRetry?: () => void;

@@ -1,4 +1,3 @@
-import type { MoneyEstimate } from "@/control-protocol/paid-tool-contract";
 import {
   visualGenerationTaskSchema,
   type VisualGenerationPlan,
@@ -7,14 +6,8 @@ import {
 } from "./contracts";
 import { validateVisualGenerationPlan } from "./validate";
 
-export interface VisualPlanEstimate {
-  readonly generate: MoneyEstimate;
-  readonly edit: MoneyEstimate;
-}
-
 export function planVisualGeneration(
   taskInput: VisualGenerationTask,
-  estimate: VisualPlanEstimate,
 ): VisualGenerationPlan {
   const task = visualGenerationTaskSchema.parse(taskInput);
   const generated: VisualDagNode[] = Array.from(
@@ -48,17 +41,11 @@ export function planVisualGeneration(
     operation: "promote",
     inputs: [review.id],
   };
-  const amount =
-    estimate.generate.amount * task.variants.count + estimate.edit.amount;
-  const credits =
-    (estimate.generate.credits ?? 0) * task.variants.count +
-    (estimate.edit.credits ?? 0);
   return validateVisualGenerationPlan({
     version: "visual-generation-plan.v1",
     planId: `visual-plan:${task.taskId}`,
     task,
     nodes: [...generated, select, edit, review, promote],
-    estimatedCost: { currency: estimate.generate.currency, amount, credits },
     idempotencyKey: `visual:${task.taskId}:${task.catalogItemId}`,
   });
 }

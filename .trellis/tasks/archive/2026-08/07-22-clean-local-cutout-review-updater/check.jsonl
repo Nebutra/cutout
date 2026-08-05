@@ -1,0 +1,2 @@
+{"file":".trellis/spec/frontend/release-pipeline.md","reason":"Verify the installation evidence and updater/release review against the release contract."}
+{"file":"docs/RELEASE_CHECKLIST.md","reason":"Check that all required local install and update-distribution evidence was collected."}

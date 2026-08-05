@@ -58,9 +58,9 @@ assert(manifest.externalControllers?.sandboxOwnership?.includes('external Agent 
 assert(manifest.integrations?.role?.includes('not external controllers'), 'Integrations must remain distinct from external controllers.')
 assert(manifest.desktopPlanningRuntime?.surface === 'desktop-only', 'System planning runtime must remain desktop-only.')
 assert(manifest.desktopPlanningRuntime?.conversationBinding === false, 'System planning runtime must not advertise conversation binding before real Codex threads exist.')
-assert(manifest.desktopPlanningRuntime?.turnExecution === false, 'System planning runtime turn execution must remain disabled until confinement is proven.')
+assert(manifest.desktopPlanningRuntime?.turnExecution === false, 'System planning runtime turn execution must remain unadvertised until signed packaged execution is proven.')
 assert(manifest.desktopPlanningRuntime?.headlessAvailable === false, 'System planning runtime must not be advertised by CLI/MCP.')
-assert(manifest.desktopPlanningRuntime?.executionReason === 'restricted-read-roots-required', 'System planning runtime must preserve the reviewed fail-closed reason.')
+assert(manifest.desktopPlanningRuntime?.executionReason === 'packaged-turn-execution-proof-required', 'System planning runtime must preserve the packaged execution-proof release gate.')
 for (const tool of manifest.externalControllers?.progressiveDisclosure ?? []) assert(manifestMcpTools.includes(tool), `External controller discovery tool is missing: ${tool}.`)
 
 if (failures.length > 0) {

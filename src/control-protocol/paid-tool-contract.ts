@@ -22,12 +22,12 @@ export const paidToolCapabilitySchema = z.enum([
 ])
 export type PaidToolCapability = z.infer<typeof paidToolCapabilitySchema>
 
-export const moneyEstimateSchema = z.object({
+export const moneyAmountSchema = z.object({
   currency: z.string().regex(/^[A-Z]{3}$/),
   amount: z.number().nonnegative().finite(),
   credits: z.number().nonnegative().finite().optional(),
 }).strict()
-export type MoneyEstimate = z.infer<typeof moneyEstimateSchema>
+export type MoneyAmount = z.infer<typeof moneyAmountSchema>
 
 export const paidToolRequestSchema = z.object({
   capability: paidToolCapabilitySchema,
@@ -36,8 +36,7 @@ export const paidToolRequestSchema = z.object({
   intent: safeText.min(1).max(paidToolIntentMaxLength),
   prompt: safeText.min(1).max(paidToolPromptMaxLength),
   inputArtifactIds: z.array(safeText.min(1).max(300)).max(32).default([]),
-  budgetCeiling: moneyEstimateSchema,
-  approvalPolicy: z.enum(['explicit', 'auto-within-budget']).default('auto-within-budget'),
+  approvalPolicy: z.enum(['explicit', 'auto']).default('auto'),
 }).strict()
 export type PaidToolRequest = z.infer<typeof paidToolRequestSchema>
 
@@ -56,18 +55,15 @@ export const paidToolExecutorCapabilitySchema = z.object({
   providerId: safeText.min(1).max(160),
   model: safeText.min(1).max(300),
   available: z.boolean(),
-  estimatedCost: moneyEstimateSchema,
 }).strict()
 export type PaidToolExecutorCapability = z.infer<typeof paidToolExecutorCapabilitySchema>
 
-export type PaidToolPlanStatus = 'ready' | 'authorization-required' | 'capability-required' | 'budget-exceeded'
+export type PaidToolPlanStatus = 'ready' | 'authorization-required' | 'capability-required'
 
 export interface PaidToolPlan {
   readonly capability: PaidToolCapability
   readonly providerId?: string
   readonly model?: string
-  readonly estimatedCost?: MoneyEstimate
-  readonly budgetCeiling: MoneyEstimate
   readonly approvalPolicy: PaidToolRequest['approvalPolicy']
   readonly status: PaidToolPlanStatus
   readonly executable: boolean
@@ -76,7 +72,6 @@ export interface PaidToolPlan {
 
 export interface PaidToolPolicy {
   readonly allowPaid: boolean
-  readonly maxCost?: MoneyEstimate
 }
 
 export function planPaidTool(
@@ -89,8 +84,6 @@ export function planPaidTool(
     capability: request.capability,
     providerId: capability?.providerId ?? request.providerId,
     model: capability?.model ?? request.model,
-    estimatedCost: capability?.estimatedCost,
-    budgetCeiling: request.budgetCeiling,
     approvalPolicy: request.approvalPolicy,
   }
   if (!capability?.available) {
@@ -99,28 +92,10 @@ export function planPaidTool(
   if (!policy.allowPaid) {
     return { ...base, status: 'authorization-required', executable: false, reason: 'Paid actions are disabled by host policy.' }
   }
-  if (!sameCurrency(request.budgetCeiling, capability.estimatedCost)
-    || capability.estimatedCost.amount > request.budgetCeiling.amount
-    || exceedsCredits(capability.estimatedCost, request.budgetCeiling)
-    || (policy.maxCost && exceeds(capability.estimatedCost, policy.maxCost))) {
-    return { ...base, status: 'budget-exceeded', executable: false, reason: 'The host estimate exceeds the approved budget ceiling.' }
-  }
   if (request.approvalPolicy === 'explicit' && !hasExplicitApproval) {
     return { ...base, status: 'authorization-required', executable: false, reason: 'This request requires explicit approval.' }
   }
   return { ...base, status: 'ready', executable: true }
-}
-
-function sameCurrency(left: MoneyEstimate, right: MoneyEstimate): boolean {
-  return left.currency === right.currency
-}
-
-function exceedsCredits(cost: MoneyEstimate, ceiling: MoneyEstimate): boolean {
-  return cost.credits !== undefined && ceiling.credits !== undefined && cost.credits > ceiling.credits
-}
-
-function exceeds(cost: MoneyEstimate, ceiling: MoneyEstimate): boolean {
-  return !sameCurrency(cost, ceiling) || cost.amount > ceiling.amount || exceedsCredits(cost, ceiling)
 }
 
 export const paidToolReceiptSchema = z.object({
@@ -130,7 +105,7 @@ export const paidToolReceiptSchema = z.object({
   providerId: safeText.min(1).max(160),
   model: safeText.min(1).max(300),
   status: z.enum(['succeeded', 'failed', 'cancelled']),
-  charged: moneyEstimateSchema,
+  charged: moneyAmountSchema.optional(),
   outputArtifactIds: z.array(safeText.min(1).max(300)).max(128),
   startedAt: z.number().int().nonnegative(),
   completedAt: z.number().int().nonnegative(),
@@ -145,9 +120,7 @@ export function desktopPaidToolCapabilities(
     readonly descriptors?: readonly ModelDescriptor[]
     readonly bindings?: CapabilityBindings['bindings']
   } = {},
-  estimates: Partial<Record<PaidToolCapability, MoneyEstimate>> = {},
 ): readonly PaidToolExecutorCapability[] {
-  const fallback = { currency: 'USD', amount: 0, credits: 0 }
   const generation = evidence.bindings?.['image-generation'] ?? assignments.image
   const edit = evidence.bindings?.['image-edit'] ?? generation
   const routes = [
@@ -172,7 +145,6 @@ export function desktopPaidToolCapabilities(
       providerId: assignment.providerId,
       model: assignment.model,
       available: true,
-      estimatedCost: estimates[capability] ?? fallback,
     }] : []
   })
 }
@@ -184,7 +156,6 @@ export function composerRouteToPaidToolRequest(input: {
   readonly prompt: string
   readonly image: ModelAssignment
   readonly inputArtifactIds?: readonly string[]
-  readonly budgetCeiling: MoneyEstimate
   readonly approvalPolicy?: PaidToolRequest['approvalPolicy']
 }): PaidToolRequest {
   return paidToolRequestSchema.parse({
@@ -194,7 +165,6 @@ export function composerRouteToPaidToolRequest(input: {
     intent: input.intent,
     prompt: input.prompt,
     inputArtifactIds: input.inputArtifactIds ?? [],
-    budgetCeiling: input.budgetCeiling,
-    approvalPolicy: input.approvalPolicy ?? 'auto-within-budget',
+    approvalPolicy: input.approvalPolicy ?? 'auto',
   })
 }

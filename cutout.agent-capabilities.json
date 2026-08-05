@@ -4,7 +4,7 @@
   "product": {
     "name": "Cutout",
     "positioning": "Agent-native Design OS with a visual workbench and repo-native control plane",
-    "packageVersion": "0.1.18"
+    "packageVersion": "0.1.19"
   },
   "protocol": {
     "control": "cutout.control.v1",
@@ -39,7 +39,7 @@
     "authentication": "sanitized-native-status",
     "credentialCustody": "system-runtime-owned",
     "conversationBinding": false,
-    "executionReason": "restricted-read-roots-required",
+    "executionReason": "packaged-turn-execution-proof-required",
     "turnExecution": false,
     "headlessAvailable": false
   },
@@ -86,7 +86,7 @@
   "policy": {
     "defaultMode": "dry-run",
     "applyRequires": ["operation enabled by .cutout policy", "host-issued short-lived single-use approval lease bound to operation, preview digest, and expected revision"],
-    "paidActions": "Budget and approval are declared by cutout.control.v1; the desktop executor can require a short-lived capability lease, while the current headless host has no paid-tool executor.",
+    "paidActions": "Execution intent and approval policy are declared by cutout.control.v1; the desktop executor can require a short-lived capability lease, while the current headless host has no paid-tool executor.",
     "secrets": "Control requests, manifests and receipts reject or redact credential-shaped values; provider credentials stay in the native local credential store, auth headers are assembled in Rust, and credentials are never part of this manifest.",
     "filesystemBoundary": "Controlled paths resolve below the canonical selected project root and reject absolute paths, parent traversal and symlink components; generated writes stay below .cutout/exports and use no caller-selected destination.",
     "permissionBroker": "Host-issued cutout.capability-lease.v1 leases bind subject, request digest, approval id, scopes, paths, commands, hosts, budgets and expiry. Durable approval-lease state is HMAC-authenticated with a host key outside the workspace, and desktop writes require native confirmation rather than a caller-authored approval string; revocation, expiry, tampering and replay fail closed and authorization produces an immutable receipt.",
@@ -120,7 +120,7 @@
     "No cloud collaboration or remote project service.",
     "No arbitrary command execution, process spawning, absolute-path scans or arbitrary export destinations.",
     "No provider executor or bundled Coding workspace is available in the default CLI/MCP headless host; coding.* requires injected controlled adapters and tool.invoke returns capability-required.",
-    "The desktop codex-system adapter performs only signed executable, sanitized authentication and generated app-server schema probes. Conversation binding and turn execution remain capability-required until restricted readable roots are feature-proven and enforced.",
+    "The desktop codex-system adapter has an internal native-owned zero-tool turn path with isolated staged context, negotiated app-server schema checks and sanitized terminal evidence. Public conversation binding and turnExecution remain capability-required until a signed packaged turn succeeds against a healthy real upstream.",
     "The desktop app has an internal durable local Agent Host, a native-routed Provider executor, and a bounded static-site Coding backend under an opaque host-managed workspace. Those desktop lifecycle bindings are not exposed through cutout.control.v1, CLI, or MCP, and no arbitrary-shell executor is provided.",
     "CPU hard limits are capability-required; the Node command host currently enforces wall-clock and output-byte limits, not a kernel CPU quota.",
     "General Node network isolation is capability-required; provider network traffic is instead constrained by the Rust proxy boundary.",
