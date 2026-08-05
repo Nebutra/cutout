@@ -3184,14 +3184,14 @@ wire_api = "responses"
 [model_providers.relay]
 base_url = "https://relay.example/v1"
 env_key = "RELAY_API_KEY"
-wire_api = "legacy-completions"
+wire_api = "unsupported-completions"
 "#,
         )
         .unwrap();
 
         assert!(matches!(
             discover_codex_at(&home.path().join(".codex"), "~/.codex"),
-            Err(DiscoveryError::UnsupportedWireProtocol(value)) if value == "legacy-completions"
+            Err(DiscoveryError::UnsupportedWireProtocol(value)) if value == "unsupported-completions"
         ));
     }
 

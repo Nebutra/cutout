@@ -10,7 +10,7 @@ const CONTROL_FILES = [
 ]
 
 describe('Integration SDK architecture boundary', () => {
-  it('keeps External Agent Control independent from provider adapters and legacy connectors', () => {
+  it('keeps External Agent Control independent from provider and integration adapters', () => {
     for (const path of CONTROL_FILES) {
       const source = readFileSync(path, 'utf8')
       expect(source, path).not.toMatch(/from\s+['"][^'"]*(?:connectors\/figma|connectors\/repository|integration-sdk\/adapters|@figma|@notionhq|octokit|canva)[^'"]*['"]/) 

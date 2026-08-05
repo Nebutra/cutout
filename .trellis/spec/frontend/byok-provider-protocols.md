@@ -535,7 +535,7 @@ import_provider_draft(app: AppHandle, input: ImportDraftInput) -> Result<Provide
 - `image-generation` and `image-edit` are independent task routes. Automatic
   setup, desktop paid-tool capability projection, and prototype execution must
   honor separate bindings when different exact models own those capabilities.
-  The legacy singular image assignment is only a fallback; it must not cause an
+  The derived primary image projection is only a convenience view; it must not cause an
   available edit route to be ignored or a generation-only route to be advertised
   for editing.
 - Automatic nomination may recognize image-family ids such as `seedream-*` and
@@ -612,7 +612,7 @@ import_provider_draft(app: AppHandle, input: ImportDraftInput) -> Result<Provide
   selector binding, candidate/binding revision changes, post-check secret
   changes, ambiguous draft sources, conflict, and provider-save key rollback.
 - Format-specific negatives: OpenCode JSONC, OMP YAML hazards, Gemini/Kimi env
-  precedence, Qwen unknown providers, Kimi current-over-legacy precedence, and
+  precedence, Qwen unknown providers, Kimi TOML/environment precedence, and
   Vibe dotenv export/duplicate/interpolation/command rejection.
 - Settings setup projection: loading, configuration failure, discovery failure,
   complete and incomplete verification evidence, disabled Providers, verified

@@ -48,7 +48,6 @@ const WORKSPACE_KEYS = new Set([
   'selectedPrototypePageId',
   'runError',
   'namingStatus',
-  'liveAgentOutput',
   'attachments',
   'webSearchEnabled',
   'composerModelPolicy',
@@ -691,7 +690,6 @@ function isCurrentWorkspaceSnapshot(input: unknown): input is WorkspaceSnapshot 
     && 'runError' in workspace
     && typeof workspace.namingStatus === 'string'
     && WORKSPACE_NAMING_STATUSES.has(workspace.namingStatus)
-    && typeof workspace.liveAgentOutput === 'string'
     && Array.isArray(workspace.attachments)
     && typeof workspace.webSearchEnabled === 'boolean'
 }

@@ -466,7 +466,6 @@ function snapshot(options: {
     selectedPrototypePageId: 'home',
     runError: null,
     namingStatus: 'idle',
-    liveAgentOutput: '',
     attachments: [
       {
         id: 'ref:logo',

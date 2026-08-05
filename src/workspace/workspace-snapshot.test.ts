@@ -43,21 +43,6 @@ describe('workspace snapshot helpers', () => {
     )
   })
 
-  it('accepts workspace.v1 records saved before composer and attachment fields existed', () => {
-    const legacy = {
-      ...snapshot(outcome('running', [])),
-      outcome: undefined,
-      attachments: undefined,
-      webSearchEnabled: undefined,
-      composerModelPolicy: undefined,
-      composerThinkingPolicy: undefined,
-      agentRunEvents: undefined,
-    } as unknown as WorkspaceSnapshot
-
-    expect(() => isWorkspaceSnapshotEmpty(legacy)).not.toThrow()
-    expect(() => workspaceSnapshotFingerprint(legacy)).not.toThrow()
-  })
-
   it('fingerprints durable run events so autosave persists activity progress', () => {
     const base = snapshot(outcome('running', []))
     const started = {
@@ -109,14 +94,14 @@ describe('workspace snapshot helpers', () => {
     expect(workspaceSnapshotFingerprint(approved)).not.toBe(workspaceSnapshotFingerprint(base))
   })
 
-  it('treats a Design IR-only legacy snapshot as persistent workspace state', () => {
+  it('treats a current Design IR-only snapshot as persistent workspace state', () => {
     const irOnly = {
       ...snapshot(outcome('running', [])),
       outcome: undefined,
       designDocument: {
         version: 'design-ir.v1',
-        meta: { id: 'design-document:legacy', title: 'Legacy', createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z' },
-        revision: { id: 'revision:legacy:1', number: 1, createdAt: '2026-01-01T00:00:00.000Z', author: { kind: 'import', id: 'legacy' } },
+        meta: { id: 'design-document:ir-only', title: 'IR only', createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z' },
+        revision: { id: 'revision:ir-only:1', number: 1, createdAt: '2026-01-01T00:00:00.000Z', author: { kind: 'import', id: 'ir-only' } },
         needs: [],
         sources: [],
         materials: [],
@@ -239,7 +224,6 @@ function snapshot(outcomeState: OutcomeRuntimeState): WorkspaceSnapshot {
     selectedPrototypePageId: null,
     runError: null,
     namingStatus: 'idle',
-    liveAgentOutput: '',
     attachments: [],
     webSearchEnabled: false,
     outcome: outcomeState,

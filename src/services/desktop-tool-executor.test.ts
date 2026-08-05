@@ -150,7 +150,7 @@ describe('desktop paid tool executor', () => {
     ])
   })
 
-  it('uses the complete execution prompt for generation and editing while retaining legacy fallback', async () => {
+  it('uses the complete execution prompt for generation and editing', async () => {
     const generated = harness()
     await generated.executor.execute(execution(request('generate-image', 'Complete generated page prompt')))
     expect(generated.generation.generateImages).toHaveBeenCalledWith(

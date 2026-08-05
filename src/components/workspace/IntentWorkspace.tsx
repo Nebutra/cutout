@@ -398,7 +398,6 @@ import {
 import {
   collectLiveText,
   createLiveTextBatcher,
-  restoreLiveAgentOutput,
 } from "./live-agent-output";
 import { useDesktopToolLoop } from "@/agent-runtime/use-desktop-tool-loop";
 import {
@@ -791,11 +790,9 @@ export function IntentWorkspace({
     () => initialWorkspace?.humanLoopCustomAnswer ?? "",
   );
   const [composerDraft, setComposerDraft] = useState("");
-  // Live provider deltas are deliberately not restored from workspace.v1.
-  // Durable agent-message events are the transcript source of truth.
-  const [liveAgentOutput, setLiveAgentOutput] = useState(() =>
-    restoreLiveAgentOutput(initialWorkspace?.liveAgentOutput),
-  );
+  // Live provider deltas are ephemeral. Durable Agent events and artifacts
+  // are the only transcript and production evidence persisted by Workspace.
+  const [liveAgentOutput, setLiveAgentOutput] = useState("");
   const [liveAgentLabel, setLiveAgentLabel] = useState<string | null>(null);
   const [runError, setRunError] = useState<string | null>(
     () => initialWorkspace?.runError ?? null,
@@ -1396,7 +1393,6 @@ export function IntentWorkspace({
       selectedPrototypePageId,
       runError,
       namingStatus,
-      liveAgentOutput: "",
       attachments: attachments.map(persistReferenceAttachment),
       webSearchEnabled,
       composerModelPolicy:

@@ -801,30 +801,17 @@ fn kimi_binding(provider_type: &str, base_url: &str) -> Option<Binding> {
 fn discover_kimi(home: &Path) -> Result<Vec<ProviderCandidate>, DiscoveryError> {
     let root = home.join(".kimi");
     let env_available = environment_value("KIMI_API_KEY").is_some();
-    let (providers, schema, location): (HashMap<String, TomlValue>, &str, &str) =
+    let providers: HashMap<String, TomlValue> =
         if let Some(raw) = read_exact_config(&root.join("config.toml"))? {
             let value: TomlValue = toml::from_str(&raw)
                 .map_err(|_| DiscoveryError::Parse("Kimi config TOML: invalid TOML".into()))?;
-            let map = value
+            value
                 .get("providers")
                 .and_then(TomlValue::as_table)
                 .cloned()
                 .unwrap_or_default()
                 .into_iter()
-                .collect();
-            (map, "kimi-config-toml-v1", "~/.kimi/config.toml")
-        } else if let Some(raw) = read_exact_config(&root.join("config.json"))? {
-            let value = parse_json(&raw, "Kimi legacy config")?;
-            let mut map = HashMap::new();
-            if let Some(entries) = value.get("providers").and_then(JsonValue::as_object) {
-                for (id, entry) in entries {
-                    let encoded = toml::Value::try_from(entry.clone()).map_err(|_| {
-                        DiscoveryError::Parse("Kimi legacy config: unsupported value".into())
-                    })?;
-                    map.insert(id.clone(), encoded);
-                }
-            }
-            (map, "kimi-config-json-v1", "~/.kimi/config.json")
+                .collect()
         } else {
             if env_available {
                 let binding = kimi_binding("kimi", "https://api.kimi.com/coding/v1").unwrap();
@@ -867,8 +854,8 @@ fn discover_kimi(home: &Path) -> Result<Vec<ProviderCandidate>, DiscoveryError> 
             rows.push(candidate_with_selector(
                 "kimi",
                 "Kimi Code CLI",
-                schema,
-                location,
+                "kimi-config-toml-v1",
+                "~/.kimi/config.toml",
                 binding,
                 entry_id,
                 "environment",
@@ -882,8 +869,8 @@ fn discover_kimi(home: &Path) -> Result<Vec<ProviderCandidate>, DiscoveryError> 
             rows.push(candidate_with_selector(
                 "kimi",
                 "Kimi Code CLI",
-                schema,
-                location,
+                "kimi-config-toml-v1",
+                "~/.kimi/config.toml",
                 binding,
                 entry_id,
                 "config-literal",
@@ -897,8 +884,8 @@ fn discover_kimi(home: &Path) -> Result<Vec<ProviderCandidate>, DiscoveryError> 
             rows.push(candidate_with_selector(
                 "kimi",
                 "Kimi Code CLI",
-                schema,
-                location,
+                "kimi-config-toml-v1",
+                "~/.kimi/config.toml",
                 binding,
                 entry_id,
                 "session",
@@ -1089,59 +1076,19 @@ fn resolve_tagged_candidate(
 
 fn resolve_kimi(candidate: &ProviderCandidate, home: &Path) -> Result<String, DiscoveryError> {
     let root = home.join(".kimi");
-    let schema = candidate.schema_id.as_deref();
-    let raw = match schema {
-        Some("kimi-config-toml-v1") => read_exact_config(&root.join("config.toml"))?,
-        Some("kimi-config-json-v1") if read_exact_config(&root.join("config.toml"))?.is_none() => {
-            read_exact_config(&root.join("config.json"))?
-        }
-        _ => return Err(DiscoveryError::CandidateMissing),
+    if candidate.schema_id.as_deref() != Some("kimi-config-toml-v1") {
+        return Err(DiscoveryError::CandidateMissing);
     }
-    .ok_or(DiscoveryError::CandidateMissing)?;
-    if schema == Some("kimi-config-toml-v1") {
-        let value: TomlValue = toml::from_str(&raw)
-            .map_err(|_| DiscoveryError::Parse("Kimi config: invalid TOML".into()))?;
-        return value
-            .get("providers")
-            .and_then(TomlValue::as_table)
-            .and_then(|providers| {
-                providers.iter().find_map(|(entry_id, entry)| {
-                    let table = entry.as_table()?;
-                    let binding = kimi_binding(
-                        table.get("type")?.as_str()?,
-                        table.get("base_url")?.as_str()?,
-                    )?;
-                    let current = candidate_with_selector(
-                        "kimi",
-                        "Kimi Code CLI",
-                        "kimi-config-toml-v1",
-                        "~/.kimi/config.toml",
-                        binding,
-                        entry_id,
-                        "config-literal",
-                        "Provider API key",
-                        true,
-                        true,
-                        None,
-                        vec![],
-                    );
-                    if current.id == candidate.id {
-                        table.get("api_key")?.as_str().map(str::to_owned)
-                    } else {
-                        None
-                    }
-                })
-            })
-            .filter(|value| !value.is_empty())
-            .ok_or(DiscoveryError::CandidateMissing);
-    }
-    let value = parse_json(&raw, "Kimi legacy config")?;
+    let raw =
+        read_exact_config(&root.join("config.toml"))?.ok_or(DiscoveryError::CandidateMissing)?;
+    let value: TomlValue = toml::from_str(&raw)
+        .map_err(|_| DiscoveryError::Parse("Kimi config: invalid TOML".into()))?;
     value
         .get("providers")
-        .and_then(JsonValue::as_object)
+        .and_then(TomlValue::as_table)
         .and_then(|providers| {
             providers.iter().find_map(|(entry_id, entry)| {
-                let table = entry.as_object()?;
+                let table = entry.as_table()?;
                 let binding = kimi_binding(
                     table.get("type")?.as_str()?,
                     table.get("base_url")?.as_str()?,
@@ -1149,8 +1096,8 @@ fn resolve_kimi(candidate: &ProviderCandidate, home: &Path) -> Result<String, Di
                 let current = candidate_with_selector(
                     "kimi",
                     "Kimi Code CLI",
-                    "kimi-config-json-v1",
-                    "~/.kimi/config.json",
+                    "kimi-config-toml-v1",
+                    "~/.kimi/config.toml",
                     binding,
                     entry_id,
                     "config-literal",
@@ -1653,7 +1600,6 @@ mod tests {
 
                 std::fs::create_dir(home.path().join(".kimi")).unwrap();
                 std::fs::write(home.path().join(".kimi/config.toml"), "[providers.kimi-for-coding]\ntype='kimi'\nbase_url='https://api.kimi.com/coding/v1'\napi_key='kimi-literal'\n").unwrap();
-                std::fs::write(home.path().join(".kimi/config.json"), r#"{"providers":{"legacy":{"type":"kimi","base_url":"https://api.kimi.com/coding/v1","api_key":"legacy-secret"}}}"#).unwrap();
                 let kimi = discover_kimi(home.path()).unwrap();
                 assert_eq!(kimi.len(), 1);
                 assert_eq!(
@@ -1664,7 +1610,6 @@ mod tests {
                 assert_eq!(resolve(&kimi[0], home.path()).unwrap(), "kimi-environment");
                 let serialized = serde_json::to_string(&kimi).unwrap();
                 assert!(!serialized.contains("kimi-literal"));
-                assert!(!serialized.contains("legacy-secret"));
             },
         );
     }

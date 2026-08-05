@@ -3,7 +3,7 @@ import { createFigmaIntegration } from './figma'
 import { createRepositoryIntegration } from './repository'
 import { IntegrationRegistry } from '@/integration-sdk'
 
-describe('legacy connector Integration SDK compatibility', () => {
+describe('Connector to Integration SDK projection', () => {
   it('exposes Figma snapshot capabilities without claiming live sync', () => {
     const integration = createFigmaIntegration()
     expect(integration.manifest.protocol).toBe('integration-sdk.v1')
