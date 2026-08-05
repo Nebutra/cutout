@@ -1424,3 +1424,38 @@ Removed the superseded v0.1.16 task record and obsolete Codex auth fallback, con
 ### Next Steps
 
 - None - task complete
+
+
+## Session 43: Converge post-v0.1.19 contracts
+
+**Date**: 2026-08-05
+**Task**: Converge post-v0.1.19 contracts
+**Branch**: `fix/converge-post-v0.1.19`
+
+### Summary
+
+Removed retired Workspace and Kimi compatibility paths, made reviewed release-note catalogs mandatory for updater generation, and retired stale planning records after verifying v0.1.19 publication evidence.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `c3be532` | (see git log) |
+| `6cdfb1f` | (see git log) |
+| `56faf6c` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
