@@ -39,19 +39,21 @@ the exact verified public Apple Silicon artifact.
 
 ## Acceptance Criteria
 
-- [ ] Candidate, merged main SHA, annotated tag, and synchronized source all
+- [x] Candidate, merged main SHA, annotated tag, and synchronized source all
       resolve to version `0.1.19` without tag movement.
-- [ ] Exact five-locale release notes and local release-critical gates pass.
-- [ ] The exact tag workflow succeeds and publishes a non-draft,
+- [x] Exact five-locale release notes and local release-critical gates pass.
+- [x] The exact tag workflow succeeds and publishes a non-draft,
       non-prerelease stable GitHub Release.
-- [ ] Required cross-platform installer/updater, checksum, SBOM, metadata, and
+- [x] Required cross-platform installer/updater, checksum, SBOM, metadata, and
       provenance assets are present and independently validated.
-- [ ] Public `latest.json` has readable English `notes`, matching localized
+- [x] Public `latest.json` has readable English `notes`, matching localized
       `cutoutReleaseNotes`, and signed entries for all four platform keys.
-- [ ] The Apple Silicon DMG matches `SHA256SUMS` and passes `hdiutil`,
+- [x] The Apple Silicon DMG matches `SHA256SUMS` and passes `hdiutil`,
       Developer ID, Gatekeeper, and stapler verification.
-- [ ] `/Applications/Cutout.app` reports `0.1.19`, contains `arm64`, launches
+- [x] `/Applications/Cutout.app` reports `0.1.19`, contains `arm64`, launches
       from the installed bundle, and the prior app remains recoverable.
+
+See `verification.md` for the exact public and local evidence.
 
 ## Out Of Scope
 
