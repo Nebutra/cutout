@@ -6,41 +6,42 @@
 
 ## Overview
 
-<!--
-Document your project's component conventions here.
-
-Questions to answer:
-- What component patterns do you use?
-- How are props defined?
-- How do you handle composition?
-- What accessibility standards apply?
--->
-
-(To be filled by the team)
+Components render typed domain projections and dispatch commands; they do not
+decode persisted/provider payloads or own the authoritative workflow state.
+Shared controls come from `src/components/ui/` and visual behavior follows the
+existing quiet, work-focused application shell.
 
 ---
 
 ## Component Structure
 
-<!-- Standard structure of a component file -->
-
-(To be filled by the team)
+- Keep pure formatting/projection helpers above the component or in a neighboring
+  view-model module when reused or complex.
+- Define props, then the named component. Use composition for panels, rows and
+  disclosures rather than adding unrelated modes to a monolith.
+- Keep effects in hooks and event handlers. Rendering must be side-effect free.
+- Add the closest focused test beside the component; use Playwright for geometry,
+  focus, responsive and native-dialog behavior that jsdom cannot prove.
 
 ---
 
 ## Props Conventions
 
-<!-- How props should be defined and typed -->
-
-(To be filled by the team)
+- Use named interfaces with `readonly` fields for non-trivial props.
+- Pass domain projections and explicit callbacks, not the entire store or service
+  registry.
+- Use discriminated unions when visible states require different data.
+- Do not accept credential values, arbitrary filesystem paths or caller-authored
+  approval authority as component props.
 
 ---
 
 ## Styling Patterns
 
-<!-- How styles are applied (CSS modules, styled-components, Tailwind, etc.) -->
-
-(To be filled by the team)
+Tailwind utility classes are the default; `cn` composes conditional classes and
+shared primitives use `class-variance-authority`. Stable controls declare fixed
+dimensions. Prefer transform/opacity animation, respect reduced motion and keep
+pressed states from shifting absolutely positioned controls.
 
 ---
 
@@ -182,6 +183,8 @@ treatment but continues to open the established inline delivery workspace.
 
 ## Common Mistakes
 
-<!-- Component-related mistakes your team has made -->
-
-(To be filled by the team)
+- Treating DOM presence as proof that content is visible when a drawer overlaps it.
+- Rendering duplicate controls for one action instead of one accessible button.
+- Showing inferred percentages, ETAs or completion without source evidence.
+- Nesting operational page sections in decorative cards and reducing scanability.
+- Binding `aria-pressed` to a different surface than the click handler opens.

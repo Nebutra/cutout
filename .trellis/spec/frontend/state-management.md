@@ -6,49 +6,51 @@
 
 ## Overview
 
-<!--
-Document your project's state management conventions here.
-
-Questions to answer:
-- What state management solution do you use?
-- How is local vs global state decided?
-- How do you handle server state?
-- What are the patterns for derived state?
--->
-
-(To be filled by the team)
+State ownership follows lifetime and authority. Component-local interaction is
+React state, workspace production state is Zustand, cacheable service reads use
+TanStack Query, and durable design/material truth is projected from `.cutout`
+Design IR plus validated workspace persistence.
 
 ---
 
 ## State Categories
 
-<!-- Local state, global state, server state, URL state -->
-
-(To be filled by the team)
+- Local React state: disclosure, focus, draft text and in-flight streamed text.
+- Zustand workspace state: current source, production phase, generated artifacts
+  and commands shared across workspace surfaces.
+- TanStack Query: repeatable service reads and mutations with explicit keys.
+- Persisted state: validated current `workspace.v1`, run events and Design IR.
+- Derived state: pure projections/view models, never separately persisted copies.
 
 ---
 
 ## When to Use Global State
 
-<!-- Criteria for promoting state to global -->
-
-(To be filled by the team)
+Promote state only when multiple mounted surfaces coordinate it, it survives a
+surface transition, or it participates in save/restore. Keep transient progress
+text and display-only expansion local. Add actions at the store owner rather
+than mutating objects from components.
 
 ---
 
 ## Server State
 
-<!-- How server data is cached and synchronized -->
-
-(To be filled by the team)
+Cutout is local-first. Provider and native operations return typed results through
+services; TanStack Query may cache stable reads. Long-running production uses
+AbortSignals and run evidence instead of pretending Provider work is ordinary
+server cache. External integration results become authority only through their
+validated receipts and revision bindings.
 
 ---
 
 ## Common Mistakes
 
-<!-- State management mistakes your team has made -->
-
-(To be filled by the team)
+- Persisting ephemeral streamed Agent output creates a second transcript authority.
+- Keeping removed fields optional in current schemas preserves hidden legacy UI.
+- Independently deriving readiness in multiple components causes restart drift.
+- Publishing a late async result without checking run/source identity corrupts the
+  current project.
+- A fresh collection selector in `useSyncExternalStore` can loop renders.
 
 ---
 

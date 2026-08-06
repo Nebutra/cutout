@@ -6,17 +6,10 @@
 
 ## Overview
 
-<!--
-Document your project's quality standards here.
-
-Questions to answer:
-- What patterns are forbidden?
-- What linting rules do you enforce?
-- What are your testing requirements?
-- What code review standards apply?
--->
-
-(To be filled by the team)
+Quality is evidence proportional to the changed boundary. Static checks are the
+floor; workflow work must prove state transitions, failure behavior and final
+artifacts. Tests may use deterministic Provider fixtures but must not bypass the
+production orchestration or claim an unexecuted live integration.
 
 ## Dependency And Vendoring
 
@@ -74,34 +67,47 @@ showing that the vulnerable package no longer resolves.
 
 ## Forbidden Patterns
 
-<!-- Patterns that should never be used and why -->
-
-(To be filled by the team)
+- Invented approvals, credentials, capability evidence, progress or delivery.
+- Unbounded network/model waits, retrying every error, fixed sleeps for readiness.
+- Direct secrets in browser state, logs, manifests, receipts or test snapshots.
+- Arbitrary filesystem paths, shell interpolation or unvalidated native payloads.
+- Shipping TODO/WIP scaffolds with no current consumer.
+- Weakening a schema or policy to make a failing fixture pass.
 
 ---
 
 ## Required Patterns
 
-<!-- Patterns that must always be used -->
-
-(To be filled by the team)
+- Preview before approved apply and bind execution to exact revision/digest evidence.
+- Finite deadlines, cancellation propagation and semantic retry classification for
+  every remote operation.
+- Strict runtime decoding at persistence, Provider, native and model boundaries.
+- Shared source-of-truth projections for readiness, recovery and UI display.
+- Sanitized errors and content-addressed/provenance-bound artifact receipts.
 
 ---
 
 ## Testing Requirements
 
-<!-- What level of testing is expected -->
-
-(To be filled by the team)
+- Pure domain changes: focused unit tests including invalid/empty boundaries.
+- Cross-layer workflow changes: integration tests through the real service/store/UI
+  path and assertions on complete declared output, cancellation and failure.
+- Visual interaction changes: Playwright geometry, keyboard/focus and representative
+  desktop/mobile coverage.
+- Agent surface changes: `pnpm agent:validate`; locale copy changes: `pnpm i18n:ci`.
+- Release/native changes: frontend build/tests, locked Rust test/check and release
+  contract checks on applicable target matrices.
 
 ---
 
 ## Code Review Checklist
 
-<!-- What reviewers should check -->
-
-(To be filled by the team)
-
+- [ ] Behavioral claims have direct test, receipt or explicitly labeled external evidence.
+- [ ] Complete output is checked against the Agent-authored plan or manifest.
+- [ ] Error, timeout, retry, cancellation and restart paths were reviewed.
+- [ ] Secrets, paths, approvals and revisions preserve their trust boundaries.
+- [ ] New abstractions have a current consumer and do not preserve retired behavior.
+- [ ] Optional Provider fields are not inferred from generic protocol compatibility.
 - [ ] Searched JavaScript, TypeScript, scripts, and CSS subpath imports before
       removing a package that appears unused.
 - [ ] Vendored third-party source has license, version, checksum, provenance,

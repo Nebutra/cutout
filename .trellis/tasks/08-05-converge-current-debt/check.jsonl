@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/frontend/cutout-pipeline.md", "reason": "Verify slicing behavior and ImageMagick benchmark boundary."}
+{"file": ".trellis/spec/frontend/byok-provider-protocols.md", "reason": "Verify Provider conformance and secret-boundary invariants."}
+{"file": ".trellis/spec/frontend/prototype-generation.md", "reason": "Verify all planned routes and assets reach delivery."}
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "Apply repository quality and dependency review gates."}
