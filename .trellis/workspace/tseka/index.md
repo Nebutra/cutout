@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 43
-- **Last Active**: 2026-08-05
+- **Total Sessions**: 44
+- **Last Active**: 2026-08-06
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~1461 | Active |
+| `journal-1.md` | ~1498 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 44 | 2026-08-06 | Converge production asset workflow debt | `9906bee`, `30bcb70`, `5be17ff`, `13858a7`, `4395ef3` | `main` |
 | 43 | 2026-08-05 | Converge post-v0.1.19 contracts | `c3be532`, `6cdfb1f`, `56faf6c` | `fix/converge-post-v0.1.19` |
 | 42 | 2026-08-05 | Converge stale backlog and Codex auth discovery | `0edf555` | `release/v0.1.19-rc` |
 | 41 | 2026-08-04 | Remove legacy compatibility surfaces | `b374771` | `main` |
