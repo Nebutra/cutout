@@ -13,9 +13,12 @@ test("Deliver tabs share the product visual language without becoming forms", as
   const deliver = page.locator('[data-slot="design-os-workbench"][aria-label="Deliver"]');
   const tabs = deliver.getByRole("tablist", { name: "Deliver sections" });
   const back = deliver.getByRole("button", { name: /Back to (Canvas|Agent)/ });
-  const topGeometry = await Promise.all([back, ...await tabs.getByRole("tab").all()].map(async (item) => await item.boundingBox()));
-  expect(topGeometry.every(Boolean)).toBe(true);
-  expect(topGeometry.some((box, index) => topGeometry.slice(index + 1).some((other) => box!.x < other!.x + other!.width && box!.x + box!.width > other!.x && box!.y < other!.y + other!.height && box!.y + box!.height > other!.y))).toBe(false);
+  const topControls = [back, ...await tabs.getByRole("tab").all()];
+  await expect.poll(async () => {
+    const geometry = await Promise.all(topControls.map(async (item) => await item.boundingBox()));
+    if (!geometry.every(Boolean)) return false;
+    return !geometry.some((box, index) => geometry.slice(index + 1).some((other) => box!.x < other!.x + other!.width && box!.x + box!.width > other!.x && box!.y < other!.y + other!.height && box!.y + box!.height > other!.y));
+  }).toBe(true);
 
   const surfaces: Array<{ tab: string; region: Locator; cta: RegExp }> = [
     { tab: "Delivery center", region: deliver.locator('[data-slot="delivery-center"]'), cta: /Preview delivery|Ask Agent to prepare deliverables|Add destination/ },

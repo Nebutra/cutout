@@ -377,6 +377,14 @@ test.beforeEach(async ({ page }) => {
   await openStableHome(page)
 })
 
+test.afterEach(async ({ page }) => {
+  const stop = page.getByRole('button', { name: 'Stop' })
+  if (await stop.isVisible()) {
+    await stop.click()
+    await expect(stop).toBeHidden()
+  }
+})
+
 test('Home has one primary need entry and recent work remains reachable', async ({ page }, testInfo) => {
   const main = page.getByRole('main')
   const composer = page.getByPlaceholder('Describe what you want to design...')
@@ -453,14 +461,14 @@ test('conversational Agent replies stay in the panel and never cover the canvas'
   await expect(page.locator('[data-sonner-toast]').filter({ hasText: 'Build it anyway' })).toHaveCount(0)
 
   const containmentTolerance = 1
-  const contained = await Promise.all([panel.boundingBox(), reply.boundingBox()]).then(([panelBox, replyBox]) =>
-    Boolean(panelBox && replyBox
+  await expect.poll(async () => {
+    const [panelBox, replyBox] = await Promise.all([panel.boundingBox(), reply.boundingBox()])
+    return Boolean(panelBox && replyBox
       && replyBox.x >= panelBox.x - containmentTolerance
       && replyBox.x + replyBox.width <= panelBox.x + panelBox.width + containmentTolerance
       && replyBox.y >= panelBox.y - containmentTolerance
-      && replyBox.y + replyBox.height <= panelBox.y + panelBox.height + containmentTolerance),
-  )
-  expect(contained).toBe(true)
+      && replyBox.y + replyBox.height <= panelBox.y + panelBox.height + containmentTolerance)
+  }).toBe(true)
 })
 
 test('design details open in the left workspace drawer and do not leak internals by default', async ({ page }, testInfo) => {

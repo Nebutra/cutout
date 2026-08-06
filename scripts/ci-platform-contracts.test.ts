@@ -33,10 +33,10 @@ describe('cross-platform CI contracts', () => {
     }))
   })
 
-  it('uses bundled Playwright browsers away from macOS unless overridden', () => {
+  it('uses Playwright-matched bundled Chromium on every platform unless overridden', () => {
     expect(resolveChromeExecutable(undefined, 'linux')).toBeUndefined()
     expect(resolveChromeExecutable(undefined, 'win32')).toBeUndefined()
-    expect(resolveChromeExecutable(undefined, 'darwin')).toContain('Google Chrome.app')
+    expect(resolveChromeExecutable(undefined, 'darwin')).toBeUndefined()
     expect(resolveChromeExecutable('/custom/chrome', 'linux')).toBe('/custom/chrome')
   })
 
