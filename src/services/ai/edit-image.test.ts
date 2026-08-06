@@ -167,6 +167,40 @@ describe('GenerationService.editImage', () => {
       images: [new Uint8Array([1])],
     })
     expect(result).toEqual({ ok: false, error: 'images/edits failed: HTTP 401' })
+    expect(invokeMock).toHaveBeenCalledOnce()
+  })
+
+  it('retries one HTTP 400 without the optional high-fidelity field', async () => {
+    invokeMock
+      .mockRejectedValueOnce(new Error('images/edits failed: HTTP 400'))
+      .mockResolvedValueOnce({ images: [ABC_B64] })
+    const gen = createLocalGenerationService(providersWith([cfg()]))
+
+    const result = await gen.editImage({
+      providerId: 'p1',
+      prompt: 'preserve the reference',
+      images: [new Uint8Array([1])],
+    })
+
+    expect(result).toEqual({ ok: true, data: [{ mediaType: 'image/png', bytes: ABC_BYTES }] })
+    expect(invokeMock).toHaveBeenCalledTimes(2)
+    expect(invokeMock.mock.calls[0]?.[1]).toEqual(expect.objectContaining({ inputFidelity: 'high' }))
+    expect(invokeMock.mock.calls[1]?.[1]).toEqual(expect.objectContaining({ inputFidelity: null }))
+  })
+
+  it('does not downgrade an explicit low-fidelity request after HTTP 400', async () => {
+    invokeMock.mockRejectedValueOnce(new Error('images/edits failed: HTTP 400'))
+    const gen = createLocalGenerationService(providersWith([cfg()]))
+
+    const result = await gen.editImage({
+      providerId: 'p1',
+      prompt: 'edit',
+      images: [new Uint8Array([1])],
+      inputFidelity: 'low',
+    })
+
+    expect(result).toEqual({ ok: false, error: 'images/edits failed: HTTP 400' })
+    expect(invokeMock).toHaveBeenCalledOnce()
   })
 
   it('does not start a paid native edit when already aborted', async () => {

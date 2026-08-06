@@ -445,3 +445,20 @@ state correctly, but several commands still re-parsed event payload fields with
 local casts. The fix was to make the core event layer own `ThreadChannelEvent`
 and `isThreadEvent`, make `reduceChannelMetadata` the only channel metadata
 projection, and make `reduceThreads` the only thread replay reducer.
+
+## Provider Optional-Field Checklist
+
+Use this before defaulting any vendor-specific request option on a compatible
+Provider route.
+
+- [ ] Which fields are required by the implemented transport, and which are
+      optional extensions of the first-party API?
+- [ ] Does capability evidence prove the operation, the optional field, or only
+      the model's abstract ability?
+- [ ] Can one narrowly classified conformance response retry without the field,
+      without retrying auth, quota, server or cancellation failures?
+- [ ] Does the native serializer truly omit an absent option, or restore a
+      hidden default?
+- [ ] If reference conditioning is unavailable, does the workflow fail clearly
+      instead of silently producing an unconditioned substitute?
+- [ ] Do attempt-level events close before retry so UI progress cannot look hung?

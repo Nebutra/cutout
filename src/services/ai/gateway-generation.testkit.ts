@@ -37,7 +37,7 @@ import type {
 
 export const GATEWAY_PROVIDER_ID = 'mox-gateway'
 export const GATEWAY_CHAT_MODEL = 'gpt-5.5'
-export const GATEWAY_IMAGE_MODEL = 'gpt-image-1'
+export const GATEWAY_IMAGE_MODEL = process.env.MOX_IMAGE_MODEL ?? 'gpt-image-1'
 
 /** Normalize a base URL to include a version path (mirrors the existing integration tests). */
 export function apiBase(value: string): string {
@@ -122,10 +122,6 @@ async function directGenerateImages(
         model: input.model ?? GATEWAY_IMAGE_MODEL,
         prompt: input.prompt ?? '',
         n: 1,
-        // `low` quality keeps the gated test fast and cheap — the test proves
-        // the pipeline delivers artifacts, not print-quality images.
-        quality: 'low',
-        size: '1024x1024',
       }),
       signal: input.signal,
     })
@@ -150,43 +146,51 @@ async function directEditImage(
 ): Promise<Result<GeneratedAsset[]>> {
   if (input.signal?.aborted) return err('Operation aborted')
   try {
-    const boundary = '----cutout-gateway-boundary-3f7a1c9e'
-    const field = (name: string, value: string): Buffer =>
-      Buffer.from(
-        `--${boundary}\r\nContent-Disposition: form-data; name="${name}"\r\n\r\n${value}\r\n`,
-        'utf8',
-      )
-    const parts: Buffer[] = [
-      field('model', input.model ?? GATEWAY_IMAGE_MODEL),
-      field('prompt', input.prompt),
-      field('input_fidelity', input.inputFidelity ?? 'high'),
-      // `low` quality keeps the gated test fast and cheap (see generateImages).
-      field('quality', 'low'),
-      field('size', input.size ?? '1024x1024'),
-    ]
-    // Field name is literally `image`, repeated once per reference (NOT `image[]`).
-    input.images.forEach((bytes, index) => {
-      parts.push(
+    const request = async (inputFidelity: 'high' | 'low' | null) => {
+      const boundary = '----cutout-gateway-boundary-3f7a1c9e'
+      const field = (name: string, value: string): Buffer =>
         Buffer.from(
-          `--${boundary}\r\nContent-Disposition: form-data; name="image"; filename="reference-${index}.png"\r\nContent-Type: image/png\r\n\r\n`,
+          `--${boundary}\r\nContent-Disposition: form-data; name="${name}"\r\n\r\n${value}\r\n`,
           'utf8',
-        ),
-        Buffer.from(bytes),
-        Buffer.from('\r\n', 'utf8'),
-      )
-    })
-    parts.push(Buffer.from(`--${boundary}--\r\n`, 'utf8'))
-    const body = Buffer.concat(parts)
-    const res = await fetch(`${base}/images/edits`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${key}`,
-        'content-type': `multipart/form-data; boundary=${boundary}`,
-      },
-      body: new Uint8Array(body),
-      signal: input.signal,
-    })
-    return parseImageItems(await res.text())
+        )
+      const parts: Buffer[] = [
+        field('model', input.model ?? GATEWAY_IMAGE_MODEL),
+        field('prompt', input.prompt),
+      ]
+      if (inputFidelity) parts.push(field('input_fidelity', inputFidelity))
+      if (input.size) parts.push(field('size', input.size))
+      // Field name is literally `image`, repeated once per reference (NOT `image[]`).
+      input.images.forEach((bytes, index) => {
+        parts.push(
+          Buffer.from(
+            `--${boundary}\r\nContent-Disposition: form-data; name="image"; filename="reference-${index}.png"\r\nContent-Type: image/png\r\n\r\n`,
+            'utf8',
+          ),
+          Buffer.from(bytes),
+          Buffer.from('\r\n', 'utf8'),
+        )
+      })
+      parts.push(Buffer.from(`--${boundary}--\r\n`, 'utf8'))
+      const res = await fetch(`${base}/images/edits`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${key}`,
+          'content-type': `multipart/form-data; boundary=${boundary}`,
+        },
+        body: new Uint8Array(Buffer.concat(parts)),
+        signal: input.signal,
+      })
+      return { status: res.status, body: await res.text() }
+    }
+    const requestedFidelity = input.inputFidelity ?? 'high'
+    let response = await request(requestedFidelity)
+    if (response.status === 400 && requestedFidelity === 'high' && !input.signal?.aborted) {
+      response = await request(null)
+    }
+    if (response.status < 200 || response.status >= 300) {
+      return err(`images/edits failed: HTTP ${response.status}`)
+    }
+    return parseImageItems(response.body)
   } catch (error) {
     return err(error instanceof Error ? error.message : String(error))
   }

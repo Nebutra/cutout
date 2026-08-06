@@ -4758,8 +4758,8 @@ export function IntentWorkspace({
       prototypeDesignSystemPrompt(plan, designMarkdown, direction),
     );
     // Attached reference images condition the design system on the user's visual
-    // direction (垫图, via editImage). editImage is provider-specific, so on
-    // failure — or with no attachments — fall back to a plain prompt generate.
+    // direction through a reviewed edit route. Never discard those references
+    // and silently replace the requested edit with an unconditioned generation.
     const references = [
       ...(await Promise.all(
         attachments.map((attachment) => blobToBytes(attachment.blob)),
@@ -4774,9 +4774,9 @@ export function IntentWorkspace({
         ? `workspace:${lease.id}`
         : `workspace:${lease.id}:design-system:${candidateId}${retryIdentity}`;
     const editImage = currentImageEditRoute(image);
-    if (materialReference && !editImage) {
+    if (references.length > 0 && !editImage) {
       throw new Error(
-        "The configured image provider cannot preserve the selected material because its route does not support edit-image.",
+        "The configured image provider cannot preserve the visual reference because its reviewed route does not support edit-image.",
       );
     }
     const edited =
@@ -4791,16 +4791,11 @@ export function IntentWorkspace({
             toolCallId: `tool:${lease.id}:design-system:${candidateId}${retryIdentity}:edit`,
             logicalNodeId: `design-system:${candidateId}`,
             lease,
-          }).catch(() => null)
+          })
         : null;
     // A provider may resolve an aborted edit as an error result instead of
     // throwing AbortError. Never enter the paid fallback after cancellation.
     agentRunCoordinatorRef.current.checkpoint(lease);
-    if (materialReference && !edited) {
-      throw new Error(
-        "The configured image provider could not preserve the selected material as an edit reference.",
-      );
-    }
     const result =
       edited ??
       (await invokeDesktopImageTool({
@@ -4861,6 +4856,15 @@ export function IntentWorkspace({
     publish(candidateSet);
 
     const candidateIds = candidateSet.set.candidates.map((candidate) => candidate.id);
+    const candidatePosition = new Map(
+      candidateIds.map((candidateId, index) => [candidateId, index + 1]),
+    );
+    const runId = `workspace:${lease.id}`;
+    const attemptStepId = (candidateId: string, attempt: number) => {
+      const position = candidatePosition.get(candidateId);
+      if (!position) throw new Error("Unknown Design System candidate attempt.");
+      return `step:${lease.id}:design-system:${position}:attempt:${attempt}`;
+    };
     const concurrency = Math.min(
       candidateSet.set.proposal.bounds.maxParallelism,
       candidateIds.length,
@@ -4895,27 +4899,64 @@ export function IntentWorkspace({
         isAgentRunCancelled(error) ||
         lease.controller.signal.aborted ||
         !agentRunCoordinatorRef.current.isActive(lease),
-      onAttemptStart: ({ candidateId }) => {
+      onAttemptStart: ({ candidateId, attempt }) => {
         publish(updatePrototypeDesignSystemCandidate(candidateSet, candidateId, {
           status: "generating",
         }));
+        const stepId = attemptStepId(candidateId, attempt);
+        emitRunEvent(runId, {
+          type: "step-started",
+          stepId,
+          label: "Generate Design System direction",
+          detail: `Direction ${candidatePosition.get(candidateId) ?? 1}/${candidateIds.length}, attempt ${attempt}.`,
+        }, { eventId: `${stepId}:started` });
       },
-      onReady: ({ candidateId }, artifact) => {
+      onReady: ({ candidateId, attempt }, artifact) => {
         publish(updatePrototypeDesignSystemCandidate(candidateSet, candidateId, {
           status: "ready",
           artifact,
         }));
+        const stepId = attemptStepId(candidateId, attempt);
+        emitRunEvent(runId, {
+          type: "step-succeeded",
+          stepId,
+          label: "Generate Design System direction",
+          detail: `Completed direction ${candidatePosition.get(candidateId) ?? 1}/${candidateIds.length}.`,
+        }, { eventId: `${stepId}:succeeded` });
       },
-      onFailed: ({ candidateId }, failure) => {
+      onRetry: ({ candidateId, attempt }) => {
+        const stepId = attemptStepId(candidateId, attempt);
+        emitRunEvent(runId, {
+          type: "step-failed",
+          stepId,
+          label: "Generate Design System direction",
+          detail: `Direction ${candidatePosition.get(candidateId) ?? 1}/${candidateIds.length} hit a temporary Provider failure and will retry once.`,
+        }, { eventId: `${stepId}:failed` });
+      },
+      onFailed: ({ candidateId, attempt }, failure) => {
         publish(updatePrototypeDesignSystemCandidate(candidateSet, candidateId, {
           status: "failed",
           error: failure.message,
         }));
+        const stepId = attemptStepId(candidateId, attempt);
+        emitRunEvent(runId, {
+          type: "step-failed",
+          stepId,
+          label: "Generate Design System direction",
+          detail: `Direction ${candidatePosition.get(candidateId) ?? 1}/${candidateIds.length} stopped after a bounded attempt.`,
+        }, { eventId: `${stepId}:failed` });
       },
-      onCancelled: ({ candidateId }) => {
+      onCancelled: ({ candidateId, attempt }) => {
         publish(updatePrototypeDesignSystemCandidate(candidateSet, candidateId, {
           status: "cancelled",
         }));
+        const stepId = attemptStepId(candidateId, attempt);
+        emitRunEvent(runId, {
+          type: "step-cancelled",
+          stepId,
+          label: "Generate Design System direction",
+          detail: `Stopped direction ${candidatePosition.get(candidateId) ?? 1}/${candidateIds.length}.`,
+        }, { eventId: `${stepId}:cancelled` });
       },
     });
     agentRunCoordinatorRef.current.checkpoint(lease);
@@ -5234,6 +5275,11 @@ export function IntentWorkspace({
     );
     const runId = `workspace:${lease.id}`;
     const editImage = currentImageEditRoute(image);
+    if (referenceImages.length > 0 && !editImage) {
+      throw new Error(
+        "The configured image provider cannot preserve the Design System reference because its reviewed route does not support edit-image.",
+      );
+    }
     const useReferenceEdit = referenceImages.length > 0 && Boolean(editImage);
 
     // One paid invocation owns one page attempt. The previous visual DAG always

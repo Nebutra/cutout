@@ -1023,17 +1023,34 @@ export function createLocalGenerationService(
       // real key is injected in Rust; the base64 reply is decoded to PNG bytes.
       try {
         if (input.signal?.aborted) return err('Operation aborted')
-        const res = await invokeCancellableProxy<{ images: string[] }>('ai_image_edit', {
-          providerId: cfg.id,
-          kind: cfg.kind,
-          wireProtocol,
-          baseUrl,
-          model: modelId,
-          prompt: input.prompt,
-          images: input.images.map((bytes) => Array.from(bytes)),
-          size: input.size ?? null,
-          inputFidelity: input.inputFidelity ?? 'high',
-        }, input.signal)
+        const invokeEdit = (inputFidelity: 'high' | 'low' | null) =>
+          invokeCancellableProxy<{ images: string[] }>('ai_image_edit', {
+            providerId: cfg.id,
+            kind: cfg.kind,
+            wireProtocol,
+            baseUrl,
+            model: modelId,
+            prompt: input.prompt,
+            images: input.images.map((bytes) => Array.from(bytes)),
+            size: input.size ?? null,
+            inputFidelity,
+          }, input.signal)
+        const requestedFidelity = input.inputFidelity ?? 'high'
+        let res: { images: string[] }
+        try {
+          res = await invokeEdit(requestedFidelity)
+        } catch (error) {
+          // Some OpenAI-compatible edit endpoints implement the multipart route
+          // but reject the optional OpenAI `input_fidelity` field. Retry that
+          // exact conformance failure once without the field; auth, rate-limit,
+          // server and transport failures retain their normal semantics.
+          if (
+            requestedFidelity !== 'high' ||
+            input.signal?.aborted ||
+            !/images\/edits failed: HTTP 400\b/i.test(errorText(error))
+          ) throw error
+          res = await invokeEdit(null)
+        }
         if (input.signal?.aborted) return err('Operation aborted')
         const assets: GeneratedAsset[] = res.images.map((b64) => ({
           mediaType: 'image/png',

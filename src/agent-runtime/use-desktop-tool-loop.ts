@@ -24,7 +24,10 @@ import { getAuthorizedWorkspace } from '@/platform/authorized-workspace'
 import { createTauriAgentHostService } from '@/agent-host/tauri-service'
 import { runDurableHostEffect } from '@/agent-host/durable-effect'
 
-const DESKTOP_TOOL_TIMEOUT_MS = 300_000
+// One Provider attempt must terminate independently of the larger workflow.
+// Three minutes accommodates production image models without turning one dead
+// request into a five-minute opaque wait before the orchestrator can retry.
+const DESKTOP_TOOL_TIMEOUT_MS = 180_000
 const DESKTOP_PAID_TOOL_POLICY: PaidToolPolicy = { allowPaid: true }
 const FOREGROUND_SEGMENTATION_UNAVAILABLE =
   'capability-required: foreground segmentation is unavailable on this host.'

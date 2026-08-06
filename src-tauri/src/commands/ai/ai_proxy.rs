@@ -601,8 +601,9 @@ fn enforce_bound_url(base: &str, request: &str) -> Result<(), ProxyError> {
 }
 
 /// Generative endpoints can run substantially longer than catalog and health
-/// probes. Keep probes bounded at 120s while allowing one non-retried model
-/// request to use the same ten-minute lease as the desktop runtime.
+/// probes. Keep probes bounded at 120s and retain a 300s native failsafe. The
+/// interactive desktop tool owner uses a stricter 180s deadline and propagates
+/// cancellation into this transport.
 pub(crate) fn buffered_timeout_for_url(url: &str) -> u64 {
     if url.contains("/images/generations")
         || url.contains("/images/edits")

@@ -49,6 +49,7 @@ const desktopHarness = vi.hoisted(() => ({
   providerTests: 0,
   directToolGateCalls: 0,
   directTextCalls: 0,
+  editRouteEnabled: true,
 }))
 
 const codexHarness = vi.hoisted(() => ({
@@ -78,7 +79,9 @@ vi.mock('@/services/ai/model-assignment.local', () => ({
       text: { providerId: PROVIDER_ID, model: CHAT_MODEL },
       vision: { providerId: PROVIDER_ID, model: CHAT_MODEL },
       'image-generation': { providerId: PROVIDER_ID, model: IMAGE_MODEL },
-      'image-edit': { providerId: PROVIDER_ID, model: EDIT_MODEL },
+      ...(desktopHarness.editRouteEnabled
+        ? { 'image-edit': { providerId: PROVIDER_ID, model: EDIT_MODEL } }
+        : {}),
     },
     descriptors: [
       {
@@ -90,15 +93,17 @@ vi.mock('@/services/ai/model-assignment.local', () => ({
           { capability: 'image-generation', kind: 'verified', sourceId: 'rendered-e2e' },
         ],
       },
-      {
-        providerId: PROVIDER_ID,
-        model: EDIT_MODEL,
-        capabilities: ['image-edit'],
-        source: 'verified-catalog',
-        evidence: [
-          { capability: 'image-edit', kind: 'observed', sourceId: 'rendered-e2e' },
-        ],
-      },
+      ...(desktopHarness.editRouteEnabled
+        ? [{
+            providerId: PROVIDER_ID,
+            model: EDIT_MODEL,
+            capabilities: ['image-edit'],
+            source: 'verified-catalog',
+            evidence: [
+              { capability: 'image-edit', kind: 'observed', sourceId: 'rendered-e2e' },
+            ],
+          }]
+        : []),
     ],
   }),
   loadAssignments: async (): Promise<ModelAssignments> => ({
@@ -625,7 +630,6 @@ function fakeRegistry(): ServiceRegistry {
     throw new Error('not used in this test')
   }
   return {
-    session: { current: async () => ({ userId: 'test', isAuthenticated: false }) },
     cutout: { run: async () => err('not used in this test') },
     foregroundSegmentation: {
       capabilities: async () => ok({ available: false, platform: 'test', backend: 'unavailable', reason: 'capability-required' }),
@@ -771,6 +775,7 @@ describe('brief → every planned route — rendered IntentWorkspace', () => {
     desktopHarness.providerTests = 0
     desktopHarness.directToolGateCalls = 0
     desktopHarness.directTextCalls = 0
+    desktopHarness.editRouteEnabled = true
     codexHarness.enabled = false
     codexHarness.turns = 0
     if (!i18n.locale) await activateLocale('en')
@@ -862,6 +867,38 @@ describe('brief → every planned route — rendered IntentWorkspace', () => {
       .toEqual(['/routes/story'])
   }, 30_000)
 
+  it('fails before page generation when no reviewed edit route can preserve its references', async () => {
+    codexHarness.enabled = true
+    desktopHarness.editRouteEnabled = false
+    const node = mount()
+    const textarea = await waitFor(
+      () => node.querySelector<HTMLTextAreaElement>('[aria-label="Message the Agent"]'),
+    )
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 50))
+    })
+    act(() => {
+      const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!
+      setter.call(textarea, 'Create a focused field-notes experience with a consistent visual system.')
+      textarea!.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    await act(async () => {
+      node.querySelector<HTMLButtonElement>('[aria-label="Send"]')!.click()
+    })
+
+    const failed = await waitFor(() => {
+      const current = getStoreState().workspaceSnapshot
+      return current?.runError?.includes('does not support edit-image') ? current : null
+    }, 30_000)
+
+    expect(failed).toBeTruthy()
+    expect(desktopHarness.imageToolCallIds.filter((id) => id.includes(':design-system:')))
+      .toHaveLength(1)
+    expect(desktopHarness.imageToolCallIds.filter((id) => id.includes(':prototype-page:')))
+      .toHaveLength(0)
+    expect(failed!.prototypePages).toHaveLength(0)
+  }, 30_000)
+
   it('selects one of three Design Systems, then completes every route and attributable asset', async () => {
     const node = mount()
     const textarea = await waitFor(
@@ -905,6 +942,12 @@ describe('brief → every planned route — rendered IntentWorkspace', () => {
     ) ?? []
     expect(designMarkdownStepIds).toHaveLength(3)
     expect(new Set(designMarkdownStepIds).size).toBe(3)
+    const designDirectionEvents = selectionSnapshot!.agentRunEvents?.events.filter(
+      (event) => 'label' in event && event.label === 'Generate Design System direction',
+    ) ?? []
+    expect(designDirectionEvents.filter((event) => event.type === 'step-started')).toHaveLength(3)
+    expect(designDirectionEvents.filter((event) => event.type === 'step-succeeded')).toHaveLength(3)
+    expect(designDirectionEvents.filter((event) => event.type === 'step-failed')).toHaveLength(0)
     expect(desktopHarness.imageToolPrompts).toHaveLength(3)
     expect(desktopHarness.imageToolPrompts).toEqual(expect.arrayContaining([
       expect.stringContaining('Signal Grid'),
@@ -1132,6 +1175,31 @@ describe('brief → every planned route — rendered IntentWorkspace', () => {
       expect.stringMatching(/candidate:editorial-ledger:retry:1:generate$/),
       expect.stringMatching(/candidate:workshop-console:generate$/),
     ]))
+    const failedDirectionEvents = partial!.agentRunEvents?.events.filter(
+      (event) => 'stepId' in event && typeof event.stepId === 'string'
+        && event.stepId.includes('design-system:2:attempt:'),
+    ) ?? []
+    expect(failedDirectionEvents.filter((event) => event.type === 'step-started'))
+      .toHaveLength(2)
+    expect(failedDirectionEvents.filter((event) => event.type === 'step-failed'))
+      .toHaveLength(2)
+    expect(new Set(failedDirectionEvents.flatMap((event) =>
+      'stepId' in event ? [event.stepId] : [])))
+      .toEqual(new Set([
+        expect.stringMatching(/:attempt:1$/),
+        expect.stringMatching(/:attempt:2$/),
+      ]))
+    expect(failedDirectionEvents).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: 'step-failed',
+        detail: expect.stringContaining('will retry once'),
+      }),
+      expect.objectContaining({
+        type: 'step-failed',
+        detail: expect.stringContaining('stopped after a bounded attempt'),
+      }),
+    ]))
+    expect(failedDirectionEvents.every((event) => event.eventId.length <= 160)).toBe(true)
 
     const selectionButtons = [...node.querySelectorAll<HTMLButtonElement>(
       '[data-design-candidate-action="select"]',

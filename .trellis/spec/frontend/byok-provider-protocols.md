@@ -155,8 +155,10 @@ Every renderer-owned generation `AbortSignal` propagates through the desktop
 tool loop and `GenerationService` into an opaque UUID-bound native proxy
 request. Cancellation calls `ai_proxy_cancel`, which drops the matching
 `reqwest` future; discarding a late renderer result alone is not cancellation.
-Buffered generation and native image-edit requests share the desktop 300-second
-deadline. Catalog/health probes retain their shorter bound.
+The owning desktop paid-tool attempt has a 180-second deadline and propagates
+its abort into the native request. Native buffered generation and image-edit
+requests retain a 300-second transport failsafe for callers outside that
+interactive owner. Catalog/health probes retain their shorter bound.
 
 The application entry must not statically load provider catalog definitions or
 provider SDK runtime solely to support connection testing. When a configured
@@ -761,3 +763,87 @@ or sandbox parameter.
   app-server authority.
 - Run `pnpm agent:validate`, `pnpm lint`, TypeScript, focused Vitest and Rust
   tests, `cargo fmt --check`, production build, and `git diff --check`.
+
+## Scenario: Optional OpenAI Image Edit Fields
+
+### 1. Scope / Trigger
+
+Apply whenever the OpenAI-shaped `/images/edits` request, its native multipart
+builder, edit-route execution or reference-conditioned prototype generation
+changes.
+
+### 2. Signatures
+
+```ts
+interface EditImageInput {
+  readonly images: readonly Uint8Array[]
+  readonly inputFidelity?: 'high' | 'low'
+  readonly signal?: AbortSignal
+}
+
+ai_image_edit(
+  provider_id: String,
+  model: String,
+  images: Vec<Vec<u8>>,
+  input_fidelity: Option<String>,
+) -> Result<ImageEditResult, ProxyError>
+```
+
+### 3. Contracts
+
+- Model capability evidence and an OpenAI-shaped Provider adapter authorize the
+  edit route; they do not prove support for every optional OpenAI field.
+- The normal high-fidelity attempt sends `input_fidelity=high`.
+- Only an HTTP 400 from that high-fidelity attempt may retry once with the field
+  omitted. Explicit low fidelity, authentication, rate limits, server failures,
+  timeouts, transport failures and cancellation do not use this downgrade.
+- Native multipart construction omits `input_fidelity` when its value is absent;
+  it must not restore a hidden default.
+- A workflow with reference images and no executable edit route fails before an
+  unconditioned generation. Dropping references changes the requested outcome.
+- The outer desktop attempt remains one receipted operation with a finite
+  deadline and one owning AbortSignal.
+
+### 4. Validation & Error Matrix
+
+| Condition | Required behavior |
+| --- | --- |
+| High fidelity succeeds | Return its images; one native call |
+| High fidelity returns HTTP 400 | Retry once with no `input_fidelity` |
+| Explicit low fidelity returns HTTP 400 | Return failure; no downgrade |
+| HTTP 401/403/429/5xx or transport failure | Preserve classified failure; no optional-field retry |
+| Owner signal aborts before or between calls | Stop; never publish a late result |
+| References exist but edit route is unavailable | Fail capability preflight; never generate without them |
+
+### 5. Good / Base / Bad Cases
+
+- Good: a compatible relay rejects `input_fidelity`, accepts the same multipart
+  request without it, and the reference-conditioned result keeps one receipt.
+- Base: OpenAI accepts high fidelity on the first attempt.
+- Bad: catch every edit error and call image generation with no references, or
+  retry a 401/429 as though an optional field caused it.
+
+### 6. Tests Required
+
+- TypeScript service tests assert high-first/null-second arguments for HTTP 400,
+  one call for 401, and no downgrade for explicit low fidelity.
+- Rust tests build multipart forms both with and without the optional field.
+- Component E2E asserts every Design System candidate attempt has a start and
+  terminal run event and complete suites retain all planned resource bindings.
+- Desktop tool-loop tests cover deadline and external cancellation.
+
+### 7. Wrong vs Correct
+
+```ts
+// Wrong: compatibility failure silently erases the user's reference.
+const edited = await editImage(input).catch(() => null)
+return edited ?? generateImages({ prompt: input.prompt })
+
+// Correct: downgrade only the optional field; otherwise preserve failure.
+try {
+  return await invokeEdit('high')
+} catch (error) {
+  if (!isHttp400EditFailure(error)) throw error
+  return invokeEdit(null)
+}
+```
