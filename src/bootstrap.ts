@@ -7,7 +7,7 @@
  * `useAnalysisBridge` owns inside AppShell. Two workers, each with a single
  * clear job — coherent per spec §4b/§5 (live drag vs. API-shaped call).
  *
- * `AssetRepository` (export) and `SessionService` (stub) round out the registry;
+ * `AssetRepository` and the native-backed services round out the registry;
  * both are worker-independent. A future backend swaps `createLocalRegistry` for
  * a `createRemoteRegistry` here and nothing downstream changes.
  */

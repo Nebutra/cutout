@@ -177,7 +177,6 @@ function realGenerateWithTools(key: string, base: string) {
 function fakeRegistry(key: string, base: string): ServiceRegistry {
   const notUsed = async (): Promise<never> => { throw new Error('not used in this test') }
   return {
-    session: { current: async () => ({ userId: 'test', isAuthenticated: false }) },
     cutout: { run: async () => err('not used in this test') },
     foregroundSegmentation: {
       capabilities: async () => ok({ available: false, platform: 'test', backend: 'unavailable', reason: 'capability-required' }),

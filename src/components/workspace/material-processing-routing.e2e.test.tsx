@@ -84,7 +84,6 @@ function registry(
 ): ServiceRegistry {
   const notUsed = async (): Promise<never> => { throw new Error('not used in this test') }
   return {
-    session: { current: async () => ({ userId: 'test', isAuthenticated: false }) },
     cutout: {
       run: async () => ok({
         slices: [{

@@ -182,7 +182,7 @@
     "src/services/ai/model-capabilities.ts": "784777a6f9608223726950412ccb71afb807451cec036a2f26c6c81ae8acd356",
     "src/services/ai/model-catalog.ts": "868bf0e8fc10a22f2f71aa3a3044acba5edac310c7321795cc8fdd4f3ad2de97",
     "src/services/ai/provider-types.ts": "6cda6ba2d6408dc11e7996994eea3eea04caeb47f418c36556629f6c461888f4",
-    "src/services/types.ts": "3eb50c80be9ae6bb57fc934661f8536f3b206e390ba5122bc73401241d9597c5",
+    "src/services/types.ts": "2c240401c704c5ba26049cfcce3565bb3a4d8b471560b5935cc5fd49b6cd0adb",
     "src/starter-compiler/compiler.ts": "98d2e1179954f20602335e3d744b4231552238f89852c5e02e2825237795447a",
     "src/starter-compiler/consumer-matrix.ts": "6ba1593e8e80d5096827e783dd3ba95f97d5e49d0d0536decce8ff028630642f",
     "src/starter-compiler/index.ts": "34d813b309cf901d1457ad0e874a2f96e1e76fab330965b06eb6c9b31fa026e5"

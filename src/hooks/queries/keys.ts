@@ -15,11 +15,6 @@ export const assetKeys = {
   one: (id: string) => [...assetKeys.all, 'one', id] as const,
 }
 
-export const sessionKeys = {
-  all: ['session'] as const,
-  current: () => [...sessionKeys.all, 'current'] as const,
-}
-
 export const cutoutKeys = {
   all: ['cutout'] as const,
 }
