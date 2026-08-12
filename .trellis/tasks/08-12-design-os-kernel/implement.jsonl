@@ -1,0 +1,6 @@
+{"file": ".trellis/spec/frontend/state-management.md", "reason": "Canonical persistence, revision and restore rules."}
+{"file": ".trellis/spec/frontend/agent-control-safety.md", "reason": "Authorization, durable execution and revision-bound apply rules."}
+{"file": ".trellis/spec/frontend/cutout-pipeline.md", "reason": "Existing production lifecycle, CAS and prototype compatibility evidence."}
+{"file": ".trellis/spec/frontend/prototype-generation.md", "reason": "Prototype regression and generation invariants."}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "Cross-layer contract and data-flow review guidance."}
+{"file": ".trellis/tasks/08-12-commerce-material-agent/research/competition-contract.md", "reason": "Host constraints used by cross-host conformance fixtures."}
