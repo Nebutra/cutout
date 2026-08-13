@@ -1529,3 +1529,36 @@ Implemented and verified the host-neutral Design OS kernel with canonical record
 ### Next Steps
 
 - None - task complete
+
+
+## Session 46: Commerce production profile benchmark
+
+**Date**: 2026-08-13
+**Task**: Commerce production profile benchmark
+**Branch**: `main`
+
+### Summary
+
+Added the removable evidence-first Commerce Profile, deterministic normalization and policy gates, mocked cross-media evaluation and targeted repair, plus a versioned three-tier benchmark whose current 8/16 baseline keeps all real-Host metrics blocked until trusted receipt and artifact-byte verification exists.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `e0e90c3` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
