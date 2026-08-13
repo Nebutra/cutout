@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdir, rm, symlink } from 'node:fs/promises'
+import { lstat, mkdir, rm, symlink } from 'node:fs/promises'
 import { join } from 'node:path'
 import { after, test } from 'node:test'
 import { DashScopeClient } from '../lib/provider.js'
@@ -12,10 +12,14 @@ const cleanup = []
 after(async () => { await Promise.all(cleanup.map((path) => rm(path, { recursive: true, force: true }))) })
 const logger = { write: async () => {} }
 
+async function clientWorkspace(fixture, planHash) {
+  const info = await lstat(fixture.output)
+  return createWorkspace({ resolved: fixture.output, canonical: fixture.output, device: info.dev, inode: info.ino }, planHash, 'test-key')
+}
+
 test('invalid result origin fails after one paid POST and cannot duplicate spend', async () => {
   const fixture = await fixtureDirectories(); cleanup.push(fixture.root)
-  const workspace = { stageRoot: join(fixture.output, 'stage'), checkpointRoot: join(fixture.output, 'checkpoints') }
-  await Promise.all([mkdir(workspace.stageRoot), mkdir(workspace.checkpointRoot)])
+  const workspace = await clientWorkspace(fixture, '1'.repeat(64))
   let posts = 0
   const client = new DashScopeClient({
     apiKey: 'test-key', baseUrl: 'http://127.0.0.1:8787', deadline: Date.now() + 120_000,
@@ -33,8 +37,7 @@ test('invalid result origin fails after one paid POST and cannot duplicate spend
 
 test('provider response without content length is cancelled at the streaming byte limit', async () => {
   const fixture = await fixtureDirectories(); cleanup.push(fixture.root)
-  const workspace = { stageRoot: join(fixture.output, 'stage'), checkpointRoot: join(fixture.output, 'checkpoints') }
-  await Promise.all([mkdir(workspace.stageRoot), mkdir(workspace.checkpointRoot)])
+  const workspace = await clientWorkspace(fixture, '0'.repeat(64))
   let cancelled = false
   const stream = new ReadableStream({
     start(controller) {
@@ -58,8 +61,7 @@ test('only exact DashScope regional and acceleration result origins are accepted
     'https://dashscope-a717.oss-accelerate.aliyuncs.com/result.png?token=opaque',
   ].entries()) {
     const fixture = await fixtureDirectories(); cleanup.push(fixture.root)
-    const workspace = { stageRoot: join(fixture.output, 'stage'), checkpointRoot: join(fixture.output, 'checkpoints') }
-    await Promise.all([mkdir(workspace.stageRoot), mkdir(workspace.checkpointRoot)])
+    const workspace = await clientWorkspace(fixture, String(index + 2).repeat(64))
     const client = new DashScopeClient({
       apiKey: 'test-key', baseUrl: 'http://127.0.0.1:8787', deadline: Date.now() + 120_000,
       workspace, planHash: String(index + 2).repeat(64), logger, allowTestOrigin: true,
@@ -78,8 +80,7 @@ test('only exact DashScope regional and acceleration result origins are accepted
     'https://not-dashscope-result.oss-accelerate.aliyuncs.com/result.png',
   ]) {
     const fixture = await fixtureDirectories(); cleanup.push(fixture.root)
-    const workspace = { stageRoot: join(fixture.output, 'stage'), checkpointRoot: join(fixture.output, 'checkpoints') }
-    await Promise.all([mkdir(workspace.stageRoot), mkdir(workspace.checkpointRoot)])
+    const workspace = await clientWorkspace(fixture, 'f'.repeat(64))
     const client = new DashScopeClient({
       apiKey: 'test-key', baseUrl: 'http://127.0.0.1:8787', deadline: Date.now() + 120_000,
       workspace, planHash: 'f'.repeat(64), logger, allowTestOrigin: true,
