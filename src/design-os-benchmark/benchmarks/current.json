@@ -1,0 +1,382 @@
+{
+  "schema": "design-os.benchmark-report.v1",
+  "benchmark": {
+    "id": "benchmark:design-os:production-maturity",
+    "version": 1
+  },
+  "identity": {
+    "id": "benchmark-run:design-os:current",
+    "revision": "benchmark-run:design-os:current:revision:1"
+  },
+  "profiles": [
+    {
+      "id": "commerce",
+      "label": "Commerce",
+      "sourceReport": {
+        "id": "source-report:commerce:benchmark-run:current",
+        "schema": "commerce.profile-benchmark.v1",
+        "benchmark": {
+          "id": "benchmark:commerce-profile:p1-p7",
+          "version": 1
+        },
+        "identity": {
+          "id": "benchmark-run:current",
+          "revision": "benchmark-run:current:revision:1"
+        },
+        "contentHash": "caa9fbf6f94b70b298ccb4879168568a7ecfbf81dedd0b423b008a15d03ee085"
+      }
+    }
+  ],
+  "metrics": [
+    {
+      "id": "commerce.contract.product-facts-normalization",
+      "profileId": "commerce",
+      "stage": "contract",
+      "label": "Bounded product-facts normalization",
+      "critical": true,
+      "status": "passed",
+      "source": {
+        "kind": "profile-report-metric",
+        "sourceReportId": "source-report:commerce:benchmark-run:current",
+        "sourceMetricId": "p1.product-facts-normalization"
+      }
+    },
+    {
+      "id": "commerce.contract.fact-citation-closure",
+      "profileId": "commerce",
+      "stage": "contract",
+      "label": "Fact citation closure",
+      "critical": true,
+      "status": "passed",
+      "source": {
+        "kind": "profile-report-metric",
+        "sourceReportId": "source-report:commerce:benchmark-run:current",
+        "sourceMetricId": "p2.fact-citation-closure"
+      }
+    },
+    {
+      "id": "commerce.contract.catalog-closure",
+      "profileId": "commerce",
+      "stage": "contract",
+      "label": "Catalog closure",
+      "critical": true,
+      "status": "passed",
+      "source": {
+        "kind": "profile-report-metric",
+        "sourceReportId": "source-report:commerce:benchmark-run:current",
+        "sourceMetricId": "p3.catalog-closure"
+      }
+    },
+    {
+      "id": "commerce.contract.offline-policy-gates",
+      "profileId": "commerce",
+      "stage": "contract",
+      "label": "Offline policy gates",
+      "critical": true,
+      "status": "passed",
+      "source": {
+        "kind": "profile-report-metric",
+        "sourceReportId": "source-report:commerce:benchmark-run:current",
+        "sourceMetricId": "p4.offline-policy-gates"
+      }
+    },
+    {
+      "id": "commerce.contract.kernel-profile-composition",
+      "profileId": "commerce",
+      "stage": "contract",
+      "label": "Removable Kernel/Profile composition",
+      "critical": true,
+      "status": "passed",
+      "source": {
+        "kind": "profile-report-metric",
+        "sourceReportId": "source-report:commerce:benchmark-run:current",
+        "sourceMetricId": "p5.kernel-profile-composition"
+      }
+    },
+    {
+      "id": "commerce.conformance.deliverable-closure",
+      "profileId": "commerce",
+      "stage": "conformance",
+      "label": "Mocked deliverable closure",
+      "critical": true,
+      "status": "passed",
+      "source": {
+        "kind": "profile-report-metric",
+        "sourceReportId": "source-report:commerce:benchmark-run:current",
+        "sourceMetricId": "p6.mocked-deliverable-closure"
+      }
+    },
+    {
+      "id": "commerce.conformance.targeted-repair",
+      "profileId": "commerce",
+      "stage": "conformance",
+      "label": "Mocked targeted repair",
+      "critical": true,
+      "status": "passed",
+      "source": {
+        "kind": "profile-report-metric",
+        "sourceReportId": "source-report:commerce:benchmark-run:current",
+        "sourceMetricId": "p6.mocked-targeted-repair"
+      }
+    },
+    {
+      "id": "commerce.conformance.strategy-evidence",
+      "profileId": "commerce",
+      "stage": "conformance",
+      "label": "Mocked strategy evidence",
+      "critical": true,
+      "status": "passed",
+      "source": {
+        "kind": "profile-report-metric",
+        "sourceReportId": "source-report:commerce:benchmark-run:current",
+        "sourceMetricId": "p7.mocked-strategy-evidence"
+      }
+    },
+    {
+      "id": "commerce.real-host.text-execution",
+      "profileId": "commerce",
+      "stage": "real-host",
+      "label": "Real localized text execution",
+      "critical": true,
+      "status": "blocked",
+      "source": {
+        "kind": "profile-report-metric",
+        "sourceReportId": "source-report:commerce:benchmark-run:current",
+        "sourceMetricId": "p6.real-text-execution"
+      },
+      "diagnostic": {
+        "code": "real-host-evidence-unavailable",
+        "message": "Real Host execution evidence has not been supplied."
+      }
+    },
+    {
+      "id": "commerce.real-host.text-deliverable",
+      "profileId": "commerce",
+      "stage": "real-host",
+      "label": "Real localized text deliverables",
+      "critical": true,
+      "status": "blocked",
+      "source": {
+        "kind": "profile-report-metric",
+        "sourceReportId": "source-report:commerce:benchmark-run:current",
+        "sourceMetricId": "p6.real-text-bytes"
+      },
+      "diagnostic": {
+        "code": "real-host-evidence-unavailable",
+        "message": "Real Host execution evidence has not been supplied."
+      }
+    },
+    {
+      "id": "commerce.real-host.image-execution",
+      "profileId": "commerce",
+      "stage": "real-host",
+      "label": "Real commerce image execution",
+      "critical": true,
+      "status": "blocked",
+      "source": {
+        "kind": "profile-report-metric",
+        "sourceReportId": "source-report:commerce:benchmark-run:current",
+        "sourceMetricId": "p6.real-image-execution"
+      },
+      "diagnostic": {
+        "code": "real-host-evidence-unavailable",
+        "message": "Real Host execution evidence has not been supplied."
+      }
+    },
+    {
+      "id": "commerce.real-host.image-deliverable",
+      "profileId": "commerce",
+      "stage": "real-host",
+      "label": "Real commerce image deliverables",
+      "critical": true,
+      "status": "blocked",
+      "source": {
+        "kind": "profile-report-metric",
+        "sourceReportId": "source-report:commerce:benchmark-run:current",
+        "sourceMetricId": "p6.real-image-bytes"
+      },
+      "diagnostic": {
+        "code": "real-host-evidence-unavailable",
+        "message": "Real Host execution evidence has not been supplied."
+      }
+    },
+    {
+      "id": "commerce.real-host.video-execution",
+      "profileId": "commerce",
+      "stage": "real-host",
+      "label": "Real product video execution",
+      "critical": true,
+      "status": "blocked",
+      "source": {
+        "kind": "profile-report-metric",
+        "sourceReportId": "source-report:commerce:benchmark-run:current",
+        "sourceMetricId": "p6.real-video-execution"
+      },
+      "diagnostic": {
+        "code": "real-host-evidence-unavailable",
+        "message": "Real Host execution evidence has not been supplied."
+      }
+    },
+    {
+      "id": "commerce.real-host.video-deliverable",
+      "profileId": "commerce",
+      "stage": "real-host",
+      "label": "Real playable product video",
+      "critical": true,
+      "status": "blocked",
+      "source": {
+        "kind": "profile-report-metric",
+        "sourceReportId": "source-report:commerce:benchmark-run:current",
+        "sourceMetricId": "p6.real-video-bytes"
+      },
+      "diagnostic": {
+        "code": "real-host-evidence-unavailable",
+        "message": "Real Host execution evidence has not been supplied."
+      }
+    },
+    {
+      "id": "commerce.real-host.strategy-execution",
+      "profileId": "commerce",
+      "stage": "real-host",
+      "label": "Real strategy execution",
+      "critical": true,
+      "status": "blocked",
+      "source": {
+        "kind": "profile-report-metric",
+        "sourceReportId": "source-report:commerce:benchmark-run:current",
+        "sourceMetricId": "p7.real-strategy-execution"
+      },
+      "diagnostic": {
+        "code": "real-host-evidence-unavailable",
+        "message": "Real Host execution evidence has not been supplied."
+      }
+    },
+    {
+      "id": "commerce.real-host.strategy-deliverable",
+      "profileId": "commerce",
+      "stage": "real-host",
+      "label": "Real evidence-derived strategy",
+      "critical": true,
+      "status": "blocked",
+      "source": {
+        "kind": "profile-report-metric",
+        "sourceReportId": "source-report:commerce:benchmark-run:current",
+        "sourceMetricId": "p7.real-strategy-bytes"
+      },
+      "diagnostic": {
+        "code": "real-host-evidence-unavailable",
+        "message": "Real Host execution evidence has not been supplied."
+      }
+    },
+    {
+      "id": "commerce.production-rehearsal.complete-run",
+      "profileId": "commerce",
+      "stage": "production-rehearsal",
+      "label": "Complete unseen-input production rehearsal",
+      "critical": true,
+      "status": "blocked",
+      "source": {
+        "kind": "profile-capability-audit",
+        "sourceReportId": "source-report:commerce:benchmark-run:current",
+        "findingCode": "complete-production-rehearsal-unavailable"
+      },
+      "diagnostic": {
+        "code": "complete-production-rehearsal-unavailable",
+        "message": "No complete unseen-input Commerce production rehearsal bundle is available."
+      }
+    }
+  ],
+  "summary": {
+    "overall": {
+      "total": 17,
+      "passed": 8,
+      "failed": 0,
+      "blocked": 9,
+      "ready": false
+    },
+    "coverage": {
+      "passed": 8,
+      "total": 17,
+      "basisPoints": 4706
+    },
+    "stages": [
+      {
+        "stage": "contract",
+        "total": 5,
+        "passed": 5,
+        "failed": 0,
+        "blocked": 0,
+        "ready": true
+      },
+      {
+        "stage": "conformance",
+        "total": 3,
+        "passed": 3,
+        "failed": 0,
+        "blocked": 0,
+        "ready": true
+      },
+      {
+        "stage": "real-host",
+        "total": 8,
+        "passed": 0,
+        "failed": 0,
+        "blocked": 8,
+        "ready": false
+      },
+      {
+        "stage": "production-rehearsal",
+        "total": 1,
+        "passed": 0,
+        "failed": 0,
+        "blocked": 1,
+        "ready": false
+      }
+    ],
+    "maturity": "conformance",
+    "nextStage": "real-host",
+    "criticalFrontier": [
+      {
+        "metricId": "commerce.real-host.text-execution",
+        "stage": "real-host",
+        "status": "blocked"
+      },
+      {
+        "metricId": "commerce.real-host.text-deliverable",
+        "stage": "real-host",
+        "status": "blocked"
+      },
+      {
+        "metricId": "commerce.real-host.image-execution",
+        "stage": "real-host",
+        "status": "blocked"
+      },
+      {
+        "metricId": "commerce.real-host.image-deliverable",
+        "stage": "real-host",
+        "status": "blocked"
+      },
+      {
+        "metricId": "commerce.real-host.video-execution",
+        "stage": "real-host",
+        "status": "blocked"
+      },
+      {
+        "metricId": "commerce.real-host.video-deliverable",
+        "stage": "real-host",
+        "status": "blocked"
+      },
+      {
+        "metricId": "commerce.real-host.strategy-execution",
+        "stage": "real-host",
+        "status": "blocked"
+      },
+      {
+        "metricId": "commerce.real-host.strategy-deliverable",
+        "stage": "real-host",
+        "status": "blocked"
+      }
+    ],
+    "productionReady": false
+  }
+}

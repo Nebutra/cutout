@@ -1,0 +1,30 @@
+{
+  "id": "full-scenario-design-os",
+  "name": "full-scenario-design-os",
+  "title": "Build full-scenario Design OS",
+  "description": "Define and execute the first-principles architecture, extension law, workbench and proof program that make Cutout a full-scenario Design OS without domain branches in the Kernel.",
+  "status": "planning",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P0",
+  "creator": "tseka",
+  "assignee": "tseka",
+  "createdAt": "2026-08-13",
+  "completedAt": null,
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [
+    "08-12-commerce-material-agent",
+    "08-13-design-profile-platform",
+    "08-13-sprite-production-workflow"
+  ],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {}
+}

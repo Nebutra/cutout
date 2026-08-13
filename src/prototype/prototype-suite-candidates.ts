@@ -19,11 +19,15 @@ import {
 } from './review-evidence'
 import { createPrototypeAssetManifest } from './asset-manifest'
 import { designSystemMarkdownValidationError } from './design-system-validation'
-import { prototypeMediaValidationError } from './prototype-artifact-recovery'
+import {
+  prototypeMediaValidationError,
+  prototypePageViewportValidationError,
+} from './prototype-artifact-recovery'
 import { resourcePackRunId } from './resource-pack-production'
 import {
   prototypePageSchema,
   prototypePlanSchema,
+  prototypeRouteGraphFingerprint,
   validatePrototypePlan,
   type PrototypePlan,
 } from './prototype-plan'
@@ -272,24 +276,6 @@ export function validatePrototypeSuiteCandidateSet(
   return ok({ set: parsedSet.data, artifacts })
 }
 
-export function prototypeRouteGraphFingerprint(plan: PrototypePlan): string {
-  return JSON.stringify({
-    pages: plan.pages.map((page) => ({
-      id: page.id,
-      name: page.name,
-      route: page.route,
-      purpose: page.purpose,
-      interactions: page.interactions.map((interaction) => ({
-        id: interaction.id,
-        trigger: interaction.trigger,
-        sourceSectionId: interaction.sourceSectionId,
-        action: interaction.action,
-      })),
-    })),
-    flows: plan.flows,
-  })
-}
-
 function validatePrototypeSuiteArtifact(
   input: unknown,
   directionId: string,
@@ -418,6 +404,8 @@ function validateCompletePages(
     }
     const mediaError = prototypeMediaValidationError(value)
     if (mediaError) return err(`Prototype page "${id}": ${mediaError}`)
+    const viewportError = prototypePageViewportValidationError(planned, value)
+    if (viewportError) return err(viewportError)
     const review = value.review === undefined
       ? undefined
       : prototypePageReviewRecordSchema.safeParse(value.review)

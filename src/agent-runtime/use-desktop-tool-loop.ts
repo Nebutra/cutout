@@ -23,11 +23,8 @@ import { PermissionBroker } from '@/tool-sandbox/broker'
 import { getAuthorizedWorkspace } from '@/platform/authorized-workspace'
 import { createTauriAgentHostService } from '@/agent-host/tauri-service'
 import { runDurableHostEffect } from '@/agent-host/durable-effect'
+import { desktopPaidToolTimeoutMs } from './paid-tool-timeouts'
 
-// One Provider attempt must terminate independently of the larger workflow.
-// Three minutes accommodates production image models without turning one dead
-// request into a five-minute opaque wait before the orchestrator can retry.
-const DESKTOP_TOOL_TIMEOUT_MS = 180_000
 const DESKTOP_PAID_TOOL_POLICY: PaidToolPolicy = { allowPaid: true }
 const FOREGROUND_SEGMENTATION_UNAVAILABLE =
   'capability-required: foreground segmentation is unavailable on this host.'
@@ -77,6 +74,21 @@ export interface DesktopToolInvocation {
   readonly expectedSourceImageId?: string
 }
 
+export interface DesktopToolRuntimeSnapshot {
+  readonly providers: readonly ProviderConfig[]
+  readonly assignments: ModelAssignments
+  readonly capabilityBindings?: CapabilityBindings
+}
+
+export function desktopToolCapabilitiesForSnapshot(
+  snapshot: DesktopToolRuntimeSnapshot,
+): readonly PaidToolExecutorCapability[] {
+  return desktopPaidToolCapabilities(snapshot.providers, snapshot.assignments, {
+    descriptors: snapshot.capabilityBindings?.descriptors,
+    bindings: snapshot.capabilityBindings?.bindings,
+  })
+}
+
 export function createExplicitDesktopPaidToolRequest(input: {
   readonly capability: PaidToolCapability
   readonly intent: string
@@ -102,7 +114,7 @@ export function useDesktopToolLoop(input: {
   readonly providers: readonly ProviderConfig[]
   readonly assignments: ModelAssignments
   readonly capabilityBindings?: CapabilityBindings
-  readonly resolveCapabilityBindings?: () => CapabilityBindings | undefined
+  readonly resolveRuntimeSnapshot?: () => DesktopToolRuntimeSnapshot
   readonly revision: number
   readonly append: (events: readonly AgentRunEvent[]) => void
   readonly cutoutResultSink?: CutoutResultSink
@@ -133,13 +145,13 @@ export function useDesktopToolLoop(input: {
     return { capabilityLeaseId: lease.leaseId, requestDigest }
   }, [permissionBroker])
   const capabilities = useCallback((): readonly PaidToolExecutorCapability[] => {
-    const bindings = state.current.resolveCapabilityBindings?.()
-      ?? state.current.capabilityBindings
+    const snapshot = state.current.resolveRuntimeSnapshot?.() ?? {
+      providers: state.current.providers,
+      assignments: state.current.assignments,
+      capabilityBindings: state.current.capabilityBindings,
+    }
     return [
-    ...desktopPaidToolCapabilities(state.current.providers, state.current.assignments, {
-      descriptors: bindings?.descriptors,
-      bindings: bindings?.bindings,
-    }),
+    ...desktopToolCapabilitiesForSnapshot(snapshot),
     { capability: 'cutout', providerId: 'local', model: 'cutout-v1', available: true },
     { capability: 'semantic-cutout', providerId: 'local', model: 'apple-vision-foreground-v1', available: semanticCutoutAvailable.current },
   ]}, [])
@@ -158,7 +170,8 @@ export function useDesktopToolLoop(input: {
       currentRevision: () => state.current.revision,
       policy: () => DESKTOP_PAID_TOOL_POLICY,
       append: (events) => state.current.append(events),
-      timeoutMs: DESKTOP_TOOL_TIMEOUT_MS,
+      timeoutMs: (request) =>
+        desktopPaidToolTimeoutMs(request.request.capability),
       authorize: (request, approvalId) => authorize(
         request.runId,
         request.requestId,

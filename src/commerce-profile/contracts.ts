@@ -57,6 +57,7 @@ export const productFactsSchema = z.object({
   titleFactIds: z.array(z.string().min(1).max(240)).min(1).max(20),
   descriptionFactIds: z.array(z.string().min(1).max(240)).min(1).max(20),
   categoryFactId: z.string().min(1).max(240),
+  identityAnchorFactId: z.string().min(1).max(240),
   mediaFactIds: z.array(z.string().min(1).max(240)).max(2_000),
   skus: z.array(skuFactReferencesSchema).max(2_000),
   attributeFactIds: z.array(z.string().min(1).max(240)).max(2_000),
@@ -74,6 +75,7 @@ export const productFactsSchema = z.object({
     ...record.titleFactIds,
     ...record.descriptionFactIds,
     record.categoryFactId,
+    record.identityAnchorFactId,
     ...record.mediaFactIds,
     ...record.attributeFactIds,
     ...record.measurementFactIds,
@@ -93,6 +95,13 @@ export const productFactsSchema = z.object({
     return fact?.confidence !== 'unknown' || fact.value.type !== 'unknown'
   })) {
     context.addIssue({ code: 'custom', message: 'Required unknown references must point to unknown facts.' })
+  }
+  const identityAnchor = record.facts.find((fact) => fact.id === record.identityAnchorFactId)
+  if (!record.mediaFactIds.includes(record.identityAnchorFactId)
+    || identityAnchor?.confidence !== 'explicit'
+    || identityAnchor.value.type !== 'media'
+    || identityAnchor.value.mediaKind !== 'image') {
+    context.addIssue({ code: 'custom', message: 'Product identity anchor must reference an explicit image fact in the media closure.' })
   }
 })
 export type ProductFacts = z.infer<typeof productFactsSchema>

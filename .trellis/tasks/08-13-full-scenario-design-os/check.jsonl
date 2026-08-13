@@ -1,0 +1,5 @@
+{"file":".trellis/tasks/08-13-full-scenario-design-os/research/first-principles.md","reason":"Audit implementation against the original first-principles derivation instead of feature count."}
+{"file":".trellis/tasks/08-13-full-scenario-design-os/research/commerce-session-promotion-analysis.md","reason":"Verify promoted mechanisms stay generic and competition-specific details remain isolated."}
+{"file":".trellis/spec/frontend/design-os-kernel.md","reason":"Check Kernel ownership, lifecycle, authority and promotion invariants."}
+{"file":".trellis/spec/frontend/design-os-benchmark.md","reason":"Check evidence maturity and Outcome quality cannot mint one another's readiness."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Apply repository quality gates and test expectations during cross-program review."}

@@ -368,9 +368,15 @@ describe('buildAgentViewModel', () => {
       workflowPhase: 'generating-suite',
       stages,
       outcome: outcome(),
-      working: false,
+      working: true,
+      preparing: true,
       elapsedSeconds: 8,
       runError: 'Provider rejected the image request.',
+      liveAgentMessage: {
+        id: 'runtime:stale-planner-progress',
+        label: 'Creating navigation flows',
+        text: '',
+      },
     })
 
     expect(model.summary).toMatchObject({
@@ -383,6 +389,9 @@ describe('buildAgentViewModel', () => {
       detail: 'Provider rejected the image request.',
       provenance: 'runtime',
     })
+    expect(model.feed).not.toContainEqual(expect.objectContaining({
+      status: 'pending',
+    }))
   })
 
   it('surfaces capability degradation as a factual feed notice', () => {

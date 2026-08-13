@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { inventoryCommerceInputs } from './inventory'
 import { ingestCommerceInputs } from './ingestion'
-import { extractUntrustedHtml, normalizeProductRecord } from './normalizer'
+import { extractUntrustedHtml, normalizeProductRecord, selectCommerceIdentityAnchor } from './normalizer'
 import {
   fixtureAttributeCatalog,
   fixtureCategoryCatalog,
@@ -35,6 +35,64 @@ describe('Commerce input inventory and product normalization (P1)', () => {
     expect(extracted.visibleText).toBe('Visible product.')
     expect(extracted.visibleText).not.toContain('ignore evidence')
     expect(extracted.mediaDescriptors).toEqual([{ kind: 'image', descriptor: 'https://media.invalid/a.png' }])
+  })
+
+  it('normalizes official nested commerce aliases, nested image collections and SKU evidence', () => {
+    const officialShape = {
+      offerId: 123456,
+      platform: 'source-marketplace',
+      url: 'https://source.invalid/product/123456',
+      subject: 'Loose chiffon blouse',
+      description: '<p>Lightweight blouse.</p><img src="https://media.invalid/description-first.jpg">',
+      categoryId: 9301181,
+      category_name: 'Women shirts',
+      productAttribute: [
+        { attributeName: 'Material', value: 'Chiffon' },
+      ],
+      productImage: {
+        images: [
+          'https://media.invalid/product-1.jpg',
+          'https://media.invalid/product-2.jpg',
+        ],
+      },
+      productSkuInfos: [{
+        skuId: 101,
+        skuAttributes: [
+          { attributeName: 'Color', value: 'Lavender', skuImageUrl: 'https://media.invalid/lavender.jpg' },
+          { attributeName: 'Size', value: 'M' },
+        ],
+      }],
+    }
+    const facts = normalizeProductRecord({
+      file: 'products/official.json',
+      contents: JSON.stringify({ ret: { result: { result: officialShape } } }),
+    })
+
+    expect(facts.facts.find((fact) => fact.field === 'identity.product-id')).toMatchObject({
+      value: { type: 'text', value: '123456' },
+      source: { pointer: '/ret/result/result/offerId' },
+    })
+    expect(facts.facts.find((fact) => fact.field === 'category.source-id')).toMatchObject({
+      value: { type: 'text', value: '9301181' },
+      source: { pointer: '/ret/result/result/categoryId' },
+    })
+    expect(facts.facts.find((fact) => fact.field === 'category.source-name')?.source.pointer)
+      .toBe('/ret/result/result/category_name')
+    expect(selectCommerceIdentityAnchor(facts)).toMatchObject({
+      id: facts.identityAnchorFactId,
+      value: { type: 'media', mediaKind: 'image', descriptor: 'https://media.invalid/product-1.jpg' },
+      confidence: 'explicit',
+      source: { pointer: '/ret/result/result/productImage/images/0' },
+    })
+    expect(facts.mediaFactIds.map((id) => facts.facts.find((fact) => fact.id === id)?.source.pointer))
+      .toEqual(expect.arrayContaining([
+        '/ret/result/result/productImage/images/0',
+        '/ret/result/result/productImage/images/1',
+        '/ret/result/result/productSkuInfos/0/skuAttributes/0/skuImageUrl',
+      ]))
+    expect(facts.skus).toHaveLength(1)
+    expect(facts.skus[0]?.attributeFactIds).toHaveLength(2)
+    expect(facts.skus[0]?.mediaFactIds).toHaveLength(1)
   })
 
   it('rejects traversal, symlinks, duplicate paths, unsupported types, oversized and excessive inputs', () => {
@@ -78,6 +136,10 @@ describe('Commerce input inventory and product normalization (P1)', () => {
     expect(() => normalizeProductRecord({ file: '../unsafe.json', contents: '{}' })).toThrow(/unsafe segment/)
     expect(() => normalizeProductRecord({ file: 'unsupported.json', contents: JSON.stringify({ response: { value: 1 } }) }))
       .toThrow(/Unsupported product record shape/)
+    expect(() => normalizeProductRecord({
+      file: 'missing-image.json',
+      contents: JSON.stringify({ ...fixtureProductRecord, images: [] }),
+    })).toThrow(/explicit product image identity anchor/)
   })
 
   it('ingests the complete bounded role closure through one fail-closed entry point', () => {

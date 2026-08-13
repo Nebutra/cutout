@@ -371,7 +371,9 @@ function factConsistencyFindings(input: {
 }): readonly ValidationFinding[] {
   const result: ValidationFinding[] = []
   const categoryFact = input.facts.facts.find((fact) => fact.id === input.facts.categoryFactId)
-  if (categoryFact?.value.type === 'text' && categoryFact.value.value !== input.description.categoryId) {
+  if (categoryFact?.field === 'category.leaf-id'
+    && categoryFact.value.type === 'text'
+    && categoryFact.value.value !== input.description.categoryId) {
     result.push(finding(input.outcomeNodeId, 'category-fact-mismatch', 'Catalog category conflicts with normalized product evidence.', [categoryFact.id], input.artifactId))
   }
   const factAttributes = new Map(input.facts.facts.flatMap((fact) => {

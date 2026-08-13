@@ -1,24 +1,5 @@
-import type { Page } from "@playwright/test";
 import { expect, test } from "./local-state.fixture";
-
-async function projectCount(page: Page) {
-  return page.evaluate(async () => {
-    const db = await new Promise<IDBDatabase>((resolve, reject) => {
-      const request = indexedDB.open("cutout-projects", 1);
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error);
-    });
-    try {
-      return await new Promise<number>((resolve, reject) => {
-        const request = db.transaction("projects", "readonly").objectStore("projects").count();
-        request.onsuccess = () => resolve(request.result);
-        request.onerror = () => reject(request.error);
-      });
-    } finally {
-      db.close();
-    }
-  });
-}
+import { projectCount } from "./project-storage";
 
 test("Topbar New project creates clean workspaces without persisting blank drafts", async ({ page }) => {
   await page.goto("/");

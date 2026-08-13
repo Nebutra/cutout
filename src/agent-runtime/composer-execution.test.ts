@@ -98,7 +98,16 @@ describe('composer execution adapter', () => {
       defaultModel: 'gpt-5.6-sol',
       enabled: true,
     }]
-    const descriptors = runtimeModelDescriptors(ccAssignments, ccProviders, () => true)
+    const descriptors = runtimeModelDescriptors(ccAssignments, ccProviders, () => true, [{
+      providerId: 'cc',
+      model: 'gpt-image-2',
+      capabilities: ['image-generation', 'image-edit'],
+      source: 'verified-catalog',
+      evidence: [
+        { capability: 'image-generation', sourceId: 'test', kind: 'verified' },
+        { capability: 'image-edit', sourceId: 'test', kind: 'observed' },
+      ],
+    }])
 
     expect(descriptors.find((model) => model.slot === 'chat')?.capabilities)
       .toEqual(expect.arrayContaining(['text', 'vision', 'reasoning', 'tools']))
@@ -112,6 +121,52 @@ describe('composer execution adapter', () => {
       hasReferenceImages: true,
       modelCatalog: descriptors,
     })).not.toThrow()
+  })
+
+  it('routes an exact verified Qwen Image 3 binding without granting image capability by provider kind', () => {
+    const qwenAssignments: ModelAssignments = {
+      chat: { providerId: 'mox', model: 'gpt-5.5' },
+      image: { providerId: 'qwen', model: 'qwen-image-3.0' },
+    }
+    const qwenProviders: ProviderConfig[] = [
+      {
+        id: 'mox', kind: 'openai-compatible', label: 'MOX',
+        wireProtocol: 'chat-completions', defaultModel: 'gpt-5.5', enabled: true,
+      },
+      {
+        id: 'qwen', kind: 'dashscope', label: 'Qwen Image 3',
+        wireProtocol: 'chat-completions', defaultModel: 'qwen-image-3.0', enabled: true,
+      },
+    ]
+    const withoutEvidence = runtimeModelDescriptors(
+      qwenAssignments,
+      qwenProviders,
+      () => true,
+    )
+    expect(() => lockComposerImageRoute({
+      model: { mode: 'auto' }, thinking: 'auto', assignments: qwenAssignments,
+      providers: qwenProviders, hasReferenceImages: false, modelCatalog: withoutEvidence,
+    })).toThrow('selected image provider is unavailable')
+
+    const withEvidence = runtimeModelDescriptors(
+      qwenAssignments,
+      qwenProviders,
+      (_providerId, model) => model === 'gpt-5.5' || model === 'qwen-image-3.0',
+      [{
+        providerId: 'qwen',
+        model: 'qwen-image-3.0',
+        capabilities: ['image-generation', 'image-edit'],
+        source: 'verified-catalog',
+        evidence: [
+          { capability: 'image-generation', sourceId: 'dashscope-qwen-image-3-api', kind: 'verified' },
+          { capability: 'image-edit', sourceId: 'dashscope-qwen-image-3-api', kind: 'verified' },
+        ],
+      }],
+    )
+    expect(lockComposerImageRoute({
+      model: { mode: 'auto' }, thinking: 'auto', assignments: qwenAssignments,
+      providers: qwenProviders, hasReferenceImages: false, modelCatalog: withEvidence,
+    }).image).toEqual(qwenAssignments.image)
   })
 
   it('turns capability degradation into factual user-visible notices', () => {

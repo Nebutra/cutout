@@ -1,4 +1,5 @@
 import {
+  candidateIdMaxLength,
   candidateSetSchema,
   type CandidateDirection,
   type CandidateExplorationDecision,
@@ -70,13 +71,24 @@ export function createPrototypeDesignSystemCandidateSet(input: {
   readonly id?: string
 }): PrototypeDesignSystemCandidateSet {
   const proposal = designSystemExplorationForPlan(input.plan)
+  const directCandidateIds = proposal.directions.map((direction) =>
+    `candidate:${direction.id}`,
+  )
+  const candidateIds = directCandidateIds.some((id) =>
+    id.length > candidateIdMaxLength
+    || candidateMaterialId(id, 'visual').length > candidateIdMaxLength
+    || candidateMaterialId(id, 'markdown').length > candidateIdMaxLength
+    || candidateProvenanceId(id).length > candidateIdMaxLength,
+  )
+    ? proposal.directions.map((_, index) => `candidate:direction:${index + 1}`)
+    : directCandidateIds
   const set = candidateSetSchema.parse({
     id: input.id ?? `candidate-set:design-system:${crypto.randomUUID()}`,
     kind: 'design-system',
     baseRevisionId: input.baseRevisionId,
     proposal,
-    candidates: proposal.directions.map((direction) => ({
-      id: candidateId(direction),
+    candidates: proposal.directions.map((direction, index) => ({
+      id: candidateIds[index],
       directionId: direction.id,
       status: 'planned',
       outputs: [],
@@ -203,10 +215,6 @@ export function directionForCandidate(
   const direction = candidateSet.set.proposal.directions.find((item) => item.id === candidate?.directionId)
   if (!candidate || !direction) throw new Error(`Candidate "${candidateId}" has no declared direction.`)
   return direction
-}
-
-function candidateId(direction: CandidateDirection): string {
-  return `candidate:${direction.id}`
 }
 
 export function candidateProvenanceId(candidateId: string): string {

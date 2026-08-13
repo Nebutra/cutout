@@ -105,7 +105,13 @@ export function AiSection() {
     setAutomaticBusy(true)
     setAutomaticError(undefined)
     try {
-      await configureAutomaticAi(candidates)
+      if (import.meta.env.VITE_CUTOUT_PACKAGED_E2E === '1') {
+        await configureAutomaticAi(candidates, {
+          preferredTextRoutes: [{ kind: 'dashscope', model: 'qwen-plus' }],
+        })
+      } else {
+        await configureAutomaticAi(candidates)
+      }
       await Promise.all([
         providers.refetch(),
         discovery.refetch(),
@@ -129,10 +135,10 @@ export function AiSection() {
 
   useEffect(() => {
     if (setup.status === 'ready') return
-    const key = setup.importableCandidates.map((candidate) => candidate.id).sort().join(':')
+    const key = setup.automaticCandidates.map((candidate) => candidate.id).sort().join(':')
     if (!key || automaticAttempt.current === key) return
     automaticAttempt.current = key
-    void runAutomaticSetup(setup.importableCandidates)
+    void runAutomaticSetup(setup.automaticCandidates)
   }, [runAutomaticSetup, setup])
 
   useEffect(() => {

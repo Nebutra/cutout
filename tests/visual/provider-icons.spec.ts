@@ -99,6 +99,9 @@ test("all integrations have nonempty non-Plug icons in light/dark after scrollin
   await page.getByRole("menuitem", { name: /Settings|设置/ }).click();
   if (targetViewport) await page.setViewportSize(targetViewport);
   await page.getByText(/Integrations|集成/, { exact: true }).click();
+  await expect.poll(() => page.getByRole("dialog").evaluate(
+    (element) => getComputedStyle(element).transform,
+  )).toBe("none");
   const icons = page.locator("[data-integration-icon]");
   expect(await icons.count()).toBe(9);
   await expect(page.locator("[data-integration-icon].lucide-plug")).toHaveCount(

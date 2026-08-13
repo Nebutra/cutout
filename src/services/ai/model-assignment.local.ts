@@ -6,6 +6,7 @@
  * interpreted.
  */
 import { LazyStore } from '@tauri-apps/plugin-store'
+import { hasNativeDesktopHost } from '@/platform/runtime'
 import {
   type ModelAssignment,
   type ModelAssignments,
@@ -74,6 +75,11 @@ export function createCapabilityBindingsRepository(host: BindingsStore) {
 const bindingsRepository = createCapabilityBindingsRepository(store)
 
 export const loadCapabilityBindings = () => bindingsRepository.load()
+export const loadRuntimeCapabilityBindings = (
+  browserProjection?: CapabilityBindings,
+) => hasNativeDesktopHost()
+  ? bindingsRepository.load()
+  : Promise.resolve(browserProjection ?? emptyBindings())
 export const setCapabilityBinding = (
   task: ModelTaskKind,
   assignment: ModelAssignment,

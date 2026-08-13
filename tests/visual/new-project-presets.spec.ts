@@ -17,20 +17,6 @@ test("new project and presets are fast idempotent draft actions", async ({
     }).observe({ entryTypes: ["longtask"] });
   });
   await page.goto("/");
-  for (const database of await page.evaluate(() => indexedDB.databases()))
-    if (database.name)
-      await page.evaluate(
-        (name) =>
-          new Promise<void>((resolve) => {
-            const request = indexedDB.deleteDatabase(name);
-            request.onsuccess =
-              request.onerror =
-              request.onblocked =
-                () => resolve();
-          }),
-        database.name,
-      );
-  await page.reload();
   const composer = page.getByRole("textbox", {
       name: "Describe what you want to design...",
     }),

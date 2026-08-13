@@ -1,0 +1,3 @@
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Verify static, browser and repository quality gates."}
+{"file":".trellis/spec/frontend/release-pipeline.md","reason":"Verify download/release claims and deployment evidence."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Audit the GitHub-to-Vercel-to-Cloudflare production path."}

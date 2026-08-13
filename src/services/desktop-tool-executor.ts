@@ -10,6 +10,7 @@ import {
 } from '@/control-protocol/paid-tool-contract'
 import { createRunEvent, type AgentRunEvent } from '@/agent-runtime/run-events'
 import type { GeneratedAsset } from '@/services/ai/types'
+import type { ImageAdapterStrategy } from '@/services/ai/image-route-assessment'
 import type { CutoutSlice, ServiceRegistry } from '@/services/types'
 import type { PermissionBroker } from '@/tool-sandbox/broker'
 
@@ -236,6 +237,12 @@ async function executeCapability(
   readonly providerRoute?: string
 }> {
   if (input.request.capability === 'generate-image') {
+    requireImageStrategy(capability, [
+      'openai-images-generations',
+      'xai-images-generations',
+      'google-multimodal-generate',
+      'dashscope-native-image-generation',
+    ])
     const result = await dependencies.services.generation.generateImages({
       providerId: capability.providerId, model: capability.model, prompt: paidToolExecutionPrompt(input.request), signal: input.signal,
     })
@@ -250,10 +257,28 @@ async function executeCapability(
     if (sources.length === 0) {
       throw new Error('The paid tool requires an input image artifact.')
     }
-    const result = await dependencies.services.generation.editImage({
-      providerId: capability.providerId, model: capability.model, prompt: paidToolExecutionPrompt(input.request),
-      images: sources.map((source) => source.bytes), signal: input.signal,
-    })
+    const strategy = requireImageStrategy(capability, [
+      'openai-images-edits',
+      'xai-images-edits',
+      'google-multimodal-generate',
+      'dashscope-native-image-edit',
+    ])
+    const prompt = paidToolExecutionPrompt(input.request)
+    const result = strategy === 'google-multimodal-generate'
+      ? await dependencies.services.generation.generateImages({
+          providerId: capability.providerId,
+          model: capability.model,
+          system: prompt,
+          input: [
+            { type: 'text', text: 'Create one edited image using every attached reference image.' },
+            ...sources.map((source) => ({ type: 'image' as const, image: source.bytes })),
+          ],
+          signal: input.signal,
+        })
+      : await dependencies.services.generation.editImage({
+          providerId: capability.providerId, model: capability.model, prompt,
+          images: sources.map((source) => source.bytes), signal: input.signal,
+        })
     if (!result.ok) throw new Error(result.error)
     return { assets: result.data }
   }
@@ -290,6 +315,17 @@ async function executeCapability(
     mediaType: 'image/png', bytes: new Uint8Array(await slice.png.arrayBuffer()),
   })))
   return { assets, cutoutSlices: result.data.slices, evidenceAssets, providerRoute }
+}
+
+function requireImageStrategy(
+  capability: PaidToolExecutorCapability,
+  allowed: readonly ImageAdapterStrategy[],
+): ImageAdapterStrategy {
+  const strategy = capability.transportStrategy
+  if (!strategy || !allowed.includes(strategy)) {
+    throw new Error('capability-required: no executable image transport matches the approved route.')
+  }
+  return strategy
 }
 
 async function writeAssets(store: DesktopToolArtifactStore, assets: readonly GeneratedAsset[], input: DesktopToolExecution, source: 'generate-image' | 'edit-image' | 'cutout') {

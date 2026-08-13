@@ -20,7 +20,9 @@ export type CategoryIndex = z.infer<typeof categoryIndexSchema>
 const attributeDefinitionSchema = z.object({
   categoryId: z.string().min(1).max(240),
   key: z.string().min(1).max(240),
-  values: z.array(z.string().min(1).max(500)).min(1).max(10_000),
+  label: z.string().min(1).max(500),
+  values: z.array(z.string().min(1).max(500)).max(10_000),
+  customizable: z.boolean(),
 }).strict()
 export type AttributeDefinition = z.infer<typeof attributeDefinitionSchema>
 
@@ -65,7 +67,7 @@ function rootArray(raw: unknown, keys: readonly string[], label: string): readon
 function attributeRoots(raw: unknown): readonly unknown[] {
   if (Array.isArray(raw)) return raw
   if (!isObject(raw)) throw new Error('Attribute catalog must be an object or array.')
-  for (const key of ['attributes', 'attributeList', 'attribute_list', 'data', 'result', 'definitions']) {
+  for (const key of ['attributes', 'attributeList', 'attribute_list', 'data', 'result', 'definitions', 'categories']) {
     if (Array.isArray(raw[key])) return raw[key]
   }
   return Object.entries(raw).map(([categoryId, definitions]) => ({
@@ -82,7 +84,7 @@ export function buildCategoryIndex(contents: string): CategoryIndex {
   const walk = (entries: readonly unknown[], inheritedParentId?: string): void => {
     for (const entry of entries) {
       if (!isObject(entry)) throw new Error('Category entries must be objects.')
-      const id = stringValue(first(entry, ['id', 'categoryId', 'category_id', 'value']))
+      const id = stringValue(first(entry, ['id', 'catId', 'cat_id', 'categoryId', 'category_id', 'value']))
       const name = stringValue(first(entry, ['name', 'categoryName', 'category_name', 'label']))
       if (!id || !name) throw new Error('Category entries require exact id and name values.')
       const parentId = stringValue(first(entry, ['parentId', 'parent_id', 'parentCategoryId', 'parent_category_id']))
@@ -122,7 +124,7 @@ export function buildCategoryIndex(contents: string): CategoryIndex {
   const normalized = categories.map((category) => {
     const derivedLeaf = !childCount.has(category.id)
     const declared = explicitLeaf.get(category.id)
-    if (declared !== undefined && declared !== derivedLeaf) {
+    if (declared === true && !derivedLeaf) {
       throw new Error(`Category ${category.id} leaf flag conflicts with its hierarchy.`)
     }
     return { ...category, leaf: derivedLeaf }
@@ -134,34 +136,65 @@ export function buildCategoryIndex(contents: string): CategoryIndex {
   })
 }
 
-function normalizedValues(value: unknown, definitionKey: string): readonly string[] {
+function normalizedValues(value: unknown, definitionKey: string, customizable: boolean): readonly string[] {
+  if (value === undefined && customizable) return []
   if (!Array.isArray(value)) throw new Error(`Attribute ${definitionKey} requires an enum value array.`)
-  return value.map((entry) => {
+  const normalized = value.map((entry) => {
     const result = stringValue(entry)
-      ?? (isObject(entry) ? stringValue(first(entry, ['value', 'id', 'name', 'label'])) : undefined)
+      ?? (isObject(entry) ? stringValue(first(entry, ['valueNameAlias', 'value_name_alias', 'value', 'name', 'label', 'id'])) : undefined)
     if (!result) throw new Error(`Attribute ${definitionKey} contains a malformed enum value.`)
     return result
   })
+  if (new Set(normalized).size === normalized.length) return normalized
+  const sourceIds = value.map((entry) => isObject(entry)
+    ? stringValue(first(entry, ['id', 'valueId', 'value_id']))
+    : undefined)
+  if (sourceIds.every((id): id is string => Boolean(id))
+    && new Set(sourceIds).size === sourceIds.length) {
+    return normalized.filter((entry, index) => normalized.indexOf(entry) === index)
+  }
+  return normalized
 }
 
 export function buildAttributeIndex(contents: string, categoryIndex: CategoryIndex): AttributeIndex {
   const parsedCategories = categoryIndexSchema.parse(categoryIndex)
   const raw = parseJson(contents, 'attribute catalog')
   const roots = attributeRoots(raw)
-  const definitions: AttributeDefinition[] = []
+  const sourceDefinitions: AttributeDefinition[] = []
   const addDefinition = (entry: JsonObject, inheritedCategoryId?: string) => {
     const categoryId = stringValue(first(entry, ['categoryId', 'category_id', 'leafCategoryId', 'leaf_category_id']))
       ?? inheritedCategoryId
-    const key = stringValue(first(entry, ['key', 'id', 'attributeId', 'attribute_id', 'name', 'attributeName']))
+    const key = stringValue(first(entry, ['key', 'id', 'attrId', 'attributeId', 'attribute_id']))
+      ?? stringValue(first(entry, ['attributeName', 'attribute_name', 'name']))
+    const label = stringValue(first(entry, [
+      'attributeNameAlias', 'attribute_name_alias', 'attributeName', 'attribute_name', 'name', 'key',
+    ])) ?? key
+    const customizable = first(entry, ['customizable', 'isCustomized', 'is_customized']) === true
     const values = first(entry, [
       'values', 'attributeValues', 'attribute_values', 'enumValues', 'enum_values',
       'options', 'valueList', 'value_list',
     ])
-    if (!categoryId || !key) throw new Error('Attribute definitions require categoryId and key.')
-    definitions.push({ categoryId, key, values: [...normalizedValues(values, key)] })
+    if (!categoryId || !key || !label) throw new Error('Attribute definitions require categoryId, key and label.')
+    sourceDefinitions.push({ categoryId, key, label, values: [...normalizedValues(values, key, customizable)], customizable })
   }
   for (const entry of roots) {
     if (!isObject(entry)) throw new Error('Attribute catalog entries must be objects.')
+    const metadata = first(entry, ['categoryMetadata', 'category_metadata'])
+    if (isObject(metadata)) {
+      const categoryId = stringValue(first(entry, ['categoryId', 'category_id', 'leafCategoryId', 'leaf_category_id', 'id']))
+      // Some source-marketplace groups have no target-catalog mapping. Their
+      // unrelated `cid` is not a safe substitute for the absent target id.
+      if (!categoryId) continue
+      const definitions = [
+        first(metadata, ['categorySaleAttrList', 'category_sale_attr_list']),
+        first(metadata, ['categoryProductAttrList', 'category_product_attr_list']),
+      ].flatMap((value) => Array.isArray(value) ? value : [])
+      for (const child of definitions) {
+        if (!isObject(child)) throw new Error('Attribute definitions must be objects.')
+        addDefinition(child, categoryId)
+      }
+      continue
+    }
     const nested = first(entry, ['attributes', 'attributeList', 'attribute_list', 'definitions'])
     if (Array.isArray(nested)) {
       const categoryId = stringValue(first(entry, ['categoryId', 'category_id', 'leafCategoryId', 'leaf_category_id', 'id']))
@@ -174,21 +207,50 @@ export function buildAttributeIndex(contents: string, categoryIndex: CategoryInd
       addDefinition(entry)
     }
   }
-  const knownCategories = new Set(parsedCategories.categories.map((category) => category.id))
-  const leafCategories = new Set(parsedCategories.leafIds)
-  for (const definition of definitions) {
-    if (!knownCategories.has(definition.categoryId)) {
+  const categoryById = new Map(parsedCategories.categories.map((category) => [category.id, category]))
+  const sourceDefinitionsByCategory = new Map<string, AttributeDefinition[]>()
+  const sourceByKey = new Map<string, AttributeDefinition>()
+  for (const definition of sourceDefinitions) {
+    if (!categoryById.has(definition.categoryId)) {
       throw new Error(`Attribute references unknown category ${definition.categoryId}.`)
-    }
-    if (!leafCategories.has(definition.categoryId)) {
-      throw new Error(`Attributes may only bind leaf category ${definition.categoryId}.`)
     }
     if (new Set(definition.values).size !== definition.values.length) {
       throw new Error(`Attribute ${definition.key} contains duplicate enum values.`)
     }
+    const sourceKey = `${definition.categoryId}\0${definition.key}`
+    const existing = sourceByKey.get(sourceKey)
+    if (existing) {
+      if (JSON.stringify(existing) === JSON.stringify(definition)) continue
+      throw new Error('Attribute keys must be unique within a source category unless definitions are identical.')
+    }
+    sourceByKey.set(sourceKey, definition)
+    const siblings = sourceDefinitionsByCategory.get(definition.categoryId) ?? []
+    siblings.push(definition)
+    sourceDefinitionsByCategory.set(definition.categoryId, siblings)
   }
-  const keys = definitions.map((definition) => `${definition.categoryId}\0${definition.key}`)
-  if (new Set(keys).size !== keys.length) throw new Error('Attribute keys must be unique within a category.')
+  const definitions: AttributeDefinition[] = []
+  const usedSourceCategoryIds = new Set<string>()
+  for (const leafId of parsedCategories.leafIds) {
+    const lineage: CatalogCategory[] = []
+    let cursor: CatalogCategory | undefined = categoryById.get(leafId)
+    while (cursor) {
+      lineage.unshift(cursor)
+      cursor = cursor.parentId ? categoryById.get(cursor.parentId) : undefined
+    }
+    const inherited = new Map<string, AttributeDefinition>()
+    for (const category of lineage) {
+      for (const definition of sourceDefinitionsByCategory.get(category.id) ?? []) {
+        inherited.set(definition.key, definition)
+        usedSourceCategoryIds.add(category.id)
+      }
+    }
+    for (const definition of inherited.values()) definitions.push({ ...definition, categoryId: leafId })
+  }
+  const unusedSourceCategoryId = [...sourceDefinitionsByCategory.keys()]
+    .find((categoryId) => !usedSourceCategoryIds.has(categoryId))
+  if (unusedSourceCategoryId) {
+    throw new Error(`Attribute category has no descendant leaf: ${unusedSourceCategoryId}.`)
+  }
   return attributeIndexSchema.parse({
     schema: 'commerce.attribute-index.v1',
     definitions: definitions.sort((left, right) => left.categoryId.localeCompare(right.categoryId)
@@ -209,10 +271,12 @@ export function validateCatalogSelection(input: {
   }
   const permitted = new Map(attributes.definitions
     .filter((definition) => definition.categoryId === input.categoryId)
-    .map((definition) => [definition.key, new Set(definition.values)]))
+    .map((definition) => [definition.key, definition] as const))
   for (const [key, value] of Object.entries(input.attributes)) {
-    const values = permitted.get(key)
-    if (!values) throw new Error(`Attribute key is not permitted for ${input.categoryId}: ${key}`)
-    if (!values.has(value)) throw new Error(`Attribute value is not permitted for ${input.categoryId}/${key}: ${value}`)
+    const definition = permitted.get(key)
+    if (!definition) throw new Error(`Attribute key is not permitted for ${input.categoryId}: ${key}`)
+    if (!definition.customizable && !definition.values.includes(value)) {
+      throw new Error(`Attribute value is not permitted for ${input.categoryId}/${key}: ${value}`)
+    }
   }
 }

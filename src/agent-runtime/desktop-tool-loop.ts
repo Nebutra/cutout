@@ -15,6 +15,7 @@ import type {
   ToolExecutorRegistry,
 } from "@/services/desktop-tool-executor";
 import type { ToolDurabilityStore } from './tool-durability'
+import { createMonotonicDeadline } from '@/platform/monotonic-deadline'
 
 export interface DesktopToolLoopRequest {
   readonly runId: string;
@@ -40,7 +41,7 @@ export interface DesktopToolLoopDependencies {
   readonly append: (events: readonly AgentRunEvent[]) => void;
   readonly now?: () => number;
   readonly id?: () => string;
-  readonly timeoutMs?: number;
+  readonly timeoutMs?: number | ((input: DesktopToolLoopRequest) => number);
   /** Optional durable request/attempt ledger and event outbox for desktop hosts. */
   readonly durability?: ToolDurabilityStore;
   /** Issues a short-lived capability lease only after this attempt has an
@@ -154,7 +155,9 @@ export function createDesktopToolLoop(
           onStarted: (event) => append([event]),
         }),
         call.controller,
-        dependencies.timeoutMs ?? 600_000,
+        typeof dependencies.timeoutMs === "function"
+          ? dependencies.timeoutMs(call.input)
+          : dependencies.timeoutMs ?? 600_000,
       );
     } catch (error) {
       result = loopFailure(call.input, safeExecutionError(error), now());
@@ -544,12 +547,24 @@ async function withDeadline<T>(
 ): Promise<T> {
   if (!Number.isFinite(timeoutMs) || timeoutMs <= 0)
     throw new Error("Provider deadline exceeded.");
+  const deadline = createMonotonicDeadline(timeoutMs);
   return new Promise<T>((resolve, reject) => {
-    const timer = setTimeout(() => {
+    let settled = false;
+    const settle = (complete: () => void) => {
+      if (settled) return;
+      settled = true;
+      deadline.cancel();
+      complete();
+    };
+    void deadline.elapsed.then((elapsed) => {
+      if (!elapsed) return;
       controller.abort();
-      reject(new Error("Provider deadline exceeded."));
-    }, timeoutMs);
-    promise.then(resolve, reject).finally(() => clearTimeout(timer));
+      settle(() => reject(new Error("Provider deadline exceeded.")));
+    });
+    promise.then(
+      (value) => settle(() => resolve(value)),
+      (error: unknown) => settle(() => reject(error)),
+    );
   });
 }
 

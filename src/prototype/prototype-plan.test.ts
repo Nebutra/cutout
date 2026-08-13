@@ -1,11 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { z } from 'zod'
 import {
-  generatedPrototypePlanningMaterialSchema,
   generatedPrototypePlanSchema,
-  generatedPrototypePlanningSeedSchema,
-  prototypePlanningSeedSchema,
   prototypePlanSchema,
+  prototypeRouteGraphFingerprint,
   validatePrototypePlan,
   type PrototypePlan,
 } from './prototype-plan'
@@ -134,12 +131,62 @@ const validPlan: PrototypePlan = {
 }
 
 describe('PrototypePlan', () => {
+  it('fingerprints semantic graph changes even when route strings are unchanged', () => {
+    const alternative = structuredClone(validPlan)
+    alternative.pages[0]!.regions[0]!.summary = 'A different information hierarchy.'
+
+    expect(alternative.pages.map(({ route }) => route)).toEqual(
+      validPlan.pages.map(({ route }) => route),
+    )
+    expect(prototypeRouteGraphFingerprint(alternative)).not.toBe(
+      prototypeRouteGraphFingerprint(validPlan),
+    )
+  })
+
+  it('keeps id-renamed and reordered copies on one canonical graph identity', () => {
+    const renamed = structuredClone(validPlan)
+    const [home, pricing] = renamed.pages
+    home.id = 'page-a'
+    home.regions[0]!.id = 'region-a'
+    home.interactions[0]!.id = 'interaction-a'
+    home.interactions[0]!.sourceSectionId = 'region-a'
+    home.interactions[0]!.action = { type: 'navigate', targetPageId: 'page-b' }
+    pricing.id = 'page-b'
+    pricing.regions[0]!.id = 'region-b'
+    pricing.overlays[0]!.id = 'overlay-b'
+    pricing.interactions[0]!.id = 'interaction-b'
+    pricing.interactions[0]!.sourceSectionId = 'region-b'
+    pricing.interactions[0]!.action = { type: 'open-overlay', targetOverlayId: 'overlay-b' }
+    renamed.flows[0]!.id = 'flow-renamed'
+    renamed.flows[0]!.startPageId = 'page-a'
+    renamed.flows[0]!.steps[0] = {
+      fromPageId: 'page-a',
+      interactionId: 'interaction-a',
+      toPageId: 'page-b',
+    }
+    renamed.pages.reverse()
+
+    expect(prototypeRouteGraphFingerprint(renamed)).toBe(
+      prototypeRouteGraphFingerprint(validPlan),
+    )
+  })
+
   it('parses and validates a reachable multi-page plan', () => {
     const parsed = prototypePlanSchema.parse(validPlan)
     const result = validatePrototypePlan(parsed)
 
     expect(result.ok).toBe(true)
     expect(result.ok && result.data.reachablePageIds).toEqual(['home', 'pricing'])
+  })
+
+  it('rejects a navigation flow step that omits its exact target page', () => {
+    const plan = structuredClone(validPlan)
+    delete plan.flows[0]!.steps[0]!.toPageId
+
+    expect(validatePrototypePlan(plan)).toEqual({
+      ok: false,
+      error: 'Flow "visitor-to-pricing" step "open-pricing" target does not match the interaction target.',
+    })
   })
 
   it('applies the current continue default when a planner omits humanLoop', () => {
@@ -171,197 +218,6 @@ describe('PrototypePlan', () => {
     const parsed = prototypePlanSchema.parse(raw)
 
     expect(parsed.pages[0].regions[0].assetRoute).toBe('board-cutout')
-  })
-
-  it('requires each Agent-authored route to declare zero or more classified materials', () => {
-    const seed = {
-      product: {
-        name: 'Field Notes',
-        summary: 'A route journal for urban walks.',
-        audience: 'Independent walkers',
-        primaryGoal: 'Turn observations into reusable route stories.',
-        platform: 'responsive web app',
-      },
-      rationale: 'The route graph and materials follow the actual journal workflow.',
-      suites: [{
-        direction: {
-          id: 'editorial',
-          label: 'Editorial field guide',
-          thesis: 'Prioritize place identity and collected observations.',
-          vary: ['material density'],
-          preserve: ['route accuracy'],
-        },
-        pages: [
-          {
-            id: 'route-index',
-            name: 'Route index',
-            route: '/routes',
-            purpose: 'Browse saved walking routes.',
-            viewport: {
-              platform: 'desktop', width: 1440, height: 1000, scroll: 'long-scroll',
-            },
-            materials: [],
-          },
-          {
-            id: 'route-story',
-            name: 'Route story',
-            route: '/routes/story',
-            purpose: 'Read the observations and visual identity of one route.',
-            viewport: {
-              platform: 'desktop', width: 1440, height: 1000, scroll: 'long-scroll',
-            },
-            materials: [
-              {
-                id: 'marker-set',
-                name: 'Route marker set',
-                description: 'Three reusable illustrated location markers.',
-                production: 'board-cutout',
-                boardGroupId: 'route-markers',
-              },
-              {
-                id: 'route-map',
-                name: 'Illustrated route map',
-                description: 'One art-directed map showing the complete walk.',
-                production: 'direct-generate',
-              },
-            ],
-          },
-        ],
-      }],
-    }
-
-    const parsed = prototypePlanningSeedSchema.parse(seed)
-    expect(parsed.suites[0]!.pages[0]!.materials).toEqual([])
-    expect(parsed.suites[0]!.pages[1]!.materials.map((material) => material.production)).toEqual([
-      'board-cutout',
-      'direct-generate',
-    ])
-    const boardMaterial = parsed.suites[0]!.pages[1]!.materials[0]!
-    expect(boardMaterial.production).toBe('board-cutout')
-    if (boardMaterial.production !== 'board-cutout') throw new Error('Expected a board material.')
-    expect(boardMaterial.boardGroupId).toBe('route-markers')
-
-    const missing = structuredClone(seed)
-    delete (missing.suites[0]!.pages[0] as { materials?: unknown }).materials
-    expect(prototypePlanningSeedSchema.safeParse(missing).success).toBe(false)
-
-    const invalidProduction = structuredClone(seed)
-    invalidProduction.suites[0]!.pages[1]!.materials[0]!.production = 'ignore-code-ui'
-    expect(prototypePlanningSeedSchema.safeParse(invalidProduction).success).toBe(false)
-
-    const invalidDirectGroup = structuredClone(seed)
-    invalidDirectGroup.suites[0]!.pages[1]!.materials[1]!.boardGroupId = 'not-a-board'
-    expect(prototypePlanningSeedSchema.safeParse(invalidDirectGroup).success).toBe(false)
-
-    const missingGroup = structuredClone(seed)
-    delete (missingGroup.suites[0]!.pages[1]!.materials[0] as {
-      boardGroupId?: string
-    }).boardGroupId
-    const missingGroupResult = prototypePlanningSeedSchema.safeParse(missingGroup)
-    expect(missingGroupResult.success).toBe(false)
-    if (missingGroupResult.success) throw new Error('Expected board materials to require a group id.')
-    expect(missingGroupResult.error.issues[0]).toMatchObject({
-      path: ['suites', 0, 'pages', 1, 'materials', 0, 'boardGroupId'],
-      message: 'Invalid input: expected string, received undefined',
-    })
-
-    const providerSchema = JSON.stringify(
-      z.toJSONSchema(generatedPrototypePlanningMaterialSchema),
-    )
-    expect(providerSchema).toContain(
-      '"required":["id","name","description","production","boardGroupId"]',
-    )
-  })
-
-  it('does not impose a per-route material quota on an Agent-authored graph', () => {
-    const materials = Array.from({ length: 30 }, (_, index) => ({
-      id: `scene-${index + 1}`,
-      name: `Scene ${index + 1}`,
-      description: `Standalone reusable scene ${index + 1}.`,
-      production: 'direct-generate' as const,
-    }))
-    const result = generatedPrototypePlanningSeedSchema.safeParse({
-      product: {
-        name: 'World Atlas',
-        summary: 'A reference atlas whose authored scene graph is unusually broad.',
-        audience: 'World builders',
-        primaryGoal: 'Organize reusable scenes for one atlas route.',
-        platform: 'desktop app',
-      },
-      rationale: 'The domain requires every independently reusable authored scene.',
-      suites: [{
-        direction: {
-          id: 'atlas',
-          label: 'Atlas',
-          thesis: 'Treat every scene as independent production material.',
-          vary: ['scene treatment'],
-          preserve: ['world identity'],
-        },
-        pages: [{
-          id: 'world-atlas',
-          name: 'World atlas',
-          route: '/atlas',
-          purpose: 'Browse the complete authored scene collection.',
-          viewport: {
-            platform: 'desktop', width: 1440, height: 1000, scroll: 'long-scroll',
-          },
-          materials,
-        }],
-      }],
-    })
-
-    expect(result.success).toBe(true)
-    expect(result.success && result.data.suites[0]!.pages[0]!.materials).toHaveLength(30)
-  })
-
-  it('rejects duplicate material ids within one route', () => {
-    const result = prototypePlanningSeedSchema.safeParse({
-      product: {
-        name: 'Field Notes',
-        summary: 'A route journal for urban walks.',
-        audience: 'Independent walkers',
-        primaryGoal: 'Turn observations into reusable route stories.',
-        platform: 'responsive web app',
-      },
-      rationale: 'One route with separately produced visual materials.',
-      suites: [{
-        direction: {
-          id: 'editorial',
-          label: 'Editorial field guide',
-          thesis: 'Prioritize place identity.',
-          vary: ['material treatment'],
-          preserve: ['route accuracy'],
-        },
-        pages: [{
-          id: 'route-story',
-          name: 'Route story',
-          route: '/routes/story',
-          purpose: 'Read one route.',
-          viewport: {
-            platform: 'desktop', width: 1440, height: 1000, scroll: 'long-scroll',
-          },
-          materials: [
-            {
-              id: 'map',
-              name: 'Route map',
-              description: 'A reusable route map.',
-              production: 'direct-generate',
-            },
-            {
-              id: 'map',
-              name: 'Marker board',
-              description: 'A board of route markers.',
-              production: 'board-cutout',
-              boardGroupId: 'route-markers',
-            },
-          ],
-        }],
-      }],
-    })
-
-    expect(result.success).toBe(false)
-    if (result.success) throw new Error('Expected duplicate materials to fail validation.')
-    expect(result.error.issues[0]?.message).toContain('Duplicate material id "map"')
   })
 
   it('validates a dynamic human-in-the-loop question', () => {

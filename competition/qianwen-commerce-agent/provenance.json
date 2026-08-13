@@ -1,0 +1,48 @@
+{
+  "schema": "cutout.qianwen-package-provenance.v1",
+  "generatedFrom": [
+    {
+      "path": "src/design-os-kernel/contracts.ts",
+      "sha256": "bc8018c1adbe238e5f312a415368d32f48ed01f2404052b58e48296127d0b1a1"
+    },
+    {
+      "path": "src/design-os-kernel/runtime.ts",
+      "sha256": "6d98795321cac3a9449472cd393688731fecaa709f6e82767073133c86163c11"
+    },
+    {
+      "path": "src/commerce-profile/contracts.ts",
+      "sha256": "63baae66eba1c72c6198d10d6b7a74396662c604ccb5378e507aa784ff1dffa7"
+    },
+    {
+      "path": "src/commerce-profile/normalizer.ts",
+      "sha256": "d173ed691fb2e71c03b72841c1a5f57c69f0441f3330195047b5d1f451dc7155"
+    },
+    {
+      "path": "src/commerce-profile/catalog.ts",
+      "sha256": "00f425246a6c9cc9f0be7f263f1f9cd585178ccd727537c15a1a2bb060f58418"
+    },
+    {
+      "path": "src/commerce-profile/policies.ts",
+      "sha256": "f56bf73a703da30fc73adc38f4cde45e6ff1fd925051aceb1a0789c3611b63b6"
+    },
+    {
+      "path": "src/commerce-profile/recipes.ts",
+      "sha256": "8b44527928f85b0f39f811d9b884a0f9c028d58b0d536e9b9760baf432195006"
+    },
+    {
+      "path": "src/commerce-profile/evaluation.ts",
+      "sha256": "63c694a0fa7683e417ee93a7d7724ae4de5352d879db50341fb19ea914d081e4"
+    }
+  ],
+  "hostProjection": {
+    "kernelContract": "design-os.protocol.v1",
+    "productFacts": "product-facts.v1",
+    "categoryIndex": "commerce.category-index.v1",
+    "attributeIndex": "commerce.attribute-index.v1",
+    "mediaIdentity": {
+      "authority": "first explicit product image",
+      "binding": ["role", "source JSON Pointer", "ordered URL"],
+      "inheritance": "main image -> reviewed details -> image-conditioned video"
+    }
+  }
+}

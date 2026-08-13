@@ -20,6 +20,7 @@ import type { GenerationService, GenerationTool } from '@/services/ai/types'
 import type { PersonalizationReceiptFlags } from '@/services/ai/types'
 import type { ReasoningEffort } from '@/services/ai/reasoning'
 import { isErr, type Result } from '@/services/types'
+import { createMonotonicDeadline } from '@/platform/monotonic-deadline'
 
 /** Re-exported under this module's own name — the vocabulary tool authors reach for. */
 export interface AgentToolDefinition<TInput = unknown, TOutput = unknown>
@@ -70,6 +71,7 @@ export interface ToolLoopResult {
 }
 
 const DEFAULT_MAX_STEPS = 2
+export const AGENT_TOOL_LOOP_TIMEOUT_MS = 120_000
 
 /**
  * Short labels for durable run events and the Agent activity UI.
@@ -100,24 +102,48 @@ export async function runToolLoop(
   generation: Pick<GenerationService, 'generateWithTools'>,
   input: ToolLoopInput,
 ): Promise<Result<ToolLoopResult>> {
+  if (input.signal?.aborted) return { ok: false, error: 'Operation aborted' }
+  const controller = new AbortController()
+  const deadline = createMonotonicDeadline(AGENT_TOOL_LOOP_TIMEOUT_MS)
+  const abortFromParent = () => {
+    controller.abort()
+    deadline.cancel()
+  }
+  input.signal?.addEventListener('abort', abortFromParent, { once: true })
   const byName = new Map(input.tools.map((tool) => [tool.name, tool]))
-  const result = await generation.generateWithTools({
-    providerId: input.providerId,
-    model: input.model,
-    prompt: input.prompt,
-    tools: input.tools,
-    maxSteps: input.maxSteps ?? DEFAULT_MAX_STEPS,
-    maxOutputTokens: input.maxOutputTokens,
-    terminalToolNames: input.terminalToolNames,
-    signal: input.signal,
-    reasoningEffort: input.reasoningEffort,
-    reasoningProtocol: input.reasoningProtocol,
-  })
-  if (isErr(result)) return result
+  try {
+    const interruption = deadline.elapsed.then((elapsed) => ({
+      kind: 'interrupted' as const,
+      elapsed,
+    }))
+    const settled = await Promise.race([
+      generation.generateWithTools({
+        providerId: input.providerId,
+        model: input.model,
+        prompt: input.prompt,
+        tools: input.tools,
+        maxSteps: input.maxSteps ?? DEFAULT_MAX_STEPS,
+        maxOutputTokens: input.maxOutputTokens,
+        terminalToolNames: input.terminalToolNames,
+        signal: controller.signal,
+        reasoningEffort: input.reasoningEffort,
+        reasoningProtocol: input.reasoningProtocol,
+      }).then((result) => ({ kind: 'result' as const, result })),
+      interruption,
+    ])
+    if (settled.kind === 'interrupted') {
+      controller.abort()
+      return {
+        ok: false,
+        error: settled.elapsed ? 'Agent tool loop timed out.' : 'Operation aborted',
+      }
+    }
+    const result = settled.result
+    if (isErr(result)) return result
 
-  const events: AgentRunEvent[] = []
-  const calls: ToolLoopCall[] = []
-  for (const call of result.data.toolCalls) {
+    const events: AgentRunEvent[] = []
+    const calls: ToolLoopCall[] = []
+    for (const call of result.data.toolCalls) {
     const tool = byName.get(call.toolName)
     const toolCallId = call.toolCallId
     // Event labels are human UI copy. Never reuse the model-facing description
@@ -169,7 +195,11 @@ export async function runToolLoop(
       outputRefs: [],
     }))
     calls.push({ toolCallId, toolName: call.toolName, toolInput: call.input, toolOutput: call.output, registered: true })
-  }
+    }
 
-  return { ok: true, data: { called: calls.length > 0, calls, text: result.data.text, events, ...(result.data.personalizationReceipt?{personalizationReceipt:result.data.personalizationReceipt}:{}) } }
+    return { ok: true, data: { called: calls.length > 0, calls, text: result.data.text, events, ...(result.data.personalizationReceipt?{personalizationReceipt:result.data.personalizationReceipt}:{}) } }
+  } finally {
+    deadline.cancel()
+    input.signal?.removeEventListener('abort', abortFromParent)
+  }
 }

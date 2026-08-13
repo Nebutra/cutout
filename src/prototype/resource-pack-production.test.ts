@@ -79,6 +79,7 @@ describe('prototype resource-pack production authority', () => {
       artifactId: 'artifact:first',
       sha256: digest,
       byteLength: 4,
+      bytesBase64: 'AQIDBA==',
     })])
     await expect(verifyResourcePackProductionArtifacts({
       snapshot,

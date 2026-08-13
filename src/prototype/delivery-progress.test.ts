@@ -69,6 +69,58 @@ describe('prototype delivery progress', () => {
       .toEqual({ state: 'unavailable' })
   })
 
+  it('projects live page generation, review, rejection, and retry stages', () => {
+    let observation = updatePrototypeDeliveryObservation({
+      update: { totalPages: 3, pageProgress: { pageId: 'home', stage: 'reviewing', attempt: 1 } },
+      at: 0,
+    })
+    observation = updatePrototypeDeliveryObservation({
+      previous: observation,
+      update: { pageProgress: { pageId: 'catalog', stage: 'rejected', attempt: 1 } },
+      at: 1,
+    })
+    observation = updatePrototypeDeliveryObservation({
+      previous: observation,
+      update: { pageProgress: { pageId: 'catalog', stage: 'retrying', attempt: 2 } },
+      at: 2,
+    })
+    const projected = projectPrototypeDeliveryProgress({
+      status: 'generating', observation, now: 2,
+    })
+
+    expect(projected).toMatchObject({
+      generatingPages: 0,
+      generatedPages: 2,
+      reviewingPages: 1,
+      rejectedPages: 0,
+      retryingPages: 1,
+    })
+  })
+
+  it('projects a pre-settlement page as active without reporting generation or completion', () => {
+    const observation = updatePrototypeDeliveryObservation({
+      update: {
+        totalPages: 2,
+        pageProgress: { pageId: 'home', stage: 'generating', attempt: 1 },
+      },
+      at: 0,
+    })
+
+    expect(projectPrototypeDeliveryProgress({
+      status: 'generating',
+      observation,
+      now: 1,
+    })).toMatchObject({
+      completedNodes: 0,
+      completed: 0,
+      active: 1,
+      queued: 1,
+      generatingPages: 1,
+      generatedPages: 0,
+      reviewingPages: 0,
+    })
+  })
+
   it('rejects negative values and completion beyond the graph', () => {
     expect(() => updatePrototypeDeliveryObservation({
       update: { completedPages: -1 }, at: 0,
@@ -76,5 +128,8 @@ describe('prototype delivery progress', () => {
     expect(() => updatePrototypeDeliveryObservation({
       update: { completedPages: 2, totalPages: 1 }, at: 0,
     })).toThrow(/cannot exceed/i)
+    expect(() => updatePrototypeDeliveryObservation({
+      update: { pageProgress: { pageId: '', stage: 'generated', attempt: 0 } }, at: 0,
+    })).toThrow(/page id and positive attempt/i)
   })
 })

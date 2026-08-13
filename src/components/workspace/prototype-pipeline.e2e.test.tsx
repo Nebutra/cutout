@@ -53,7 +53,13 @@ import { installE2eLocalStorage } from './intent-workspace.e2e.testkit'
 const RUN = process.env.CUTOUT_RUN_PIPELINE_BENCHMARK === '1'
 const verificationStorage = installE2eLocalStorage()
 
-vi.mock('@/services/ai/model-assignment.local', () => ({
+vi.mock('@/services/ai/model-assignment.local', () => {
+  const loadBindings = async () => ({
+    version: 'model-assignments.v2' as const,
+    bindings: {},
+    descriptors: [],
+  })
+  return {
   loadAssignments: async (): Promise<ModelAssignments> => ({
     chat: { providerId: GATEWAY_PROVIDER_ID, model: GATEWAY_CHAT_MODEL },
     image: { providerId: GATEWAY_PROVIDER_ID, model: GATEWAY_IMAGE_MODEL },
@@ -62,11 +68,8 @@ vi.mock('@/services/ai/model-assignment.local', () => ({
   // `useCapabilityBindings` (hooks/queries/ai-settings.ts) reads these three.
   // Routing here comes from `loadAssignments` above, so the binding table stays
   // empty; it only has to be a schema-valid `model-assignments.v2` value.
-  loadCapabilityBindings: async () => ({
-    version: 'model-assignments.v2' as const,
-    bindings: {},
-    descriptors: [],
-  }),
+  loadCapabilityBindings: loadBindings,
+  loadRuntimeCapabilityBindings: loadBindings,
   setCapabilityBinding: async () => ({
     version: 'model-assignments.v2' as const,
     bindings: {},
@@ -77,7 +80,8 @@ vi.mock('@/services/ai/model-assignment.local', () => ({
     bindings: {},
     descriptors: [],
   }),
-}))
+  }
+})
 
 // The gateway generation service transitively imports the Tauri proxy fetch;
 // its `invoke` is never called (text rides the injected adapter, images ride

@@ -22,7 +22,11 @@ describe('Commerce mocked receipts, quality gates and targeted repair (P6-P7)', 
     const attributeIndex = buildAttributeIndex(fixtureAttributeCatalog, categoryIndex)
     const evidenceGraph = createCommerceEvidenceGraph({ facts })
     const outcomeGraph = createCommerceOutcomeGraph({ facts })
-    const { plan } = await compileCommerceProduction({ evidenceGraph, outcomeGraph })
+    const { plan } = await compileCommerceProduction({
+      evidenceGraph,
+      outcomeGraph,
+      sourceImageArtifactIds: [`artifact:sha256:${'a'.repeat(64)}`],
+    })
     return { facts, categoryIndex, attributeIndex, evidenceGraph, outcomeGraph, plan }
   }
 

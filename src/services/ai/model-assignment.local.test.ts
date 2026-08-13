@@ -18,11 +18,15 @@ vi.mock('@tauri-apps/plugin-store', () => ({
 
 import {
   loadAssignments,
+  loadRuntimeCapabilityBindings,
   setAssignment,
   clearAssignment,
 } from './model-assignment.local'
 
-beforeEach(() => mem.clear())
+beforeEach(() => {
+  mem.clear()
+  vi.unstubAllGlobals()
+})
 
 describe('model-assignment.local', () => {
   it('empty store resolves to {}', async () => {
@@ -59,6 +63,28 @@ describe('model-assignment.local', () => {
     await clearAssignment('chat')
     expect(await loadAssignments()).toEqual({
       image: { providerId: 'p2', model: 'm2' },
+    })
+  })
+
+  it('uses the query projection only when the native store is unavailable', async () => {
+    const projection = {
+      version: 'model-assignments.v2' as const,
+      bindings: { text: { providerId: 'browser', model: 'browser-model' } },
+      descriptors: [],
+    }
+    mem.set('ai.capabilityBindings', {
+      version: 'model-assignments.v2',
+      bindings: { text: { providerId: 'native', model: 'native-model' } },
+      descriptors: [],
+    })
+
+    expect(await loadRuntimeCapabilityBindings(projection)).toEqual(projection)
+
+    vi.stubGlobal('__TAURI_INTERNALS__', { invoke: vi.fn() })
+    expect(await loadRuntimeCapabilityBindings(projection)).toEqual({
+      version: 'model-assignments.v2',
+      bindings: { text: { providerId: 'native', model: 'native-model' } },
+      descriptors: [],
     })
   })
 })

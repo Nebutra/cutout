@@ -3,25 +3,40 @@ import {
   JourneyFailure,
   PACKAGED_E2E_ALL_SUITES_TIMEOUT_MS,
   PACKAGED_E2E_CASUAL_PROMPT,
+  PACKAGED_E2E_CANDIDATE_OWNER_DEADLINES_MS,
+  PACKAGED_E2E_CREATIVE_BRIEF,
+  PACKAGED_E2E_MAX_CANDIDATE_COUNT,
+  PACKAGED_E2E_MAX_DELIVERY_EVIDENCE_LENGTH,
   PACKAGED_E2E_MAX_RETRIES_PER_FAILURE_FRONTIER,
   PACKAGED_E2E_MAX_RUN_RETRIES,
   PACKAGED_E2E_RETRY_UI_GRACE_MS,
   PACKAGED_E2E_PER_SUITE_TIMEOUT_MS,
-  PACKAGED_E2E_PROTOTYPE_SUITE_COUNT,
   approvePendingTools,
+  cancelPackagedE2eActiveRun,
   collectPackagedE2eOutcome,
+  createPackagedE2eCandidateOwnerWatch,
   createPackagedE2eRetryTracker,
+  hasAttentionRequiredDeliveryEvidence,
   hasCompleteDeliveryEvidence,
+  hasDeliveryEvidenceForEverySuite,
   hasRetryRunStarted,
   hasFreshAgentMessage,
+  hasFreshCreativeSubmission,
   hasSettledFreshAgentResponse,
   hasVisibleDialog,
   monotonicDeadline,
+  observePackagedE2eCandidateOwners,
+  plannerProgressCheckpointId,
+  packagedE2eSuiteTimeoutMs,
+  PACKAGED_E2E_SUITE_SETTLEMENT_GRACE_MS,
+  createPackagedE2eSuiteSettlementWatch,
+  observePackagedE2eSuiteSettlement,
   packagedE2ePlanningReady,
   readWorkspaceFailureDiagnostic,
   readWorkspacePipelineStage,
   readWorkspacePipelineStages,
   readWorkspaceDesignCandidateProgress,
+  readWorkspacePlannerAttempt,
   readWorkspacePlannerProgress,
   readWorkspacePlannerProgressHistory,
   readWorkspacePrototypeSuiteProgress,
@@ -31,7 +46,11 @@ import {
   retryPendingRun,
   retryUiGraceStartedAt,
   prototypeSuiteProgressCheckpointEntries,
+  qualityAttentionPhaseEntries,
+  readWorkspaceQualitySummaries,
 } from './runner'
+import { projectPackagedE2eDesignCandidateOwnerStage } from './design-candidate-owner'
+import { prototypeRouteGraphFingerprint } from '@/prototype/prototype-plan'
 
 afterEach(() => {
   document.body.replaceChildren()
@@ -41,57 +60,227 @@ function makeVisible(element: HTMLElement): void {
   element.getClientRects = () => ({ length: 1 }) as DOMRectList
 }
 
-function completeOutcomeWorkspace(): HTMLElement {
+const digest = 'a'.repeat(64)
+const indexedDigest = (index: number) => index.toString(16).padStart(64, '0')
+const noPageActivity = {
+  generatingPages: 0,
+  reviewingPages: 0,
+  retryingPages: 0,
+  rejectedPages: 0,
+} as const
+
+function validIntent() {
+  return { text: PACKAGED_E2E_CREATIVE_BRIEF, sha256: digest }
+}
+
+function validCaptures() {
+  return (['design-systems', 'prototype-suites', 'selected-delivery'] as const).map((id) => ({
+    id,
+    sha256: digest,
+    width: 1440,
+    height: 900,
+    byteLength: 4_096,
+  }))
+}
+
+function collect(workspace: HTMLElement) {
+  return collectPackagedE2eOutcome(
+    workspace,
+    validIntent(),
+    validCaptures(),
+    validEvidenceManifest(workspace),
+  )
+}
+
+const deliveryDocumentRoles = [
+  'plan', 'designMarkdown', 'cssVariables', 'tailwindTheme', 'tokensJson',
+  'designIrTokens', 'routeGraph', 'pageMedia', 'manifest', 'bindings',
+  'resourcePack', 'resourceArtifacts', 'provenance', 'reviewDocument',
+  'pageReviews', 'resourceReviews',
+] as const
+
+function uploadFile(
+  role: string,
+  sha256: string,
+  media?: { ordinal?: number; mediaType: string; width: number; height: number },
+) {
+  return {
+    role,
+    ...(media?.ordinal === undefined ? {} : { ordinal: media.ordinal }),
+    sha256,
+    byteLength: 1,
+    bytesBase64: 'YQ==',
+    ...(media ? {
+      mediaType: media.mediaType,
+      width: media.width,
+      height: media.height,
+    } : {}),
+  }
+}
+
+function validEvidenceManifest(workspace: HTMLElement): import('./runner').PackagedE2eEvidenceManifest {
+  const suites = JSON.parse(workspace.dataset.packagedE2eDeliveryEvidence!) as Array<{
+    candidateId: string
+    files: Array<{
+      role: string
+      ordinal?: number
+      sha256: string
+      byteLength: number
+      bytesBase64: string
+      mediaType?: string
+      width?: number
+      height?: number
+    }>
+  }>
+  return {
+    protocol: 'cutout.packaged-e2e-evidence.v1' as const,
+    providerRoutes: [{
+      purpose: 'image' as const,
+      kind: 'openai',
+      model: 'image-model',
+      classification: 'remote' as const,
+    }],
+    files: [{
+      role: 'designIr',
+      path: `objects/${digest}`,
+      sha256: digest,
+      byteLength: 1,
+    }, ...suites.flatMap((suite) => suite.files.map(({ bytesBase64: _bytes, ...file }) => ({
+      ...file,
+      candidateId: suite.candidateId,
+      path: `objects/${file.sha256}`,
+    })))],
+  }
+}
+
+function completeOutcomeWorkspace(
+  candidateCount = 3,
+  resourceCounts: readonly number[] = Array.from(
+    { length: candidateCount },
+    (_, index) => [7, 11, 19][index] ?? index + 1,
+  ),
+): HTMLElement {
   const workspace = document.createElement('div')
-  const routeCounts = [4, 5, 7] as const
-  const resourceCounts = [7, 11, 19] as const
+  const routeCounts = Array.from({ length: candidateCount }, (_, index) => index + 4)
   workspace.dataset.packagedE2eDesignCandidates = JSON.stringify(
-    Array.from({ length: 3 }, (_, index) => ({
+    Array.from({ length: candidateCount }, (_, index) => ({
       candidateId: `design-${index + 1}`,
       status: 'ready',
+      ownerStage: 'terminal',
     })),
   )
-  const digest = 'a'.repeat(64)
   workspace.dataset.packagedE2eDeliveryEvidence = JSON.stringify(
-    routeCounts.map((routeCount, suiteIndex) => ({
-      candidateId: `suite-${suiteIndex + 1}`,
-      designSystemId: `design-${suiteIndex + 1}`,
-      resourcePackId: `resource-pack-${suiteIndex + 1}`,
-      status: 'ready',
-      routes: Array.from(
+    routeCounts.map((routeCount, suiteIndex) => {
+      const routes = Array.from(
         { length: routeCount },
         (_, routeIndex) => `/suite-${suiteIndex + 1}/route-${routeIndex + 1}`,
-      ),
-      routeCount,
-      pageCount: routeCount,
-      resourceAssetCount: resourceCounts[suiteIndex],
-      artifactCount: resourceCounts[suiteIndex],
-      qualityReviewStatus: 'passed',
-      digests: {
-        designSystemImage: digest,
-        designMarkdown: digest,
-        cssVariables: digest,
-        tailwindTheme: digest,
-        tokensJson: digest,
-        designIrTokens: digest,
-        routeGraph: digest,
-        pageMedia: digest,
-        manifest: digest,
-        bindings: digest,
-        resourcePack: digest,
-        resourceArtifacts: digest,
-        provenance: digest,
-        reviewDocument: digest,
-        pageReviews: digest,
-        resourceReviews: digest,
-      },
-    })),
+      )
+      const resourceCount = resourceCounts[suiteIndex] ?? 0
+      const routeGraphDigest = indexedDigest(30_000 + suiteIndex)
+      const routeGraph = prototypeRouteGraphFingerprint({
+        pages: routes.map((route, index) => ({
+          id: `page-${index + 1}`,
+          name: `Page ${index + 1}`,
+          route,
+          purpose: `Serve ${route}.`,
+          regions: [{
+            id: `region-${index + 1}`,
+            name: 'Primary content',
+            role: 'content',
+            summary: `Content for ${route}.`,
+          }],
+          overlays: [],
+          states: [],
+          interactions: [],
+        })),
+        flows: [{
+          id: 'primary-flow',
+          name: 'Primary flow',
+          goal: 'Explore the planned experience.',
+          startPageId: 'page-1',
+          steps: [],
+        }],
+      })
+      const designSystemMedia = {
+        mediaType: 'image/png', width: 1440, height: 900,
+        sha256: indexedDigest(1_000 + suiteIndex),
+      }
+      const pageMedia = routes.map((route, index) => ({
+        ordinal: index + 1,
+        route,
+        mediaType: 'image/png',
+        width: 1440,
+        height: 900,
+        sha256: indexedDigest(10_000 + suiteIndex * 100 + index),
+      }))
+      const resourceMedia = Array.from({ length: resourceCount }, (_, index) => ({
+        ordinal: index + 1,
+        mediaType: 'image/png',
+        width: 512,
+        height: 512,
+        byteLength: 1,
+        sha256: indexedDigest(20_000 + suiteIndex * 1_000 + index),
+      }))
+      return {
+        candidateId: `suite-${suiteIndex + 1}`,
+        designSystemId: `design-${suiteIndex + 1}`,
+        resourcePackId: `resource-pack-${suiteIndex + 1}`,
+        status: 'ready',
+        routes,
+        routeCount,
+        pageCount: routeCount,
+        resourceAssetCount: resourceCount,
+        artifactCount: resourceCount,
+        qualityReviewStatus: 'passed',
+        routeGraph,
+        designSystemMedia,
+        pageMedia,
+        resourceMedia,
+        digests: {
+          plan: digest,
+          designSystemImage: designSystemMedia.sha256,
+          designMarkdown: digest,
+          cssVariables: digest,
+          tailwindTheme: digest,
+          tokensJson: digest,
+          designIrTokens: digest,
+          routeGraph: routeGraphDigest,
+          pageMedia: digest,
+          manifest: digest,
+          bindings: digest,
+          resourcePack: digest,
+          resourceArtifacts: digest,
+          provenance: digest,
+          reviewDocument: digest,
+          pageReviews: digest,
+          resourceReviews: digest,
+        },
+        files: [
+          ...deliveryDocumentRoles.map((role) => uploadFile(
+            role,
+            role === 'routeGraph' ? routeGraphDigest : digest,
+          )),
+          uploadFile('designSystemMedia', designSystemMedia.sha256, designSystemMedia),
+          ...pageMedia.map((media) => uploadFile('pageMediaObject', media.sha256, media)),
+          ...resourceMedia.map((media) => uploadFile('resourceMediaObject', media.sha256, media)),
+        ],
+      }
+    }),
   )
-  workspace.dataset.packagedE2eSelectedSuiteId = 'suite-2'
-  workspace.dataset.packagedE2eVisibleSliceCount = '11'
-  workspace.dataset.packagedE2eCodexPlanningTurnCount = '2'
+  const selectedIndex = Math.min(1, candidateCount - 1)
+  workspace.dataset.packagedE2eSelectedSuiteId = `suite-${selectedIndex + 1}`
+  workspace.dataset.packagedE2eVisibleSliceCount = String(resourceCounts[selectedIndex] ?? 0)
+  workspace.dataset.packagedE2ePlanningTurnCount = '2'
+  workspace.dataset.packagedE2eCodexPlanningTurnCount = '0'
+  workspace.dataset.packagedE2eDirectPlanningTurnCount = '2'
   workspace.dataset.packagedE2ePlannedImageCallCount = '23'
   workspace.dataset.packagedE2eImageCallCount = '23'
+  workspace.dataset.packagedE2eRetryStartCount = '0'
+  workspace.dataset.packagedE2eRetryImageCallCount = '0'
+  workspace.dataset.packagedE2eDesignIr = JSON.stringify({ version: 'design-ir.v1' })
+  workspace.dataset.packagedE2eProviderRoutes = JSON.stringify([{
+    purpose: 'image', kind: 'openai', model: 'image-model', classification: 'remote',
+  }])
   return workspace
 }
 
@@ -108,10 +297,15 @@ describe('packaged E2E provider-response boundary', () => {
     expect(hasVisibleDialog()).toBe(false)
   })
 
-  it('budgets the complete three-suite workload without weakening per-suite bounds', () => {
-    expect(PACKAGED_E2E_PROTOTYPE_SUITE_COUNT).toBe(3)
+  it('derives the workload timeout from the Agent-authored candidate count', () => {
+    expect(PACKAGED_E2E_MAX_CANDIDATE_COUNT).toBe(8)
     expect(PACKAGED_E2E_PER_SUITE_TIMEOUT_MS).toBe(45 * 60_000)
-    expect(PACKAGED_E2E_ALL_SUITES_TIMEOUT_MS).toBe(3 * 45 * 60_000)
+    expect(packagedE2eSuiteTimeoutMs(1)).toBe(45 * 60_000)
+    expect(packagedE2eSuiteTimeoutMs(5)).toBe(5 * 45 * 60_000)
+    expect(PACKAGED_E2E_ALL_SUITES_TIMEOUT_MS).toBe(8 * 45 * 60_000)
+    expect(() => packagedE2eSuiteTimeoutMs(0)).toThrow()
+    expect(() => packagedE2eSuiteTimeoutMs(9)).toThrow()
+    expect(PACKAGED_E2E_CREATIVE_BRIEF).not.toMatch(/(?:生成|提供|先做)\s*[358]\s*套/u)
   })
 
   it('keeps journey deadlines independent from wall-clock jumps', () => {
@@ -172,6 +366,20 @@ describe('packaged E2E provider-response boundary', () => {
 
     workspace.dataset.agentWorking = 'false'
     expect(hasSettledFreshAgentResponse(workspace, 0)).toBe(true)
+  })
+
+  it('acknowledges a creative submission only after its input clears and a new run owns it', () => {
+    const workspace = document.createElement('div')
+    const composer = document.createElement('textarea')
+    workspace.dataset.packagedE2eActiveRunId = 'workspace:old'
+    composer.value = PACKAGED_E2E_CREATIVE_BRIEF
+    expect(hasFreshCreativeSubmission(workspace, composer, 'workspace:old')).toBe(false)
+
+    composer.value = ''
+    expect(hasFreshCreativeSubmission(workspace, composer, 'workspace:old')).toBe(false)
+
+    workspace.dataset.packagedE2eActiveRunId = 'workspace:new'
+    expect(hasFreshCreativeSubmission(workspace, composer, 'workspace:old')).toBe(true)
   })
 
   it('auto-approves visible controls on every reviewed Agent approval surface', () => {
@@ -253,6 +461,52 @@ describe('packaged E2E provider-response boundary', () => {
     expect(tracker.pendingAttempt).toBeNull()
   })
 
+  it('does not replay the full run for a deterministic Planner graph failure', () => {
+    document.body.innerHTML = [
+      '<div data-workspace-root data-run-failed="true" data-packaged-e2e-run-diagnostic="planner-progressive-graph"></div>',
+      '<div data-slot="agent-run-feed"><button data-agent-action="retry-run">Retry</button></div>',
+    ].join('')
+    const retry = document.querySelector<HTMLButtonElement>('button')!
+    makeVisible(retry)
+    const click = vi.fn()
+    retry.addEventListener('click', click)
+
+    expect(retryPendingRun(createPackagedE2eRetryTracker())).toBe(false)
+    expect(click).not.toHaveBeenCalled()
+  })
+
+  it('binds Planner progress checkpoints to the retry attempt', () => {
+    const progress = {
+      stage: 'page' as const,
+      completedPages: 3,
+      totalPages: 6,
+    }
+    expect(plannerProgressCheckpointId(progress, 1))
+      .toBe('planner-stage-page-attempt-1')
+    expect(plannerProgressCheckpointId(progress, 3))
+      .toBe('planner-stage-page-attempt-3')
+    expect(plannerProgressCheckpointId(progress, PACKAGED_E2E_MAX_RUN_RETRIES + 1))
+      .toBe(`planner-stage-page-attempt-${PACKAGED_E2E_MAX_RUN_RETRIES + 1}`)
+    expect(() => plannerProgressCheckpointId(progress, 0))
+      .toThrow('packaged-e2e-planner-attempt-invalid')
+    expect(() => plannerProgressCheckpointId(progress, PACKAGED_E2E_MAX_RUN_RETRIES + 2))
+      .toThrow('packaged-e2e-planner-attempt-invalid')
+  })
+
+  it('reads the product-owned Planner invocation instead of the run Retry count', () => {
+    const workspace = document.createElement('div')
+    workspace.dataset.packagedE2ePlannerAttemptCount = '2'
+    workspace.dataset.packagedE2eRetryStartCount = '7'
+
+    expect(readWorkspacePlannerAttempt(workspace)).toBe(2)
+    workspace.dataset.packagedE2ePlannerAttemptCount = '0'
+    expect(readWorkspacePlannerAttempt(workspace)).toBeUndefined()
+    workspace.dataset.packagedE2ePlannerAttemptCount = String(
+      PACKAGED_E2E_MAX_RUN_RETRIES + 2,
+    )
+    expect(readWorkspacePlannerAttempt(workspace)).toBeUndefined()
+  })
+
   it('allows a later suite failure to recover without an unbounded retry loop', () => {
     document.body.innerHTML = [
       '<div data-workspace-root data-run-failed="true"></div>',
@@ -272,6 +526,7 @@ describe('packaged E2E provider-response boundary', () => {
         totalPages: 6,
         completedResources: 0,
         totalResources: 8,
+        ...noPageActivity,
       },
     ])
 
@@ -292,7 +547,7 @@ describe('packaged E2E provider-response boundary', () => {
 
   it('bounds retries per failure frontier and across the complete journey', () => {
     expect(PACKAGED_E2E_MAX_RETRIES_PER_FAILURE_FRONTIER).toBe(2)
-    expect(PACKAGED_E2E_MAX_RUN_RETRIES).toBe(6)
+    expect(PACKAGED_E2E_MAX_RUN_RETRIES).toBe(16)
 
     document.body.innerHTML = [
       '<div data-workspace-root data-run-failed="true"></div>',
@@ -306,6 +561,7 @@ describe('packaged E2E provider-response boundary', () => {
       totalPages: 4,
       completedResources: 0,
       totalResources: 7,
+      ...noPageActivity,
     }])
     const retry = document.querySelector<HTMLButtonElement>('button')!
     makeVisible(retry)
@@ -326,6 +582,7 @@ describe('packaged E2E provider-response boundary', () => {
       totalPages: 5,
       completedResources: 0,
       totalResources: 9,
+      ...noPageActivity,
     }])
     expect(retryPendingRun(tracker)).toBe(false)
   })
@@ -366,6 +623,7 @@ describe('packaged E2E failure diagnostics', () => {
     const workspace = document.createElement('div')
     const diagnostics = [
       'planner-structured-contract',
+      'planner-timeout',
       'planner-progressive-outline',
       'planner-progressive-design-foundation',
       'planner-progressive-design-exploration',
@@ -377,8 +635,10 @@ describe('packaged E2E failure diagnostics', () => {
       'planner-progressive-graph',
       'planner-progressive-coverage',
       'provider-auth',
+      'provider-configuration-state',
       'provider-transport',
       'provider-output',
+      'prototype-viewport',
       'board-decode',
       'board-composition',
       'board-zero-slices',
@@ -386,6 +646,12 @@ describe('packaged E2E failure diagnostics', () => {
       'artifact-persistence',
       'generation-candidate',
       'orchestration-state',
+      'quality-review-required',
+      'planning-evidence-mismatch',
+      'candidate-preparation-timeout',
+      'candidate-approval-timeout',
+      'candidate-provider-timeout',
+      'candidate-post-processing-timeout',
     ] as const
 
     for (const diagnostic of diagnostics) {
@@ -435,6 +701,7 @@ describe('packaged E2E failure diagnostics', () => {
       'image-execution-proven',
       'research-brief',
       'planner',
+      'planner-complete',
     ]) {
       workspace.dataset.packagedE2ePipelineStage = stage
       expect(readWorkspacePipelineStage(workspace)).toBe(stage)
@@ -451,6 +718,7 @@ describe('packaged E2E failure diagnostics', () => {
       'tool-gate',
       'research-brief',
       'planner',
+      'planner-complete',
       'image-route-catalogued',
       'image-execution-started',
       'image-execution-proven',
@@ -465,6 +733,7 @@ describe('packaged E2E failure diagnostics', () => {
       'tool-gate',
       'research-brief',
       'planner',
+      'planner-complete',
       'image-route-catalogued',
       'image-execution-started',
       'image-execution-proven',
@@ -490,20 +759,149 @@ describe('packaged E2E failure diagnostics', () => {
   it('reads only closed credential-free Design System candidate progress', () => {
     const workspace = document.createElement('div')
     workspace.dataset.packagedE2eDesignCandidates = JSON.stringify([
-      { candidateId: 'design-1', status: 'generating' },
-      { candidateId: 'design-2', status: 'ready' },
-      { candidateId: 'design-3', status: 'failed' },
+      { candidateId: 'design-1', status: 'generating', ownerStage: 'awaiting-approval' },
+      { candidateId: 'design-2', status: 'ready', ownerStage: 'terminal' },
+      { candidateId: 'design-3', status: 'failed', ownerStage: 'terminal' },
     ])
     expect(readWorkspaceDesignCandidateProgress(workspace)).toEqual([
-      { candidateId: 'design-1', status: 'generating' },
-      { candidateId: 'design-2', status: 'ready' },
-      { candidateId: 'design-3', status: 'failed' },
+      { candidateId: 'design-1', status: 'generating', ownerStage: 'awaiting-approval' },
+      { candidateId: 'design-2', status: 'ready', ownerStage: 'terminal' },
+      { candidateId: 'design-3', status: 'failed', ownerStage: 'terminal' },
     ])
 
     workspace.dataset.packagedE2eDesignCandidates = JSON.stringify([
-      { candidateId: 'provider:private-account', status: 'failed' },
+      { candidateId: 'provider:private-account', status: 'failed', ownerStage: 'terminal' },
     ])
     expect(readWorkspaceDesignCandidateProgress(workspace)).toEqual([])
+
+    workspace.dataset.packagedE2eDesignCandidates = JSON.stringify([
+      { candidateId: 'design-1', status: 'generating', ownerStage: 'terminal' },
+    ])
+    expect(readWorkspaceDesignCandidateProgress(workspace)).toEqual([])
+  })
+
+  it('projects candidate ownership from the durable tool lifecycle without leaking route data', () => {
+    const tools = {
+      approval: {
+        id: 'tool:run:design-system:candidate:quiet:generate',
+        status: 'running' as const,
+        approvalStatus: 'required' as const,
+      },
+    }
+    expect(projectPackagedE2eDesignCandidateOwnerStage({
+      candidateId: 'candidate:quiet', status: 'planned', tools: {},
+    })).toBe('queued')
+    expect(projectPackagedE2eDesignCandidateOwnerStage({
+      candidateId: 'candidate:quiet', status: 'generating', tools: {},
+    })).toBe('preparing')
+    expect(projectPackagedE2eDesignCandidateOwnerStage({
+      candidateId: 'candidate:quiet', status: 'generating', tools,
+    })).toBe('awaiting-approval')
+    expect(projectPackagedE2eDesignCandidateOwnerStage({
+      candidateId: 'candidate:quiet', status: 'generating', tools: {
+        approval: { ...tools.approval, approvalStatus: 'approved' },
+      },
+    })).toBe('provider-executing')
+    expect(projectPackagedE2eDesignCandidateOwnerStage({
+      candidateId: 'candidate:quiet', status: 'generating', tools: {
+        approval: { ...tools.approval, status: 'succeeded', approvalStatus: 'approved' },
+      },
+    })).toBe('post-processing')
+    expect(projectPackagedE2eDesignCandidateOwnerStage({
+      candidateId: 'candidate:quiet', status: 'ready', tools,
+    })).toBe('terminal')
+  })
+
+  it('times out the exact stalled candidate owner stage without a journey-wide guess', () => {
+    const watch = createPackagedE2eCandidateOwnerWatch()
+    const progress = [{
+      candidateId: 'design-3' as const,
+      status: 'generating' as const,
+      ownerStage: 'awaiting-approval' as const,
+    }]
+    expect(observePackagedE2eCandidateOwners(progress, watch, 100)).toBeUndefined()
+    expect(observePackagedE2eCandidateOwners(
+      progress,
+      watch,
+      100 + PACKAGED_E2E_CANDIDATE_OWNER_DEADLINES_MS['awaiting-approval'] - 1,
+    )).toBeUndefined()
+    expect(observePackagedE2eCandidateOwners(
+      progress,
+      watch,
+      100 + PACKAGED_E2E_CANDIDATE_OWNER_DEADLINES_MS['awaiting-approval'],
+    )).toBe('candidate-approval-timeout')
+
+    expect(observePackagedE2eCandidateOwners([{
+      ...progress[0], ownerStage: 'provider-executing',
+    }], watch, 50_000)).toBeUndefined()
+    expect(watch.active.get('design-3')).toMatchObject({
+      stage: 'provider-executing', since: 50_000,
+    })
+    expect(observePackagedE2eCandidateOwners([{
+      ...progress[0], status: 'ready', ownerStage: 'terminal',
+    }], watch, 50_001)).toBeUndefined()
+    expect(watch.active.size).toBe(0)
+  })
+
+  it('cancels a timed-out owner through the real Agent run control', async () => {
+    const workspace = document.createElement('div')
+    workspace.dataset.workspaceRoot = ''
+    workspace.dataset.agentWorking = 'true'
+    const cancel = document.createElement('button')
+    cancel.dataset.agentAction = 'cancel-run'
+    cancel.addEventListener('click', () => {
+      workspace.dataset.agentWorking = 'false'
+    })
+    document.body.append(workspace, cancel)
+
+    await expect(cancelPackagedE2eActiveRun()).resolves.toBe(true)
+    expect(workspace.dataset.agentWorking).toBe('false')
+    cancel.remove()
+    await expect(cancelPackagedE2eActiveRun()).resolves.toBe(false)
+  })
+
+  it('bounds a settled suite set that remains falsely busy', () => {
+    const watch = createPackagedE2eSuiteSettlementWatch()
+    const progress = [
+      {
+        candidateId: 'suite-1' as const,
+        status: 'ready' as const,
+        completedPages: 6,
+        totalPages: 6,
+        completedResources: 4,
+        totalResources: 4,
+        ...noPageActivity,
+      },
+      {
+        candidateId: 'suite-2' as const,
+        status: 'failed' as const,
+        completedPages: 1,
+        totalPages: 6,
+        completedResources: 0,
+        totalResources: 7,
+        ...noPageActivity,
+      },
+    ]
+
+    expect(observePackagedE2eSuiteSettlement(progress, true, watch, 100)).toBe(false)
+    expect(observePackagedE2eSuiteSettlement(
+      progress,
+      true,
+      watch,
+      100 + PACKAGED_E2E_SUITE_SETTLEMENT_GRACE_MS - 1,
+    )).toBe(false)
+    expect(observePackagedE2eSuiteSettlement(
+      progress,
+      true,
+      watch,
+      100 + PACKAGED_E2E_SUITE_SETTLEMENT_GRACE_MS,
+    )).toBe(true)
+
+    expect(observePackagedE2eSuiteSettlement([
+      { ...progress[1], status: 'generating' },
+    ], true, watch, 200_000)).toBe(false)
+    expect(watch.settledWhileWorkingSince).toBeUndefined()
+    expect(observePackagedE2eSuiteSettlement(progress, false, watch, 200_001)).toBe(false)
   })
 
   it('reads bounded credential-free prototype suite page and resource progress', () => {
@@ -516,6 +914,10 @@ describe('packaged E2E failure diagnostics', () => {
         totalPages: 6,
         completedResources: 0,
         totalResources: 13,
+        generatingPages: 0,
+        reviewingPages: 2,
+        retryingPages: 1,
+        rejectedPages: 0,
       },
       {
         candidateId: 'suite-2',
@@ -524,6 +926,7 @@ describe('packaged E2E failure diagnostics', () => {
         totalPages: 6,
         completedResources: 13,
         totalResources: 13,
+        ...noPageActivity,
       },
       {
         candidateId: 'suite-3',
@@ -532,6 +935,10 @@ describe('packaged E2E failure diagnostics', () => {
         totalPages: 6,
         completedResources: 0,
         totalResources: 13,
+        generatingPages: 0,
+        reviewingPages: 0,
+        retryingPages: 0,
+        rejectedPages: 1,
       },
     ])
 
@@ -543,6 +950,10 @@ describe('packaged E2E failure diagnostics', () => {
         totalPages: 6,
         completedResources: 0,
         totalResources: 13,
+        generatingPages: 0,
+        reviewingPages: 2,
+        retryingPages: 1,
+        rejectedPages: 0,
       },
       {
         candidateId: 'suite-2',
@@ -551,6 +962,7 @@ describe('packaged E2E failure diagnostics', () => {
         totalPages: 6,
         completedResources: 13,
         totalResources: 13,
+        ...noPageActivity,
       },
       {
         candidateId: 'suite-3',
@@ -559,6 +971,10 @@ describe('packaged E2E failure diagnostics', () => {
         totalPages: 6,
         completedResources: 0,
         totalResources: 13,
+        generatingPages: 0,
+        reviewingPages: 0,
+        retryingPages: 0,
+        rejectedPages: 1,
       },
     ])
   })
@@ -586,6 +1002,7 @@ describe('packaged E2E failure diagnostics', () => {
       totalPages: 6,
       completedResources: 4,
       totalResources: 13,
+      ...noPageActivity,
     }
     for (const invalid of [
       [{ ...valid, candidateId: 'provider:private-account' }],
@@ -608,17 +1025,22 @@ describe('packaged E2E failure diagnostics', () => {
       totalPages: 6,
       completedResources: 7,
       totalResources: 13,
+      generatingPages: 0,
+      reviewingPages: 3,
+      retryingPages: 0,
+      rejectedPages: 0,
     })
 
     expect(checkpoints.map(({ id }) => id)).toEqual([
       'prototype-suite-1-generating-pages-6-of-6-resources-7-of-13',
+      'prototype-suite-1-activity-reviewing-3',
       'prototype-suite-1-generating-pages-first-1-of-6-resources-7-of-13',
       'prototype-suite-1-generating-pages-half-3-of-6-resources-7-of-13',
       'prototype-suite-1-generating-pages-complete-6-of-6-resources-7-of-13',
       'prototype-suite-1-generating-pages-6-of-6-resources-first-1-of-13',
       'prototype-suite-1-generating-pages-6-of-6-resources-half-7-of-13',
     ])
-    expect(checkpoints).toHaveLength(6)
+    expect(checkpoints).toHaveLength(7)
     expect(checkpoints.every(({ id }) => id.length <= 80 && /^[a-z0-9-]+$/.test(id))).toBe(true)
     expect(JSON.stringify(checkpoints)).not.toMatch(/provider|credential|prompt|path/i)
 
@@ -629,15 +1051,128 @@ describe('packaged E2E failure diagnostics', () => {
       totalPages: 6,
       completedResources: 13,
       totalResources: 13,
+      ...noPageActivity,
     })).toEqual([{
       key: 'suite-1:status:ready',
       id: 'prototype-suite-1-ready-pages-6-of-6-resources-13-of-13',
+      status: 'passed',
+    }])
+
+    expect(prototypeSuiteProgressCheckpointEntries({
+      candidateId: 'suite-1',
+      status: 'generating',
+      completedPages: 0,
+      totalPages: 6,
+      completedResources: 0,
+      totalResources: 13,
+      generatingPages: 1,
+      reviewingPages: 2,
+      retryingPages: 1,
+      rejectedPages: 2,
+    }).filter(({ key }) => key.includes(':activity:'))).toEqual([
+      {
+        key: 'suite-1:activity:generating',
+        id: 'prototype-suite-1-activity-generating-1',
+        status: 'passed',
+      },
+      {
+        key: 'suite-1:activity:reviewing',
+        id: 'prototype-suite-1-activity-reviewing-2',
+        status: 'passed',
+      },
+      {
+        key: 'suite-1:activity:retrying',
+        id: 'prototype-suite-1-activity-retrying-1',
+        status: 'passed',
+      },
+      {
+        key: 'suite-1:activity:rejected',
+        id: 'prototype-suite-1-activity-rejected-2',
+        status: 'passed',
+      },
+    ])
+
+    expect(prototypeSuiteProgressCheckpointEntries({
+      candidateId: 'suite-1',
+      status: 'failed',
+      completedPages: 2,
+      totalPages: 6,
+      completedResources: 0,
+      totalResources: 13,
+      generatingPages: 0,
+      reviewingPages: 0,
+      retryingPages: 0,
+      rejectedPages: 1,
+    })).toEqual([{
+      key: 'suite-1:status:failed',
+      id: 'prototype-suite-1-failed-pages-2-of-6-resources-0-of-13',
       status: 'passed',
     }])
   })
 })
 
 describe('packaged E2E outcome evidence', () => {
+  it('rejects review warnings as release-quality proof', () => {
+    const workspace = completeOutcomeWorkspace()
+    const suites = JSON.parse(workspace.dataset.packagedE2eDeliveryEvidence!) as Array<{
+      qualityReviewStatus: string
+    }>
+    suites[0]!.qualityReviewStatus = 'attention-required'
+    workspace.dataset.packagedE2eDeliveryEvidence = JSON.stringify(suites)
+
+    expect(() => collect(workspace)).toThrow(JourneyFailure)
+    expect(hasCompleteDeliveryEvidence(workspace)).toBe(false)
+    expect(hasAttentionRequiredDeliveryEvidence(workspace)).toBe(true)
+    expect(hasDeliveryEvidenceForEverySuite(workspace, 3)).toBe(true)
+  })
+
+  it('records only closed quality categories and bounded counts', () => {
+    const workspace = completeOutcomeWorkspace(2)
+    workspace.dataset.packagedE2eQualitySummaries = JSON.stringify([{
+      candidateId: 'suite-1',
+      pageRejectedCount: 1,
+      pageUnavailableCount: 0,
+      resourceRejectedCount: 0,
+      resourceUnavailableCount: 2,
+      resourceObservationalIssueCount: 3,
+    }, {
+      candidateId: 'suite-2',
+      pageRejectedCount: 0,
+      pageUnavailableCount: 1,
+      resourceRejectedCount: 4,
+      resourceUnavailableCount: 0,
+      resourceObservationalIssueCount: 0,
+    }])
+
+    expect(readWorkspaceQualitySummaries(workspace)).toHaveLength(2)
+    expect(qualityAttentionPhaseEntries(workspace)).toEqual([
+      { id: 'quality-page-rejected-1', status: 'failed' },
+      { id: 'quality-page-unavailable-1', status: 'failed' },
+      { id: 'quality-resource-rejected-4', status: 'failed' },
+      { id: 'quality-resource-unavailable-2', status: 'failed' },
+      { id: 'quality-resource-observational-3', status: 'failed' },
+    ])
+    expect(JSON.stringify(qualityAttentionPhaseEntries(workspace)))
+      .not.toMatch(/provider|prompt|path|message/i)
+  })
+
+  it('fails closed when quality-summary structure is not reviewed', () => {
+    const workspace = completeOutcomeWorkspace(1)
+    workspace.dataset.packagedE2eQualitySummaries = JSON.stringify([{
+      candidateId: 'suite-1',
+      pageRejectedCount: 1,
+      pageUnavailableCount: 0,
+      resourceRejectedCount: 0,
+      resourceUnavailableCount: 0,
+      resourceObservationalIssueCount: 0,
+      rawReview: 'must not escape',
+    }])
+    expect(readWorkspaceQualitySummaries(workspace)).toEqual([])
+    expect(qualityAttentionPhaseEntries(workspace)).toEqual([
+      { id: 'quality-diagnostic-unavailable-1', status: 'failed' },
+    ])
+  })
+
   it('waits for asynchronous delivery evidence instead of treating ready counts as proof', () => {
     const workspace = completeOutcomeWorkspace()
     workspace.dataset.prototypeSuiteCount = '3'
@@ -649,7 +1184,7 @@ describe('packaged E2E outcome evidence', () => {
   })
 
   it('collects only bounded quantities and opaque identities for the completed graph', () => {
-    const outcome = collectPackagedE2eOutcome(completeOutcomeWorkspace())
+    const outcome = collect(completeOutcomeWorkspace())
 
     expect(outcome.designSystems).toEqual([
       { candidateId: 'design-1', status: 'ready' },
@@ -662,46 +1197,90 @@ describe('packaged E2E outcome evidence', () => {
       'design-2',
       'design-3',
     ])
-    expect(outcome.prototypeSuites.map((suite) => suite.routes.length)).toEqual([4, 5, 7])
+    expect(outcome.prototypeSuites.map((suite) => suite.routes.length)).toEqual([4, 5, 6])
     expect(outcome.prototypeSuites.map((suite) => suite.resourceAssetCount)).toEqual([7, 11, 19])
     expect(outcome).toMatchObject({
       selectedSuiteId: 'suite-2',
       selectedVisibleSliceCount: 11,
-      codexPlanningTurnCount: 2,
+      planningTurnCount: 2,
+      planningRuntimeCounts: { codexSystem: 0, direct: 2 },
       plannedImageCallCount: 23,
       imageCallCount: 23,
     })
     expect(outcome).not.toHaveProperty('coding')
-    expect(JSON.stringify(outcome)).not.toMatch(/prompt|provider|credential|localPath/i)
+    expect(JSON.stringify(outcome)).not.toMatch(/prompt|providerId|credential|localPath/i)
+  })
+
+  it.each([1, 2, 5, 8])(
+    'accepts %i Agent-authored Design System and route-suite candidates',
+    (candidateCount) => {
+      const workspace = completeOutcomeWorkspace(candidateCount)
+      if (candidateCount === 8) {
+        expect(workspace.dataset.packagedE2eDeliveryEvidence!.length).toBeGreaterThan(32_768)
+      }
+      const outcome = collect(workspace)
+      expect(outcome.designSystems).toHaveLength(candidateCount)
+      expect(outcome.prototypeSuites).toHaveLength(candidateCount)
+    },
+  )
+
+  it('rejects delivery evidence beyond the bounded dynamic-plan budget', () => {
+    const workspace = completeOutcomeWorkspace()
+    const evidence = validEvidenceManifest(workspace)
+    workspace.dataset.packagedE2eDeliveryEvidence = 'x'.repeat(
+      PACKAGED_E2E_MAX_DELIVERY_EVIDENCE_LENGTH + 1,
+    )
+    expect(() => collectPackagedE2eOutcome(
+      workspace,
+      validIntent(),
+      validCaptures(),
+      evidence,
+    )).toThrow(JourneyFailure)
+  })
+
+  it('accepts a complete Agent-authored suite with no reusable non-UI assets', () => {
+    const outcome = collect(completeOutcomeWorkspace(1, [0]))
+    expect(outcome.prototypeSuites[0]).toMatchObject({
+      resourceAssetCount: 0,
+      artifactCount: 0,
+      resourceMedia: [],
+    })
+    expect(outcome.selectedVisibleSliceCount).toBe(0)
   })
 
   it('rejects hidden paid-image amplification beyond the benchmark DAG', () => {
     const workspace = completeOutcomeWorkspace()
     workspace.dataset.packagedE2eImageCallCount = '24'
-    expect(() => collectPackagedE2eOutcome(workspace)).toThrow(JourneyFailure)
+    expect(() => collect(workspace)).toThrow(JourneyFailure)
   })
 
-  it('rejects completion without both real Codex planning turns', () => {
+  it('rejects completion without both successful planning turns', () => {
     const workspace = completeOutcomeWorkspace()
-    workspace.dataset.packagedE2eCodexPlanningTurnCount = '1'
-    expect(() => collectPackagedE2eOutcome(workspace)).toThrow(JourneyFailure)
+    workspace.dataset.packagedE2ePlanningTurnCount = '1'
+    expect(() => collect(workspace)).toThrow(JourneyFailure)
+  })
+
+  it('rejects planning provenance that does not sum to the successful turn count', () => {
+    const workspace = completeOutcomeWorkspace()
+    workspace.dataset.packagedE2eDirectPlanningTurnCount = '1'
+    expect(() => collect(workspace)).toThrow(JourneyFailure)
   })
 
   it('rejects an actual call count that differs from the compiled material plan', () => {
     const workspace = completeOutcomeWorkspace()
     workspace.dataset.packagedE2ePlannedImageCallCount = '22'
-    expect(() => collectPackagedE2eOutcome(workspace)).toThrow(JourneyFailure)
+    expect(() => collect(workspace)).toThrow(JourneyFailure)
   })
 
   it('rejects duplicate route graphs and incomplete resource quantities', () => {
     const duplicate = completeOutcomeWorkspace()
     const suites = JSON.parse(duplicate.dataset.packagedE2eDeliveryEvidence!) as Array<{
-      routes: string[]
+      routeGraph: string
       resourceAssetCount: number
     }>
-    suites[2]!.routes = [...suites[0]!.routes]
+    suites[2]!.routeGraph = suites[0]!.routeGraph
     duplicate.dataset.packagedE2eDeliveryEvidence = JSON.stringify(suites)
-    expect(() => collectPackagedE2eOutcome(duplicate)).toThrow(JourneyFailure)
+    expect(() => collect(duplicate)).toThrow(JourneyFailure)
 
     const incomplete = completeOutcomeWorkspace()
     const incompleteSuites = JSON.parse(
@@ -709,7 +1288,68 @@ describe('packaged E2E outcome evidence', () => {
     ) as Array<{ resourceAssetCount: number }>
     incompleteSuites[1]!.resourceAssetCount = 0
     incomplete.dataset.packagedE2eDeliveryEvidence = JSON.stringify(incompleteSuites)
-    expect(() => collectPackagedE2eOutcome(incomplete)).toThrow(JourneyFailure)
+    expect(() => collect(incomplete)).toThrow(JourneyFailure)
+  })
+
+  it('accepts route-identical suites with different canonical information graphs', () => {
+    const workspace = completeOutcomeWorkspace(2)
+    const suites = JSON.parse(workspace.dataset.packagedE2eDeliveryEvidence!) as Array<{
+      routes: string[]
+      routeCount: number
+      pageCount: number
+      routeGraph: string
+      pageMedia: Array<{ ordinal: number; route: string }>
+      files: Array<{ role: string; ordinal?: number }>
+    }>
+    const first = suites[0]!
+    const second = suites[1]!
+    second.routes = [...first.routes]
+    second.routeCount = first.routeCount
+    second.pageCount = first.pageCount
+    second.pageMedia = second.pageMedia.slice(0, first.pageCount).map((media, index) => ({
+      ...media,
+      route: first.routes[index]!,
+    }))
+    second.files = second.files.filter((file) =>
+      file.role !== 'pageMediaObject' || (file.ordinal ?? 0) <= first.pageCount)
+    const alternative = JSON.parse(first.routeGraph) as {
+      pages: Array<{ regions: Array<{ summary: string }> }>
+    }
+    alternative.pages[0]!.regions[0]!.summary = 'A distinct task-oriented information hierarchy.'
+    second.routeGraph = JSON.stringify(alternative)
+    workspace.dataset.packagedE2eDeliveryEvidence = JSON.stringify(suites)
+
+    expect(() => collect(workspace)).not.toThrow()
+  })
+
+  it('rejects duplicate media across suites and artifact roles', () => {
+    for (const duplicateHash of [
+      (suites: Array<{
+        designSystemMedia: { sha256: string }
+        pageMedia: Array<{ sha256: string }>
+      }>) => {
+        suites[1]!.pageMedia[0]!.sha256 = suites[0]!.pageMedia[0]!.sha256
+      },
+      (suites: Array<{
+        designSystemMedia: { sha256: string }
+        pageMedia: Array<{ sha256: string }>
+        resourceMedia: Array<{ sha256: string }>
+      }>) => {
+        suites[1]!.resourceMedia[0]!.sha256 = suites[0]!.resourceMedia[0]!.sha256
+      },
+      (suites: Array<{
+        designSystemMedia: { sha256: string }
+        pageMedia: Array<{ sha256: string }>
+      }>) => {
+        suites[0]!.pageMedia[0]!.sha256 = suites[0]!.designSystemMedia.sha256
+      },
+    ]) {
+      const workspace = completeOutcomeWorkspace()
+      const suites = JSON.parse(workspace.dataset.packagedE2eDeliveryEvidence!)
+      duplicateHash(suites)
+      workspace.dataset.packagedE2eDeliveryEvidence = JSON.stringify(suites)
+      expect(() => collect(workspace)).toThrow(JourneyFailure)
+    }
   })
 
   it('rejects prototype suites that do not bind one-to-one to ready Design Systems', () => {
@@ -720,7 +1360,7 @@ describe('packaged E2E outcome evidence', () => {
     suites[2]!.designSystemId = suites[0]!.designSystemId
     workspace.dataset.packagedE2eDeliveryEvidence = JSON.stringify(suites)
 
-    expect(() => collectPackagedE2eOutcome(workspace)).toThrow(JourneyFailure)
+    expect(() => collect(workspace)).toThrow(JourneyFailure)
   })
 
   it('rejects duplicate resource-pack identities and malformed digests', () => {
@@ -730,7 +1370,7 @@ describe('packaged E2E outcome evidence', () => {
     }>
     duplicateSuites[2]!.resourcePackId = duplicateSuites[0]!.resourcePackId
     duplicate.dataset.packagedE2eDeliveryEvidence = JSON.stringify(duplicateSuites)
-    expect(() => collectPackagedE2eOutcome(duplicate)).toThrow(JourneyFailure)
+    expect(() => collect(duplicate)).toThrow(JourneyFailure)
 
     for (const digest of ['A'.repeat(64), 'g'.repeat(64), 'a'.repeat(63)]) {
       const workspace = completeOutcomeWorkspace()
@@ -739,14 +1379,14 @@ describe('packaged E2E outcome evidence', () => {
       }>
       suites[0]!.digests.designSystemImage = digest
       workspace.dataset.packagedE2eDeliveryEvidence = JSON.stringify(suites)
-      expect(() => collectPackagedE2eOutcome(workspace)).toThrow(JourneyFailure)
+      expect(() => collect(workspace)).toThrow(JourneyFailure)
     }
   })
 
   it('rejects a visible consumable count that differs from selected production authority', () => {
     const slices = completeOutcomeWorkspace()
     slices.dataset.packagedE2eVisibleSliceCount = '47'
-    expect(() => collectPackagedE2eOutcome(slices)).toThrow(JourneyFailure)
+    expect(() => collect(slices)).toThrow(JourneyFailure)
   })
 
   it('rejects non-opaque ids, unbounded routes, and extra payload fields', () => {
@@ -757,7 +1397,7 @@ describe('packaged E2E outcome evidence', () => {
     designs[0] = { ...designs[0], candidateId: 'candidate:generated-title', prompt: 'secret' }
     workspace.dataset.packagedE2eDesignCandidates = JSON.stringify(designs)
 
-    expect(() => collectPackagedE2eOutcome(workspace)).toThrow(JourneyFailure)
+    expect(() => collect(workspace)).toThrow(JourneyFailure)
   })
 
   it('rejects missing review, token, provenance, binding, or pack digests', () => {
@@ -777,7 +1417,7 @@ describe('packaged E2E outcome evidence', () => {
       }>
       delete suites[0]!.digests[key]
       workspace.dataset.packagedE2eDeliveryEvidence = JSON.stringify(suites)
-      expect(() => collectPackagedE2eOutcome(workspace)).toThrow(JourneyFailure)
+      expect(() => collect(workspace)).toThrow(JourneyFailure)
     }
   })
 })

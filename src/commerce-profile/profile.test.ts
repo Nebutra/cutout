@@ -15,6 +15,7 @@ import { fixtureProductRecord } from './commerce-profile.test-fixture'
 
 describe('Commerce declarative Profile and Kernel compilation (P5)', () => {
   const facts = normalizeProductRecord({ file: 'product.json', contents: JSON.stringify(fixtureProductRecord) })
+  const sourceImageArtifactIds = [`artifact:sha256:${'a'.repeat(64)}`]
 
   it('installs removable schemas without changing the Kernel registry', () => {
     const kernelOnly = createKernelRegistry()
@@ -43,7 +44,11 @@ describe('Commerce declarative Profile and Kernel compilation (P5)', () => {
   it('compiles eleven bounded generic plan nodes with semantic capabilities and a strategy dependency closure', async () => {
     const evidenceGraph = createCommerceEvidenceGraph({ facts })
     const outcomeGraph = createCommerceOutcomeGraph({ facts })
-    const { contract, plan } = await compileCommerceProduction({ evidenceGraph, outcomeGraph })
+    const { contract, plan } = await compileCommerceProduction({
+      evidenceGraph,
+      outcomeGraph,
+      sourceImageArtifactIds,
+    })
     const catalog = createCommerceCapabilityCatalog()
     expect(plan.body.nodes).toHaveLength(11)
     expect(contract.body.allowedCapabilityIds.sort()).toEqual(Object.values(COMMERCE_CAPABILITY_IDS).sort())
@@ -51,8 +56,24 @@ describe('Commerce declarative Profile and Kernel compilation (P5)', () => {
     const mainPlanNode = plan.body.nodes.find((node) => node.outcomeNodeId === 'outcome:commerce:main-image')!
     const videoPlanNode = plan.body.nodes.find((node) => node.outcomeNodeId === 'outcome:commerce:product-video')!
     const strategyPlanNode = plan.body.nodes.find((node) => node.outcomeNodeId === 'outcome:commerce:strategy-document')!
+    const detailPlanNodes = plan.body.nodes.filter((node) => node.outcomeNodeId.includes('detail-image:'))
+    expect(mainPlanNode.inputArtifactIds).toEqual(sourceImageArtifactIds)
+    expect(detailPlanNodes.every((node) => (
+      node.inputArtifactIds.join(',') === sourceImageArtifactIds.slice(0, 1).join(',')
+      && node.dependencyNodeIds.includes(mainPlanNode.id)
+    ))).toBe(true)
     expect(videoPlanNode.dependencyNodeIds).toContain(mainPlanNode.id)
     expect(strategyPlanNode.dependencyNodeIds).toHaveLength(10)
     expect(plan.body.nodes.every((node) => node.maxAttempts === 2 && node.deadlineMs > 0)).toBe(true)
+  })
+
+  it('rejects a Commerce Plan that omits content-addressed product source images', async () => {
+    const evidenceGraph = createCommerceEvidenceGraph({ facts })
+    const outcomeGraph = createCommerceOutcomeGraph({ facts })
+    await expect(compileCommerceProduction({
+      evidenceGraph,
+      outcomeGraph,
+      sourceImageArtifactIds: [],
+    })).rejects.toThrow(/requires one to three unique content-addressed source images/)
   })
 })

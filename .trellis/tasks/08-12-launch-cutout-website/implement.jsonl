@@ -1,0 +1,5 @@
+{"file":".trellis/spec/frontend/directory-structure.md","reason":"Keep the website isolated from the desktop bundle and preserve domain ownership."}
+{"file":".trellis/spec/frontend/component-guidelines.md","reason":"Apply responsive, accessible and stable interaction contracts."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Use repository validation, evidence and dependency rules."}
+{"file":".trellis/spec/frontend/release-pipeline.md","reason":"Preserve immutable release authority and truthful publication semantics."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Review site, release, Vercel and DNS boundaries end to end."}

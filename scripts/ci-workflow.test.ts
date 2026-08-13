@@ -18,6 +18,12 @@ describe('CI workflow contract', () => {
     expect(workflow).toContain('scripts/tauri-config.test.ts scripts/tauri-capabilities.test.ts')
   })
 
+  it('runs a pinned Rust advisory scanner and delegates exceptions to the reviewed gate', () => {
+    expect(workflow).toContain('cargo install cargo-audit --locked --version 0.22.2')
+    expect(workflow).toContain('run: pnpm audit:rust')
+    expect(workflow).not.toContain('cargo audit --ignore')
+  })
+
   it('installs Chromium before contract tests that exercise generated starters', () => {
     expect(workflow.indexOf('playwright install')).toBeGreaterThan(-1)
     expect(workflow.indexOf('playwright install')).toBeLessThan(workflow.indexOf('pnpm test\n'))

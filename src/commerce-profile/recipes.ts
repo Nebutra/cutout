@@ -12,6 +12,7 @@ import {
   COMMERCE_CAPABILITY_IDS,
   COMMERCE_CONSTRAINT_IDS,
   COMMERCE_RECIPE_ID,
+  COMMERCE_RECIPE_VERSION,
   COMMERCE_TARGET_ID,
   commerceOutcomePayloadSchema,
 } from './profile'
@@ -58,49 +59,64 @@ const strategyBudget: Budget = Object.freeze({
 
 const transientFailureCodes = ['provider-timeout', 'rate-limit', 'host-recovery-interrupted'] as const
 
-export const commerceRecipeCompiler: RecipeCompiler = {
-  id: COMMERCE_RECIPE_ID,
-  version: 1,
-  compile: (node) => {
-    const payload = commerceOutcomePayloadSchema.parse(node.payload)
-    const capabilityId = payload.kind === 'localized-description'
-      ? COMMERCE_CAPABILITY_IDS.localizedCopy
-      : payload.kind === 'strategy'
-        ? COMMERCE_CAPABILITY_IDS.strategy
-        : payload.mediaKind === 'image'
-          ? COMMERCE_CAPABILITY_IDS.image
-          : COMMERCE_CAPABILITY_IDS.video
-    const outputSchema = payload.kind === 'localized-description'
-      ? { id: 'commerce.localized-description', version: 1 as const }
-      : payload.kind === 'strategy'
-        ? { id: 'commerce.strategy-document', version: 1 as const }
-        : { id: 'commerce.media-artifact', version: 1 as const }
-    const budget = payload.kind === 'localized-description'
-      ? copyBudget
-      : payload.kind === 'strategy'
-        ? strategyBudget
-        : payload.mediaKind === 'image'
-          ? imageBudget
-          : videoBudget
-    return [{
-      capabilityId,
-      targetId: COMMERCE_TARGET_ID,
-      dependencyNodeIds: [],
-      inputArtifactIds: [],
-      outputSchema,
-      constraints: [
-        ...COMMERCE_CONSTRAINT_IDS,
-        payload.marketPolicyId,
-        payload.identityLockId,
-        payload.creativeDirectionId,
-        `role:${payload.semanticRole}`,
-      ],
-      transientFailureCodes: [...transientFailureCodes],
-      budget,
-      maxAttempts: 2,
-      deadlineMs: budget.timeMs,
-    }]
-  },
+const artifactIdPattern = /^artifact:sha256:[a-f0-9]{64}$/
+
+export function createCommerceRecipeCompiler(
+  sourceImageArtifactIds: readonly string[],
+): RecipeCompiler {
+  if (sourceImageArtifactIds.length < 1 || sourceImageArtifactIds.length > 3
+    || new Set(sourceImageArtifactIds).size !== sourceImageArtifactIds.length
+    || sourceImageArtifactIds.some((artifactId) => !artifactIdPattern.test(artifactId))) {
+    throw new Error('Commerce production requires one to three unique content-addressed source images.')
+  }
+  return {
+    id: COMMERCE_RECIPE_ID,
+    version: COMMERCE_RECIPE_VERSION,
+    compile: (node) => {
+      const payload = commerceOutcomePayloadSchema.parse(node.payload)
+      const capabilityId = payload.kind === 'localized-description'
+        ? COMMERCE_CAPABILITY_IDS.localizedCopy
+        : payload.kind === 'strategy'
+          ? COMMERCE_CAPABILITY_IDS.strategy
+          : payload.mediaKind === 'image'
+            ? COMMERCE_CAPABILITY_IDS.image
+            : COMMERCE_CAPABILITY_IDS.video
+      const outputSchema = payload.kind === 'localized-description'
+        ? { id: 'commerce.localized-description', version: 1 as const }
+        : payload.kind === 'strategy'
+          ? { id: 'commerce.strategy-document', version: 1 as const }
+          : { id: 'commerce.media-artifact', version: 1 as const }
+      const budget = payload.kind === 'localized-description'
+        ? copyBudget
+        : payload.kind === 'strategy'
+          ? strategyBudget
+          : payload.mediaKind === 'image'
+            ? imageBudget
+            : videoBudget
+      return [{
+        capabilityId,
+        targetId: COMMERCE_TARGET_ID,
+        dependencyNodeIds: [],
+        inputArtifactIds: payload.kind === 'media' && payload.mediaKind === 'image'
+          ? payload.semanticRole === 'main-image'
+            ? [...sourceImageArtifactIds]
+            : [sourceImageArtifactIds[0]!]
+          : [],
+        outputSchema,
+        constraints: [
+          ...COMMERCE_CONSTRAINT_IDS,
+          payload.marketPolicyId,
+          payload.identityLockId,
+          payload.creativeDirectionId,
+          `role:${payload.semanticRole}`,
+        ],
+        transientFailureCodes: [...transientFailureCodes],
+        budget,
+        maxAttempts: 2,
+        deadlineMs: budget.timeMs,
+      }]
+    },
+  }
 }
 export async function compileCommerceProduction(input: {
   readonly evidenceGraph: EvidenceGraph
@@ -110,6 +126,7 @@ export async function compileCommerceProduction(input: {
   readonly planId?: string
   readonly planRevision?: string
   readonly budget?: Budget
+  readonly sourceImageArtifactIds: readonly string[]
 }): Promise<{ readonly contract: OutcomeContract, readonly plan: ExecutionPlan }> {
   const budget = input.budget ?? COMMERCE_RUN_BUDGET
   const contract = await compileOutcomeContract({
@@ -130,7 +147,7 @@ export async function compileCommerceProduction(input: {
     budget,
     provenance: [{
       sourceId: 'profile:commerce-materials',
-      revision: '1.0.0',
+      revision: '1.1.0',
       relation: 'compiled-from-profile',
     }],
   })
@@ -139,11 +156,11 @@ export async function compileCommerceProduction(input: {
     revision: input.planRevision ?? 'plan:commerce-production:revision:1',
     contract,
     outcomeGraph: input.outcomeGraph,
-    recipes: [commerceRecipeCompiler],
+    recipes: [createCommerceRecipeCompiler(input.sourceImageArtifactIds)],
     budget,
     provenance: [{
       sourceId: 'profile:commerce-materials',
-      revision: '1.0.0',
+      revision: '1.1.0',
       relation: 'compiled-from-profile',
     }],
   })

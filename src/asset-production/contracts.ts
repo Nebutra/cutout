@@ -127,6 +127,33 @@ export const productionIssueSchema = z.object({
 })
 export type ProductionIssue = z.infer<typeof productionIssueSchema>
 
+export const sliceCoverageSchema = z.object({
+  totalForegroundPixelCount: z.number().int().nonnegative(),
+  retainedForegroundPixelCount: z.number().int().nonnegative(),
+  omittedForegroundPixelCount: z.number().int().nonnegative(),
+  retainedRatio: z.number().min(0).max(1),
+}).strict().superRefine((coverage, context) => {
+  if (
+    coverage.retainedForegroundPixelCount + coverage.omittedForegroundPixelCount
+    !== coverage.totalForegroundPixelCount
+  ) {
+    context.addIssue({
+      code: 'custom',
+      message: 'Slice coverage retained and omitted pixels must equal the detected total.',
+    })
+  }
+  const expectedRatio = coverage.totalForegroundPixelCount === 0
+    ? 1
+    : coverage.retainedForegroundPixelCount / coverage.totalForegroundPixelCount
+  if (Math.abs(coverage.retainedRatio - expectedRatio) > 1e-9) {
+    context.addIssue({
+      code: 'custom',
+      message: 'Slice coverage ratio must match its pixel counts.',
+    })
+  }
+})
+export type SliceCoverage = z.infer<typeof sliceCoverageSchema>
+
 export const productionTaskEvidenceSchema = z.object({
   sourceArtifactId: id.optional(),
   maskArtifactId: id.optional(),
@@ -147,6 +174,7 @@ export const productionTaskEvidenceSchema = z.object({
     whiteRatio: z.number().min(0).max(1),
     compliant: z.boolean(),
   }).strict().optional(),
+  sliceCoverage: sliceCoverageSchema.optional(),
   qaVerdict: z.object({
     pass: z.boolean(),
     failures: z.array(z.string().min(1).max(2_000)),

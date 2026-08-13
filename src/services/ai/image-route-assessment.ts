@@ -10,11 +10,18 @@ import {
   supportsOpenAIImageEndpoints,
   type ProviderConfig,
 } from './provider-types'
+import { z } from 'zod'
 
-export type ImageAdapterStrategy =
-  | 'openai-images-generations'
-  | 'openai-images-edits'
-  | 'google-multimodal-generate'
+export const imageAdapterStrategySchema = z.enum([
+  'openai-images-generations',
+  'openai-images-edits',
+  'xai-images-generations',
+  'xai-images-edits',
+  'google-multimodal-generate',
+  'dashscope-native-image-generation',
+  'dashscope-native-image-edit',
+])
+export type ImageAdapterStrategy = z.infer<typeof imageAdapterStrategySchema>
 
 export type ImageRouteCapabilityAssessment =
   | { readonly supported: true; readonly strategy: ImageAdapterStrategy }
@@ -35,6 +42,8 @@ export type ImageRoutePresentationStatus =
   | 'supported'
   | 'adapter-required'
   | 'evidence-required'
+
+export type ImageRouteRecommendationObjective = 'configured' | 'refinement'
 
 const HIGH_FIDELITY_MODEL_IDS = new Set([
   'gpt-image-2',
@@ -94,6 +103,14 @@ const REVIEWED_IMAGE_MODEL_CAPABILITIES: Readonly<Record<
     capabilities: ['image-generation', 'image-edit'],
     sourceId: 'openai-images-api:chatgpt-image-latest',
   },
+  'grok-imagine-image': {
+    capabilities: ['image-generation', 'image-edit'],
+    sourceId: 'xai-imagine-api:2026-08-10:grok-imagine-image',
+  },
+  'grok-imagine-image-quality': {
+    capabilities: ['image-generation', 'image-edit'],
+    sourceId: 'xai-imagine-api:2026-08-10:grok-imagine-image-quality',
+  },
   'gemini-2.5-flash-image': {
     capabilities: ['image-generation'],
     sourceId: 'google-generate-content:gemini-2.5-flash-image',
@@ -106,7 +123,69 @@ const REVIEWED_IMAGE_MODEL_CAPABILITIES: Readonly<Record<
     capabilities: ['image-generation'],
     sourceId: 'google-generate-content:gemini-3-pro-image-preview',
   },
+  'qwen-image-2.0': {
+    capabilities: ['image-generation'],
+    sourceId: 'dashscope-qwen-image-api:qwen-image-2.0',
+  },
+  'qwen-image-2.0-2026-03-03': {
+    capabilities: ['image-generation'],
+    sourceId: 'dashscope-qwen-image-api:qwen-image-2.0-2026-03-03',
+  },
+  'qwen-image-2.0-pro': {
+    capabilities: ['image-generation'],
+    sourceId: 'dashscope-qwen-image-api:qwen-image-2.0-pro',
+  },
+  'qwen-image-2.0-pro-2026-03-03': {
+    capabilities: ['image-generation'],
+    sourceId: 'dashscope-qwen-image-api:qwen-image-2.0-pro-2026-03-03',
+  },
+  'qwen-image-2.0-pro-2026-04-22': {
+    capabilities: ['image-generation'],
+    sourceId: 'dashscope-qwen-image-api:qwen-image-2.0-pro-2026-04-22',
+  },
+  'qwen-image-2.0-pro-2026-06-22': {
+    capabilities: ['image-generation'],
+    sourceId: 'dashscope-qwen-image-api:qwen-image-2.0-pro-2026-06-22',
+  },
+  'qwen-image-max': {
+    capabilities: ['image-generation'],
+    sourceId: 'dashscope-qwen-image-api:qwen-image-max',
+  },
+  'qwen-image-max-2025-12-30': {
+    capabilities: ['image-generation'],
+    sourceId: 'dashscope-qwen-image-api:qwen-image-max-2025-12-30',
+  },
+  'qwen-image-plus': {
+    capabilities: ['image-generation'],
+    sourceId: 'dashscope-qwen-image-api:qwen-image-plus',
+  },
+  'qwen-image-plus-2026-01-09': {
+    capabilities: ['image-generation'],
+    sourceId: 'dashscope-qwen-image-api:qwen-image-plus-2026-01-09',
+  },
+  'qwen-image-3.0': {
+    capabilities: ['image-generation', 'image-edit'],
+    sourceId: 'dashscope-qwen-image-3-api:2026-08-05:qwen-image-3.0',
+  },
+  'qwen-image-3.0-pro': {
+    capabilities: ['image-generation', 'image-edit'],
+    sourceId: 'dashscope-qwen-image-3-api:2026-08-05:qwen-image-3.0-pro',
+  },
 }
+
+const XAI_IMAGE_MODEL_CAPABILITIES: Readonly<Record<
+  string,
+  readonly ('image-generation' | 'image-edit')[]
+>> = {
+  'grok-imagine-image': ['image-generation', 'image-edit'],
+  'grok-imagine-image-quality': ['image-generation', 'image-edit'],
+}
+
+const EXACT_REVIEWED_MODEL_IDS = new Set([
+  ...Object.keys(XAI_IMAGE_MODEL_CAPABILITIES),
+  'qwen-image-3.0',
+  'qwen-image-3.0-pro',
+])
 
 // Exact model ids observed on the Image Edit Arena dated 2026-07-25. Arena
 // evidence proves that the model can edit an image; it does not prove that a
@@ -177,10 +256,46 @@ export function imageRouteFidelity(model: string): ImageRouteAssessment['fidelit
 }
 
 /** Orders already-supported routes only; it never participates in capability assessment. */
-export function imageRouteRecommendationRank(model: string): number {
+export function imageRouteRecommendationRank(
+  model: string,
+  objective: ImageRouteRecommendationObjective = 'refinement',
+): number {
   if (imageRouteFidelity(model) !== 'recommended') return 0
+  if (objective === 'configured') return 1
   const normalized = model.toLocaleLowerCase('en-US')
-  return normalized === 'gpt-image-2' || normalized.startsWith('gpt-image-2-') ? 2 : 1
+  const gptImage2 = normalized === 'gpt-image-2' || normalized.startsWith('gpt-image-2-')
+  if (normalized === 'qwen-image-3.0-pro') return 4
+  if (gptImage2) return 3
+  return normalized === 'qwen-image-3.0' ? 2 : 1
+}
+
+/** Stable objective ordering for routes whose executable capability is already proven. */
+export function sortImageRouteRecommendations<T extends { readonly model: string }>(
+  routes: readonly T[],
+  objective: ImageRouteRecommendationObjective = 'configured',
+): T[] {
+  if (objective === 'configured') return [...routes]
+  return routes
+    .map((route, index) => ({ route, index }))
+    .sort((left, right) =>
+      imageRouteRecommendationRank(right.route.model, objective)
+      - imageRouteRecommendationRank(left.route.model, objective)
+      || left.index - right.index,
+    )
+    .map(({ route }) => route)
+}
+
+/**
+ * Product-fit gate for full UI/UX prototype production. Generic image-edit
+ * compatibility is intentionally broader and must not become a silent
+ * quality fallback for page, design-system, or resource-pack generation.
+ */
+export function isPrototypeProductionImageModel(model: string): boolean {
+  const normalized = model.toLocaleLowerCase('en-US')
+  return normalized === 'gpt-image-2'
+    || normalized.startsWith('gpt-image-2-')
+    || normalized === 'qwen-image-3.0'
+    || normalized === 'qwen-image-3.0-pro'
 }
 
 export function isImageModelNominationCandidate(model: string): boolean {
@@ -209,7 +324,7 @@ export function assessImageRoute(input: {
     if (!hasExecutableEvidence(input, capability)) {
       return { supported: false, reason: 'evidence-required' }
     }
-    const strategy = adapterStrategy(provider!, capability)
+    const strategy = adapterStrategy(provider!, assignment.model, capability)
     return strategy
       ? { supported: true, strategy }
       : { supported: false, reason: 'adapter-required' }
@@ -255,8 +370,15 @@ export function reviewedCatalogImageDescriptors(
 ): ModelDescriptor[] {
   return catalogModels.flatMap((model) => {
     const normalized = normalizeModelId(model)
-    const reviewed = REVIEWED_IMAGE_MODEL_CAPABILITIES[normalized]
-    const arenaEdit = REVIEWED_IMAGE_EDIT_MODEL_IDS.has(normalized)
+    const exactCaseMismatch = EXACT_REVIEWED_MODEL_IDS.has(normalized) && model !== normalized
+    const reviewed = exactCaseMismatch
+      ? undefined
+      : REVIEWED_IMAGE_MODEL_CAPABILITIES[normalized]
+    // Arena labels are quality/capability evidence, not first-party xAI API
+    // identifiers. The xAI transport accepts only the closed documented ids.
+    const arenaEdit = provider.kind !== 'xai'
+      && !exactCaseMismatch
+      && REVIEWED_IMAGE_EDIT_MODEL_IDS.has(normalized)
     if (!reviewed && !arenaEdit) return []
     const capabilities = [
       ...(reviewed?.capabilities ?? []),
@@ -349,6 +471,7 @@ function normalizeModelId(model: string): string {
 
 function adapterStrategy(
   provider: ProviderConfig,
+  model: string,
   capability: 'image-generation' | 'image-edit',
 ): ImageAdapterStrategy | undefined {
   if (supportsOpenAIImageEndpoints(provider)) {
@@ -357,11 +480,76 @@ function adapterStrategy(
       : 'openai-images-generations'
   }
   if (
-    capability === 'image-generation'
-    && provider.kind === 'google'
+    provider.kind === 'xai'
+    && effectiveProviderWireProtocol(provider) === 'chat-completions'
+    && supportsXaiImageModel(model, capability)
+  ) {
+    return capability === 'image-edit'
+      ? 'xai-images-edits'
+      : 'xai-images-generations'
+  }
+  if (
+    provider.kind === 'google'
     && effectiveProviderWireProtocol(provider) === 'google-generate-content'
   ) {
     return 'google-multimodal-generate'
   }
+  if (
+    provider.kind === 'dashscope'
+    && effectiveProviderWireProtocol(provider) === 'chat-completions'
+    && supportsNativeDashScopeImageTransport(provider)
+    && supportsNativeDashScopeImageModel(model, capability)
+  ) {
+    return capability === 'image-edit'
+      ? 'dashscope-native-image-edit'
+      : 'dashscope-native-image-generation'
+  }
   return undefined
+}
+
+/** Exact first-party xAI Imagine API model/operation contract. */
+export function supportsXaiImageModel(
+  model: string,
+  capability: 'image-generation' | 'image-edit',
+): boolean {
+  return XAI_IMAGE_MODEL_CAPABILITIES[model]?.includes(capability) === true
+}
+
+const DASHSCOPE_NATIVE_IMAGE_CAPABILITIES: Readonly<Record<
+  string,
+  readonly ('image-generation' | 'image-edit')[]
+>> = {
+  'qwen-image-2.0': ['image-generation'],
+  'qwen-image-2.0-2026-03-03': ['image-generation'],
+  'qwen-image-2.0-pro': ['image-generation'],
+  'qwen-image-2.0-pro-2026-03-03': ['image-generation'],
+  'qwen-image-2.0-pro-2026-04-22': ['image-generation'],
+  'qwen-image-2.0-pro-2026-06-22': ['image-generation', 'image-edit'],
+  'qwen-image-max': ['image-generation'],
+  'qwen-image-max-2025-12-30': ['image-generation'],
+  'qwen-image-plus': ['image-generation'],
+  'qwen-image-plus-2026-01-09': ['image-generation'],
+  'qwen-image-edit': ['image-edit'],
+  'qwen-image-edit-2511': ['image-edit'],
+  'qwen-image-3.0': ['image-generation', 'image-edit'],
+  'qwen-image-3.0-pro': ['image-generation', 'image-edit'],
+}
+
+function supportsNativeDashScopeImageModel(
+  model: string,
+  capability: 'image-generation' | 'image-edit',
+): boolean {
+  return DASHSCOPE_NATIVE_IMAGE_CAPABILITIES[model]?.includes(capability) === true
+}
+
+const DASHSCOPE_COMPATIBLE_BASE_URL = 'https://dashscope.aliyuncs.com/compatible-mode/v1'
+
+/** Native image calls are bound to the reviewed first-party DashScope origin. */
+export function supportsNativeDashScopeImageTransport(
+  provider: Pick<ProviderConfig, 'kind' | 'baseUrl' | 'wireProtocol'>,
+): boolean {
+  if (provider.kind !== 'dashscope') return false
+  if (effectiveProviderWireProtocol(provider) !== 'chat-completions') return false
+  if (!provider.baseUrl) return true
+  return provider.baseUrl.trim().replace(/\/+$/, '') === DASHSCOPE_COMPATIBLE_BASE_URL
 }

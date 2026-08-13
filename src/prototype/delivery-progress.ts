@@ -10,6 +10,20 @@ export interface PrototypeDeliveryCompletionSample {
   readonly at: number
 }
 
+export type PrototypeDeliveryPageStage =
+  | 'generating'
+  | 'generated'
+  | 'reviewing'
+  | 'accepted'
+  | 'rejected'
+  | 'retrying'
+
+export interface PrototypeDeliveryPageProgress {
+  readonly pageId: string
+  readonly stage: PrototypeDeliveryPageStage
+  readonly attempt: number
+}
+
 export interface PrototypeDeliveryObservation {
   readonly completedPages: number
   readonly totalPages: number
@@ -18,6 +32,7 @@ export interface PrototypeDeliveryObservation {
   readonly firstObservedAt: number
   readonly completionSamples: readonly PrototypeDeliveryCompletionSample[]
   readonly retryPreservedNodes: number
+  readonly pageProgress: Readonly<Record<string, PrototypeDeliveryPageProgress>>
 }
 
 export interface PrototypeDeliveryProgress {
@@ -28,6 +43,11 @@ export interface PrototypeDeliveryProgress {
   readonly queued: number
   readonly failed: number
   readonly retryPreserved: number
+  readonly generatingPages: number
+  readonly generatedPages: number
+  readonly reviewingPages: number
+  readonly rejectedPages: number
+  readonly retryingPages: number
   readonly estimate:
     | { readonly state: 'unavailable' }
     | { readonly state: 'collecting' }
@@ -39,7 +59,7 @@ export function updatePrototypeDeliveryObservation(input: {
   readonly update: Partial<Pick<
     PrototypeDeliveryObservation,
     'completedPages' | 'totalPages' | 'completedResources' | 'totalResources' | 'retryPreservedNodes'
-  >>
+  >> & { readonly pageProgress?: PrototypeDeliveryPageProgress }
   readonly at: number
 }): PrototypeDeliveryObservation {
   const previous = input.previous
@@ -63,6 +83,18 @@ export function updatePrototypeDeliveryObservation(input: {
   if (previous && completedNodes > previousCompleted) {
     completionSamples.push({ completedNodes, at: input.at })
   }
+  const pageProgress = { ...(previous?.pageProgress ?? {}) }
+  if (input.update.pageProgress) {
+    const update = input.update.pageProgress
+    if (
+      !update.pageId.trim()
+      || !Number.isSafeInteger(update.attempt)
+      || update.attempt < 1
+    ) {
+      throw new Error('Prototype page progress requires a page id and positive attempt.')
+    }
+    pageProgress[update.pageId] = { ...update }
+  }
   return {
     completedPages,
     totalPages,
@@ -71,6 +103,7 @@ export function updatePrototypeDeliveryObservation(input: {
     firstObservedAt: previous?.firstObservedAt ?? input.at,
     completionSamples: completionSamples.slice(-64),
     retryPreservedNodes,
+    pageProgress,
   }
 }
 
@@ -86,7 +119,13 @@ export function projectPrototypeDeliveryProgress(input: {
   const totalNodes = observation ? observation.totalPages + observation.totalResources : 0
   const remaining = Math.max(0, totalNodes - completedNodes)
   const retryPreserved = Math.min(completedNodes, observation?.retryPreservedNodes ?? 0)
-  const active = input.status === 'generating' && remaining > 0 ? 1 : 0
+  const pageProgress = Object.values(observation?.pageProgress ?? {})
+  const generatingPages = pageProgress.filter(({ stage }) => stage === 'generating').length
+  const activePageCount = pageProgress.filter(({ stage }) =>
+    stage === 'generating' || stage === 'reviewing' || stage === 'retrying').length
+  const active = input.status === 'generating' && remaining > 0
+    ? Math.min(remaining, Math.max(1, activePageCount))
+    : 0
   const failed = input.status === 'failed' ? remaining : 0
   const queued = input.status === 'planned' || input.status === 'cancelled'
     ? remaining
@@ -100,6 +139,13 @@ export function projectPrototypeDeliveryProgress(input: {
     queued,
     failed,
     retryPreserved,
+    generatingPages,
+    // A later attempt can be generating only after a prior image was rejected.
+    generatedPages: pageProgress.filter(({ stage, attempt }) =>
+      stage !== 'generating' || attempt > 1).length,
+    reviewingPages: pageProgress.filter(({ stage }) => stage === 'reviewing').length,
+    rejectedPages: pageProgress.filter(({ stage }) => stage === 'rejected').length,
+    retryingPages: pageProgress.filter(({ stage }) => stage === 'retrying').length,
     estimate: estimate(input.status, observation, remaining, input.now),
   }
 }

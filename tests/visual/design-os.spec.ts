@@ -1,5 +1,7 @@
-import { expect, test, type Page, type TestInfo } from '@playwright/test'
+import type { Page, TestInfo } from '@playwright/test'
+import { expect, test } from './local-state.fixture'
 import { openDeliverWorkspace } from './workspace-helpers'
+import { projectStorageRows } from './project-storage'
 
 async function stabilize(page: Page) {
   await page.addInitScript(() => {
@@ -199,10 +201,18 @@ test('archive leaves Recent and restore returns the project', async ({ page }) =
   const directory = page.getByRole('main')
   await directoryProjectCard(directory, 'Archive candidate').getByRole('button', { name: 'More actions for Archive candidate' }).click()
   await page.getByRole('menuitem', { name: 'Archive' }).click()
+  const archiveDialog = page.getByRole('alertdialog')
+  await expect(archiveDialog).toBeVisible()
   await page.getByRole('button', { name: 'Archive', exact: true }).click()
+  await expect(archiveDialog).toHaveCount(0)
   await expect(directoryProjectButton(directory, 'Archive candidate')).toHaveCount(0)
 
   await page.reload()
+  const reloadedRows = (await projectStorageRows(page)).filter(
+    (project) => project.name === 'Archive candidate',
+  )
+  expect(reloadedRows).toHaveLength(1)
+  expect(reloadedRows[0]?.archivedAt).toEqual(expect.any(Number))
   await page.getByRole('button', { name: /^All projects\b/ }).click()
   await expect(directoryProjectButton(page.getByRole('main'), 'Archive candidate')).toHaveCount(0)
 

@@ -2,7 +2,11 @@ import { describe, expect, it } from 'vitest'
 import type { PersistedPrototypeSuiteCandidateSet } from '@/workspace/workspace-snapshot'
 import { createPrototypeAssetManifest } from './asset-manifest'
 import { sha256Bytes } from '@/asset-production/hash'
-import { projectPrototypeDeliveryEvidence } from './delivery-evidence'
+import { pngDimensionFixture } from '@/lib/raster-dimensions.test-fixture'
+import {
+  projectPrototypeDeliveryEvidence,
+  projectPrototypeDeliveryQualitySummaries,
+} from './delivery-evidence'
 import type { VerifiedResourcePackArtifact } from './resource-pack-production'
 import { prototypePlanSchema } from './prototype-plan'
 import { currentPrototypeExploration } from './prototype-plan.test-fixture'
@@ -25,10 +29,25 @@ describe('prototype delivery evidence', () => {
       artifactCount: 1,
       qualityReviewStatus: 'passed',
     })
-    expect(Object.values(evidence[0]!.digests)).toHaveLength(16)
+    expect(Object.values(evidence[0]!.digests)).toHaveLength(17)
     expect(Object.values(evidence[0]!.digests).every((digest) => /^[a-f0-9]{64}$/.test(digest)))
       .toBe(true)
-    expect(JSON.stringify(evidence)).not.toMatch(/artifact:private|provenance:private|bytes|prompt|provider/i)
+    expect(evidence[0]!.designSystemMedia).toMatchObject({
+      mediaType: 'image/png', width: 100, height: 100,
+    })
+    expect(evidence[0]!.pageMedia).toEqual([expect.objectContaining({
+      ordinal: 1, route: '/atlas', mediaType: 'image/png', width: 1440, height: 900,
+    })])
+    expect(evidence[0]!.resourceMedia).toEqual([expect.objectContaining({
+      ordinal: 1, mediaType: 'image/png', width: 100, height: 80, byteLength: 25,
+    })])
+    expect(evidence[0]!.files).toHaveLength(19)
+    expect(evidence[0]!.files.find((file) => file.role === 'plan')).toMatchObject({
+      sha256: evidence[0]!.digests.plan,
+    })
+    expect(evidence[0]!.files.find((file) => file.role === 'pageMediaObject'))
+      .toMatchObject({ ordinal: 1, sha256: evidence[0]!.pageMedia[0]!.sha256 })
+    expect(JSON.stringify(evidence)).not.toMatch(/artifact:private|provenance:private|prompt|provider/i)
     expect(await projectPrototypeDeliveryEvidence(await candidateSet(), await verifiedArtifacts()))
       .toEqual(evidence)
   })
@@ -90,6 +109,39 @@ describe('prototype delivery evidence', () => {
     })
     await expect(projectPrototypeDeliveryEvidence(set, await verifiedArtifacts()))
       .resolves.toMatchObject([{ qualityReviewStatus: 'attention-required' }])
+    expect(projectPrototypeDeliveryQualitySummaries(set)).toEqual([{
+      candidateId: 'suite-1',
+      pageRejectedCount: 0,
+      pageUnavailableCount: 0,
+      resourceRejectedCount: 0,
+      resourceUnavailableCount: 0,
+      resourceObservationalIssueCount: 1,
+    }])
+  })
+
+  it('projects closed quality counts without review text or reviewer identity', async () => {
+    const set = await candidateSet()
+    const pageReview = set.artifacts['candidate:suite:1']!.pages[0]!.review!
+    ;(pageReview.verdict as { pass: boolean; unavailable?: boolean }).pass = false
+    ;(pageReview.verdict.failures as string[]).push('Private page review text')
+    const resourceReview = set.artifacts['candidate:suite:1']!.resourcePack.assets[0]!.review!
+    ;(resourceReview.verdict as { pass: boolean; unavailable?: boolean }).pass = false
+    ;(resourceReview.verdict.failures as string[]).push('Private resource review text')
+    ;(resourceReview.observationalIssues as Array<{ code: string; message: string }>).push({
+      code: 'board-background-noncompliant',
+      message: 'Private observational text',
+    })
+
+    const summaries = projectPrototypeDeliveryQualitySummaries(set)
+    expect(summaries).toEqual([{
+      candidateId: 'suite-1',
+      pageRejectedCount: 1,
+      pageUnavailableCount: 0,
+      resourceRejectedCount: 1,
+      resourceUnavailableCount: 0,
+      resourceObservationalIssueCount: 1,
+    }])
+    expect(JSON.stringify(summaries)).not.toMatch(/private|reviewer|provider|message/i)
   })
 
   it('rejects a page review bound to stale bytes', async () => {
@@ -99,12 +151,28 @@ describe('prototype delivery evidence', () => {
     await expect(projectPrototypeDeliveryEvidence(set, await verifiedArtifacts()))
       .rejects.toThrow(/stale page review/i)
   })
+
+  it('accepts a complete plan that identifies no reusable non-UI assets', async () => {
+    const set = await candidateSet()
+    const artifact = set.artifacts['candidate:suite:1']!
+    ;(artifact.plan.pages[0]!.regions[0] as { assetRoute: string }).assetRoute = 'ignore-code-ui'
+    const manifest = createPrototypeAssetManifest(artifact.plan, artifact.plan.pages)
+    ;(artifact.resourcePack as unknown as { manifest: unknown; assets: unknown[] }).manifest = manifest
+    ;(artifact.resourcePack as unknown as { manifest: unknown; assets: unknown[] }).assets = []
+
+    await expect(projectPrototypeDeliveryEvidence(set, { 'candidate:suite:1': [] }))
+      .resolves.toMatchObject([{
+        resourceAssetCount: 0,
+        artifactCount: 0,
+        resourceMedia: [],
+      }])
+  })
 })
 
 async function verifiedArtifacts(): Promise<
   Readonly<Record<string, readonly VerifiedResourcePackArtifact[]>>
 > {
-  const bytes = new Uint8Array([7, 8, 9])
+  const bytes = pngDimensionFixture(100, 80, 9)
   return {
     'candidate:suite:1': [{
       manifestItemId: 'atlas-home-hero-1',
@@ -114,6 +182,7 @@ async function verifiedArtifacts(): Promise<
       width: 100,
       height: 80,
       byteLength: bytes.byteLength,
+      bytesBase64: bytesToBase64(bytes),
     }],
   }
 }
@@ -144,14 +213,14 @@ async function candidateSet(): Promise<PersistedPrototypeSuiteCandidateSet> {
     },
   })
   const manifest = createPrototypeAssetManifest(plan, plan.pages)
-  const pageBytes = new Uint8Array([4, 5, 6])
+  const pageBytes = pngDimensionFixture(1440, 900, 4)
   const artifact = {
     designSystem: {
       candidateSetId: 'candidate-set:design:1', candidateId: 'candidate:design:1',
       directionId: 'direction:1', baseRevisionId: 'revision:1',
       provenanceIds: ['provenance:private:design'],
       artifact: {
-        name: 'Atlas', designMarkdown: markdown, bytes: new Uint8Array([1, 2, 3]),
+        name: 'Atlas', designMarkdown: markdown, bytes: pngDimensionFixture(100, 100, 3),
         mediaType: 'image/png', width: 100, height: 100,
       },
     },
@@ -208,4 +277,8 @@ async function candidateSet(): Promise<PersistedPrototypeSuiteCandidateSet> {
     },
     artifacts: { 'candidate:suite:1': artifact },
   }
+}
+
+function bytesToBase64(bytes: Uint8Array): string {
+  return btoa(String.fromCharCode(...bytes))
 }

@@ -18,6 +18,7 @@ outer Host projections and do not alter this Profile.
 ```ts
 ingestCommerceInputs(files, limits?): CommerceIngestionResult
 normalizeProductRecord(input): ProductFacts
+selectCommerceIdentityAnchor(facts): ProductFact
 compileGenerationPolicy(policy): CompiledGenerationPolicy
 compileCommerceProduction(input): Promise<{ contract: ExecutionContract; plan: ExecutionPlan }>
 evaluateCommerceProduction(input): CommerceEvaluationResult
@@ -37,6 +38,10 @@ their paths.
   supplied logical root. Product records normalize into `product-facts.v1`
   with JSON Pointer lineage and explicit unknown facts; HTML and media URLs
   remain untrusted data.
+- The first explicit product-image fact is the immutable visual identity
+  anchor. Its media role, source JSON Pointer, ordered descriptor, retained
+  bytes, and content hash remain bound together. Description media and later
+  SKU variants may add evidence but cannot replace or broaden that authority.
 - Catalog selections must use an exact supplied leaf category plus permitted
   key/value enums. A catalog-valid value still requires normalized source-fact
   evidence before it may become an output claim.
@@ -51,6 +56,15 @@ their paths.
   Media kind must match the planned semantic role. Strategy evidence ids are
   unique and close over the actual facts, Plan nodes, routes, validations,
   receipts, and repairs.
+- Localized product claims may be model-authored from resolved facts, but a
+  model cannot predeclare what a later media file contains. After media QA, the
+  Host projects each physical filename against its fixed semantic role; the
+  completed-output validator rejects free-form media descriptions that can
+  drift from delivered bytes.
+- Image production, review, targeted repair, and image-conditioned video must
+  inherit the same identity anchor through the DAG. Visual acceptance has two
+  independent gates: source fidelity against that anchor and intra-run
+  consistency across generated siblings. Passing one never implies the other.
 - The benchmark identity and ordered 16-metric closure are versioned. Status,
   diagnostics, tier summaries, production frontier, and `productionReady` are
   derived; callers cannot author those report projections independently.
@@ -69,10 +83,14 @@ their paths.
 | --- | --- |
 | Traversal, symlink, duplicate, unsupported, oversized, or malformed input | Reject before normalization with an actionable diagnostic |
 | HTML contains scripts or instruction-like text | Extract visible data only; never execute or trust embedded instructions |
+| Description image or another SKU precedes the explicit product image in a flattened media list | Preserve media roles and select the first explicit product image as authority |
+| Generated siblings are mutually consistent but drift from the anchor color/SKU | Fail source fidelity and product-identity preservation |
+| One generated sibling matches the anchor but drifts from accepted siblings | Fail intra-run consistency and target only that sibling for repair |
 | Category is not an exact leaf or attribute enum is absent | Reject catalog selection |
 | Catalog attribute lacks matching normalized source evidence | Reject the localized description |
 | Citation is missing, unresolved, unknown, or semantically unrelated | Emit a blocking fact-consistency finding |
 | Artifact media kind, role, lock, dimensions, type, bytes, or playability differs | Reject only that Outcome frontier and retain valid siblings |
+| Localized copy describes a generated media scene before that artifact exists | Ignore the predeclared description and project the QA-validated physical filename/role closure after execution |
 | Strategy repeats evidence ids or omits actual Plan/receipt/repair closure | Fail strict decode or emit a blocking strategy finding |
 | Benchmark metrics/assertions are missing, duplicated, or reordered | Reject the evidence/report closure |
 | Report status, diagnostics, summary, or binding is caller-tampered | Reject because projections are not derived |
@@ -88,6 +106,9 @@ their paths.
 - Base: one detail image fails dimensions. Evaluation keeps five of six images
   usable, repairs only that Plan node, preserves accepted sibling hashes, and
   records the repair receipt in strategy evidence.
+- Base: all generated images share one color, but the anchor names and depicts
+  another SKU color. The run is internally consistent yet fails source
+  fidelity, so it cannot pass the identity gate or raise the real-Host tier.
 - Bad: a caller marks real video as passed by supplying strings shaped like a
   receipt and artifact reference. Version 1 rejects the report rather than
   treating schema-shaped claims as authoritative Host evidence.
@@ -104,6 +125,10 @@ their paths.
   identity/creative locks, bounded Kernel Plan, accepted receipt closure, media-
   kind matching, 80% image usability, targeted repair, sibling preservation,
   unique strategy evidence, and Kernel gate projection.
+- Media identity: product-image priority over description/SKU media, anchor
+  role and JSON Pointer retention, request-level anchor inheritance through
+  main/detail/repair/video nodes, same-color sibling drift, and the inverse
+  case where siblings agree with one another but disagree with the anchor.
 - Benchmark: exact metric/assertion order, three-tier summaries, mocked/real
   separation, forged real evidence rejection, receipt/artifact binding,
   tampered projection rejection, compatible deltas/regressions, incompatible
@@ -127,4 +152,15 @@ createCommerceProfileBenchmarkReport({
 // verifier can decode receipts and recompute retained artifact-byte evidence.
 const report = createCommerceProfileBenchmarkReport(currentEvidence)
 if (!report.summary.productionReady) scheduleTrustedHostGate(report.summary.productionFrontier)
+```
+
+```ts
+// Wrong: a flat list lets downstream nodes recreate visual authority.
+const sourceUrls = facts.mediaUrls.slice(0, 3)
+
+// Correct: normalization selects one evidence-backed authority; every paid
+// node receives it explicitly and may only narrow the evidence set.
+const anchor = selectCommerceIdentityAnchor(facts)
+await generateMain({ sourceFactIds: [anchor.id] })
+await generateDetail({ sourceFactIds: [anchor.id], parentArtifactId: main.id })
 ```

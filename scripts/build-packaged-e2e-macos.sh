@@ -61,6 +61,10 @@ VITE_CUTOUT_PACKAGED_E2E=1 pnpm tauri build \
 
 app="src-tauri/target/release/bundle/macos/Cutout.app"
 codesign --verify --deep --strict --verbose=2 "$app"
+[[ "$(/usr/libexec/PlistBuddy -c 'Print :LSUIElement' "$app/Contents/Info.plist")" == "true" ]] || {
+  echo "Packaged E2E blocked: bundle is not declared as a background UI agent." >&2
+  exit 3
+}
 signature="$(codesign -dvvv "$app" 2>&1)"
 identifier="$(sed -n 's/^Identifier=//p' <<<"$signature")"
 team="$(sed -n 's/^TeamIdentifier=//p' <<<"$signature")"

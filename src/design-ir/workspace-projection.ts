@@ -358,6 +358,7 @@ function productionEvidenceForSlice(
         },
         cutoutParams: state.evidence?.cutoutParams,
         boardDiagnostics: state.evidence?.boardDiagnostics,
+        sliceCoverage: state.evidence?.sliceCoverage,
         qaVerdict: state.evidence?.qaVerdict,
         maskArtifactId: state.evidence?.maskArtifactId,
         providerRoute: state.evidence?.providerRoute,

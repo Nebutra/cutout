@@ -23,20 +23,24 @@ const storage = installE2eLocalStorage()
 const uploadedBytes = Uint8Array.of(82, 73, 70, 70, 9, 8, 7, 6)
 const decodedImages: Blob[] = []
 
-vi.mock('@/services/ai/model-assignment.local', () => ({
-  loadCapabilityBindings: async () => ({
+vi.mock('@/services/ai/model-assignment.local', () => {
+  const loadBindings = async () => ({
     version: 'model-assignments.v2' as const,
     bindings: {
       text: { providerId: PROVIDER_ID, model: MODEL },
       vision: { providerId: PROVIDER_ID, model: MODEL },
     },
     descriptors: [],
-  }),
+  })
+  return {
+  loadCapabilityBindings: loadBindings,
+  loadRuntimeCapabilityBindings: loadBindings,
   loadAssignments: async (): Promise<ModelAssignments> => ({
     chat: { providerId: PROVIDER_ID, model: MODEL },
   }),
   setAssignment: async () => ({}),
-}))
+  }
+})
 
 ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 

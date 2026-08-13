@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { BoardDiagnostics } from '@/algorithm/boardDiagnostics'
+import type { PipelineForegroundCoverage } from '@/algorithm/runPipeline'
 import { ok, err } from '@/services/types'
 import type { EditImageInput, GeneratedAsset } from '@/services/ai/types'
 import type { PrototypePage, PrototypeRegion } from './prototype-plan'
@@ -13,6 +14,7 @@ import {
   selectBoardCutoutRegions,
   selectPagesWithBoardCutouts,
   type RegionBreakdownDeps,
+  type RegionImageRoute,
 } from './region-deconstruct'
 
 function region(overrides: Partial<PrototypeRegion> & { id: string; name: string }): PrototypeRegion {
@@ -22,7 +24,7 @@ function region(overrides: Partial<PrototypeRegion> & { id: string; name: string
     complexity: 'medium',
     decompositionStrategy: 'direct',
     assetRoute: 'board-cutout',
-    assetOpportunities: [],
+    assetOpportunities: ['reusable visual asset'],
     ...overrides,
   } as PrototypeRegion
 }
@@ -47,6 +49,13 @@ const COMPLIANT_DIAGNOSTICS: BoardDiagnostics = {
   borderWhiteRatio: 1,
   whiteRatio: 0.9,
   compliant: true,
+}
+
+const COMPLETE_COVERAGE: PipelineForegroundCoverage = {
+  totalForegroundPixelCount: 100,
+  retainedForegroundPixelCount: 100,
+  omittedForegroundPixelCount: 0,
+  retainedRatio: 1,
 }
 
 function sliceInput(id: string, regionId: string): SliceInput {
@@ -82,6 +91,7 @@ function makeDeps(
     slice: async (_bitmap, regionId) => ({
       slices: [sliceInput(`slice-${regionId}`, regionId)],
       diagnostics: COMPLIANT_DIAGNOSTICS,
+      coverage: COMPLETE_COVERAGE,
     }),
     ...overrides,
   }
@@ -90,12 +100,13 @@ function makeDeps(
 const IMAGE = { providerId: 'p', model: 'gpt-image-1' }
 
 describe('selectBoardCutoutRegions', () => {
-  it('keeps only board-cutout regions, in order', () => {
+  it('keeps only non-empty board-cutout regions, in order', () => {
     const p = page([
       region({ id: 'a', name: 'Hero', assetRoute: 'board-cutout' }),
       region({ id: 'b', name: 'Copy', assetRoute: 'ignore-code-ui' }),
       region({ id: 'c', name: 'Gallery', assetRoute: 'board-cutout' }),
       region({ id: 'd', name: 'Splash', assetRoute: 'direct-generate' }),
+      region({ id: 'e', name: 'Empty board', assetRoute: 'board-cutout', assetOpportunities: [] }),
     ])
     expect(selectBoardCutoutRegions(p).map((r) => r.id)).toEqual(['a', 'c'])
   })
@@ -200,6 +211,7 @@ describe('runRegionBreakdown', () => {
       slice: async (_bitmap, regionId) => ({
         slices: [sliceInput(`slice-${regionId}`, regionId)],
         diagnostics: regionId === 'c' ? nonCompliant : COMPLIANT_DIAGNOSTICS,
+        coverage: COMPLETE_COVERAGE,
       }),
     })
     const result = await runRegionBreakdown(deps, {
@@ -238,6 +250,7 @@ describe('runRegionBreakdown', () => {
         return {
           slices: [sliceInput(`slice-${regionId}`, regionId)],
           diagnostics: COMPLIANT_DIAGNOSTICS,
+          coverage: COMPLETE_COVERAGE,
         }
       },
     })
@@ -278,7 +291,11 @@ describe('runRegionBreakdown', () => {
     const errors: string[] = []
     const onRegionSliced = vi.fn()
     const deps = makeDeps({
-      slice: async () => ({ slices: [], diagnostics: COMPLIANT_DIAGNOSTICS }),
+      slice: async () => ({
+        slices: [],
+        diagnostics: COMPLIANT_DIAGNOSTICS,
+        coverage: COMPLETE_COVERAGE,
+      }),
     })
 
     const result = await runRegionBreakdown(deps, {
@@ -373,6 +390,175 @@ describe('runRegionBreakdown', () => {
     expect(result.sliceCount).toBe(0)
   })
 
+  it('retries a transient board transport once but not an output failure', async () => {
+    let transientCalls = 0
+    const transient = makeDeps({
+      generateAsset: async () => {
+        transientCalls += 1
+        return transientCalls === 1
+          ? err('HTTP 502 bad gateway')
+          : ok([{ mediaType: 'image/png', bytes: new Uint8Array([137]) }])
+      },
+    })
+    await expect(runRegionBreakdown(transient, {
+      page: page([region({ id: 'a', name: 'Hero' })]),
+      pageBytes: new Uint8Array([1]),
+      image: IMAGE,
+      transientRetries: 1,
+      onRegionSliced: () => {},
+    })).resolves.toMatchObject({ failedRegionIds: [], sliceCount: 1 })
+    expect(transientCalls).toBe(2)
+
+    let outputCalls = 0
+    const outputFailure = makeDeps({
+      generateAsset: async () => {
+        outputCalls += 1
+        return err('The model returned no board image for this region.')
+      },
+    })
+    await expect(runRegionBreakdown(outputFailure, {
+      page: page([region({ id: 'a', name: 'Hero' })]),
+      pageBytes: new Uint8Array([1]),
+      image: IMAGE,
+      transientRetries: 1,
+      onRegionSliced: () => {},
+    })).resolves.toMatchObject({ failedRegionIds: ['a'], sliceCount: 0 })
+    expect(outputCalls).toBe(1)
+  })
+
+  it('re-resolves the exact route for a transient retry and reviews the successful route', async () => {
+    const firstRoute: RegionImageRoute = {
+      assignment: { providerId: 'pressured', model: 'edit-a' },
+      operation: 'image-edit',
+    }
+    const recoveredRoute: RegionImageRoute = {
+      assignment: { providerId: 'healthy', model: 'generate-b' },
+      operation: 'image-generation',
+    }
+    const routes = [firstRoute, recoveredRoute]
+    const editImage = vi.fn(async (_input: EditImageInput) => err('HTTP 502 bad gateway'))
+    const generateImages = vi.fn(async (
+      _input: Parameters<RegionBreakdownDeps['generation']['generateImages']>[0],
+    ) =>
+      ok([{ mediaType: 'image/png' as const, bytes: new Uint8Array([137]) }]),
+    )
+    const reviewedRoutes: RegionImageRoute[] = []
+    const publishedRoutes: RegionImageRoute[] = []
+    const deps: RegionBreakdownDeps = {
+      ...makeDeps(),
+      generation: { editImage, generateImages },
+      reviewBoard: async (_bytes, _checklist, _signal, route) => {
+        reviewedRoutes.push(route)
+        return { pass: true, failures: [] }
+      },
+    }
+
+    await expect(runRegionBreakdown(deps, {
+      page: page([region({ id: 'a', name: 'Hero' })]),
+      pageBytes: new Uint8Array([1]),
+      image: IMAGE,
+      transientRetries: 1,
+      resolveImageRoute: () => routes.shift()!,
+      onRegionSliced: (_regionId, _slices, evidence) => {
+        publishedRoutes.push(evidence.generationRoute)
+      },
+    })).resolves.toMatchObject({ failedRegionIds: [], sliceCount: 1 })
+
+    expect(editImage).toHaveBeenCalledOnce()
+    expect(editImage.mock.calls[0]![0]).toMatchObject({
+      providerId: 'pressured',
+      model: 'edit-a',
+    })
+    expect(generateImages).toHaveBeenCalledOnce()
+    expect(generateImages.mock.calls[0]![0]).toMatchObject({
+      providerId: 'healthy',
+      model: 'generate-b',
+    })
+    expect(reviewedRoutes).toEqual([recoveredRoute])
+    expect(publishedRoutes).toEqual([recoveredRoute])
+  })
+
+  it('dispatches a Google edit strategy through multimodal generation with every reference', async () => {
+    const route: RegionImageRoute = {
+      assignment: { providerId: 'google', model: 'gemini-image' },
+      operation: 'image-edit',
+      transportStrategy: 'google-multimodal-generate',
+    }
+    const editImage = vi.fn(async () => err('Google multipart edit is unavailable.'))
+    const generateImages = vi.fn(async (
+      _input: Parameters<RegionBreakdownDeps['generation']['generateImages']>[0],
+    ) =>
+      ok([{ mediaType: 'image/png' as const, bytes: new Uint8Array([137]) }]),
+    )
+    const publishedRoutes: RegionImageRoute[] = []
+
+    await expect(runRegionBreakdown({
+      ...makeDeps(),
+      generation: { editImage, generateImages },
+    }, {
+      page: page([region({ id: 'a', name: 'Hero' })]),
+      pageBytes: new Uint8Array([9]),
+      referenceImages: [new Uint8Array([8]), new Uint8Array([7])],
+      image: route.assignment,
+      resolveImageRoute: () => route,
+      onRegionSliced: (_regionId, _slices, evidence) => {
+        publishedRoutes.push(evidence.generationRoute)
+      },
+    })).resolves.toMatchObject({ failedRegionIds: [], sliceCount: 1 })
+
+    expect(editImage).not.toHaveBeenCalled()
+    expect(generateImages).toHaveBeenCalledOnce()
+    expect(generateImages.mock.calls[0]![0].input).toEqual([
+      expect.objectContaining({ type: 'text' }),
+      { type: 'image', image: new Uint8Array([9]) },
+      { type: 'image', image: new Uint8Array([8]) },
+      { type: 'image', image: new Uint8Array([7]) },
+    ])
+    expect(publishedRoutes).toEqual([route])
+  })
+
+  it('re-resolves the exact route for each QA regeneration', async () => {
+    const firstRoute: RegionImageRoute = {
+      assignment: { providerId: 'provider-a', model: 'edit-a' },
+      operation: 'image-edit',
+    }
+    const secondRoute: RegionImageRoute = {
+      assignment: { providerId: 'provider-b', model: 'edit-b' },
+      operation: 'image-edit',
+    }
+    const routes = [firstRoute, secondRoute]
+    const editImage = vi.fn(async (_input: EditImageInput) =>
+      ok([{ mediaType: 'image/png' as const, bytes: new Uint8Array([137]) }]),
+    )
+    const reviewedRoutes: RegionImageRoute[] = []
+    const deps: RegionBreakdownDeps = {
+      ...makeDeps(),
+      generation: { ...makeDeps().generation, editImage },
+      reviewBoard: async (_bytes, _checklist, _signal, route) => {
+        reviewedRoutes.push(route)
+        return reviewedRoutes.length === 1
+          ? { pass: false, failures: ['missing declared asset'] }
+          : { pass: true, failures: [] }
+      },
+    }
+
+    await expect(runRegionBreakdown(deps, {
+      page: page([region({ id: 'a', name: 'Hero' })]),
+      pageBytes: new Uint8Array([1]),
+      image: IMAGE,
+      transientRetries: 0,
+      qaMaxRetries: 1,
+      resolveImageRoute: () => routes.shift()!,
+      onRegionSliced: () => {},
+    })).resolves.toMatchObject({ failedRegionIds: [], sliceCount: 1 })
+
+    expect(editImage.mock.calls.map(([input]) => [input.providerId, input.model])).toEqual([
+      ['provider-a', 'edit-a'],
+      ['provider-b', 'edit-b'],
+    ])
+    expect(reviewedRoutes).toEqual([firstRoute, secondRoute])
+  })
+
   it('names each region with region context and namespaces names by region slug', async () => {
     const contexts: string[] = []
     const named: Array<{ id: string; name: string }> = []
@@ -390,6 +576,7 @@ describe('runRegionBreakdown', () => {
       onRegionSliced: () => {},
       onRegionNamed: (renames) => named.push(...renames),
     })
+    await vi.waitFor(() => expect(named).toHaveLength(1))
     // The naming call was primed with the region's semantics.
     expect(contexts[0]).toContain('Hero Banner')
     expect(contexts[0]).toContain('a big hero')
@@ -457,10 +644,37 @@ describe('runRegionBreakdown', () => {
       onRegionNamed: (renames) => named.push(...renames),
       onRegionError: (regionId, message) => errors.push(`${regionId}:${message}`),
     })
+    await vi.waitFor(() => expect(errors).toHaveLength(1))
     expect(streamed).toEqual(['a']) // slices still streamed
     expect(named).toEqual([]) // names not applied
     expect(errors).toEqual(['a:naming: vision timed out'])
     expect(result.sliceCount).toBe(1) // slice count unaffected
+  })
+
+  it('settles required slices when optional naming never resolves', async () => {
+    let namingSignal: AbortSignal | undefined
+    const errors: string[] = []
+    const deps: RegionBreakdownDeps = {
+      ...makeDeps(),
+      nameRegion: async (_bytes, _slices, _context, signal) => {
+        namingSignal = signal
+        return new Promise(() => {})
+      },
+    }
+
+    const result = await runRegionBreakdown(deps, {
+      page: page([region({ id: 'a', name: 'Hero' })]),
+      pageBytes: new Uint8Array([1]),
+      image: IMAGE,
+      namingTimeoutMs: 5,
+      onRegionSliced: () => {},
+      onRegionNamed: () => {},
+      onRegionError: (_regionId, message) => errors.push(message),
+    })
+
+    expect(result).toMatchObject({ regionCount: 1, sliceCount: 1, failedRegionIds: [] })
+    await vi.waitFor(() => expect(namingSignal?.aborted).toBe(true))
+    expect(errors).toEqual(['naming: Optional slice naming exceeded its deadline.'])
   })
 })
 

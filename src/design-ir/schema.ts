@@ -8,6 +8,7 @@
 import { z } from 'zod'
 import { prototypePlanSchema } from '@/prototype/prototype-plan'
 import { candidateSetSchema } from '@/candidate-selection/contracts'
+import { sliceCoverageSchema } from '@/asset-production/contracts'
 
 const idSchema = z.string().min(1).max(160)
 const isoDateTimeSchema = z.iso.datetime({ offset: true })
@@ -234,6 +235,7 @@ export const materialProductionEvidenceSchema = z.object({
     whiteRatio: z.number().min(0).max(1),
     compliant: z.boolean(),
   }).strict().optional(),
+  sliceCoverage: sliceCoverageSchema.optional(),
   qaVerdict: z.object({
     pass: z.boolean(),
     failures: z.array(z.string().min(1).max(2_000)),

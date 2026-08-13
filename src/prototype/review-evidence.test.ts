@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
+  countPassingPrototypePageReviews,
+  isPassingPrototypePageReview,
   prototypePageReviewRecordSchema,
   prototypeResourceReviewRecordSchema,
 } from './review-evidence'
@@ -49,5 +51,34 @@ describe('prototype review evidence authority', () => {
       observationalIssues: [],
       ...unavailable,
     }).success).toBe(false)
+  })
+
+  it('counts only valid passing page receipts as completed delivery work', () => {
+    const passing = {
+      version: 'prototype-page-review.v1',
+      artifactSha256: digest,
+      reviewer,
+      verdict: { pass: true, failures: [] },
+      reviewedAt,
+    }
+    const rejected = {
+      ...passing,
+      verdict: { pass: false, failures: ['The page is incomplete.'] },
+    }
+    const unavailable = {
+      ...passing,
+      reviewer: null,
+      verdict: { pass: false, failures: ['Visual QA unavailable.'], unavailable: true },
+    }
+
+    expect(isPassingPrototypePageReview(passing)).toBe(true)
+    expect(isPassingPrototypePageReview(rejected)).toBe(false)
+    expect(isPassingPrototypePageReview(unavailable)).toBe(false)
+    expect(countPassingPrototypePageReviews([
+      { review: passing },
+      { review: rejected },
+      { review: unavailable },
+      {},
+    ])).toBe(1)
   })
 })

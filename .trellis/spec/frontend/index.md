@@ -32,7 +32,10 @@ more restrictive.
 | [Desktop Release Pipeline](./release-pipeline.md) | Atomic cross-platform native builds, updater evidence, and GitHub Release publication | Filled |
 | [Agent Control Safety](./agent-control-safety.md) | Durable claims, host-issued approval leases, controlled paths, governance evidence, and composite receipts | Filled |
 | [Design OS Kernel](./design-os-kernel.md) | Canonical OutcomeGraph contracts, frozen authority, bounded scheduling, conformance, and replay | Filled |
+| [Design OS Evidence Benchmark](./design-os-benchmark.md) | Versioned maturity stages, Profile projections, evidence-derived progress and release regressions | Filled |
+| [Design Profile Platform](./design-profile-platform.md) | Declarative manifests, trusted registries, Universal Brief composition, lifecycle closure, and promotion gates | Filled |
 | [Commerce Production Profile](./commerce-production-profile.md) | Fact lineage, offline policy, cross-media evaluation, targeted repair, and evidence-tier benchmarks | Filled |
+| [Game Asset Profile](./game-asset-profile.md) | Typed sprite-family roles, identity/scale/anchor locks, targeted repair, layered maps, and delivery | Filled |
 | [Integration Brand Icons](./integration-brand-icons.md) | Local brand asset provenance, theme contrast, accessibility, and visual verification | Filled |
 
 ---

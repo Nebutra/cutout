@@ -916,7 +916,13 @@ export function AgentRunControls({
         </Button>
       ) : null}
       {running && onCancel ? (
-        <Button type="button" variant="destructive" size="sm" onClick={onCancel}>
+        <Button
+          type="button"
+          variant="destructive"
+          size="sm"
+          data-agent-action="cancel-run"
+          onClick={onCancel}
+        >
           <CircleStop /> {labels.cancel}
         </Button>
       ) : null}

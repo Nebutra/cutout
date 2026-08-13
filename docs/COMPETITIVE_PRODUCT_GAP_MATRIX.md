@@ -62,7 +62,7 @@ by reviewed first-party material.
 | Asset lineage | Design IR sources, content hashes, material revisions, provenance, relations and durable receipts | Lineage is technically strong but not legible in normal UX; users need “derived from”, version ancestry, approval and cost on demand | P0 |
 | Structured canvas/editor | Prototype plans and material canvas; Figma snapshot adapter | Generated results are still primarily deliverables, not universally editable structured nodes with stable selection/constraints | P0 |
 | Component system | Explicit component candidates, Design Kit, Astryx binding, starter compiler | No direct canvas-to-explicit-component authoring UX, variant/property editor, story/state matrix or round-trip implementation status | P0 |
-| Motion system | Brand VI catalog can request motion/Lottie output; motion quality gates exist | No Motion IR, timeline, easing/keyframe editor, Lottie validation/render preview or reduced-motion authoring | P1 |
+| Motion system | Design IR carries motion tokens and governance samples; Brand VI can request motion/Lottie output | No executable timeline, easing/keyframe editor, Lottie validation/render preview or reduced-motion authoring | P1 |
 | Collaboration | Local projects, durable runs and external controller protocol | No accounts, comments, multiplayer, branch review, permissions or remote project service; manifest explicitly states this | P1 |
 | Publish/delivery | Verified Design/Brand/Starter exports; GitHub P1 previewed PR/check publish; Notion host adapter | No unified release center covering web preview, package, design handoff, campaign bundle and integration receipts | P1 |
 | Reference search | Everything Inbox accepts explicit URL descriptors and files | No web/reference search; Refero-like discovery, rights filters, boards and reference dedupe are absent | P1 |
@@ -134,7 +134,7 @@ before presenting the final receipt.
 
 ### P1
 
-- Motion IR plus Lottie JSON schema validation, runtime preview, reduced-motion
+- Motion timeline plus Lottie JSON schema validation, runtime preview, reduced-motion
   fallback and frame/easing inspection.
 - Reference discovery service with query, product/platform/pattern filters,
   board collection, duplicate detection and explicit license/provenance state.

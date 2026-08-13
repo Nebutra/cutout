@@ -47,6 +47,7 @@ export interface AiSetupProjection {
   readonly status: 'checking' | 'ready' | 'action-required'
   readonly rows: readonly CapabilityReadinessRow[]
   readonly verifiedProviders: readonly ProviderConfig[]
+  readonly automaticCandidates: readonly ProviderDiscoveryCandidate[]
   readonly importableCandidates: readonly ProviderDiscoveryCandidate[]
 }
 
@@ -160,10 +161,14 @@ export function projectAiSetup(input: AiSetupProjectionInput): AiSetupProjection
   const verifiedProviders = providers.filter(
     (provider) => provider.enabled && providerVerificationIsVerified(input.verifications[provider.id]),
   )
-  const importableCandidates = (input.candidates ?? []).filter(
+  const automaticCandidates = (input.candidates ?? []).filter(
     (candidate) => candidate.credential.available
-      && candidate.credential.importable
-      && !providers.some((provider) => discoveredCandidateMatchesProvider(candidate, provider)),
+      && candidate.credential.importable,
+  )
+  const importableCandidates = automaticCandidates.filter(
+    (candidate) => !providers.some(
+      (provider) => discoveredCandidateMatchesProvider(candidate, provider),
+    ),
   )
 
   const configurationPending = input.providersState === 'pending' || input.bindingsState === 'pending'
@@ -305,5 +310,5 @@ export function projectAiSetup(input: AiSetupProjectionInput): AiSetupProjection
     : rows.every((row) => row.status === 'ready')
       ? 'ready' as const
       : 'action-required' as const
-  return { status, rows, verifiedProviders, importableCandidates }
+  return { status, rows, verifiedProviders, automaticCandidates, importableCandidates }
 }

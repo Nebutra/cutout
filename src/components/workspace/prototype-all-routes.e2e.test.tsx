@@ -16,14 +16,17 @@ import type { ModelAssignments } from '@/services/ai/model-assignment-types'
 import { capabilityBindingsSchema } from '@/services/ai/model-capabilities'
 import type { PrototypePage, PrototypePlan } from '@/prototype/prototype-plan'
 import { compilePrototypeImageRequestBudget } from '@/prototype/production-throughput'
+import { designSystemMarkdownValidationError } from '@/prototype/design-system-validation'
+import { pngDimensionFixture } from '@/lib/raster-dimensions.test-fixture'
+import { readRasterDimensions } from '@/lib/raster-dimensions'
 import type { VisualGenerationTask } from '@/visual-generation'
 import { IntentWorkspace } from './IntentWorkspace'
 import { installE2eLocalStorage } from './intent-workspace.e2e.testkit'
 
 const PROVIDER_ID = 'provider:e2e'
 const CHAT_MODEL = 'chat-e2e'
-const IMAGE_MODEL = 'image-e2e'
-const EDIT_MODEL = 'flux-2-max'
+const IMAGE_MODEL = 'gpt-image-2'
+const EDIT_MODEL = IMAGE_MODEL
 
 const desktopHarness = vi.hoisted(() => ({
   artifacts: new Map<string, { bytes: Uint8Array; mediaType: string }>(),
@@ -33,28 +36,47 @@ const desktopHarness = vi.hoisted(() => ({
   imageToolCallIds: [] as string[],
   imageToolSignals: [] as Array<AbortSignal | undefined>,
   imageToolReferenceCounts: [] as number[],
+  imageToolReferenceBytes: [] as Uint8Array[][],
+  imageToolOutputs: new Map<string, Uint8Array>(),
   imageToolModels: [] as string[],
   imageToolFailure: null as null | ((toolCallId: string) => Error | null),
   imageToolWait: null as null | ((toolCallId: string) => Promise<void>),
+  activeImageCalls: 0,
+  maximumImageConcurrency: 0,
   boardPrompts: [] as string[],
   boardFailure: null as null | ((prompt: string) => Error | null),
   activeBoardCalls: 0,
   maximumBoardConcurrency: 0,
+  sliceCoverageOmission: null as null | ((regionId: string) => boolean),
   sliceSequence: 0,
   sequence: 0,
   plannerCalls: 0,
-  successfulAlternativePlannerCalls: 0,
   plannerPrompts: [] as string[],
+  progressivePlannerStages: [] as string[],
   plannerFailure: null as null | ((call: number, prompt: string) => string | null),
+  pageQaCalls: 0,
+  pageQaVerdict: null as null | ((checklist: string, call: number) => {
+    readonly pass: boolean
+    readonly failures: readonly string[]
+  }),
   providerTests: 0,
   directToolGateCalls: 0,
   directTextCalls: 0,
   editRouteEnabled: true,
+  taskFitRouteEnabled: true,
 }))
 
 const codexHarness = vi.hoisted(() => ({
   enabled: false,
   turns: 0,
+  plannerStages: [] as string[],
+}))
+
+const runtimeConfigHarness = vi.hoisted(() => ({
+  configured: true,
+  providerLoads: 0,
+  assignmentLoads: 0,
+  bindingLoads: 0,
 }))
 
 function artifactId(sequence: number): string {
@@ -72,13 +94,23 @@ function persistArtifact(bytes: Uint8Array, mediaType: string): string {
   return id
 }
 
-vi.mock('@/services/ai/model-assignment.local', () => ({
-  loadCapabilityBindings: async () => capabilityBindingsSchema.parse({
+vi.mock('@/services/ai/model-assignment.local', () => {
+  const loadBindings = async () => {
+    runtimeConfigHarness.bindingLoads += 1
+    if (!runtimeConfigHarness.configured) {
+      return capabilityBindingsSchema.parse({
+        version: 'model-assignments.v2',
+        bindings: {},
+        descriptors: [],
+      })
+    }
+    const imageModel = desktopHarness.taskFitRouteEnabled ? IMAGE_MODEL : 'image-e2e'
+    return capabilityBindingsSchema.parse({
     version: 'model-assignments.v2',
     bindings: {
       text: { providerId: PROVIDER_ID, model: CHAT_MODEL },
       vision: { providerId: PROVIDER_ID, model: CHAT_MODEL },
-      'image-generation': { providerId: PROVIDER_ID, model: IMAGE_MODEL },
+      'image-generation': { providerId: PROVIDER_ID, model: imageModel },
       ...(desktopHarness.editRouteEnabled
         ? { 'image-edit': { providerId: PROVIDER_ID, model: EDIT_MODEL } }
         : {}),
@@ -86,7 +118,7 @@ vi.mock('@/services/ai/model-assignment.local', () => ({
     descriptors: [
       {
         providerId: PROVIDER_ID,
-        model: IMAGE_MODEL,
+        model: imageModel,
         capabilities: ['image-generation'],
         source: 'verified-catalog',
         evidence: [
@@ -105,17 +137,30 @@ vi.mock('@/services/ai/model-assignment.local', () => ({
           }]
         : []),
     ],
-  }),
-  loadAssignments: async (): Promise<ModelAssignments> => ({
-    chat: { providerId: PROVIDER_ID, model: CHAT_MODEL },
-    image: { providerId: PROVIDER_ID, model: IMAGE_MODEL },
-  }),
+    })
+  }
+  return {
+  loadCapabilityBindings: loadBindings,
+  loadRuntimeCapabilityBindings: loadBindings,
+  loadAssignments: async (): Promise<ModelAssignments> => {
+    runtimeConfigHarness.assignmentLoads += 1
+    return runtimeConfigHarness.configured
+      ? {
+          chat: { providerId: PROVIDER_ID, model: CHAT_MODEL },
+          image: {
+            providerId: PROVIDER_ID,
+            model: desktopHarness.taskFitRouteEnabled ? IMAGE_MODEL : 'image-e2e',
+          },
+        }
+      : {}
+  },
   setAssignment: async () => ({}),
-}))
+  }
+})
 
 vi.mock('@tauri-apps/api/core', () => ({
   invoke: async (command: string, args?: {
-    input?: { requestId?: string; contextRevision?: string }
+    input?: { requestId?: string; contextRevision?: string; prompt?: string }
   }) => {
     if (!codexHarness.enabled) {
       throw new Error('Tauri invoke is not available in this component E2E test')
@@ -135,63 +180,18 @@ vi.mock('@tauri-apps/api/core', () => ({
       throw new Error(`Unexpected native command: ${command}`)
     }
     codexHarness.turns += 1
+    const prompt = args?.input?.prompt ?? ''
+    const plannerStage = codexPlannerStage(prompt)
+    if (plannerStage) codexHarness.plannerStages.push(plannerStage)
     return {
-      output: {
-        action: 'proceed',
-        reply: null,
-        generation: {
-          refinedBrief: 'A focused field-notes route with one reusable illustrated marker.',
-          planningSeed: {
-            product: {
-              name: 'Field Notes',
-              projectName: 'Field Notes',
-              summary: 'A route journal for documenting urban walks.',
-              audience: 'Independent walkers',
-              primaryGoal: 'Turn observations into a reusable route story.',
-              platform: 'responsive web app',
-            },
-            rationale: 'One focused route is the complete product surface for this field-note concept.',
-            suites: [{
-              direction: {
-                id: 'field-guide',
-                label: 'Field guide',
-                thesis: 'Place identity and observations drive the experience.',
-                vary: ['material density'],
-                preserve: ['route accuracy'],
-              },
-              pages: [{
-                id: 'route-story',
-                name: 'Route story',
-                route: '/routes/story',
-                purpose: 'Read one route and reuse its illustrated place marker.',
-                viewport: {
-                  platform: 'desktop',
-                  width: 1440,
-                  height: 1000,
-                  scroll: 'long-scroll',
-                },
-                materials: [{
-                  id: 'place-marker',
-                  name: 'Place marker',
-                  description: 'A reusable illustrated marker for the route.',
-                  production: 'direct-generate',
-                }],
-              }],
-            }],
-          },
-        },
-        clarification: null,
-        material: null,
-        regeneration: null,
-        targetPageNames: null,
-      },
+      output: codexTurnOutput(prompt),
       receipt: {
         protocol: 'cutout.codex-execution.v1',
         runtimeId: 'codex-system',
         runtimeVersion: '0.146.0',
         bindingId: 'codex:field-notes',
         requestId: args?.input?.requestId,
-        turnId: 'turn.field-notes',
+        turnId: `turn.field-notes.${codexHarness.turns}`,
         contextRevision: args?.input?.contextRevision,
         contextDigest: 'a'.repeat(64),
         outputDigest: 'b'.repeat(64),
@@ -216,7 +216,7 @@ vi.mock('@/agent-runtime/use-desktop-tool-loop', () => ({
       readonly prompt?: string
       readonly toolCallId: string
       readonly signal?: AbortSignal
-      readonly inputs?: readonly unknown[]
+      readonly inputs?: readonly { readonly bytes?: Uint8Array }[]
       readonly image: { readonly model: string }
     }) => {
       const prompt = request.prompt ?? ''
@@ -224,19 +224,40 @@ vi.mock('@/agent-runtime/use-desktop-tool-loop', () => ({
       desktopHarness.imageToolCallIds.push(request.toolCallId)
       desktopHarness.imageToolSignals.push(request.signal)
       desktopHarness.imageToolReferenceCounts.push(request.inputs?.length ?? 0)
+      desktopHarness.imageToolReferenceBytes.push(
+        request.inputs?.map(({ bytes }) => bytes ? new Uint8Array(bytes) : new Uint8Array()) ?? [],
+      )
       desktopHarness.imageToolModels.push(request.image.model)
-      await desktopHarness.imageToolWait?.(request.toolCallId)
-      const failure = desktopHarness.imageToolFailure?.(request.toolCallId)
-      if (failure) throw failure
-      const marker = prompt.includes('Editorial Ledger')
-        ? 21
-        : prompt.includes('Workshop Console')
-          ? 31
-          : 11
-      return [{
-        bytes: new Uint8Array([marker, marker + 1, marker + 2, marker + 3]),
-        mediaType: 'image/png',
-      }]
+      desktopHarness.activeImageCalls += 1
+      desktopHarness.maximumImageConcurrency = Math.max(
+        desktopHarness.maximumImageConcurrency,
+        desktopHarness.activeImageCalls,
+      )
+      try {
+        const wait = desktopHarness.imageToolWait?.(request.toolCallId)
+        if (wait) {
+          await waitForMockImageTool(wait, request.signal)
+        }
+        const failure = desktopHarness.imageToolFailure?.(request.toolCallId)
+        if (failure) throw failure
+        const marker = prompt.includes('Editorial Ledger')
+          ? 21
+          : prompt.includes('Workshop Console')
+            ? 31
+            : 11
+        const bytes = pngDimensionFixture(
+          1440,
+          960,
+          marker + (desktopHarness.imageToolCallIds.length % 20),
+        )
+        desktopHarness.imageToolOutputs.set(request.toolCallId, bytes)
+        return [{
+          bytes,
+          mediaType: 'image/png',
+        }]
+      } finally {
+        desktopHarness.activeImageCalls -= 1
+      }
     },
     visualRuntime: {
       execute: async (_runId: string, task: VisualGenerationTask) => {
@@ -264,11 +285,14 @@ vi.mock('@/agent-runtime/use-desktop-tool-loop', () => ({
 
 vi.mock('@/lib/image', async (importOriginal) => ({
   ...await importOriginal<typeof import('@/lib/image')>(),
-  decodeImage: async () => ({
-    width: 300,
-    height: 300,
-    close: () => {},
-  } as unknown as ImageBitmap),
+  decodeImage: async (blob: Blob) => {
+    const dimensions = readRasterDimensions(new Uint8Array(await blob.arrayBuffer()))
+    return {
+      width: dimensions?.width ?? 300,
+      height: dimensions?.height ?? 300,
+      close: () => {},
+    } as unknown as ImageBitmap
+  },
 }))
 
 vi.mock('@/prototype/region-deconstruct', async (importOriginal) => ({
@@ -288,6 +312,9 @@ vi.mock('@/prototype/region-deconstruct', async (importOriginal) => ({
     const rows = Math.ceil(materialCount / columns)
     const cellWidth = 300 / columns
     const cellHeight = 300 / rows
+    const omitForeground = desktopHarness.sliceCoverageOmission?.(regionId) === true
+    const totalForegroundPixelCount = materialCount * 10_000
+    const omittedForegroundPixelCount = omitForeground ? 20 : 0
     return {
       slices: Array.from({ length: materialCount }, (_, index) => {
         desktopHarness.sliceSequence += 1
@@ -318,6 +345,15 @@ vi.mock('@/prototype/region-deconstruct', async (importOriginal) => ({
         }
       }),
       diagnostics: { borderWhiteRatio: 1, whiteRatio: 0.9, compliant: true },
+      coverage: {
+        totalForegroundPixelCount,
+        retainedForegroundPixelCount:
+          totalForegroundPixelCount - omittedForegroundPixelCount,
+        omittedForegroundPixelCount,
+        retainedRatio:
+          (totalForegroundPixelCount - omittedForegroundPixelCount)
+          / totalForegroundPixelCount,
+      },
     }
   },
 }))
@@ -519,6 +555,137 @@ const AGENT_PLAN: PrototypePlan = {
   },
 }
 
+const FIELD_NOTES_PLAN: PrototypePlan = {
+  version: 'prototype-plan.v0',
+  product: {
+    name: 'Field Notes',
+    projectName: 'Field Notes',
+    summary: 'A focused place journal for preserving one complete route story.',
+    audience: 'Independent walkers',
+    primaryGoal: 'Turn one field route into a readable story with a reusable marker.',
+    platform: 'responsive web app',
+  },
+  designSystem: {
+    styleSummary: 'Editorial field-guide typography with quiet cartographic accents.',
+    palette: ['paper white', 'graphite ink', 'trail green'],
+    typography: 'Readable editorial serif paired with compact sans-serif labels.',
+    spacing: 'An 8px rhythm with generous narrative breathing room.',
+    componentPrinciples: ['Keep route facts scannable', 'Preserve one calm reading path'],
+    assetDirection: 'Generate only the reusable illustrated route marker.',
+    exploration: {
+      mode: 'auto',
+      decidedBy: 'agent',
+      count: 1,
+      rationale: 'The focused route story has one clear visual identity.',
+      directions: [{
+        id: 'field-guide',
+        label: 'Field Guide',
+        thesis: 'Make the route feel collected, specific, and calm.',
+        vary: ['marker illustration treatment'],
+        preserve: ['route legibility', 'place identity'],
+      }],
+      bounds: { maxCandidates: 8, maxParallelism: 3 },
+    },
+  },
+  pages: [{
+    id: 'route-story',
+    name: 'Route story',
+    route: '/routes/story',
+    purpose: 'Read the complete field-notes route and reuse its visual marker.',
+    viewport: {
+      platform: 'responsive web app',
+      width: 1440,
+      height: 960,
+      scroll: 'single-screen',
+    },
+    regions: [{
+      id: 'route-content',
+      name: 'Route narrative',
+      role: 'story',
+      summary: 'Read the route observations and practical details.',
+      complexity: 'medium',
+      decompositionStrategy: 'region-crop',
+      assetRoute: 'ignore-code-ui',
+      assetOpportunities: [],
+    }, {
+      id: 'route-marker-materials-1-1',
+      name: 'Route marker',
+      role: 'visual-material',
+      summary: 'One reusable illustrated marker for this route.',
+      complexity: 'low',
+      decompositionStrategy: 'region-crop',
+      assetRoute: 'board-cutout',
+      assetOpportunities: ['A reusable illustrated marker for the route.'],
+    }],
+    overlays: [],
+    states: [],
+    interactions: [],
+  }],
+  flows: [{
+    id: 'read-route',
+    name: 'Read route story',
+    goal: 'Read the complete route story.',
+    startPageId: 'route-story',
+    steps: [],
+  }],
+  reviewDocument: {
+    format: 'markdown',
+    primaryFlow: '# Field Notes\n\nRead the complete route story.',
+    fullPlan: '# Field Notes\n\nOne focused route with one reusable marker.',
+  },
+  humanLoop: {
+    mode: 'continue',
+    rationale: 'The focused route, audience, and material need are clear.',
+  },
+}
+
+function codexPlannerStage(prompt: string): string | null {
+  if (prompt.includes('Classify this user turn')) return null
+  if (prompt.includes('CUTOUT_OUTLINE_V2')) return 'outline'
+  if (prompt.includes("Design System architect")) return 'design-foundation'
+  if (prompt.includes('Design System exploration planner')) return 'design-exploration'
+  if (prompt.includes('prototype page architect')) return 'page'
+  if (prompt.includes('prototype page integrity repairer')) return 'page-repair'
+  if (prompt.includes('prototype journey reviewer')) return 'closure'
+  if (prompt.includes('prototype journey closure repairer')) return 'closure-repair'
+  return 'unknown'
+}
+
+function codexTurnOutput(prompt: string): unknown {
+  if (prompt.includes('Classify this user turn')) {
+    return {
+      action: 'proceed',
+      reply: null,
+      generation: {
+        refinedBrief: 'A focused field-notes route with one reusable illustrated marker.',
+      },
+      clarification: null,
+      material: null,
+      regeneration: null,
+      targetPageNames: null,
+    }
+  }
+  const stage = codexPlannerStage(prompt)
+  if (stage === 'outline') return { text: progressiveOutlineProtocol(FIELD_NOTES_PLAN) }
+  if (stage === 'design-foundation') {
+    const { exploration: _exploration, ...foundation } = FIELD_NOTES_PLAN.designSystem
+    return foundation
+  }
+  if (stage === 'design-exploration') {
+    const { bounds: _bounds, ...exploration } = FIELD_NOTES_PLAN.designSystem.exploration!
+    return exploration
+  }
+  if (stage === 'page' || stage === 'page-repair') return FIELD_NOTES_PLAN.pages[0]
+  if (stage === 'closure') {
+    return {
+      flows: FIELD_NOTES_PLAN.flows,
+      reviewDocument: FIELD_NOTES_PLAN.reviewDocument,
+    }
+  }
+  if (stage === 'closure-repair') return { flows: FIELD_NOTES_PLAN.flows }
+  throw new Error(`Unexpected native Codex Planner stage: ${stage}`)
+}
+
 function alternativePlan(
   key: string,
   definitions: readonly [
@@ -594,6 +761,100 @@ const SUITE_PLANS = [
   ]),
 ] as const
 
+function progressiveOutlineProtocol(plan: PrototypePlan): string {
+  return [
+    'CUTOUT_OUTLINE_V2',
+    'VERSION\tprototype-plan.v0',
+    [
+      'PRODUCT',
+      plan.product.name,
+      plan.product.projectName ?? '-',
+      plan.product.summary,
+      plan.product.audience,
+      plan.product.primaryGoal,
+      plan.product.platform,
+    ].join('\t'),
+    ...plan.pages.map((plannedPage) => [
+      'PAGE',
+      plannedPage.id,
+      plannedPage.name,
+      plannedPage.route,
+      plannedPage.purpose,
+      plannedPage.viewport.platform,
+      String(plannedPage.viewport.width),
+      String(plannedPage.viewport.height),
+      plannedPage.viewport.scroll,
+    ].join('\t')),
+    ...plan.flows.map(({ startPageId }) => ['ENTRY', startPageId].join('\t')),
+    ...plan.pages.flatMap((plannedPage) => plannedPage.interactions.flatMap((interaction) =>
+      interaction.action.type === 'navigate'
+        ? [[
+            'EDGE',
+            interaction.id,
+            plannedPage.id,
+            interaction.action.targetPageId,
+            interaction.label,
+            interaction.trigger,
+            interaction.sourceElement,
+            interaction.intent,
+          ].join('\t')]
+        : [])),
+    ['CONTINUE', AGENT_PLAN.humanLoop.rationale].join('\t'),
+    'END',
+  ].join('\n')
+}
+
+function progressiveStage(input: GenerateInput): string | null {
+  const system = input.system ?? ''
+  if (system.includes("Design System architect")) return 'design-foundation'
+  if (system.includes('Design System exploration planner')) return 'design-exploration'
+  if (system.includes('prototype page architect')) return 'page'
+  if (system.includes('prototype journey reviewer')) return 'closure'
+  if (system.includes('prototype route architect')) return 'outline'
+  return null
+}
+
+function inputText(input: GenerateInput): string {
+  return input.input?.flatMap((part) => part.type === 'text' ? [part.text] : []).join('\n') ?? ''
+}
+
+function progressivePageFrom(
+  input: GenerateInput,
+  plan: PrototypePlan,
+): PrototypePage | null {
+  const text = inputText(input)
+  const marker = 'Expand only this exact page outline JSON:\n'
+  const target = text.slice(text.lastIndexOf(marker) + marker.length)
+  if (!target || !text.includes(marker)) return null
+  const parsed = JSON.parse(target) as { id?: string }
+  return plan.pages.find((plannedPage) => plannedPage.id === parsed.id) ?? null
+}
+
+function alternativePlanFrom(prompt: string): PrototypePlan | null {
+  if (prompt.includes('Direction: Editorial Ledger')) return SUITE_PLANS[0]
+  if (prompt.includes('Direction: Signal Grid')) return SUITE_PLANS[1]
+  if (prompt.includes('Direction: Workshop Console')) return SUITE_PLANS[2]
+  return null
+}
+
+async function waitForMockImageTool(
+  wait: Promise<void>,
+  signal: AbortSignal | undefined,
+): Promise<void> {
+  if (!signal) return wait
+  if (signal.aborted) throw new DOMException('Operation aborted', 'AbortError')
+  let abort!: () => void
+  const aborted = new Promise<never>((_resolve, reject) => {
+    abort = () => reject(new DOMException('Operation aborted', 'AbortError'))
+    signal.addEventListener('abort', abort, { once: true })
+  })
+  try {
+    await Promise.race([wait, aborted])
+  } finally {
+    signal.removeEventListener('abort', abort)
+  }
+}
+
 async function generateObject<T>(input: GenerateInput): Promise<Result<T>> {
   if (input.promptRef?.id === 'ui-prototype-planner') {
     const prompt = input.input?.flatMap((part) =>
@@ -603,16 +864,77 @@ async function generateObject<T>(input: GenerateInput): Promise<Result<T>> {
     const call = desktopHarness.plannerCalls++
     const failure = desktopHarness.plannerFailure?.(call, prompt)
     if (failure) return err(failure)
-    if (call === 0) return ok(AGENT_PLAN as T)
-    return ok(SUITE_PLANS[desktopHarness.successfulAlternativePlannerCalls++] as T)
+    const plan = alternativePlanFrom(prompt)
+    return plan ? ok(plan as T) : err('Unknown prototype-suite direction in test planner input.')
+  }
+  const stage = progressiveStage(input)
+  if (stage) {
+    const prompt = inputText(input)
+    const plan = alternativePlanFrom(prompt) ?? AGENT_PLAN
+    desktopHarness.progressivePlannerStages.push(stage)
+    if (stage === 'outline' && plan !== AGENT_PLAN) {
+      desktopHarness.plannerPrompts.push(prompt)
+      const call = desktopHarness.plannerCalls++
+      const failure = desktopHarness.plannerFailure?.(call, prompt)
+      if (failure) return err(failure)
+    }
+    if (stage === 'design-foundation') {
+      const { exploration: _exploration, ...foundation } = plan.designSystem
+      return ok(foundation as T)
+    }
+    if (stage === 'design-exploration') {
+      const exploration = plan.designSystem.exploration!
+      const { bounds: _bounds, ...decision } = exploration
+      return ok(decision as T)
+    }
+    if (stage === 'page') {
+      const plannedPage = progressivePageFrom(input, plan)
+      return plannedPage
+        ? ok(plannedPage as T)
+        : err('Progressive test planner could not resolve the target page.')
+    }
+    if (stage === 'closure') {
+      return ok({
+        flows: plan.flows,
+        reviewDocument: plan.reviewDocument,
+      } as T)
+    }
+    return ok({
+      version: plan.version,
+      product: plan.product,
+      pages: plan.pages.map((plannedPage) => ({
+        id: plannedPage.id,
+        name: plannedPage.name,
+        route: plannedPage.route,
+        purpose: plannedPage.purpose,
+        viewport: plannedPage.viewport,
+      })),
+      entryPageIds: plan.flows.map(({ startPageId }) => startPageId),
+      edges: plan.pages.flatMap((plannedPage) => plannedPage.interactions.flatMap(
+        (interaction) => interaction.action.type === 'navigate'
+          ? [{
+              id: interaction.id,
+              fromPageId: plannedPage.id,
+              toPageId: interaction.action.targetPageId,
+              label: interaction.label,
+              trigger: interaction.trigger,
+              sourceElement: interaction.sourceElement,
+              intent: interaction.intent,
+            }]
+          : [],
+      )),
+      humanLoop: plan.humanLoop,
+    } as T)
   }
   if (input.promptRef?.id === 'ui-generation-qa') {
     const checklist = input.input?.flatMap((part) =>
       part.type === 'text' ? [part.text] : [],
     ).join('\n') ?? ''
-    return ok((checklist.includes('single flat pure-white canvas')
-      ? { pass: false, failures: ['Board spacing needs visual review.'] }
-      : { pass: true, failures: [] }) as T)
+    const call = desktopHarness.pageQaCalls++
+    return ok((desktopHarness.pageQaVerdict?.(checklist, call) ?? {
+      pass: true,
+      failures: [],
+    }) as T)
   }
   if (input.promptRef?.id === 'ui-slice-naming') {
     const text = input.input?.flatMap((part) => part.type === 'text' ? [part.text] : []).join('\n') ?? ''
@@ -652,14 +974,19 @@ function fakeRegistry(): ServiceRegistry {
       deleteApiKey: notUsed,
     },
     providers: {
-      list: async () => [{
-        id: PROVIDER_ID,
-        kind: 'openai',
-        label: 'E2E provider',
-        wireProtocol: 'responses',
-        defaultModel: CHAT_MODEL,
-        enabled: true,
-      }],
+      list: async () => {
+        runtimeConfigHarness.providerLoads += 1
+        return runtimeConfigHarness.configured
+          ? [{
+              id: PROVIDER_ID,
+              kind: 'openai' as const,
+              label: 'E2E provider',
+              wireProtocol: 'responses' as const,
+              defaultModel: CHAT_MODEL,
+              enabled: true,
+            }]
+          : []
+      },
       upsert: notUsed,
       remove: notUsed,
       setKey: notUsed,
@@ -667,7 +994,14 @@ function fakeRegistry(): ServiceRegistry {
       statuses: async (ids) => Object.fromEntries(ids.map((id) => [id, true])),
       test: async () => {
         desktopHarness.providerTests += 1
-        return ok({ model: CHAT_MODEL, models: [CHAT_MODEL, IMAGE_MODEL, EDIT_MODEL] })
+        return ok({
+          model: CHAT_MODEL,
+          models: [
+            CHAT_MODEL,
+            desktopHarness.taskFitRouteEnabled ? IMAGE_MODEL : 'image-e2e',
+            ...(desktopHarness.editRouteEnabled ? [EDIT_MODEL] : []),
+          ],
+        })
       },
     },
     generation: {
@@ -675,7 +1009,13 @@ function fakeRegistry(): ServiceRegistry {
         desktopHarness.directTextCalls += 1
         return ok(DESIGN_MARKDOWN)
       },
-      streamText: async function* () {
+      streamText: async function* (input) {
+        const stage = progressiveStage(input)
+        if (stage === 'outline') {
+          desktopHarness.progressivePlannerStages.push(stage)
+          yield progressiveOutlineProtocol(alternativePlanFrom(inputText(input)) ?? AGENT_PLAN)
+          return
+        }
         yield DESIGN_MARKDOWN
       },
       generateImages: async () => err('not used in this test'),
@@ -745,6 +1085,27 @@ const globalWithBitmap = globalThis as typeof globalThis & {
 }
 globalWithBitmap.createImageBitmap = async () => ({ width: 1440, height: 960, close() {} })
 
+class OffscreenCanvasStub {
+  readonly width: number
+  readonly height: number
+
+  constructor(width: number, height: number) {
+    this.width = width
+    this.height = height
+  }
+  getContext() {
+    return {
+      drawImage() {},
+      getImageData: (_x: number, _y: number, width: number, height: number) => ({
+        data: new Uint8ClampedArray(width * height * 4),
+      }),
+    }
+  }
+}
+
+;(globalThis as typeof globalThis & { OffscreenCanvas: typeof OffscreenCanvas })
+  .OffscreenCanvas = OffscreenCanvasStub as unknown as typeof OffscreenCanvas
+
 describe('brief → every planned route — rendered IntentWorkspace', () => {
   let root: Root | undefined
   let host: HTMLDivElement | undefined
@@ -759,25 +1120,38 @@ describe('brief → every planned route — rendered IntentWorkspace', () => {
     desktopHarness.imageToolCallIds.length = 0
     desktopHarness.imageToolSignals.length = 0
     desktopHarness.imageToolReferenceCounts.length = 0
+    desktopHarness.imageToolReferenceBytes.length = 0
+    desktopHarness.imageToolOutputs.clear()
     desktopHarness.imageToolModels.length = 0
     desktopHarness.imageToolFailure = null
     desktopHarness.imageToolWait = null
+    desktopHarness.activeImageCalls = 0
+    desktopHarness.maximumImageConcurrency = 0
     desktopHarness.boardPrompts.length = 0
     desktopHarness.boardFailure = null
     desktopHarness.activeBoardCalls = 0
     desktopHarness.maximumBoardConcurrency = 0
+    desktopHarness.sliceCoverageOmission = null
     desktopHarness.sliceSequence = 0
     desktopHarness.sequence = 0
     desktopHarness.plannerCalls = 0
-    desktopHarness.successfulAlternativePlannerCalls = 0
     desktopHarness.plannerPrompts.length = 0
+    desktopHarness.progressivePlannerStages.length = 0
     desktopHarness.plannerFailure = null
+    desktopHarness.pageQaCalls = 0
+    desktopHarness.pageQaVerdict = null
     desktopHarness.providerTests = 0
     desktopHarness.directToolGateCalls = 0
     desktopHarness.directTextCalls = 0
     desktopHarness.editRouteEnabled = true
+    desktopHarness.taskFitRouteEnabled = true
     codexHarness.enabled = false
     codexHarness.turns = 0
+    codexHarness.plannerStages.length = 0
+    runtimeConfigHarness.configured = true
+    runtimeConfigHarness.providerLoads = 0
+    runtimeConfigHarness.assignmentLoads = 0
+    runtimeConfigHarness.bindingLoads = 0
     if (!i18n.locale) await activateLocale('en')
   })
 
@@ -816,8 +1190,14 @@ describe('brief → every planned route — rendered IntentWorkspace', () => {
     return host
   }
 
-  it('uses Codex planning output with the direct image route and truthful unavailable QA', async () => {
+  it('uses the vision binding for Codex-planned QA and locally retries a transient direct asset', async () => {
     codexHarness.enabled = true
+    let directFailureInjected = false
+    desktopHarness.boardFailure = () => {
+      if (directFailureInjected) return null
+      directFailureInjected = true
+      return new Error('HTTP 502 bad gateway')
+    }
     const node = mount()
     const textarea = await waitFor(
       () => node.querySelector<HTMLTextAreaElement>('[aria-label="Message the Agent"]'),
@@ -836,13 +1216,24 @@ describe('brief → every planned route — rendered IntentWorkspace', () => {
 
     const snapshot = await waitFor(() => {
       const current = getStoreState().workspaceSnapshot
-      return current?.prototypePages.length === 1 && current.workflowPhase === 'idle'
+      return current?.prototypePages.length === 1 &&
+        Object.values(getStoreState().assetProduction.runs).some(
+          ({ status }) => status === 'completed',
+        ) && !current.runError
         ? current
         : null
     }, 30_000)
 
     expect(snapshot).toBeTruthy()
-    expect(codexHarness.turns).toBe(1)
+    expect(snapshot!.runError).toBeNull()
+    expect(codexHarness.turns).toBe(6)
+    expect(codexHarness.plannerStages).toEqual([
+      'outline',
+      'design-foundation',
+      'design-exploration',
+      'page',
+      'closure',
+    ])
     expect(desktopHarness.directToolGateCalls).toBe(0)
     expect(desktopHarness.plannerCalls).toBe(0)
     expect(desktopHarness.directTextCalls).toBe(0)
@@ -851,25 +1242,89 @@ describe('brief → every planned route — rendered IntentWorkspace', () => {
       expect.stringMatching(/:design-system:/),
       expect.stringMatching(/:prototype-page:/),
     ]))
+    expect(directFailureInjected).toBe(true)
     expect(desktopHarness.boardPrompts).toEqual([
+      expect.stringContaining('A reusable illustrated marker for the route.'),
       expect.stringContaining('A reusable illustrated marker for the route.'),
     ])
     const productionRuns = Object.values(getStoreState().assetProduction.runs)
     expect(productionRuns).toHaveLength(1)
+    expect(productionRuns[0]).toMatchObject({ status: 'completed' })
     expect(Object.values(productionRuns[0]!.tasks)).toEqual([
       expect.objectContaining({ status: 'ready' }),
     ])
     expect(snapshot!.prototypePages[0]!.review).toMatchObject({
-      reviewer: null,
-      verdict: { unavailable: true },
+      reviewer: { providerId: PROVIDER_ID, model: CHAT_MODEL },
+      verdict: { pass: true },
     })
     expect(snapshot!.prototypePlan?.pages.map((page) => page.route))
       .toEqual(['/routes/story'])
-  }, 30_000)
+  }, 60_000)
 
-  it('fails before page generation when no reviewed edit route can preserve its references', async () => {
+  it('loads one authoritative runtime snapshot when AI setup changes after queries mounted', async () => {
+    codexHarness.enabled = true
+    runtimeConfigHarness.configured = false
+    const node = mount()
+    const textarea = await waitFor(
+      () => node.querySelector<HTMLTextAreaElement>('[aria-label="Message the Agent"]'),
+    )
+    await waitFor(() => runtimeConfigHarness.providerLoads > 0
+      && runtimeConfigHarness.assignmentLoads > 0
+      && runtimeConfigHarness.bindingLoads > 0)
+    const cachedLoads = {
+      providers: runtimeConfigHarness.providerLoads,
+      assignments: runtimeConfigHarness.assignmentLoads,
+      bindings: runtimeConfigHarness.bindingLoads,
+    }
+
+    // Automatic setup updates the native/local stores after the workspace
+    // queries mounted. Deliberately do not invalidate the stale empty cache.
+    runtimeConfigHarness.configured = true
+    act(() => {
+      const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!
+      setter.call(textarea, 'Create a focused field-notes experience and produce its reusable visual material.')
+      textarea!.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    await act(async () => {
+      node.querySelector<HTMLButtonElement>('[aria-label="Send"]')!.click()
+    })
+
+    const snapshot = await waitFor(() => {
+      const current = getStoreState().workspaceSnapshot
+      return current?.prototypePages.length === 1
+        && Object.values(getStoreState().assetProduction.runs).some(
+          ({ status }) => status === 'completed',
+        )
+        && !current.runError
+        ? current
+        : null
+    }, 30_000)
+
+    expect(snapshot).toBeTruthy()
+    expect(runtimeConfigHarness.providerLoads).toBeGreaterThan(cachedLoads.providers)
+    expect(runtimeConfigHarness.bindingLoads).toBeGreaterThan(cachedLoads.bindings)
+    expect(runtimeConfigHarness.assignmentLoads).toBe(cachedLoads.assignments)
+    expect(codexHarness.turns).toBe(6)
+    expect(codexHarness.plannerStages).toEqual([
+      'outline',
+      'design-foundation',
+      'design-exploration',
+      'page',
+      'closure',
+    ])
+    expect(desktopHarness.imageToolCallIds).toEqual(expect.arrayContaining([
+      expect.stringMatching(/:design-system:/),
+      expect.stringMatching(/:prototype-page:/),
+    ]))
+    expect(desktopHarness.boardPrompts).toEqual([
+      expect.stringContaining('A reusable illustrated marker for the route.'),
+    ])
+  }, 60_000)
+
+  it('fails before paid prototype generation when no task-fit image route exists', async () => {
     codexHarness.enabled = true
     desktopHarness.editRouteEnabled = false
+    desktopHarness.taskFitRouteEnabled = false
     const node = mount()
     const textarea = await waitFor(
       () => node.querySelector<HTMLTextAreaElement>('[aria-label="Message the Agent"]'),
@@ -888,12 +1343,12 @@ describe('brief → every planned route — rendered IntentWorkspace', () => {
 
     const failed = await waitFor(() => {
       const current = getStoreState().workspaceSnapshot
-      return current?.runError?.includes('does not support edit-image') ? current : null
+      return current?.runError?.includes('requires a reviewed gpt-image-2') ? current : null
     }, 30_000)
 
     expect(failed).toBeTruthy()
     expect(desktopHarness.imageToolCallIds.filter((id) => id.includes(':design-system:')))
-      .toHaveLength(1)
+      .toHaveLength(0)
     expect(desktopHarness.imageToolCallIds.filter((id) => id.includes(':prototype-page:')))
       .toHaveLength(0)
     expect(failed!.prototypePages).toHaveLength(0)
@@ -940,8 +1395,11 @@ describe('brief → every planned route — rendered IntentWorkspace', () => {
         ? [event.stepId]
         : [],
     ) ?? []
-    expect(designMarkdownStepIds).toHaveLength(3)
-    expect(new Set(designMarkdownStepIds).size).toBe(3)
+    expect(designMarkdownStepIds).toHaveLength(0)
+    expect(Object.values(
+      selectionSnapshot!.prototypeDesignSystemCandidates!.artifacts,
+    ).map((artifact) => designSystemMarkdownValidationError(artifact.designMarkdown)))
+      .toEqual([null, null, null])
     const designDirectionEvents = selectionSnapshot!.agentRunEvents?.events.filter(
       (event) => 'label' in event && event.label === 'Generate Design System direction',
     ) ?? []
@@ -1016,13 +1474,27 @@ describe('brief → every planned route — rendered IntentWorkspace', () => {
     expect(snapshot!.prototypeDesignSystem?.name).toBe('Editorial Ledger')
     expect(snapshot!.prototypeSuiteCandidates?.set.candidates).toHaveLength(3)
     expect(Object.values(snapshot!.prototypeSuiteCandidates!.artifacts)).toHaveLength(3)
-    expect(desktopHarness.plannerPrompts).toHaveLength(4)
-    const alternativePrompts = desktopHarness.plannerPrompts.slice(1)
+    const progressiveStageCounts = desktopHarness.progressivePlannerStages.reduce<Record<string, number>>(
+      (counts, stage) => ({ ...counts, [stage]: (counts[stage] ?? 0) + 1 }),
+      {},
+    )
+    expect(progressiveStageCounts).toEqual({
+      outline: 8,
+      'design-foundation': 4,
+      'design-exploration': 4,
+      page: 24,
+      closure: 4,
+    })
+    expect(desktopHarness.plannerPrompts).toHaveLength(3)
+    const alternativePrompts = desktopHarness.plannerPrompts
     expect(alternativePrompts).toHaveLength(3)
     expect(alternativePrompts.every((prompt) =>
       prompt.includes('page count independently')
         && prompt.includes("page count is context, not a quota")
         && !/Author exactly \d+ complete/.test(prompt)
+    )).toBe(true)
+    expect(alternativePrompts.every((prompt) =>
+      !prompt.includes('"version":"prototype-route-graph.v1"')
     )).toBe(true)
     expect(new Set(Object.values(snapshot!.prototypeSuiteCandidates!.artifacts).map(
       (artifact) => artifact.plan.pages.map((plannedPage) => plannedPage.route).join('|'),
@@ -1046,9 +1518,8 @@ describe('brief → every planned route — rendered IntentWorkspace', () => {
       const prompt = desktopHarness.imageToolPrompts[index]!
       expect(prompt).toContain('Suite route contract (all planned screens)')
       expect(prompt).toContain('Final DESIGN.md:')
-      expect(prompt).toContain(
-        'Use one quiet navigation shell, stable typography, and consistent controls across every route.',
-      )
+      expect(prompt).toContain('source: planner-design-contract')
+      expect(prompt).toContain('tokens:')
       expect(SUITE_PLANS.some((suite) => suite.pages.every(
         (plannedPage) => prompt.includes(`${plannedPage.name}: ${plannedPage.route}`),
       ))).toBe(true)
@@ -1083,20 +1554,14 @@ describe('brief → every planned route — rendered IntentWorkspace', () => {
       expect(productionPlan.tasks).toHaveLength(MATERIALS_PER_SUITE)
       expect(productionTasks).toHaveLength(MATERIALS_PER_SUITE)
       expect(productionTasks.every((task) => task.status === 'ready')).toBe(true)
-      expect(productionTasks.every((task) =>
-        task.issues.some((issue) =>
-          issue.code === 'board-qa-rejected' && issue.kind === 'warning'
-        )
-      )).toBe(true)
+      expect(productionTasks.every((task) => task.issues.length === 0)).toBe(true)
     }
     const slices = getStoreState().analysis.slices
     expect(slices).toHaveLength(MATERIALS_PER_SUITE)
     expect(slices.every((slice) =>
       Boolean(slice.pageId && slice.assetManifestItemId && slice.productionTaskId && slice.outputArtifactId)
     )).toBe(true)
-    expect(slices.every((slice) =>
-      slice.included && slice.reviewIssues.includes('Board spacing needs visual review.')
-    )).toBe(true)
+    expect(slices.every((slice) => slice.included && slice.reviewIssues.length === 0)).toBe(true)
 
     const initiallySelectedSuiteId = snapshot!.prototypeSuiteCandidates!.set.selection!.candidateId
     const compareSuites = node.querySelector<HTMLButtonElement>(
@@ -1212,19 +1677,82 @@ describe('brief → every planned route — rendered IntentWorkspace', () => {
     )).toBe(true)
   })
 
+  it('keeps the Agent approval surface reachable until every Design System direction settles', async () => {
+    let releaseThirdDirection!: () => void
+    const thirdDirectionBlocked = new Promise<void>((resolve) => {
+      releaseThirdDirection = resolve
+    })
+    let heldThirdDirection = false
+    desktopHarness.imageToolWait = async (toolCallId) => {
+      if (!heldThirdDirection && toolCallId.includes('candidate:workshop-console:generate')) {
+        heldThirdDirection = true
+        await thirdDirectionBlocked
+      }
+    }
+
+    const node = mount()
+    const textarea = await waitFor(
+      () => node.querySelector<HTMLTextAreaElement>('[aria-label="Message the Agent"]'),
+    )
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 50))
+    })
+    act(() => {
+      const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!
+      setter.call(textarea, 'Design a complete retail operations web app with three directions. Generate it now.')
+      textarea!.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    await act(async () => {
+      node.querySelector<HTMLButtonElement>('[aria-label="Send"]')!.click()
+    })
+
+    const generating = await waitFor(() => {
+      const current = getStoreState().workspaceSnapshot
+      const statuses = current?.prototypeDesignSystemCandidates?.set.candidates.map(
+        ({ status }) => status,
+      )
+      return heldThirdDirection && statuses?.filter((status) => status === 'ready').length === 2
+        && statuses.includes('generating')
+        ? current
+        : null
+    })
+    expect(generating).toBeTruthy()
+    expect(node.querySelector<HTMLElement>('[data-testid="workspace-drawer"]')
+      ?.dataset.workspacePanel).toBe('agent-drawer')
+    const selectionButtons = [...node.querySelectorAll<HTMLButtonElement>(
+      '[data-design-candidate-action="select"]',
+    )]
+    expect(selectionButtons).toHaveLength(3)
+    expect(selectionButtons.every((button) => button.disabled)).toBe(true)
+
+    releaseThirdDirection()
+    await waitFor(() => getStoreState().workspaceSnapshot?.workflowPhase === 'design-system-selection')
+    expect([...node.querySelectorAll<HTMLButtonElement>(
+      '[data-design-candidate-action="select"]',
+    )].filter((button) => !button.disabled)).toHaveLength(3)
+  })
+
   it('preserves a human suite selection while later siblings finish', async () => {
     let releaseLaterSibling!: () => void
     const laterSiblingBlocked = new Promise<void>((resolve) => {
       releaseLaterSibling = resolve
     })
+    let releaseResumedSibling!: () => void
+    const resumedSiblingBlocked = new Promise<void>((resolve) => {
+      releaseResumedSibling = resolve
+    })
     let heldLaterSibling = false
+    let heldResumedSibling = false
+    let laterSiblingPageCalls = 0
     desktopHarness.imageToolWait = async (toolCallId) => {
-      if (
-        !heldLaterSibling &&
-        toolCallId.includes(':candidate:prototype-suite:1:prototype-page:')
-      ) {
+      if (!toolCallId.includes(':candidate:prototype-suite:1:prototype-page:')) return
+      laterSiblingPageCalls += 1
+      if (laterSiblingPageCalls === 1) {
         heldLaterSibling = true
         await laterSiblingBlocked
+      } else if (laterSiblingPageCalls === 2) {
+        heldResumedSibling = true
+        await resumedSiblingBlocked
       }
     }
 
@@ -1259,7 +1787,9 @@ describe('brief → every planned route — rendered IntentWorkspace', () => {
       const suites = current?.prototypeSuiteCandidates
       return heldLaterSibling &&
         suites?.set.candidates.find(({ id }) => id === 'candidate:prototype-suite:2')?.status === 'ready' &&
-        suites.set.candidates.find(({ id }) => id === 'candidate:prototype-suite:1')?.status === 'generating'
+        suites.set.candidates.find(({ id }) => id === 'candidate:prototype-suite:1')?.status === 'generating' &&
+        desktopHarness.imageToolCallIds.some((id) =>
+          id.includes(':candidate:prototype-suite:3:prototype-page:'))
         ? current
         : null
     }, 30_000)
@@ -1289,6 +1819,18 @@ describe('brief → every planned route — rendered IntentWorkspace', () => {
     })).toBeTruthy()
 
     releaseLaterSibling()
+    await waitFor(() => heldResumedSibling)
+    const selectedWhileSiblingRuns = getStoreState().workspaceSnapshot!
+    const selectedWhileSiblingRunsArtifact = selectedWhileSiblingRuns
+      .prototypeSuiteCandidates!.artifacts['candidate:prototype-suite:2']!
+    expect(selectedWhileSiblingRuns.prototypePages).toEqual(
+      selectedWhileSiblingRunsArtifact.pages,
+    )
+    expect(new Set(getStoreState().analysis.slices.map((slice) => slice.outputArtifactId)))
+      .toEqual(new Set(
+        selectedWhileSiblingRunsArtifact.resourcePack.assets.map((asset) => asset.artifactId),
+      ))
+    releaseResumedSibling()
     const completed = await waitFor(() => {
       const current = getStoreState().workspaceSnapshot
       return current?.prototypeSuiteCandidates?.set.candidates.every(
@@ -1313,9 +1855,11 @@ describe('brief → every planned route — rendered IntentWorkspace', () => {
     expect(getStoreState().assetProduction.activeRunId).toBe(selectedRunId)
     expect(new Set(getStoreState().analysis.slices.map((slice) => slice.outputArtifactId)))
       .toEqual(new Set(selectedArtifact.resourcePack.assets.map((asset) => asset.artifactId)))
+    expect(desktopHarness.maximumImageConcurrency).toBeLessThanOrEqual(3)
   }, 60_000)
 
-  it('resumes only missing pages after a selected suite transport failure', async () => {
+  it('retries all failed suite frontiers together without replaying ready siblings', async () => {
+    vi.stubEnv('VITE_CUTOUT_PACKAGED_E2E', '1')
     const node = mount()
     const textarea = await waitFor(
       () => node.querySelector<HTMLTextAreaElement>('[aria-label="Message the Agent"]'),
@@ -1338,15 +1882,25 @@ describe('brief → every planned route — rendered IntentWorkspace', () => {
         ? candidates
         : null
     })
-    let failedOnce = false
+    const failedPageSuffixes = new Map<string, string>()
+    const failedAttemptCounts = new Map<string, number>()
     desktopHarness.imageToolFailure = (toolCallId) => {
-      if (
-        !failedOnce &&
-        toolCallId.includes('candidate:prototype-suite:2:prototype-page:') &&
-        !toolCallId.includes(':overview:')
-      ) {
-        failedOnce = true
-        return new Error('HTTP 503 service unavailable')
+      const candidateId = ['candidate:prototype-suite:2', 'candidate:prototype-suite:3']
+        .find((id) => toolCallId.includes(`${id}:prototype-page:`))
+      if (!candidateId || toolCallId.includes(':overview:')) return null
+      const logicalSuffix = toolCallId
+        .slice(toolCallId.indexOf(candidateId))
+        .replace(/:attempt-\d+$/, '')
+      const targetSuffix = failedPageSuffixes.get(candidateId) ?? logicalSuffix
+      failedPageSuffixes.set(candidateId, targetSuffix)
+      if (logicalSuffix === targetSuffix) {
+        const attempts = failedAttemptCounts.get(candidateId) ?? 0
+        const maximumAttempts = candidateId === 'candidate:prototype-suite:2' ? 2 : 1
+        if (attempts >= maximumAttempts) return null
+        failedAttemptCounts.set(candidateId, attempts + 1)
+        return candidateId === 'candidate:prototype-suite:2'
+          ? new Error('HTTP 503 service unavailable')
+          : new Error('The model returned no image.')
       }
       return null
     }
@@ -1363,11 +1917,16 @@ describe('brief → every planned route — rendered IntentWorkspace', () => {
         ({ status }) => status === 'failed',
       ) ? current : null
     }, 30_000)
-    expect(failedOnce).toBe(true)
+    expect(failedPageSuffixes.size).toBe(2)
+    expect([...failedPageSuffixes.keys()].every((candidateId) => [
+      'candidate:prototype-suite:2',
+      'candidate:prototype-suite:3',
+    ].includes(candidateId))).toBe(true)
+    expect([...failedAttemptCounts.values()].sort()).toEqual([1, 2])
     expect(failed!.prototypePages.length).toBeGreaterThan(0)
     expect(failed!.prototypeSuiteCandidates?.set.candidates.map(({ status }) => status))
-      .toEqual(['ready', 'failed', 'ready'])
-    expect(Object.values(failed!.prototypeSuiteCandidates!.artifacts)).toHaveLength(2)
+      .toEqual(['ready', 'failed', 'failed'])
+    expect(Object.values(failed!.prototypeSuiteCandidates!.artifacts)).toHaveLength(1)
     desktopHarness.imageToolFailure = null
 
     const retry = await waitFor(() =>
@@ -1417,8 +1976,24 @@ describe('brief → every planned route — rendered IntentWorkspace', () => {
       id.includes(':prototype-page:'))
     const designSystemCalls = desktopHarness.imageToolCallIds.filter((id) =>
       id.includes(':design-system:'))
-    expect(pageCalls).toHaveLength(19)
+    const repeatedPageCalls = [...failedAttemptCounts.values()]
+      .reduce((total, attempts) => total + attempts, 0)
+    expect(pageCalls).toHaveLength(18 + repeatedPageCalls)
     expect(designSystemCalls).toHaveLength(3)
+    for (const [candidateId, suffix] of failedPageSuffixes) {
+      expect(pageCalls.filter((id) => id.includes(suffix))).toHaveLength(
+        (failedAttemptCounts.get(candidateId) ?? 0) + 1,
+      )
+    }
+    const expectedCalls = compilePrototypeImageRequestBudget({
+      designSystemCalls: 3,
+      suites: SUITE_PLANS,
+    }).totalCalls + repeatedPageCalls
+    const workspaceRoot = node.querySelector<HTMLElement>('[data-workspace-root]')
+    expect(workspaceRoot?.dataset.packagedE2eImageCallCount).toBe(String(expectedCalls))
+    expect(workspaceRoot?.dataset.packagedE2ePlannedImageCallCount).toBe(String(expectedCalls))
+    expect(workspaceRoot?.dataset.packagedE2eRetryImageCallCount).toBe(String(repeatedPageCalls))
+    expect(workspaceRoot?.dataset.packagedE2eRetryStartCount).toBe('1')
   }, 60_000)
 
   it('replans a failed candidate when no reusable suite frontier exists yet', async () => {
@@ -1445,8 +2020,8 @@ describe('brief → every planned route — rendered IntentWorkspace', () => {
         : null
     })
     let failedPlanningOnce = false
-    desktopHarness.plannerFailure = (call) => {
-      if (call === 0 || failedPlanningOnce) return null
+    desktopHarness.plannerFailure = (_call, prompt) => {
+      if (!prompt.includes('Direction: Editorial Ledger') || failedPlanningOnce) return null
       failedPlanningOnce = true
       return 'HTTP 503 service unavailable'
     }
@@ -1467,7 +2042,7 @@ describe('brief → every planned route — rendered IntentWorkspace', () => {
     expect(failed!.prototypeSuiteCandidates?.set.candidates.map(({ status }) => status))
       .toEqual(['ready', 'failed', 'ready'])
     expect(Object.values(failed!.prototypeSuiteCandidates!.artifacts)).toHaveLength(2)
-    expect(desktopHarness.plannerPrompts).toHaveLength(4)
+    expect(desktopHarness.plannerPrompts).toHaveLength(3)
     desktopHarness.plannerFailure = null
 
     const retry = await waitFor(() =>
@@ -1485,19 +2060,217 @@ describe('brief → every planned route — rendered IntentWorkspace', () => {
     }, 30_000)
 
     expect(recovered).toBeTruthy()
-    expect(desktopHarness.plannerPrompts).toHaveLength(5)
+    expect(desktopHarness.plannerPrompts).toHaveLength(4)
     expect(Object.values(recovered!.prototypeSuiteCandidates!.artifacts)).toHaveLength(3)
     expect(new Set(Object.values(recovered!.prototypeSuiteCandidates!.artifacts).map(
       (artifact) => artifact.plan.pages.map((page) => page.route).join('|'),
     )).size).toBe(3)
     expect(recovered!.prototypePlan?.pages.map((page) => page.route)).toEqual(
-      SUITE_PLANS[2].pages.map((page) => page.route),
+      SUITE_PLANS[0].pages.map((page) => page.route),
     )
     expect(desktopHarness.imageToolCallIds.filter((id) => id.includes(':prototype-page:')))
       .toHaveLength(18)
   }, 60_000)
 
-  it('retries only a failed material board while carrying ready pages and materials', async () => {
+  it('edits the latest rejected page across local and suite Retry without replaying accepted pages', async () => {
+    const node = mount()
+    const textarea = await waitFor(
+      () => node.querySelector<HTMLTextAreaElement>('[aria-label="Message the Agent"]'),
+    )
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 50))
+    })
+    act(() => {
+      const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!
+      setter.call(textarea, 'Design a complete travel operations web app with several directions. Generate it now.')
+      textarea!.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    await act(async () => {
+      node.querySelector<HTMLButtonElement>('[aria-label="Send"]')!.click()
+    })
+
+    await waitFor(() => {
+      const candidates = getStoreState().workspaceSnapshot?.prototypeDesignSystemCandidates
+      return candidates?.set.candidates.every(({ status }) => status === 'ready')
+        ? candidates
+        : null
+    })
+    let targetReviews = 0
+    desktopHarness.pageQaVerdict = (checklist) => {
+      if (!checklist.includes('Primary content for workspace')) {
+        return { pass: true, failures: [] }
+      }
+      targetReviews += 1
+      return targetReviews <= 2
+        ? {
+            pass: false,
+            failures: [
+              'Keep the complete comparison rail. Bearer secret-token sk-123456789abcdef /Users/test/private.png',
+            ],
+          }
+        : { pass: true, failures: [] }
+    }
+    const selectionButtons = [...node.querySelectorAll<HTMLButtonElement>(
+      '[data-design-candidate-action="select"]',
+    )]
+    await act(async () => {
+      selectionButtons[1]!.click()
+    })
+
+    await waitFor(() => {
+      const current = getStoreState().workspaceSnapshot
+      return current?.runError && current.prototypeSuiteCandidates?.set.candidates.some(
+        ({ status }) => status === 'failed',
+      ) ? current : null
+    }, 30_000)
+    const targetCallsBeforeRetry = desktopHarness.imageToolCallIds.filter((id) =>
+      id.includes(':prototype-page:workspace:'))
+    expect(targetCallsBeforeRetry).toHaveLength(2)
+    const secondTargetIndex = desktopHarness.imageToolCallIds.indexOf(targetCallsBeforeRetry[1]!)
+    expect(desktopHarness.imageToolReferenceBytes[secondTargetIndex]?.[0]).toEqual(
+      desktopHarness.imageToolOutputs.get(targetCallsBeforeRetry[0]!),
+    )
+    expect(desktopHarness.imageToolReferenceCounts[secondTargetIndex]).toBe(2)
+    expect(desktopHarness.imageToolPrompts[secondTargetIndex]).toContain('<redacted>')
+    expect(desktopHarness.imageToolPrompts[secondTargetIndex]).toContain('<local-path>')
+    expect(desktopHarness.imageToolPrompts[secondTargetIndex]).not.toContain('secret-token')
+
+    const failedCandidateId = targetCallsBeforeRetry[0]!.match(
+      /candidate:prototype-suite:\d+/,
+    )?.[0]
+    expect(failedCandidateId).toBeTruthy()
+    const acceptedSiblingCallsBeforeRetry = desktopHarness.imageToolCallIds.filter((id) =>
+      id.includes(`${failedCandidateId}:prototype-page:trips:`))
+    expect(acceptedSiblingCallsBeforeRetry).toHaveLength(1)
+
+    const retry = await waitFor(() =>
+      node.querySelector<HTMLButtonElement>('[data-agent-action="retry-run"]:not(:disabled)'))
+    act(() => {
+      retry!.click()
+    })
+    const recovered = await waitFor(() => {
+      const current = getStoreState().workspaceSnapshot
+      return current?.prototypeSuiteCandidates?.set.candidates.every(
+        ({ status }) => status === 'ready',
+      ) && !current.runError ? current : null
+    }, 30_000)
+
+    expect(recovered).toBeTruthy()
+    const targetCalls = desktopHarness.imageToolCallIds.filter((id) =>
+      id.includes(':prototype-page:workspace:'))
+    expect(targetCalls).toHaveLength(3)
+    const resumedTargetIndex = desktopHarness.imageToolCallIds.indexOf(targetCalls[2]!)
+    expect(desktopHarness.imageToolReferenceBytes[resumedTargetIndex]?.[0]).toEqual(
+      desktopHarness.imageToolOutputs.get(targetCalls[1]!),
+    )
+    expect(desktopHarness.imageToolReferenceCounts[resumedTargetIndex]).toBe(2)
+    expect(desktopHarness.imageToolReferenceCounts[resumedTargetIndex]).toBeLessThanOrEqual(3)
+    expect(desktopHarness.imageToolPrompts[resumedTargetIndex]).toContain('complete comparison rail')
+    expect(desktopHarness.imageToolCallIds.filter((id) =>
+      id.includes(`${failedCandidateId}:prototype-page:trips:`))).toEqual(
+      acceptedSiblingCallsBeforeRetry,
+    )
+
+    const reviewEvents = (recovered!.agentRunEvents?.events ?? []).filter((event) =>
+      'pageId' in event && event.pageId === 'workspace')
+    expect(reviewEvents.filter(({ type }) => type === 'prototype-page-review-started'))
+      .toHaveLength(3)
+    expect(reviewEvents.filter(({ type }) => type === 'prototype-page-review-rejected'))
+      .toHaveLength(2)
+    expect(reviewEvents.filter(({ type }) => type === 'prototype-page-review-passed'))
+      .toHaveLength(1)
+    expect(JSON.stringify(reviewEvents)).not.toContain('secret-token')
+    expect(JSON.stringify(reviewEvents)).not.toContain('/Users/test')
+  }, 60_000)
+
+  it('blocks omitted slice foreground and retries only that needs-review region', async () => {
+    const node = mount()
+    const textarea = await waitFor(
+      () => node.querySelector<HTMLTextAreaElement>('[aria-label="Message the Agent"]'),
+    )
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 50))
+    })
+    act(() => {
+      const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!
+      setter.call(textarea, 'Design a complete retail operations web app with three directions. Generate it now.')
+      textarea!.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    await act(async () => {
+      node.querySelector<HTMLButtonElement>('[aria-label="Send"]')!.click()
+    })
+
+    await waitFor(() => {
+      const candidates = getStoreState().workspaceSnapshot?.prototypeDesignSystemCandidates
+      return candidates?.set.candidates.every(({ status }) => status === 'ready')
+        ? candidates
+        : null
+    })
+    const targetRegionId = SUITE_PLANS[1]!.pages
+      .flatMap((page) => page.regions)
+      .find((region) => region.assetRoute === 'board-cutout')!.id
+    let omittedOnce = false
+    desktopHarness.sliceCoverageOmission = (regionId) => {
+      if (omittedOnce || regionId !== targetRegionId) return false
+      omittedOnce = true
+      return true
+    }
+    const selectionButtons = [...node.querySelectorAll<HTMLButtonElement>(
+      '[data-design-candidate-action="select"]',
+    )]
+    await act(async () => {
+      selectionButtons[1]!.click()
+    })
+
+    const failed = await waitFor(() => {
+      const current = getStoreState().workspaceSnapshot
+      return current?.runError && current.prototypeSuiteCandidates?.set.candidates.some(
+        ({ status }) => status === 'failed',
+      ) ? current : null
+    }, 30_000)
+    expect(omittedOnce).toBe(true)
+    expect(Object.values(failed!.prototypeSuiteCandidates!.artifacts)).toHaveLength(2)
+    const reviewRun = await waitFor(() => {
+      const run = Object.values(getStoreState().assetProduction.runs)
+        .find(({ tasks }) => Object.values(tasks).some((task) => task.issues.some(
+          (issue) => issue.code === 'slice-foreground-omitted',
+        )))
+      return run?.status === 'cancelled' ? run : null
+    }, 30_000)
+    const reviewTask = Object.values(reviewRun?.tasks ?? {}).find((task) =>
+      task.issues.some((issue) => issue.code === 'slice-foreground-omitted'))
+    expect(reviewRun?.status).toBe('cancelled')
+    expect(reviewTask).toMatchObject({
+      status: 'needs-review',
+      candidate: expect.objectContaining({ mediaType: 'image/png' }),
+    })
+    const pageCallsBeforeRetry = desktopHarness.imageToolCallIds.filter((id) =>
+      id.includes(':prototype-page:'))
+    const boardCallsBeforeRetry = desktopHarness.boardPrompts.length
+    desktopHarness.sliceCoverageOmission = null
+
+    const retry = await waitFor(() =>
+      node.querySelector<HTMLButtonElement>('[data-agent-action="retry-run"]:not(:disabled)'))
+    act(() => {
+      retry!.click()
+    })
+    const recovered = await waitFor(() => {
+      const current = getStoreState().workspaceSnapshot
+      return current?.prototypeSuiteCandidates?.set.candidates.every(
+        ({ status }) => status === 'ready',
+      ) && !current.runError ? current : null
+    }, 30_000)
+
+    expect(recovered).toBeTruthy()
+    expect(desktopHarness.imageToolCallIds.filter((id) => id.includes(':prototype-page:')))
+      .toEqual(pageCallsBeforeRetry)
+    expect(desktopHarness.boardPrompts).toHaveLength(boardCallsBeforeRetry + 1)
+    expect(Object.values(getStoreState().assetProduction.runs).filter(
+      ({ status }) => status === 'completed',
+    )).toHaveLength(3)
+  }, 60_000)
+
+  it('retries one transient material board locally without replaying ready pages or siblings', async () => {
     vi.stubEnv('VITE_CUTOUT_PACKAGED_E2E', '1')
     const node = mount()
     const textarea = await waitFor(
@@ -1539,39 +2312,6 @@ describe('brief → every planned route — rendered IntentWorkspace', () => {
       selectionButtons[1]!.click()
     })
 
-    const failed = await waitFor(() => {
-      const current = getStoreState().workspaceSnapshot
-      return current?.runError && current.prototypeSuiteCandidates?.set.candidates.some(
-        ({ status }) => status === 'failed',
-      ) ? current : null
-    }, 30_000)
-    if (!failed) throw new Error('Expected the material-production failure snapshot.')
-    expect(failedOnce).toBe(true)
-    expect(failed.prototypePages).toHaveLength(6)
-    expect(desktopHarness.imageToolCallIds.filter((id) =>
-      id.includes(':prototype-page:'))).toHaveLength(18)
-    expect(desktopHarness.boardPrompts).toHaveLength(BOARD_GROUPS_PER_SUITE * 3)
-    expect(Object.values(failed.prototypeSuiteCandidates!.artifacts)).toHaveLength(2)
-    const pageCallIdsBeforeRetry = desktopHarness.imageToolCallIds.filter((id) =>
-      id.includes(':prototype-page:'))
-    const boardAttemptsBeforeRetry = desktopHarness.boardPrompts.length
-    expect(failedBoardPrompt).toBeTruthy()
-    expect(Object.values(getStoreState().assetProduction.runs).filter(
-      ({ status, tasks }) => status === 'cancelled' && Object.values(tasks).some(
-        (task) => task.status === 'failed',
-      ),
-    )).toHaveLength(1)
-    desktopHarness.boardFailure = null
-
-    const retry = await waitFor(() =>
-      node.querySelector<HTMLButtonElement>('[data-agent-action="retry-run"]:not(:disabled)'))
-    expect(retry).toBeTruthy()
-    act(() => {
-      retry!.click()
-    })
-    expect(node.querySelector<HTMLElement>('[data-workspace-root]')?.dataset.agentWorking)
-      .toBe('true')
-
     const recovered = await waitFor(() => {
       const current = getStoreState().workspaceSnapshot
       return current?.prototypeSuiteCandidates?.set.candidates.every(
@@ -1581,6 +2321,13 @@ describe('brief → every planned route — rendered IntentWorkspace', () => {
         : null
     }, 30_000)
     expect(recovered).toBeTruthy()
+    expect(failedOnce).toBe(true)
+    expect(recovered!.prototypePages).toHaveLength(6)
+    expect(desktopHarness.imageToolCallIds.filter((id) =>
+      id.includes(':prototype-page:'))).toHaveLength(18)
+    expect(desktopHarness.boardPrompts).toHaveLength(BOARD_GROUPS_PER_SUITE * 3 + 1)
+    expect(Object.values(recovered!.prototypeSuiteCandidates!.artifacts)).toHaveLength(3)
+    expect(failedBoardPrompt).toBeTruthy()
     const pageCallIdsAfterRetry = desktopHarness.imageToolCallIds.filter((id) =>
       id.includes(':prototype-page:'))
     const resolvedBudget = compilePrototypeImageRequestBudget({
@@ -1589,14 +2336,9 @@ describe('brief → every planned route — rendered IntentWorkspace', () => {
     })
     const expectedImageCallsWithRetry = resolvedBudget.totalCalls + 1
     expect(pageCallIdsAfterRetry).toHaveLength(resolvedBudget.pageCalls)
-    expect(pageCallIdsAfterRetry.filter((id) => pageCallIdsBeforeRetry.includes(id)))
-      .toEqual(pageCallIdsBeforeRetry)
     expect(new Set(pageCallIdsAfterRetry).size).toBe(pageCallIdsAfterRetry.length)
     expect(pageCallIdsAfterRetry.every((id) => id.endsWith(':attempt-1'))).toBe(true)
     expect(desktopHarness.boardPrompts).toHaveLength(resolvedBudget.boardCalls + 1)
-    expect(desktopHarness.boardPrompts.length - boardAttemptsBeforeRetry).toBe(
-      1,
-    )
     expect(desktopHarness.boardPrompts.filter((prompt) => prompt === failedBoardPrompt))
       .toHaveLength(2)
 
@@ -1608,11 +2350,14 @@ describe('brief → every planned route — rendered IntentWorkspace', () => {
         : null
     })
     expect(workspaceRoot).toBeTruthy()
+    expect(workspaceRoot!.dataset.packagedE2ePlanningTurnCount).toBe('1')
+    expect(workspaceRoot!.dataset.packagedE2eCodexPlanningTurnCount).toBe('0')
+    expect(workspaceRoot!.dataset.packagedE2eDirectPlanningTurnCount).toBe('1')
     expect(workspaceRoot!.dataset.packagedE2eRetryImageCallCount).toBe('1')
-    expect(workspaceRoot!.dataset.packagedE2eRetryStartCount).toBe('1')
+    expect(workspaceRoot!.dataset.packagedE2eRetryStartCount).toBe('0')
     const productionRuns = Object.values(getStoreState().assetProduction.runs)
     expect(productionRuns.filter(({ status }) => status === 'partial')).toHaveLength(0)
-    expect(productionRuns.filter(({ status }) => status === 'cancelled')).toHaveLength(1)
+    expect(productionRuns.filter(({ status }) => status === 'cancelled')).toHaveLength(0)
     expect(productionRuns.filter(({ status }) => status === 'completed')).toHaveLength(3)
   }, 60_000)
 })

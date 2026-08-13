@@ -3,8 +3,25 @@ import type { PackagedE2eFailureDiagnostic } from './runner'
 
 export function packagedE2eFailureDiagnostic(message: string): PackagedE2eFailureDiagnostic {
   const lower = message.toLowerCase()
+  if (
+    lower.includes('selected image provider is unavailable')
+    || lower.includes('current ai configuration could not be loaded')
+    || lower.includes('configured image provider is unavailable')
+  ) {
+    return 'provider-configuration-state'
+  }
+  if (
+    lower.includes('prototype planning timed out')
+    || /prototype planner [a-z -]+ timed out\.?/u.test(lower)
+    || lower.includes('progressive planner outline timed out')
+  ) {
+    return 'planner-timeout'
+  }
   if (lower.includes('progressive planner outline structured output failed')) {
     return 'planner-progressive-outline'
+  }
+  if (/progressive planner (?:outline|design-foundation|design-exploration|page|closure) transport failed\.?$/u.test(lower)) {
+    return 'provider-transport'
   }
   if (lower.includes('progressive planner design-foundation structured output failed')) {
     return 'planner-progressive-design-foundation'
@@ -33,6 +50,13 @@ export function packagedE2eFailureDiagnostic(message: string): PackagedE2eFailur
   if (lower.includes('progressive planner produced an invalid prototype plan')) {
     return 'planner-progressive-graph'
   }
+  if (
+    lower.includes('progressive planner page details remained invalid')
+    || lower.includes('progressive planner page repair remained invalid')
+    || lower.includes('progressive planner closure repair remained invalid')
+  ) {
+    return 'planner-progressive-graph'
+  }
   if (lower.includes('progressive planner did not satisfy the explicit scope')) {
     return 'planner-progressive-coverage'
   }
@@ -51,6 +75,7 @@ export function packagedE2eFailureDiagnostic(message: string): PackagedE2eFailur
   const classification = classifyGenerationError(message)
   if (classification.kind === 'credential') return 'provider-auth'
   if (classification.kind === 'transient') return 'provider-transport'
+  if (lower.includes('prototype page viewport contract failed')) return 'prototype-viewport'
   if (lower.includes('board decode failed')) return 'board-decode'
   if (lower.includes('board composition failed')) return 'board-composition'
   if (lower.includes('board slicing produced zero candidates')) return 'board-zero-slices'

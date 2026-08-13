@@ -2,6 +2,9 @@
   "identifier": "com.nebutra.cutout.packaged-e2e",
   "bundle": {
     "targets": ["app"],
-    "createUpdaterArtifacts": false
+    "createUpdaterArtifacts": false,
+    "macOS": {
+      "infoPlist": "Info.e2e.plist"
+    }
   }
 }

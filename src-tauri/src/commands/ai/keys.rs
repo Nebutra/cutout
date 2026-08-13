@@ -128,8 +128,12 @@ fn key_status_inner(provider_id: &str) -> Result<bool, KeyError> {
     }
 }
 
+pub(crate) fn key_presence_exact(provider_id: &str) -> Result<bool, KeyError> {
+    key_status_inner(provider_id)
+}
+
 pub(crate) fn has_key_exact(provider_id: &str) -> bool {
-    key_status_inner(provider_id).unwrap_or(false)
+    key_presence_exact(provider_id).unwrap_or(false)
 }
 
 pub(crate) fn store_imported_key(provider_id: &str, secret: &str) -> Result<(), KeyError> {

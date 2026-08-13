@@ -1,0 +1,162 @@
+{
+  "schema": "design-os.benchmark-ruler.v1",
+  "benchmark": {
+    "id": "benchmark:design-os:production-maturity",
+    "version": 1
+  },
+  "stages": [
+    { "id": "contract", "label": "Contract" },
+    { "id": "conformance", "label": "Conformance" },
+    { "id": "real-host", "label": "Real Host" },
+    { "id": "production-rehearsal", "label": "Production Rehearsal" }
+  ],
+  "profiles": [
+    {
+      "id": "commerce",
+      "label": "Commerce",
+      "sourceSchema": "commerce.profile-benchmark.v1",
+      "sourceBenchmark": {
+        "id": "benchmark:commerce-profile:p1-p7",
+        "version": 1
+      }
+    }
+  ],
+  "metrics": [
+    {
+      "id": "commerce.contract.product-facts-normalization",
+      "profileId": "commerce",
+      "stage": "contract",
+      "label": "Bounded product-facts normalization",
+      "critical": true,
+      "sourceMetricId": "p1.product-facts-normalization"
+    },
+    {
+      "id": "commerce.contract.fact-citation-closure",
+      "profileId": "commerce",
+      "stage": "contract",
+      "label": "Fact citation closure",
+      "critical": true,
+      "sourceMetricId": "p2.fact-citation-closure"
+    },
+    {
+      "id": "commerce.contract.catalog-closure",
+      "profileId": "commerce",
+      "stage": "contract",
+      "label": "Catalog closure",
+      "critical": true,
+      "sourceMetricId": "p3.catalog-closure"
+    },
+    {
+      "id": "commerce.contract.offline-policy-gates",
+      "profileId": "commerce",
+      "stage": "contract",
+      "label": "Offline policy gates",
+      "critical": true,
+      "sourceMetricId": "p4.offline-policy-gates"
+    },
+    {
+      "id": "commerce.contract.kernel-profile-composition",
+      "profileId": "commerce",
+      "stage": "contract",
+      "label": "Removable Kernel/Profile composition",
+      "critical": true,
+      "sourceMetricId": "p5.kernel-profile-composition"
+    },
+    {
+      "id": "commerce.conformance.deliverable-closure",
+      "profileId": "commerce",
+      "stage": "conformance",
+      "label": "Mocked deliverable closure",
+      "critical": true,
+      "sourceMetricId": "p6.mocked-deliverable-closure"
+    },
+    {
+      "id": "commerce.conformance.targeted-repair",
+      "profileId": "commerce",
+      "stage": "conformance",
+      "label": "Mocked targeted repair",
+      "critical": true,
+      "sourceMetricId": "p6.mocked-targeted-repair"
+    },
+    {
+      "id": "commerce.conformance.strategy-evidence",
+      "profileId": "commerce",
+      "stage": "conformance",
+      "label": "Mocked strategy evidence",
+      "critical": true,
+      "sourceMetricId": "p7.mocked-strategy-evidence"
+    },
+    {
+      "id": "commerce.real-host.text-execution",
+      "profileId": "commerce",
+      "stage": "real-host",
+      "label": "Real localized text execution",
+      "critical": true,
+      "sourceMetricId": "p6.real-text-execution"
+    },
+    {
+      "id": "commerce.real-host.text-deliverable",
+      "profileId": "commerce",
+      "stage": "real-host",
+      "label": "Real localized text deliverables",
+      "critical": true,
+      "sourceMetricId": "p6.real-text-bytes"
+    },
+    {
+      "id": "commerce.real-host.image-execution",
+      "profileId": "commerce",
+      "stage": "real-host",
+      "label": "Real commerce image execution",
+      "critical": true,
+      "sourceMetricId": "p6.real-image-execution"
+    },
+    {
+      "id": "commerce.real-host.image-deliverable",
+      "profileId": "commerce",
+      "stage": "real-host",
+      "label": "Real commerce image deliverables",
+      "critical": true,
+      "sourceMetricId": "p6.real-image-bytes"
+    },
+    {
+      "id": "commerce.real-host.video-execution",
+      "profileId": "commerce",
+      "stage": "real-host",
+      "label": "Real product video execution",
+      "critical": true,
+      "sourceMetricId": "p6.real-video-execution"
+    },
+    {
+      "id": "commerce.real-host.video-deliverable",
+      "profileId": "commerce",
+      "stage": "real-host",
+      "label": "Real playable product video",
+      "critical": true,
+      "sourceMetricId": "p6.real-video-bytes"
+    },
+    {
+      "id": "commerce.real-host.strategy-execution",
+      "profileId": "commerce",
+      "stage": "real-host",
+      "label": "Real strategy execution",
+      "critical": true,
+      "sourceMetricId": "p7.real-strategy-execution"
+    },
+    {
+      "id": "commerce.real-host.strategy-deliverable",
+      "profileId": "commerce",
+      "stage": "real-host",
+      "label": "Real evidence-derived strategy",
+      "critical": true,
+      "sourceMetricId": "p7.real-strategy-bytes"
+    },
+    {
+      "id": "commerce.production-rehearsal.complete-run",
+      "profileId": "commerce",
+      "stage": "production-rehearsal",
+      "label": "Complete unseen-input production rehearsal",
+      "critical": true,
+      "auditFindingCode": "complete-production-rehearsal-unavailable"
+    }
+  ]
+}

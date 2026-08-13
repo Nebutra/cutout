@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { z } from 'zod'
 import {
+  createCodexPlanningGenerationService,
   interruptCodexSystemTurn,
   planningRuntimeEvidenceSchema,
   probeCodexSystemRuntime,
@@ -26,6 +28,24 @@ const proven = planningRuntimeEvidenceSchema.parse({
   execution: 'unproven',
   version: '0.200.0',
 })
+
+function turnResult(args: { input: { requestId: string; contextRevision: string } }, output: unknown) {
+  return {
+    output,
+    receipt: {
+      protocol: 'cutout.codex-execution.v1',
+      runtimeId: 'codex-system',
+      runtimeVersion: '0.200.0',
+      bindingId: 'codex:binding',
+      requestId: args.input.requestId,
+      turnId: `turn.${args.input.requestId}`,
+      contextRevision: args.input.contextRevision,
+      contextDigest: 'a'.repeat(64),
+      outputDigest: 'b'.repeat(64),
+      completedAt: 1,
+    },
+  }
+}
 
 beforeEach(() => invokeMock.mockReset())
 
@@ -222,6 +242,142 @@ describe('planning runtime boundary', () => {
       'workspace.1',
       'conversation.1',
     )).resolves.toBe(true)
+  })
+
+  it('serializes formal Planner stages through the one-active-turn native runtime', async () => {
+    const resolvers: Array<() => void> = []
+    let active = 0
+    let maximumActive = 0
+    invokeMock.mockImplementation((command: string, args: {
+      input: { requestId: string; contextRevision: string }
+    }) => {
+      if (command !== 'codex_system_turn_start') return Promise.resolve(false)
+      active += 1
+      maximumActive = Math.max(maximumActive, active)
+      return new Promise((resolve) => {
+        resolvers.push(() => {
+          active -= 1
+          resolve(turnResult(args, { value: args.input.requestId }))
+        })
+      })
+    })
+    const service = createCodexPlanningGenerationService({
+      workspaceHandle: 'workspace.1',
+      conversationPrefix: 'conversation.planner',
+      contextRevision: 'revision.1',
+      prompts: { render: async () => ({ system: 'Plan the product.' }) },
+    })
+    const schema = z.object({ value: z.string() }).strict()
+    const first = service.generateObject({ providerId: 'codex-system', prompt: 'First.' }, schema)
+    const second = service.generateObject({ providerId: 'codex-system', prompt: 'Second.' }, schema)
+
+    await vi.waitFor(() => expect(resolvers).toHaveLength(1))
+    resolvers[0]!()
+    await vi.waitFor(() => expect(resolvers).toHaveLength(2))
+    resolvers[1]!()
+
+    await expect(first).resolves.toMatchObject({ ok: true })
+    await expect(second).resolves.toMatchObject({ ok: true })
+    expect(maximumActive).toBe(1)
+    const starts = invokeMock.mock.calls.filter(([command]) => command === 'codex_system_turn_start')
+    expect(starts).toHaveLength(2)
+    expect(starts.map(([, args]) => args.input.conversationId)).toEqual([
+      'conversation.planner:1',
+      'conversation.planner:2',
+    ])
+  })
+
+  it('cancels a queued Planner stage without starting another native turn', async () => {
+    let resolveFirst!: (value: unknown) => void
+    invokeMock.mockImplementationOnce((command: string, args: {
+      input: { requestId: string; contextRevision: string }
+    }) => {
+      expect(command).toBe('codex_system_turn_start')
+      return new Promise((resolve) => {
+        resolveFirst = (output) => resolve(turnResult(args, output))
+      })
+    })
+    const service = createCodexPlanningGenerationService({
+      workspaceHandle: 'workspace.1',
+      conversationPrefix: 'conversation.planner',
+      contextRevision: 'revision.1',
+      prompts: { render: async () => ({ system: 'Plan the product.' }) },
+    })
+    const schema = z.object({ value: z.string() }).strict()
+    const first = service.generateObject({ providerId: 'codex-system', prompt: 'First.' }, schema)
+    const controller = new AbortController()
+    const queued = service.generateObject({
+      providerId: 'codex-system',
+      prompt: 'Second.',
+      signal: controller.signal,
+    }, schema)
+    controller.abort()
+
+    await expect(queued).resolves.toEqual({
+      ok: false,
+      error: 'AbortError: operation aborted',
+    })
+    expect(invokeMock).toHaveBeenCalledTimes(1)
+    resolveFirst({ value: 'done' })
+    await expect(first).resolves.toEqual({ ok: true, data: { value: 'done' } })
+    expect(invokeMock.mock.calls.filter(([command]) =>
+      command === 'codex_system_turn_start')).toHaveLength(1)
+    expect(invokeMock.mock.calls.filter(([command]) =>
+      command === 'codex_system_conversation_reset')).toHaveLength(1)
+  })
+
+  it('arbitrates complete planning sessions across independent adapter instances', async () => {
+    const first = createCodexPlanningGenerationService({
+      workspaceHandle: 'workspace.first',
+      conversationPrefix: 'conversation.first',
+      contextRevision: 'revision.1',
+      prompts: { render: async () => ({ system: 'Plan the product.' }) },
+    })
+    const second = createCodexPlanningGenerationService({
+      workspaceHandle: 'workspace.second',
+      conversationPrefix: 'conversation.second',
+      contextRevision: 'revision.1',
+      prompts: { render: async () => ({ system: 'Plan the product.' }) },
+    })
+    let releaseFirst!: () => void
+    const firstSession = first.runExclusive(undefined, () =>
+      new Promise<void>((resolve) => { releaseFirst = resolve }))
+    const secondRun = vi.fn(async () => 'second')
+    const secondSession = second.runExclusive(undefined, secondRun)
+
+    await Promise.resolve()
+    expect(secondRun).not.toHaveBeenCalled()
+    releaseFirst()
+    await expect(firstSession).resolves.toBeUndefined()
+    await expect(secondSession).resolves.toBe('second')
+    expect(secondRun).toHaveBeenCalledTimes(1)
+  })
+
+  it('cancels a queued planning session before it can own the native runtime', async () => {
+    const first = createCodexPlanningGenerationService({
+      workspaceHandle: 'workspace.first',
+      conversationPrefix: 'conversation.first',
+      contextRevision: 'revision.1',
+      prompts: { render: async () => ({ system: 'Plan the product.' }) },
+    })
+    const second = createCodexPlanningGenerationService({
+      workspaceHandle: 'workspace.second',
+      conversationPrefix: 'conversation.second',
+      contextRevision: 'revision.1',
+      prompts: { render: async () => ({ system: 'Plan the product.' }) },
+    })
+    let releaseFirst!: () => void
+    const firstSession = first.runExclusive(undefined, () =>
+      new Promise<void>((resolve) => { releaseFirst = resolve }))
+    const controller = new AbortController()
+    const secondRun = vi.fn(async () => undefined)
+    const secondSession = second.runExclusive(controller.signal, secondRun)
+    controller.abort()
+
+    await expect(secondSession).rejects.toMatchObject({ name: 'AbortError' })
+    expect(secondRun).not.toHaveBeenCalled()
+    releaseFirst()
+    await expect(firstSession).resolves.toBeUndefined()
   })
 
 })

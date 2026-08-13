@@ -242,6 +242,9 @@ export interface NativeBridge {
   }): Promise<VectorizeSvgResult>
   foregroundSegmentationCapabilities?(): Promise<ForegroundSegmentationCapabilities>
   foregroundSegment?(bytes: Uint8Array): Promise<ForegroundSegmentationNativeResult>
+  /** Settles from the native monotonic clock even when renderer timers are throttled. */
+  waitForMonotonicDeadline?(deadlineId: string, timeoutMs: number): Promise<void>
+  cancelMonotonicDeadline?(deadlineId: string): Promise<void>
 }
 
 /**
@@ -341,6 +344,10 @@ export const tauriBridge: NativeBridge = {
     >('foreground_segment', { bytes: Array.from(bytes) })
     return { ...result, pngBytes: Uint8Array.from(result.pngBytes) }
   },
+  waitForMonotonicDeadline: (deadlineId, timeoutMs) =>
+    invoke('wait_for_monotonic_deadline', { deadlineId, timeoutMs }),
+  cancelMonotonicDeadline: (deadlineId) =>
+    invoke('cancel_monotonic_deadline', { deadlineId }),
 }
 
 /** Opaque-handle bridge for controlled CodingTask staging and promotion. */

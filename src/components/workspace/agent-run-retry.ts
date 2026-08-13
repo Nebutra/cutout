@@ -42,6 +42,12 @@ export function createAgentRunRetryControl(
   input: {
     readonly working: boolean;
     readonly hasRepairPlan: boolean;
+    /**
+     * A transient failure can occur before any durable artifact exists. In
+     * that state the projected outcome is necessarily incomplete, but it is
+     * not a material repair and must not replace the run-level Retry action.
+     */
+    readonly retryableRunFailure?: boolean;
     readonly retryableBrief: string | null;
     readonly retryPlanningRuntime?: RetryPlanningRuntime;
     readonly currentError: string | null;
@@ -51,7 +57,7 @@ export function createAgentRunRetryControl(
 ): AgentRunRetryControl {
   if (input.working) return {};
 
-  if (input.hasRepairPlan) {
+  if (input.hasRepairPlan && !input.retryableRunFailure) {
     return {
       label: "Continue",
       onRetry: () => void createAssets("repair"),

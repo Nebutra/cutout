@@ -8,21 +8,35 @@ const workspaceSource = readFileSync(
 )
 
 describe('prototype production throughput wiring', () => {
-  it('keeps page QA observational and one paid page invocation per attempt', () => {
+  it('keeps page QA gated with one bounded node-local repair and unique paid attempts', () => {
     const start = workspaceSource.indexOf('async function generatePrototypePage(')
     const end = workspaceSource.indexOf('async function invokeDesktopImageTool(', start)
     const pageGeneration = workspaceSource.slice(start, end)
 
     expect(workspaceSource).toContain('const PROTOTYPE_QA_MAX_RETRIES = 0')
+    expect(workspaceSource).toContain('const PROTOTYPE_PAGE_QA_MAX_RETRIES = 1')
     expect(workspaceSource).toContain('const PROTOTYPE_QA_CONCURRENCY = 3')
     expect(pageGeneration).toContain('capability: useReferenceEdit ? "edit-image" : "generate-image"')
     expect(pageGeneration).toContain('references: useReferenceEdit ? referenceImages : []')
     expect(pageGeneration).not.toContain('generateWithQa')
-    expect(pageGeneration).toContain('await reviewGeneratedImage(')
+    expect(pageGeneration).toContain('reviewGeneratedImage(')
     expect(pageGeneration).toContain('lease.controller.signal')
     expect(pageGeneration).not.toContain('visualRuntime.execute')
-    expect(workspaceSource).toContain('reviewMode: image.providerId === chat.providerId ? "inline" : "overlap"')
+    expect(workspaceSource).toContain('const PROTOTYPE_PAGE_CONCURRENCY = PROTOTYPE_GENERATION_CONCURRENCY')
+    expect(workspaceSource).toContain('reviewMode: "overlap"')
+    expect(workspaceSource).toContain('maxReviewRetries: PROTOTYPE_PAGE_QA_MAX_RETRIES')
+    expect(workspaceSource).toContain('retryAfterReview: (page, _anchor, rejected, attempt) =>')
+    expect(workspaceSource).toContain('prototypePageRepairReferences(rejected, designSystem, materialReference)')
+    expect(workspaceSource).toContain('[options.suiteRunId]: { ...frontier, pages: generated }')
+    expect(workspaceSource).not.toContain('[options.suiteRunId]: { ...frontier, pages: acceptedPages }')
+    expect(pageGeneration).toContain('qaRetryPrompt(')
+    expect(pageGeneration).toContain('`qa-${qaAttempt}`')
+    expect(pageGeneration).toContain('prototypePageImageRoutesRef.current.get(artifact)')
+    expect(pageGeneration).toContain('productionScheduler?.providerLane(')
     expect(workspaceSource).toContain('reviewConcurrency: PROTOTYPE_QA_CONCURRENCY')
+    expect(workspaceSource).toContain('concurrency: PROTOTYPE_PAGE_CONCURRENCY')
+    expect(pageGeneration).toContain('productionScheduler?.imageLane(')
+    expect(pageGeneration).toContain('imageRouteHealthKey(')
   })
 
   it('interleaves direct and board work under one global image ceiling', () => {
@@ -37,15 +51,45 @@ describe('prototype production throughput wiring', () => {
     expect(boardProduction).toContain('designSystem.bytes')
     expect(boardProduction).toContain('anchorPage.bytes')
     expect(boardProduction).not.toContain('textFreeSource')
+    expect(workspaceSource).toContain('createPrototypeProductionScheduler(')
+    expect(workspaceSource).toContain('scheduleAssetProduction')
+    expect(workspaceSource).toContain('stopQueuedImageWorkAfter: (error) =>')
+    expect(workspaceSource).toContain('kind === "credential" || kind === "configuration"')
+    expect(workspaceSource).toContain('reduceImageConcurrencyAfter: (error) =>')
+    expect(workspaceSource).toContain('imageRouteHealth,')
+    expect(workspaceSource).not.toContain('VITE_CUTOUT_PACKAGED_E2E === "1" ||')
   })
 
   it('does not truncate Agent-authored routes or cancel independent suite siblings', () => {
     expect(workspaceSource).not.toContain('pages.slice(0, 6)')
     expect(workspaceSource).not.toContain('cancelUnstartedPrototypeSuiteCandidates(')
     expect(workspaceSource).toContain('if (left.directionId === selectedDirectionId) return -1')
-    expect(workspaceSource).toContain('nameRegion: isCodexSystemAssignment(route.chat)')
-    expect(workspaceSource).toContain('? undefined')
-    expect(workspaceSource).toContain(': (boardBytes, slices, context, signal) =>')
-    expect(workspaceSource).not.toContain('nameRegion: options.resumePrototypeSuiteCandidates')
+    expect(workspaceSource).not.toContain('nameRegion:')
+    expect(workspaceSource).toContain('task.label ?? task.manifestItemId')
+    expect(workspaceSource).toContain('await Promise.all(')
+    expect(workspaceSource).toContain('await Promise.all(scheduledCandidates.map(generateCandidate))')
+    expect(workspaceSource).toContain('retrySuiteCandidateIds.has(candidate.id)')
+    expect(workspaceSource).toContain('PROTOTYPE_PAGE_TRANSIENT_RETRIES = 1')
+    expect(workspaceSource).toContain('`attempt-${attempt}`')
+    expect(workspaceSource).toContain('const ownsSingularProjection = () =>')
+    expect(workspaceSource).toContain('if (shouldProject?.() ?? true) setPrototypePages(artifacts)')
+    expect(workspaceSource).toContain('regionRunId !== null && ownsSingularProjection()')
+    expect(workspaceSource).toContain(
+      'priorRouteGraphs.push(prototypeRouteGraphFingerprint(planned.data))',
+    )
+    expect(workspaceSource).not.toContain(
+      'routes: planned.data.pages.map((page) => page.route)',
+    )
+    expect(workspaceSource).toContain('data-suite-progress-stage="topology-planning"')
+    expect(workspaceSource).toContain('Planning route topology')
+  })
+
+  it('keeps deterministic Design IR projection off the visual synthesis critical path', () => {
+    const start = workspaceSource.indexOf('async function generatePrototypeDesignSystem(')
+    const end = workspaceSource.indexOf('async function generatePrototypeDesignSystemCandidates(', start)
+    const candidateGeneration = workspaceSource.slice(start, end)
+
+    expect(candidateGeneration).toContain('prototypeDesignMarkdown(')
+    expect(candidateGeneration).not.toContain('synthesizeDesignMarkdownFromReference(')
   })
 })

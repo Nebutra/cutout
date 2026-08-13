@@ -1,4 +1,9 @@
 import { z } from 'zod'
+import {
+  commerceDagReferenceBindingSchema,
+  verifyCommerceProductionRehearsalBundle,
+  type VerifiedCommerceProductionRehearsal,
+} from './rehearsal'
 
 export const COMMERCE_BENCHMARK_SCHEMA = 'commerce.profile-benchmark.v1' as const
 export const COMMERCE_BENCHMARK_ID = 'benchmark:commerce-profile:p1-p7' as const
@@ -167,6 +172,8 @@ const realHostReceiptReferenceSchema = z.object({
     runId: recordIdSchema,
     capabilityId: recordIdSchema,
     artifactIds: z.array(recordIdSchema).min(1).max(100),
+    acceptedReferenceArtifactIds: z.array(recordIdSchema).max(100).optional(),
+    dagReferences: z.array(commerceDagReferenceBindingSchema).max(64).optional(),
   }).strict(),
 }).strict()
 
@@ -178,6 +185,7 @@ const artifactBytesReferenceSchema = z.object({
     artifactId: recordIdSchema,
     mediaType: z.string().min(1).max(120),
     byteLength: z.number().int().positive(),
+    derivedFromArtifactId: recordIdSchema.optional(),
   }).strict(),
 }).strict()
 
@@ -219,7 +227,7 @@ const assertionEvidenceSchema = z.object({
 const metricEvidenceSchema = z.object({
   metricId: recordIdSchema,
   assertions: z.array(assertionEvidenceSchema).min(1).max(20),
-  evidenceReferences: z.array(commerceBenchmarkEvidenceReferenceSchema).min(1).max(20),
+  evidenceReferences: z.array(commerceBenchmarkEvidenceReferenceSchema).min(1).max(100),
 }).strict()
 
 export const commerceBenchmarkEvidenceSetSchema = z.object({
@@ -245,7 +253,7 @@ const reportMetricSchema = z.object({
   label: z.string().min(1).max(240),
   status: commerceBenchmarkStatusSchema,
   assertions: z.array(assertionEvidenceSchema).min(1).max(20),
-  evidenceReferences: z.array(commerceBenchmarkEvidenceReferenceSchema).min(1).max(20),
+  evidenceReferences: z.array(commerceBenchmarkEvidenceReferenceSchema).min(1).max(100),
   diagnostics: z.array(diagnosticSchema).max(20),
 }).strict()
 
@@ -350,6 +358,7 @@ function metricStatus(assertions: readonly z.infer<typeof assertionEvidenceSchem
 function assertPassEvidence(
   definition: CommerceBenchmarkMetricDefinition,
   evidenceReferences: readonly CommerceBenchmarkEvidenceReference[],
+  trustedRealHost = false,
 ): void {
   for (const kind of definition.passEvidenceKinds) {
     if (!evidenceReferences.some((reference) => reference.kind === kind)) {
@@ -363,11 +372,40 @@ function assertPassEvidence(
   }
   const byteEvidence = evidenceReferences.filter((reference) => reference.kind === 'artifact-bytes')
   for (const bytes of byteEvidence) {
+    const signedArtifactId = bytes.binding.derivedFromArtifactId ?? bytes.binding.artifactId
     if (!realReceipts.some((receipt) => receipt.binding.receiptId === bytes.binding.receiptId
-      && receipt.binding.artifactIds.includes(bytes.binding.artifactId))) {
+      && receipt.binding.artifactIds.includes(signedArtifactId))) {
       throw new Error(`Artifact bytes for ${definition.id} must bind a real Host receipt and artifact.`)
     }
   }
+  if (definition.id.includes('real-video')) {
+    const videoReferences = realReceipts.flatMap((receipt) => receipt.binding.dagReferences ?? [])
+    if (videoReferences.length !== 1
+      || videoReferences[0]?.sourceSemanticRole !== 'main-image'
+      || videoReferences[0].referenceRole !== 'first-frame') {
+      throw new Error(`Real-Host video pass requires the exact signed Commerce DAG reference binding.`)
+    }
+  }
+  if (definition.id.includes('real-image')) {
+    const imageReceipts = realReceipts.filter((reference) => (
+      reference.binding.capabilityId === 'capability:commerce-image'
+    ))
+    const sourceClosure = imageReceipts[0]?.binding.acceptedReferenceArtifactIds ?? []
+    const detailReceipts = imageReceipts.slice(1)
+    if (imageReceipts.length !== 6 || sourceClosure.length === 0
+      || detailReceipts.some((reference) => (
+        reference.binding.acceptedReferenceArtifactIds?.[0] !== sourceClosure[0]
+      ))) {
+      throw new Error('Real-Host image pass requires the exact retained product source-material closure.')
+    }
+    const detailReferences = detailReceipts.flatMap((receipt) => receipt.binding.dagReferences ?? [])
+    if (detailReferences.length !== 5 || detailReferences.some((reference) => (
+      reference.sourceSemanticRole !== 'main-image' || reference.referenceRole !== 'visual-continuity'
+    ))) {
+      throw new Error('Real-Host detail images require the exact signed main-image continuity binding.')
+    }
+  }
+  if (trustedRealHost) return
   throw new Error(
     `Real-Host metric ${definition.id} cannot pass until a trusted Host verification contract is installed.`,
   )
@@ -432,7 +470,10 @@ export function createCommerceProfileBenchmarkReport(input: unknown): CommercePr
   })
 }
 
-export function decodeCommerceProfileBenchmarkReport(input: unknown): CommerceProfileBenchmarkReport {
+function decodeCommerceProfileBenchmarkReportInternal(
+  input: unknown,
+  trustedRealHost: boolean,
+): CommerceProfileBenchmarkReport {
   const report = commerceProfileBenchmarkReportSchema.parse(input)
   assertBenchmarkIdentity(report.benchmark)
   const metricIds = report.metrics.map((metric) => metric.id)
@@ -449,7 +490,7 @@ export function decodeCommerceProfileBenchmarkReport(input: unknown): CommercePr
     if (metric.status !== metricStatus(metric.assertions)) {
       throw new Error(`Benchmark metric status is not derived for ${metric.id}.`)
     }
-    if (metric.status === 'passed') assertPassEvidence(definition, metric.evidenceReferences)
+    if (metric.status === 'passed') assertPassEvidence(definition, metric.evidenceReferences, trustedRealHost)
     const derivedDiagnostics = metric.assertions.flatMap((assertion) => assertion.diagnostic ? [assertion.diagnostic] : [])
     if (canonical(metric.diagnostics) !== canonical(derivedDiagnostics)) {
       throw new Error(`Benchmark diagnostics are not derived for ${metric.id}.`)
@@ -462,12 +503,194 @@ export function decodeCommerceProfileBenchmarkReport(input: unknown): CommercePr
   return report
 }
 
+export function decodeCommerceProfileBenchmarkReport(input: unknown): CommerceProfileBenchmarkReport {
+  return decodeCommerceProfileBenchmarkReportInternal(input, false)
+}
+
+function referenceRevision(receiptId: string): string {
+  return `${receiptId}:revision:1`
+}
+
+function realReceiptReference(input: {
+  readonly metricId: string
+  readonly runId: string
+  readonly receipt: VerifiedCommerceProductionRehearsal['artifacts'][number]['receipt']
+  readonly artifactIds?: readonly string[]
+  readonly dagReferences?: VerifiedCommerceProductionRehearsal['artifacts'][number]['dagReferenceBindings']
+}): CommerceBenchmarkEvidenceReference {
+  return commerceBenchmarkEvidenceReferenceSchema.parse({
+    id: `evidence:${input.metricId}:${input.receipt.receiptId}`,
+    revision: referenceRevision(input.receipt.receiptId),
+    contentHash: input.receipt.receiptHash,
+    kind: 'real-host-receipt',
+    binding: {
+      metricId: input.metricId,
+      receiptId: input.receipt.receiptId,
+      runId: input.runId,
+      capabilityId: input.receipt.capabilityId,
+      artifactIds: input.artifactIds ?? [input.receipt.artifact.artifactId],
+      acceptedReferenceArtifactIds: input.receipt.acceptedReferenceArtifactIds,
+      ...(input.dagReferences ? { dagReferences: input.dagReferences } : {}),
+    },
+  })
+}
+
+function byteReference(input: {
+  readonly metricId: string
+  readonly evidence: VerifiedCommerceProductionRehearsal['artifacts'][number]['retainedBytes'][number]
+}): CommerceBenchmarkEvidenceReference {
+  return commerceBenchmarkEvidenceReferenceSchema.parse({
+    id: `evidence:${input.metricId}:bytes:${input.evidence.artifactId}`,
+    revision: `${input.evidence.artifactId}:revision:1`,
+    contentHash: input.evidence.contentHash,
+    kind: 'artifact-bytes',
+    binding: {
+      metricId: input.metricId,
+      receiptId: input.evidence.receiptId,
+      artifactId: input.evidence.artifactId,
+      mediaType: input.evidence.mediaType,
+      byteLength: input.evidence.byteLength,
+      ...(input.evidence.derivedFromArtifactId
+        ? { derivedFromArtifactId: input.evidence.derivedFromArtifactId }
+        : {}),
+    },
+  })
+}
+
+function referencesForArtifacts(input: {
+  readonly metricId: string
+  readonly rehearsal: VerifiedCommerceProductionRehearsal
+  readonly artifacts: readonly VerifiedCommerceProductionRehearsal['artifacts'][number][]
+  readonly includeBytes: boolean
+  readonly includeSemanticQa: boolean
+}): CommerceBenchmarkEvidenceReference[] {
+  return input.artifacts.flatMap((artifact) => {
+    const receipts = [realReceiptReference({
+      metricId: input.metricId,
+      runId: input.rehearsal.runId,
+      receipt: artifact.receipt,
+      dagReferences: artifact.dagReferenceBindings,
+    })]
+    const bytes = input.includeBytes
+      ? artifact.retainedBytes.map((evidence) => byteReference({ metricId: input.metricId, evidence }))
+      : []
+    if (!input.includeSemanticQa || !artifact.semanticQa) return [...receipts, ...bytes]
+    return [
+      ...receipts,
+      realReceiptReference({
+        metricId: input.metricId,
+        runId: input.rehearsal.runId,
+        receipt: artifact.semanticQa.receipt,
+      }),
+      ...bytes,
+      ...(input.includeBytes ? [byteReference({
+        metricId: input.metricId,
+        evidence: artifact.semanticQa.retainedBytes,
+      })] : []),
+    ]
+  })
+}
+
+function realMetricArtifacts(
+  metricId: string,
+  rehearsal: VerifiedCommerceProductionRehearsal,
+): readonly VerifiedCommerceProductionRehearsal['artifacts'][number][] {
+  if (metricId.includes('real-text')) {
+    return rehearsal.artifacts.filter((artifact) => artifact.semanticRole.startsWith('localized-description:'))
+  }
+  if (metricId.includes('real-image')) {
+    return rehearsal.artifacts.filter((artifact) => artifact.semanticRole === 'main-image'
+      || artifact.semanticRole.startsWith('detail-image:'))
+  }
+  if (metricId.includes('real-video')) {
+    return rehearsal.artifacts.filter((artifact) => artifact.semanticRole === 'product-video')
+  }
+  return rehearsal.artifacts.filter((artifact) => artifact.semanticRole === 'strategy-document')
+}
+
+function createVerifiedCommerceReport(
+  baselineInput: unknown,
+  rehearsal: VerifiedCommerceProductionRehearsal,
+): CommerceProfileBenchmarkReport {
+  const baseline = decodeCommerceProfileBenchmarkReport(baselineInput)
+  const metrics = baseline.metrics.map((metric) => {
+    if (metric.tier !== 'real-host') return metric
+    const definition = metricDefinition(metric.id)
+    const includeBytes = metric.id.endsWith('-bytes')
+    const artifacts = realMetricArtifacts(metric.id, rehearsal)
+    const includeSemanticQa = metric.id.includes('real-image') || metric.id.includes('real-video')
+    const evidenceReferences = referencesForArtifacts({
+      metricId: metric.id,
+      rehearsal,
+      artifacts,
+      includeBytes,
+      includeSemanticQa,
+    })
+    const assertions = definition.assertionIds.map((id) => ({ id, verdict: 'passed' as const }))
+    assertPassEvidence(definition, evidenceReferences, true)
+    return {
+      id: definition.id,
+      acceptanceCriterion: definition.acceptanceCriterion,
+      tier: definition.tier,
+      label: definition.label,
+      status: 'passed' as const,
+      assertions,
+      evidenceReferences,
+      diagnostics: [],
+    }
+  })
+  return decodeCommerceProfileBenchmarkReportInternal({
+    schema: COMMERCE_BENCHMARK_SCHEMA,
+    benchmark: baseline.benchmark,
+    identity: rehearsal.identity,
+    metrics,
+    summary: deriveSummary(metrics),
+  }, true)
+}
+
+export async function createCommerceProfileBenchmarkReportFromRehearsal(input: {
+  readonly baselineReport: unknown
+  readonly rehearsalBundle: unknown
+}): Promise<{
+  readonly report: CommerceProfileBenchmarkReport
+  readonly rehearsal: VerifiedCommerceProductionRehearsal
+}> {
+  const rehearsal = await verifyCommerceProductionRehearsalBundle(input.rehearsalBundle)
+  return {
+    report: createVerifiedCommerceReport(input.baselineReport, rehearsal),
+    rehearsal,
+  }
+}
+
+export async function decodeCommerceProfileBenchmarkReportFromRehearsal(input: {
+  readonly report: unknown
+  readonly baselineReport: unknown
+  readonly rehearsalBundle: unknown
+}): Promise<CommerceProfileBenchmarkReport> {
+  const expected = await createCommerceProfileBenchmarkReportFromRehearsal({
+    baselineReport: input.baselineReport,
+    rehearsalBundle: input.rehearsalBundle,
+  })
+  const candidate = commerceProfileBenchmarkReportSchema.parse(input.report)
+  if (canonical(candidate) !== canonical(expected.report)) {
+    throw new Error('Commerce real-Host report does not match its reverified rehearsal bundle.')
+  }
+  return expected.report
+}
+
 export function compareCommerceProfileBenchmarkReports(
   priorInput: unknown,
   currentInput: unknown,
 ): CommerceBenchmarkComparison {
   const prior = decodeCommerceProfileBenchmarkReport(priorInput)
   const current = decodeCommerceProfileBenchmarkReport(currentInput)
+  return compareDecodedCommerceProfileBenchmarkReports(prior, current)
+}
+
+function compareDecodedCommerceProfileBenchmarkReports(
+  prior: CommerceProfileBenchmarkReport,
+  current: CommerceProfileBenchmarkReport,
+): CommerceBenchmarkComparison {
   if (prior.benchmark.id !== current.benchmark.id || prior.benchmark.version !== current.benchmark.version) {
     throw new Error('Commerce benchmark reports are incompatible by benchmark id or version.')
   }
@@ -496,4 +719,21 @@ export function compareCommerceProfileBenchmarkReports(
     regressions: transitions.filter((transition) => transition.from === 'passed' && transition.to !== 'passed')
       .map((transition) => transition.metricId),
   })
+}
+
+interface ReverifiedCommerceReportInput {
+  readonly report: unknown
+  readonly baselineReport: unknown
+  readonly rehearsalBundle: unknown
+}
+
+export async function compareCommerceProfileBenchmarkReportsFromRehearsals(
+  priorInput: ReverifiedCommerceReportInput,
+  currentInput: ReverifiedCommerceReportInput,
+): Promise<CommerceBenchmarkComparison> {
+  const [prior, current] = await Promise.all([
+    decodeCommerceProfileBenchmarkReportFromRehearsal(priorInput),
+    decodeCommerceProfileBenchmarkReportFromRehearsal(currentInput),
+  ])
+  return compareDecodedCommerceProfileBenchmarkReports(prior, current)
 }

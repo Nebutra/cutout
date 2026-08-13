@@ -9,7 +9,8 @@ export interface PrototypeAssetManifestItem {
   readonly regionId: string
   readonly regionName: string
   readonly assetRoute: PrototypePage['regions'][number]['assetRoute']
-  readonly source: 'asset-opportunity' | 'region'
+  readonly assetOutput: 'transparent-subject' | 'rectangular-media'
+  readonly source: 'asset-opportunity'
   readonly description: string
 }
 
@@ -32,10 +33,7 @@ export interface PrototypeAssetManifest {
 export function prototypePageAssetCount(page: PrototypePage): number {
   return page.regions
     .filter((region) => region.assetRoute !== 'ignore-code-ui')
-    .reduce(
-      (count, region) => count + Math.max(1, region.assetOpportunities.length),
-      0,
-    )
+    .reduce((count, region) => count + region.assetOpportunities.length, 0)
 }
 
 export function createPrototypeAssetManifest(
@@ -48,18 +46,10 @@ export function createPrototypeAssetManifest(
     const assets = page.regions
       .filter((region) => region.assetRoute !== 'ignore-code-ui')
       .flatMap((region) => {
-        const opportunities =
-          region.assetOpportunities.length > 0
-            ? region.assetOpportunities.map((description) => ({
-                source: 'asset-opportunity' as const,
-                description,
-              }))
-            : [
-                {
-                  source: 'region' as const,
-                  description: region.name || region.role || region.summary,
-                },
-              ]
+        const opportunities = region.assetOpportunities.map((description) => ({
+          source: 'asset-opportunity' as const,
+          description,
+        }))
 
         return opportunities.map((item, index) => {
           const base = uniqueName(
@@ -75,6 +65,9 @@ export function createPrototypeAssetManifest(
             regionId: region.id,
             regionName: region.name,
             assetRoute: region.assetRoute,
+            assetOutput: region.assetRoute === 'direct-generate'
+              ? region.assetOutput ?? 'transparent-subject'
+              : 'transparent-subject',
             source: item.source,
             description: item.description,
           }

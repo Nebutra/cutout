@@ -6,6 +6,7 @@ import type { CapabilityBindings, ModelDescriptor } from '@/services/ai/model-ca
 import {
   assessImageRoute,
   exactImageRouteDescriptor,
+  imageAdapterStrategySchema,
 } from '@/services/ai/image-route-assessment'
 
 const CREDENTIAL_VALUE = /(?:\b(?:sk|rk|pk)-[A-Za-z0-9_-]{8,}\b|\bBearer\s+[A-Za-z0-9._~+/-]+\b)/i
@@ -55,6 +56,7 @@ export const paidToolExecutorCapabilitySchema = z.object({
   providerId: safeText.min(1).max(160),
   model: safeText.min(1).max(300),
   available: z.boolean(),
+  transportStrategy: imageAdapterStrategySchema.optional(),
 }).strict()
 export type PaidToolExecutorCapability = z.infer<typeof paidToolExecutorCapabilitySchema>
 
@@ -137,14 +139,13 @@ export function desktopPaidToolCapabilities(
       provider,
       descriptor: exactImageRouteDescriptor(evidence.descriptors ?? [], assignment),
     })
-    const supported = capability === 'edit-image'
-      ? assessment.edit.supported
-      : assessment.generation.supported
-    return supported ? [{
+    const route = capability === 'edit-image' ? assessment.edit : assessment.generation
+    return route.supported ? [{
       capability,
       providerId: assignment.providerId,
       model: assignment.model,
       available: true,
+      transportStrategy: route.strategy,
     }] : []
   })
 }

@@ -151,14 +151,46 @@ An authenticated catalog image id is a candidate route, not proof that image
 generation is usable. The packaged journey records catalog routing separately
 from the first completed image execution and never calls the former success.
 
+Composer image routing must consume the exact observed/verified model descriptor
+from the same immutable run snapshot as the Provider and task binding. Provider
+kind may supply text-adapter behavior, but it never grants a paid image
+capability. The paid image route-lock API requires this catalog explicitly so a
+call site cannot silently fall back to a kind-derived capability table.
+
+A failed conversational tool-gate Provider call is terminal for that turn. It
+must preserve the original classified failure and must not fall through into
+planning or paid image production, where a later preflight could overwrite the
+owning diagnostic.
+
 Every renderer-owned generation `AbortSignal` propagates through the desktop
 tool loop and `GenerationService` into an opaque UUID-bound native proxy
 request. Cancellation calls `ai_proxy_cancel`, which drops the matching
 `reqwest` future; discarding a late renderer result alone is not cancellation.
-The owning desktop paid-tool attempt has a 180-second deadline and propagates
-its abort into the native request. Native buffered generation and image-edit
-requests retain a 300-second transport failsafe for callers outside that
-interactive owner. Catalog/health probes retain their shorter bound.
+Native buffered generation and image-edit requests own a 300-second transport
+failsafe. The desktop owner for remote image tools settles 15 seconds later so
+the native request can return its own terminal result before an outer abort;
+ending the outer owner first can discard a valid slow result and cause a second
+paid call on Retry. Deterministic local cutout tools retain their 180-second
+owner. The packaged candidate watchdog settles another 15 seconds after the
+desktop image owner. Catalog/health probes retain their shorter bound.
+
+OpenAI-shaped structured generation sends JSON Schema in non-strict provider
+mode and always validates the returned value against the caller-owned Zod
+schema locally. This preserves optional/default fields across compatible
+relays without weakening Cutout's final acceptance contract. A native
+structured route may be cached as unsupported only after an explicit
+protocol-level unsupported error. Invalid JSON, a schema mismatch, missing
+output, transport failure, or one malformed schema is call-local evidence and
+must not disable native structured output for later schemas on the same
+provider/model route. Forced-tool and plain-JSON fallbacks remain bounded and
+receive the same local validation.
+
+Each attempted structured route emits only its closed attempt/category pair.
+Explicit HTTP 408/429/5xx status owns transient classification before arbitrary
+Provider response prose, and the response body is neither retained nor used to
+change that class. If a later structured fallback terminates with transport,
+authentication, policy, or cancellation evidence, Planner wrapping must retain
+that closed owner rather than replace it with a Planner schema diagnostic.
 
 The application entry must not statically load provider catalog definitions or
 provider SDK runtime solely to support connection testing. When a configured
@@ -175,6 +207,8 @@ import.
 | --- | --- |
 | Unknown protocol string | TypeScript/Rust decoding fails closed |
 | Known protocol unsupported by `kind` | Reject before reading a secret or sending a request |
+| One structured schema is invalid or mismatched | Fall back for that call; do not cache the provider/model as unsupported |
+| Provider explicitly rejects structured response format as unsupported | Cache only that protocol capability and use the validated fallback on later calls |
 | Missing protocol on a persisted non-Gateway record | Reject the record with an actionable wire-protocol-required error |
 | Missing protocol on a new draft | Apply the current product default before persistence |
 | `/models` returns HTML or malformed JSON | Report endpoint/catalog misconfiguration |
@@ -207,7 +241,7 @@ import.
   stripped inbound auth headers, mapped/reserved address rejection,
   resolve-to-connect pinning, draft catalog checks, and buffered/stream proxy
   parity; UUID-only request registration, duplicate rejection, native
-  cancellation, and the aligned generation deadline.
+  cancellation, and the ordered native/desktop/packaged generation deadlines.
 - UI: protocol options and explicit labels for each supported kind; visible
   action copy must say credential/catalog check rather than generation proof.
 - Visual: desktop/mobile provider directory and custom endpoint form coverage.
@@ -260,6 +294,18 @@ Claude Code, the process environment, or Cutout's OS credential vault.
 Finder-launched desktop apps commonly do not inherit shell environment
 variables. A provider being present in a local tool config therefore does not
 prove that its `env_key` is reusable by Cutout.
+
+The clean packaged macOS VM harness may project an existing host-owned Cutout
+Provider credential into the ephemeral VM Keychain only through the audited
+stdin-to-Keychain helper. The helper uses the stable `com.nebutra.cutout`
+service and `provider:<id>` account, grants access only to the verified signed
+E2E binary, never places the value in argv, a file, Provider metadata, WebView
+state, or logs, and deletes the remote item after evidence collection. Its
+partition list retains Apple's tool/application partitions plus the verified
+Developer ID Team partition; a binary-only ACL without that partition list is
+not sufficient for a signed packaged app to read the item through securityd.
+The product still discovers and imports that credential through its normal
+native candidate path; harness provisioning is not capability evidence.
 
 ### 2. Signatures
 
@@ -521,6 +567,22 @@ import_provider_draft(app: AppHandle, input: ImportDraftInput) -> Result<Provide
   Grok Image families, then falls back to another supported
   compatible route without changing its exact model id. Recommendation never
   establishes support.
+- Generic route support is not full-prototype task fitness. Settings and
+  ordinary edit-image may expose any exact executable route above, including
+  GPT Image 1/1.5. Complete UI/UX Design System, page and resource production
+  applies a second closed product-fit gate and currently admits only exact
+  `gpt-image-2`, `qwen-image-3.0`, and `qwen-image-3.0-pro` ids. Health fallback
+  may choose only within that task-fit set; absence fails before paid prototype
+  work instead of silently degrading visual fidelity.
+- Planning chat and semantic Vision QA are separate task bindings. The resolved
+  workspace route carries an exact verified `vision` assignment, and page,
+  direct-asset, and board review consume only that assignment. They never fall
+  back to `chat` or a planning-only system runtime. A missing, stale, or
+  capability-ineligible Vision binding fails QA preflight before review; using
+  a different Provider from the route that actually produced the bytes permits
+  a bounded independent overlap lane. Same-Provider review may still overlap
+  logically, but consumes `providerLane()` under the shared production ceiling.
+  Vision settlement never contributes image-route recovery or pressure evidence.
 - Reviewed image-model evidence is Provider-neutral. It records only the exact
   model id, capability, source, and capture/version identity; it must not carry
   an adapter family or Provider classification. An authenticated endpoint model
@@ -545,19 +607,94 @@ import_provider_draft(app: AppHandle, input: ImportDraftInput) -> Result<Provide
   ids contain no image keyword. Nomination is discovery only: exact route
   evidence and an implemented adapter still decide support.
 - OpenAI-shaped image routes have implemented generation and edit adapters.
-  Google/Gemini routes have an implemented generation adapter but remain
-  `adapter-required` for generic image editing. DashScope/Qwen compatible-mode
-  routes remain `adapter-required` for both generation and editing until their
-  native request, response, authentication, and cancellation contracts are
-  implemented and tested. Provider kind, catalog presence, and model-name
-  heuristics alone never authorize an image call.
-- Automatic setup stops importing candidates as soon as the configured results
-  cover every required task dimension. It must continue after a failed or
-  partial candidate, but it must not probe unrelated credentials after a
-  complete route exists.
+  Google/Gemini routes use `google-multimodal-generate` for both generation and
+  reference-conditioned editing; edit dispatch supplies the complete edit
+  instruction, one text framing part and every locked reference image to the
+  existing GenerateContent image-output path. A missing image output is
+  terminal and never falls back to prompt-only generation.
+- DashScope compatible-mode remains text-only. A `dashscope` Provider bound to
+  the reviewed first-party
+  `https://dashscope.aliyuncs.com/compatible-mode/v1` connection may separately
+  use `dashscope-native-image-generation` or `dashscope-native-image-edit` when
+  the exact model has observed or verified evidence and appears in the closed
+  native model/operation contract. Static Provider adapter capability metadata
+  describes the available adapter only; it never substitutes for exact-model
+  evidence or authenticated catalog presence.
+- The first-party `xai` Provider keeps Chat Completions as its text wire
+  protocol and separately exposes the documented JSON
+  `/v1/images/generations` and `/v1/images/edits` contracts through
+  `xai-images-generations` and `xai-images-edits`. Generation requests ask for
+  `b64_json`; edit requests preserve one reference in `image` or two-to-three
+  ordered references in `images`, encode only bounded PNG/JPEG/WebP data URIs,
+  and also require inline output. The OpenAI multipart edit command is never
+  used for xAI.
+- Only authenticated catalog presence for the currently documented exact
+  `grok-imagine-image` and `grok-imagine-image-quality` ids contributes reviewed
+  xAI generation/edit evidence. Imagine Image 2.0's August 7 quality evidence
+  makes it a future high-fidelity candidate, but the announcement says API
+  access is still coming and the public API catalog does not expose a 2.0 model
+  id. Cutout must not invent one or advertise 2.0 execution before that changes.
+  Arena-only labels, including version strings that differ from the public xAI
+  API catalog, remain recommendation evidence only and cannot select an xAI
+  transport even if a caller supplies an observed descriptor. The generation
+  service repeats this exact-model check before network admission. Base64 xAI
+  output is media-sniffed because the documented response may omit a MIME field;
+  a URL-only response cannot fall through to renderer-side fetching after Cutout
+  requested inline output.
+- The exact lowercase `qwen-image-3.0` and `qwen-image-3.0-pro` ids receive
+  reviewed generation and edit evidence only when present in the authenticated
+  catalog. Case variants, `image-3`,
+  `image-3-pro`, and other marketing aliases have neither evidence nor a native
+  strategy. Image 3 requests use the documented synchronous response contract
+  and never send `X-DashScope-Async`; an async task-shaped response is invalid.
+  Only closed older model/operation contracts retain async submission, bounded
+  polling, and best-effort remote cancellation.
+- Rust fixes the legacy Beijing native request/task origins, reads the same
+  Provider's keychain secret, and preserves every edit reference as a bounded
+  data image. Image 3 editing requires 1-3 ordered references of at most 10 MB
+  each. Cutout deliberately accepts only PNG, JPEG, and WebP reference bytes;
+  BMP, TIFF, GIF, unknown media, and over-limit input fail before a Provider
+  request. An explicit Image 3 `size` must have pixel area from `512*512`
+  through `2048*2048` and aspect ratio from 1:8 through 8:1.
+- The reviewed native binding remains the legacy Beijing
+  `https://dashscope.aliyuncs.com` origin. Singapore and workspace-specific
+  origins are not accepted until regional key, endpoint, entitlement, and
+  result-origin binding evidence is closed. Result downloads accept only HTTPS
+  `dashscope-result-*.oss-cn-*.aliyuncs.com` origins after DNS validation, use
+  no Provider authorization header, and enforce content-type, image-magic and
+  byte limits. A renderer cannot supply a native endpoint, task URL or result
+  origin.
+- Provider kind, catalog presence, compatible-mode support and model-name
+  heuristics alone never authorize an image call. The desktop capability carries
+  the closed assessed transport strategy into execution; an absent or mismatched
+  strategy fails before a Provider image request.
+- Automatic setup first imports reviewed candidates until the configured
+  results cover every required task dimension. After coverage becomes complete,
+  it may attempt exactly one additional available/importable candidate so the
+  verified descriptor set can retain an independently routed image fallback.
+  That bounded probe uses the same native re-read, authenticated catalog, exact
+  capability-evidence, and typed-transport checks as the primary route. Its
+  failure does not invalidate already-complete coverage, and setup never scans
+  a third post-coverage candidate.
+- Among equally available/importable candidates, Cutout-owned Keychain metadata
+  is attempted before Agent-derived metadata because it carries the exact
+  persisted Provider kind, base URL, wire protocol and model hint for that
+  credential. This authority order does not change model ranking and does not
+  make any Provider family a global default. When no Cutout-owned candidate is
+  available, reviewed Coding Agent candidates remain reusable as before.
 - Importable candidates that match an existing Provider's kind, effective wire
   protocol, and normalized base URL are omitted from setup suggestions. Repair
   the existing connection instead of adding a duplicate Provider.
+- Suggestion deduplication does not remove a reviewed available/importable
+  candidate from automatic repair while setup is incomplete. Rust revalidates
+  exactly one matching existing Provider in place by kind, effective protocol,
+  and normalized base URL, using that Provider ID's current Keychain secret. It
+  neither derives a second Provider ID nor imports/replaces candidate credential
+  material. Multiple matching persisted Providers are an ambiguous conflict.
+- Discovery isolates malformed Agent-owned configs by reviewed adapter. One bad
+  Agent source contributes no candidates, but it does not discard valid
+  candidates from another Agent source; if every source is empty or invalid,
+  the first bounded error remains visible.
 - Discovered provider source labels preserve the sanitized Agent-owned label.
   Only the process environment and Cutout-owned OS credential vault use
   translated category labels; Agent configs must never be mislabeled as
@@ -584,7 +721,12 @@ import_provider_draft(app: AppHandle, input: ImportDraftInput) -> Result<Provide
 | Candidate IPC contains a host path, secret-shaped text, unsafe URL, controls, or unknown field | Reject at native and TypeScript boundaries |
 | Provider save fails after key storage | Restore the prior key or remove the newly written key |
 | Provider exists without complete verification evidence | Show action required; do not count it toward ready coverage |
+| Required coverage is complete and another importable candidate exists | Attempt only the next candidate; retain it only through normal verification and stop before any later candidate |
+| The one post-coverage candidate fails verification | Preserve the complete setup, record no fallback Provider, and stop probing |
 | Candidate resolves to an already configured connection | Omit the duplicate import action and expose Provider management |
+| Automatic repair resolves to exactly one configured connection | Recheck its catalog with its existing Keychain secret and preserve its Provider ID and credential |
+| Automatic repair resolves to multiple configured connections | Reject the ambiguous binding; do not derive or import another Provider |
+| One Agent credential config is malformed while another is valid | Reject the malformed source and retain the other reviewed candidate |
 | Discovery fails after a verified full-coverage setup is ready | Keep the ready outcome; discovery is not required for continued use |
 
 ### 5. Good / Base / Bad Cases
@@ -596,7 +738,8 @@ import_provider_draft(app: AppHandle, input: ImportDraftInput) -> Result<Provide
   only a reviewed credential adapter or supported runtime can contribute setup
   evidence.
 - Good: a verified full-coverage Provider produces one `AI is ready` outcome;
-  successful routing coverage and the local Agent inventory are not repeated.
+  one additional verified Provider may contribute fallback descriptors without
+  repeating the local Agent inventory or changing the outcome surface.
 - Bad: show both a configured MOX Provider and its Cutout-owned credential as a
   new reusable connection, or claim ready from an unverified Provider.
 - Bad: a webview supplies `candidateId` plus a different `secret`, edits the
@@ -621,6 +764,15 @@ import_provider_draft(app: AppHandle, input: ImportDraftInput) -> Result<Provide
   capability gaps, ready state, importable candidate actions, existing-
   connection deduplication, source-label ownership, advanced-management
   disclosure, and five-locale catalog parity.
+- Automatic setup: continue until required coverage, attempt at most one
+  post-coverage candidate, persist both verified descriptor sets when that
+  candidate succeeds, and stop before a third candidate whether the bounded
+  fallback probe succeeds or fails.
+- Projection/native repair: keep setup suggestions deduplicated while forwarding
+  matching reviewed candidates to automatic repair; cover normalized unique
+  matching, ambiguous matches, stable Provider IDs, and existing-credential use.
+- Agent discovery: a malformed source does not erase a valid candidate from a
+  different reviewed Agent adapter, while all-invalid discovery still fails.
 
 ### 7. Wrong vs Correct
 
@@ -703,6 +855,12 @@ or sandbox parameter.
 - Runtime selection considers both capability and latest execution health. A
   failed or stale system runtime is not silently preferred over a healthy
   verified direct-text fallback before the next turn starts.
+- Packaged journey completion counts schema-valid planning turns independently
+  of whether `codex-system` or the verified direct Provider route executed
+  them. Sanitized evidence records the total plus per-runtime counts and rejects
+  any provenance sum mismatch. A direct fallback can prove the product planning
+  journey, but it never establishes Codex execution evidence or changes the
+  public `conversationBinding` / `turnExecution` release gate.
 - A turn uses a native-written strict configuration, empty environments and
   dynamic tools, disabled MCP/skills/apps/plugins/web/image/Agent surfaces,
   staged context under a native-owned root, read-only sandboxing, `never`
@@ -717,6 +875,11 @@ or sandbox parameter.
   `turn/completed`; if Codex later collapses the terminal `codexErrorInfo` to
   `other` or null, that evidence may recover the closed failure reason. An
   explicit terminal reason always takes precedence.
+- A schema-valid `turn/completed` event whose status is `failed` is a runtime
+  turn failure, not protocol drift. Keep malformed/missing protocol fields on
+  the non-retryable protocol path; expose the valid terminal failure as a
+  retryable closed reason so an already verified direct Provider can own the
+  next bounded attempt.
 - Never infer a failure kind from `message`, `additionalDetails`, app-server
   stderr, or the Codex log database. Those surfaces may contain Provider or
   credential-shaped text and are not stable protocol authority.
@@ -752,6 +915,9 @@ or sandbox parameter.
 - Planning selection prefers healthy capability-proven Codex, uses the direct
   fallback for unsupported/failed/stale Codex evidence, and returns no route
   when neither adapter is eligible.
+- Packaged evidence accepts a successful direct fallback as a planning turn,
+  requires total planning turns to equal the sum of closed runtime counters,
+  and reports a typed planning-evidence mismatch instead of an unknown failure.
 - Native tests cover platform identity, command timeout/output overflow,
   sanitized auth projection, required protocol methods and zero-tool fields,
   cancellation during handshake/turn execution, stale binding isolation,
@@ -846,4 +1012,83 @@ try {
   if (!isHttp400EditFailure(error)) throw error
   return invokeEdit(null)
 }
+```
+
+## Scenario: Select A Direct Text Route From Execution Health
+
+### 1. Scope / Trigger
+
+Apply when automatic setup, direct planning, Provider verification, text-route
+selection, generation error classification, or GUI Retry behavior changes.
+
+### 2. Signatures
+
+```ts
+verifiedTextRouteCandidates(input): readonly ModelAssignment[]
+TextRouteHealthRegistry.run(route, operation): Promise<T>
+TextRouteHealthRegistry.prefer(routes): readonly ModelAssignment[]
+```
+
+### 3. Contracts
+
+- An enabled Provider plus an authenticated exact-model catalog row creates a
+  cold candidate. It proves credential/catalog access, not text execution.
+- Only a real tool-gate turn records execution health. Retain the exact route,
+  closed outcome and bounded latency; never retain prompts, errors, credentials
+  or local paths in health state.
+- A successful route ranks before cold candidates. A transiently failed route
+  ranks behind successful and cold candidates; terminal and cancelled routes
+  do not authorize automatic failover.
+- Explicit HTTP status outranks overlapping response prose: 429 is transient,
+  401 is credential failure, and 403 is policy failure. Cancellation remains
+  highest priority.
+- Failover is a user-owned GUI Retry. Retry reloads Provider configs, capability
+  bindings and verification receipts, freezes one immutable run snapshot, and
+  starts a new run/remote request. It does not silently replay a tool loop whose
+  clarification or tool side effects may already have executed.
+- Qwen-first ordering is permitted only in the packaged throughput experiment.
+  Normal product routing preserves the configured exact binding until runtime
+  health demotes it.
+
+### 4. Validation & Error Matrix
+
+| Condition | Required behavior |
+| --- | --- |
+| `/models` lists an exact text model | Admit one cold candidate; do not mark it healthy |
+| Direct turn succeeds | Record anonymous success and prefer the route |
+| Direct turn returns HTTP 429 with API-key/quota prose | Record transient failure and expose Retry |
+| Direct turn returns HTTP 401 or 403 | Preserve terminal class; do not fail over automatically |
+| Retry begins after a transient failure | Re-read authority, choose the best eligible route, freeze a new run snapshot |
+| Retry succeeds through a sibling route | Keep one user turn, append the response, and retain two distinct run attempts |
+
+### 5. Good / Base / Bad Cases
+
+- Good: MOX returns 429; Retry starts a new run through authenticated
+  `dashscope/qwen-plus`, while the transcript still contains one submitted user
+  message.
+- Base: the configured route succeeds and remains preferred.
+- Bad: treat `/models` success as execution readiness, retry MOX silently inside
+  the same tool loop, or persist its response body in route health.
+
+### 6. Tests Required
+
+- Unit tests distinguish cold, successful, transient, terminal and cancelled
+  health without retaining error text.
+- Error-classification tests cover 429 bodies that mention API keys plus 401/403
+  precedence.
+- Component integration starts on one direct Provider, observes a real 429
+  result, clicks GUI Retry, proves the exact sibling Provider/model receives the
+  next tool-gate turn, and asserts one user bubble plus distinct run IDs.
+- Type-check, lint, `pnpm agent:validate`, and `git diff --check` must pass.
+
+### 7. Wrong vs Correct
+
+```ts
+// Wrong: catalog discovery is treated as a successful generation probe.
+if (verification.models.includes(model)) route.health = 'ready'
+
+// Correct: catalog evidence admits a cold candidate; a real turn owns health.
+const candidates = verifiedTextRouteCandidates(input)
+const selected = health.prefer(candidates)[0]
+await health.run(selected, () => executeToolGate(selected))
 ```

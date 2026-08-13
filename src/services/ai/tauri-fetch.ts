@@ -43,6 +43,9 @@ type CancellableProxyCommand =
   | 'ai_proxy_request'
   | 'ai_proxy_stream'
   | 'ai_image_edit'
+  | 'ai_dashscope_image'
+  | 'ai_dashscope_structured_text'
+  | 'ai_dashscope_video'
 
 /**
  * Tauri's invoke promise has no AbortSignal channel. Bind every cancellable AI

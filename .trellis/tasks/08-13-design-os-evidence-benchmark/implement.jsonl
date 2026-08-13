@@ -1,0 +1,5 @@
+{"_example": "Fill with {\"file\": \"<path>\", \"reason\": \"<why>\"}. Put spec/research files only — no code paths. Run `python3 .trellis/scripts/get_context.py --mode packages` to list available specs. Delete this line once real entries are added."}
+{"file": ".trellis/spec/frontend/design-os-kernel.md", "reason": "Profile-neutral contracts, exact evidence closure and host parity"}
+{"file": ".trellis/spec/frontend/commerce-production-profile.md", "reason": "Commerce source report and versioned benchmark rules"}
+{"file": ".trellis/spec/frontend/type-safety.md", "reason": "Strict Zod persisted-boundary requirements"}
+{"file": ".trellis/tasks/08-13-design-os-evidence-benchmark/research/commerce-real-host-verification-review.md", "reason": "Fail-closed real-host verification gaps"}

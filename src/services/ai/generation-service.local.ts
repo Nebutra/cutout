@@ -50,6 +50,16 @@ import { resolveModel } from './models'
 import { invokeCancellableProxy, tauriFetch } from './tauri-fetch'
 import { apiBaseUrl } from './base-url'
 import { createDefaultGenerationAdapterRegistry, type GenerationAdapterRegistry } from './provider-adapter-registry'
+import {
+  supportsNativeDashScopeImageTransport,
+  supportsXaiImageModel,
+} from './image-route-assessment'
+import {
+  structuredGenerationFailureText,
+  type StructuredGenerationAttempt,
+  type StructuredGenerationAttemptFailure,
+  type StructuredGenerationFailureCategory,
+} from './generation-error'
 
 /** Placeholder key handed to the SDK; the real key is injected in Rust. */
 const DUMMY_KEY = '__managed_by_rust__'
@@ -73,6 +83,13 @@ interface ProxyResponse {
   readonly status: number
   readonly headers: Record<string, string>
   readonly body: string
+}
+
+interface NativeImageResult {
+  readonly images: readonly {
+    readonly mediaType: string
+    readonly data: string
+  }[]
 }
 
 /** Build the AI SDK model for a config, wired to the per-provider proxy fetch. */
@@ -244,6 +261,79 @@ function dataUrlParts(value: string): { mediaType: string; base64: string } | nu
   return { mediaType: match[1] || 'image/png', base64: match[2] }
 }
 
+const XAI_MAX_REFERENCE_IMAGES = 3
+const XAI_MAX_REFERENCE_BYTES = 20 * 1024 * 1024
+const XAI_MAX_TOTAL_REFERENCE_BYTES = 48 * 1024 * 1024
+
+function bytesToBase64(bytes: Uint8Array): string {
+  let binary = ''
+  for (let offset = 0; offset < bytes.length; offset += 0x8000) {
+    binary += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000))
+  }
+  return btoa(binary)
+}
+
+function imageBytesMediaType(bytes: Uint8Array): string | undefined {
+  if (
+    bytes.length >= 8
+    && bytes[0] === 0x89
+    && bytes[1] === 0x50
+    && bytes[2] === 0x4e
+    && bytes[3] === 0x47
+  ) return 'image/png'
+  if (bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) {
+    return 'image/jpeg'
+  }
+  if (
+    bytes.length >= 12
+    && String.fromCharCode(...bytes.subarray(0, 4)) === 'RIFF'
+    && String.fromCharCode(...bytes.subarray(8, 12)) === 'WEBP'
+  ) return 'image/webp'
+  return undefined
+}
+
+function xaiImageReference(bytes: Uint8Array): { readonly type: 'image_url'; readonly url: string } {
+  const mediaType = imageBytesMediaType(bytes)
+  if (!mediaType) throw new Error('xAI reference images must be PNG, JPEG, or WebP.')
+  return {
+    type: 'image_url',
+    url: `data:${mediaType};base64,${bytesToBase64(bytes)}`,
+  }
+}
+
+function xaiEditSizeOptions(
+  size: string | undefined,
+  multipleReferences: boolean,
+): { readonly resolution?: '1k' | '2k'; readonly aspect_ratio?: string } {
+  if (!size) return {}
+  const match = size.match(/^(\d+)x(\d+)$/)
+  if (!match) throw new Error('xAI image size must use WIDTHxHEIGHT pixels.')
+  const width = Number(match[1])
+  const height = Number(match[2])
+  if (!Number.isInteger(width) || !Number.isInteger(height) || width <= 0 || height <= 0) {
+    throw new Error('xAI image size must use positive pixel dimensions.')
+  }
+  const resolution = Math.max(width, height) > 1024 ? '2k' as const : '1k' as const
+  if (!multipleReferences) return { resolution }
+  const divisor = greatestCommonDivisor(width, height)
+  const aspectRatio = `${width / divisor}:${height / divisor}`
+  const supported = new Set([
+    '1:1', '3:4', '4:3', '9:16', '16:9', '2:3', '3:2',
+    '9:19.5', '19.5:9', '9:20', '20:9', '1:2', '2:1',
+  ])
+  if (!supported.has(aspectRatio)) {
+    throw new Error(`xAI does not support the requested ${aspectRatio} output ratio.`)
+  }
+  return { resolution, aspect_ratio: aspectRatio }
+}
+
+function greatestCommonDivisor(left: number, right: number): number {
+  let a = left
+  let b = right
+  while (b !== 0) [a, b] = [b, a % b]
+  return a
+}
+
 async function imageUrlToAsset(url: string): Promise<GeneratedAsset> {
   const response = await fetch(url)
   if (!response.ok) {
@@ -256,7 +346,13 @@ async function imageUrlToAsset(url: string): Promise<GeneratedAsset> {
   }
 }
 
-async function imageItemToAsset(item: unknown): Promise<GeneratedAsset | null> {
+async function imageItemToAsset(
+  item: unknown,
+  options: {
+    readonly allowRemoteUrl?: boolean
+    readonly defaultMediaType?: string
+  } = {},
+): Promise<GeneratedAsset | null> {
   if (!isRecord(item)) return null
 
   const rawBase64 =
@@ -269,9 +365,14 @@ async function imageItemToAsset(item: unknown): Promise<GeneratedAsset | null> {
           : undefined
   if (rawBase64) {
     const dataUrl = dataUrlParts(rawBase64)
+    const bytes = base64ToBytes(dataUrl?.base64 ?? rawBase64)
     return {
-      mediaType: dataUrl?.mediaType ?? 'image/png',
-      bytes: base64ToBytes(dataUrl?.base64 ?? rawBase64),
+      mediaType: dataUrl?.mediaType
+        ?? (typeof item.mime_type === 'string' ? item.mime_type : undefined)
+        ?? imageBytesMediaType(bytes)
+        ?? options.defaultMediaType
+        ?? 'image/png',
+      bytes,
     }
   }
 
@@ -284,13 +385,16 @@ async function imageItemToAsset(item: unknown): Promise<GeneratedAsset | null> {
         bytes: base64ToBytes(dataUrl.base64),
       }
     }
-    return imageUrlToAsset(url)
+    return options.allowRemoteUrl === false ? null : imageUrlToAsset(url)
   }
 
   return null
 }
 
-async function parseImageGenerationBody(body: string): Promise<Result<GeneratedAsset[]>> {
+async function parseImageGenerationBody(
+  body: string,
+  options?: Parameters<typeof imageItemToAsset>[1],
+): Promise<Result<GeneratedAsset[]>> {
   let parsed: unknown
   try {
     parsed = JSON.parse(body)
@@ -305,7 +409,7 @@ async function parseImageGenerationBody(body: string): Promise<Result<GeneratedA
   const data = Array.isArray(parsed.data) ? parsed.data : [parsed]
   const assets: GeneratedAsset[] = []
   for (const item of data) {
-    const asset = await imageItemToAsset(item)
+    const asset = await imageItemToAsset(item, options)
     if (asset) assets.push(asset)
   }
 
@@ -313,23 +417,77 @@ async function parseImageGenerationBody(body: string): Promise<Result<GeneratedA
   return err(`The image endpoint returned no usable image data. Body: ${snippet(body)}`)
 }
 
-function shouldRetryAsTextJson(message: string): boolean {
-  const lower = message.toLowerCase()
-  if (
-    lower.includes('provider returned') ||
-    lower.includes('provider base url') ||
-    lower.includes('not the web console')
-  ) {
-    return false
+function shouldRetryStructuredFallback(
+  category: StructuredGenerationFailureCategory,
+): boolean {
+  switch (category) {
+    case 'unsupported':
+    case 'output-missing':
+    case 'invalid-json':
+    case 'schema-mismatch':
+      return true
+    case 'unknown':
+    case 'aborted':
+    case 'authentication':
+    case 'policy':
+    case 'rate-limited':
+    case 'endpoint-misconfigured':
+    case 'transport':
+    case 'provider-rejected':
+      return false
+    default: {
+      const exhaustive: never = category
+      return exhaustive
+    }
   }
-  return (
-    lower.includes('json') ||
-    lower.includes('schema') ||
-    lower.includes('structured') ||
-    lower.includes('response_format') ||
-    lower.includes('object') ||
-    lower.includes('no output generated')
-  )
+}
+
+function structuredHttpStatus(error: unknown, depth = 0): number | null {
+  if (depth > 4 || !isRecord(error)) return null
+  if (typeof error.statusCode === 'number') return error.statusCode
+  const lastStatus = structuredHttpStatus(error.lastError, depth + 1)
+  if (lastStatus !== null) return lastStatus
+  if (!Array.isArray(error.errors)) return null
+  for (let index = error.errors.length - 1; index >= 0; index -= 1) {
+    const status = structuredHttpStatus(error.errors[index], depth + 1)
+    if (status !== null) return status
+  }
+  return null
+}
+
+function structuredErrorMessages(error: unknown, depth = 0): readonly string[] {
+  if (depth > 4) return []
+  const messages: string[] = []
+  if (error instanceof Error) messages.push(error.message)
+  else if (!isRecord(error)) messages.push(String(error))
+  if (!isRecord(error)) return messages
+  messages.push(...structuredErrorMessages(error.lastError, depth + 1))
+  if (Array.isArray(error.errors)) {
+    for (const nested of error.errors) {
+      messages.push(...structuredErrorMessages(nested, depth + 1))
+    }
+  }
+  return messages
+}
+
+function structuredErrorHasName(error: unknown, name: string, depth = 0): boolean {
+  if (depth > 4 || !isRecord(error)) return false
+  if (error.name === name) return true
+  if (structuredErrorHasName(error.lastError, name, depth + 1)) return true
+  return Array.isArray(error.errors)
+    && error.errors.some((nested) => structuredErrorHasName(nested, name, depth + 1))
+}
+
+function structuredResponseIsNonApi(error: unknown, depth = 0): boolean {
+  if (depth > 4 || !isRecord(error)) return false
+  const body = typeof error.responseBody === 'string' ? error.responseBody : undefined
+  const contentType = headerValue(error.responseHeaders, 'content-type')
+  if (body !== undefined && (contentType.toLowerCase().includes('text/html') || htmlLike(body))) {
+    return true
+  }
+  if (structuredResponseIsNonApi(error.lastError, depth + 1)) return true
+  return Array.isArray(error.errors)
+    && error.errors.some((nested) => structuredResponseIsNonApi(nested, depth + 1))
 }
 
 function extractJson(text: string): string {
@@ -371,88 +529,56 @@ interface StructuredParseFailure {
   readonly error: string
   readonly jsonText: string
   readonly category: Extract<
-    StructuredFailureCategory,
+    StructuredGenerationFailureCategory,
     'invalid-json' | 'schema-mismatch'
   >
 }
 
-type StructuredAttempt =
-  | 'native-schema'
-  | 'forced-tool'
-  | 'text-json'
-  | 'repair-json'
+function structuredFailureCategory(error: unknown): StructuredGenerationFailureCategory {
+  const messages = structuredErrorMessages(error)
+  const reviewedStatus = structuredHttpStatus(error)
+  const status = reviewedStatus
+    ?? messages.reduce<number>((current, message) => current || Number(message.match(
+        /\b(?:http(?:\s+status)?(?:\s+code)?|status(?:\s+code)?)\s*(?:[:=]\s*)?(\d{3})\b/i,
+      )?.[1] ?? Number.NaN), Number.NaN)
 
-type StructuredFailureCategory =
-  | 'aborted'
-  | 'authentication'
-  | 'rate-limited'
-  | 'endpoint-misconfigured'
-  | 'transport'
-  | 'unsupported'
-  | 'output-missing'
-  | 'invalid-json'
-  | 'schema-mismatch'
-  | 'provider-rejected'
-  | 'unknown'
-
-interface StructuredAttemptFailure {
-  readonly attempt: StructuredAttempt
-  readonly category: StructuredFailureCategory
-}
-
-function structuredFailureCategory(error: unknown): StructuredFailureCategory {
-  const message = errorText(error).toLowerCase()
-  const status = isRecord(error) && typeof error.statusCode === 'number'
-    ? error.statusCode
-    : Number(message.match(/\b(?:http\s*)?(\d{3})\b/i)?.[1] ?? Number.NaN)
-
-  if (
-    (isRecord(error) && error.name === 'AbortError')
-    || message.includes('abort')
-  ) return 'aborted'
-  if (status === 401 || status === 403 || message.includes('unauthorized')) {
-    return 'authentication'
-  }
-  if (status === 429 || message.includes('rate limit')) return 'rate-limited'
-  if (
-    TRANSPORT_ERROR_PATTERNS.some((pattern) => pattern.test(message))
-    || message.includes(TRANSPORT_HINT.toLowerCase())
-  ) return 'transport'
-  if (
-    message.includes('html page')
-    || message.includes('provider base url')
-    || message.includes('not the web console')
-    || message.includes('non-api response')
-  ) return 'endpoint-misconfigured'
-  if (
-    message.includes('response_format')
-    || message.includes('not supported')
-    || message.includes('unsupported')
-    || message.includes('capability-required')
-  ) return 'unsupported'
-  if (
-    message.includes('no output generated')
-    || message.includes('did not submit structured tool output')
-    || message.includes('no tool call')
-  ) return 'output-missing'
-  if (
-    message.includes('parseable json')
-    || message.includes('invalid json')
-    || message.includes('json parse')
-  ) return 'invalid-json'
-  if (message.includes('schema') || message.includes('structured')) {
-    return 'schema-mismatch'
+  if (structuredErrorHasName(error, 'AbortError')) return 'aborted'
+  if (status === 401) return 'authentication'
+  if (status === 403) return 'policy'
+  if (status === 429) return 'rate-limited'
+  if (status === 408 || (status >= 500 && status <= 599)) return 'transport'
+  if (structuredResponseIsNonApi(error)) return 'endpoint-misconfigured'
+  if (messages.some((message) => [
+    /^request failed: error sending request for url\b/iu,
+    /^error sending request for url\b/iu,
+    /^failed to fetch\.?$/iu,
+    /^fetch failed\.?$/iu,
+    /^network error(?:\b|:)/iu,
+    /^connection (?:refused|reset|closed)(?:\b|:)/iu,
+    /^dns error(?:\b|:)/iu,
+  ].some((pattern) => pattern.test(message)))) return 'transport'
+  if (messages.some((message) => [
+    /^Provider returned (?:an HTML page|a non-API response)/u,
+    /^Provider returned HTTP \d{3} instead of an API response/u,
+  ].some((pattern) => pattern.test(message)))) return 'endpoint-misconfigured'
+  if (messages.some((message) => [
+    /^Invalid schema for response_format(?:\b|:)/iu,
+    /^Structured tool output did not match the schema(?:\b|:)/iu,
+    /^No object generated: response did not match schema(?:\b|:)/iu,
+  ].some((pattern) => pattern.test(message)))) return 'schema-mismatch'
+  if (messages.some((message) => [
+    /^response_format is not supported\.?$/iu,
+    /^structured output is not supported\.?$/iu,
+  ].some((pattern) => pattern.test(message)))) return 'unsupported'
+  if (messages.some((message) => [
+    /^No output generated(?:\. Check the stream for errors\.)?$/iu,
+    /^The model did not submit structured tool output\.?$/iu,
+  ].some((pattern) => pattern.test(message)))) return 'output-missing'
+  if (messages.some((message) => /^Invalid JSON response(?:\b|:)/iu.test(message))) {
+    return 'invalid-json'
   }
   if (Number.isFinite(status) && status >= 400) return 'provider-rejected'
   return 'unknown'
-}
-
-function structuredFailureText(
-  failures: readonly StructuredAttemptFailure[],
-): string {
-  return `Structured output failed: ${failures
-    .map(({ attempt, category }) => `${attempt}=${category}`)
-    .join('; ')}.`
 }
 
 type StructuredParseResult<T> =
@@ -553,12 +679,33 @@ async function generateStructuredTool<T>(
   return parsed.data
 }
 
+function nativeStructuredProviderOptions(
+  prepared: Extract<Prepared, { readonly messages: ModelMessage[] }>,
+): ReasoningProviderOptions {
+  if (
+    prepared.wireProtocol !== 'chat-completions'
+    && prepared.wireProtocol !== 'responses'
+  ) return prepared.providerOptions
+
+  // OpenAI strict JSON Schema rejects any Zod optional/default property because
+  // every declared property must also appear in `required`. Compatible relays
+  // differ here, while Cutout already validates the final value with Zod. Keep
+  // the provider schema advisory and make the local schema the final authority.
+  return {
+    ...prepared.providerOptions,
+    openai: {
+      ...(prepared.providerOptions.openai ?? {}),
+      strictJsonSchema: false,
+    },
+  }
+}
+
 export function createLocalGenerationService(
   providers: ConfigSource,
   prompts?: PromptSource,
   adapters:GenerationAdapterRegistry=createDefaultGenerationAdapterRegistry(),
 ): GenerationService {
-  const structuredToolPreferred = new Set<string>()
+  const structuredNativeUnsupported = new Set<string>()
 
   async function resolveConfig(
     id: string,
@@ -809,8 +956,8 @@ export function createLocalGenerationService(
         return err('structured output requires system/promptRef input')
       }
       const structuredKey = `${input.providerId}:${p.wireProtocol ?? 'none'}:${input.model ?? 'default'}`
-      const failures: StructuredAttemptFailure[] = []
-      if (!structuredToolPreferred.has(structuredKey)) {
+      const failures: StructuredGenerationAttemptFailure[] = []
+      if (!structuredNativeUnsupported.has(structuredKey)) {
         try {
           const result = aiStreamText({
             model: p.model,
@@ -818,37 +965,42 @@ export function createLocalGenerationService(
             messages: p.messages,
             abortSignal: input.signal,
             maxOutputTokens: input.maxOutputTokens,
-            providerOptions: p.providerOptions,
+            providerOptions: nativeStructuredProviderOptions(p),
             output: Output.object({ schema }),
           })
           return ok(await result.output)
         } catch (error) {
-          const message = errorText(error)
+          const category = structuredFailureCategory(error)
           failures.push({
             attempt: 'native-schema',
-            category: structuredFailureCategory(error),
+            category,
           })
-          if (!shouldRetryAsTextJson(message)) {
-            return err(structuredFailureText(failures))
+          if (!shouldRetryStructuredFallback(category)) {
+            return err(structuredGenerationFailureText(failures))
           }
-          structuredToolPreferred.add(structuredKey)
+          // Cache only a protocol-level unsupported response. A schema mismatch
+          // is specific to that call and must not disable native structure for
+          // every later schema on the same provider/model route.
+          if (category === 'unsupported') {
+            structuredNativeUnsupported.add(structuredKey)
+          }
         }
       }
 
       try {
         return ok(await generateStructuredTool(p, input, schema))
       } catch (error) {
-        const message = errorText(error)
+        const category = structuredFailureCategory(error)
         failures.push({
           attempt: 'forced-tool',
-          category: structuredFailureCategory(error),
+          category,
         })
-        if (!shouldRetryAsTextJson(message)) {
-          return err(structuredFailureText(failures))
+        if (!shouldRetryStructuredFallback(category)) {
+          return err(structuredGenerationFailureText(failures))
         }
       }
       let activeTextAttempt: Extract<
-        StructuredAttempt,
+        StructuredGenerationAttempt,
         'text-json' | 'repair-json'
       > = 'text-json'
       try {
@@ -886,13 +1038,13 @@ export function createLocalGenerationService(
           attempt: 'repair-json',
           category: repairedParsed.failure.category,
         })
-        return err(structuredFailureText(failures))
+        return err(structuredGenerationFailureText(failures))
       } catch (fallbackError) {
         failures.push({
           attempt: activeTextAttempt,
           category: structuredFailureCategory(fallbackError),
         })
-        return err(structuredFailureText(failures))
+        return err(structuredGenerationFailureText(failures))
       }
     },
 
@@ -905,13 +1057,65 @@ export function createLocalGenerationService(
       if (!cfg) return err('provider not configured')
       const modelId = resolveModel(cfg.kind, cfg.defaultModel, input.model)
 
+      if (cfg.kind === 'xai' && !supportsXaiImageModel(modelId, 'image-generation')) {
+        return err('xAI image generation requires an exact documented Imagine API model id.')
+      }
+
+      if (supportsNativeDashScopeImageTransport(cfg)) {
+        if (instructionSourceCount(input) !== 1) {
+          return err('provide exactly one of prompt, system, or promptRef')
+        }
+        if (input.input?.some((part) => part.type === 'image')) {
+          return err('reference-conditioned DashScope output requires an image-edit route')
+        }
+        const chunks: string[] = []
+        if (input.prompt !== undefined) chunks.push(input.prompt)
+        if (input.system !== undefined) chunks.push(input.system)
+        if (input.promptRef !== undefined) {
+          if (!prompts) return err('prompt service not available')
+          try {
+            const rendered = await prompts.render(input.promptRef)
+            chunks.push(rendered.system)
+            for (const part of rendered.userScaffold ?? []) {
+              if (part.type === 'text') chunks.push(part.text)
+            }
+          } catch (error) {
+            return err(error instanceof Error ? error.message : String(error))
+          }
+        }
+        for (const part of input.input ?? []) {
+          if (part.type === 'text') chunks.push(part.text)
+        }
+        const prompt = chunks.filter((chunk) => chunk.trim()).join('\n\n')
+        if (!prompt) return err('no prompt text for image generation')
+        try {
+          const result = await invokeCancellableProxy<NativeImageResult>('ai_dashscope_image', {
+            providerId: cfg.id,
+            model: modelId,
+            operation: 'generation',
+            prompt,
+            images: [],
+            size: null,
+          }, input.signal)
+          const assets = result.images.map((image) => ({
+            mediaType: image.mediaType,
+            bytes: base64ToBytes(image.data),
+          }))
+          if (assets.length === 0) return err('The model returned no image.')
+          return ok(assets)
+        } catch (error) {
+          if (input.signal?.aborted) return err('Operation aborted')
+          return err(error instanceof Error ? error.message : String(error))
+        }
+      }
+
       // OpenAI-shaped image models (gpt-image / dall-e) are served by the IMAGES
       // endpoint, not /chat/completions. Call the proxied endpoint directly so
       // OpenAI-compatible relays that return URL-shaped image data don't fail
       // the AI SDK's stricter `b64_json` response schema.
       const wireProtocol = effectiveProviderWireProtocol(cfg)
       if (
-        supportsOpenAIImageEndpoints(cfg.kind) &&
+        (supportsOpenAIImageEndpoints(cfg.kind) || cfg.kind === 'xai') &&
         (wireProtocol === 'responses' || wireProtocol === 'chat-completions')
       ) {
         if (instructionSourceCount(input) !== 1) {
@@ -955,6 +1159,7 @@ export function createLocalGenerationService(
               model: modelId,
               prompt: promptText,
               n: 1,
+              ...(cfg.kind === 'xai' ? { response_format: 'b64_json' } : {}),
             }),
           }, input.signal)
           if (input.signal?.aborted) return err('Operation aborted')
@@ -964,7 +1169,12 @@ export function createLocalGenerationService(
               `images/generations failed: HTTP ${res.status}${providerMessage ? ` · ${providerMessage}` : res.body ? ` · ${snippet(res.body)}` : ''}`,
             )
           }
-          return parseImageGenerationBody(res.body)
+          return parseImageGenerationBody(
+            res.body,
+            cfg.kind === 'xai'
+              ? { allowRemoteUrl: false, defaultMediaType: 'image/jpeg' }
+              : undefined,
+          )
         } catch (error) {
           if (input.signal?.aborted) return err('Operation aborted')
           return err(error instanceof Error ? error.message : String(error))
@@ -992,6 +1202,7 @@ export function createLocalGenerationService(
         const assets: GeneratedAsset[] = result.files
           .filter((file) => file.mediaType.startsWith('image/'))
           .map((file) => ({ mediaType: file.mediaType, bytes: file.uint8Array }))
+        if (assets.length === 0) return err('The model returned no image.')
         return ok(assets)
       } catch (error) {
         if (input.signal?.aborted) return err('Operation aborted')
@@ -1006,6 +1217,86 @@ export function createLocalGenerationService(
       if (!cfg) return err('provider not configured')
       // The edits endpoint is OpenAI-shaped; other kinds have no `/images/edits`.
       const wireProtocol = effectiveProviderWireProtocol(cfg)
+      if (supportsNativeDashScopeImageTransport(cfg)) {
+        if (input.images.length === 0) {
+          return err('at least one reference image is required')
+        }
+        try {
+          const result = await invokeCancellableProxy<NativeImageResult>('ai_dashscope_image', {
+            providerId: cfg.id,
+            model: resolveModel(cfg.kind, cfg.defaultModel, input.model),
+            operation: 'edit',
+            prompt: input.prompt,
+            images: input.images.map((bytes) => Array.from(bytes)),
+            size: input.size ?? null,
+          }, input.signal)
+          const assets = result.images.map((image) => ({
+            mediaType: image.mediaType,
+            bytes: base64ToBytes(image.data),
+          }))
+          if (assets.length === 0) return err('The model returned no image.')
+          return ok(assets)
+        } catch (error) {
+          if (input.signal?.aborted) return err('Operation aborted')
+          return err(error instanceof Error ? error.message : String(error))
+        }
+      }
+      if (cfg.kind === 'xai' && wireProtocol === 'chat-completions') {
+        if (input.images.length === 0) {
+          return err('at least one reference image is required')
+        }
+        if (
+          input.images.length > XAI_MAX_REFERENCE_IMAGES
+          || input.images.some((image) => image.byteLength > XAI_MAX_REFERENCE_BYTES)
+          || input.images.reduce((total, image) => total + image.byteLength, 0)
+            > XAI_MAX_TOTAL_REFERENCE_BYTES
+        ) {
+          return err('xAI image edit accepts up to three bounded reference images.')
+        }
+        const modelId = resolveModel(cfg.kind, cfg.defaultModel, input.model)
+        if (!supportsXaiImageModel(modelId, 'image-edit')) {
+          return err('xAI image edit requires an exact documented Imagine API model id.')
+        }
+        try {
+          const baseUrl = apiBaseUrl(cfg.kind, cfg.baseUrl, wireProtocol)
+          if (!baseUrl) return err('provider has no base URL for image edit')
+          const references = input.images.map(xaiImageReference)
+          const size = xaiEditSizeOptions(input.size, references.length > 1)
+          const source = references.length === 1
+            ? { image: references[0] }
+            : { images: references }
+          const res = await invokeCancellableProxy<ProxyResponse>('ai_proxy_request', {
+            providerId: cfg.id,
+            kind: cfg.kind,
+            wireProtocol,
+            url: `${baseUrl}/images/edits`,
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({
+              model: modelId,
+              prompt: input.prompt,
+              n: 1,
+              response_format: 'b64_json',
+              ...source,
+              ...size,
+            }),
+          }, input.signal)
+          if (input.signal?.aborted) return err('Operation aborted')
+          if (res.status < 200 || res.status >= 300) {
+            const providerMessage = errorBodyMessage(res.body)
+            return err(
+              `images/edits failed: HTTP ${res.status}${providerMessage ? ` · ${providerMessage}` : res.body ? ` · ${snippet(res.body)}` : ''}`,
+            )
+          }
+          return parseImageGenerationBody(res.body, {
+            allowRemoteUrl: false,
+            defaultMediaType: 'image/jpeg',
+          })
+        } catch (error) {
+          if (input.signal?.aborted) return err('Operation aborted')
+          return err(errorText(error))
+        }
+      }
       if (
         !supportsOpenAIImageEndpoints(cfg.kind) ||
         (wireProtocol !== 'responses' && wireProtocol !== 'chat-completions')

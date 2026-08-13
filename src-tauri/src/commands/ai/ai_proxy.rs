@@ -47,6 +47,7 @@ use super::providers::{
 
 const DEFAULT_BUFFERED_TIMEOUT_SECS: u64 = 120;
 const GENERATION_BUFFERED_TIMEOUT_SECS: u64 = 300;
+const PACKAGED_E2E_HTTPS_PROXY_ENV: &str = "CUTOUT_PACKAGED_E2E_HTTPS_PROXY";
 
 /// Active native proxy requests keyed by a renderer-created opaque UUID. The
 /// renderer never receives a handle to the request or its credentials; it can
@@ -365,6 +366,52 @@ fn validated_resolved_addresses(
 pub(crate) struct ResolvedTarget {
     host: String,
     addresses: Vec<SocketAddr>,
+    packaged_proxy: Option<reqwest::Url>,
+}
+
+fn reviewed_packaged_e2e_proxy(
+    value: Option<&str>,
+    enabled: bool,
+) -> Result<Option<reqwest::Url>, ProxyError> {
+    if !enabled {
+        return Ok(None);
+    }
+    let Some(value) = value.filter(|value| !value.is_empty()) else {
+        return Ok(None);
+    };
+    let parsed = reqwest::Url::parse(value).map_err(|_| ProxyError::BadUrl)?;
+    let explicit_port = value
+        .strip_suffix('/')
+        .unwrap_or(value)
+        .strip_prefix("http://127.0.0.1:")
+        .and_then(|value| value.parse::<u16>().ok())
+        .filter(|port| *port > 0);
+    if parsed.scheme() != "http"
+        || parsed.host_str() != Some("127.0.0.1")
+        || explicit_port.is_none()
+        || parsed.path() != "/"
+        || !parsed.username().is_empty()
+        || parsed.password().is_some()
+        || parsed.query().is_some()
+        || parsed.fragment().is_some()
+    {
+        return Err(ProxyError::DisallowedHost);
+    }
+    Ok(Some(parsed))
+}
+
+fn packaged_e2e_https_proxy() -> Result<Option<reqwest::Url>, ProxyError> {
+    let value = std::env::var(PACKAGED_E2E_HTTPS_PROXY_ENV).ok();
+    reviewed_packaged_e2e_proxy(value.as_deref(), crate::commands::packaged_e2e::enabled())
+}
+
+fn is_packaged_e2e_proxy_target(kind: &str, target: &reqwest::Url) -> bool {
+    let Some(host) = target.host_str().map(str::to_ascii_lowercase) else {
+        return false;
+    };
+    kind == "dashscope"
+        && target.scheme() == "https"
+        && (host == "aliyuncs.com" || host.ends_with(".aliyuncs.com"))
 }
 
 /// Resolve immediately before connecting and reject any non-public address.
@@ -375,9 +422,15 @@ pub(crate) async fn enforce_resolved_host(
     kind: &str,
     url: &str,
 ) -> Result<ResolvedTarget, ProxyError> {
+    enforce_host(kind, url)?;
     let parsed = reqwest::Url::parse(url).map_err(|_| ProxyError::BadUrl)?;
     let host = parsed.host_str().ok_or(ProxyError::BadUrl)?;
     let local = matches!(kind, "cc-switch" | "ollama" | "vllm" | "lm-studio");
+    let packaged_proxy = if is_packaged_e2e_proxy_target(kind, &parsed) {
+        packaged_e2e_https_proxy()?
+    } else {
+        None
+    };
     if let Ok(ip) = host
         .trim_start_matches('[')
         .trim_end_matches(']')
@@ -392,10 +445,21 @@ pub(crate) async fn enforce_resolved_host(
             Ok(ResolvedTarget {
                 host: host.to_string(),
                 addresses: Vec::new(),
+                packaged_proxy,
             })
         } else {
             Err(ProxyError::DisallowedHost)
         };
+    }
+    if packaged_proxy.is_some() {
+        // The reviewed packaged-E2E proxy owns DNS only for the native
+        // DashScope/Aliyun route. Its fake-IP answers must not be mistaken for
+        // the origin address; every other Provider retains direct DNS pinning.
+        return Ok(ResolvedTarget {
+            host: host.to_string(),
+            addresses: Vec::new(),
+            packaged_proxy,
+        });
     }
     let port = parsed.port_or_known_default().ok_or(ProxyError::BadUrl)?;
     let addresses: Vec<_> = tokio::net::lookup_host((host, port))
@@ -405,6 +469,7 @@ pub(crate) async fn enforce_resolved_host(
     Ok(ResolvedTarget {
         host: host.to_string(),
         addresses: validated_resolved_addresses(host, port, local, addresses)?,
+        packaged_proxy: None,
     })
 }
 
@@ -511,6 +576,12 @@ pub(crate) fn build_client_for_target(
         .redirect(reqwest::redirect::Policy::none());
     if !target.addresses.is_empty() {
         builder = builder.resolve_to_addrs(&target.host, &target.addresses);
+    }
+    if let Some(proxy) = target.packaged_proxy.clone() {
+        builder = builder.proxy(
+            reqwest::Proxy::https(proxy)
+                .map_err(|_| ProxyError::Request("invalid packaged E2E proxy".into()))?,
+        );
     }
     if let Some(secs) = overall {
         builder = builder.timeout(std::time::Duration::from_secs(secs));
@@ -895,6 +966,63 @@ mod tests {
             assert!(is_non_public_ip(address.parse().unwrap()), "{address}");
         }
         assert!(!is_non_public_ip("8.8.8.8".parse().unwrap()));
+    }
+
+    #[test]
+    fn packaged_e2e_proxy_is_compile_and_loopback_bound() {
+        let valid = reviewed_packaged_e2e_proxy(Some("http://127.0.0.1:7897"), true)
+            .unwrap()
+            .unwrap();
+        assert_eq!(valid.as_str(), "http://127.0.0.1:7897/");
+        assert!(reviewed_packaged_e2e_proxy(Some("https://127.0.0.1:7897"), true).is_err());
+        assert!(reviewed_packaged_e2e_proxy(Some("http://localhost:7897"), true).is_err());
+        assert!(reviewed_packaged_e2e_proxy(Some("http://127.0.0.1:7897/path"), true).is_err());
+        assert!(reviewed_packaged_e2e_proxy(Some("http://user@127.0.0.1:7897"), true).is_err());
+        assert!(
+            reviewed_packaged_e2e_proxy(Some("http://127.0.0.1:7897"), false)
+                .unwrap()
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn packaged_e2e_proxy_is_scoped_to_reviewed_dashscope_targets() {
+        for url in [
+            "https://dashscope.aliyuncs.com/api/v1/tasks/task-id",
+            "https://dashscope-result-sh.oss-cn-shanghai.aliyuncs.com/result.png",
+        ] {
+            let target = reqwest::Url::parse(url).unwrap();
+            assert!(is_packaged_e2e_proxy_target("dashscope", &target));
+        }
+
+        for (kind, url) in [
+            ("openai-compatible", "https://aigw.mox.ktvsky.com/v1/models"),
+            ("openai", "https://api.openai.com/v1/models"),
+            (
+                "dashscope",
+                "https://aliyuncs.com.evil.example/api/v1/tasks",
+            ),
+        ] {
+            let target = reqwest::Url::parse(url).unwrap();
+            assert!(!is_packaged_e2e_proxy_target(kind, &target));
+        }
+    }
+
+    #[test]
+    fn proxy_fake_ip_bypass_is_not_available_to_non_dashscope_targets() {
+        let fake_ip = vec![SocketAddr::new(
+            IpAddr::V4(Ipv4Addr::new(198, 18, 1, 4)),
+            443,
+        )];
+        let dashscope = reqwest::Url::parse("https://dashscope.aliyuncs.com/api/v1/tasks").unwrap();
+        assert!(is_packaged_e2e_proxy_target("dashscope", &dashscope));
+
+        let mox = reqwest::Url::parse("https://aigw.mox.ktvsky.com/v1/models").unwrap();
+        assert!(!is_packaged_e2e_proxy_target("openai-compatible", &mox));
+        assert!(matches!(
+            validated_resolved_addresses("unreviewed.example", 443, false, fake_ip),
+            Err(ProxyError::DisallowedHost)
+        ));
     }
 
     #[test]

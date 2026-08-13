@@ -1,16 +1,23 @@
 import { z } from 'zod'
-import {
-  candidateDirectionSchema,
-  candidateExplorationDecisionSchema,
-} from '@/candidate-selection/contracts'
+import { candidateExplorationDecisionSchema } from '@/candidate-selection/contracts'
 import type { Result } from '@/services/types'
 import { err, ok } from '@/services/types'
 
+const prototypeNavigateActionSchema = z.object({
+  type: z.literal('navigate'),
+  targetPageId: z.string().min(1),
+})
+const prototypeExternalActionSchema = z.object({
+  type: z.literal('external'),
+  destination: z.string().min(1),
+})
+const prototypeNoopActionSchema = z.object({
+  type: z.literal('none'),
+  reason: z.string().min(1),
+})
+
 export const prototypeActionSchema = z.discriminatedUnion('type', [
-  z.object({
-    type: z.literal('navigate'),
-    targetPageId: z.string().min(1),
-  }),
+  prototypeNavigateActionSchema,
   z.object({
     type: z.literal('open-overlay'),
     targetOverlayId: z.string().min(1),
@@ -19,14 +26,8 @@ export const prototypeActionSchema = z.discriminatedUnion('type', [
     type: z.literal('change-state'),
     targetStateId: z.string().min(1),
   }),
-  z.object({
-    type: z.literal('external'),
-    destination: z.string().min(1),
-  }),
-  z.object({
-    type: z.literal('none'),
-    reason: z.string().min(1),
-  }),
+  prototypeExternalActionSchema,
+  prototypeNoopActionSchema,
 ])
 
 export const prototypeInteractionSchema = z.object({
@@ -51,6 +52,9 @@ export const prototypeRegionSchema = z.object({
   assetRoute: z
     .enum(['direct-generate', 'board-cutout', 'ignore-code-ui'])
     .default('board-cutout'),
+  assetOutput: z
+    .enum(['transparent-subject', 'rectangular-media'])
+    .optional(),
   assetOpportunities: z.array(z.string().min(1)).default([]),
 })
 
@@ -130,119 +134,6 @@ export const prototypeDesignSystemSchema = z.object({
   exploration: candidateExplorationDecisionSchema,
 })
 
-const prototypePlanningMaterialIdentityShape = {
-  id: z.string().min(1),
-  name: z.string().min(1),
-  description: z.string().min(1),
-} as const
-
-const prototypePlanningBoardGroupIdSchema = z.string().trim().min(1).max(80)
-
-/** The shape is structural so Provider tool schemas expose the conditional
- * requirement before execution. */
-export const prototypePlanningMaterialSchema = z.discriminatedUnion(
-  'production',
-  [
-    z.object({
-      ...prototypePlanningMaterialIdentityShape,
-      production: z.literal('board-cutout'),
-      boardGroupId: prototypePlanningBoardGroupIdSchema.describe(
-        'Required route-local id for the coherent atomic family sharing this board.',
-      ),
-    }).strict(),
-    z.object({
-      ...prototypePlanningMaterialIdentityShape,
-      production: z.literal('direct-generate'),
-    }).strict(),
-  ],
-)
-export const generatedPrototypePlanningMaterialSchema = prototypePlanningMaterialSchema
-
-export const prototypePlanningRouteSchema = prototypePageSchema.pick({
-  id: true,
-  name: true,
-  route: true,
-  purpose: true,
-  viewport: true,
-}).extend({
-  materials: z.array(prototypePlanningMaterialSchema).describe(
-    'Zero or more non-UI visual materials genuinely worth reusing on this route. '
-      + 'Do not include cards, forms, navigation, buttons, tables, or other code-reproducible UI.',
-  ),
-}).superRefine((route, context) => {
-  const materialIds = new Set<string>()
-  for (const [materialIndex, material] of route.materials.entries()) {
-    if (materialIds.has(material.id)) {
-      context.addIssue({
-        code: 'custom',
-        path: ['materials', materialIndex, 'id'],
-        message: `Duplicate material id "${material.id}" on route "${route.route}".`,
-      })
-    }
-    materialIds.add(material.id)
-  }
-})
-
-export const prototypePlanningSeedSchema = z.object({
-  product: z.object({
-    name: z.string().min(1),
-    projectName: z.string().min(1).max(32).optional(),
-    summary: z.string().min(1),
-    audience: z.string().min(1),
-    primaryGoal: z.string().min(1),
-    platform: z.string().min(1),
-  }),
-  rationale: z.string().trim().min(1).max(2_000),
-  suites: z.array(z.object({
-    direction: candidateDirectionSchema,
-    pages: z.array(prototypePlanningRouteSchema).min(1).max(12),
-  }).strict()).min(1).max(8),
-}).strict().superRefine((seed, context) => {
-  const directionIds = new Set<string>()
-  const routeGraphs = new Set<string>()
-  for (const [suiteIndex, suite] of seed.suites.entries()) {
-    if (directionIds.has(suite.direction.id)) {
-      context.addIssue({
-        code: 'custom',
-        path: ['suites', suiteIndex, 'direction', 'id'],
-        message: `Duplicate direction id "${suite.direction.id}".`,
-      })
-    }
-    directionIds.add(suite.direction.id)
-    const ids = new Set<string>()
-    const routes = new Set<string>()
-    for (const [pageIndex, page] of suite.pages.entries()) {
-      if (ids.has(page.id)) {
-        context.addIssue({
-          code: 'custom',
-          path: ['suites', suiteIndex, 'pages', pageIndex, 'id'],
-          message: `Duplicate page id "${page.id}".`,
-        })
-      }
-      if (routes.has(page.route)) {
-        context.addIssue({
-          code: 'custom',
-          path: ['suites', suiteIndex, 'pages', pageIndex, 'route'],
-          message: `Duplicate route "${page.route}".`,
-        })
-      }
-      ids.add(page.id)
-      routes.add(page.route)
-    }
-    const graph = JSON.stringify(suite.pages.map(({ route }) => route))
-    if (routeGraphs.has(graph)) {
-      context.addIssue({
-        code: 'custom',
-        path: ['suites', suiteIndex, 'pages'],
-        message: 'Every suite must use a distinct route graph.',
-      })
-    }
-    routeGraphs.add(graph)
-  }
-})
-
-export const generatedPrototypePlanningSeedSchema = prototypePlanningSeedSchema
-
 export const prototypePlanSchema = z.object({
   version: z.literal('prototype-plan.v0'),
   product: z.object({
@@ -257,8 +148,6 @@ export const prototypePlanSchema = z.object({
   pages: z.array(prototypePageSchema).min(1).max(12),
   flows: z.array(prototypeFlowSchema).min(1),
   reviewDocument: prototypeReviewDocumentSchema,
-  /** Agent-authored compact input used to derive corresponding suite alternatives. */
-  planningSeed: prototypePlanningSeedSchema.optional(),
   humanLoop: prototypeHumanLoopSchema.default({
     mode: 'continue',
     rationale: 'The requirement is clear enough to proceed.',
@@ -274,10 +163,252 @@ export type PrototypePage = z.infer<typeof prototypePageSchema>
 export type PrototypeFlow = z.infer<typeof prototypeFlowSchema>
 export type PrototypeHumanLoop = z.infer<typeof prototypeHumanLoopSchema>
 export type PrototypeReviewDocument = z.infer<typeof prototypeReviewDocumentSchema>
-export type PrototypePlanningMaterial = z.infer<typeof prototypePlanningMaterialSchema>
-export type PrototypePlanningSeed = z.infer<typeof prototypePlanningSeedSchema>
 export type PrototypeHumanLoopAsk = Extract<PrototypeHumanLoop, { mode: 'ask' }>
 export type PrototypePlan = z.infer<typeof prototypePlanSchema>
+
+export interface PrototypeRouteGraphLike {
+  readonly pages: readonly {
+    readonly id: string
+    readonly name: string
+    readonly route: string
+    readonly purpose: string
+    readonly regions: readonly {
+      readonly id: string
+      readonly name: string
+      readonly role: PrototypeRegion['role']
+      readonly summary: string
+    }[]
+    readonly overlays?: readonly {
+      readonly id: string
+      readonly name: string
+      readonly purpose: string
+    }[]
+    readonly states?: readonly {
+      readonly id: string
+      readonly name: string
+      readonly purpose: string
+    }[]
+    readonly interactions: readonly PrototypeInteraction[]
+  }[]
+  readonly flows: readonly PrototypeFlow[]
+}
+
+const prototypeRouteGraphIdentityActionSchema = z.discriminatedUnion('type', [
+  z.object({ type: z.literal('navigate'), targetPage: z.number().int().nonnegative() }).strict(),
+  z.object({ type: z.literal('open-overlay'), targetOverlay: z.number().int().nonnegative() }).strict(),
+  z.object({ type: z.literal('change-state'), targetState: z.number().int().nonnegative() }).strict(),
+  z.object({ type: z.literal('external'), destination: z.string().min(1) }).strict(),
+  z.object({ type: z.literal('none'), reason: z.string().min(1) }).strict(),
+])
+
+export const prototypeRouteGraphIdentitySchema = z.object({
+  version: z.literal('prototype-route-graph.v1'),
+  pages: z.array(z.object({
+    name: z.string().min(1),
+    route: z.string().min(1),
+    purpose: z.string().min(1),
+    regions: z.array(z.object({
+      name: z.string().min(1),
+      role: z.string().min(1),
+      summary: z.string().min(1),
+    }).strict()).min(1),
+    overlays: z.array(z.object({
+      name: z.string().min(1),
+      purpose: z.string().min(1),
+    }).strict()),
+    states: z.array(z.object({
+      name: z.string().min(1),
+      purpose: z.string().min(1),
+    }).strict()),
+    interactions: z.array(z.object({
+      label: z.string().min(1),
+      trigger: prototypeInteractionSchema.shape.trigger,
+      sourceRegion: z.number().int().nonnegative().nullable(),
+      sourceElement: z.string().min(1),
+      intent: z.string().min(1),
+      action: prototypeRouteGraphIdentityActionSchema,
+    }).strict()),
+  }).strict()).min(1).max(12),
+  flows: z.array(z.object({
+    name: z.string().min(1),
+    goal: z.string().min(1),
+    startPage: z.number().int().nonnegative(),
+    steps: z.array(z.object({
+      fromPage: z.number().int().nonnegative(),
+      interaction: z.number().int().nonnegative(),
+      toPage: z.number().int().nonnegative().nullable(),
+    }).strict()),
+  }).strict()).min(1),
+}).strict()
+
+export type PrototypeRouteGraphIdentity = z.infer<typeof prototypeRouteGraphIdentitySchema>
+type PrototypeRouteGraphIdentityAction = z.infer<typeof prototypeRouteGraphIdentityActionSchema>
+
+function normalizeGraphText(value: string): string {
+  return value.trim().replace(/\s+/g, ' ')
+}
+
+function compareCanonical(left: unknown, right: unknown): number {
+  return JSON.stringify(left).localeCompare(JSON.stringify(right))
+}
+
+function normalizedGraphAction(
+  action: PrototypeInteraction['action'],
+  pageIndexById: ReadonlyMap<string, number>,
+  overlayIndexById: ReadonlyMap<string, number>,
+  stateIndexById: ReadonlyMap<string, number>,
+): PrototypeRouteGraphIdentityAction {
+  switch (action.type) {
+    case 'navigate':
+      return {
+        type: action.type,
+        targetPage: pageIndexById.get(action.targetPageId) ?? -1,
+      }
+    case 'open-overlay':
+      return {
+        type: action.type,
+        targetOverlay: overlayIndexById.get(action.targetOverlayId) ?? -1,
+      }
+    case 'change-state':
+      return {
+        type: action.type,
+        targetState: stateIndexById.get(action.targetStateId) ?? -1,
+      }
+    case 'external':
+      return { type: action.type, destination: normalizeGraphText(action.destination) }
+    case 'none':
+      return { type: action.type, reason: normalizeGraphText(action.reason) }
+  }
+}
+
+/**
+ * Canonical semantic graph projection. Internal ids never contribute to the
+ * identity; references are rewritten to stable page/region/interaction
+ * ordinals so an id-renamed copy remains the same graph.
+ */
+export function prototypeRouteGraphProjection(
+  plan: PrototypeRouteGraphLike,
+): PrototypeRouteGraphIdentity {
+  const orderedPages = [...plan.pages].sort((left, right) =>
+    left.route.localeCompare(right.route) || compareCanonical(left, right))
+  const pageIndexById = new Map(orderedPages.map((page, index) => [page.id, index]))
+  const interactionIndexByPageId = new Map<string, ReadonlyMap<string, number>>()
+
+  const pages = orderedPages.map((page) => {
+    const regionIndexById = new Map(page.regions.map((region, index) => [region.id, index]))
+    const overlays = page.overlays ?? []
+    const states = page.states ?? []
+    const overlayIndexById = new Map(overlays.map((overlay, index) => [overlay.id, index]))
+    const stateIndexById = new Map(states.map((state, index) => [state.id, index]))
+    const interactionsWithIds = page.interactions.map((interaction) => ({
+      id: interaction.id,
+      value: {
+        label: normalizeGraphText(interaction.label),
+        trigger: interaction.trigger,
+        sourceRegion: interaction.sourceSectionId === undefined
+          ? null
+          : (regionIndexById.get(interaction.sourceSectionId) ?? -1),
+        sourceElement: normalizeGraphText(interaction.sourceElement),
+        intent: normalizeGraphText(interaction.intent),
+        action: normalizedGraphAction(
+          interaction.action,
+          pageIndexById,
+          overlayIndexById,
+          stateIndexById,
+        ),
+      },
+    })).sort((left, right) => compareCanonical(left.value, right.value))
+    interactionIndexByPageId.set(
+      page.id,
+      new Map(interactionsWithIds.map((interaction, index) => [interaction.id, index])),
+    )
+    return {
+      name: normalizeGraphText(page.name),
+      route: page.route.trim(),
+      purpose: normalizeGraphText(page.purpose),
+      regions: page.regions.map((region) => ({
+        name: normalizeGraphText(region.name),
+        role: normalizeGraphText(region.role),
+        summary: normalizeGraphText(region.summary),
+      })),
+      overlays: overlays.map((overlay) => ({
+        name: normalizeGraphText(overlay.name),
+        purpose: normalizeGraphText(overlay.purpose),
+      })),
+      states: states.map((state) => ({
+        name: normalizeGraphText(state.name),
+        purpose: normalizeGraphText(state.purpose),
+      })),
+      interactions: interactionsWithIds.map(({ value }) => value),
+    }
+  })
+
+  const flows = plan.flows.map((flow) => ({
+    name: normalizeGraphText(flow.name),
+    goal: normalizeGraphText(flow.goal),
+    startPage: pageIndexById.get(flow.startPageId) ?? -1,
+    steps: flow.steps.map((step) => ({
+      fromPage: pageIndexById.get(step.fromPageId) ?? -1,
+      interaction: interactionIndexByPageId.get(step.fromPageId)?.get(step.interactionId) ?? -1,
+      toPage: step.toPageId === undefined ? null : (pageIndexById.get(step.toPageId) ?? -1),
+    })),
+  })).sort(compareCanonical)
+
+  return {
+    version: 'prototype-route-graph.v1',
+    pages,
+    flows,
+  }
+}
+
+export function prototypeRouteGraphFingerprint(plan: PrototypeRouteGraphLike): string {
+  const identity = prototypeRouteGraphProjection(plan)
+  prototypeRouteGraphIdentitySchema.parse(identity)
+  return JSON.stringify(identity)
+}
+
+export function parsePrototypeRouteGraphFingerprint(
+  value: unknown,
+): PrototypeRouteGraphIdentity | undefined {
+  if (typeof value !== 'string' || value.length < 1 || value.length > 512_000) return undefined
+  try {
+    const parsed = prototypeRouteGraphIdentitySchema.safeParse(JSON.parse(value))
+    if (!parsed.success || JSON.stringify(parsed.data) !== value) return undefined
+    const routes = new Set<string>()
+    for (const page of parsed.data.pages) {
+      if (routes.has(page.route)) return undefined
+      routes.add(page.route)
+      if (page.interactions.some((interaction) =>
+        interaction.sourceRegion !== null
+          && interaction.sourceRegion >= page.regions.length)) return undefined
+      if (page.interactions.some((interaction) =>
+        (interaction.action.type === 'navigate'
+          && interaction.action.targetPage >= parsed.data.pages.length)
+        || (interaction.action.type === 'open-overlay'
+          && interaction.action.targetOverlay >= page.overlays.length)
+        || (interaction.action.type === 'change-state'
+          && interaction.action.targetState >= page.states.length))) return undefined
+      if (page.interactions.some((interaction, index, interactions) =>
+        index > 0 && compareCanonical(interactions[index - 1], interaction) > 0)) return undefined
+    }
+    if (parsed.data.pages.some((page, index, pages) =>
+      index > 0 && pages[index - 1]!.route.localeCompare(page.route) > 0)) return undefined
+    if (parsed.data.flows.some((flow, index, flows) =>
+      flow.startPage >= parsed.data.pages.length
+      || flow.steps.some((step) =>
+        step.fromPage >= parsed.data.pages.length
+        || step.interaction >= parsed.data.pages[step.fromPage]!.interactions.length
+        || (step.toPage !== null && step.toPage >= parsed.data.pages.length))
+      || (index > 0 && compareCanonical(flows[index - 1], flow) > 0))) return undefined
+    return parsed.data
+  } catch {
+    return undefined
+  }
+}
+
+export function isPrototypeRouteGraphFingerprint(value: unknown): value is string {
+  return parsePrototypeRouteGraphFingerprint(value) !== undefined
+}
 
 export type HumanLoopChoice = PrototypeHumanLoopAsk['choices'][number]
 export type ResolvedHumanLoopAnswer =
@@ -404,7 +535,6 @@ export function validatePrototypePlan(
       }
       if (
         interaction.action.type === 'navigate' &&
-        step.toPageId &&
         interaction.action.targetPageId !== step.toPageId
       ) {
         return err(

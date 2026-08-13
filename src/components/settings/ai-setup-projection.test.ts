@@ -13,6 +13,7 @@ const openai: ProviderConfig = {
   id: 'openai',
   kind: 'openai',
   label: 'OpenAI',
+  baseUrl: 'https://api.openai.com/v1',
   wireProtocol: 'responses',
   defaultModel: 'gpt-5',
   enabled: true,
@@ -50,6 +51,7 @@ const candidate: ProviderDiscoveryCandidate = {
   sourceLabel: 'Codex',
   kind: 'openai',
   label: 'OpenAI from Codex',
+  baseUrl: 'https://api.openai.com/v1/',
   wireProtocol: 'responses',
   credential: {
     sourceType: 'config-literal',
@@ -226,6 +228,8 @@ describe('capability-first AI setup projection', () => {
 
   it('does not offer a discovered credential as a duplicate configured connection', () => {
     expect(discoveredCandidateMatchesProvider(candidate, openai)).toBe(true)
-    expect(projectAiSetup(input({ providers: [openai], candidates: [candidate] })).importableCandidates).toEqual([])
+    const result = projectAiSetup(input({ providers: [openai], candidates: [candidate] }))
+    expect(result.importableCandidates).toEqual([])
+    expect(result.automaticCandidates).toEqual([candidate])
   })
 })

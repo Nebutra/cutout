@@ -109,6 +109,26 @@ describe('runPipeline', () => {
     expect(boxes[0]).toEqual({ x: 1, y: 1, width: 8, height: 8 })
   })
 
+  it('reports foreground omitted by component filtering', () => {
+    const frame = frameWithSquares(80, 60, [
+      [5, 5, 40, 40],
+      [60, 45, 5, 4],
+    ])
+    const { boxes, coverage } = runPipeline(frame, {
+      ...PARAMS,
+      minArea: 900,
+      padding: 4,
+    })
+
+    expect(boxes).toHaveLength(1)
+    expect(coverage).toEqual({
+      totalForegroundPixelCount: 1_620,
+      retainedForegroundPixelCount: 1_600,
+      omittedForegroundPixelCount: 20,
+      retainedRatio: 1_600 / 1_620,
+    })
+  })
+
   it('throws PipelineAbortError when the signal is already aborted', () => {
     const frame = frameWithSquares(10, 10, [[2, 2, 3, 3]])
     const controller = new AbortController()

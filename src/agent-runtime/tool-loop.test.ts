@@ -1,6 +1,10 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
-import { runToolLoop, type AgentToolDefinition } from './tool-loop'
+import {
+  AGENT_TOOL_LOOP_TIMEOUT_MS,
+  runToolLoop,
+  type AgentToolDefinition,
+} from './tool-loop'
 import { ok, err, type Result } from '@/services/types'
 import type { GenerateWithToolsInput, GenerateWithToolsOutput, GenerationService } from '@/services/ai/types'
 
@@ -18,6 +22,10 @@ const echoTool: AgentToolDefinition<{ value: string }, { echoed: string }> = {
     return { echoed: input.value }
   },
 }
+
+afterEach(() => {
+  vi.useRealTimers()
+})
 
 describe('runToolLoop', () => {
   it('falls through cleanly when the model calls no tool', async () => {
@@ -155,6 +163,46 @@ describe('runToolLoop', () => {
       runId: 'run:1', providerId: 'p1', prompt: 'hello', tools: [echoTool],
     })
     expect(result).toEqual({ ok: false, error: 'provider not configured' })
+  })
+
+  it('settles a tool turn whose Provider ignores abort at the monotonic deadline', async () => {
+    vi.useFakeTimers()
+    const generation = {
+      generateWithTools: (_input: GenerateWithToolsInput) =>
+        new Promise<Result<GenerateWithToolsOutput>>(() => undefined),
+    }
+    const pending = runToolLoop(generation, {
+      runId: 'run:timeout', providerId: 'p1', prompt: 'build', tools: [echoTool],
+    })
+
+    await vi.advanceTimersByTimeAsync(AGENT_TOOL_LOOP_TIMEOUT_MS)
+
+    await expect(pending).resolves.toEqual({
+      ok: false,
+      error: 'Agent tool loop timed out.',
+    })
+  })
+
+  it('settles parent cancellation even when the Provider ignores abort', async () => {
+    vi.useFakeTimers()
+    const controller = new AbortController()
+    const generation = {
+      generateWithTools: (_input: GenerateWithToolsInput) =>
+        new Promise<Result<GenerateWithToolsOutput>>(() => undefined),
+    }
+    const pending = runToolLoop(generation, {
+      runId: 'run:cancelled',
+      providerId: 'p1',
+      prompt: 'build',
+      tools: [echoTool],
+      signal: controller.signal,
+    })
+
+    controller.abort()
+
+    await expect(pending).resolves.toEqual({ ok: false, error: 'Operation aborted' })
+    await vi.advanceTimersByTimeAsync(AGENT_TOOL_LOOP_TIMEOUT_MS)
+    await expect(pending).resolves.toEqual({ ok: false, error: 'Operation aborted' })
   })
 
   it('defaults maxSteps to 2 when the caller omits it', async () => {

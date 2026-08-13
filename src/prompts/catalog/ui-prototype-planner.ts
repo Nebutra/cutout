@@ -1,5 +1,5 @@
 /**
- * `ui-prototype-planner` v1.8.0 — plan a multi-page prototype suite before image
+ * `ui-prototype-planner` v1.9.0 — plan a multi-page prototype suite before image
  * generation. It emits a `PrototypePlan`: product definition, shared design
  * system, pages, regions, interactions, and reachable flows.
  */
@@ -71,7 +71,7 @@ Emit exactly one JSON object matching this contract:
           "preserve": string[]
         }
       ],
-      "bounds": { "maxCandidates": 8, "maxParallelism": 2 }
+      "bounds": { "maxCandidates": 8, "maxParallelism": 3 }
     }
   },
   "pages": [
@@ -163,7 +163,7 @@ Emit exactly one JSON object matching this contract:
 - A mentioned count informs scope but never overrides business completeness. Do not mechanically pad, merge, repair, or reject a route graph solely to equal that number; ask or justify when the resolved topology differs materially.
 - Complete route coverage wins over a small screenshot count: every route needed to operate the planned app must have a generated page identity, purpose, viewport, regions, interactions, and reachable flow.
 - Do not invent generic "modern, trustworthy, business" design language when the brief implies a more specific professional standard.
-- designSystem.exploration.count must be between 1 and 8, directions.length must equal count, and every direction id/thesis must be distinct. Runtime bounds are always maxCandidates 8 and maxParallelism 2 in this protocol version.
+- designSystem.exploration.count must be between 1 and 8, directions.length must equal count, and every direction id/thesis must be distinct. Runtime bounds are always maxCandidates 8 and maxParallelism 3 in this protocol version.
 - A multi-candidate proposal must create meaningfully comparable directions while preserving the same product, platform, audience, source references, and non-negotiable requirements.
 - Both reviewDocument fields must be self-contained Markdown artifacts written in the user's language. Do not force fixed Overview/User flow/Visual direction sections; use the structure that communicates this plan best.
 
@@ -173,7 +173,7 @@ const inputSchema = z.object({})
 
 export const uiPrototypePlanner: PromptVersion<typeof inputSchema> = {
   id: 'ui-prototype-planner',
-  version: '1.8.0',
+  version: '1.9.0',
   description:
     'Planner: emit a reachable multi-page PrototypePlan with shared design system and interaction semantics.',
   scenario: 'prototype-planning',

@@ -1,0 +1,5 @@
+{"file":".trellis/tasks/08-13-sprite-production-workflow/research/agent-sprite-forge-gap-analysis.md","reason":"Check the implemented workflow closes the researched gaps without copying unsafe reference patterns."}
+{"file":".trellis/tasks/08-13-full-scenario-design-os/research/commerce-session-promotion-analysis.md","reason":"Verify Game Asset independently proves promoted Commerce patterns and keeps domain details local."}
+{"file":".trellis/spec/frontend/design-os-kernel.md","reason":"Audit that no Game Asset branch enters protected Kernel lifecycle or authority surfaces."}
+{"file":".trellis/spec/frontend/cutout-pipeline.md","reason":"Check provenance, raster processing, preview-before-apply and export compatibility."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Apply repository test, type, lint and review expectations."}

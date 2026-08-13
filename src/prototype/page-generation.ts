@@ -2,6 +2,20 @@ import { createAsyncLimiter, forEachConcurrent } from '@/lib/async-pool'
 
 export type PrototypePageGenerationMode = 'serial' | 'anchor-parallel'
 export type PrototypePageReviewMode = 'inline' | 'overlap'
+export type PrototypePageProductionStage =
+  | 'generating'
+  | 'generated'
+  | 'reviewing'
+  | 'accepted'
+  | 'rejected'
+  | 'retrying'
+
+export interface PrototypePageProductionProgress<Page> {
+  readonly page: Page
+  readonly stage: PrototypePageProductionStage
+  /** One-based image-generation attempt. */
+  readonly attempt: number
+}
 
 /**
  * Generate a complete ordered page set while keeping one stable visual anchor.
@@ -25,10 +39,24 @@ export async function generatePrototypePageSet<
     predecessor: Artifact | undefined,
   ) => Promise<Artifact>
   /** Adds durable review evidence to newly generated artifacts; reused pages are not reviewed again. */
-  readonly review?: (artifact: Artifact) => Promise<Artifact>
+  readonly review?: (artifact: Artifact, attempt: number) => Promise<Artifact>
   /** Inline protects a shared Provider quota; overlap uses an independent bounded review lane. */
   readonly reviewMode?: PrototypePageReviewMode
   readonly reviewConcurrency?: number
+  /** Extra page-local image attempts after a completed review rejection. */
+  readonly maxReviewRetries?: number
+  /** A review outage is normally terminal evidence, not permission to spend another image call. */
+  readonly shouldRetryReview?: (artifact: Artifact) => boolean
+  /** Separates an accepted review from a terminal rejection such as reviewer unavailability. */
+  readonly isReviewAccepted?: (artifact: Artifact) => boolean
+  /** Regenerates only the rejected page and receives the reviewed bytes plus lesson evidence. */
+  readonly retryAfterReview?: (
+    page: Page,
+    predecessor: Artifact | undefined,
+    rejected: Artifact,
+    attempt: number,
+  ) => Promise<Artifact>
+  readonly onPageStage?: (progress: PrototypePageProductionProgress<Page>) => void
   readonly onProgress?: (artifacts: readonly Artifact[]) => void
 }): Promise<Artifact[]> {
   if (input.pages.length === 0) throw new Error('The prototype plan has no pages.')
@@ -49,29 +77,74 @@ export async function generatePrototypePageSet<
 
   const pendingReviews: Promise<void>[] = []
   const reviewLimiter = createAsyncLimiter(input.reviewConcurrency ?? input.concurrency)
+  const retryLimiter = createAsyncLimiter(input.concurrency)
+  const reviewRetryBudget = Math.max(0, Math.floor(input.maxReviewRetries ?? 0))
   let overlappingReviewFailed = false
   let overlappingReviewFailure: unknown
 
-  const queueOverlappingReview = (page: Page, artifact: Artifact): void => {
+  const predecessorForRetry = (page: Page): Artifact | undefined => {
+    const pageIndex = input.pages.findIndex((candidate) => candidate.id === page.id)
+    if (pageIndex <= 0) return undefined
+    if (input.mode === 'serial') return results.get(input.pages[pageIndex - 1]!.id)
+    return results.get(input.pages[0]!.id)
+  }
+
+  const reviewWithPageRetries = async (page: Page, initial: Artifact): Promise<void> => {
     const review = input.review
     if (!review) return
+    let current = initial
+    let attempt = 1
+    for (;;) {
+      input.onPageStage?.({ page, stage: 'reviewing', attempt })
+      const reviewed = await reviewLimiter(() => review(current, attempt))
+      if (reviewed.page.id !== page.id) {
+        throw new Error(
+          `Prototype reviewer returned page "${reviewed.page.id}" for planned page "${page.id}".`,
+        )
+      }
+      results.set(page.id, reviewed)
+      input.onProgress?.(ordered())
+      const shouldRetry = input.shouldRetryReview?.(reviewed) ?? false
+      const accepted = input.isReviewAccepted?.(reviewed) ?? !shouldRetry
+      if (accepted) {
+        input.onPageStage?.({ page, stage: 'accepted', attempt })
+        return
+      }
+      input.onPageStage?.({ page, stage: 'rejected', attempt })
+      if (!shouldRetry) return
+      if (!input.retryAfterReview || attempt > reviewRetryBudget) return
+
+      attempt += 1
+      input.onPageStage?.({ page, stage: 'retrying', attempt })
+      const replacement = await retryLimiter(() => {
+        input.onPageStage?.({ page, stage: 'generating', attempt })
+        return input.retryAfterReview!(
+          page,
+          predecessorForRetry(page),
+          reviewed,
+          attempt,
+        )
+      })
+      if (replacement.page.id !== page.id) {
+        throw new Error(
+          `Prototype generator returned page "${replacement.page.id}" for planned page "${page.id}".`,
+        )
+      }
+      current = replacement
+      results.set(page.id, replacement)
+      input.onProgress?.(ordered())
+      input.onPageStage?.({ page, stage: 'generated', attempt })
+    }
+  }
+
+  const queueOverlappingReview = (page: Page, artifact: Artifact): void => {
     pendingReviews.push(
-      reviewLimiter(() => review(artifact))
-        .then((reviewed) => {
-          if (reviewed.page.id !== page.id) {
-            throw new Error(
-              `Prototype reviewer returned page "${reviewed.page.id}" for planned page "${page.id}".`,
-            )
-          }
-          results.set(page.id, reviewed)
-          input.onProgress?.(ordered())
-        })
-        .catch((error: unknown) => {
-          if (!overlappingReviewFailed) {
-            overlappingReviewFailed = true
-            overlappingReviewFailure = error
-          }
-        }),
+      reviewWithPageRetries(page, artifact).catch((error: unknown) => {
+        if (!overlappingReviewFailed) {
+          overlappingReviewFailed = true
+          overlappingReviewFailure = error
+        }
+      }),
     )
   }
 
@@ -82,17 +155,22 @@ export async function generatePrototypePageSet<
       )
     }
     const reviewMode = input.reviewMode ?? 'inline'
-    const published = input.review && reviewMode === 'inline'
-      ? await input.review(artifact)
-      : artifact
-    if (published.page.id !== page.id) {
-      throw new Error(
-        `Prototype reviewer returned page "${published.page.id}" for planned page "${page.id}".`,
-      )
+    input.onPageStage?.({ page, stage: 'generated', attempt: 1 })
+    if (input.review && reviewMode === 'inline') {
+      await reviewWithPageRetries(page, artifact)
+      return
     }
-    results.set(page.id, published)
+    results.set(page.id, artifact)
     input.onProgress?.(ordered())
     if (reviewMode === 'overlap') queueOverlappingReview(page, artifact)
+  }
+
+  const generateInitial = (
+    page: Page,
+    predecessor: Artifact | undefined,
+  ): Promise<Artifact> => {
+    input.onPageStage?.({ page, stage: 'generating', attempt: 1 })
+    return input.generate(page, predecessor)
   }
 
   let generationFailed = false
@@ -106,7 +184,7 @@ export async function generatePrototypePageSet<
           predecessor = existing
           continue
         }
-        const artifact = await input.generate(page, predecessor)
+        const artifact = await generateInitial(page, predecessor)
         await publish(page, artifact)
         predecessor = artifact
       }
@@ -114,12 +192,12 @@ export async function generatePrototypePageSet<
       const anchorPage = input.pages[0]!
       let anchor = results.get(anchorPage.id)
       if (!anchor) {
-        anchor = await input.generate(anchorPage, undefined)
+        anchor = await generateInitial(anchorPage, undefined)
         await publish(anchorPage, anchor)
       }
       const missing = input.pages.slice(1).filter((page) => !results.has(page.id))
       await forEachConcurrent(missing, input.concurrency, async (page) => {
-        const artifact = await input.generate(page, anchor)
+        const artifact = await generateInitial(page, anchor)
         await publish(page, artifact)
       })
     }

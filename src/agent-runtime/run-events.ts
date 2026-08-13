@@ -26,6 +26,11 @@ const missingRequirementSchema = z.object({
   count: z.number().int().nonnegative(),
   label: z.string(),
 }).strict()
+const prototypePageReviewIdentitySchema = {
+  suiteCandidateId: z.string().min(1).max(240),
+  pageId: z.string().min(1).max(240),
+  attempt: z.number().int().min(1).max(16),
+} as const
 
 export const agentRunEventSchema = z.discriminatedUnion('type', [
   runEventBaseSchema.extend({ type: z.literal('run-started'), mode: z.enum(['create', 'repair']) }).strict(),
@@ -56,6 +61,20 @@ export const agentRunEventSchema = z.discriminatedUnion('type', [
   runEventBaseSchema.extend({ type: z.literal('tool-succeeded'), toolCallId: eventText, tool: eventText, label: eventText, stepId: eventText.optional(), outputRefs: z.array(eventText), receipt: paidToolReceiptSchema.optional() }).strict(),
   runEventBaseSchema.extend({ type: z.enum(['tool-failed', 'tool-cancelled']), toolCallId: eventText, tool: eventText, label: eventText, stepId: eventText.optional(), detail: eventText, receipt: paidToolReceiptSchema.optional() }).strict(),
   runEventBaseSchema.extend({ type: z.literal('material-recorded'), material: materialEvidenceSchema }).strict(),
+  runEventBaseSchema.extend({
+    type: z.literal('prototype-page-review-started'),
+    ...prototypePageReviewIdentitySchema,
+  }).strict(),
+  runEventBaseSchema.extend({
+    type: z.literal('prototype-page-review-passed'),
+    ...prototypePageReviewIdentitySchema,
+  }).strict(),
+  runEventBaseSchema.extend({
+    type: z.literal('prototype-page-review-rejected'),
+    ...prototypePageReviewIdentitySchema,
+    failures: z.array(z.string().min(1).max(500)).max(8),
+    unavailable: z.boolean(),
+  }).strict(),
   runEventBaseSchema.extend({ type: z.literal('capability-fallback'), capability: eventText, detail: eventText }).strict(),
   runEventBaseSchema.extend({ type: z.literal('outcome-evaluated'), status: z.enum(['satisfied', 'needs-repair']), missing: z.array(missingRequirementSchema) }).strict(),
   runEventBaseSchema.extend({ type: z.literal('run-cancelled'), reason: eventText }).strict(),
@@ -191,6 +210,20 @@ export type AgentRunEvent =
   | (RunEventBase & {
       readonly type: 'material-recorded'
       readonly material: MaterialEvidence
+    })
+  | (RunEventBase & {
+      readonly type: 'prototype-page-review-started' | 'prototype-page-review-passed'
+      readonly suiteCandidateId: string
+      readonly pageId: string
+      readonly attempt: number
+    })
+  | (RunEventBase & {
+      readonly type: 'prototype-page-review-rejected'
+      readonly suiteCandidateId: string
+      readonly pageId: string
+      readonly attempt: number
+      readonly failures: readonly string[]
+      readonly unavailable: boolean
     })
   | (RunEventBase & {
       readonly type: 'capability-fallback'
@@ -710,6 +743,9 @@ function reduceActiveRun(
           : [...run.materials, event.material],
       }
     case 'capability-fallback':
+    case 'prototype-page-review-started':
+    case 'prototype-page-review-passed':
+    case 'prototype-page-review-rejected':
     case 'agent-message':
       return run
     case 'outcome-evaluated':

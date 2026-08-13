@@ -13,7 +13,7 @@ import { SettingsUIProvider } from '@/components/settings/settings-ui'
 import { LibraryUIProvider } from '@/components/library/library-ui'
 import { IntentWorkspace } from './IntentWorkspace'
 import { getStoreState } from '@/store'
-import { ok, type Result } from '@/services/types'
+import { err, ok, type Result } from '@/services/types'
 import type { ServiceRegistry } from '@/services/types'
 import type { GenerateWithToolsOutput } from '@/services/ai/types'
 import type { ModelAssignments } from '@/services/ai/model-assignment-types'
@@ -22,9 +22,14 @@ import { createEmptyWorkspaceSnapshot } from '@/workspace/workspace-snapshot'
 import { installE2eLocalStorage } from './intent-workspace.e2e.testkit'
 
 const PROVIDER_ID = 'regeneration-provider'
-const MODEL = 'regeneration-model'
+const MODEL = 'gpt-5.5'
+const QWEN_PROVIDER_ID = 'qwen-provider'
+const QWEN_MODEL = 'qwen-plus'
 const storage = installE2eLocalStorage()
-const { tauriInvokeMock } = vi.hoisted(() => ({ tauriInvokeMock: vi.fn() }))
+const { tauriInvokeMock, assignmentsMock } = vi.hoisted(() => ({
+  tauriInvokeMock: vi.fn(),
+  assignmentsMock: { model: 'gpt-5.5' },
+}))
 
 vi.mock('@tauri-apps/api/core', () => ({
   invoke: tauriInvokeMock,
@@ -33,23 +38,27 @@ vi.mock('@tauri-apps/api/core', () => ({
   },
 }))
 
-vi.mock('@/services/ai/model-assignment.local', () => ({
-  loadCapabilityBindings: async () => ({
+vi.mock('@/services/ai/model-assignment.local', () => {
+  const loadBindings = async () => ({
     version: 'model-assignments.v2' as const,
     bindings: {
-      text: { providerId: PROVIDER_ID, model: MODEL },
-      vision: { providerId: PROVIDER_ID, model: MODEL },
-      'image-generation': { providerId: PROVIDER_ID, model: MODEL },
-      'image-edit': { providerId: PROVIDER_ID, model: MODEL },
+      text: { providerId: PROVIDER_ID, model: assignmentsMock.model },
+      vision: { providerId: PROVIDER_ID, model: assignmentsMock.model },
+      'image-generation': { providerId: PROVIDER_ID, model: assignmentsMock.model },
+      'image-edit': { providerId: PROVIDER_ID, model: assignmentsMock.model },
     },
     descriptors: [],
-  }),
+  })
+  return {
+  loadCapabilityBindings: loadBindings,
+  loadRuntimeCapabilityBindings: loadBindings,
   loadAssignments: async (): Promise<ModelAssignments> => ({
-    chat: { providerId: PROVIDER_ID, model: MODEL },
-    image: { providerId: PROVIDER_ID, model: MODEL },
+    chat: { providerId: PROVIDER_ID, model: assignmentsMock.model },
+    image: { providerId: PROVIDER_ID, model: assignmentsMock.model },
   }),
   setAssignment: async () => ({}),
-}))
+  }
+})
 
 ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -60,6 +69,15 @@ class ResizeObserverStub {
 }
 
 ;(globalThis as typeof globalThis & { ResizeObserver: typeof ResizeObserverStub }).ResizeObserver = ResizeObserverStub
+
+class MutationObserverStub {
+  observe() {}
+  disconnect() {}
+  takeRecords() { return [] }
+}
+
+;(globalThis as typeof globalThis & { MutationObserver: typeof MutationObserver })
+  .MutationObserver = MutationObserverStub as unknown as typeof MutationObserver
 if (!Element.prototype.scrollIntoView) Element.prototype.scrollIntoView = () => {}
 
 function deferred<T>() {
@@ -142,6 +160,7 @@ describe('Agent response regeneration workspace flow', () => {
   beforeEach(async () => {
     getStoreState().resetProject()
     storage.clear()
+    assignmentsMock.model = MODEL
     tauriInvokeMock.mockReset()
     tauriInvokeMock.mockImplementation((command: string) => {
       if (command === 'codex_system_probe') {
@@ -161,6 +180,7 @@ describe('Agent response regeneration workspace flow', () => {
   })
 
   it('uses a ready system Codex turn before direct text Provider preflight', async () => {
+    vi.stubEnv('VITE_CUTOUT_PACKAGED_E2E', '1')
     const directToolGate = vi.fn()
     const providerTest = vi.fn(async () => ok({ model: MODEL, models: [MODEL] }))
     const registry = fakeRegistry(
@@ -238,6 +258,10 @@ describe('Agent response regeneration workspace flow', () => {
     })
 
     expect(await waitFor(() => host!.textContent?.includes('I can help shape that idea.'))).toBe(true)
+    const workspaceRoot = host!.querySelector<HTMLElement>('[data-workspace-root]')
+    expect(workspaceRoot?.dataset.packagedE2ePlanningTurnCount).toBe('1')
+    expect(workspaceRoot?.dataset.packagedE2eCodexPlanningTurnCount).toBe('1')
+    expect(workspaceRoot?.dataset.packagedE2eDirectPlanningTurnCount).toBe('0')
     expect(directToolGate).not.toHaveBeenCalled()
     expect(providerTest).not.toHaveBeenCalled()
     expect(tauriInvokeMock).toHaveBeenCalledWith(
@@ -245,7 +269,9 @@ describe('Agent response regeneration workspace flow', () => {
       expect.objectContaining({
         input: expect.objectContaining({
           workspaceHandle: 'workspace:project.1',
-          conversationId: 'conversation:primary',
+          conversationId: expect.stringMatching(
+            /^conversation:gate:[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+          ),
         }),
       }),
     )
@@ -377,7 +403,238 @@ describe('Agent response regeneration workspace flow', () => {
     expect(providerTest).not.toHaveBeenCalled()
   })
 
+  it('keeps Retry actionable when the Codex Planner fails after the tool gate', async () => {
+    assignmentsMock.model = 'gpt-image-2'
+    const directToolGate = vi.fn()
+    const registry = fakeRegistry(
+      directToolGate,
+      Promise.resolve(ok({ text: '', toolCalls: [] })),
+    )
+    registry.providers.list = async () => [{
+      id: PROVIDER_ID,
+      kind: 'openai',
+      label: 'Test',
+      wireProtocol: 'responses',
+      defaultModel: 'gpt-image-2',
+      enabled: true,
+    }]
+    registry.providers.test = async () => ok({
+      model: 'gpt-image-2',
+      models: ['gpt-image-2'],
+    })
+    let turnCount = 0
+    const plannerPrompts: string[] = []
+    tauriInvokeMock.mockImplementation((command: string, args?: {
+      input?: { prompt?: string; requestId?: string; contextRevision?: string }
+    }) => {
+      if (command === 'codex_system_probe') {
+        return Promise.resolve({
+          runtimeId: 'codex-system',
+          installed: true,
+          authenticated: true,
+          authClass: 'chatgpt',
+          capability: 'proven',
+          execution: 'unproven',
+          version: '0.146.0',
+        })
+      }
+      if (command !== 'codex_system_turn_start') {
+        return Promise.reject(new Error(`Unexpected native command: ${command}`))
+      }
+      turnCount += 1
+      if (turnCount % 2 === 0) {
+        plannerPrompts.push(args?.input?.prompt ?? '')
+        return Promise.reject(new Error('planning runtime upstream is unavailable'))
+      }
+      return Promise.resolve({
+        output: {
+          action: 'proceed',
+          reply: null,
+          generation: { refinedBrief: 'Design a calm restaurant website.' },
+          clarification: null,
+          material: null,
+          regeneration: null,
+          targetPageNames: null,
+        },
+        receipt: {
+          protocol: 'cutout.codex-execution.v1',
+          runtimeId: 'codex-system',
+          runtimeVersion: '0.146.0',
+          bindingId: 'codex:binding',
+          requestId: args?.input?.requestId,
+          turnId: `turn.${turnCount}`,
+          contextRevision: args?.input?.contextRevision,
+          contextDigest: 'a'.repeat(64),
+          outputDigest: 'b'.repeat(64),
+          completedAt: turnCount,
+        },
+      })
+    })
+    getStoreState().setBrief('Make a calm restaurant website with online reservations.')
+    getStoreState().setWorkspaceSnapshot(createEmptyWorkspaceSnapshot())
+    getStoreState().requestAgentRun('create-assets')
+
+    host = document.createElement('div')
+    document.body.append(host)
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    act(() => {
+      root = createRoot(host!)
+      root.render(
+        <QueryClientProvider client={queryClient}>
+          <I18nProvider i18n={i18n}>
+            <TooltipProvider>
+              <SettingsUIProvider value={{ open: () => {} }}>
+                <LibraryUIProvider value={{ open: () => {}, openGlobal: () => {} }}>
+                  <ServiceProvider registry={registry}>
+                    <ImageImportActionsProvider value={{ openPicker: () => {} }}>
+                      <IntentWorkspace projectId="project.1" />
+                    </ImageImportActionsProvider>
+                  </ServiceProvider>
+                </LibraryUIProvider>
+              </SettingsUIProvider>
+            </TooltipProvider>
+          </I18nProvider>
+        </QueryClientProvider>,
+      )
+    })
+
+    const retry = await waitFor(() =>
+      host!.querySelector<HTMLButtonElement>('[data-agent-action="retry-run"]:not(:disabled)'))
+    expect(retry).toBeTruthy()
+    expect(host!.textContent).toContain('The planning Agent could not finish this turn.')
+    expect(turnCount).toBe(2)
+    expect(plannerPrompts).toEqual([expect.stringContaining('Design a calm restaurant website.')])
+
+    await act(async () => retry!.click())
+
+    expect(await waitFor(() => turnCount === 4)).toBe(true)
+    expect(plannerPrompts).toEqual([
+      expect.stringContaining('Design a calm restaurant website.'),
+      expect.stringContaining('Design a calm restaurant website.'),
+    ])
+    expect(await waitFor(() =>
+      host!.querySelector<HTMLButtonElement>('[data-agent-action="retry-run"]:not(:disabled)'))).toBeTruthy()
+    expect(directToolGate).not.toHaveBeenCalled()
+  }, 15_000)
+
+  it('moves a 429 text route behind verified Qwen on Retry without duplicating the user turn', async () => {
+    const checkedAt = '2026-08-12T00:00:00.000Z'
+    storage.setItem('cutout.provider-verification.v1', JSON.stringify({
+      [PROVIDER_ID]: {
+        status: 'verified',
+        checkedAt,
+        model: 'gpt-5.5',
+        models: ['gpt-5.5'],
+      },
+      [QWEN_PROVIDER_ID]: {
+        status: 'verified',
+        checkedAt,
+        model: QWEN_MODEL,
+        models: [QWEN_MODEL],
+      },
+    }))
+    const routes: Array<{ providerId: string; model?: string }> = []
+    const registry = fakeRegistry(
+      () => {},
+      Promise.resolve(ok({ text: '', toolCalls: [] })),
+    )
+    registry.providers.list = async () => [
+      {
+        id: PROVIDER_ID,
+        kind: 'openai-compatible',
+        label: 'MOX',
+        baseUrl: 'https://mox.example/v1',
+        wireProtocol: 'chat-completions',
+        defaultModel: 'gpt-5.5',
+        enabled: true,
+      },
+      {
+        id: QWEN_PROVIDER_ID,
+        kind: 'dashscope',
+        label: 'Qwen',
+        baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+        wireProtocol: 'chat-completions',
+        defaultModel: QWEN_MODEL,
+        enabled: true,
+      },
+    ]
+    registry.generation.generateWithTools = async (input) => {
+      routes.push({ providerId: input.providerId, model: input.model })
+      if (input.providerId === PROVIDER_ID) {
+        return err('HTTP 429: quota for this API key is temporarily exhausted')
+      }
+      return ok({
+        text: '',
+        toolCalls: [{
+          toolCallId: 'reply-through-qwen',
+          toolName: 'reply_conversationally',
+          input: { reply: 'Qwen can continue this turn.' },
+          output: { reply: 'Qwen can continue this turn.' },
+        }],
+      })
+    }
+    registry.generation.streamText = async function* (input) {
+      expect(input.providerId).toBe(QWEN_PROVIDER_ID)
+      expect(input.model).toBe(QWEN_MODEL)
+      yield 'Recovered through Qwen.'
+    }
+    // The primary binding remains MOX. Qwen is a cold authenticated catalog
+    // candidate until the user-owned Retry gives it a real execution turn.
+    registry.providers.test = async (providerId) => ok({
+      model: providerId === QWEN_PROVIDER_ID ? QWEN_MODEL : 'gpt-5.5',
+      models: [providerId === QWEN_PROVIDER_ID ? QWEN_MODEL : 'gpt-5.5'],
+    })
+
+    getStoreState().setBrief('Help me think through a quiet restaurant website.')
+    getStoreState().setWorkspaceSnapshot(createEmptyWorkspaceSnapshot())
+    getStoreState().requestAgentRun('create-assets')
+
+    host = document.createElement('div')
+    document.body.append(host)
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    act(() => {
+      root = createRoot(host!)
+      root.render(
+        <QueryClientProvider client={queryClient}>
+          <I18nProvider i18n={i18n}>
+            <TooltipProvider>
+              <SettingsUIProvider value={{ open: () => {} }}>
+                <LibraryUIProvider value={{ open: () => {}, openGlobal: () => {} }}>
+                  <ServiceProvider registry={registry}>
+                    <ImageImportActionsProvider value={{ openPicker: () => {} }}>
+                      <IntentWorkspace projectId="project.1" />
+                    </ImageImportActionsProvider>
+                  </ServiceProvider>
+                </LibraryUIProvider>
+              </SettingsUIProvider>
+            </TooltipProvider>
+          </I18nProvider>
+        </QueryClientProvider>,
+      )
+    })
+
+    const retry = await waitFor(() =>
+      host!.querySelector<HTMLButtonElement>('[data-agent-action="retry-run"]:not(:disabled)'))
+    expect(retry).toBeTruthy()
+    expect(routes).toEqual([{ providerId: PROVIDER_ID, model: 'gpt-5.5' }])
+    expect(host.querySelectorAll('[data-slot="user-message"]')).toHaveLength(1)
+
+    await act(async () => retry!.click())
+
+    expect(await waitFor(() => host!.textContent?.includes('Recovered through Qwen.'))).toBe(true)
+    expect(routes).toEqual([
+      { providerId: PROVIDER_ID, model: 'gpt-5.5' },
+      { providerId: QWEN_PROVIDER_ID, model: QWEN_MODEL },
+    ])
+    expect(host.querySelectorAll('[data-slot="user-message"]')).toHaveLength(1)
+    expect(host.querySelectorAll('[data-slot="agent-message"]')).toHaveLength(1)
+    const runStarts = getStoreState().workspaceSnapshot?.agentRunEvents?.events
+      .filter((event) => event.type === 'run-started') ?? []
+    expect(new Set(runStarts.map((event) => event.runId)).size).toBe(2)
+  })
+
   afterEach(() => {
+    vi.unstubAllEnvs()
     act(() => root?.unmount())
     host?.remove()
     root = undefined

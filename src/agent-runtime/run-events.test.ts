@@ -96,6 +96,37 @@ describe('agent run events', () => {
       expect.objectContaining({ id: 'page:home', evidenceKey: 'page:home', revision: 'v2' }),
     ])
   })
+  it('persists bounded prototype page review evidence without changing run status', () => {
+    const events = [
+      started('run', 'start', 1),
+      createRunEvent('run', {
+        type: 'prototype-page-review-started',
+        suiteCandidateId: 'suite-1',
+        pageId: 'itinerary',
+        attempt: 2,
+      }, { eventId: 'review-started', at: 2 }),
+      createRunEvent('run', {
+        type: 'prototype-page-review-rejected',
+        suiteCandidateId: 'suite-1',
+        pageId: 'itinerary',
+        attempt: 2,
+        failures: ['The route comparison is incomplete.'],
+        unavailable: false,
+      }, { eventId: 'review-rejected', at: 3 }),
+    ]
+
+    const store = replayRunEvents(events)
+    expect(store.events).toEqual(events)
+    expect(store.activeRun?.status).toBe('running')
+    expect(agentRunEventSchema.safeParse({
+      ...events[1],
+      attempt: 17,
+    }).success).toBe(false)
+    expect(agentRunEventSchema.safeParse({
+      ...events[2],
+      failures: Array.from({ length: 9 }, () => 'failure'),
+    }).success).toBe(false)
+  })
   it('records steer history without replacing the run intent', () => {
     const store = replayRunEvents([
       createRunEvent('run', { type: 'run-started', mode: 'create' }, { eventId: 'start', at: 1 }),

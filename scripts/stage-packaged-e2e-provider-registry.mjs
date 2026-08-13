@@ -12,6 +12,10 @@ import { pathToFileURL } from 'node:url'
 
 const MAX_REGISTRY_BYTES = 1024 * 1024
 export const PACKAGED_E2E_PROVIDER_DISCOVERY_FILE = 'provider-discovery.json'
+export const PACKAGED_E2E_IMAGE_MODELS = new Set([
+  'qwen-image-3.0',
+  'qwen-image-3.0-pro',
+])
 const PROVIDER_KINDS = new Set([
   'anthropic',
   'openai',
@@ -101,7 +105,7 @@ function safeProvider(value) {
     && value.enabled === true
 }
 
-export async function stageProviderRegistry(source, destination) {
+export async function stageProviderRegistry(source, destination, imageModel) {
   let metadata
   try {
     metadata = await lstat(source)
@@ -114,7 +118,11 @@ export async function stageProviderRegistry(source, destination) {
   }
   const parsed = JSON.parse(await readFile(source, 'utf8'))
   if (!Array.isArray(parsed) || parsed.length > 64) return 0
-  const providers = parsed.filter(safeProvider)
+  if (imageModel !== undefined && !PACKAGED_E2E_IMAGE_MODELS.has(imageModel)) return 0
+  const providers = parsed.filter(safeProvider).map((provider) =>
+    imageModel !== undefined && provider.kind === 'dashscope'
+      ? { ...provider, defaultModel: imageModel }
+      : provider)
   if (providers.length === 0 || new Set(providers.map(({ id }) => id)).size !== providers.length) {
     return 0
   }
@@ -144,7 +152,11 @@ export function providerRegistryPaths(home) {
 
 async function main() {
   const { source, destination } = providerRegistryPaths(homedir())
-  const count = await stageProviderRegistry(source, destination)
+  const count = await stageProviderRegistry(
+    source,
+    destination,
+    process.env.CUTOUT_PACKAGED_E2E_IMAGE_MODEL,
+  )
   process.stdout.write(`Staged ${count} non-secret local Provider record(s) for packaged E2E.\n`)
 }
 

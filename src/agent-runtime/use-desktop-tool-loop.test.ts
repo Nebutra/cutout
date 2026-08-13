@@ -2,8 +2,10 @@ import { describe, expect, it, vi } from 'vitest'
 import { ok, type ForegroundSegmentationService } from '@/services/types'
 import {
   createExplicitDesktopPaidToolRequest,
+  desktopToolCapabilitiesForSnapshot,
   probeForegroundSegmentationCapability,
 } from './use-desktop-tool-loop'
+import { capabilityBindingsSchema } from '@/services/ai/model-capabilities'
 
 describe('desktop paid tool request', () => {
   it('requires explicit approval for the selected host route', () => {
@@ -30,6 +32,51 @@ describe('desktop paid tool request', () => {
     expect(request).toMatchObject({
       approvalPolicy: 'explicit',
     })
+  })
+
+  it('resolves paid image capabilities from one coherent fresh runtime snapshot', () => {
+    const stale = desktopToolCapabilitiesForSnapshot({
+      providers: [],
+      assignments: {},
+      capabilityBindings: capabilityBindingsSchema.parse({
+        version: 'model-assignments.v2', bindings: {}, descriptors: [],
+      }),
+    })
+    expect(stale).toEqual([])
+
+    const assignment = { providerId: 'qwen', model: 'qwen-image-3.0' }
+    const fresh = desktopToolCapabilitiesForSnapshot({
+      providers: [{
+        id: 'qwen',
+        kind: 'dashscope',
+        label: 'DashScope',
+        wireProtocol: 'chat-completions',
+        defaultModel: 'qwen-image-3.0',
+        enabled: true,
+      }],
+      assignments: { image: assignment },
+      capabilityBindings: capabilityBindingsSchema.parse({
+        version: 'model-assignments.v2',
+        bindings: {
+          'image-generation': assignment,
+          'image-edit': assignment,
+        },
+        descriptors: [{
+          providerId: 'qwen',
+          model: 'qwen-image-3.0',
+          capabilities: ['image-generation', 'image-edit'],
+          source: 'verified-catalog',
+          evidence: [
+            { capability: 'image-generation', kind: 'verified', sourceId: 'test' },
+            { capability: 'image-edit', kind: 'verified', sourceId: 'test' },
+          ],
+        }],
+      }),
+    })
+    expect(fresh).toEqual(expect.arrayContaining([
+      expect.objectContaining({ capability: 'generate-image', providerId: 'qwen' }),
+      expect.objectContaining({ capability: 'edit-image', providerId: 'qwen' }),
+    ]))
   })
 
   it('fails malformed and rejected foreground capability probes closed', async () => {

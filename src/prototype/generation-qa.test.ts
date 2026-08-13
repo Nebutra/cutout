@@ -1,15 +1,23 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   buildBoardChecklist,
   buildPageChecklist,
   generateWithQa,
+  PROTOTYPE_QA_REVIEW_TIMEOUT_MS,
   qaRetryPrompt,
   reviewGeneratedImage,
+  sanitizeQaFailures,
   type QaVerdict,
 } from './generation-qa'
 import type { PrototypePage, PrototypePlan, PrototypeRegion } from './prototype-plan'
 import { err, ok } from '@/services/types'
 import type { GenerationService } from '@/services/ai/types'
+import { tauriBridge } from '@/platform/native'
+
+afterEach(() => {
+  vi.unstubAllGlobals()
+  vi.restoreAllMocks()
+})
 
 const region: PrototypeRegion = {
   id: 'r1',
@@ -70,6 +78,19 @@ describe('qaRetryPrompt', () => {
     expect(prompt).toContain('1. fix a')
     expect(prompt).toContain('2. fix b')
   })
+
+  it('bounds and redacts retry lessons before prompt or durable evidence use', () => {
+    const failures = sanitizeQaFailures([
+      'Fix route rail. Bearer secret-token sk-123456789abcdef /Users/test/private.png\u0000',
+      ...Array.from({ length: 10 }, (_, index) => `failure ${index}`),
+    ])
+
+    expect(failures).toHaveLength(8)
+    expect(failures[0]).toContain('<redacted>')
+    expect(failures[0]).toContain('<local-path>')
+    expect(failures[0]).not.toContain('secret-token')
+    expect(failures[0]).not.toContain('/Users/test')
+  })
 })
 
 describe('reviewGeneratedImage', () => {
@@ -107,6 +128,61 @@ describe('reviewGeneratedImage', () => {
       unavailable: true,
     })
     expect(reported).toBe('boom')
+  })
+
+  it('cleans up the native deadline when an adapter throws synchronously', async () => {
+    const nativeWait = vi.spyOn(tauriBridge, 'waitForMonotonicDeadline')
+      .mockReturnValue(new Promise(() => undefined))
+    const nativeCancel = vi.spyOn(tauriBridge, 'cancelMonotonicDeadline')
+      .mockResolvedValue(undefined)
+    vi.stubGlobal('__TAURI_INTERNALS__', { invoke: vi.fn() })
+    const generation = {
+      generateObject: () => {
+        throw new Error('synchronous adapter failure')
+      },
+    } as unknown as Pick<GenerationService, 'generateObject'>
+
+    await expect(reviewGeneratedImage(generation, slot, bytes, ['rule'])).resolves.toEqual({
+      pass: false,
+      failures: ['Visual QA unavailable: synchronous adapter failure'],
+      unavailable: true,
+    })
+    expect(nativeCancel).toHaveBeenCalledWith(nativeWait.mock.calls[0]![0])
+  })
+
+  it('returns unavailable and aborts an unresponsive review from the native deadline', async () => {
+    let settleNative!: () => void
+    const native = new Promise<void>((resolve) => {
+      settleNative = resolve
+    })
+    const nativeWait = vi.spyOn(tauriBridge, 'waitForMonotonicDeadline')
+      .mockReturnValue(native)
+    vi.spyOn(tauriBridge, 'cancelMonotonicDeadline').mockResolvedValue(undefined)
+    vi.stubGlobal('__TAURI_INTERNALS__', { invoke: vi.fn() })
+    const rendererTimer = vi.spyOn(globalThis, 'setTimeout')
+      .mockImplementation(() => 0 as never)
+    let reviewSignal: AbortSignal | undefined
+    const generation = {
+      generateObject: async (input: { signal?: AbortSignal }) => {
+        reviewSignal = input.signal
+        return new Promise(() => undefined)
+      },
+    } as unknown as Pick<GenerationService, 'generateObject'>
+
+    const pending = reviewGeneratedImage(generation, slot, bytes, ['rule'])
+    settleNative()
+
+    await expect(pending).resolves.toEqual({
+      pass: false,
+      failures: ['Visual QA unavailable: review deadline exceeded'],
+      unavailable: true,
+    })
+    expect(reviewSignal?.aborted).toBe(true)
+    expect(nativeWait).toHaveBeenCalledWith(
+      expect.stringMatching(/^[0-9a-f-]{36}$/),
+      PROTOTYPE_QA_REVIEW_TIMEOUT_MS,
+    )
+    expect(rendererTimer).not.toHaveBeenCalled()
   })
 })
 

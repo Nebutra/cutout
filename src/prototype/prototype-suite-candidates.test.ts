@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { createEmptyWorkspaceSnapshot, isWorkspaceSnapshotEmpty, workspaceSnapshotFingerprint } from '@/workspace/workspace-snapshot'
 import type { CodingReceipt } from '@/coding-runtime/contracts'
+import { pngDimensionFixture } from '@/lib/raster-dimensions.test-fixture'
 import { createPrototypeAssetManifest } from './asset-manifest'
 import {
   createPrototypeDesignSystemCandidateSet,
@@ -164,6 +165,22 @@ describe('persisted prototype suite candidates', () => {
       },
       designSystems,
     )).toThrow(/bound to Design System direction/i)
+
+    const portraitBytes = pngDimensionFixture(1024, 1536)
+    expect(() => updatePrototypeSuiteCandidate(
+      suites,
+      candidateId,
+      {
+        status: 'ready',
+        artifact: {
+          ...complete,
+          pages: complete.pages.map((page, index) => index === 0
+            ? { ...page, bytes: portraitBytes, width: 1024, height: 1536 }
+            : page),
+        },
+      },
+      designSystems,
+    )).toThrow(/viewport contract failed.*different orientation/i)
   })
 
   it('requires Agent-authored alternatives to have distinct route graphs', () => {
@@ -187,6 +204,33 @@ describe('persisted prototype suite candidates', () => {
       { status: 'ready', artifact: suiteArtifact(suites, second.id, designSystems, 'same') },
       designSystems,
     )).toThrow(/duplicates the route graph/i)
+  })
+
+  it('accepts the same route paths when the authored information graph differs', () => {
+    const designSystems = readyDesignSystems()
+    let suites = createPrototypeSuiteCandidateSet({
+      designSystemCandidates: designSystems,
+      baseRevisionId: 'revision:suites:1',
+    })
+    const first = suites.set.candidates[0]!
+    suites = updatePrototypeSuiteCandidate(
+      suites,
+      first.id,
+      { status: 'ready', artifact: suiteArtifact(suites, first.id, designSystems, 'same') },
+      designSystems,
+    )
+    const second = suites.set.candidates[1]!
+    const alternative = suiteArtifact(suites, second.id, designSystems, 'same')
+    alternative.plan.pages[0]!.regions[0]!.summary =
+      'A route-identical alternative with a different information hierarchy.'
+    alternative.pages[0]!.page = alternative.plan.pages[0]!
+
+    expect(() => updatePrototypeSuiteCandidate(
+      suites,
+      second.id,
+      { status: 'ready', artifact: alternative },
+      designSystems,
+    )).not.toThrow()
   })
 
   it('round-trips optional controlled Coding evidence and fails closed on corrupted persisted state', () => {
@@ -284,7 +328,7 @@ function suiteArtifact(
     plan,
     pages: plan.pages.map((page, index) => ({
       page,
-      bytes: new Uint8Array([index + 1, 7, 9]),
+      bytes: pngDimensionFixture(page.viewport.width, page.viewport.height, index + 1),
       mediaType: 'image/png',
       width: page.viewport.width,
       height: page.viewport.height,

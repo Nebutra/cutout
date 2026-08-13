@@ -11,6 +11,7 @@ import {
 } from './design-system-candidates'
 import { createEmptyWorkspaceSnapshot } from '@/workspace/workspace-snapshot'
 import type { DesignDocument } from '@/design-ir'
+import { candidateIdMaxLength } from '@/candidate-selection/contracts'
 
 const plan = prototypePlanSchema.parse({
   version: 'prototype-plan.v0',
@@ -67,6 +68,46 @@ const artifact = {
 }
 
 describe('Design System candidate runtime', () => {
+  it('keeps every derived identity bounded for a planner-valid maximum-length direction id', () => {
+    const boundedPlan = prototypePlanSchema.parse({
+      ...plan,
+      designSystem: {
+        ...plan.designSystem,
+        exploration: {
+          ...plan.designSystem.exploration,
+          directions: plan.designSystem.exploration.directions.map((direction, index) => ({
+            ...direction,
+            id: `${'x'.repeat(candidateIdMaxLength - 1)}${index}`,
+          })),
+        },
+      },
+    })
+    let state = createPrototypeDesignSystemCandidateSet({
+      plan: boundedPlan,
+      baseRevisionId: 'revision:bounded',
+    })
+
+    expect(state.set.candidates.map(({ id }) => id)).toEqual([
+      'candidate:direction:1',
+      'candidate:direction:2',
+    ])
+    for (const candidate of state.set.candidates) {
+      state = updatePrototypeDesignSystemCandidate(state, candidate.id, {
+        status: 'ready',
+        artifact,
+      })
+    }
+    for (const candidate of state.set.candidates) {
+      expect(candidate.id.length).toBeLessThanOrEqual(candidateIdMaxLength)
+      expect(candidate.outputs.every(({ materialId }) =>
+        materialId.length <= candidateIdMaxLength,
+      )).toBe(true)
+      expect(candidate.provenanceIds.every((id) =>
+        id.length <= candidateIdMaxLength,
+      )).toBe(true)
+    }
+  })
+
   it('requires a human to choose among multiple ready candidates', () => {
     let state = createPrototypeDesignSystemCandidateSet({ plan, baseRevisionId: 'revision:1', id: 'set:1' })
     for (const candidate of state.set.candidates) {

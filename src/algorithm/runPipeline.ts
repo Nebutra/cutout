@@ -16,6 +16,15 @@ export interface PipelineResult {
   readonly frame: PixelFrame
   /** Final slice boxes in reading order (padded, clamped to image bounds). */
   readonly boxes: Box[]
+  /** Foreground retained by the union of the final crop boxes. */
+  readonly coverage: PipelineForegroundCoverage
+}
+
+export interface PipelineForegroundCoverage {
+  readonly totalForegroundPixelCount: number
+  readonly retainedForegroundPixelCount: number
+  readonly omittedForegroundPixelCount: number
+  readonly retainedRatio: number
 }
 
 /**
@@ -25,7 +34,7 @@ export interface PipelineResult {
  * truncating multi-stroke line-art. We drop only true antialiasing specks here
  * and apply the real `minArea` to the ASSEMBLED (merged) boxes instead.
  */
-const NOISE_FLOOR = 16
+export const PIPELINE_FOREGROUND_NOISE_FLOOR = 16
 
 /** Thrown by {@link runPipeline} when an abort signal fires between stages. */
 export class PipelineAbortError extends Error {
@@ -80,7 +89,7 @@ export function runPipeline(
   // Keep sub-`minArea` strokes so they can merge into their parent asset; the
   // real area cull happens on the merged boxes below (`box.pixels` is the summed
   // foreground of the union — see `unionBox`).
-  const noiseFloor = Math.min(NOISE_FLOOR, minArea)
+  const noiseFloor = Math.min(PIPELINE_FOREGROUND_NOISE_FLOOR, minArea)
   const components = findComponents(frame, noiseFloor)
   checkAbort()
 
@@ -97,6 +106,45 @@ export function runPipeline(
 
   const padded = assetBoxes.map((box) => padBox(box, padding, width, height))
   const boxes = sortBoxes(padded)
+  const coverage = measureForegroundCoverage(frame, boxes)
 
-  return { frame, boxes }
+  return { frame, boxes, coverage }
+}
+
+/** Measure source foreground that will survive the union of all final crops. */
+export function measureForegroundCoverage(
+  frame: PixelFrame,
+  boxes: readonly Box[],
+): PipelineForegroundCoverage {
+  let totalForegroundPixelCount = 0
+  let retainedForegroundPixelCount = 0
+  const rowCoverage = new Int32Array(frame.width + 1)
+
+  for (let y = 0; y < frame.height; y += 1) {
+    rowCoverage.fill(0)
+    for (const box of boxes) {
+      if (y < box.y || y >= box.y + box.height) continue
+      rowCoverage[box.x] += 1
+      rowCoverage[box.x + box.width] -= 1
+    }
+
+    let activeCrops = 0
+    for (let x = 0; x < frame.width; x += 1) {
+      activeCrops += rowCoverage[x]!
+      if (frame.data[(y * frame.width + x) * 4 + 3] === 0) continue
+      totalForegroundPixelCount += 1
+      if (activeCrops > 0) retainedForegroundPixelCount += 1
+    }
+  }
+
+  const omittedForegroundPixelCount =
+    totalForegroundPixelCount - retainedForegroundPixelCount
+  return {
+    totalForegroundPixelCount,
+    retainedForegroundPixelCount,
+    omittedForegroundPixelCount,
+    retainedRatio: totalForegroundPixelCount === 0
+      ? 1
+      : retainedForegroundPixelCount / totalForegroundPixelCount,
+  }
 }

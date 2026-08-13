@@ -267,7 +267,10 @@ function taskIsConsumable(task: ProductionTaskState): boolean {
 }
 
 function taskIsSettled(task: ProductionTaskState): boolean {
-  return taskIsConsumable(task) || task.status === 'failed' || task.status === 'cancelled'
+  return taskIsConsumable(task)
+    || task.status === 'needs-review'
+    || task.status === 'failed'
+    || task.status === 'cancelled'
 }
 
 function runIsTerminal(status: ProductionRunStatus): boolean {

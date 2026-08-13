@@ -419,6 +419,7 @@ export function AppShell() {
   const activeRecordRef = useRef<LocalProjectRecord | null>(null);
   const restoringRef = useRef(false);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const projectWriteBlockedRef = useRef(new Set<string>());
   const saveInFlightRef = useRef<{
     readonly projectId: string;
     readonly promise: Promise<boolean>;
@@ -477,6 +478,7 @@ export function AppShell() {
   const saveActiveProjectNow = useCallback(
     async (projectId = activeProjectId): Promise<boolean> => {
       if (!projectId) return true;
+      if (projectWriteBlockedRef.current.has(projectId)) return true;
       if (saveTimerRef.current) {
         clearTimeout(saveTimerRef.current);
         saveTimerRef.current = null;
@@ -563,6 +565,9 @@ export function AppShell() {
       const rows = result.data.filter(
         (project) => !isDisposableEmptyProject(project),
       );
+      for (const project of rows) {
+        if (project.archivedAt) projectWriteBlockedRef.current.add(project.id);
+      }
       const disposable = result.data.filter(isDisposableEmptyProject);
       if (disposable.length > 0) {
         await Promise.all(
@@ -574,7 +579,8 @@ export function AppShell() {
       dispatchProjectShell({
         type: "projects-loaded",
         projects: rows,
-        activeProjectId: rows[0]?.id ?? null,
+        activeProjectId:
+          rows.find((project) => !project.archivedAt)?.id ?? null,
       });
     },
     [projectRepository],
@@ -1848,16 +1854,21 @@ export function AppShell() {
   }, [importFile, newProject, pickFile]);
   const deleteProject = useCallback(
     async (id: string) => {
-      const removed = await projectRepository.remove(id);
-      if (isErr(removed)) {
-        toast.error("Could not delete project", { description: removed.error });
-        return;
-      }
-
       if (saveTimerRef.current) {
         clearTimeout(saveTimerRef.current);
         saveTimerRef.current = null;
       }
+      projectWriteBlockedRef.current.add(id);
+      const pending = saveInFlightRef.current;
+      if (pending?.projectId === id) await pending.promise;
+
+      const removed = await projectRepository.remove(id);
+      if (isErr(removed)) {
+        projectWriteBlockedRef.current.delete(id);
+        toast.error("Could not delete project", { description: removed.error });
+        return;
+      }
+
       if (activeProjectId === id) {
         restoringRef.current = true;
         activeRecordRef.current = null;
@@ -1884,30 +1895,31 @@ export function AppShell() {
         });
         return false;
       }
+      projectWriteBlockedRef.current.add(id);
       const archived = await projectRepository.archive(id, Date.now());
       if (isErr(archived)) {
+        projectWriteBlockedRef.current.delete(id);
         toast.error("Could not archive project", {
           description: archived.error,
         });
         return false;
       }
 
-      if (activeProjectId === id) {
+      const archivingActive = activeProjectId === id;
+      if (archivingActive) {
         restoringRef.current = true;
         activeRecordRef.current = null;
         resetProject();
       }
 
-      withViewTransition(() =>
-        dispatchProjectShell({
-          type: "project-archived",
-          project: projectSummaryFromRecord(archived.data),
-        }),
-      );
-      if (activeProjectId === id) {
-        queueMicrotask(() => {
-          restoringRef.current = false;
-        });
+      const action = {
+        type: "project-archived",
+        project: projectSummaryFromRecord(archived.data),
+      } as const;
+      try {
+        await withViewTransitionApplied(() => dispatchProjectShell(action));
+      } finally {
+        if (archivingActive) restoringRef.current = false;
       }
       toast.success("Project archived");
       return true;
@@ -1924,6 +1936,7 @@ export function AppShell() {
         return;
       }
 
+      projectWriteBlockedRef.current.delete(id);
       dispatchProjectShell({
         type: "project-updated",
         project: projectSummaryFromRecord(restored.data),

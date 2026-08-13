@@ -227,7 +227,7 @@ export function createLocalProjectRepository(
     if (!idb) return err(`Project storage is unavailable.`)
     try {
       const normalized = await normalizeProjectRecord(record, idb)
-      await writeRecord(idb, normalized.record)
+      await writeRecordWithLifecycleGuard(idb, normalized.record)
       return ok(undefined)
     } catch (error) {
       return err(errorMessage(error))
@@ -881,6 +881,30 @@ async function writeRecord(idb: IDBFactory, record: LocalProjectRecord): Promise
     const tx = db.transaction(STORE, 'readwrite')
     tx.objectStore(STORE).put(record)
     await txDone(tx)
+  } finally {
+    db.close()
+  }
+}
+
+async function writeRecordWithLifecycleGuard(
+  idb: IDBFactory,
+  record: LocalProjectRecord,
+): Promise<void> {
+  const db = await openProjectsDb(idb)
+  try {
+    const tx = db.transaction(STORE, 'readwrite')
+    const done = txDone(tx)
+    const store = tx.objectStore(STORE)
+    const existing = await promisify(
+      store.get(record.id) as IDBRequest<LocalProjectRecord | undefined>,
+    )
+    if (existing?.archivedAt !== record.archivedAt) {
+      tx.abort()
+      await done.catch(() => undefined)
+      throw new Error('Project lifecycle changed during autosave.')
+    }
+    store.put(record)
+    await done
   } finally {
     db.close()
   }

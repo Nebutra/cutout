@@ -51,6 +51,25 @@ validated receipts and revision bindings.
 - Publishing a late async result without checking run/source identity corrupts the
   current project.
 - A fresh collection selector in `useSyncExternalStore` can loop renders.
+- Allowing a late autosave to cross an archive/delete transition can resurrect
+  a project or silently clear its lifecycle metadata.
+
+## Project Lifecycle Write Barrier
+
+Archiving and permanent deletion are terminal transitions for the active
+project writer. The shell must block new autosaves for the project before the
+repository mutation and wait for any write that was already in flight. A failed
+mutation may reopen the writer; a successful restore explicitly reopens it.
+
+The repository enforces the same boundary transactionally. A workspace save may
+create a new project or update one whose persisted `archivedAt` still matches,
+but it must reject a stale record when archive state changed before commit.
+Lifecycle mutations remain owned by `archive`; autosave cannot archive or
+restore a project by replacing the whole record.
+
+On startup, archived rows are never selected as the active autosave target. E2E
+coverage must reload after archive and prove the project remains absent from
+active lists before restoring it.
 
 ---
 
@@ -269,6 +288,51 @@ Wrong: keep `advanced?: boolean` in `WorkspaceNavigation` and let each component
 Correct: remove `advanced` from the current schema and reject non-current records in
 `parseWorkspaceNavigation`.
 
+## Scenario: Read-Only IndexedDB E2E Probes
+
+### 1. Scope / Trigger
+
+Apply whenever a browser E2E test inspects an app-owned IndexedDB database,
+especially project counts used around create, restore, and autosave flows.
+
+### 2. Contracts
+
+- A read-only test probe must not become a database schema writer. Before
+  calling `indexedDB.open`, check `indexedDB.databases()` for the app-owned
+  database and return the empty read result when it does not exist.
+- Open an existing database without pinning its version. If an unexpected
+  upgrade is requested, abort it instead of creating stores from test code.
+- The production repository remains the only owner of its database name,
+  version, object stores, and indexes. Tests must fail when an existing database
+  lacks a required store; they must not recreate or normalize it.
+- Playwright already isolates each test in a fresh BrowserContext. Never delete
+  IndexedDB after the app mounts, because deletion races repository initialization
+  and autosave.
+- Local-state E2E fixtures fail on `project autosave failed` console warnings so
+  a persistence race cannot pass as visual-test noise.
+
+### 3. Tests Required
+
+- Exercise project count before the repository has created its database and
+  prove the probe returns zero without creating `cutout-projects`.
+- Repeat create/new-project flows on desktop and mobile while rejecting every
+  autosave warning.
+- Keep repository initialization/restart unit tests as the schema-owner proof.
+
+### 4. Wrong vs Correct
+
+```ts
+// Wrong: a count probe can win the first-open race and create an empty v1 DB.
+const db = await openRequest(indexedDB.open('cutout-projects', 1))
+
+// Correct: absence is zero; only production code may create or upgrade the DB.
+if (!(await indexedDB.databases()).some((db) => db.name === 'cutout-projects')) {
+  return 0
+}
+const request = indexedDB.open('cutout-projects')
+request.onupgradeneeded = () => request.transaction?.abort()
+```
+
 ## Scenario: Atomic Project Transitions With Native View Transitions
 
 ### 1. Scope / Trigger
@@ -417,4 +481,65 @@ id: `agent:${event.runId}:outcome`
 
 // Correct: semantic identity replaces outcome state across runs.
 id: 'agent:outcome'
+```
+
+## Scenario: Retry One Submitted Agent Turn
+
+### 1. Scope / Trigger
+
+Apply when a transient planning or Provider failure exposes GUI Retry for a
+submitted conversation turn.
+
+### 2. Signatures
+
+- Stable conversation identity: the original `intent-recorded.eventId`.
+- Attempt identity: a fresh `run-started.runId` for each Retry.
+- Runtime authority: one immutable Provider/binding/verification snapshot per
+  attempt.
+
+### 3. Contracts
+
+- The first attempt records the submitted user intent before remote execution.
+- A Retry starts a fresh run and request but reuses the original user event as
+  the response source. It must not append a duplicate `intent-recorded` event.
+- Route health may change the Provider/model selected for the new attempt. Once
+  selected, that attempt's snapshot is frozen through preflight, tool-gate,
+  planning and paid execution.
+- Clearing the visible failure must not discard the retry source identity before
+  the new attempt receives it.
+- Regenerate remains a response-branch operation and is distinct from Retry.
+
+### 4. Validation & Error Matrix
+
+| Condition | Required behavior |
+| --- | --- |
+| First attempt fails transiently after recording intent | Show one user turn and Retry |
+| User clicks Retry | Start a fresh run/request and reuse the prior source event |
+| Retry selects another Provider | Response still links to the original user event |
+| Retry succeeds | One user bubble, one selected response, two distinct runs |
+| Retry fails again | Keep one user bubble and preserve the latest actionable failure |
+
+### 5. Good / Base / Bad Cases
+
+- Good: one restaurant-site message survives a MOX 429 and a Qwen Retry as one
+  conversation turn with two auditable attempts.
+- Base: a successful first attempt creates one user and one Agent message.
+- Bad: identify a user turn by run ID, so every Retry duplicates the message.
+
+### 6. Tests Required
+
+- Component integration asserts one user bubble before and after Retry.
+- Persisted events contain distinct `run-started` IDs but only one
+  `intent-recorded` event for the submission.
+- The successful Agent message links to that original source event.
+
+### 7. Wrong vs Correct
+
+```ts
+// Wrong: a new execution attempt becomes a new user submission.
+emitRunEvent(retryRunId, { type: 'intent-recorded', intent })
+
+// Correct: the attempt is new; the conversation source is stable.
+startAgentRun('create', { runId: retryRunId })
+emitAgentResponse({ responseToEventId: originalIntentEventId })
 ```

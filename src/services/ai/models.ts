@@ -33,6 +33,7 @@ export const SUGGESTED_MODELS: Record<string, readonly string[]> = {
   ],
   'openai-compatible': [],
   'cc-switch': ['gpt-5.6-sol', 'gpt-image-2'],
+  xai: ['grok-4', 'grok-imagine-image-quality', 'grok-imagine-image'],
 }
 
 /**
@@ -69,6 +70,8 @@ export const POPULAR_MODELS: readonly string[] = [
   'imagen-3',
   // xAI
   'grok-4',
+  'grok-imagine-image-quality',
+  'grok-imagine-image',
 ]
 
 /** Resolve the effective model for a call: explicit override → config default. */

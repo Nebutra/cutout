@@ -1,5 +1,5 @@
-import type { Page } from "@playwright/test";
 import { test, expect } from "./local-state.fixture";
+import { projectCount } from "./project-storage";
 const presets = [
   "Web",
   "Mobile app",
@@ -8,27 +8,6 @@ const presets = [
   "Brand kit",
   "Poster",
 ] as const;
-async function projectCount(page: Page) {
-  return page.evaluate(async () => {
-    const request = indexedDB.open("cutout-projects");
-    const db = await new Promise<IDBDatabase>((resolve, reject) => {
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error);
-    });
-    if (!db.objectStoreNames.contains("projects")) {
-      db.close();
-      return 0;
-    }
-    const tx = db.transaction("projects", "readonly"),
-      count = await new Promise<number>((resolve, reject) => {
-        const result = tx.objectStore("projects").count();
-        result.onsuccess = () => resolve(result.result);
-        result.onerror = () => reject(result.error);
-      });
-    db.close();
-    return count;
-  });
-}
 for (const viewport of [
   { name: "desktop", width: 1440, height: 900 },
   { name: "mobile", width: 390, height: 844 },

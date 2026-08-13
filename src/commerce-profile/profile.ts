@@ -24,8 +24,9 @@ import {
 import { commercePolicyPackSchema, ALIEXPRESS_POLICY_PACKS } from './policies'
 
 export const COMMERCE_PROFILE_ID = 'profile:commerce-materials' as const
-export const COMMERCE_PROFILE_VERSION = '1.0.0' as const
+export const COMMERCE_PROFILE_VERSION = '1.1.0' as const
 export const COMMERCE_RECIPE_ID = 'commerce.material-recipe' as const
+export const COMMERCE_RECIPE_VERSION = 2 as const
 export const COMMERCE_TARGET_ID = 'target:commerce-material' as const
 export const COMMERCE_IDENTITY_LOCK_ID = 'lock:commerce-product-identity' as const
 export const COMMERCE_CREATIVE_DIRECTION_ID = 'lock:commerce-creative-direction' as const
@@ -209,7 +210,7 @@ function outcomeNode(input: {
     id: `outcome:commerce:${input.role}`,
     revision: `outcome:commerce:${input.role}:revision:1`,
     schema: { id: input.schemaId, version: 1 },
-    recipe: { id: COMMERCE_RECIPE_ID, version: 1 },
+    recipe: { id: COMMERCE_RECIPE_ID, version: COMMERCE_RECIPE_VERSION },
     payload: commerceOutcomePayloadSchema.parse(input.payload),
     dependencies: input.dependencies,
     state: 'proposed',
@@ -243,7 +244,14 @@ export function createCommerceOutcomeFragments(facts: ProductFacts): readonly Gr
   const imageNodes = imageRoles.map((role) => outcomeNode({
     role,
     schemaId: 'commerce.media-artifact',
-    dependencies: sharedDependencies(facts, ALIEXPRESS_POLICY_PACKS['en-US'].id),
+    dependencies: [
+      ...sharedDependencies(facts, ALIEXPRESS_POLICY_PACKS['en-US'].id),
+      ...(role === 'main-image' ? [] : [{
+        kind: 'outcome' as const,
+        id: 'outcome:commerce:main-image',
+        revision: 'outcome:commerce:main-image:revision:1',
+      }]),
+    ],
     payload: {
       kind: 'media',
       semanticRole: role,
@@ -406,7 +414,7 @@ export function installCommerceProfileSchemas(registry: SchemaRegistry): SchemaR
     { reference: { id: 'commerce.media-artifact', version: 1 }, category: 'outcome' as const, schema: commerceMediaArtifactSchema },
     { reference: { id: 'commerce.strategy-document', version: 1 }, category: 'outcome' as const, schema: strategyDocumentSchema },
     { reference: { id: 'commerce.market-policy', version: 1 }, category: 'presentation' as const, schema: commercePolicyPackSchema },
-    { reference: { id: COMMERCE_RECIPE_ID, version: 1 }, category: 'recipe' as const, schema: commerceOutcomePayloadSchema },
+    { reference: { id: COMMERCE_RECIPE_ID, version: COMMERCE_RECIPE_VERSION }, category: 'recipe' as const, schema: commerceOutcomePayloadSchema },
   ]
   for (const registration of registrations) {
     registerDomainSchema(registry, {

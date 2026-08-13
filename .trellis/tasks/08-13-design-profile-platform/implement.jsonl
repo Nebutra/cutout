@@ -1,0 +1,5 @@
+{"file":".trellis/spec/frontend/design-os-kernel.md","reason":"Defines the protected Kernel protocols the Profile Platform may extend but not reinterpret."}
+{"file":".trellis/spec/frontend/commerce-production-profile.md","reason":"Provides the first real Profile behavior and compatibility baseline for manifest wrapping."}
+{"file":".trellis/spec/frontend/design-os-benchmark.md","reason":"Defines Profile-neutral evidence projection and frozen benchmark semantics."}
+{"file":".trellis/tasks/08-13-full-scenario-design-os/research/commerce-session-promotion-analysis.md","reason":"Defines required-role, identity, observed-truth, dual-report and promotion patterns extracted from Commerce."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Guides contract flow across Profile, Platform, Project, Workbench and Host boundaries."}

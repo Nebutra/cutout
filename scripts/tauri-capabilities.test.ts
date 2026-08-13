@@ -80,6 +80,24 @@ describe('Tauri capability least privilege contract', () => {
     expect(desktopCapability.permissions).toContain('foreground-segmentation')
   })
 
+  it('registers only bounded wait and cancellation for native monotonic deadlines', async () => {
+    const [modules, handlers, permissions, desktopCapability] = await Promise.all([
+      readRepositoryFile('src-tauri/src/commands/mod.rs'),
+      readRepositoryFile('src-tauri/src/lib.rs'),
+      readRepositoryFile('src-tauri/permissions/application.toml'),
+      readCapability('updater'),
+    ])
+
+    expect(modules).toContain('pub mod monotonic_deadline;')
+    expect(handlers).toContain('commands::monotonic_deadline::wait_for_monotonic_deadline')
+    expect(handlers).toContain('commands::monotonic_deadline::cancel_monotonic_deadline')
+    expect(permissions).toContain('identifier = "monotonic-deadline"')
+    expect(permissions).toContain(
+      'commands.allow = ["wait_for_monotonic_deadline", "cancel_monotonic_deadline"]',
+    )
+    expect(desktopCapability.permissions).toContain('monotonic-deadline')
+  })
+
   it('registers the closed Codex planning runtime without generic process authority', async () => {
     const [modules, handlers, permissions, desktopCapability] = await Promise.all([
       readRepositoryFile('src-tauri/src/commands/ai/mod.rs'),
@@ -100,6 +118,44 @@ describe('Tauri capability least privilege contract', () => {
     expect(desktopCapability.permissions).toContain('codex-system-runtime')
     expect(handlers).not.toContain('codex_system_bind_conversation')
     expect(permissions).not.toMatch(/codex_system_(?:exec|spawn|shell)/)
+  })
+
+  it('registers native DashScope images only inside the reviewed provider boundary', async () => {
+    const [modules, handlers, permissions, desktopCapability] = await Promise.all([
+      readRepositoryFile('src-tauri/src/commands/ai/mod.rs'),
+      readRepositoryFile('src-tauri/src/lib.rs'),
+      readRepositoryFile('src-tauri/permissions/application.toml'),
+      readCapability('updater'),
+    ])
+
+    expect(modules).toContain('pub mod dashscope_image;')
+    expect(handlers).toContain('commands::ai::dashscope_image::ai_dashscope_image')
+    expect(permissions).toContain('identifier = "provider-secrets-network"')
+    expect(permissions).toContain('"ai_dashscope_image"')
+    expect(desktopCapability.permissions).toContain('provider-secrets-network')
+    expect(handlers).not.toContain('ai_dashscope_request')
+    expect(permissions).not.toContain('ai_dashscope_request')
+  })
+
+  it('registers only the bounded multimodal Host commands inside the provider boundary', async () => {
+    const [modules, handlers, permissions, desktopCapability] = await Promise.all([
+      readRepositoryFile('src-tauri/src/commands/ai/mod.rs'),
+      readRepositoryFile('src-tauri/src/lib.rs'),
+      readRepositoryFile('src-tauri/permissions/application.toml'),
+      readCapability('updater'),
+    ])
+
+    expect(modules).toContain('pub mod dashscope_multimodal;')
+    expect(modules).toContain('pub mod multimodal_receipt;')
+    expect(handlers).toContain('commands::ai::dashscope_multimodal::ai_dashscope_structured_text')
+    expect(handlers).toContain('commands::ai::dashscope_multimodal::ai_dashscope_video')
+    expect(handlers).toContain('commands::ai::multimodal_receipt::verify_multimodal_host_artifact')
+    expect(handlers).toContain('commands::ai::multimodal_receipt::promote_multimodal_video_playback')
+    expect(permissions).toContain('"ai_dashscope_structured_text"')
+    expect(permissions).toContain('"ai_dashscope_video"')
+    expect(permissions).toContain('"verify_multimodal_host_artifact"')
+    expect(permissions).toContain('"promote_multimodal_video_playback"')
+    expect(desktopCapability.permissions).toContain('provider-secrets-network')
   })
 
   it('does not expose the retired local Agent inventory as a readiness surface', async () => {

@@ -42,10 +42,28 @@ describe("provider definition registry", () => {
     ).toEqual([
       expect.arrayContaining(["text", "image-generation", "image-edit"]),
     ]);
+    expect(registry.adaptersFor("google")).toEqual([
+      expect.objectContaining({
+        wireProtocols: ["google-generate-content"],
+        capabilities: expect.arrayContaining(["text", "image-generation", "image-edit"]),
+      }),
+    ]);
     expect(registry.adaptersFor("deepseek")).toEqual([
       expect.objectContaining({
         wireProtocols: ["chat-completions"],
         capabilities: ["text", "reasoning", "tools"],
+      }),
+    ]);
+    expect(registry.adaptersFor("dashscope")).toEqual([
+      expect.objectContaining({
+        wireProtocols: ["chat-completions"],
+        capabilities: expect.arrayContaining(["text", "image-generation", "image-edit"]),
+      }),
+    ]);
+    expect(registry.adaptersFor("xai")).toEqual([
+      expect.objectContaining({
+        wireProtocols: ["chat-completions"],
+        capabilities: expect.arrayContaining(["text", "image-generation", "image-edit"]),
       }),
     ]);
     expect(registry.adaptersFor("ollama")).toEqual([

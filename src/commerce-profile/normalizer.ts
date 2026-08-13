@@ -4,23 +4,32 @@ import { assertAllowlistedCommerceInputPath, DEFAULT_INVENTORY_LIMITS } from './
 type JsonObject = Record<string, unknown>
 
 const PRODUCT_MARKERS = new Set([
-  'productId', 'product_id', 'itemId', 'item_id', 'subject', 'title', 'productTitle',
+  'productId', 'product_id', 'itemId', 'item_id', 'offerId', 'subject', 'title', 'productTitle',
   'description', 'descriptionHtml', 'description_html', 'skus', 'skuList', 'sku_list',
+  'productAttribute', 'productImage', 'productSkuInfos',
 ])
 
 const FIELD_ALIASES = {
-  productId: ['productId', 'product_id', 'itemId', 'item_id', 'num_iid', 'id'],
+  productId: ['productId', 'product_id', 'itemId', 'item_id', 'offerId', 'offer_id', 'num_iid', 'id'],
   sourcePlatform: ['sourcePlatform', 'source_platform', 'sourceType', 'source_type', 'platform', 'platformName', 'platform_name', 'site'],
   sourceUrl: ['productUrl', 'product_url', 'detailUrl', 'detail_url', 'itemUrl', 'url'],
   title: ['title', 'subject', 'productTitle', 'product_title', 'itemName', 'item_name'],
   description: ['description', 'descriptionHtml', 'description_html', 'desc', 'descHtml', 'desc_html'],
   category: ['leafCategoryId', 'leaf_category_id', 'categoryId', 'category_id', 'category'],
   attributes: [
-    'productAttributes', 'product_attributes', 'skuAttributes', 'sku_attributes',
+    'productAttributes', 'product_attributes', 'productAttribute', 'product_attribute',
+    'skuAttributes', 'sku_attributes',
     'attributes', 'props', 'productProps', 'product_props', 'productPropList', 'product_prop_list',
   ],
-  skus: ['skus', 'skuList', 'sku_list', 'skuRecords', 'sku_records', 'skuInfos', 'sku_infos'],
-  images: ['images', 'itemImages', 'item_images', 'itemImgs', 'item_imgs', 'imageUrls', 'image_urls', 'imageUrlList', 'image_url_list', 'imageUrl', 'image_url'],
+  skus: [
+    'skus', 'skuList', 'sku_list', 'skuRecords', 'sku_records', 'skuInfos', 'sku_infos',
+    'productSkuInfos', 'product_sku_infos',
+  ],
+  images: [
+    'images', 'productImage', 'product_image', 'itemImages', 'item_images', 'itemImgs', 'item_imgs',
+    'imageUrls', 'image_urls', 'imageUrlList', 'image_url_list', 'imageUrl', 'image_url',
+    'skuImageUrl', 'sku_image_url',
+  ],
   videos: ['videos', 'itemVideos', 'item_videos', 'videoUrls', 'video_urls', 'videoUrlList', 'video_url_list', 'videoUrl', 'video_url'],
 } as const
 
@@ -167,11 +176,25 @@ function arrayItems(selection: { value: unknown, pointer: string } | undefined):
 }
 
 function mediaItems(selection: { value: unknown, pointer: string } | undefined): readonly { descriptor: string, pointer: string }[] {
-  return arrayItems(selection).flatMap((entry) => {
-    const descriptor = text(entry.value)
-      ?? (isObject(entry.value) ? text(entry.value.url) ?? text(entry.value.src) : undefined)
-    return descriptor ? [{ descriptor, pointer: entry.pointer }] : []
-  })
+  if (!selection) return []
+  const visit = (value: unknown, pointer: string, depth: number): readonly { descriptor: string, pointer: string }[] => {
+    const descriptor = text(value)
+    if (descriptor) return [{ descriptor, pointer }]
+    if (depth > 3) return []
+    if (Array.isArray(value)) {
+      return value.flatMap((entry, index) => visit(entry, `${pointer}/${index}`, depth + 1))
+    }
+    if (!isObject(value)) return []
+    for (const key of ['url', 'src', 'imageUrl', 'image_url', 'skuImageUrl', 'sku_image_url', 'videoUrl', 'video_url']) {
+      const direct = text(value[key])
+      if (direct) return [{ descriptor: direct, pointer: `${pointer}/${escapePointer(key)}` }]
+    }
+    return ['images', 'imageUrls', 'image_urls', 'videos', 'videoUrls', 'video_urls']
+      .flatMap((key) => Object.hasOwn(value, key)
+        ? visit(value[key], `${pointer}/${escapePointer(key)}`, depth + 1)
+        : [])
+  }
+  return visit(selection.value, selection.pointer, 0)
 }
 
 function parseMeasurement(value: string): { value: number, unit: string } | undefined {
@@ -233,22 +256,35 @@ export function normalizeProductRecord(input: {
   const categoryValue = categorySelection && isObject(categorySelection.value)
     ? text(categorySelection.value.id) ?? text(categorySelection.value.categoryId) ?? text(categorySelection.value.name)
     : categorySelection ? text(categorySelection.value) : undefined
+  const categoryIsDeclaredTargetLeaf = categorySelection?.pointer.endsWith('/leafCategoryId')
+    || categorySelection?.pointer.endsWith('/leaf_category_id')
   const categoryFactId = categoryValue
-    ? addFact('category.leaf-id', { type: 'text', value: categoryValue }, categorySelection!.pointer, 'explicit')
+    ? addFact(categoryIsDeclaredTargetLeaf ? 'category.leaf-id' : 'category.source-id', { type: 'text', value: categoryValue }, categorySelection!.pointer, 'explicit')
     : addFact('category.leaf-id', { type: 'unknown', reason: 'A leaf category was not supplied.' }, unwrapped.pointer || '/', 'unknown')
   if (!categoryValue) requiredUnknownFactIds.push(categoryFactId)
+  const sourceCategoryName = pick(unwrapped.object, ['sourceCategoryName', 'source_category_name', 'category_name'], unwrapped.pointer)
+  const sourceCategoryNameValue = sourceCategoryName ? text(sourceCategoryName.value) : undefined
+  if (sourceCategoryNameValue) {
+    addFact('category.source-name', { type: 'text', value: sourceCategoryNameValue }, sourceCategoryName!.pointer, 'explicit')
+  }
 
   const mediaFactIds: string[] = []
   const addMedia = (kind: 'image' | 'video', descriptor: string, pointer: string, confidence: ProductFact['confidence']) => {
-    if (mediaFactIds.some((id) => {
+    const existing = mediaFactIds.find((id) => {
       const fact = facts.find((candidate) => candidate.id === id)
       return fact?.value.type === 'media' && fact.value.descriptor === descriptor
-    })) return
-    mediaFactIds.push(addFact(`media.${kind}`, { type: 'media', mediaKind: kind, descriptor }, pointer, confidence))
+    })
+    if (existing) return existing
+    const id = addFact(`media.${kind}`, { type: 'media', mediaKind: kind, descriptor }, pointer, confidence)
+    mediaFactIds.push(id)
+    return id
   }
+  const productImageFactIds: string[] = []
   for (const item of mediaItems(pick(unwrapped.object, FIELD_ALIASES.images, unwrapped.pointer))) {
-    addMedia('image', item.descriptor, item.pointer, 'explicit')
+    productImageFactIds.push(addMedia('image', item.descriptor, item.pointer, 'explicit'))
   }
+  const identityAnchorFactId = productImageFactIds[0]
+  if (!identityAnchorFactId) throw new Error('Product record must supply at least one explicit product image identity anchor.')
   for (const item of mediaItems(pick(unwrapped.object, FIELD_ALIASES.videos, unwrapped.pointer))) {
     addMedia('video', item.descriptor, item.pointer, 'explicit')
   }
@@ -310,9 +346,14 @@ export function normalizeProductRecord(input: {
     if (!skuId) requiredUnknownFactIds.push(skuIdFactId)
     const beforeAttributes = attributeFactIds.length
     const beforeMeasurements = measurementFactIds.length
-    normalizeAttributes(pick(entry.value, FIELD_ALIASES.attributes, entry.pointer), `sku.${index + 1}`)
+    const skuAttributes = pick(entry.value, FIELD_ALIASES.attributes, entry.pointer)
+    normalizeAttributes(skuAttributes, `sku.${index + 1}`)
     const skuMediaFactIds: string[] = []
-    for (const image of mediaItems(pick(entry.value, FIELD_ALIASES.images, entry.pointer))) {
+    const skuImages = [
+      ...mediaItems(pick(entry.value, FIELD_ALIASES.images, entry.pointer)),
+      ...mediaItems(skuAttributes),
+    ]
+    for (const image of skuImages) {
       const before = mediaFactIds.length
       addMedia('image', image.descriptor, image.pointer, 'explicit')
       if (mediaFactIds.length > before) skuMediaFactIds.push(mediaFactIds.at(-1)!)
@@ -345,6 +386,7 @@ export function normalizeProductRecord(input: {
     titleFactIds,
     descriptionFactIds,
     categoryFactId,
+    identityAnchorFactId,
     mediaFactIds,
     skus,
     attributeFactIds,
@@ -352,4 +394,15 @@ export function normalizeProductRecord(input: {
     requiredUnknownFactIds,
     facts,
   })
+}
+
+export function selectCommerceIdentityAnchor(facts: ProductFacts): ProductFact {
+  const anchor = facts.facts.find((fact) => fact.id === facts.identityAnchorFactId)
+  if (!anchor || !facts.mediaFactIds.includes(anchor.id)
+    || anchor.confidence !== 'explicit'
+    || anchor.value.type !== 'media'
+    || anchor.value.mediaKind !== 'image') {
+    throw new Error('Product identity anchor is not an explicit image fact in the media closure.')
+  }
+  return anchor
 }

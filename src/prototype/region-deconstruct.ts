@@ -19,7 +19,7 @@
  * `src/algorithm` suite, not jsdom unit tests.
  */
 import { computeBoardDiagnostics, type BoardDiagnostics } from '@/algorithm/boardDiagnostics'
-import { runPipeline } from '@/algorithm/runPipeline'
+import { runPipeline, type PipelineForegroundCoverage } from '@/algorithm/runPipeline'
 import type { CutoutParams } from '@/algorithm/types'
 import {
   bitmapToFrame,
@@ -29,7 +29,9 @@ import {
 import type { GenerationService } from '@/services/ai/types'
 import type { ProviderService } from '@/services/ai/types'
 import type { ModelAssignment } from '@/services/ai/model-assignment-types'
+import type { ImageAdapterStrategy } from '@/services/ai/image-route-assessment'
 import type { ReasoningEffort } from '@/services/ai/reasoning'
+import { runWithTransientGenerationRetry } from '@/services/ai/generation-error'
 import { nameSlices } from '@/services/ai/naming'
 import { isErr } from '@/services/types'
 import { buildBoardChecklist, generateWithQa, type QaVerdict } from './generation-qa'
@@ -38,12 +40,51 @@ import type { SliceInput } from '@/store/types'
 import { forEachConcurrent } from '@/lib/async-pool'
 
 const DEFAULT_REGION_CONCURRENCY = 2
+const DEFAULT_OPTIONAL_NAMING_TIMEOUT_MS = 30_000
+
+async function runOptionalNaming<T>(input: {
+  readonly parentSignal?: AbortSignal
+  readonly timeoutMs: number
+  readonly run: (signal: AbortSignal) => Promise<T>
+}): Promise<T> {
+  const controller = new AbortController()
+  let rejectBoundary: (error: Error) => void = () => {}
+  const boundary = new Promise<never>((_, reject) => {
+    rejectBoundary = reject
+  })
+  const abort = (error: Error) => {
+    if (controller.signal.aborted) return
+    controller.abort(error)
+    rejectBoundary(error)
+  }
+  const onParentAbort = () => abort(
+    input.parentSignal?.reason instanceof Error
+      ? input.parentSignal.reason
+      : new DOMException('The operation was aborted.', 'AbortError'),
+  )
+  if (input.parentSignal?.aborted) onParentAbort()
+  else input.parentSignal?.addEventListener('abort', onParentAbort, { once: true })
+  const timer = setTimeout(
+    () => abort(new Error('Optional slice naming exceeded its deadline.')),
+    Math.max(1, input.timeoutMs),
+  )
+  const operation = Promise.resolve().then(() => input.run(controller.signal))
+  try {
+    return await Promise.race([operation, boundary])
+  } finally {
+    clearTimeout(timer)
+    input.parentSignal?.removeEventListener('abort', onParentAbort)
+    void operation.catch(() => undefined)
+  }
+}
 
 /** A region eligible for board-cutout slicing, in the order it should stream. */
 export function selectBoardCutoutRegions(
   page: PrototypePage,
 ): readonly PrototypeRegion[] {
-  return page.regions.filter((region) => region.assetRoute === 'board-cutout')
+  return page.regions.filter(
+    (region) => region.assetRoute === 'board-cutout' && region.assetOpportunities.length > 0,
+  )
 }
 
 /** Every page that owns at least one reusable board-cutout region. */
@@ -110,6 +151,9 @@ export function regionBoardPrompt(page: PrototypePage, region: PrototypeRegion):
       `connect, or share a bounding box — an automatic white-background cutout separates them.`,
     `Do NOT include assets from any other region. Do NOT draw page chrome, containers, or backgrounds. ` +
       `Do NOT add any text labels, captions, numbering, or watermarks of your own.`,
+    `Each declared item is exactly ONE independently reusable asset. Never turn one item into a ` +
+      `collage, contact sheet, thumbnail strip, grid, nested card set, or adjacent variants. ` +
+      `Remove UI presentation masks: no rounded card corners, circular crop, frame, border, or container shadow.`,
     `Do NOT bake any text into assets: no labels, headings, numerals, UI copy, or isolated ` +
       `glyphs — text is rendered at runtime, never as a cutout asset. Any white or very light ` +
       `asset must have a visible closed non-white contour, stroke, or internal contrast so the ` +
@@ -130,6 +174,7 @@ export function regionBoardLayoutInstruction(region: PrototypeRegion): string {
       `one complete asset per cell, and leave unused cells empty.`,
     `Cell ownership in reading order: ${assets.map((asset, index) => `${index + 1}=${asset}`).join('; ')}.`,
     `Keep every asset fully inside its own cell with white clearance from the cell boundaries. ` +
+      `One cell contains one complete asset only; do not subdivide a cell. ` +
       `Do not add visible cell borders, labels, numbers, or guides.`,
   ].join(' ')
 }
@@ -148,11 +193,15 @@ export async function sliceRegionBoardBitmap(
   regionId: string,
   pageId: string,
   signal?: AbortSignal,
-): Promise<{ slices: SliceInput[]; diagnostics: BoardDiagnostics }> {
+): Promise<{
+  slices: SliceInput[]
+  diagnostics: BoardDiagnostics
+  coverage: PipelineForegroundCoverage
+}> {
   const frame = bitmapToFrame(bitmap)
   // Measure before runPipeline: it mutates the frame's alpha in place.
   const diagnostics = computeBoardDiagnostics(frame, params.threshold)
-  const { boxes } = runPipeline(frame, params, signal)
+  const { boxes, coverage } = runPipeline(frame, params, signal)
   const cropSource = renderFrameCanvas(frame)
   const slices: SliceInput[] = []
   for (const [index, box] of boxes.entries()) {
@@ -169,7 +218,7 @@ export async function sliceRegionBoardBitmap(
       pageId,
     })
   }
-  return { slices, diagnostics }
+  return { slices, diagnostics, coverage }
 }
 
 /**
@@ -206,8 +255,29 @@ export async function nameRegionSlices(
   return renames
 }
 
+/** The exact Provider/model transport selected for one paid board attempt. */
+export interface RegionImageRoute {
+  readonly assignment: ModelAssignment
+  readonly operation: 'image-edit' | 'image-generation'
+  readonly transportStrategy?: ImageAdapterStrategy
+}
+
+function routeUsesMultimodalGeneration(route: RegionImageRoute): boolean {
+  return route.operation === 'image-generation'
+    || route.transportStrategy === 'google-multimodal-generate'
+}
+
 export interface RegionBreakdownDeps {
-  readonly generation: Pick<GenerationService, 'editImage' | 'generateImages'>
+  readonly generation: {
+    editImage: (
+      input: Parameters<GenerationService['editImage']>[0],
+      onAttemptAdmitted?: () => void,
+    ) => ReturnType<GenerationService['editImage']>
+    generateImages: (
+      input: Parameters<GenerationService['generateImages']>[0],
+      onAttemptAdmitted?: () => void,
+    ) => ReturnType<GenerationService['generateImages']>
+  }
   readonly providers: Pick<ProviderService, 'list'>
   /** Decode board bytes → bitmap (real: `decodeImage`; test: a stub). */
   readonly decode: (bytes: Uint8Array) => Promise<ImageBitmap>
@@ -220,7 +290,11 @@ export interface RegionBreakdownDeps {
     regionId: string,
     pageId: string,
     signal?: AbortSignal,
-  ) => Promise<{ slices: SliceInput[]; diagnostics: BoardDiagnostics }>
+  ) => Promise<{
+    slices: SliceInput[]
+    diagnostics: BoardDiagnostics
+    coverage: PipelineForegroundCoverage
+  }>
   /**
    * Optional: name one region's slices in a single region-primed vision call
    * (real: wraps `nameSlices` with `regionNameContext`). Returns `{id,name}`
@@ -236,12 +310,15 @@ export interface RegionBreakdownDeps {
    * Optional vision QA gate over each generated region board (real: wraps
    * `reviewGeneratedImage` with the chat/vision slot). When present, a
    * rejected board is regenerated with the failures appended as corrections
-   * (bounded by `qaMaxRetries`); the final board ships either way.
+   * (bounded by `qaMaxRetries`); the final board ships either way. The fourth
+   * argument is the exact route that produced the reviewed bytes, so callers
+   * can share a Provider limiter without relying on a pre-retry route.
    */
   readonly reviewBoard?: (
     boardBytes: Uint8Array,
     checklist: readonly string[],
-    signal?: AbortSignal,
+    signal: AbortSignal | undefined,
+    generationRoute: RegionImageRoute,
   ) => Promise<QaVerdict>
 }
 
@@ -254,6 +331,12 @@ export interface RegionBreakdownParams {
   readonly image: ModelAssignment
   /** Exact model evidence intersected with an implemented edit adapter. */
   readonly editSupported?: boolean
+  /**
+   * Re-resolve the exact route immediately before every paid attempt. This is
+   * intentionally attempt-scoped so transient and QA retries can leave a
+   * pressured route without replaying the logical board node.
+   */
+  readonly resolveImageRoute?: () => RegionImageRoute
   readonly signal?: AbortSignal
   /** Streamed once per region as its slices are cut, so the UI fills in live. */
   readonly onRegionSliced: (
@@ -278,8 +361,12 @@ export interface RegionBreakdownParams {
   readonly targetRegionIds?: readonly string[]
   /** Explicit paid QA retries per region board (only with `deps.reviewBoard`). Default 0. */
   readonly qaMaxRetries?: number
+  /** Bounded retries for classified transient Provider transport failures. Default 1. */
+  readonly transientRetries?: number
   /** Maximum region boards generated at once. Defaults to 2. */
   readonly regionConcurrency?: number
+  /** Optional semantic naming budget. Naming never blocks required slice settlement. */
+  readonly namingTimeoutMs?: number
   /**
    * Derive a text-free variant of the page first and use it as the source for
    * every region board (one extra image call per page; the DISPLAYED page
@@ -298,7 +385,9 @@ export interface RegionSliceEvidence {
   readonly boardWidth: number
   readonly boardHeight: number
   readonly diagnostics: BoardDiagnostics
+  readonly coverage: PipelineForegroundCoverage
   readonly qaVerdict: QaVerdict | null
+  readonly generationRoute: RegionImageRoute
 }
 
 export interface RegionBreakdownResult {
@@ -323,8 +412,12 @@ export async function runRegionBreakdown(
   const regions = selectBoardCutoutRegions(params.page).filter(
     (region) => !targets || targets.has(region.id),
   )
-  const useEdit = params.editSupported === true
   const references = params.referenceImages ?? []
+  const fallbackRoute: RegionImageRoute = {
+    assignment: params.image,
+    operation: params.editSupported === true ? 'image-edit' : 'image-generation',
+  }
+  const resolveImageRoute = () => params.resolveImageRoute?.() ?? fallbackRoute
 
   // Optionally swap the board source for a text-free variant of the page so
   // no text bleeds into cutout assets. Best-effort: the original page bytes
@@ -334,25 +427,32 @@ export async function runRegionBreakdown(
     params.signal?.throwIfAborted()
     const variantPrompt = pageTextFreeVariantPrompt(params.page)
     try {
-      const variant = useEdit
-        ? await deps.generation.editImage({
-            providerId: params.image.providerId,
-            model: params.image.model,
-            prompt: variantPrompt,
-            images: [params.pageBytes],
-            inputFidelity: 'high',
-            signal: params.signal,
-          })
-        : await deps.generation.generateImages({
-            providerId: params.image.providerId,
-            model: params.image.model,
-            system: variantPrompt,
-            input: [
-              { type: 'text', text: variantPrompt },
-              { type: 'image', image: params.pageBytes },
-            ],
-            signal: params.signal,
-          })
+      const variant = await runWithTransientGenerationRetry({
+        maxRetries: params.transientRetries ?? 1,
+        signal: params.signal,
+        run: () => {
+          const route = resolveImageRoute()
+          return routeUsesMultimodalGeneration(route)
+            ? deps.generation.generateImages({
+              providerId: route.assignment.providerId,
+              model: route.assignment.model,
+              system: variantPrompt,
+              input: [
+                { type: 'text', text: variantPrompt },
+                { type: 'image', image: params.pageBytes },
+              ],
+              signal: params.signal,
+            })
+            : deps.generation.editImage({
+              providerId: route.assignment.providerId,
+              model: route.assignment.model,
+              prompt: variantPrompt,
+              images: [params.pageBytes],
+              inputFidelity: 'high',
+              signal: params.signal,
+            })
+        },
+      })
       if (isErr(variant)) throw new Error(variant.error)
       const asset = variant.data[0]
       if (!asset) throw new Error('The model returned no text-free page variant.')
@@ -366,10 +466,8 @@ export async function runRegionBreakdown(
   }
 
   const failedRegionIds: string[] = []
-  // Naming runs concurrently with the NEXT region's board generation (a region-
-  // primed vision call), then applied once resolved — so slices show instantly
-  // and names fill in without serializing behind every region's generation.
-  const namingJobs: Promise<void>[] = []
+  // Naming is a bounded, non-authoritative enhancement. Required board bytes,
+  // slices, coverage, and task publication settle without waiting for it.
   const diagnosticsByRegion: Record<string, BoardDiagnostics> = {}
   let sliceCount = 0
 
@@ -384,44 +482,55 @@ export async function runRegionBreakdown(
         boardPrompt: string,
         signal?: AbortSignal,
       ): Promise<Uint8Array> => {
-        params.onRegionGenerationAttempt?.(region.id)
-        const board = useEdit
-          ? await deps.generation.editImage({
-              providerId: params.image.providerId,
-              model: params.image.model,
-              prompt: boardPrompt,
-              images: [sourceBytes, ...references],
-              inputFidelity: 'high',
-              signal,
-            })
-          : await deps.generation.generateImages({
-              providerId: params.image.providerId,
-              model: params.image.model,
-              // Chat-image (Gemini) path can't take a reference via `images`;
-              // carry the page + references as multimodal input parts instead.
-              system: boardPrompt,
-              input: [
-                { type: 'text', text: boardPrompt },
-                { type: 'image', image: sourceBytes },
-                ...references.map((image) => ({ type: 'image' as const, image })),
-              ],
-              signal,
-            })
-        if (isErr(board)) throw new Error(board.error)
-        const asset = board.data[0]
-        if (!asset) throw new Error('The model returned no board image for this region.')
-        return asset.bytes
+        return runWithTransientGenerationRetry({
+          maxRetries: params.transientRetries ?? 1,
+          signal,
+          run: async () => {
+            const route = resolveImageRoute()
+            const board = routeUsesMultimodalGeneration(route)
+              ? await deps.generation.generateImages({
+                  providerId: route.assignment.providerId,
+                  model: route.assignment.model,
+                  system: boardPrompt,
+                  input: [
+                    { type: 'text', text: boardPrompt },
+                    { type: 'image', image: sourceBytes },
+                    ...references.map((image) => ({ type: 'image' as const, image })),
+                  ],
+                  signal,
+                }, () => params.onRegionGenerationAttempt?.(region.id))
+              : await deps.generation.editImage({
+                  providerId: route.assignment.providerId,
+                  model: route.assignment.model,
+                  prompt: boardPrompt,
+                  images: [sourceBytes, ...references],
+                  inputFidelity: 'high',
+                  signal,
+                }, () => params.onRegionGenerationAttempt?.(region.id))
+            if (isErr(board)) throw new Error(board.error)
+            const asset = board.data[0]
+            if (!asset) throw new Error('The model returned no board image for this region.')
+            successfulGenerationRoute = route
+            return asset.bytes
+          },
+        })
       }
 
       let boardBytes: Uint8Array
       let qaVerdict: QaVerdict | null = null
+      let successfulGenerationRoute: RegionImageRoute | null = null
       if (deps.reviewBoard) {
         const checklist = buildBoardChecklist(params.page, region)
         const reviewBoard = deps.reviewBoard
         const outcome = await generateWithQa({
           basePrompt: prompt,
           generate: generateBoard,
-          review: (bytes, signal) => reviewBoard(bytes, checklist, signal),
+          review: (bytes, signal) => {
+            if (!successfulGenerationRoute) {
+              throw new Error('Board review has no successful image generation route.')
+            }
+            return reviewBoard(bytes, checklist, signal, successfulGenerationRoute)
+          },
           maxRetries: params.qaMaxRetries,
           onVerdict: (attempt, verdict) => params.onRegionQa?.(region.id, attempt, verdict),
           signal: params.signal,
@@ -442,9 +551,11 @@ export async function runRegionBreakdown(
       const boardWidth = bitmap.width
       const boardHeight = bitmap.height
       let slices: SliceInput[]
+      let coverage!: PipelineForegroundCoverage
       try {
         const sliced = await deps.slice(bitmap, region.id, params.page.id, params.signal)
         slices = sliced.slices
+        coverage = sliced.coverage
         if (slices.length === 0) {
           throw new Error('Board slicing produced zero candidates.')
         }
@@ -460,14 +571,19 @@ export async function runRegionBreakdown(
         boardWidth,
         boardHeight,
         diagnostics: diagnosticsByRegion[region.id]!,
+        coverage,
         qaVerdict,
+        generationRoute: successfulGenerationRoute!,
       })
 
       if (deps.nameRegion && params.onRegionNamed && slices.length > 0) {
         const prefix = regionSlug(region.name)
-        namingJobs.push(
-          deps
-            .nameRegion(boardBytes, slices, regionNameContext(region), params.signal)
+        const nameRegion = deps.nameRegion
+        void runOptionalNaming({
+          parentSignal: params.signal,
+          timeoutMs: params.namingTimeoutMs ?? DEFAULT_OPTIONAL_NAMING_TIMEOUT_MS,
+          run: (signal) => nameRegion(boardBytes, slices, regionNameContext(region), signal),
+        })
             .then((renames) => {
               const namespaced = renames.map((rename) => ({
                 id: rename.id,
@@ -476,17 +592,14 @@ export async function runRegionBreakdown(
               if (namespaced.length > 0) params.onRegionNamed?.(namespaced)
             })
             .catch((error) => {
-              // Naming is best-effort. On abort the whole run is being torn
-              // down — swallow it so this job never rejects (a re-throw here
-              // would orphan the promise if the main loop's abort skips the
-              // Promise.all below, surfacing as an unhandled rejection).
+              // Naming is best-effort. The bounded detached job owns and
+              // observes its failure so required slice settlement is unchanged.
               if (params.signal?.aborted) return
               params.onRegionError?.(
                 region.id,
                 `naming: ${error instanceof Error ? error.message : String(error)}`,
               )
-            }),
-        )
+            })
       }
     } catch (error) {
       if (params.signal?.aborted) throw error
@@ -497,6 +610,5 @@ export async function runRegionBreakdown(
     },
   )
 
-  await Promise.all(namingJobs)
   return { regionCount: regions.length, sliceCount, failedRegionIds, diagnosticsByRegion }
 }

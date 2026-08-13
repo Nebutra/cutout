@@ -3,21 +3,26 @@ import type { z } from 'zod'
 import { err, ok, type Result } from '@/services/types'
 import type { GenerateInput, GenerationService } from '@/services/ai/types'
 import type { IntentProfile } from '@/dag/intent-types'
+import { tauriBridge } from '@/platform/native'
 import {
   composePrototypeRequirement,
   createLocalPrototypePlan,
-  createPrototypePlanFromSeed,
   explicitPrototypePageCount,
   planPrototype,
+  PROTOTYPE_DESIGN_SYSTEM_MAX_PARALLELISM,
+  PROGRESSIVE_OUTLINE_TEXT_MAX_BYTES,
+  PROTOTYPE_PLANNER_PAGE_MAX_PARALLELISM,
+  PROTOTYPE_PLANNER_STAGE_TIMEOUT_MS,
+  PROTOTYPE_PLANNER_TOTAL_TIMEOUT_MS,
 } from './planner'
 import {
   generatedPrototypePlanSchema,
   validatePrototypePlan,
   type PrototypePlan,
-  type PrototypePlanningSeed,
 } from './prototype-plan'
 import { prototypePageAssetCount } from './asset-manifest'
 import { currentPrototypeExploration } from './prototype-plan.test-fixture'
+import { packagedE2eFailureDiagnostic } from '@/packaged-e2e/failure-diagnostic'
 
 type GenObjectFn = <T>(
   input: GenerateInput,
@@ -210,7 +215,7 @@ function createBenchmarkPlan(): PrototypePlan {
         interactions: nextPageId === null ? [] : [{
           ...samplePlan.pages[0]!.interactions[0]!,
           id: `go-to-page-${pageNumber + 1}`,
-          sourceSectionId: `region-${pageNumber}`,
+          sourceSectionId: undefined,
           action: { type: 'navigate', targetPageId: nextPageId },
         }],
       }
@@ -233,7 +238,10 @@ function createBenchmarkPlan(): PrototypePlan {
           vary: ['visual execution'],
           preserve: ['route intent', 'asset coverage'],
         }],
-        bounds: { maxCandidates: 8, maxParallelism: 2 },
+        bounds: {
+          maxCandidates: 8,
+          maxParallelism: PROTOTYPE_DESIGN_SYSTEM_MAX_PARALLELISM,
+        },
       },
     },
     pages,
@@ -262,13 +270,26 @@ function progressiveOutlineFor(plan: PrototypePlan) {
       purpose,
       viewport,
     })),
+    entryPageIds: plan.flows.map(({ startPageId }) => startPageId),
+    edges: plan.pages.flatMap((page) => page.interactions.flatMap((interaction) =>
+      interaction.action.type === 'navigate'
+        ? [{
+            id: interaction.id,
+            fromPageId: page.id,
+            toPageId: interaction.action.targetPageId,
+            label: interaction.label,
+            trigger: interaction.trigger,
+            sourceElement: interaction.sourceElement,
+            intent: interaction.intent,
+          }]
+        : [])),
     humanLoop: plan.humanLoop,
   }
 }
 
 function progressiveOutlineProtocolFor(plan: PrototypePlan): string {
   const lines = [
-    'CUTOUT_OUTLINE_V1',
+    'CUTOUT_OUTLINE_V2',
     'VERSION\tprototype-plan.v0',
     [
       'PRODUCT',
@@ -290,6 +311,20 @@ function progressiveOutlineProtocolFor(plan: PrototypePlan): string {
       String(page.viewport.height),
       page.viewport.scroll,
     ].join('\t')),
+    ...plan.flows.map(({ startPageId }) => ['ENTRY', startPageId].join('\t')),
+    ...plan.pages.flatMap((page) => page.interactions.flatMap((interaction) =>
+      interaction.action.type === 'navigate'
+        ? [[
+            'EDGE',
+            interaction.id,
+            page.id,
+            interaction.action.targetPageId,
+            interaction.label,
+            interaction.trigger,
+            interaction.sourceElement,
+            interaction.intent,
+          ].join('\t')]
+        : [])),
   ]
   if (plan.humanLoop.mode === 'continue') {
     lines.push(['CONTINUE', plan.humanLoop.rationale].join('\t'))
@@ -351,6 +386,7 @@ describe('planPrototype', () => {
     expect(explicitPrototypePageCount(
       '原型必须恰好包含 6 个完整、可互相导航的页面，由你决定路由。',
     )).toBe(6)
+    expect(explicitPrototypePageCount('钻石王老五只需要一个页面')).toBe(1)
     expect(explicitPrototypePageCount('做一个清晰的工作台')).toBeNull()
   })
 
@@ -372,7 +408,7 @@ describe('planPrototype', () => {
     const result = await planPrototype(fakeGeneration(generateObject), {
       providerId: 'p',
       model: 'm',
-      brief: 'Build a three-page restaurant site, but cover the complete ordering journey.',
+      brief: 'Build three pages for a restaurant site, but cover the complete ordering journey.',
     })
 
     expect(result).toEqual(ok(samplePlan))
@@ -394,10 +430,12 @@ describe('planPrototype', () => {
 
   it('plans a valid prototype suite on the chat slot', async () => {
     const generateObject = mockGenerateObject(ok(samplePlan))
+    const onProgress = vi.fn()
     const result = await planPrototype(fakeGeneration(generateObject), {
       providerId: 'chat',
       model: 'gpt-5.5',
-      brief: '脱衣舞娘俱乐部',
+      brief: '为脱衣舞娘俱乐部设计两个页面',
+      onProgress,
     })
 
     expect(result).toEqual(ok(samplePlan))
@@ -407,9 +445,15 @@ describe('planPrototype', () => {
     expect(input.model).toBe('gpt-5.5')
     expect(input.input?.[0]).toEqual({
       type: 'text',
-      text: '脱衣舞娘俱乐部',
+      text: '为脱衣舞娘俱乐部设计两个页面',
     })
     expect(schema).toBe(generatedPrototypePlanSchema)
+    expect(onProgress).toHaveBeenCalledOnce()
+    expect(onProgress).toHaveBeenCalledWith({
+      stage: 'complete',
+      completedPages: samplePlan.pages.length,
+      totalPages: samplePlan.pages.length,
+    })
   })
 
   it('composes reconstructed intent into the planner input', async () => {
@@ -426,7 +470,7 @@ describe('planPrototype', () => {
     const result = await planPrototype(fakeGeneration(generateObject), {
       providerId: 'chat',
       model: 'gpt-5.5',
-      brief: '夜店',
+      brief: '为夜店设计两个页面',
       intent,
     })
 
@@ -448,7 +492,7 @@ describe('planPrototype', () => {
     const result = await planPrototype(fakeGeneration(generateObject), {
       providerId: 'p',
       model: 'm',
-      brief: 'x',
+      brief: 'Build one page.',
     })
 
     expect(result).toEqual(err('boom'))
@@ -467,7 +511,7 @@ describe('planPrototype', () => {
     ), {
       providerId: 'p',
       model: 'm',
-      brief: '钻石王老五',
+      brief: 'Build one page for a wealthy bachelor.',
     })
 
     expect(result.ok).toBe(false)
@@ -482,10 +526,30 @@ describe('planPrototype', () => {
     const result = await planPrototype(fakeGeneration(generateObject), {
       providerId: 'p',
       model: 'm',
-      brief: '钻石王老五',
+      brief: 'Build one page for a wealthy bachelor.',
     })
 
     expect(result).toEqual(err('request failed: operation timed out'))
+  })
+
+  it.each([
+    'Structured output failed: native-schema=transport.',
+    'Structured output failed: native-schema=rate-limited.',
+    'Structured output failed: native-schema=authentication.',
+    'Structured output failed: native-schema=policy.',
+    'Structured output failed: native-schema=aborted.',
+  ])('does not start progressive recovery for a terminal structured failure: %s', async (failure) => {
+    const generateObject = mockGenerateObject(err(failure))
+    const generateText = mockGenerateText(ok('unexpected progressive output'))
+    const result = await planPrototype(fakeGeneration(generateObject, generateText), {
+      providerId: 'p',
+      model: 'm',
+      brief: 'Build one page for a focused tool.',
+    })
+
+    expect(result).toEqual(err(failure))
+    expect(generateObject).toHaveBeenCalledTimes(1)
+    expect(generateText).not.toHaveBeenCalled()
   })
 
   it('propagates provider auth failures without inventing topology', async () => {
@@ -493,7 +557,7 @@ describe('planPrototype', () => {
     const result = await planPrototype(fakeGeneration(generateObject), {
       providerId: 'p',
       model: 'm',
-      brief: '钻石王老五',
+      brief: 'Build one page for a wealthy bachelor.',
     })
 
     expect(result).toEqual(err('API_KEY_REQUIRED'))
@@ -544,6 +608,110 @@ describe('planPrototype', () => {
     )
   })
 
+  it('outlines a natural business intent before any structured expansion', async () => {
+    const plan = createBenchmarkPlan()
+    const generateObject = mockGenerateSequence(
+      ok(progressiveDesignFoundationFor(plan)),
+      ok(progressiveDesignExplorationFor(plan)),
+      ...plan.pages.map((page) => ok(page)),
+      ok(progressiveClosureFor(plan)),
+    )
+    const generateText = mockGenerateText(ok(progressiveOutlineProtocolFor(plan)))
+
+    const result = await planPrototype(fakeGeneration(generateObject, generateText), {
+      providerId: 'p',
+      model: 'm',
+      brief: '为一家现代餐厅设计完整官网，覆盖顾客从了解品牌到到店用餐的真实旅程。',
+    })
+
+    expect(result).toEqual(ok(plan))
+    expect(generateText).toHaveBeenCalledTimes(1)
+    expect(generateObject).toHaveBeenCalledTimes(2 + plan.pages.length + 1)
+    expect(generateText.mock.invocationCallOrder[0])
+      .toBeLessThan(generateObject.mock.invocationCallOrder[0]!)
+    expect(generateObject.mock.calls[0]![1]).not.toBe(generatedPrototypePlanSchema)
+  })
+
+  it('expands independent route pages with bounded parallelism', async () => {
+    const plan = createBenchmarkPlan()
+    let objectCall = 0
+    let activePages = 0
+    let maximumActivePages = 0
+    const generateObject = vi.fn(async <T,>(
+      _input: GenerateInput,
+      _schema: z.ZodType<T>,
+    ): Promise<Result<T>> => {
+      const call = objectCall
+      objectCall += 1
+      if (call === 0) return ok(progressiveDesignFoundationFor(plan)) as Result<T>
+      if (call === 1) return ok(progressiveDesignExplorationFor(plan)) as Result<T>
+      if (call === plan.pages.length + 2) {
+        return ok(progressiveClosureFor(plan)) as Result<T>
+      }
+      activePages += 1
+      maximumActivePages = Math.max(maximumActivePages, activePages)
+      await Promise.resolve()
+      activePages -= 1
+      return ok(plan.pages[call - 2]!) as Result<T>
+    })
+
+    const result = await planPrototype(fakeGeneration(
+      generateObject,
+      mockGenerateText(ok(progressiveOutlineProtocolFor(plan))),
+    ), {
+      providerId: 'p',
+      model: 'm',
+      brief: PROGRESSIVE_TEST_BRIEF,
+    })
+
+    expect(result).toEqual(ok(plan))
+    expect(maximumActivePages).toBe(PROTOTYPE_PLANNER_PAGE_MAX_PARALLELISM)
+  })
+
+  it('lets a single-turn runtime serialize pages before stage deadlines begin', async () => {
+    const plan = createBenchmarkPlan()
+    let objectCall = 0
+    let activePages = 0
+    let maximumActivePages = 0
+    const generateObject = vi.fn(async <T,>(
+      _input: GenerateInput,
+      _schema: z.ZodType<T>,
+    ): Promise<Result<T>> => {
+      const call = objectCall++
+      if (call === 0) return ok(progressiveDesignFoundationFor(plan)) as Result<T>
+      if (call === 1) return ok(progressiveDesignExplorationFor(plan)) as Result<T>
+      if (call === plan.pages.length + 2) return ok(progressiveClosureFor(plan)) as Result<T>
+      activePages += 1
+      maximumActivePages = Math.max(maximumActivePages, activePages)
+      await Promise.resolve()
+      activePages -= 1
+      return ok(plan.pages[call - 2]!) as Result<T>
+    })
+
+    const result = await planPrototype(fakeGeneration(
+      generateObject,
+      mockGenerateText(ok(progressiveOutlineProtocolFor(plan))),
+    ), {
+      providerId: 'codex-system',
+      brief: PROGRESSIVE_TEST_BRIEF,
+      pageParallelism: 1,
+    })
+
+    expect(result).toEqual(ok(plan))
+    expect(maximumActivePages).toBe(1)
+  })
+
+  it('rejects unsupported runtime page parallelism before a Provider call', async () => {
+    const generateObject = mockGenerateObject(ok(samplePlan))
+    const result = await planPrototype(fakeGeneration(generateObject), {
+      providerId: 'p',
+      brief: PROGRESSIVE_TEST_BRIEF,
+      pageParallelism: PROTOTYPE_PLANNER_PAGE_MAX_PARALLELISM + 1,
+    })
+    expect(result).toEqual(err('Prototype planner page parallelism is outside the supported range.'))
+    expect(generateObject).not.toHaveBeenCalled()
+  })
+
   it('parses a bounded Agent-authored six-route outline before schema generation', async () => {
     const plan = createBenchmarkPlan()
     const generateObject = mockGenerateSequence(
@@ -563,11 +731,83 @@ describe('planPrototype', () => {
     expect(result).toEqual(ok(plan))
     expect(generateText).toHaveBeenCalledTimes(1)
     expect(generateText.mock.calls[0]![0].maxOutputTokens).toBe(4_000)
-    expect(generateText.mock.calls[0]![0].system).toContain('CUTOUT_OUTLINE_V1')
+    expect(generateText.mock.calls[0]![0].system).toContain('CUTOUT_OUTLINE_V2')
     expect(generateObject.mock.calls[0]![0].system).toContain('Design System architect')
+    const foundationInput = generateObject.mock.calls[0]![0].input?.[0]
+    expect(foundationInput?.type === 'text' ? foundationInput.text : '')
+      .toContain('"entryPageIds":["page-1"]')
     expect(result.ok && result.data.pages.map((page) => page.route)).toEqual(
       plan.pages.map((page) => page.route),
     )
+  })
+
+  it('accepts the maximal bounded V2 topology without a structured fallback', async () => {
+    const benchmark = createBenchmarkPlan()
+    const pages = Array.from(
+      { length: 12 },
+      (_, index): PrototypePlan['pages'][number] => {
+        const pageNumber = index + 1
+        return {
+          ...benchmark.pages[index % benchmark.pages.length]!,
+          id: `max-page-${pageNumber}`,
+          name: `Maximum page ${pageNumber}`,
+          route: pageNumber === 1 ? '/' : `/maximum-${pageNumber}`,
+          purpose: `Serve maximum topology route ${pageNumber}.`,
+          regions: [{
+            ...benchmark.pages[index % benchmark.pages.length]!.regions[0]!,
+            id: `max-region-${pageNumber}`,
+          }],
+          interactions: Array.from({ length: 4 }, (_, edgeIndex) => ({
+            ...benchmark.pages[0]!.interactions[0]!,
+            id: `max-edge-${pageNumber}-${edgeIndex + 1}`,
+            sourceSectionId: undefined,
+            action: {
+              type: 'navigate' as const,
+              targetPageId: `max-page-${((index + edgeIndex + 1) % 12) + 1}`,
+            },
+          })),
+        }
+      },
+    )
+    const plan: PrototypePlan = {
+      ...benchmark,
+      pages,
+      flows: pages.map((page, index) => ({
+        id: `max-flow-${index + 1}`,
+        name: `Maximum flow ${index + 1}`,
+        goal: `Enter maximum route ${index + 1}.`,
+        startPageId: page.id,
+        steps: [],
+      })),
+      humanLoop: {
+        mode: 'ask',
+        rationale: 'One product decision changes the route content.',
+        question: 'Which content mode should lead?',
+        choices: Array.from({ length: 4 }, (_, index) => ({
+          id: `mode-${index + 1}`,
+          label: `Mode ${index + 1}`,
+          description: `Use content mode ${index + 1}.`,
+          impact: `Route content follows mode ${index + 1}.`,
+        })),
+        defaultChoiceId: 'mode-1',
+      },
+    }
+    const generateObject = mockGenerateObject(
+      err('Structured JSON generation failed: response did not match schema'),
+    )
+
+    const result = await planPrototype(fakeGeneration(
+      generateObject,
+      mockGenerateText(ok(progressiveOutlineProtocolFor(plan))),
+    ), {
+      providerId: 'p',
+      model: 'm',
+      brief: 'Plan the complete maximum bounded route topology.',
+    })
+
+    expect(result.ok && result.data.pages).toHaveLength(12)
+    expect(result.ok && result.data.humanLoop).toEqual(plan.humanLoop)
+    expect(generateObject).not.toHaveBeenCalled()
   })
 
   it('accepts a progressive Agent-authored outline with a different route count', async () => {
@@ -678,6 +918,87 @@ describe('planPrototype', () => {
 
   it.each([
     {
+      name: 'duplicate page ids',
+      outline: (plan: PrototypePlan) => ({
+        ...progressiveOutlineFor(plan),
+        pages: progressiveOutlineFor(plan).pages.map((page, index) =>
+          index === 1 ? { ...page, id: plan.pages[0]!.id } : page),
+      }),
+    },
+    {
+      name: 'duplicate routes',
+      outline: (plan: PrototypePlan) => ({
+        ...progressiveOutlineFor(plan),
+        pages: progressiveOutlineFor(plan).pages.map((page, index) =>
+          index === 1 ? { ...page, route: plan.pages[0]!.route } : page),
+      }),
+    },
+    {
+      name: 'disconnected pages',
+      outline: (plan: PrototypePlan) => ({
+        ...progressiveOutlineFor(plan),
+        edges: progressiveOutlineFor(plan).edges.slice(0, 1),
+      }),
+    },
+  ])('rejects a structured outline with $name before page expansion', async ({ outline }) => {
+    const plan = createBenchmarkPlan()
+    const generateObject = vi.fn(async <T,>(
+      _input: GenerateInput,
+      schema: z.ZodType<T>,
+    ): Promise<Result<T>> => {
+      const parsed = schema.safeParse(outline(plan))
+      return parsed.success
+        ? ok(parsed.data)
+        : err('Structured JSON generation failed: response did not match schema')
+    })
+    const result = await planPrototype(fakeGeneration(
+      generateObject,
+      mockGenerateText(ok('not-the-closed-protocol')),
+    ), {
+      providerId: 'p',
+      model: 'm',
+      brief: PROGRESSIVE_TEST_BRIEF,
+    })
+
+    expect(result.ok).toBe(false)
+    expect(generateObject).toHaveBeenCalledTimes(1)
+  })
+
+  it('compiles exact outline navigation and discards page-authored navigate drift', async () => {
+    const plan = createBenchmarkPlan()
+    const driftedPages = plan.pages.map((page, index) => ({
+      ...page,
+      interactions: index === 0
+        ? [{
+            ...page.interactions[0]!,
+            id: 'invented-navigation',
+            action: { type: 'navigate' as const, targetPageId: 'page-6' },
+          }]
+        : page.interactions,
+    }))
+    const generateObject = mockGenerateSequence(
+      ok(progressiveDesignFoundationFor(plan)),
+      ok(progressiveDesignExplorationFor(plan)),
+      ...driftedPages.map((page) => ok(page)),
+      ok(progressiveClosureFor(plan)),
+    )
+    const result = await planPrototype(fakeGeneration(
+      generateObject,
+      mockGenerateText(ok(progressiveOutlineProtocolFor(plan))),
+    ), {
+      providerId: 'p',
+      model: 'm',
+      brief: PROGRESSIVE_TEST_BRIEF,
+    })
+
+    expect(result).toEqual(ok(plan))
+    expect(result.ok && result.data.pages[0]!.interactions).toEqual(
+      plan.pages[0]!.interactions,
+    )
+  })
+
+  it.each([
+    {
       name: 'malformed lines',
       output: (plan: PrototypePlan) => progressiveOutlineProtocolFor(plan)
         .replace('PAGE\tpage-2', 'SCREEN\tpage-2'),
@@ -705,7 +1026,7 @@ describe('planPrototype', () => {
     },
     {
       name: 'oversized output',
-      output: (plan: PrototypePlan) => `${progressiveOutlineProtocolFor(plan)}${'RAW_OUTPUT_SENTINEL'.repeat(1_024)}`,
+      output: (plan: PrototypePlan) => `${progressiveOutlineProtocolFor(plan)}${'R'.repeat(PROGRESSIVE_OUTLINE_TEXT_MAX_BYTES)}`,
       error: 'exceeded the line protocol limits',
     },
   ])('rejects $name without echoing model output', async ({ output, error }) => {
@@ -776,6 +1097,146 @@ describe('planPrototype', () => {
     }
   })
 
+  it('settles a structured planning stage whose transport ignores abort', async () => {
+    vi.useFakeTimers()
+    try {
+      let stageSignal: AbortSignal | undefined
+      const generation = {
+        async generateObject<T>(input: GenerateInput, _schema: z.ZodType<T>): Promise<Result<T>> {
+          stageSignal = input.signal
+          return new Promise<Result<T>>(() => {})
+        },
+        async *streamText() {
+          yield await Promise.reject(new Error('Unexpected progressive planner call.'))
+        },
+      } as Pick<GenerationService, 'generateObject' | 'streamText'>
+
+      const pending = planPrototype(generation, {
+        providerId: 'p',
+        model: 'm',
+        brief: 'Plan one page for a focused single-screen tool.',
+      })
+      await vi.advanceTimersByTimeAsync(PROTOTYPE_PLANNER_STAGE_TIMEOUT_MS)
+
+      await expect(pending).resolves.toEqual(err('Prototype planner plan timed out.'))
+      expect(stageSignal?.aborted).toBe(true)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('settles from the native monotonic deadline when renderer timers are disabled', async () => {
+    let settleStage!: () => void
+    const stageDeadline = new Promise<void>((resolve) => {
+      settleStage = resolve
+    })
+    const never = new Promise<void>(() => {})
+    const nativeWait = vi.spyOn(tauriBridge, 'waitForMonotonicDeadline')
+      .mockImplementation((_deadlineId, timeoutMs) =>
+        timeoutMs === PROTOTYPE_PLANNER_STAGE_TIMEOUT_MS ? stageDeadline : never)
+    vi.spyOn(tauriBridge, 'cancelMonotonicDeadline').mockResolvedValue(undefined)
+    vi.stubGlobal('__TAURI_INTERNALS__', { invoke: vi.fn() })
+    const rendererTimer = vi.spyOn(globalThis, 'setTimeout')
+      .mockImplementation(() => 0 as never)
+    try {
+      let stageSignal: AbortSignal | undefined
+      const generation = {
+        async generateObject<T>(input: GenerateInput): Promise<Result<T>> {
+          stageSignal = input.signal
+          return new Promise<Result<T>>(() => {})
+        },
+        async *streamText() {
+          yield await Promise.reject(new Error('Unexpected progressive planner call.'))
+        },
+      } as Pick<GenerationService, 'generateObject' | 'streamText'>
+
+      const pending = planPrototype(generation, {
+        providerId: 'p',
+        model: 'm',
+        brief: 'Plan one page for a focused single-screen tool.',
+      })
+      expect(nativeWait).toHaveBeenCalledWith(
+        expect.any(String),
+        PROTOTYPE_PLANNER_TOTAL_TIMEOUT_MS,
+      )
+      expect(nativeWait).toHaveBeenCalledWith(
+        expect.any(String),
+        PROTOTYPE_PLANNER_STAGE_TIMEOUT_MS,
+      )
+      expect(rendererTimer).not.toHaveBeenCalled()
+
+      settleStage()
+
+      await expect(pending).resolves.toEqual(err('Prototype planner plan timed out.'))
+      expect(stageSignal?.aborted).toBe(true)
+    } finally {
+      vi.unstubAllGlobals()
+      vi.restoreAllMocks()
+    }
+  })
+
+  it('preserves parent cancellation before an outstanding deadline', async () => {
+    const parent = new AbortController()
+    let stageSignal: AbortSignal | undefined
+    const generation = {
+      async generateObject<T>(input: GenerateInput): Promise<Result<T>> {
+        stageSignal = input.signal
+        return new Promise<Result<T>>(() => {})
+      },
+      async *streamText() {
+        yield await Promise.reject(new Error('Unexpected progressive planner call.'))
+      },
+    } as Pick<GenerationService, 'generateObject' | 'streamText'>
+
+    const pending = planPrototype(generation, {
+      providerId: 'p',
+      model: 'm',
+      brief: 'Plan one page for a focused single-screen tool.',
+      signal: parent.signal,
+    })
+    parent.abort()
+
+    await expect(pending).resolves.toEqual(err('AbortError: operation aborted'))
+    expect(stageSignal?.aborted).toBe(true)
+  })
+
+  it('bounds the complete progressive planning journey across successful stages', async () => {
+    vi.useFakeTimers()
+    try {
+      const plan = createBenchmarkPlan()
+      let objectCall = 0
+      let latestSignal: AbortSignal | undefined
+      const generation = {
+        async generateObject<T>(input: GenerateInput, _schema: z.ZodType<T>): Promise<Result<T>> {
+          latestSignal = input.signal
+          const call = objectCall
+          objectCall += 1
+          await new Promise<void>((resolve) => globalThis.setTimeout(resolve, 160_000))
+          const value = call === 0
+            ? progressiveDesignFoundationFor(plan)
+            : progressiveDesignExplorationFor(plan)
+          return ok(value) as Result<T>
+        },
+        async *streamText() {
+          yield progressiveOutlineProtocolFor(plan)
+        },
+      } as Pick<GenerationService, 'generateObject' | 'streamText'>
+
+      const pending = planPrototype(generation, {
+        providerId: 'p',
+        model: 'm',
+        brief: PROGRESSIVE_TEST_BRIEF,
+      })
+      await vi.advanceTimersByTimeAsync(PROTOTYPE_PLANNER_TOTAL_TIMEOUT_MS)
+
+      await expect(pending).resolves.toEqual(err('Prototype planning timed out.'))
+      expect(objectCall).toBe(2)
+      expect(latestSignal?.aborted).toBe(true)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('preserves a transport failure from the text fallback', async () => {
     const generateObject = mockGenerateObject(ok(progressiveOutlineFor(createBenchmarkPlan())))
     const generateText = mockGenerateText(err('request failed: operation timed out'))
@@ -791,6 +1252,28 @@ describe('planPrototype', () => {
     expect(generateText).toHaveBeenCalledTimes(1)
   })
 
+  it(
+    'preserves structured transient fallback authority after a malformed streamed outline',
+    async () => {
+      const structuredTransport =
+        'Structured output failed: native-schema=invalid-json; forced-tool=transport.'
+      const generateObject = mockGenerateObject(err(structuredTransport))
+      const generateText = mockGenerateText(ok('not-the-closed-protocol'))
+
+      const result = await planPrototype(fakeGeneration(generateObject, generateText), {
+        providerId: 'p',
+        model: 'm',
+        brief: PROGRESSIVE_TEST_BRIEF,
+      })
+
+      expect(result).toEqual(err(structuredTransport))
+      expect(!result.ok && packagedE2eFailureDiagnostic(result.error))
+        .toBe('provider-transport')
+      expect(generateText).toHaveBeenCalledTimes(1)
+      expect(generateObject).toHaveBeenCalledTimes(1)
+    },
+  )
+
   it('reports bounded progressive page progress and preserves the failed stage', async () => {
     const plan = createBenchmarkPlan()
     const onProgress = vi.fn()
@@ -799,6 +1282,7 @@ describe('planPrototype', () => {
       ok(progressiveDesignExplorationFor(plan)),
       ok(plan.pages[0]!),
       err('Structured JSON generation failed: response did not match schema'),
+      ...plan.pages.slice(2).map((page) => ok(page)),
     )
 
     const result = await planPrototype(fakeGeneration(
@@ -818,11 +1302,11 @@ describe('planPrototype', () => {
       stage: 'outline', completedPages: 0, totalPages: 0,
     })
     expect(onProgress).toHaveBeenLastCalledWith({
-      stage: 'page', completedPages: 1, totalPages: 6,
+      stage: 'page', completedPages: 5, totalPages: 6,
     })
   })
 
-  it('rejects progressive page expansion that changes route outline identity', async () => {
+  it('repairs only the progressive page whose route identity changed', async () => {
     const plan = createBenchmarkPlan()
     const changedPages = plan.pages.map((page, index) => index === 2
       ? { ...page, purpose: 'A changed purpose.' }
@@ -831,6 +1315,8 @@ describe('planPrototype', () => {
       ok(progressiveDesignFoundationFor(plan)),
       ok(progressiveDesignExplorationFor(plan)),
       ...changedPages.map((page) => ok(page)),
+      ok(plan.pages[2]!),
+      ok(progressiveClosureFor(plan)),
     )
     const result = await planPrototype(fakeGeneration(
       generateObject,
@@ -841,14 +1327,62 @@ describe('planPrototype', () => {
       brief: PROGRESSIVE_TEST_BRIEF,
     })
 
-    expect(result.ok).toBe(false)
-    expect(!result.ok && result.error).toContain(
-      'changed route identity for page-3',
-    )
-    expect(generateObject).toHaveBeenCalledTimes(5)
+    expect(result).toEqual(ok(plan))
+    expect(generateObject).toHaveBeenCalledTimes(10)
+    const repairInput = generateObject.mock.calls[8]![0]
+    expect(repairInput.system).toContain('page integrity repairer')
+    expect(repairInput.input?.[0]).toEqual(expect.objectContaining({
+      type: 'text',
+      text: expect.stringContaining('"pageId":"page-3"'),
+    }))
   })
 
-  it('rejects progressive page expansion that changes viewport', async () => {
+  it('repairs one page-local reference without changing authored counts', async () => {
+    const plan = createBenchmarkPlan()
+    const invalidPage = {
+      ...plan.pages[3]!,
+      interactions: plan.pages[3]!.interactions.map((interaction) => ({
+        ...interaction,
+        sourceSectionId: 'missing-region',
+      })),
+    }
+    const generateObject = mockGenerateSequence(
+      ok(progressiveDesignFoundationFor(plan)),
+      ok(progressiveDesignExplorationFor(plan)),
+      ...plan.pages.map((page, index) => ok(index === 3 ? invalidPage : page)),
+      ok(plan.pages[3]!),
+      ok(progressiveClosureFor(plan)),
+    )
+
+    const result = await planPrototype(fakeGeneration(
+      generateObject,
+      mockGenerateText(ok(progressiveOutlineProtocolFor(plan))),
+    ), {
+      providerId: 'p',
+      model: 'm',
+      brief: PROGRESSIVE_TEST_BRIEF,
+    })
+
+    expect(result).toEqual(ok(plan))
+    expect(generateObject).toHaveBeenCalledTimes(10)
+    expect(generateObject.mock.calls[8]![0].input?.[0]).toEqual(
+      expect.objectContaining({
+        type: 'text',
+        text: expect.stringContaining('"code":"unknown-source-section"'),
+      }),
+    )
+    expect(result.ok && result.data.pages[3]!.regions).toHaveLength(
+      invalidPage.regions.length,
+    )
+    expect(result.ok && result.data.pages[3]!.interactions).toHaveLength(
+      invalidPage.interactions.length,
+    )
+    expect(result.ok && prototypePageAssetCount(result.data.pages[3]!)).toBe(
+      prototypePageAssetCount(invalidPage),
+    )
+  })
+
+  it('fails closed after the single page repair remains invalid', async () => {
     const plan = createBenchmarkPlan()
     const changedViewport = plan.pages.map((page, index) => index === 1
       ? { ...page, viewport: { ...page.viewport, width: 1280 } }
@@ -857,6 +1391,7 @@ describe('planPrototype', () => {
       ok(progressiveDesignFoundationFor(plan)),
       ok(progressiveDesignExplorationFor(plan)),
       ...changedViewport.map((page) => ok(page)),
+      ok(changedViewport[1]!),
     )
     const viewportResult = await planPrototype(fakeGeneration(
       viewportGeneration,
@@ -869,11 +1404,201 @@ describe('planPrototype', () => {
 
     expect(viewportResult.ok).toBe(false)
     expect(!viewportResult.ok && viewportResult.error).toContain(
-      'changed viewport for page-2',
+      'page repair remained invalid',
+    )
+    expect(viewportGeneration).toHaveBeenCalledTimes(9)
+  })
+
+  it('repairs only a closure with an unknown page interaction reference', async () => {
+    const plan = createBenchmarkPlan()
+    const closure = progressiveClosureFor(plan)
+    const generateObject = mockGenerateSequence(
+      ok(progressiveDesignFoundationFor(plan)),
+      ok(progressiveDesignExplorationFor(plan)),
+      ...plan.pages.map((page) => ok(page)),
+      ok({
+        ...closure,
+        flows: [{
+          ...closure.flows[0]!,
+          steps: closure.flows[0]!.steps.map((step, index) => index === 0
+            ? { ...step, interactionId: 'missing-interaction' }
+            : step),
+        }],
+      }),
+      ok({ flows: closure.flows }),
+    )
+    const result = await planPrototype(fakeGeneration(
+      generateObject,
+      mockGenerateText(ok(progressiveOutlineProtocolFor(plan))),
+    ), {
+      providerId: 'p',
+      model: 'm',
+      brief: PROGRESSIVE_TEST_BRIEF,
+    })
+
+    expect(result).toEqual(ok(plan))
+    expect(generateObject).toHaveBeenCalledTimes(10)
+    const repairInput = generateObject.mock.calls[9]![0]
+    expect(repairInput.system).toContain('journey closure repairer')
+    expect(repairInput.system).toContain('orchestrator preserves the review documents')
+    expect(repairInput.input?.[0]).toEqual(expect.objectContaining({
+      type: 'text',
+      text: expect.stringContaining('"code":"flow-interaction"'),
+    }))
+    const repairSchema = generateObject.mock.calls[9]![1]
+    expect(repairSchema.safeParse({ flows: closure.flows }).success).toBe(true)
+    expect(repairSchema.safeParse({
+      flows: [{
+        ...closure.flows[0]!,
+        steps: closure.flows[0]!.steps.map((step, index) => index === 0
+          ? { ...step, interactionId: 'edit-timeline' }
+          : step),
+      }],
+    }).success).toBe(false)
+    expect(repairSchema.safeParse({
+      flows: [{
+        ...closure.flows[0]!,
+        steps: closure.flows[0]!.steps.map((step, index) => index === 0
+          ? { ...step, fromPageId: 'page-2' }
+          : step),
+      }],
+    }).success).toBe(false)
+    expect(repairSchema.safeParse({
+      flows: [{
+        ...closure.flows[0]!,
+        steps: closure.flows[0]!.steps.map((step, index) => index === 0
+          ? { ...step, toPageId: 'page-3' }
+          : step),
+      }],
+    }).success).toBe(false)
+    expect(result.ok && result.data.reviewDocument).toEqual(closure.reviewDocument)
+    const pageExpansionSystems = generateObject.mock.calls
+      .slice(2, 2 + plan.pages.length)
+      .map(([input]) => input.system)
+    expect(pageExpansionSystems.every((system) =>
+      system?.includes('prototype page architect'))).toBe(true)
+    expect(generateObject.mock.calls.slice(2 + plan.pages.length)
+      .some(([input]) => input.system?.includes('prototype page architect'))).toBe(false)
+  })
+
+  it('repairs a closure that omits the target of a navigation step', async () => {
+    const plan = createBenchmarkPlan()
+    const closure = progressiveClosureFor(plan)
+    const generateObject = mockGenerateSequence(
+      ok(progressiveDesignFoundationFor(plan)),
+      ok(progressiveDesignExplorationFor(plan)),
+      ...plan.pages.map((page) => ok(page)),
+      ok({
+        ...closure,
+        flows: [{
+          ...closure.flows[0]!,
+          steps: closure.flows[0]!.steps.map((step, index) => index === 0
+            ? { fromPageId: step.fromPageId, interactionId: step.interactionId }
+            : step),
+        }],
+      }),
+      ok({ flows: closure.flows }),
+    )
+
+    const result = await planPrototype(fakeGeneration(
+      generateObject,
+      mockGenerateText(ok(progressiveOutlineProtocolFor(plan))),
+    ), {
+      providerId: 'p',
+      model: 'm',
+      brief: PROGRESSIVE_TEST_BRIEF,
+    })
+
+    expect(result).toEqual(ok(plan))
+    expect(generateObject).toHaveBeenCalledTimes(10)
+    expect(generateObject.mock.calls[9]![0].input?.[0]).toEqual(
+      expect.objectContaining({
+        type: 'text',
+        text: expect.stringContaining('"code":"flow-target-mismatch"'),
+      }),
     )
   })
 
-  it('rejects invalid progressive closure references at the final plan boundary', async () => {
+  it('repairs a closure that redefines the authoritative route entry', async () => {
+    const plan = createBenchmarkPlan()
+    const closure = progressiveClosureFor(plan)
+    const invalidClosure = {
+      ...closure,
+      flows: [{ ...closure.flows[0]!, startPageId: 'page-2' }],
+    }
+    const generateObject = mockGenerateSequence(
+      ok(progressiveDesignFoundationFor(plan)),
+      ok(progressiveDesignExplorationFor(plan)),
+      ...plan.pages.map((page) => ok(page)),
+      ok(invalidClosure),
+      ok({ flows: closure.flows }),
+    )
+
+    const result = await planPrototype(fakeGeneration(
+      generateObject,
+      mockGenerateText(ok(progressiveOutlineProtocolFor(plan))),
+    ), {
+      providerId: 'p',
+      model: 'm',
+      brief: PROGRESSIVE_TEST_BRIEF,
+    })
+
+    expect(result).toEqual(ok(plan))
+    const repairInput = generateObject.mock.calls[9]![0].input?.[0]
+    expect(repairInput).toEqual(expect.objectContaining({
+      type: 'text',
+      text: expect.stringContaining('"code":"flow-entry-mismatch"'),
+    }))
+    const repairSchema = generateObject.mock.calls[9]![1]
+    expect(repairSchema.safeParse({ flows: closure.flows }).success).toBe(true)
+    expect(repairSchema.safeParse({ flows: invalidClosure.flows }).success).toBe(false)
+  })
+
+  it('bounds closure repair and fails closed when its graph remains invalid', async () => {
+    const plan = createBenchmarkPlan()
+    const closure = progressiveClosureFor(plan)
+    const invalidClosure = {
+      ...closure,
+      flows: [{
+        ...closure.flows[0]!,
+        steps: [{
+          fromPageId: 'page-1',
+          interactionId: 'submit-trip-intent',
+          toPageId: 'page-2',
+        }],
+      }],
+    }
+    const generateObject = mockGenerateSequence(
+      ok(progressiveDesignFoundationFor(plan)),
+      ok(progressiveDesignExplorationFor(plan)),
+      ...plan.pages.map((page) => ok(page)),
+      ok(invalidClosure),
+      ok({ flows: invalidClosure.flows }),
+    )
+
+    const result = await planPrototype(fakeGeneration(
+      generateObject,
+      mockGenerateText(ok(progressiveOutlineProtocolFor(plan))),
+    ), {
+      providerId: 'p',
+      model: 'm',
+      brief: PROGRESSIVE_TEST_BRIEF,
+    })
+
+    expect(result).toEqual(err(
+      'Progressive planner closure repair remained invalid: '
+        + 'Flow "benchmark-journey" step references unknown interaction '
+        + '"submit-trip-intent" on page "page-1".',
+    ))
+    expect(generateObject).toHaveBeenCalledTimes(10)
+  })
+
+  it.each([
+    'API_KEY_REQUIRED',
+    'AbortError: operation aborted',
+    'Prototype planner closure repair timed out.',
+    'request failed: network unavailable',
+  ])('does not retry a closure repair failure: %s', async (failure) => {
     const plan = createBenchmarkPlan()
     const closure = progressiveClosureFor(plan)
     const generateObject = mockGenerateSequence(
@@ -891,7 +1616,34 @@ describe('planPrototype', () => {
           }],
         }],
       }),
+      err(failure),
     )
+
+    const result = await planPrototype(fakeGeneration(
+      generateObject,
+      mockGenerateText(ok(progressiveOutlineProtocolFor(plan))),
+    ), {
+      providerId: 'p',
+      model: 'm',
+      brief: PROGRESSIVE_TEST_BRIEF,
+    })
+
+    expect(result).toEqual(err(failure))
+    expect(generateObject).toHaveBeenCalledTimes(10)
+  })
+
+  it('fails closed without a second page repair when two page details are invalid', async () => {
+    const plan = createBenchmarkPlan()
+    const invalidPages = plan.pages.map((page, index) => index < 2
+      ? { ...page, purpose: `Invalid purpose ${index + 1}.` }
+      : page)
+    const generateObject = mockGenerateSequence(
+      ok(progressiveDesignFoundationFor(plan)),
+      ok(progressiveDesignExplorationFor(plan)),
+      ...invalidPages.map((page) => ok(page)),
+      ok(plan.pages[0]!),
+    )
+
     const result = await planPrototype(fakeGeneration(
       generateObject,
       mockGenerateText(ok(progressiveOutlineProtocolFor(plan))),
@@ -902,16 +1654,52 @@ describe('planPrototype', () => {
     })
 
     expect(result.ok).toBe(false)
-    expect(!result.ok && result.error).toContain(
-      'step references unknown interaction "missing-interaction"',
+    expect(!result.ok && result.error).toContain('changed route identity for page-2')
+    expect(generateObject).toHaveBeenCalledTimes(9)
+  })
+
+  it.each([
+    'API_KEY_REQUIRED',
+    'policy approval denied',
+    'AbortError: operation aborted',
+    'Prototype planner page 2 timed out.',
+    'request failed: network unavailable',
+  ])('does not repair a page-stage execution failure: %s', async (failure) => {
+    const plan = createBenchmarkPlan()
+    const generateObject = mockGenerateSequence(
+      ok(progressiveDesignFoundationFor(plan)),
+      ok(progressiveDesignExplorationFor(plan)),
+      ok(plan.pages[0]!),
+      err(failure),
+      ...plan.pages.slice(2).map((page) => ok(page)),
     )
+
+    const result = await planPrototype(fakeGeneration(
+      generateObject,
+      mockGenerateText(ok(progressiveOutlineProtocolFor(plan))),
+    ), {
+      providerId: 'p',
+      model: 'm',
+      brief: PROGRESSIVE_TEST_BRIEF,
+    })
+
+    expect(result).toEqual(err(failure))
+    expect(generateObject).toHaveBeenCalledTimes(8)
+    expect(generateObject.mock.calls.some(([input]) =>
+      input.system?.includes('page integrity repairer'))).toBe(false)
+    expect(generateObject.mock.calls.some(([input]) =>
+      input.system?.includes('journey closure repairer'))).toBe(false)
   })
 
   it('fails closed when a progressive stage reports a credential error', async () => {
+    const plan = createBenchmarkPlan()
     const generateObject = mockGenerateSequence(
       err('API_KEY_REQUIRED'),
     )
-    const result = await planPrototype(fakeGeneration(generateObject), {
+    const result = await planPrototype(fakeGeneration(
+      generateObject,
+      mockGenerateText(ok(progressiveOutlineProtocolFor(plan))),
+    ), {
       providerId: 'p',
       model: 'm',
       brief: 'Create a complete prototype suite.',
@@ -930,176 +1718,8 @@ describe('planPrototype', () => {
     expect(plan.pages[0]!.regions.every((region) =>
       region.assetRoute === 'ignore-code-ui' && region.assetOpportunities.length === 0,
     )).toBe(true)
-    expect(validatePrototypePlan(plan).ok).toBe(true)
-  })
-
-  it('closes an Agent-authored planning seed into distinct complete suites', () => {
-    const seed: PrototypePlanningSeed = {
-      product: {
-        name: 'Roam',
-        projectName: 'Roam',
-        summary: 'A calm travel planning workspace.',
-        audience: 'Independent travelers',
-        primaryGoal: 'Turn saved places into a coherent trip.',
-        platform: 'responsive web app',
-      },
-      rationale: 'Compare three distinct ways to move from inspiration to itinerary.',
-      suites: ['editorial', 'atlas', 'operations'].map((direction, suiteIndex) => ({
-        direction: {
-          id: direction,
-          label: `${direction} direction`,
-          thesis: `${direction} travel planning thesis`,
-          vary: [`${direction} information architecture`],
-          preserve: ['calm travel intent'],
-        },
-        pages: Array.from({ length: 6 }, (_, pageIndex) => ({
-          id: `${direction}-${pageIndex + 1}`,
-          name: `${direction} page ${pageIndex + 1}`,
-          route: `/suite-${suiteIndex + 1}/page-${pageIndex + 1}`,
-          purpose: `Complete stage ${pageIndex + 1} of the ${direction} journey.`,
-          viewport: {
-            platform: 'desktop',
-            width: 1440,
-            height: 1000,
-            scroll: 'long-scroll' as const,
-          },
-          materials: [],
-        })),
-      })),
-    }
-
-    const plans = seed.suites.map(({ direction }) =>
-      createPrototypePlanFromSeed(seed, direction.id))
-
-    expect(plans.map((plan) => plan.pages.length)).toEqual([6, 6, 6])
-    expect(plans.map((plan) => plan.designSystem.exploration?.count)).toEqual([3, 3, 3])
-    expect(plans.every((plan) => plan.planningSeed === seed)).toBe(false)
-    expect(plans.every((plan) => plan.planningSeed?.suites.length === 3)).toBe(true)
-    expect(plans.every((plan) => validatePrototypePlan(plan).ok)).toBe(true)
-    expect(plans.flatMap((plan) =>
-      plan.pages.map((page) => prototypePageAssetCount(page))),
-    ).toEqual(Array.from({ length: 18 }, () => 0))
-    expect(plans.flatMap((plan) => plan.pages).every((page) =>
-      page.regions.filter((region) => region.assetRoute === 'board-cutout').length === 0
-      && page.regions.filter((region) => region.assetRoute === 'direct-generate').length === 0
-      && page.regions.every((region) => region.assetRoute === 'ignore-code-ui')
-    )).toBe(true)
-    expect(new Set(plans.map((plan) =>
-      JSON.stringify(plan.pages.map((page) => page.route)))).size).toBe(3)
-  })
-
-  it('closes variable board-grouped and direct materials without adding a fixed quota', () => {
-    const seed: PrototypePlanningSeed = {
-      product: {
-        name: 'Field Notes',
-        projectName: 'Field Notes',
-        summary: 'A route journal for urban walks.',
-        audience: 'Independent walkers',
-        primaryGoal: 'Turn observations into reusable route stories.',
-        platform: 'responsive web app',
-      },
-      rationale: 'Each route keeps only visual materials with genuine downstream reuse value.',
-      suites: [{
-        direction: {
-          id: 'editorial',
-          label: 'Editorial field guide',
-          thesis: 'Let place identity and observations drive the experience.',
-          vary: ['material density'],
-          preserve: ['route accuracy'],
-        },
-        pages: [
-          {
-            id: 'route-index',
-            name: 'Route index',
-            route: '/routes',
-            purpose: 'Browse saved routes using code-reproducible list UI.',
-            viewport: {
-              platform: 'desktop', width: 1440, height: 1000, scroll: 'long-scroll',
-            },
-            materials: [],
-          },
-          {
-            id: 'route-story',
-            name: 'Route story',
-            route: '/routes/story',
-            purpose: 'Read one route and reuse its atomic place markers.',
-            viewport: {
-              platform: 'desktop', width: 1440, height: 1000, scroll: 'long-scroll',
-            },
-            materials: [
-              {
-                id: 'cafe-marker',
-                name: 'Cafe marker',
-                description: 'Reusable illustrated cafe location marker.',
-                production: 'board-cutout',
-                boardGroupId: 'food-markers',
-              },
-              {
-                id: 'gallery-marker',
-                name: 'Gallery marker',
-                description: 'Reusable illustrated gallery location marker.',
-                production: 'board-cutout',
-                boardGroupId: 'culture-markers',
-              },
-              {
-                id: 'park-marker',
-                name: 'Park marker',
-                description: 'Reusable illustrated park location marker.',
-                production: 'board-cutout',
-                boardGroupId: 'culture-markers',
-              },
-            ],
-          },
-          {
-            id: 'route-map',
-            name: 'Route map',
-            route: '/routes/story/map',
-            purpose: 'Inspect art-directed maps that cannot be rebuilt as ordinary UI.',
-            viewport: {
-              platform: 'desktop', width: 1440, height: 1000, scroll: 'single-screen',
-            },
-            materials: [
-              {
-                id: 'day-map',
-                name: 'Day route map',
-                description: 'Art-directed illustrated map for the daytime walk.',
-                production: 'direct-generate',
-              },
-              {
-                id: 'night-map',
-                name: 'Night route map',
-                description: 'Art-directed illustrated map for the nighttime walk.',
-                production: 'direct-generate',
-              },
-            ],
-          },
-        ],
-      }],
-    }
-
-    const plan = createPrototypePlanFromSeed(seed)
-    const [zeroPage, boardPage, directPage] = plan.pages
-
-    expect(zeroPage && prototypePageAssetCount(zeroPage)).toBe(0)
-    expect(zeroPage?.regions.every((region) => region.assetRoute === 'ignore-code-ui')).toBe(true)
-
-    const boardRegions = boardPage?.regions.filter(
-      (region) => region.assetRoute === 'board-cutout',
-    ) ?? []
-    expect(boardRegions).toHaveLength(2)
-    expect(boardRegions.map((region) => region.assetOpportunities.length)).toEqual([1, 2])
-    expect(boardRegions.map((region) => region.name)).toEqual([
-      'Reusable visual materials: food-markers',
-      'Reusable visual materials: culture-markers',
-    ])
-    expect(boardPage && prototypePageAssetCount(boardPage)).toBe(3)
-
-    const directRegions = directPage?.regions.filter(
-      (region) => region.assetRoute === 'direct-generate',
-    ) ?? []
-    expect(directRegions).toHaveLength(2)
-    expect(directRegions.every((region) => region.assetOpportunities.length === 1)).toBe(true)
-    expect(directPage && prototypePageAssetCount(directPage)).toBe(2)
+    expect(plan.designSystem.exploration.bounds.maxParallelism)
+      .toBe(PROTOTYPE_DESIGN_SYSTEM_MAX_PARALLELISM)
     expect(validatePrototypePlan(plan).ok).toBe(true)
   })
 
@@ -1120,7 +1740,7 @@ describe('planPrototype', () => {
     const result = await planPrototype(fakeGeneration(generateObject), {
       providerId: 'p',
       model: 'm',
-      brief: 'x',
+      brief: 'Build one page.',
     })
 
     expect(result.ok).toBe(false)

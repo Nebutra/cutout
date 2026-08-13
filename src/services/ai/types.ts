@@ -152,10 +152,9 @@ export interface GenerationService {
   generateImages(input: GenerateInput): Promise<Result<GeneratedAsset[]>>
   /**
    * 垫图 / reference-conditioned image edit (spec §2/§A). Sends the reference
-   * image(s) + prompt to the OpenAI-shaped `/images/edits` endpoint via the Rust
-   * `ai_image_edit` command (multipart — the AI SDK's `generateImage` can't do
-   * edits). Only the reviewed openai / openai-compatible / cc-switch providers;
-   * returns PNG assets. Never
+   * image(s) + prompt through the route's reviewed edit transport. OpenAI-shaped
+   * routes use native multipart; xAI uses its JSON image/data-URI contract;
+   * DashScope uses its native image command. Returns normalized image assets. Never
    * throws across the seam — returns a `Result`.
    */
   editImage(input: EditImageInput): Promise<Result<GeneratedAsset[]>>

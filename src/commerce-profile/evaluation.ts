@@ -36,6 +36,10 @@ const materialPayloadSchema = z.union([
   commerceMediaArtifactSchema,
   strategyDocumentSchema,
 ])
+const supportingReceiptSchema = z.object({
+  id: z.string().min(1).max(240),
+  routeId: z.string().min(1).max(240),
+}).strict()
 export type CommerceMaterialPayload = LocalizedDescription | CommerceMediaArtifact | StrategyDocument
 
 export const commerceMaterialPublicationSchema = z.object({
@@ -91,6 +95,7 @@ function validateStrategy(input: {
   readonly facts: ProductFacts
   readonly plan: ExecutionPlan
   readonly receipts: readonly CapabilityReceipt[]
+  readonly supportingReceipts: readonly z.infer<typeof supportingReceiptSchema>[]
   readonly priorFindings: readonly ValidationFinding[]
   readonly mediaType: string
   readonly byteLength: number
@@ -111,11 +116,17 @@ function validateStrategy(input: {
     .filter((node) => node.outputSchema.id === 'commerce.strategy-document')
     .map((node) => node.id))
   const evidenceReceipts = input.receipts.filter((receipt) => !strategyPlanNodeIds.has(receipt.nodeId))
-  const expectedRoutes = sortedUnique(evidenceReceipts.map((receipt) => receipt.routeId))
+  const expectedRoutes = sortedUnique([
+    ...evidenceReceipts.map((receipt) => receipt.routeId),
+    ...input.supportingReceipts.map((receipt) => receipt.routeId),
+  ])
   if (!arraysEqual(sortedUnique(input.strategy.routeIds), expectedRoutes)) {
     result.push(finding(input.nodeId, 'strategy-routes-incomplete', 'Strategy must cite the actual capability routes.', input.artifactId))
   }
-  const expectedReceipts = sortedUnique(evidenceReceipts.map((receipt) => receipt.id))
+  const expectedReceipts = sortedUnique([
+    ...evidenceReceipts.map((receipt) => receipt.id),
+    ...input.supportingReceipts.map((receipt) => receipt.id),
+  ])
   if (!arraysEqual(sortedUnique(input.strategy.receiptIds), expectedReceipts)) {
     result.push(finding(input.nodeId, 'strategy-receipts-incomplete', 'Strategy must cite the actual capability receipts.', input.artifactId))
   }
@@ -151,10 +162,18 @@ export function evaluateCommerceProduction(input: {
   readonly plan: ExecutionPlan
   readonly publications: readonly CommerceMaterialPublication[]
   readonly receipts: readonly CapabilityReceipt[]
+  readonly supportingReceipts?: readonly z.infer<typeof supportingReceiptSchema>[]
   readonly validationHistory?: readonly ValidationFinding[]
 }): CommerceEvaluationResult {
   const publications = input.publications.map((publication) => commerceMaterialPublicationSchema.parse(publication))
   const receipts = input.receipts.map((receipt) => capabilityReceiptSchema.parse(receipt))
+  const supportingReceipts = (input.supportingReceipts ?? []).map((receipt) => supportingReceiptSchema.parse(receipt))
+  const primaryReceiptIds = new Set(receipts.map((receipt) => receipt.id))
+  const supportingReceiptIds = supportingReceipts.map((receipt) => receipt.id)
+  if (new Set(supportingReceiptIds).size !== supportingReceiptIds.length
+    || supportingReceiptIds.some((id) => primaryReceiptIds.has(id))) {
+    throw new Error('Commerce supporting receipt ids must be unique and distinct from capability receipts.')
+  }
   const outcomeById = new Map(input.outcomeGraph.body.nodes.map((node) => [node.id, node]))
   const planByOutcomeId = new Map(input.plan.body.nodes.map((node) => [node.outcomeNodeId, node]))
   const publicationByOutcomeId = new Map<string, CommerceMaterialPublication>()
@@ -278,6 +297,7 @@ export function evaluateCommerceProduction(input: {
           facts: input.facts,
           plan: input.plan,
           receipts,
+          supportingReceipts,
           priorFindings,
           mediaType: publication.mediaType,
           byteLength: publication.byteLength,
