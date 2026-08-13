@@ -1,0 +1,830 @@
+{
+  "schema": "commerce.profile-benchmark.v1",
+  "benchmark": {
+    "id": "benchmark:commerce-profile:p1-p7",
+    "version": 1
+  },
+  "identity": {
+    "id": "benchmark-run:current",
+    "revision": "benchmark-run:current:revision:1"
+  },
+  "metrics": [
+    {
+      "id": "p1.product-facts-normalization",
+      "acceptanceCriterion": "P1",
+      "tier": "deterministic",
+      "label": "Bounded product-facts normalization",
+      "status": "passed",
+      "assertions": [
+        {
+          "id": "supported-shapes-and-lineage",
+          "verdict": "passed"
+        },
+        {
+          "id": "malformed-path-size-html-rejected",
+          "verdict": "passed"
+        }
+      ],
+      "evidenceReferences": [
+        {
+          "id": "evidence:p1.product-facts-normalization",
+          "revision": "evidence:p1.product-facts-normalization:revision:1",
+          "contentHash": "d54fccf30dc1bcce89e3d6f90af31b160af2a55ad070eb65523de61c0f406f52",
+          "kind": "deterministic-test-run",
+          "binding": {
+            "metricId": "p1.product-facts-normalization",
+            "testIds": [
+              "test:supported-shapes-and-lineage",
+              "test:malformed-path-size-html-rejected"
+            ]
+          }
+        }
+      ],
+      "diagnostics": []
+    },
+    {
+      "id": "p2.fact-citation-closure",
+      "acceptanceCriterion": "P2",
+      "tier": "deterministic",
+      "label": "Claim and overlay fact citation closure",
+      "status": "passed",
+      "assertions": [
+        {
+          "id": "known-fact-citations-resolve",
+          "verdict": "passed"
+        },
+        {
+          "id": "unknown-and-conflicting-claims-rejected",
+          "verdict": "passed"
+        }
+      ],
+      "evidenceReferences": [
+        {
+          "id": "evidence:p2.fact-citation-closure",
+          "revision": "evidence:p2.fact-citation-closure:revision:1",
+          "contentHash": "0690a4223a590f007a420b4697a004eeb54a96158c1da7479ce829908eec9f5f",
+          "kind": "deterministic-test-run",
+          "binding": {
+            "metricId": "p2.fact-citation-closure",
+            "testIds": [
+              "test:known-fact-citations-resolve",
+              "test:unknown-and-conflicting-claims-rejected"
+            ]
+          }
+        }
+      ],
+      "diagnostics": []
+    },
+    {
+      "id": "p3.catalog-closure",
+      "acceptanceCriterion": "P3",
+      "tier": "deterministic",
+      "label": "Exact leaf category and attribute enum closure",
+      "status": "passed",
+      "assertions": [
+        {
+          "id": "leaf-category-exact",
+          "verdict": "passed"
+        },
+        {
+          "id": "attribute-enums-and-references-exact",
+          "verdict": "passed"
+        }
+      ],
+      "evidenceReferences": [
+        {
+          "id": "evidence:p3.catalog-closure",
+          "revision": "evidence:p3.catalog-closure:revision:1",
+          "contentHash": "0690a4223a590f007a420b4697a004eeb54a96158c1da7479ce829908eec9f5f",
+          "kind": "deterministic-test-run",
+          "binding": {
+            "metricId": "p3.catalog-closure",
+            "testIds": [
+              "test:leaf-category-exact",
+              "test:attribute-enums-and-references-exact"
+            ]
+          }
+        }
+      ],
+      "diagnostics": []
+    },
+    {
+      "id": "p4.offline-policy-gates",
+      "acceptanceCriterion": "P4",
+      "tier": "deterministic",
+      "label": "Offline locale policy compilation and validation",
+      "status": "passed",
+      "assertions": [
+        {
+          "id": "locale-generation-constraints-compile",
+          "verdict": "passed"
+        },
+        {
+          "id": "unit-size-claim-media-gates-execute",
+          "verdict": "passed"
+        }
+      ],
+      "evidenceReferences": [
+        {
+          "id": "evidence:p4.offline-policy-gates",
+          "revision": "evidence:p4.offline-policy-gates:revision:1",
+          "contentHash": "0690a4223a590f007a420b4697a004eeb54a96158c1da7479ce829908eec9f5f",
+          "kind": "deterministic-test-run",
+          "binding": {
+            "metricId": "p4.offline-policy-gates",
+            "testIds": [
+              "test:locale-generation-constraints-compile",
+              "test:unit-size-claim-media-gates-execute"
+            ]
+          }
+        }
+      ],
+      "diagnostics": []
+    },
+    {
+      "id": "p5.kernel-profile-composition",
+      "acceptanceCriterion": "P5",
+      "tier": "deterministic",
+      "label": "Removable Commerce Profile Kernel composition",
+      "status": "passed",
+      "assertions": [
+        {
+          "id": "semantic-role-and-lock-closure",
+          "verdict": "passed"
+        },
+        {
+          "id": "bounded-kernel-plan-and-removable-registry",
+          "verdict": "passed"
+        }
+      ],
+      "evidenceReferences": [
+        {
+          "id": "evidence:p5.kernel-profile-composition",
+          "revision": "evidence:p5.kernel-profile-composition:revision:1",
+          "contentHash": "235a8e790959cbd1fe1c1e0c2df6d4a8029ba1c7843fc18ac167c40299bb2839",
+          "kind": "deterministic-test-run",
+          "binding": {
+            "metricId": "p5.kernel-profile-composition",
+            "testIds": [
+              "test:semantic-role-and-lock-closure",
+              "test:bounded-kernel-plan-and-removable-registry"
+            ]
+          }
+        }
+      ],
+      "diagnostics": []
+    },
+    {
+      "id": "p6.mocked-deliverable-closure",
+      "acceptanceCriterion": "P6",
+      "tier": "mocked-host",
+      "label": "Mocked Host deliverable and usability closure",
+      "status": "passed",
+      "assertions": [
+        {
+          "id": "accepted-receipts-and-role-closure",
+          "verdict": "passed"
+        },
+        {
+          "id": "copy-image-video-usability-gates-pass",
+          "verdict": "passed"
+        }
+      ],
+      "evidenceReferences": [
+        {
+          "id": "evidence:p6.mocked-deliverable-closure",
+          "revision": "evidence:p6.mocked-deliverable-closure:revision:1",
+          "contentHash": "159d6d933216b30f0c74df5cb01e5bdebd0a8f6aad64653a1163e20307efa8ee",
+          "kind": "mocked-host-receipt",
+          "binding": {
+            "metricId": "p6.mocked-deliverable-closure",
+            "receiptId": "receipt:p6.mocked-deliverable-closure",
+            "capabilityId": "capability:p6.mocked-deliverable-closure",
+            "artifactIds": [
+              "artifact:p6.mocked-deliverable-closure"
+            ]
+          }
+        }
+      ],
+      "diagnostics": []
+    },
+    {
+      "id": "p6.mocked-targeted-repair",
+      "acceptanceCriterion": "P6",
+      "tier": "mocked-host",
+      "label": "Mocked Host targeted repair preserves siblings",
+      "status": "passed",
+      "assertions": [
+        {
+          "id": "failed-frontier-only-repairs",
+          "verdict": "passed"
+        },
+        {
+          "id": "accepted-sibling-artifacts-remain-stable",
+          "verdict": "passed"
+        }
+      ],
+      "evidenceReferences": [
+        {
+          "id": "evidence:p6.mocked-targeted-repair",
+          "revision": "evidence:p6.mocked-targeted-repair:revision:1",
+          "contentHash": "159d6d933216b30f0c74df5cb01e5bdebd0a8f6aad64653a1163e20307efa8ee",
+          "kind": "mocked-host-receipt",
+          "binding": {
+            "metricId": "p6.mocked-targeted-repair",
+            "receiptId": "receipt:p6.mocked-targeted-repair",
+            "capabilityId": "capability:p6.mocked-targeted-repair",
+            "artifactIds": [
+              "artifact:p6.mocked-targeted-repair"
+            ]
+          }
+        }
+      ],
+      "diagnostics": []
+    },
+    {
+      "id": "p7.mocked-strategy-evidence",
+      "acceptanceCriterion": "P7",
+      "tier": "mocked-host",
+      "label": "Mocked strategy cites run and repair evidence",
+      "status": "passed",
+      "assertions": [
+        {
+          "id": "facts-plan-routes-and-validations-cited",
+          "verdict": "passed"
+        },
+        {
+          "id": "receipts-and-repair-history-cited",
+          "verdict": "passed"
+        }
+      ],
+      "evidenceReferences": [
+        {
+          "id": "evidence:p7.mocked-strategy-evidence",
+          "revision": "evidence:p7.mocked-strategy-evidence:revision:1",
+          "contentHash": "159d6d933216b30f0c74df5cb01e5bdebd0a8f6aad64653a1163e20307efa8ee",
+          "kind": "mocked-host-receipt",
+          "binding": {
+            "metricId": "p7.mocked-strategy-evidence",
+            "receiptId": "receipt:p7.mocked-strategy-evidence",
+            "capabilityId": "capability:p7.mocked-strategy-evidence",
+            "artifactIds": [
+              "artifact:p7.mocked-strategy-evidence"
+            ]
+          }
+        }
+      ],
+      "diagnostics": []
+    },
+    {
+      "id": "p6.real-text-execution",
+      "acceptanceCriterion": "P6",
+      "tier": "real-host",
+      "label": "Real Host localized text execution",
+      "status": "blocked",
+      "assertions": [
+        {
+          "id": "authorized-command-settled",
+          "verdict": "blocked",
+          "diagnostic": {
+            "code": "real-host-evidence-unavailable",
+            "message": "Real Host execution evidence has not been supplied.",
+            "evidenceReferenceIds": [
+              "evidence:p6.real-text-execution"
+            ]
+          }
+        },
+        {
+          "id": "accepted-receipt-bound",
+          "verdict": "blocked",
+          "diagnostic": {
+            "code": "real-host-evidence-unavailable",
+            "message": "Real Host execution evidence has not been supplied.",
+            "evidenceReferenceIds": [
+              "evidence:p6.real-text-execution"
+            ]
+          }
+        }
+      ],
+      "evidenceReferences": [
+        {
+          "id": "evidence:p6.real-text-execution",
+          "revision": "evidence:p6.real-text-execution:revision:1",
+          "contentHash": "6f53d2b7e254518b2742e3e32c1573f3882af394c1037034749e0add421ea758",
+          "kind": "host-capability-audit",
+          "binding": {
+            "metricId": "p6.real-text-execution",
+            "findingCode": "real-host-evidence-unavailable"
+          }
+        }
+      ],
+      "diagnostics": [
+        {
+          "code": "real-host-evidence-unavailable",
+          "message": "Real Host execution evidence has not been supplied.",
+          "evidenceReferenceIds": [
+            "evidence:p6.real-text-execution"
+          ]
+        },
+        {
+          "code": "real-host-evidence-unavailable",
+          "message": "Real Host execution evidence has not been supplied.",
+          "evidenceReferenceIds": [
+            "evidence:p6.real-text-execution"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "p6.real-text-bytes",
+      "acceptanceCriterion": "P6",
+      "tier": "real-host",
+      "label": "Real Host localized text bytes and gates",
+      "status": "blocked",
+      "assertions": [
+        {
+          "id": "artifact-bytes-present-and-decoded",
+          "verdict": "blocked",
+          "diagnostic": {
+            "code": "real-host-evidence-unavailable",
+            "message": "Real Host execution evidence has not been supplied.",
+            "evidenceReferenceIds": [
+              "evidence:p6.real-text-bytes"
+            ]
+          }
+        },
+        {
+          "id": "locale-policy-and-citation-gates-pass",
+          "verdict": "blocked",
+          "diagnostic": {
+            "code": "real-host-evidence-unavailable",
+            "message": "Real Host execution evidence has not been supplied.",
+            "evidenceReferenceIds": [
+              "evidence:p6.real-text-bytes"
+            ]
+          }
+        }
+      ],
+      "evidenceReferences": [
+        {
+          "id": "evidence:p6.real-text-bytes",
+          "revision": "evidence:p6.real-text-bytes:revision:1",
+          "contentHash": "6f53d2b7e254518b2742e3e32c1573f3882af394c1037034749e0add421ea758",
+          "kind": "host-capability-audit",
+          "binding": {
+            "metricId": "p6.real-text-bytes",
+            "findingCode": "real-host-evidence-unavailable"
+          }
+        }
+      ],
+      "diagnostics": [
+        {
+          "code": "real-host-evidence-unavailable",
+          "message": "Real Host execution evidence has not been supplied.",
+          "evidenceReferenceIds": [
+            "evidence:p6.real-text-bytes"
+          ]
+        },
+        {
+          "code": "real-host-evidence-unavailable",
+          "message": "Real Host execution evidence has not been supplied.",
+          "evidenceReferenceIds": [
+            "evidence:p6.real-text-bytes"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "p6.real-image-execution",
+      "acceptanceCriterion": "P6",
+      "tier": "real-host",
+      "label": "Real Host commerce image execution",
+      "status": "blocked",
+      "assertions": [
+        {
+          "id": "authorized-command-settled",
+          "verdict": "blocked",
+          "diagnostic": {
+            "code": "real-host-evidence-unavailable",
+            "message": "Real Host execution evidence has not been supplied.",
+            "evidenceReferenceIds": [
+              "evidence:p6.real-image-execution"
+            ]
+          }
+        },
+        {
+          "id": "accepted-receipt-bound",
+          "verdict": "blocked",
+          "diagnostic": {
+            "code": "real-host-evidence-unavailable",
+            "message": "Real Host execution evidence has not been supplied.",
+            "evidenceReferenceIds": [
+              "evidence:p6.real-image-execution"
+            ]
+          }
+        }
+      ],
+      "evidenceReferences": [
+        {
+          "id": "evidence:p6.real-image-execution",
+          "revision": "evidence:p6.real-image-execution:revision:1",
+          "contentHash": "6f53d2b7e254518b2742e3e32c1573f3882af394c1037034749e0add421ea758",
+          "kind": "host-capability-audit",
+          "binding": {
+            "metricId": "p6.real-image-execution",
+            "findingCode": "real-host-evidence-unavailable"
+          }
+        }
+      ],
+      "diagnostics": [
+        {
+          "code": "real-host-evidence-unavailable",
+          "message": "Real Host execution evidence has not been supplied.",
+          "evidenceReferenceIds": [
+            "evidence:p6.real-image-execution"
+          ]
+        },
+        {
+          "code": "real-host-evidence-unavailable",
+          "message": "Real Host execution evidence has not been supplied.",
+          "evidenceReferenceIds": [
+            "evidence:p6.real-image-execution"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "p6.real-image-bytes",
+      "acceptanceCriterion": "P6",
+      "tier": "real-host",
+      "label": "Real Host image bytes and usability gates",
+      "status": "blocked",
+      "assertions": [
+        {
+          "id": "artifact-bytes-present-and-decoded",
+          "verdict": "blocked",
+          "diagnostic": {
+            "code": "real-host-evidence-unavailable",
+            "message": "Real Host execution evidence has not been supplied.",
+            "evidenceReferenceIds": [
+              "evidence:p6.real-image-bytes"
+            ]
+          }
+        },
+        {
+          "id": "dimensions-identity-policy-and-usability-pass",
+          "verdict": "blocked",
+          "diagnostic": {
+            "code": "real-host-evidence-unavailable",
+            "message": "Real Host execution evidence has not been supplied.",
+            "evidenceReferenceIds": [
+              "evidence:p6.real-image-bytes"
+            ]
+          }
+        }
+      ],
+      "evidenceReferences": [
+        {
+          "id": "evidence:p6.real-image-bytes",
+          "revision": "evidence:p6.real-image-bytes:revision:1",
+          "contentHash": "6f53d2b7e254518b2742e3e32c1573f3882af394c1037034749e0add421ea758",
+          "kind": "host-capability-audit",
+          "binding": {
+            "metricId": "p6.real-image-bytes",
+            "findingCode": "real-host-evidence-unavailable"
+          }
+        }
+      ],
+      "diagnostics": [
+        {
+          "code": "real-host-evidence-unavailable",
+          "message": "Real Host execution evidence has not been supplied.",
+          "evidenceReferenceIds": [
+            "evidence:p6.real-image-bytes"
+          ]
+        },
+        {
+          "code": "real-host-evidence-unavailable",
+          "message": "Real Host execution evidence has not been supplied.",
+          "evidenceReferenceIds": [
+            "evidence:p6.real-image-bytes"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "p6.real-video-execution",
+      "acceptanceCriterion": "P6",
+      "tier": "real-host",
+      "label": "Real Host product video execution",
+      "status": "blocked",
+      "assertions": [
+        {
+          "id": "authorized-command-settled",
+          "verdict": "blocked",
+          "diagnostic": {
+            "code": "real-host-evidence-unavailable",
+            "message": "Real Host execution evidence has not been supplied.",
+            "evidenceReferenceIds": [
+              "evidence:p6.real-video-execution"
+            ]
+          }
+        },
+        {
+          "id": "accepted-receipt-bound",
+          "verdict": "blocked",
+          "diagnostic": {
+            "code": "real-host-evidence-unavailable",
+            "message": "Real Host execution evidence has not been supplied.",
+            "evidenceReferenceIds": [
+              "evidence:p6.real-video-execution"
+            ]
+          }
+        }
+      ],
+      "evidenceReferences": [
+        {
+          "id": "evidence:p6.real-video-execution",
+          "revision": "evidence:p6.real-video-execution:revision:1",
+          "contentHash": "6f53d2b7e254518b2742e3e32c1573f3882af394c1037034749e0add421ea758",
+          "kind": "host-capability-audit",
+          "binding": {
+            "metricId": "p6.real-video-execution",
+            "findingCode": "real-host-evidence-unavailable"
+          }
+        }
+      ],
+      "diagnostics": [
+        {
+          "code": "real-host-evidence-unavailable",
+          "message": "Real Host execution evidence has not been supplied.",
+          "evidenceReferenceIds": [
+            "evidence:p6.real-video-execution"
+          ]
+        },
+        {
+          "code": "real-host-evidence-unavailable",
+          "message": "Real Host execution evidence has not been supplied.",
+          "evidenceReferenceIds": [
+            "evidence:p6.real-video-execution"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "p6.real-video-bytes",
+      "acceptanceCriterion": "P6",
+      "tier": "real-host",
+      "label": "Real Host video bytes and playability gates",
+      "status": "blocked",
+      "assertions": [
+        {
+          "id": "artifact-bytes-present-and-decoded",
+          "verdict": "blocked",
+          "diagnostic": {
+            "code": "real-host-evidence-unavailable",
+            "message": "Real Host execution evidence has not been supplied.",
+            "evidenceReferenceIds": [
+              "evidence:p6.real-video-bytes"
+            ]
+          }
+        },
+        {
+          "id": "playability-identity-and-policy-gates-pass",
+          "verdict": "blocked",
+          "diagnostic": {
+            "code": "real-host-evidence-unavailable",
+            "message": "Real Host execution evidence has not been supplied.",
+            "evidenceReferenceIds": [
+              "evidence:p6.real-video-bytes"
+            ]
+          }
+        }
+      ],
+      "evidenceReferences": [
+        {
+          "id": "evidence:p6.real-video-bytes",
+          "revision": "evidence:p6.real-video-bytes:revision:1",
+          "contentHash": "6f53d2b7e254518b2742e3e32c1573f3882af394c1037034749e0add421ea758",
+          "kind": "host-capability-audit",
+          "binding": {
+            "metricId": "p6.real-video-bytes",
+            "findingCode": "real-host-evidence-unavailable"
+          }
+        }
+      ],
+      "diagnostics": [
+        {
+          "code": "real-host-evidence-unavailable",
+          "message": "Real Host execution evidence has not been supplied.",
+          "evidenceReferenceIds": [
+            "evidence:p6.real-video-bytes"
+          ]
+        },
+        {
+          "code": "real-host-evidence-unavailable",
+          "message": "Real Host execution evidence has not been supplied.",
+          "evidenceReferenceIds": [
+            "evidence:p6.real-video-bytes"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "p7.real-strategy-execution",
+      "acceptanceCriterion": "P7",
+      "tier": "real-host",
+      "label": "Real Host strategy document execution",
+      "status": "blocked",
+      "assertions": [
+        {
+          "id": "authorized-command-settled",
+          "verdict": "blocked",
+          "diagnostic": {
+            "code": "real-host-evidence-unavailable",
+            "message": "Real Host execution evidence has not been supplied.",
+            "evidenceReferenceIds": [
+              "evidence:p7.real-strategy-execution"
+            ]
+          }
+        },
+        {
+          "id": "accepted-receipt-bound",
+          "verdict": "blocked",
+          "diagnostic": {
+            "code": "real-host-evidence-unavailable",
+            "message": "Real Host execution evidence has not been supplied.",
+            "evidenceReferenceIds": [
+              "evidence:p7.real-strategy-execution"
+            ]
+          }
+        }
+      ],
+      "evidenceReferences": [
+        {
+          "id": "evidence:p7.real-strategy-execution",
+          "revision": "evidence:p7.real-strategy-execution:revision:1",
+          "contentHash": "6f53d2b7e254518b2742e3e32c1573f3882af394c1037034749e0add421ea758",
+          "kind": "host-capability-audit",
+          "binding": {
+            "metricId": "p7.real-strategy-execution",
+            "findingCode": "real-host-evidence-unavailable"
+          }
+        }
+      ],
+      "diagnostics": [
+        {
+          "code": "real-host-evidence-unavailable",
+          "message": "Real Host execution evidence has not been supplied.",
+          "evidenceReferenceIds": [
+            "evidence:p7.real-strategy-execution"
+          ]
+        },
+        {
+          "code": "real-host-evidence-unavailable",
+          "message": "Real Host execution evidence has not been supplied.",
+          "evidenceReferenceIds": [
+            "evidence:p7.real-strategy-execution"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "p7.real-strategy-bytes",
+      "acceptanceCriterion": "P7",
+      "tier": "real-host",
+      "label": "Real Host strategy bytes and evidence gates",
+      "status": "blocked",
+      "assertions": [
+        {
+          "id": "artifact-bytes-present-and-decoded",
+          "verdict": "blocked",
+          "diagnostic": {
+            "code": "real-host-evidence-unavailable",
+            "message": "Real Host execution evidence has not been supplied.",
+            "evidenceReferenceIds": [
+              "evidence:p7.real-strategy-bytes"
+            ]
+          }
+        },
+        {
+          "id": "facts-plan-route-validation-receipt-repair-closure-passes",
+          "verdict": "blocked",
+          "diagnostic": {
+            "code": "real-host-evidence-unavailable",
+            "message": "Real Host execution evidence has not been supplied.",
+            "evidenceReferenceIds": [
+              "evidence:p7.real-strategy-bytes"
+            ]
+          }
+        }
+      ],
+      "evidenceReferences": [
+        {
+          "id": "evidence:p7.real-strategy-bytes",
+          "revision": "evidence:p7.real-strategy-bytes:revision:1",
+          "contentHash": "6f53d2b7e254518b2742e3e32c1573f3882af394c1037034749e0add421ea758",
+          "kind": "host-capability-audit",
+          "binding": {
+            "metricId": "p7.real-strategy-bytes",
+            "findingCode": "real-host-evidence-unavailable"
+          }
+        }
+      ],
+      "diagnostics": [
+        {
+          "code": "real-host-evidence-unavailable",
+          "message": "Real Host execution evidence has not been supplied.",
+          "evidenceReferenceIds": [
+            "evidence:p7.real-strategy-bytes"
+          ]
+        },
+        {
+          "code": "real-host-evidence-unavailable",
+          "message": "Real Host execution evidence has not been supplied.",
+          "evidenceReferenceIds": [
+            "evidence:p7.real-strategy-bytes"
+          ]
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "overall": {
+      "total": 16,
+      "passed": 8,
+      "failed": 0,
+      "blocked": 8,
+      "ready": false
+    },
+    "tiers": [
+      {
+        "tier": "deterministic",
+        "total": 5,
+        "passed": 5,
+        "failed": 0,
+        "blocked": 0,
+        "ready": true
+      },
+      {
+        "tier": "mocked-host",
+        "total": 3,
+        "passed": 3,
+        "failed": 0,
+        "blocked": 0,
+        "ready": true
+      },
+      {
+        "tier": "real-host",
+        "total": 8,
+        "passed": 0,
+        "failed": 0,
+        "blocked": 8,
+        "ready": false
+      }
+    ],
+    "productionReady": false,
+    "productionFrontier": [
+      {
+        "metricId": "p6.real-text-execution",
+        "tier": "real-host",
+        "status": "blocked"
+      },
+      {
+        "metricId": "p6.real-text-bytes",
+        "tier": "real-host",
+        "status": "blocked"
+      },
+      {
+        "metricId": "p6.real-image-execution",
+        "tier": "real-host",
+        "status": "blocked"
+      },
+      {
+        "metricId": "p6.real-image-bytes",
+        "tier": "real-host",
+        "status": "blocked"
+      },
+      {
+        "metricId": "p6.real-video-execution",
+        "tier": "real-host",
+        "status": "blocked"
+      },
+      {
+        "metricId": "p6.real-video-bytes",
+        "tier": "real-host",
+        "status": "blocked"
+      },
+      {
+        "metricId": "p7.real-strategy-execution",
+        "tier": "real-host",
+        "status": "blocked"
+      },
+      {
+        "metricId": "p7.real-strategy-bytes",
+        "tier": "real-host",
+        "status": "blocked"
+      }
+    ]
+  }
+}

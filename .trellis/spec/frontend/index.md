@@ -32,6 +32,7 @@ more restrictive.
 | [Desktop Release Pipeline](./release-pipeline.md) | Atomic cross-platform native builds, updater evidence, and GitHub Release publication | Filled |
 | [Agent Control Safety](./agent-control-safety.md) | Durable claims, host-issued approval leases, controlled paths, governance evidence, and composite receipts | Filled |
 | [Design OS Kernel](./design-os-kernel.md) | Canonical OutcomeGraph contracts, frozen authority, bounded scheduling, conformance, and replay | Filled |
+| [Commerce Production Profile](./commerce-production-profile.md) | Fact lineage, offline policy, cross-media evaluation, targeted repair, and evidence-tier benchmarks | Filled |
 | [Integration Brand Icons](./integration-brand-icons.md) | Local brand asset provenance, theme contrast, accessibility, and visual verification | Filled |
 
 ---

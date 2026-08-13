@@ -1,0 +1,6 @@
+{"file": ".trellis/spec/frontend/design-os-kernel.md", "reason": "Canonical Kernel records, authority, lifecycle, bounded DAG and profile conformance contracts."}
+{"file": ".trellis/spec/frontend/cutout-pipeline.md", "reason": "Existing material production, QA, CAS and targeted repair rules."}
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "Source, provenance, license and test quality requirements."}
+{"file": ".trellis/spec/frontend/type-safety.md", "reason": "Strict boundary schemas, discriminated unions and fail-closed validation conventions."}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "Fact-to-plan-to-artifact data-flow review."}
+{"file": ".trellis/tasks/08-12-commerce-material-agent/research/competition-contract.md", "reason": "Exact commerce input, output and evaluator constraints while keeping competition projection outside the Profile."}
