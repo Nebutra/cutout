@@ -285,9 +285,10 @@ describe('planning runtime boundary', () => {
     const starts = invokeMock.mock.calls.filter(([command]) => command === 'codex_system_turn_start')
     expect(starts).toHaveLength(2)
     expect(starts.map(([, args]) => args.input.conversationId)).toEqual([
-      'conversation.planner:1',
-      'conversation.planner:2',
+      expect.stringMatching(/^conversation\.planner:[0-9a-f-]{36}:1$/),
+      expect.stringMatching(/^conversation\.planner:[0-9a-f-]{36}:2$/),
     ])
+    expect(starts[0]![1].input.conversationId).not.toBe(starts[1]![1].input.conversationId)
   })
 
   it('cancels a queued Planner stage without starting another native turn', async () => {

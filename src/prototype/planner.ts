@@ -28,6 +28,14 @@ export const PROTOTYPE_PLANNER_TOTAL_TIMEOUT_MS = 300_000
 export const PROTOTYPE_PROGRESSIVE_PLANNER_MAX_TIMEOUT_MS = 10 * 60_000
 export const PROGRESSIVE_OUTLINE_TEXT_MAX_BYTES = 32_768
 
+type PlannerGenerationService = Pick<
+  GenerationService,
+  'generateObject' | 'streamText'
+> & {
+  /** A bounded native planning runtime can lower, but never raise, page fanout. */
+  readonly planningTurnConcurrency?: number
+}
+
 export interface PlanPrototypeParams {
   readonly providerId: string
   readonly model?: string
@@ -78,6 +86,17 @@ export function progressivePlannerTimeoutMs(
     PROTOTYPE_PROGRESSIVE_PLANNER_MAX_TIMEOUT_MS,
     Math.max(PROTOTYPE_PLANNER_TOTAL_TIMEOUT_MS, expectedMs),
   )
+}
+
+function effectivePlannerPageParallelism(
+  generation: PlannerGenerationService,
+  requested: number | undefined,
+): number {
+  const requestedParallelism = requested
+    ?? PROTOTYPE_PLANNER_PAGE_MAX_PARALLELISM
+  const runtimeParallelism = generation.planningTurnConcurrency
+    ?? PROTOTYPE_PLANNER_PAGE_MAX_PARALLELISM
+  return Math.min(requestedParallelism, runtimeParallelism)
 }
 
 async function runPlannerResultWithDeadline<T>(input: {
@@ -1416,7 +1435,7 @@ async function repairProgressivePage(input: {
 }
 
 async function planPrototypeProgressively(
-  generation: Pick<GenerationService, 'generateObject' | 'streamText'>,
+  generation: PlannerGenerationService,
   params: PlanPrototypeParams,
 ): Promise<Result<PrototypePlan>> {
   const requirement = composePrototypeRequirement(params.brief, params.intent)
@@ -1438,7 +1457,7 @@ async function planPrototypeProgressively(
     parentSignal: params.signal,
     timeoutMs: progressivePlannerTimeoutMs(
       outline.pages.length,
-      params.pageParallelism ?? PROTOTYPE_PLANNER_PAGE_MAX_PARALLELISM,
+      effectivePlannerPageParallelism(generation, params.pageParallelism),
     ),
     timeoutMessage: 'Prototype planning timed out.',
     run: (signal) => planPrototypeProgressivelyFromOutline(
@@ -1451,7 +1470,7 @@ async function planPrototypeProgressively(
 }
 
 async function planPrototypeProgressivelyFromOutline(
-  generation: Pick<GenerationService, 'generateObject' | 'streamText'>,
+  generation: PlannerGenerationService,
   params: PlanPrototypeParams,
   requirement: string,
   outline: ProgressivePrototypeOutline,
@@ -1545,7 +1564,7 @@ async function planPrototypeProgressivelyFromOutline(
   let completedPages = 0
   await forEachConcurrent(
     outline.pages,
-    params.pageParallelism ?? PROTOTYPE_PLANNER_PAGE_MAX_PARALLELISM,
+    effectivePlannerPageParallelism(generation, params.pageParallelism),
     async (page, pageIndex) => {
       const pageResult = await generatePlannerObject(
         generation,
@@ -1673,7 +1692,7 @@ function progressiveStageFailure(
 }
 
 async function planPrototypeWithinDeadline(
-  generation: Pick<GenerationService, 'generateObject' | 'streamText'>,
+  generation: PlannerGenerationService,
   params: PlanPrototypeParams,
 ): Promise<Result<PrototypePlan>> {
   const brief = params.brief.trim()
@@ -1741,7 +1760,7 @@ async function planPrototypeWithinDeadline(
 }
 
 export async function planPrototype(
-  generation: Pick<GenerationService, 'generateObject' | 'streamText'>,
+  generation: PlannerGenerationService,
   params: PlanPrototypeParams,
 ): Promise<Result<PrototypePlan>> {
   const brief = params.brief.trim()

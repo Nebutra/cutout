@@ -749,13 +749,16 @@ describe('planPrototype', () => {
       return ok(plan.pages[call - 2]!) as Result<T>
     })
 
-    const result = await planPrototype(fakeGeneration(
-      generateObject,
-      mockGenerateText(ok(progressiveOutlineProtocolFor(plan))),
-    ), {
+    const generation = {
+      ...fakeGeneration(
+        generateObject,
+        mockGenerateText(ok(progressiveOutlineProtocolFor(plan))),
+      ),
+      planningTurnConcurrency: 1 as const,
+    }
+    const result = await planPrototype(generation, {
       providerId: 'codex-system',
       brief: PROGRESSIVE_TEST_BRIEF,
-      pageParallelism: 1,
     })
 
     expect(result).toEqual(ok(expected))

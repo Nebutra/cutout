@@ -160,6 +160,12 @@ type CodexPlanningGenerationService = Pick<
   GenerationService,
   'generateObject' | 'streamText'
 > & {
+  /**
+   * The native app-server admits one active turn. The Planner consumes this
+   * declaration before it starts a page-stage deadline, rather than timing
+   * work out while it is only waiting for a native slot.
+   */
+  readonly planningTurnConcurrency: 1
   runExclusive<T>(signal: AbortSignal | undefined, run: () => Promise<T>): Promise<T>
 }
 
@@ -301,6 +307,9 @@ export function createCodexPlanningGenerationService(
   const workspaceHandle = opaqueIdSchema.parse(options.workspaceHandle)
   const conversationPrefix = opaqueIdSchema.max(120).parse(options.conversationPrefix)
   const contextRevision = opaqueIdSchema.max(160).parse(options.contextRevision)
+  // A failed reset must not let a subsequently reconstructed adapter resume a
+  // saved thread. The nonce is opaque, bounded, and distinct for this adapter.
+  const conversationRunNonce = crypto.randomUUID()
   const enqueueTurn = createPlanningTurnQueue()
   let sequence = 0
 
@@ -312,7 +321,7 @@ export function createCodexPlanningGenerationService(
     const rendered = await renderCodexPlanningInput(input, options.prompts)
     if (!rendered.ok) return rendered
     const ordinal = ++sequence
-    const conversationId = `${conversationPrefix}:${ordinal}`
+    const conversationId = `${conversationPrefix}:${conversationRunNonce}:${ordinal}`
     const prompt = mode === 'text'
       ? `${rendered.data}\n\nReturn the exact requested textual result in the text field.`
       : rendered.data
@@ -350,6 +359,7 @@ export function createCodexPlanningGenerationService(
   }
 
   return {
+    planningTurnConcurrency: 1,
     runExclusive: (signal, run) => enqueueCodexPlanningSession(signal, run),
     generateObject: (input, schema) => runTurn(input, schema, 'structured'),
     async *streamText(input) {
