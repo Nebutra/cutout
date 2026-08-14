@@ -1226,13 +1226,14 @@ describe('brief → every planned route — rendered IntentWorkspace', () => {
 
     expect(snapshot).toBeTruthy()
     expect(snapshot!.runError).toBeNull()
-    expect(codexHarness.turns).toBe(6)
+    // Closure is now compiled from the authoritative outline, so it does not
+    // consume a sixth Provider turn.
+    expect(codexHarness.turns).toBe(5)
     expect(codexHarness.plannerStages).toEqual([
       'outline',
       'design-foundation',
       'design-exploration',
       'page',
-      'closure',
     ])
     expect(desktopHarness.directToolGateCalls).toBe(0)
     expect(desktopHarness.plannerCalls).toBe(0)
@@ -1304,13 +1305,12 @@ describe('brief → every planned route — rendered IntentWorkspace', () => {
     expect(runtimeConfigHarness.providerLoads).toBeGreaterThan(cachedLoads.providers)
     expect(runtimeConfigHarness.bindingLoads).toBeGreaterThan(cachedLoads.bindings)
     expect(runtimeConfigHarness.assignmentLoads).toBe(cachedLoads.assignments)
-    expect(codexHarness.turns).toBe(6)
+    expect(codexHarness.turns).toBe(5)
     expect(codexHarness.plannerStages).toEqual([
       'outline',
       'design-foundation',
       'design-exploration',
       'page',
-      'closure',
     ])
     expect(desktopHarness.imageToolCallIds).toEqual(expect.arrayContaining([
       expect.stringMatching(/:design-system:/),
@@ -1483,7 +1483,6 @@ describe('brief → every planned route — rendered IntentWorkspace', () => {
       'design-foundation': 4,
       'design-exploration': 4,
       page: 24,
-      closure: 4,
     })
     expect(desktopHarness.plannerPrompts).toHaveLength(3)
     const alternativePrompts = desktopHarness.plannerPrompts

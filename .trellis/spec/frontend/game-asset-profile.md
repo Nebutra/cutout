@@ -43,6 +43,11 @@ createGameAssetRehearsalRepository(): GameAssetRehearsalRepository
   requested generation parameters. It rejects unknown or duplicate roles,
   out-of-bounds geometry, stale locks, incomplete reference lineage, and reuse of
   one artifact/content hash across distinct semantic roles.
+- `expectedAlphaSize` is the maximum normalization envelope, not permission to
+  stretch a subject to an exact rectangle. A normalized frame must remain inside
+  that envelope and fill at least one axis within one raster pixel. Anchor
+  comparison allows only the unavoidable half-pixel produced by centering an
+  odd-width or odd-height alpha rectangle on the integer pixel grid.
 - Accepted siblings are returned as exact role/artifact/revision/content-hash
   records. Repair targets only failed roles; an atlas failure cannot authorize
   regeneration of accepted action families.
@@ -84,6 +89,14 @@ createGameAssetRehearsalRepository(): GameAssetRehearsalRepository
   and style consistency; applying the preview then requests native confirmation
   and signs the acceptance receipt. Without that receipt semantic closure stays
   blocked.
+- New native runs use the v2 raster processor. It floods and mattes the retained
+  Provider source, computes its tight alpha bounds, crops that subject, scales it
+  proportionally with Lanczos3 to contain the plan's alpha envelope, then places
+  it on the fixed delivery canvas at the planned anchor. The signed evidence
+  records source size/bounds, target envelope, scale policy, resized subject,
+  placement and output bounds. The fixed canvas keeps animation cells stable;
+  transparent padding is not treated as uncropped background. The v1 matte-only
+  processor remains accepted solely to reproduce already retained signed runs.
 - A complete Game rehearsal does not itself authorize Profile maturity or shared
   promotion. No Game maturity adapter exists until a real retained run is
   independently exercised against a Game-aware Design OS ruler.
@@ -106,7 +119,7 @@ createGameAssetRehearsalRepository(): GameAssetRehearsalRepository
 | Action/direction/frame tuple or role id is duplicated | Reject the plan |
 | Atlas cells cannot contain every declared role | Reject the plan |
 | Observed frame role is missing, duplicated, or undeclared | Block/repair that exact role |
-| Decoded dimensions or alpha bounds violate the plan | Reject that frame; retain valid siblings |
+| Decoded dimensions or normalized alpha envelope violate the plan | Reject that frame; retain valid siblings |
 | Identity, scale, anchor hash, geometry, or coordinates differ | Reject that frame as stale/inconsistent |
 | Required reference artifact lineage is absent | Reject that derivative |
 | Artifact id or content hash is reused across semantic roles | Reject every affected role |
@@ -155,9 +168,12 @@ createGameAssetRehearsalRepository(): GameAssetRehearsalRepository
   maturity or production readiness. A success claim requires an actual native
   run, retained bytes and signed post-generation acceptance.
 - Native raster tests use real encoded pixels to prove the fixed white-border
-  flood/matte processor is reproducible, preserves source identity, emits a
-  content-addressed PNG and derives alpha geometry from that PNG. This is
-  deterministic processor evidence only; it is not a real-Host rehearsal.
+  flood/matte/trim/contain/anchor processor is reproducible, preserves source
+  identity, emits a content-addressed PNG and derives alpha geometry from that
+  PNG. Retained real Qwen source bytes may be reprocessed offline to prove the
+  algorithm against production pixels without another Provider call; that does
+  not create a new native receipt, semantic acceptance, maturity or promotion.
+  Contract fixtures remain deterministic processor evidence only.
 - Native apply tests assert no generation call reaches
   `require_native_confirmation`; exact execution identity and start time remain
   covered by the signed authorization verifier.

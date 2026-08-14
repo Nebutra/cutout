@@ -36,6 +36,15 @@
       contact. Their measured alpha occupancy and feet anchors do not exactly
       match the frozen plan, so strict Game evaluation requires targeted repair.
       This proves real generation, not deliverable acceptance or Profile maturity.
+- [x] Upgrade new runs to the deterministic v2 matte/trim/contain/anchor
+      processor while preserving byte-for-byte v1 replay for the signed real
+      run. Reprocess its four retained Qwen source PNGs offline with zero Provider
+      calls: all four keep a 1024x1024 delivery canvas, normalize proportionally
+      to 800px alpha height, place feet at y=912 with at most 0.5px horizontal
+      quantization, and avoid every canvas edge. Retain the four v2 PNGs plus
+      source/output geometry and hashes under the run's `normalized-v2/`
+      directory. This is real-source algorithm evidence; it does not mint a new
+      Host authorization, semantic acceptance, rehearsal completion or maturity.
 - [x] Admit the observed DashScope accelerated OSS result origin without
       broadening beyond its exact HTTPS bucket/domain shape, retain failed
       attempts for diagnosis, and align per-role timeouts with real Qwen latency.
@@ -50,6 +59,9 @@
       profile, processed frames, atlas, preview, and bundle as explicit nodes.
 - [ ] Add deterministic grid splitting, component selection, anchor estimation,
       scale-profile reuse, strip/grid/atlas composition, and raster evidence.
+- [x] Add deterministic single-frame alpha-bound trimming, aspect-preserving
+      envelope normalization, anchor placement on a stable delivery canvas, and
+      signed cross-layer raster evidence with legacy replay.
 - [ ] Decode and bind observed dimensions/alpha/frame timing to receipts and QA;
       add request-versus-output mismatch byte cases that block incompatible work.
 - [ ] Integrate candidate selection and revision-bound locks without changing the

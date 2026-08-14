@@ -53,11 +53,15 @@ export function evaluateGameAssetFrames(inputValue: GameAssetEvaluationInput): G
       if (canonicalJson(frame.identityLock) !== canonicalJson(role.identityLock)) findings.push({ code: 'identity-lock-mismatch', roleId: role.id, message: `Frame ${role.id} consumes a stale identity lock.` })
       if (canonicalJson(frame.scaleLock) !== canonicalJson(role.scaleLock)) findings.push({ code: 'scale-lock-mismatch', roleId: role.id, message: `Frame ${role.id} consumes a stale scale lock.` })
       if (canonicalJson(frame.anchorLock) !== canonicalJson(role.anchorLock)) findings.push({ code: 'anchor-lock-mismatch', roleId: role.id, message: `Frame ${role.id} consumes a stale anchor lock.` })
-      if (frame.alphaBounds.width !== role.expectedAlphaSize.width
-        || frame.alphaBounds.height !== role.expectedAlphaSize.height) {
+      const alphaWidthSlack = role.expectedAlphaSize.width - frame.alphaBounds.width
+      const alphaHeightSlack = role.expectedAlphaSize.height - frame.alphaBounds.height
+      if (alphaWidthSlack < 0
+        || alphaHeightSlack < 0
+        || (alphaWidthSlack > 1 && alphaHeightSlack > 1)) {
         findings.push({ code: 'scale-geometry-mismatch', roleId: role.id, message: `Frame ${role.id} does not match its planned alpha occupancy.` })
       }
-      if (frame.anchor.x !== role.expectedAnchor.x || frame.anchor.y !== role.expectedAnchor.y) {
+      if (Math.abs(frame.anchor.x - role.expectedAnchor.x) > 0.5
+        || Math.abs(frame.anchor.y - role.expectedAnchor.y) > 0.5) {
         findings.push({ code: 'anchor-position-mismatch', roleId: role.id, message: `Frame ${role.id} does not match its planned ${role.anchor} anchor.` })
       }
       if (plan.referenceArtifacts.some((reference) => !frame.sourceArtifacts.some((source) => (

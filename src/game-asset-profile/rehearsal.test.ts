@@ -16,7 +16,7 @@ import {
   verifyGameAssetProductionRehearsalBundle,
   type GameAssetProductionRehearsalBundle,
 } from './rehearsal'
-import { GAME_ASSET_RASTER_PROCESSOR } from './generation'
+import { LEGACY_GAME_ASSET_RASTER_PROCESSOR } from './generation'
 
 vi.mock('@/multimodal-host/desktop-host', () => ({
   verifyNativeMultimodalHostArtifact: vi.fn(),
@@ -182,7 +182,7 @@ async function createRejectedPathBundle(): Promise<GameAssetProductionRehearsalB
     })
     const processingEvidence = {
       protocol: 'cutout.game-asset-raster-processing.v1' as const,
-      implementation: GAME_ASSET_RASTER_PROCESSOR,
+      implementation: LEGACY_GAME_ASSET_RASTER_PROCESSOR,
       whiteThreshold: 246 as const,
       backgroundAlphaMax: 8 as const,
       sourceArtifactId: receipt.artifact.artifactId,
@@ -241,7 +241,7 @@ async function createRejectedPathBundle(): Promise<GameAssetProductionRehearsalB
     })),
     roles: digestRoleRequests,
     outputSize: '128x128',
-    processorImplementation: GAME_ASSET_RASTER_PROCESSOR,
+    processorImplementation: LEGACY_GAME_ASSET_RASTER_PROCESSOR,
   })
   const authorization = {
     protocol: 'cutout.game-asset-generation-authorization.v2' as const,
@@ -258,7 +258,7 @@ async function createRejectedPathBundle(): Promise<GameAssetProductionRehearsalB
     gamePlanId: plan.id,
     gamePlanHash: await fingerprint(plan),
     outputSize: '128x128',
-    processorImplementation: GAME_ASSET_RASTER_PROCESSOR,
+    processorImplementation: LEGACY_GAME_ASSET_RASTER_PROCESSOR,
     roleRequests,
     outputs: frames.map((frame) => ({
       roleId: frame.roleId,

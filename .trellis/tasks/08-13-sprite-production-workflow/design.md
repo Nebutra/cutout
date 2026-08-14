@@ -170,25 +170,37 @@ creative content is never synthesized with procedural placeholders. Processors
 emit exact artifact hashes plus measurements; review policy decides whether those
 measurements block publication.
 
-The first native processor is the bounded single-frame
-`cutout-white-border-flood-matte-rust-image-0.23-v1` stage. It retains the exact
-Provider source bytes and native receipt, floods only white/transparent pixels
-connected to the canvas border, applies the frozen one-pixel white matte rule and
-encodes a deterministic PNG. The signed authorization binds source and processed
-artifact identities plus the processor version and parameters. Verification
-repeats the processing from retained source bytes and requires byte-for-byte PNG
-equality before trusting pixel measurements. Non-white or non-removable
-backgrounds remain opaque and fail normal edge/alpha evaluation; they are never
-silently relabeled as successful cutouts. Grid splitting, scale normalization
-and atlas composition remain later typed processors rather than being implied by
-this first stage.
+The current native single-frame processor is
+`cutout-white-border-flood-matte-normalize-anchor-rust-image-0.23-v2`. It retains
+the exact Provider source bytes and native receipt, floods only white/transparent
+pixels connected to the canvas border, applies the frozen one-pixel white matte
+rule, extracts the measured alpha bounds, and crops the retained subject. It then
+uses proportional Lanczos3 scaling to contain the plan's alpha envelope and
+places the result at the declared anchor on the fixed delivery canvas. It never
+stretches width and height independently or changes cell dimensions between
+animation frames.
+
+Signed v2 processing evidence binds source dimensions/bounds, frame size, alpha
+envelope, expected anchor, anchor and scale policy, resized subject size,
+placement, output bounds, source/output identities and byte length. Verification
+repeats the complete transform from retained source bytes and requires
+byte-for-byte PNG equality before trusting pixel measurements. The matte-only
+`cutout-white-border-flood-matte-rust-image-0.23-v1` path remains dispatchable
+only for already signed retained runs so the algorithm upgrade does not destroy
+their replay evidence. Non-white or non-removable backgrounds remain opaque and
+fail normal edge/alpha evaluation; they are never silently relabeled as
+successful cutouts. Grid splitting and atlas composition remain later typed
+processors.
 
 Pixel geometry is computed locally from decoded returned bytes. Alpha bounds are
 the smallest non-transparent rectangle above the frozen alpha threshold; edge
 contact is derived from that rectangle; anchors are derived from the declared
 anchor policy and the measured rectangle. A vision model cannot supply or amend
-these fields. Model/human evidence is reserved for semantic continuity and action
-readability and remains independently attributable.
+these fields. `expectedAlphaSize` is a containing envelope: normalized output
+must stay within it and fill one axis within one pixel, preserving aspect ratio.
+Anchor matching permits at most half a pixel for odd-size raster centering.
+Model/human evidence is reserved for semantic continuity and action readability
+and remains independently attributable.
 
 Requested canvas, grid and timing parameters remain part of the frozen plan.
 Processors decode the settled artifact and record observed dimensions, alpha,

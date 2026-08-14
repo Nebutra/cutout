@@ -71,6 +71,7 @@ describe('Game Asset native generation contracts (contract-only)', () => {
       outputArtifactSha256: outputHash,
       outputByteLength: 128,
       sourceAlphaBounds: { x: 20, y: 4, width: 60, height: 92 },
+      sourceSize: { width: 128, height: 128 },
       frameSize: { width: 128, height: 128 },
       alphaTarget: { width: 80, height: 104 },
       expectedAnchor: { x: 64, y: 116 },

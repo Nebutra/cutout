@@ -539,6 +539,27 @@ describe('Game Asset Profile', () => {
     })))
   })
 
+  it('accepts aspect-preserving alpha envelopes and only raster-quantized anchor drift', () => {
+    const normalized = frame(0, {
+      alphaBounds: { x: 30, y: 12, width: 68, height: 104 },
+      anchor: { x: 64.5, y: 116 },
+    })
+    const accepted = evaluateGameAssetFrames({
+      plan: { ...plan(), roles: [plan().roles[0]!] },
+      frames: [normalized],
+    })
+    const undersized = evaluateGameAssetFrames({
+      plan: { ...plan(), roles: [plan().roles[0]!] },
+      frames: [{
+        ...normalized,
+        alphaBounds: { x: 34, y: 18, width: 60, height: 96 },
+      }],
+    })
+
+    expect(accepted.status).toBe('passed')
+    expect(undersized.findings.map(({ code }) => code)).toContain('scale-geometry-mismatch')
+  })
+
   it('rejects stale locks, incomplete lineage, reused artifacts, and invalid geometry', () => {
     const stale = evaluateGameAssetFrames({
       plan: plan(),

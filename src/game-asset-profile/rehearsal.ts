@@ -27,6 +27,8 @@ import {
   gameAssetPixelEvidenceSchema,
   gameAssetRasterProcessingEvidenceSchema,
   GAME_ASSET_RASTER_PROCESSOR,
+  GAME_ASSET_RASTER_SCALE_POLICY,
+  LEGACY_GAME_ASSET_RASTER_PROCESSOR,
   gameAssetSemanticAcceptanceSchema,
   retainedGameAssetRoleOutputSchema,
   verifyNativeGameAssetGenerationAuthorization,
@@ -274,7 +276,8 @@ async function assertGenerationAuthorizationClosure(
     || authorization.gamePlanId !== bundle.plan.id
     || authorization.gamePlanHash !== planHash
     || authorization.outputSize !== outputSize
-    || authorization.processorImplementation !== GAME_ASSET_RASTER_PROCESSOR) {
+    || ![GAME_ASSET_RASTER_PROCESSOR, LEGACY_GAME_ASSET_RASTER_PROCESSOR]
+      .includes(authorization.processorImplementation)) {
     throw new Error('Game Asset generation authorization does not bind the exact rehearsal identity, run, Plan, or output size.')
   }
   exactArray(
@@ -293,6 +296,24 @@ async function assertGenerationAuthorizationClosure(
       || request.promptHash !== await sha256Bytes(new TextEncoder().encode(request.prompt))) {
       throw new Error(`Authorized Game Asset request does not bind the exact role and prompt: ${role.id}`)
     }
+    const output = authorization.outputs[index]!
+    if (authorization.processorImplementation === GAME_ASSET_RASTER_PROCESSOR) {
+      const processing = output.processingEvidence
+      if (processing.implementation !== GAME_ASSET_RASTER_PROCESSOR
+        || canonicalJson(processing.frameSize) !== canonicalJson({
+          width: bundle.plan.delivery.frameWidth,
+          height: bundle.plan.delivery.frameHeight,
+        })
+        || canonicalJson(processing.alphaTarget) !== canonicalJson(role.expectedAlphaSize)
+        || canonicalJson(processing.expectedAnchor) !== canonicalJson(role.expectedAnchor)
+        || processing.anchorPolicy !== role.anchor
+        || processing.scalePolicy !== GAME_ASSET_RASTER_SCALE_POLICY
+        || canonicalJson(processing.outputAlphaBounds) !== canonicalJson(output.pixelEvidence.alphaBounds)) {
+        throw new Error(`Authorized Game Asset output does not bind the exact normalized geometry: ${role.id}`)
+      }
+    } else if (output.processingEvidence.implementation !== LEGACY_GAME_ASSET_RASTER_PROCESSOR) {
+      throw new Error(`Authorized Game Asset legacy output changed its processor identity: ${role.id}`)
+    }
     exactArray(request.acceptedReferenceArtifactIds, referenceArtifactIds, `Authorized Game Asset role ${role.id} references`)
     exactArray(request.lockIds, await signedGenerationLocks(bundle.plan, role), `Authorized Game Asset role ${role.id} locks`)
   }
@@ -310,7 +331,7 @@ async function assertGenerationAuthorizationClosure(
     })),
     roles: roleRequests,
     outputSize,
-    processorImplementation: GAME_ASSET_RASTER_PROCESSOR,
+    processorImplementation: authorization.processorImplementation,
   })
   if (authorization.requestDigest !== requestDigest
     || authorization.planId !== `game-asset-preview:sha256:${requestDigest}`) {
@@ -550,6 +571,8 @@ export async function fingerprintGameAssetRehearsalVerifier(): Promise<string> {
       MAX_RETAINED_BASE64_CHARACTERS,
       GAME_ASSET_GENERATION_CAPABILITY_ID,
       GAME_ASSET_RASTER_PROCESSOR,
+      LEGACY_GAME_ASSET_RASTER_PROCESSOR,
+      GAME_ASSET_RASTER_SCALE_POLICY,
     ],
   })
 }

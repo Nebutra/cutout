@@ -257,7 +257,7 @@ export function evaluateCommerceProduction(input: {
         artifact: parsed.data,
         facts: input.facts,
         policy: policyForOutcome(node),
-        expectedRole: payload.semanticRole.replace(/^detail-image:/, 'detail-image:'),
+        expectedRole: payload.semanticRole,
         expectedMediaKind: payload.mediaKind,
         identityLockId: payload.identityLockId,
         creativeDirectionId: payload.creativeDirectionId,

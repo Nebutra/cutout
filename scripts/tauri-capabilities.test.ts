@@ -23,6 +23,7 @@ const expectedMainWindowPermissions = [
   'core:app:allow-version',
   'core:event:allow-listen',
   'core:event:allow-unlisten',
+  'core:window:allow-show',
   'os:allow-locale',
   'store:allow-load',
   'store:allow-get',

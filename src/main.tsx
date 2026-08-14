@@ -29,8 +29,17 @@ let packagedE2eRenderError: unknown
 async function bootstrap() {
   await activateLocale(await detectInitialLocale())
 
+  const packagedE2e = import.meta.env.VITE_CUTOUT_PACKAGED_E2E === '1'
+  const internals = (window as Window & {
+    __TAURI_INTERNALS__?: {
+      invoke?: unknown
+      metadata?: { currentWindow?: { label?: unknown } }
+    }
+  }).__TAURI_INTERNALS__
+  const isTauriWindow = typeof internals?.invoke === 'function'
+    && typeof internals.metadata?.currentWindow?.label === 'string'
   const rootElement = document.getElementById('root')!
-  const root = createRoot(rootElement, import.meta.env.VITE_CUTOUT_PACKAGED_E2E === '1'
+  const root = createRoot(rootElement, packagedE2e
     ? {
         onUncaughtError(error) {
           packagedE2eRenderError = error
@@ -49,16 +58,16 @@ async function bootstrap() {
       <App />
     </StrictMode>
   )
-  if (import.meta.env.VITE_CUTOUT_PACKAGED_E2E === '1') {
+  if (packagedE2e || isTauriWindow) {
     // A background WKWebView may throttle the scheduler before its first timer.
-    // Commit the isolated harness synchronously so liveness never depends on a
-    // foreground paint or on a timer that requires the first commit to resume.
+    // Commit before showing so liveness never depends on a hidden window's
+    // first animation frame and the production window cannot flash empty.
     flushSync(() => root.render(app))
   } else {
     root.render(app)
   }
 
-  if (import.meta.env.VITE_CUTOUT_PACKAGED_E2E === '1') {
+  if (packagedE2e) {
     const { invoke } = await import('@tauri-apps/api/core')
     const mode = await invoke<{ windowProbe: boolean }>('packaged_e2e_mode')
     if (mode.windowProbe) {
@@ -94,15 +103,7 @@ async function bootstrap() {
     await runPackagedE2e()
     return
   }
-  await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
-  const internals = (window as Window & {
-    __TAURI_INTERNALS__?: {
-      invoke?: unknown
-      metadata?: { currentWindow?: { label?: unknown } }
-    }
-  }).__TAURI_INTERNALS__
-  const currentWindowLabel = internals?.metadata?.currentWindow?.label
-  if (typeof internals?.invoke === 'function' && typeof currentWindowLabel === 'string') {
+  if (isTauriWindow) {
     const { getCurrentWindow } = await import('@tauri-apps/api/window')
     await getCurrentWindow().show()
   }

@@ -43,8 +43,7 @@ const ROLE_TIMEOUT_SECS: u64 = 600;
 const RUN_TIMEOUT_SECS: u64 = ROLE_TIMEOUT_SECS * MAX_ROLES as u64;
 const ALPHA_THRESHOLD: u8 = 8;
 const CUTOUT_WHITE_THRESHOLD: u8 = 246;
-const LEGACY_CUTOUT_IMPLEMENTATION: &str =
-    "cutout-white-border-flood-matte-rust-image-0.23-v1";
+const LEGACY_CUTOUT_IMPLEMENTATION: &str = "cutout-white-border-flood-matte-rust-image-0.23-v1";
 const CUTOUT_IMPLEMENTATION: &str =
     "cutout-white-border-flood-matte-normalize-anchor-rust-image-0.23-v2";
 const CUTOUT_SCALE_POLICY: &str = "contain-preserve-aspect";
@@ -245,6 +244,8 @@ pub struct RasterProcessingEvidence {
     output_byte_length: usize,
     #[serde(skip_serializing_if = "Option::is_none")]
     source_alpha_bounds: Option<AlphaBounds>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    source_size: Option<PixelSize>,
     #[serde(skip_serializing_if = "Option::is_none")]
     frame_size: Option<PixelSize>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -1058,10 +1059,7 @@ fn alpha_bounds_from_rgba(image: &image::RgbaImage) -> Result<AlphaBounds, Proxy
     })
 }
 
-fn anchor_for_bounds(
-    bounds: &AlphaBounds,
-    anchor_policy: &str,
-) -> Result<AnchorPoint, ProxyError> {
+fn anchor_for_bounds(bounds: &AlphaBounds, anchor_policy: &str) -> Result<AnchorPoint, ProxyError> {
     match anchor_policy {
         "center" => Ok(AnchorPoint {
             x: f64::from(bounds.x) + f64::from(bounds.width) / 2.0,
@@ -1134,6 +1132,7 @@ fn deterministic_cutout_legacy(
         output_artifact_sha256,
         output_byte_length: output_bytes.len(),
         source_alpha_bounds: None,
+        source_size: None,
         frame_size: None,
         alpha_target: None,
         expected_anchor: None,
@@ -1169,6 +1168,10 @@ fn deterministic_cutout(
         ));
     }
     let matted = matte_cutout(source_bytes)?;
+    let source_size = PixelSize {
+        width: matted.width(),
+        height: matted.height(),
+    };
     let source_alpha_bounds = alpha_bounds_from_rgba(&matted)?;
     let cropped = image::imageops::crop_imm(
         &matted,
@@ -1260,6 +1263,7 @@ fn deterministic_cutout(
         output_artifact_sha256,
         output_byte_length: output_bytes.len(),
         source_alpha_bounds: Some(source_alpha_bounds),
+        source_size: Some(source_size),
         frame_size: Some(frame_size.clone()),
         alpha_target: Some(alpha_target.clone()),
         expected_anchor: Some(expected_anchor.clone()),
@@ -1800,70 +1804,75 @@ fn verify_generation_authorization(
             || output.receipt.lock_ids != request.lock_ids
             || output.source_media_type != output.receipt.artifact.media_type
             || output.media_type != "image/png"
-            || output.processing_evidence.implementation
-                != authorization.processor_implementation
+            || output.processing_evidence.implementation != authorization.processor_implementation
         {
             return Err(ProxyError::Request(
                 "Game Asset retained output drifted from its approved role request".into(),
             ));
         }
-        let (reprocessed_bytes, processing_evidence) =
-            if authorization.processor_implementation == LEGACY_CUTOUT_IMPLEMENTATION {
-                deterministic_cutout_legacy(
-                    &source_bytes,
-                    &output.receipt.artifact.artifact_id,
-                    &output.receipt.artifact.sha256,
-                )?
-            } else {
-                let frame_size = output.processing_evidence.frame_size.as_ref().ok_or_else(|| {
+        let (reprocessed_bytes, processing_evidence) = if authorization.processor_implementation
+            == LEGACY_CUTOUT_IMPLEMENTATION
+        {
+            deterministic_cutout_legacy(
+                &source_bytes,
+                &output.receipt.artifact.artifact_id,
+                &output.receipt.artifact.sha256,
+            )?
+        } else {
+            let frame_size = output
+                .processing_evidence
+                .frame_size
+                .as_ref()
+                .ok_or_else(|| {
                     ProxyError::Request(
                         "Game Asset normalized output is missing its frame geometry".into(),
                     )
                 })?;
-                let alpha_target =
-                    output.processing_evidence.alpha_target.as_ref().ok_or_else(|| {
-                        ProxyError::Request(
-                            "Game Asset normalized output is missing its alpha envelope".into(),
-                        )
-                    })?;
-                let expected_anchor = output
-                    .processing_evidence
-                    .expected_anchor
-                    .as_ref()
-                    .ok_or_else(|| {
-                        ProxyError::Request(
-                            "Game Asset normalized output is missing its expected anchor".into(),
-                        )
-                    })?;
-                let anchor_policy = output
-                    .processing_evidence
-                    .anchor_policy
-                    .as_deref()
-                    .ok_or_else(|| {
-                        ProxyError::Request(
-                            "Game Asset normalized output is missing its anchor policy".into(),
-                        )
-                    })?;
-                if authorization.output_size
-                    != format!("{}x{}", frame_size.width, frame_size.height)
-                    || anchor_policy != request.anchor_policy
-                    || output.processing_evidence.scale_policy.as_deref()
-                        != Some(CUTOUT_SCALE_POLICY)
-                {
-                    return Err(ProxyError::Request(
-                        "Game Asset normalized output drifted from its authorized geometry".into(),
-                    ));
-                }
-                deterministic_cutout(
-                    &source_bytes,
-                    &output.receipt.artifact.artifact_id,
-                    &output.receipt.artifact.sha256,
-                    frame_size,
-                    alpha_target,
-                    expected_anchor,
-                    anchor_policy,
-                )?
-            };
+            let alpha_target = output
+                .processing_evidence
+                .alpha_target
+                .as_ref()
+                .ok_or_else(|| {
+                    ProxyError::Request(
+                        "Game Asset normalized output is missing its alpha envelope".into(),
+                    )
+                })?;
+            let expected_anchor = output
+                .processing_evidence
+                .expected_anchor
+                .as_ref()
+                .ok_or_else(|| {
+                    ProxyError::Request(
+                        "Game Asset normalized output is missing its expected anchor".into(),
+                    )
+                })?;
+            let anchor_policy = output
+                .processing_evidence
+                .anchor_policy
+                .as_deref()
+                .ok_or_else(|| {
+                    ProxyError::Request(
+                        "Game Asset normalized output is missing its anchor policy".into(),
+                    )
+                })?;
+            if authorization.output_size != format!("{}x{}", frame_size.width, frame_size.height)
+                || anchor_policy != request.anchor_policy
+                || output.processing_evidence.scale_policy.as_deref() != Some(CUTOUT_SCALE_POLICY)
+            {
+                return Err(ProxyError::Request(
+                    "Game Asset normalized output drifted from its authorized geometry".into(),
+                ));
+            }
+            deterministic_cutout(
+                &source_bytes,
+                &output.receipt.artifact.artifact_id,
+                &output.receipt.artifact.sha256,
+                frame_size,
+                alpha_target,
+                expected_anchor,
+                anchor_policy,
+            )?
+        };
         if reprocessed_bytes != bytes || processing_evidence != output.processing_evidence {
             return Err(ProxyError::Request(
                 "Game Asset processed output cannot be reproduced from its retained source bytes"
@@ -2286,7 +2295,10 @@ mod tests {
                 height: 6,
             }
         );
-        assert_eq!(inspect_pixels(&first, "feet").unwrap().anchor, expected_anchor);
+        assert_eq!(
+            inspect_pixels(&first, "feet").unwrap().anchor,
+            expected_anchor
+        );
     }
 
     #[test]
@@ -2320,6 +2332,72 @@ mod tests {
                 height: 4,
             }
         );
+    }
+
+    #[test]
+    #[ignore = "requires CUTOUT_REAL_GAME_SOURCE_DIR and CUTOUT_REAL_GAME_NORMALIZED_OUTPUT_DIR"]
+    fn normalizes_retained_real_qwen_sources_without_provider_calls() {
+        let source_dir = std::env::var("CUTOUT_REAL_GAME_SOURCE_DIR")
+            .expect("CUTOUT_REAL_GAME_SOURCE_DIR is required");
+        let output_dir = std::env::var("CUTOUT_REAL_GAME_NORMALIZED_OUTPUT_DIR")
+            .expect("CUTOUT_REAL_GAME_NORMALIZED_OUTPUT_DIR is required");
+        std::fs::create_dir_all(&output_dir).expect("could not create normalized output directory");
+        let frame_size = PixelSize {
+            width: 1024,
+            height: 1024,
+        };
+        let alpha_target = PixelSize {
+            width: 640,
+            height: 800,
+        };
+        let expected_anchor = AnchorPoint { x: 512.0, y: 912.0 };
+        let mut summaries = Vec::new();
+        for frame_index in 1..=4 {
+            let source_name = format!("frame-{frame_index:02}-source.png");
+            let source = std::fs::read(std::path::Path::new(&source_dir).join(&source_name))
+                .expect("could not read retained real Qwen source bytes");
+            let source_hash = sha256(&source);
+            let source_id = format!("artifact:sha256:{source_hash}");
+            let (output, processing_evidence) = deterministic_cutout(
+                &source,
+                &source_id,
+                &source_hash,
+                &frame_size,
+                &alpha_target,
+                &expected_anchor,
+                "feet",
+            )
+            .expect("retained real Qwen source could not be normalized");
+            let pixel_evidence =
+                inspect_pixels(&output, "feet").expect("normalized real output is invalid");
+            let width_slack = alpha_target.width - pixel_evidence.alpha_bounds.width;
+            let height_slack = alpha_target.height - pixel_evidence.alpha_bounds.height;
+            assert!(width_slack <= 1 || height_slack <= 1);
+            assert!(!pixel_evidence.edge_contact);
+            assert!((pixel_evidence.anchor.x - expected_anchor.x).abs() <= 0.5);
+            assert!((pixel_evidence.anchor.y - expected_anchor.y).abs() <= 0.5);
+            let output_name = format!("frame-{frame_index:02}-cutout-v2.png");
+            std::fs::write(std::path::Path::new(&output_dir).join(&output_name), output)
+                .expect("could not retain normalized real Qwen output");
+            summaries.push(serde_json::json!({
+                "frame": frame_index,
+                "sourceFile": source_name,
+                "outputFile": output_name,
+                "processingEvidence": processing_evidence,
+                "pixelEvidence": pixel_evidence,
+            }));
+        }
+        let summary = serde_json::to_vec_pretty(&serde_json::json!({
+            "schema": "cutout.game-asset-real-normalization.v2",
+            "providerCalls": 0,
+            "frames": summaries,
+        }))
+        .expect("could not encode normalized real Qwen evidence");
+        std::fs::write(
+            std::path::Path::new(&output_dir).join("normalization-summary.json"),
+            summary,
+        )
+        .expect("could not retain normalized real Qwen evidence");
     }
 
     #[test]

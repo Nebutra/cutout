@@ -34,8 +34,8 @@ const migrationBundled: LocalizedReleaseNotes = {
 
 describe("release notes model", () => {
   it("bundles exact-version notes and applies whole-locale English fallback", () => {
-    expect(bundled.version).toBe("0.1.19");
-    expect(selectLocalizedReleaseNotes(bundled, "zh-CN")?.headline).toContain("付费决策");
+    expect(bundled.version).toBe("0.1.20");
+    expect(selectLocalizedReleaseNotes(bundled, "zh-CN")?.headline).toContain("本机 AI");
     expect(selectLocalizedReleaseNotes(bundled, "de-DE")?.headline).toBe(
       bundled.locales.en.headline,
     );
@@ -44,19 +44,19 @@ describe("release notes model", () => {
 
   it("prefers typed localized updater notes and safely falls back to plain text", () => {
     expect(resolveUpdateReleaseNotes({
-      version: "0.1.19",
+      version: "0.1.20",
       localizedNotes: bundled,
       notes: "English fallback",
-    }, "ja")?.headline).toContain("有料アクション");
+    }, "ja")?.headline).toContain("ローカル AI");
     // Deliberately a version the bundled catalog does not carry, so the typed
     // notes cannot apply and the plain-text fallback has to.
     expect(resolveUpdateReleaseNotes({
-      version: "0.1.20",
+      version: "0.1.21",
       localizedNotes: bundled,
       notes: "Readable English fallback.",
       publishedAt: "2026-08-04T10:00:00Z",
     }, "fr")).toMatchObject({
-      version: "0.1.20",
+      version: "0.1.21",
       releasedOn: "2026-08-04",
       highlights: [{ id: "release-notes-fallback", body: "Readable English fallback." }],
     });

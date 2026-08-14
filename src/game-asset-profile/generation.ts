@@ -89,6 +89,7 @@ const normalizedGameAssetRasterProcessingEvidenceSchema = z.object({
   ...rasterProcessingIdentityShape,
   implementation: z.literal(GAME_ASSET_RASTER_PROCESSOR),
   sourceAlphaBounds: rasterAlphaBoundsSchema,
+  sourceSize: rasterPixelSizeSchema,
   frameSize: rasterPixelSizeSchema,
   alphaTarget: rasterPixelSizeSchema,
   expectedAnchor: z.object({ x: z.number().finite(), y: z.number().finite() }).strict(),
@@ -98,7 +99,9 @@ const normalizedGameAssetRasterProcessingEvidenceSchema = z.object({
   placement: rasterAlphaBoundsSchema,
   outputAlphaBounds: rasterAlphaBoundsSchema,
 }).strict().superRefine((evidence, context) => {
-  if (evidence.alphaTarget.width > evidence.frameSize.width
+  if (evidence.sourceAlphaBounds.x + evidence.sourceAlphaBounds.width > evidence.sourceSize.width
+    || evidence.sourceAlphaBounds.y + evidence.sourceAlphaBounds.height > evidence.sourceSize.height
+    || evidence.alphaTarget.width > evidence.frameSize.width
     || evidence.alphaTarget.height > evidence.frameSize.height
     || evidence.resizedSubjectSize.width > evidence.alphaTarget.width
     || evidence.resizedSubjectSize.height > evidence.alphaTarget.height

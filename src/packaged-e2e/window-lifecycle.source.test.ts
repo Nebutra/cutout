@@ -146,6 +146,14 @@ describe('packaged E2E macOS window lifecycle', () => {
     expect(smokeScript).not.toContain('"$current_bundle_id" != "$baseline_frontmost_bundle_id"')
   })
 
+  it('shows the production window without waiting on a hidden animation frame', () => {
+    expect(frontendEntry).toContain('const isTauriWindow =')
+    expect(frontendEntry).toContain('if (packagedE2e || isTauriWindow)')
+    expect(frontendEntry).toContain('if (isTauriWindow)')
+    expect(frontendEntry).toContain('await getCurrentWindow().show()')
+    expect(frontendEntry).not.toContain('requestAnimationFrame')
+  })
+
   it('keeps screenshot capture fixed-path and disabled outside packaged E2E', () => {
     const capture = packagedE2eCommand.slice(
       packagedE2eCommand.indexOf('pub async fn packaged_e2e_capture_window'),

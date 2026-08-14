@@ -99,6 +99,16 @@ export const gameAssetPlanSchema = z.object({
   }
   const cells = plan.delivery.columns * plan.delivery.rows
   if (cells < plan.roles.length) context.addIssue({ code: 'custom', message: 'Delivery atlas cannot hold every declared role.' })
+  if (plan.roles.some((role) => role.expectedAlphaSize.width > plan.delivery.frameWidth
+    || role.expectedAlphaSize.height > plan.delivery.frameHeight)) {
+    context.addIssue({ code: 'custom', message: 'Game Asset alpha envelopes must fit within the delivery frame.' })
+  }
+  if (plan.roles.some((role) => role.expectedAnchor.x < 0
+    || role.expectedAnchor.x > plan.delivery.frameWidth
+    || role.expectedAnchor.y < 0
+    || role.expectedAnchor.y > plan.delivery.frameHeight)) {
+    context.addIssue({ code: 'custom', message: 'Game Asset expected anchors must lie within the delivery frame.' })
+  }
 })
 export type GameAssetPlan = z.infer<typeof gameAssetPlanSchema>
 

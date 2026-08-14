@@ -57,8 +57,6 @@ export function extractVisibleHtml(value) {
   const visibleText = withoutActive
     .replace(/<br\s*\/?>|<\/(?:div|li|p|section|td|tr)>/gi, ' ')
     .replace(/<[^>]+>/g, ' ')
-    .replace(/&(?:nbsp|#160);/gi, ' ')
-    .replace(/&amp;/gi, '&').replace(/&lt;/gi, '<').replace(/&gt;/gi, '>').replace(/&quot;/gi, '"').replace(/&#39;|&apos;/gi, "'")
     .replace(/\s+/g, ' ').trim()
   return { visibleText: visibleText.slice(0, 20_000), mediaUrls: [...new Set(mediaUrls)].slice(0, 20) }
 }

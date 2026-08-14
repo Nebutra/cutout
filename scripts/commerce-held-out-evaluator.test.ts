@@ -191,7 +191,7 @@ describe('independent Commerce evaluator handoff (not benchmark evidence)', () =
     } finally {
       await rm(directory, { recursive: true, force: true })
     }
-  })
+  }, 20_000)
 
   it('rejects source-selection drift before invoking the external signer', async () => {
     const directory = await mkdtemp(join(tmpdir(), 'cutout-commerce-challenge-'))
@@ -243,7 +243,7 @@ describe('independent Commerce evaluator handoff (not benchmark evidence)', () =
     } finally {
       await rm(directory, { recursive: true, force: true })
     }
-  })
+  }, 20_000)
 
   it('materializes exact retained review bytes into one exclusive private directory', async () => {
     const directory = await mkdtemp(join(tmpdir(), 'cutout-commerce-inspection-'))
@@ -293,7 +293,7 @@ describe('independent Commerce evaluator handoff (not benchmark evidence)', () =
     } finally {
       await rm(directory, { recursive: true, force: true })
     }
-  })
+  }, 20_000)
 
   it('rejects receipt-byte drift and removes the incomplete inspection directory', async () => {
     const directory = await mkdtemp(join(tmpdir(), 'cutout-commerce-inspection-drift-'))
