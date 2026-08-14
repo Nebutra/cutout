@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import { pngDimensionFixture } from '@/lib/raster-dimensions.test-fixture'
 import { IDBFactory } from 'fake-indexeddb'
 import {
   createEmptyProjectRecord,
@@ -285,7 +286,7 @@ describe('project-repository.local', () => {
             plan,
             pages: plan.pages.map((page) => ({
               page,
-              bytes: Uint8Array.from([4, 5, 6]),
+              bytes: pngDimensionFixture(page.viewport.width, page.viewport.height, 4),
               mediaType: 'image/png',
               width: page.viewport.width,
               height: page.viewport.height,
@@ -505,7 +506,7 @@ describe('project-repository.local', () => {
     expect(
       loaded.data.workspace?.prototypeSuiteCandidates
         ?.artifacts['candidate:suite:repository']?.pages[0]?.bytes,
-    ).toEqual(Uint8Array.from([4, 5, 6]))
+    ).toEqual(pngDimensionFixture(1440, 1024, 4))
     expect(loaded.data.workspace?.codingReceipts?.[0]?.receiptId)
       .toBe('receipt:repository-suite')
   })
@@ -757,6 +758,36 @@ describe('project-repository.local', () => {
     expect(restored.ok).toBe(true)
     if (!restored.ok) return
     expect(restored.data.archivedAt).toBeUndefined()
+  })
+
+  it('rejects a stale autosave after the project lifecycle changes', async () => {
+    const repo = makeRepo()
+    const project = {
+      ...createEmptyProjectRecord(350),
+      name: 'Archive race',
+      brief: 'preserve archive authority',
+      status: 'Draft' as const,
+    }
+    expect((await repo.save(project)).ok).toBe(true)
+
+    const archived = await repo.archive(project.id, 450)
+    expect(archived.ok).toBe(true)
+
+    const staleAutosave = await repo.save({
+      ...project,
+      brief: 'late workspace write',
+      updatedAt: 500,
+    })
+    expect(staleAutosave).toEqual({
+      ok: false,
+      error: 'Project lifecycle changed during autosave.',
+    })
+
+    const loaded = await repo.load(project.id)
+    expect(loaded.ok).toBe(true)
+    if (!loaded.ok) return
+    expect(loaded.data.archivedAt).toBe(450)
+    expect(loaded.data.brief).toBe('preserve archive authority')
   })
 
   it('creates autosave records from the store workspace snapshot', async () => {

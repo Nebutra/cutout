@@ -6,6 +6,8 @@ export type WorkspaceMode = z.infer<typeof workspaceModeSchema>;
 
 export const workspaceInspectorSchema = z.enum([
   "sources",
+  "commerce",
+  "game-assets",
   "specimen",
   "figma",
   "workflows",
@@ -17,6 +19,8 @@ export type WorkspaceInspector = z.infer<typeof workspaceInspectorSchema>;
 
 const systemInspectorSchema = z.enum([
   "sources",
+  "commerce",
+  "game-assets",
   "specimen",
   "figma",
   "workflows",
@@ -81,6 +85,8 @@ export const workspaceWorkbenchTabSchema = z.enum([
   "delivery",
   "workflows",
   "sources",
+  "commerce",
+  "game-assets",
   "specimen",
   "figma",
   "kits",
@@ -112,6 +118,8 @@ export function workbenchTabForNavigation(
   }
   if (value.mode === "agent") return "overview";
   return value.inspector === "sources" ||
+    value.inspector === "commerce" ||
+    value.inspector === "game-assets" ||
     value.inspector === "specimen" ||
     value.inspector === "figma" ||
     value.inspector === "workflows"

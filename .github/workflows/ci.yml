@@ -50,6 +50,12 @@ jobs:
         run: cargo test --locked --manifest-path src-tauri/Cargo.toml
       - name: Check native application
         run: cargo check --locked --manifest-path src-tauri/Cargo.toml
+      - name: Install pinned Rust advisory scanner
+        if: runner.os == 'Linux'
+        run: cargo install cargo-audit --locked --version 0.22.2
+      - name: Audit Rust dependencies with the reviewed upstream exception
+        if: runner.os == 'Linux'
+        run: pnpm audit:rust
 
   contract:
     strategy:

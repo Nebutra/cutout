@@ -3,8 +3,10 @@ import type {
   PersistedPrototypeDesignSystem,
   PersistedPrototypePage,
 } from '@/workspace/workspace-snapshot'
+import { pngDimensionFixture } from '@/lib/raster-dimensions.test-fixture'
 import {
   projectPrototypeArtifacts,
+  prototypePageViewportValidationError,
   recoverPrototypeArtifacts,
 } from './prototype-artifact-recovery'
 
@@ -76,6 +78,55 @@ describe('prototype artifact recovery', () => {
     expect(repaired.hasValidDesignMarkdown).toBe(false)
     expect(repaired.documentation.status).toBe('repair-required')
   })
+
+  it('accepts proportional landscape and portrait output scaling', () => {
+    const landscape = page('landscape', 1280, 800)
+    const portrait = {
+      ...page('portrait', 780, 1688),
+      page: {
+        ...page('portrait').page,
+        viewport: {
+          ...page('portrait').page.viewport,
+          width: 390,
+          height: 844,
+        },
+      },
+    }
+
+    expect(prototypePageViewportValidationError(landscape.page, landscape)).toBeNull()
+    expect(prototypePageViewportValidationError(portrait.page, portrait)).toBeNull()
+  })
+
+  it('rejects a portrait image for a planned landscape page', () => {
+    const artifact = page('rotated', 1024, 1536)
+
+    expect(prototypePageViewportValidationError(artifact.page, artifact))
+      .toContain('different orientation')
+    expect(recoverPrototypeArtifacts({ designSystem: null, pages: [artifact] }))
+      .toMatchObject({ pages: [], rejectedPageIds: ['rotated'] })
+  })
+
+  it('rejects materially different proportions without requiring exact pixels', () => {
+    const artifact = page('distorted', 1600, 1000)
+    const mismatched = {
+      ...artifact,
+      page: {
+        ...artifact.page,
+        viewport: { ...artifact.page.viewport, width: 1440, height: 600 },
+      },
+    }
+
+    expect(prototypePageViewportValidationError(mismatched.page, mismatched))
+      .toContain('materially different')
+  })
+
+  it('rejects forged dimension metadata that disagrees with image bytes', () => {
+    const intrinsicPortrait = page('forged', 1024, 1536)
+    const forged = { ...intrinsicPortrait, width: 1440, height: 900 }
+
+    expect(prototypePageViewportValidationError(forged.page, forged))
+      .toContain('metadata does not match intrinsic 1024x1536')
+  })
 })
 
 function designSystem(
@@ -91,7 +142,7 @@ function designSystem(
   }
 }
 
-function page(id: string): PersistedPrototypePage {
+function page(id: string, width = 1440, height = 900): PersistedPrototypePage {
   return {
     page: {
       id,
@@ -109,9 +160,9 @@ function page(id: string): PersistedPrototypePage {
       states: [],
       interactions: [],
     },
-    bytes: new Uint8Array([137, 80, 78, 71]),
+    bytes: pngDimensionFixture(width, height),
     mediaType: 'image/png',
-    width: 1440,
-    height: 900,
+    width,
+    height,
   }
 }

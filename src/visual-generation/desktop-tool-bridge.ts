@@ -42,7 +42,7 @@ export function createDesktopVisualToolInvoker(input: {
         intent: `${invocation.capability === "generate-image" ? "Generate" : "Edit"} visual for ${invocation.taskId} (${invocation.nodeId})`,
         prompt: invocation.prompt,
         inputArtifactIds: [...invocation.inputArtifactIds, ...invocation.references],
-        approvalPolicy: "explicit",
+        approvalPolicy: "auto",
       });
       const authorization = input.authorize ? await input.authorize({ runId: invocation.runId, requestId: invocation.requestId, request }) : {};
       if (invocation.signal?.aborted)

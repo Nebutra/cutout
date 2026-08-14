@@ -1011,13 +1011,28 @@ fn discover_vibe(home: &Path) -> Result<Vec<ProviderCandidate>, DiscoveryError> 
 
 pub(super) fn discover(home: &Path) -> Result<Vec<ProviderCandidate>, DiscoveryError> {
     let mut rows = Vec::new();
-    rows.extend(discover_opencode(home)?);
-    rows.extend(discover_pi(home)?);
-    rows.extend(discover_omp(home)?);
-    rows.extend(discover_gemini(home)?);
-    rows.extend(discover_qwen(home)?);
-    rows.extend(discover_kimi(home)?);
-    rows.extend(discover_vibe(home)?);
+    let mut first_error = None;
+    for discover_source in [
+        discover_opencode as fn(&Path) -> Result<Vec<ProviderCandidate>, DiscoveryError>,
+        discover_pi,
+        discover_omp,
+        discover_gemini,
+        discover_qwen,
+        discover_kimi,
+        discover_vibe,
+    ] {
+        match discover_source(home) {
+            Ok(candidates) => rows.extend(candidates),
+            Err(error) => {
+                first_error.get_or_insert(error);
+            }
+        }
+    }
+    if rows.is_empty() {
+        if let Some(error) = first_error {
+            return Err(error);
+        }
+    }
     let mut seen = HashSet::new();
     rows.retain(|row| seen.insert(row.id.clone()));
     Ok(rows)
@@ -1529,6 +1544,31 @@ mod tests {
             assert!(discover_qwen(home.path()).is_err());
             assert!(discover_kimi(home.path()).is_err());
             assert!(discover_vibe(home.path()).is_err());
+        });
+    }
+
+    #[test]
+    fn malformed_agent_config_does_not_discard_other_reviewed_candidates() {
+        with_test_environment(&[], || {
+            let home = tempdir().unwrap();
+            let opencode = home.path().join(".config/opencode");
+            std::fs::create_dir_all(&opencode).unwrap();
+            std::fs::write(opencode.join("opencode.json"), "{").unwrap();
+            let qwen = home.path().join(".qwen");
+            std::fs::create_dir(&qwen).unwrap();
+            std::fs::write(
+                qwen.join("settings.json"),
+                r#"{"security":{"auth":{"apiKey":"qwen-secret"}}}"#,
+            )
+            .unwrap();
+
+            let rows = discover(home.path()).unwrap();
+            assert_eq!(rows.len(), 1);
+            assert_eq!(rows[0].source, "qwen-code");
+            assert_eq!(resolve(&rows[0], home.path()).unwrap(), "qwen-secret");
+            assert!(!serde_json::to_string(&rows)
+                .unwrap()
+                .contains("qwen-secret"));
         });
     }
 

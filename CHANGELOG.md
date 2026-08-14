@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.1.20 - 2026-08-14
+
+- Improve automatic local AI setup so verified text and image routes are
+  selected independently from the credentials already present on the device.
+- Bind provider credentials to the signed macOS Cutout process without
+  broadening Keychain access; existing legacy items migrate only after macOS
+  permits their first read.
+- Move governance-only code off the first-paint bundle and strengthen
+  background packaged production evidence for Agent-authored planning.
+
 ## 0.1.19 - 2026-08-05
 
 - Show Agent preparation as four named phases — context, runtime, response, validation — inside one compact disclosure, instead of a single opaque wait.

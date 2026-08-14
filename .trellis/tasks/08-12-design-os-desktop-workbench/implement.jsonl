@@ -1,0 +1,6 @@
+{"_example": "Fill with {\"file\": \"<path>\", \"reason\": \"<why>\"}. Put spec/research files only — no code paths. Run `python3 .trellis/scripts/get_context.py --mode packages` to list available specs. Delete this line once real entries are added."}
+{"file": ".trellis/spec/frontend/component-guidelines.md", "reason": "Existing component, accessibility and visual implementation conventions."}
+{"file": ".trellis/spec/frontend/hook-guidelines.md", "reason": "Lifecycle, async and state projection constraints."}
+{"file": ".trellis/spec/frontend/state-management.md", "reason": "Canonical workspace state and persistence boundaries."}
+{"file": ".trellis/spec/frontend/prototype-generation.md", "reason": "Current prototype UX and regression behavior."}
+{"file": ".trellis/tasks/08-12-commerce-material-agent/research/design-agent-management.md", "reason": "Designer/Builder lens and project-management research evidence."}

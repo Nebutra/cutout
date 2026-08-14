@@ -1,10 +1,14 @@
 import { bytesToBlob } from '@/lib/image'
+import { readRasterDimensions } from '@/lib/raster-dimensions'
 import type {
   PersistedPrototypeDesignSystem,
   PersistedPrototypeImage,
   PersistedPrototypePage,
 } from '@/workspace/workspace-snapshot'
 import { designSystemMarkdownValidationError } from './design-system-validation'
+import type { PrototypePage } from './prototype-plan'
+
+const MAX_PROTOTYPE_PAGE_ASPECT_RATIO_SCALE = 1.25
 
 export interface PrototypeImageArtifact extends PersistedPrototypeImage {
   readonly blob: Blob
@@ -60,6 +64,40 @@ export function prototypeMediaValidationError(
   return null
 }
 
+/**
+ * Validate one page against its planned canvas using intrinsic image bytes.
+ * Providers may scale a requested viewport, but they may not rotate it, return
+ * a materially different canvas, or rely on forged persisted dimensions.
+ */
+export function prototypePageViewportValidationError(
+  page: Pick<PrototypePage, 'id' | 'viewport'>,
+  artifact: Pick<PersistedPrototypeImage, 'bytes' | 'width' | 'height'>,
+): string | null {
+  const intrinsic = readRasterDimensions(artifact.bytes)
+  const prefix = `Prototype page viewport contract failed for "${page.id}"`
+  if (!intrinsic) {
+    return `${prefix}: image bytes do not expose valid raster dimensions.`
+  }
+  if (intrinsic.width !== artifact.width || intrinsic.height !== artifact.height) {
+    return `${prefix}: persisted ${artifact.width}x${artifact.height} metadata does not match intrinsic ${intrinsic.width}x${intrinsic.height} image bytes.`
+  }
+
+  const planned = page.viewport
+  const plannedOrientation = Math.sign(planned.width - planned.height)
+  const actualOrientation = Math.sign(intrinsic.width - intrinsic.height)
+  if (plannedOrientation !== 0 && actualOrientation !== plannedOrientation) {
+    return `${prefix}: planned ${planned.width}x${planned.height} but received ${intrinsic.width}x${intrinsic.height} with a different orientation.`
+  }
+
+  const plannedRatio = planned.width / planned.height
+  const actualRatio = intrinsic.width / intrinsic.height
+  const ratioScale = Math.max(actualRatio / plannedRatio, plannedRatio / actualRatio)
+  if (ratioScale > MAX_PROTOTYPE_PAGE_ASPECT_RATIO_SCALE) {
+    return `${prefix}: planned ${planned.width}x${planned.height} but received materially different ${intrinsic.width}x${intrinsic.height} proportions.`
+  }
+  return null
+}
+
 /** Restore current workspace artifacts without conflating media and docs. */
 export function recoverPrototypeArtifacts(
   input: PersistedPrototypeArtifactsInput,
@@ -74,7 +112,10 @@ export function recoverPrototypeArtifacts(
   const rejectedPageIds: string[] = []
 
   for (const page of input.pages) {
-    if (prototypeMediaValidationError(page)) {
+    if (
+      prototypeMediaValidationError(page)
+      || prototypePageViewportValidationError(page.page, page)
+    ) {
       rejectedPageIds.push(page.page.id)
       continue
     }
@@ -95,12 +136,18 @@ export function projectPrototypeArtifacts(
     ? prototypeMediaValidationError(input.designSystem)
     : null
   const designSystem = designSystemMediaError ? null : input.designSystem
-  const pages = input.pages.filter((page) => !prototypeMediaValidationError(page))
+  const pages = input.pages.filter((page) =>
+    !prototypeMediaValidationError(page)
+    && !prototypePageViewportValidationError(page.page, page)
+  )
 
   return buildProjection({ designSystem, pages }, {
     designSystemMediaError,
     rejectedPageIds: input.pages
-      .filter((page) => Boolean(prototypeMediaValidationError(page)))
+      .filter((page) => Boolean(
+        prototypeMediaValidationError(page)
+        || prototypePageViewportValidationError(page.page, page),
+      ))
       .map((page) => page.page.id),
   })
 }

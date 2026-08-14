@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { lazy, Suspense, useEffect, useRef, useState, type ReactNode } from "react";
 import type { AuthoringKind } from "@/design-os-operations";
 import {
   Boxes,
@@ -12,6 +12,7 @@ import {
   FileSearch,
   PenTool,
   FolderInput,
+  Gamepad2,
   Layers3,
   Download,
   LibraryBig,
@@ -57,12 +58,26 @@ import {
 import { projectComponentReadiness } from "./component-readiness";
 import { deliveryWorkspaceClasses } from "@/workspace/delivery-workspace-ui";
 
+const GameAssetProductionPanel = lazy(() =>
+  import("./GameAssetProductionPanel").then((module) => ({
+    default: module.GameAssetProductionPanel,
+  })),
+);
+
+const CommerceProductionPanel = lazy(() =>
+  import("./CommerceProductionPanel").then((module) => ({
+    default: module.CommerceProductionPanel,
+  })),
+);
+
 export type DesignOsReadiness = "ready" | "blocked" | "pending" | "unavailable";
 export type DesignOsWorkbenchTab =
   | "overview"
   | "delivery"
   | "workflows"
   | "sources"
+  | "commerce"
+  | "game-assets"
   | "specimen"
   | "figma"
   | "kits"
@@ -326,6 +341,12 @@ export function DesignOsWorkbench({
                 <WorkbenchTab value="sources" icon={<FolderInput />}>
                   Sources
                 </WorkbenchTab>
+                <WorkbenchTab value="commerce" icon={<ReceiptText />}>
+                  Commerce
+                </WorkbenchTab>
+                <WorkbenchTab value="game-assets" icon={<Gamepad2 />}>
+                  Game assets
+                </WorkbenchTab>
                 <WorkbenchTab value="specimen" icon={<Palette />}>
                   Specimen
                 </WorkbenchTab>
@@ -386,6 +407,24 @@ export function DesignOsWorkbench({
           ) : null}
           <TabsContent value="sources" className="m-0">
             <Sources model={model} callbacks={callbacks} />
+          </TabsContent>
+          <TabsContent value="commerce" className="m-0">
+            <Suspense fallback={(
+              <div className="flex min-h-64 items-center justify-center text-muted-foreground">
+                <RefreshCw className="size-4 animate-spin" aria-label="Loading Commerce production" />
+              </div>
+            )}>
+              <CommerceProductionPanel />
+            </Suspense>
+          </TabsContent>
+          <TabsContent value="game-assets" className="m-0">
+            <Suspense fallback={(
+              <div className="flex min-h-64 items-center justify-center text-muted-foreground">
+                <RefreshCw className="size-4 animate-spin" aria-label="Loading Game assets" />
+              </div>
+            )}>
+              <GameAssetProductionPanel />
+            </Suspense>
           </TabsContent>
           <TabsContent value="specimen" className="m-0">
             <Specimen model={model} callbacks={callbacks} />

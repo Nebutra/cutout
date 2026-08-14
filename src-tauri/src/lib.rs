@@ -12,7 +12,9 @@ pub fn run() {
         .manage(commands::registry_desktop::RegistryDesktopState::default())
         .manage(commands::agent_host::AgentHostDesktopState::default())
         .manage(commands::ai::ai_proxy::AiProxyCancellationState::default())
-        .manage(commands::ai::codex_system::CodexSystemRuntimeState::default());
+        .manage(commands::ai::game_asset_generation::GameAssetGenerationState::default())
+        .manage(commands::ai::codex_system::CodexSystemRuntimeState::default())
+        .manage(commands::monotonic_deadline::MonotonicDeadlineState::default());
     #[cfg(desktop)]
     let builder = builder.manage(commands::updater::UpdateRuntimeState::default());
     #[cfg(desktop)]
@@ -31,6 +33,8 @@ pub fn run() {
             commands::packaged_e2e::packaged_e2e_mode,
             commands::packaged_e2e::packaged_e2e_tick,
             commands::packaged_e2e::packaged_e2e_checkpoint,
+            commands::packaged_e2e::packaged_e2e_persist_evidence,
+            commands::packaged_e2e::packaged_e2e_capture_window,
             commands::packaged_e2e::packaged_e2e_complete,
             commands::foreground_segmentation::foreground_segmentation_capabilities,
             commands::foreground_segmentation::foreground_segment,
@@ -51,6 +55,8 @@ pub fn run() {
             commands::git::git_switch_branch,
             commands::git::git_push_preview,
             commands::git::git_push,
+            commands::monotonic_deadline::wait_for_monotonic_deadline,
+            commands::monotonic_deadline::cancel_monotonic_deadline,
             // BYOK: keychain key management
             commands::ai::keys::set_key,
             commands::ai::keys::key_status,
@@ -76,6 +82,22 @@ pub fn run() {
             commands::ai::ai_proxy::ai_proxy_cancel,
             // BYOK: 垫图 reference-conditioned image edit (multipart /images/edits)
             commands::ai::image_edit::ai_image_edit,
+            commands::ai::commerce_source_ingest::ai_ingest_competition_source_image,
+            commands::ai::commerce_source_ingest::verify_commerce_source_ingest_receipt,
+            commands::ai::commerce_held_out::create_commerce_held_out_commitment,
+            commands::ai::commerce_held_out::verify_commerce_held_out_attestation,
+            commands::ai::dashscope_image::ai_dashscope_image,
+            commands::ai::dashscope_multimodal::ai_dashscope_structured_text,
+            commands::ai::dashscope_multimodal::ai_dashscope_vision_json,
+            commands::ai::dashscope_multimodal::ai_dashscope_video,
+            commands::ai::game_asset_generation::preview_game_asset_generation,
+            commands::ai::game_asset_generation::apply_game_asset_generation,
+            commands::ai::game_asset_generation::verify_game_asset_generation_authorization,
+            commands::ai::game_asset_generation::preview_game_asset_semantic_acceptance,
+            commands::ai::game_asset_generation::apply_game_asset_semantic_acceptance,
+            commands::ai::game_asset_generation::verify_game_asset_semantic_acceptance,
+            commands::ai::multimodal_receipt::verify_multimodal_host_artifact,
+            commands::ai::multimodal_receipt::promote_multimodal_video_playback,
             // PNG → SVG vectorization
             commands::vectorize::set_vectorizer_api_key,
             commands::vectorize::vectorizer_key_status,
@@ -153,11 +175,11 @@ pub fn run() {
                 use objc2_app_kit::NSApplication;
                 use objc2_foundation::{NSActivityOptions, NSProcessInfo, NSString};
 
-                // A fully hidden WKWebView can be suspended after a long native
-                // Provider await. Keep the dedicated E2E renderer visible to
-                // WebKit while making the process accessory-only and the window
-                // non-focusable, so it cannot activate or take keyboard focus.
-                app.set_activation_policy(tauri::ActivationPolicy::Accessory);
+                // This dedicated evidence bundle must never become the active
+                // application on the user's desktop. Prohibited is stronger
+                // than an accessory policy: AppKit cannot promote it while
+                // WebKit still renders the non-interactive background window.
+                app.set_activation_policy(tauri::ActivationPolicy::Prohibited);
                 let main_thread = MainThreadMarker::new()
                     .ok_or("packaged E2E setup must run on the macOS main thread")?;
                 NSApplication::sharedApplication(main_thread).unhideWithoutActivation();
@@ -172,7 +194,8 @@ pub fn run() {
                     .get_webview_window("main")
                     .ok_or("packaged E2E main window is unavailable")?;
                 window.set_focusable(false)?;
-                window.show()?;
+                commands::packaged_e2e::initialize_window_background(app.handle())?;
+                commands::packaged_e2e::start_background_window_watchdog(app.handle().clone());
                 if !window.is_visible()? || window.is_focused()? {
                     return Err("packaged E2E window lifecycle is unsafe".into());
                 }

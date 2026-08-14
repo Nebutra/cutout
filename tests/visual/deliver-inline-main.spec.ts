@@ -89,7 +89,7 @@ test("Deliver uses the workspace drawer before the full delivery surface", async
   await designButton.click();
   await expect(canvasInspector).toBeVisible();
   expect(await canvasInspector.innerText()).not.toMatch(/revision|provenance|host|json/i);
-  await canvasInspector.getByText("Advanced design system", { exact: true }).click();
+  await expect(canvasInspector.getByText("Advanced design system")).toHaveCount(0);
   await canvasInspector.getByRole("button", { name: "Open system inspector" }).click();
   const inspector = page.getByRole("dialog", { name: "System inspector" });
   await expect(inspector).toBeVisible();

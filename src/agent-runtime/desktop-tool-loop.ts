@@ -15,6 +15,7 @@ import type {
   ToolExecutorRegistry,
 } from "@/services/desktop-tool-executor";
 import type { ToolDurabilityStore } from './tool-durability'
+import { createMonotonicDeadline } from '@/platform/monotonic-deadline'
 
 export interface DesktopToolLoopRequest {
   readonly runId: string;
@@ -40,12 +41,12 @@ export interface DesktopToolLoopDependencies {
   readonly append: (events: readonly AgentRunEvent[]) => void;
   readonly now?: () => number;
   readonly id?: () => string;
-  readonly timeoutMs?: number;
+  readonly timeoutMs?: number | ((input: DesktopToolLoopRequest) => number);
   /** Optional durable request/attempt ledger and event outbox for desktop hosts. */
   readonly durability?: ToolDurabilityStore;
   /** Issues a short-lived capability lease only after this attempt has an
-   * actual approval event. Retries therefore receive a fresh, request-bound
-   * lease instead of replaying the previous attempt's authority. */
+   * observable execution event. Retries therefore receive a fresh,
+   * request-bound lease instead of replaying the previous attempt's authority. */
   readonly authorize?: (
     input: DesktopToolLoopRequest,
     approvalId: string,
@@ -141,7 +142,9 @@ export function createDesktopToolLoop(
       const authorization = dependencies.authorize
         ? await dependencies.authorize(
             call.input,
-            `event:${call.input.requestId}:tool-approved`,
+            approvalGranted
+              ? `event:${call.input.requestId}:tool-approved`
+              : `execution:${call.input.requestId}`,
           )
         : {};
       result = await withDeadline(
@@ -154,7 +157,9 @@ export function createDesktopToolLoop(
           onStarted: (event) => append([event]),
         }),
         call.controller,
-        dependencies.timeoutMs ?? 600_000,
+        typeof dependencies.timeoutMs === "function"
+          ? dependencies.timeoutMs(call.input)
+          : dependencies.timeoutMs ?? 600_000,
       );
     } catch (error) {
       result = loopFailure(call.input, safeExecutionError(error), now());
@@ -240,6 +245,9 @@ export function createDesktopToolLoop(
         dependencies.policy(),
         false,
       );
+      const awaitsHumanApproval = input.request.approvalPolicy === "explicit"
+        && Boolean(capability?.available)
+        && dependencies.policy().allowPaid;
       let resolve!: (result: DesktopToolExecutionResult) => void;
       const result = new Promise<DesktopToolExecutionResult>((done) => {
         resolve = done;
@@ -266,9 +274,9 @@ export function createDesktopToolLoop(
             : undefined,
           approvalPolicy: input.request.approvalPolicy,
           reason: plan.executable
-            ? "Eligible for automatic approval by host policy."
+            ? "BYOK execution will start immediately and remain observable."
             : (plan.reason ?? "Explicit approval is required."),
-          pendingApproval: !(plan.executable && Boolean(capability)),
+          pendingApproval: awaitsHumanApproval,
         },
         {
           eventId: `event:${input.requestId}:tool-approval-requested`,
@@ -295,7 +303,7 @@ export function createDesktopToolLoop(
               type: "tool-approved",
               toolCallId: input.toolCallId,
               requestId: input.requestId,
-              reason: "Automatically approved by host policy.",
+              reason: "Authorized by the configured BYOK provider policy.",
             },
             { eventId: `event:${input.requestId}:tool-approved`, at: now() },
           ),
@@ -303,6 +311,17 @@ export function createDesktopToolLoop(
         bindExternalAbort(call);
         if (call.state === "settled") return;
         await execute(call, false);
+        return;
+      }
+      if (!awaitsHumanApproval) {
+        call.state = "settled";
+        const failure = loopFailure(
+          input,
+          plan.reason ?? "Tool execution is unavailable.",
+          now(),
+        );
+        append([requested, ...failure.events]);
+        call.resolve(failure);
         return;
       }
       append([requested]);
@@ -418,7 +437,7 @@ export function createDesktopToolLoop(
               intent: "Unknown tool call",
               prompt: "Unknown tool call",
               inputArtifactIds: [],
-              approvalPolicy: "explicit",
+              approvalPolicy: "auto",
             },
           },
           "The tool call is unavailable.",
@@ -544,12 +563,24 @@ async function withDeadline<T>(
 ): Promise<T> {
   if (!Number.isFinite(timeoutMs) || timeoutMs <= 0)
     throw new Error("Provider deadline exceeded.");
+  const deadline = createMonotonicDeadline(timeoutMs);
   return new Promise<T>((resolve, reject) => {
-    const timer = setTimeout(() => {
+    let settled = false;
+    const settle = (complete: () => void) => {
+      if (settled) return;
+      settled = true;
+      deadline.cancel();
+      complete();
+    };
+    void deadline.elapsed.then((elapsed) => {
+      if (!elapsed) return;
       controller.abort();
-      reject(new Error("Provider deadline exceeded."));
-    }, timeoutMs);
-    promise.then(resolve, reject).finally(() => clearTimeout(timer));
+      settle(() => reject(new Error("Provider deadline exceeded.")));
+    });
+    promise.then(
+      (value) => settle(() => resolve(value)),
+      (error: unknown) => settle(() => reject(error)),
+    );
   });
 }
 

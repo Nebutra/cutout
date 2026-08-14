@@ -20,6 +20,9 @@ if (command === 'validate') {
   for (const unsupported of ['rollout', 'previous-version', 'previous-manifest-url']) {
     if (args[unsupported] !== undefined) throw new Error(`--${unsupported} is not supported by the desktop updater contract.`)
   }
+  for (const retired of ['artifact', 'artifact-url']) {
+    if (args[retired] !== undefined) throw new Error(`--${retired} is retired; use repeated --platform inputs with --artifact-base-url.`)
+  }
   const channel = args.channel ?? 'stable', output = resolve(args.output ?? 'dist/update')
   const platforms = await resolvePlatforms()
   const version = required('version')
@@ -45,17 +48,13 @@ async function resolveReleaseNotes(version) {
 }
 
 async function resolvePlatforms() {
-  if (platformFlags.length) {
-    const base = required('artifact-base-url').replace(/\/+$/, '')
-    return Promise.all(platformFlags.map(async (spec) => {
-      const eq = spec.indexOf('=')
-      if (eq <= 0) throw new Error(`--platform expects <key>=<artifactPath>, got: ${spec}`)
-      const key = spec.slice(0, eq), artifactPath = resolve(spec.slice(eq + 1)), signaturePath = `${artifactPath}.sig`
-      const signed = await readSignedArtifact(artifactPath, signaturePath)
-      return { key, artifactUrl: `${base}/${basename(artifactPath)}`, signature: signed.signature, artifactDigest: signed.digest, signatureFile: basename(signaturePath) }
-    }))
-  }
-  const artifactPath = resolve(required('artifact')), signaturePath = resolve(args.signature ?? `${artifactPath}.sig`)
-  const signed = await readSignedArtifact(artifactPath, signaturePath)
-  return [{ key: 'darwin-aarch64', artifactUrl: required('artifact-url'), signature: signed.signature, artifactDigest: signed.digest, signatureFile: basename(signaturePath) }]
+  if (!platformFlags.length) throw new Error('Repeated --platform <key>=<artifactPath> inputs are required for updater generation.')
+  const base = required('artifact-base-url').replace(/\/+$/, '')
+  return Promise.all(platformFlags.map(async (spec) => {
+    const eq = spec.indexOf('=')
+    if (eq <= 0) throw new Error(`--platform expects <key>=<artifactPath>, got: ${spec}`)
+    const key = spec.slice(0, eq), artifactPath = resolve(spec.slice(eq + 1)), signaturePath = `${artifactPath}.sig`
+    const signed = await readSignedArtifact(artifactPath, signaturePath)
+    return { key, artifactUrl: `${base}/${basename(artifactPath)}`, signature: signed.signature, artifactDigest: signed.digest, signatureFile: basename(signaturePath) }
+  }))
 }

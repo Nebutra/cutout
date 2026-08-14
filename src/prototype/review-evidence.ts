@@ -9,7 +9,7 @@ const routeSchema = z.object({
 
 export const prototypeReviewVerdictSchema = z.object({
   pass: z.boolean(),
-  failures: z.array(z.string().min(1).max(2_000)),
+  failures: z.array(z.string().min(1).max(500)).max(8),
   unavailable: z.boolean().optional(),
 }).strict()
 
@@ -31,6 +31,23 @@ export const prototypePageReviewRecordSchema = z.object({
   }
 })
 export type PrototypePageReviewRecord = z.infer<typeof prototypePageReviewRecordSchema>
+
+export function isPassingPrototypePageReview(
+  input: unknown,
+): input is PrototypePageReviewRecord {
+  const parsed = prototypePageReviewRecordSchema.safeParse(input)
+  return parsed.success
+    && parsed.data.verdict.pass
+    && parsed.data.verdict.unavailable !== true
+}
+
+export function countPassingPrototypePageReviews(
+  artifacts: readonly { readonly review?: unknown }[],
+): number {
+  return artifacts.filter((artifact) =>
+    isPassingPrototypePageReview(artifact.review)
+  ).length
+}
 
 export const prototypeResourceReviewRecordSchema = z.object({
   version: z.literal('prototype-resource-review.v1'),

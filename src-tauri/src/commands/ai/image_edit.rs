@@ -39,7 +39,7 @@ fn is_openai_shaped(kind: &str) -> bool {
 }
 
 /// Build the multipart form for an edits request: `model`, `prompt`, optional
-/// `size`, `input_fidelity` (caller defaults it to `high` for 垫图), and one
+/// `size`, optional `input_fidelity`, and one
 /// repeated `image` parts per reference image (PNG mime + filename). OpenAI's
 /// multipart contract names the field `image`; repeating that field represents
 /// multiple references. The bracketed `image[]` spelling is rejected by some
@@ -50,12 +50,14 @@ fn build_edit_form(
     prompt: &str,
     images: Vec<Vec<u8>>,
     size: Option<&str>,
-    input_fidelity: &str,
+    input_fidelity: Option<&str>,
 ) -> Form {
     let mut form = Form::new()
         .text("model", model.to_string())
-        .text("prompt", prompt.to_string())
-        .text("input_fidelity", input_fidelity.to_string());
+        .text("prompt", prompt.to_string());
+    if let Some(input_fidelity) = input_fidelity {
+        form = form.text("input_fidelity", input_fidelity.to_string());
+    }
     if let Some(size) = size {
         form = form.text("size", size.to_string());
     }
@@ -128,8 +130,8 @@ fn build_auth_headers(
 ///
 /// `images` are the raw reference-image bytes (one or more; sent as repeated
 /// `image` fields).
-/// `input_fidelity` defaults to `"high"` (preserves the reference's style, which
-/// is what 垫图 wants). The real key is read from the keychain and injected here;
+/// The webview normally requests high fidelity and may retry a compatible relay
+/// without the optional field after an HTTP 400. The real key is read from the keychain and injected here;
 /// non-2xx responses surface the HTTP status (secret-free), like the other proxy
 /// paths.
 #[tauri::command]
@@ -167,8 +169,13 @@ pub async fn ai_image_edit(
         let secret = read_secret(&provider_id).map_err(ProxyError::from)?;
         let header_map = build_auth_headers(provider.kind, Some(effective_protocol), &secret)?;
 
-        let fidelity = input_fidelity.as_deref().unwrap_or("high");
-        let form = build_edit_form(&model, &prompt, images, size.as_deref(), fidelity);
+        let form = build_edit_form(
+            &model,
+            &prompt,
+            images,
+            size.as_deref(),
+            input_fidelity.as_deref(),
+        );
 
         // Image edits can take several minutes on production models; use the image
         // endpoint timeout instead of the shorter text/probe cap.
@@ -225,14 +232,14 @@ mod tests {
             "redraw as assets",
             vec![vec![1, 2, 3], vec![4, 5, 6]],
             Some("1024x1024"),
-            "high",
+            Some("high"),
         );
         assert!(!form.boundary().is_empty());
     }
 
     #[test]
     fn build_edit_form_without_size_is_ok() {
-        let form = build_edit_form("m", "p", vec![vec![0u8]], None, "high");
+        let form = build_edit_form("m", "p", vec![vec![0u8]], None, None);
         assert!(!form.boundary().is_empty());
     }
 

@@ -1,0 +1,5 @@
+{"file":".trellis/spec/frontend/design-os-kernel.md","reason":"Reject Profile work that changes Kernel lifecycle, authority, history or promotion meaning."}
+{"file":".trellis/spec/frontend/commerce-production-profile.md","reason":"Verify Commerce canonical graph, evaluation and evidence semantics remain unchanged."}
+{"file":".trellis/spec/frontend/design-os-benchmark.md","reason":"Verify benchmark adapters derive reports and preserve versioned ruler meaning."}
+{"file":".trellis/tasks/08-13-full-scenario-design-os/research/commerce-session-promotion-analysis.md","reason":"Check Commerce-only rules did not leak into Platform registries or shared contracts."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Apply focused and full-scope repository quality gates."}

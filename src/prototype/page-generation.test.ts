@@ -55,6 +55,65 @@ describe('generatePrototypePageSet', () => {
     expect(progress.at(-1)).toEqual(['home', 'catalog', 'account', 'settings'])
   })
 
+  it('emits generating before every initial Provider call and later settlement stage', async () => {
+    const stages = new Map<string, string[]>()
+    const record = (pageId: string, value: string) => {
+      const pageStages = stages.get(pageId) ?? []
+      pageStages.push(value)
+      stages.set(pageId, pageStages)
+    }
+
+    await generatePrototypePageSet({
+      pages: pages.slice(0, 3),
+      mode: 'anchor-parallel',
+      concurrency: 2,
+      async generate(page) {
+        expect(stages.get(page.id)?.at(-1)).toBe('generating:1')
+        record(page.id, 'provider-call:1')
+        return artifact(page)
+      },
+      review: async (value) => value,
+      onPageStage: ({ page, stage, attempt }) => record(page.id, `${stage}:${attempt}`),
+    })
+
+    for (const page of pages.slice(0, 3)) {
+      expect(stages.get(page.id)).toEqual([
+        'generating:1',
+        'provider-call:1',
+        'generated:1',
+        'reviewing:1',
+        'accepted:1',
+      ])
+    }
+  })
+
+  it('exposes active generation while the Provider call remains unsettled', async () => {
+    let settleProvider!: (value: Artifact) => void
+    const provider = new Promise<Artifact>((resolve) => {
+      settleProvider = resolve
+    })
+    const stages: string[] = []
+    const published: string[][] = []
+    let settled = false
+
+    const pending = generatePrototypePageSet({
+      pages: pages.slice(0, 1),
+      mode: 'anchor-parallel',
+      concurrency: 1,
+      generate: () => provider,
+      onPageStage: ({ stage, attempt }) => stages.push(`${stage}:${attempt}`),
+      onProgress: (artifacts) => published.push(artifacts.map(({ page }) => page.id)),
+    })
+    void pending.then(() => { settled = true })
+
+    await vi.waitFor(() => expect(stages).toEqual(['generating:1']))
+    expect(published).toEqual([])
+    expect(settled).toBe(false)
+
+    settleProvider(artifact(pages[0]!))
+    await expect(pending).resolves.toHaveLength(1)
+  })
+
   it('uses the preceding planned page in serial mode', async () => {
     const predecessors: Array<string | undefined> = []
     await generatePrototypePageSet({
@@ -328,4 +387,110 @@ describe('generatePrototypePageSet', () => {
     expect(progress.some((items) => items.some((item) => !item.reviewed))).toBe(true)
     expect(progress.at(-1)?.every((item) => item.reviewed)).toBe(true)
   })
+
+  it('rerolls only rejected pages with review feedback and a bounded attempt', async () => {
+    type ReviewedArtifact = Artifact & {
+      readonly review?: { readonly pass: boolean; readonly failures: readonly string[] }
+      readonly attempt: number
+    }
+    const retries: Array<{
+      readonly page: string
+      readonly predecessor: string | undefined
+      readonly rejectedAttempt: number
+      readonly attempt: number
+    }> = []
+    const stages: string[] = []
+    const reviewedAttempts: number[] = []
+    const result = await generatePrototypePageSet<Page, ReviewedArtifact>({
+      pages: pages.slice(0, 3),
+      mode: 'anchor-parallel',
+      concurrency: 2,
+      reviewMode: 'overlap',
+      maxReviewRetries: 1,
+      generate: async (page) => ({ ...artifact(page), attempt: 1 }),
+      review: async (value, attempt) => {
+        if (value.page.id === 'catalog') reviewedAttempts.push(attempt)
+        return {
+          ...value,
+          review: {
+            pass: value.page.id !== 'catalog' || value.attempt > 1,
+            failures: value.attempt > 1 ? [] : ['missing product rail'],
+          },
+        }
+      },
+      isReviewAccepted: (value) => value.review?.pass === true,
+      shouldRetryReview: (value) => value.review?.pass === false,
+      retryAfterReview: async (page, predecessor, rejected, attempt) => {
+        retries.push({
+          page: page.id,
+          predecessor: predecessor?.page.id,
+          rejectedAttempt: rejected.attempt,
+          attempt,
+        })
+        return { ...artifact(page), attempt }
+      },
+      onPageStage: ({ page, stage, attempt }) => {
+        stages.push(`${page.id}:${stage}:${attempt}`)
+      },
+    })
+
+    expect(retries).toEqual([{
+      page: 'catalog',
+      predecessor: 'home',
+      rejectedAttempt: 1,
+      attempt: 2,
+    }])
+    expect(result.find((value) => value.page.id === 'catalog')).toMatchObject({
+      attempt: 2,
+      review: { pass: true },
+    })
+    expect(stages).toContain('catalog:rejected:1')
+    expect(stages).toContain('catalog:retrying:2')
+    expect(stages).toContain('catalog:accepted:2')
+    expect(stages.filter((stage) => stage.startsWith('catalog:'))).toEqual([
+      'catalog:generating:1',
+      'catalog:generated:1',
+      'catalog:reviewing:1',
+      'catalog:rejected:1',
+      'catalog:retrying:2',
+      'catalog:generating:2',
+      'catalog:generated:2',
+      'catalog:reviewing:2',
+      'catalog:accepted:2',
+    ])
+    expect(reviewedAttempts).toEqual([1, 2])
+  })
+
+  it('reports unavailable review as rejected without spending an image retry', async () => {
+    type ReviewedArtifact = Artifact & {
+      readonly review?: { readonly pass: boolean; readonly unavailable?: boolean }
+    }
+    let retries = 0
+    const stages: string[] = []
+    const result = await generatePrototypePageSet<Page, ReviewedArtifact>({
+      pages: pages.slice(0, 1),
+      mode: 'anchor-parallel',
+      concurrency: 1,
+      reviewMode: 'overlap',
+      maxReviewRetries: 1,
+      generate: async (page) => artifact(page),
+      review: async (value) => ({
+        ...value,
+        review: { pass: false, unavailable: true },
+      }),
+      isReviewAccepted: (value) => value.review?.pass === true,
+      shouldRetryReview: (value) =>
+        value.review?.pass === false && value.review.unavailable !== true,
+      retryAfterReview: async (page) => {
+        retries += 1
+        return artifact(page)
+      },
+      onPageStage: ({ stage }) => stages.push(stage),
+    })
+
+    expect(retries).toBe(0)
+    expect(result[0]?.review).toEqual({ pass: false, unavailable: true })
+    expect(stages.at(-1)).toBe('rejected')
+  })
+
 })

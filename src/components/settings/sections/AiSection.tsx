@@ -129,10 +129,10 @@ export function AiSection() {
 
   useEffect(() => {
     if (setup.status === 'ready') return
-    const key = setup.importableCandidates.map((candidate) => candidate.id).sort().join(':')
+    const key = setup.automaticCandidates.map((candidate) => candidate.id).sort().join(':')
     if (!key || automaticAttempt.current === key) return
     automaticAttempt.current = key
-    void runAutomaticSetup(setup.importableCandidates)
+    void runAutomaticSetup(setup.automaticCandidates)
   }, [runAutomaticSetup, setup])
 
   useEffect(() => {

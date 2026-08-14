@@ -217,6 +217,8 @@ pub enum CodexRuntimeError {
     Transport,
     #[error("planning runtime protocol is unsupported")]
     Protocol,
+    #[error("planning runtime turn failed")]
+    TurnFailed,
     #[error("planning runtime upstream is unavailable")]
     UpstreamUnavailable,
     #[error("planning runtime output exceeded its limit")]
@@ -1279,6 +1281,14 @@ fn binding_id(thread_id: &str) -> String {
     format!("codex:{}", &hash_text(&[thread_id])[..24])
 }
 
+fn binding_matches_context(
+    binding: &ConversationBinding,
+    context_revision: &str,
+    context_digest: &str,
+) -> bool {
+    binding.context_revision == context_revision && binding.context_digest == context_digest
+}
+
 fn bindings_path(root: &Path) -> PathBuf {
     root.join("bindings.json")
 }
@@ -1705,7 +1715,10 @@ fn retry_reason(value: &Value) -> &'static str {
 }
 
 fn reviewed_upstream_status(details: &serde_json::Map<String, Value>) -> bool {
-    details.get("httpStatusCode").and_then(Value::as_u64) == Some(503)
+    matches!(
+        details.get("httpStatusCode").and_then(Value::as_u64),
+        Some(429 | 502 | 503 | 504)
+    )
 }
 
 fn turn_error_failure_reason(error: Option<&Value>) -> StableTurnFailureReason {
@@ -1739,9 +1752,11 @@ fn turn_error_failure_reason(error: Option<&Value>) -> StableTurnFailureReason {
 fn observe_retryable_upstream_failure(value: &Value, observed: &mut bool) {
     if value.get("method").and_then(Value::as_str) == Some("error")
         && value.pointer("/params/willRetry").and_then(Value::as_bool) == Some(true)
-        && turn_error_failure_reason(value.pointer("/params/error"))
-            == StableTurnFailureReason::UpstreamUnavailable
     {
+        // `willRetry` is emitted only for Codex StreamError notifications. It
+        // is a closed native retry decision, so it remains authoritative when
+        // the eventual terminal envelope degrades `codexErrorInfo` to `other`.
+        // Provider messages and additionalDetails never cross this boundary.
         *observed = true;
     }
 }
@@ -1769,6 +1784,14 @@ fn terminal_turn_failure_reason(
         StableTurnFailureReason::UpstreamUnavailable
     } else {
         reason
+    }
+}
+
+fn terminal_turn_failure_error(reason: StableTurnFailureReason) -> CodexRuntimeError {
+    match reason {
+        StableTurnFailureReason::UpstreamUnavailable => CodexRuntimeError::UpstreamUnavailable,
+        StableTurnFailureReason::RuntimeFailed => CodexRuntimeError::TurnFailed,
+        StableTurnFailureReason::ModelOutputInvalid => CodexRuntimeError::OutputInvalid,
     }
 }
 
@@ -1815,13 +1838,8 @@ fn begin_active(
         .active
         .lock()
         .map_err(|_| CodexRuntimeError::Transport)?;
-    if let Some(current) = active.as_ref() {
-        if current.workspace_handle == input.workspace_handle {
-            return Err(CodexRuntimeError::Busy);
-        }
-        if let Some(pid) = current.pid {
-            terminate_process_group(pid);
-        }
+    if active.is_some() {
+        return Err(CodexRuntimeError::Busy);
     }
     *active = Some(ActiveRuntime {
         request_id: input.request_id.clone(),
@@ -1967,6 +1985,11 @@ fn run_turn(
                 .map_err(|_| CodexRuntimeError::Transport)?;
             load_bindings(&root)?.bindings.get(&key).cloned()
         };
+        if binding.as_ref().is_some_and(|saved| {
+            !binding_matches_context(saved, &input.context_revision, &context_digest)
+        }) {
+            return Err(CodexRuntimeError::StaleThread);
+        }
         let (mut child, writer, stdout, overflow) =
             spawn_app_server(&identity, &runtime_home, &cwd)?;
         if let Err(error) = register_active_process(&state, &input.request_id, child.id()) {
@@ -2166,12 +2189,7 @@ fn run_turn(
                                     &value,
                                     retryable_upstream_observed,
                                 );
-                                return Err(match reason {
-                                    StableTurnFailureReason::UpstreamUnavailable => {
-                                        CodexRuntimeError::UpstreamUnavailable
-                                    }
-                                    _ => CodexRuntimeError::Protocol,
-                                });
+                                return Err(terminal_turn_failure_error(reason));
                             }
                             _ => return Err(CodexRuntimeError::Protocol),
                         }
@@ -2295,11 +2313,13 @@ pub async fn codex_system_turn_start(
         finish_active(&state, &input.request_id);
         return Err(error);
     }
-    tauri::async_runtime::spawn_blocking(move || {
+    let result = tauri::async_runtime::spawn_blocking(move || {
         run_turn(identity, root, runtime_version, state, input, on_event)
     })
     .await
-    .map_err(|_| CodexRuntimeError::Transport)?
+    .map_err(|_| CodexRuntimeError::Transport)?;
+    let _ = crate::commands::packaged_e2e::pulse_background_renderer(&app);
+    result
 }
 
 fn control_active(
@@ -2682,6 +2702,65 @@ env_key = "PRIVATE_KEY""#,
     }
 
     #[test]
+    fn active_turn_is_process_wide_and_cannot_be_replaced_by_another_workspace() {
+        let state = RuntimeStateInner::default();
+        let first = CodexTurnStartInput {
+            request_id: uuid::Uuid::new_v4().to_string(),
+            workspace_handle: "workspace.first".into(),
+            conversation_id: "conversation.first".into(),
+            context_revision: "revision.1".into(),
+            prompt: "Plan a restaurant site".into(),
+            context: json!({}),
+            output_schema: json!({ "type": "object" }),
+        };
+        let second = CodexTurnStartInput {
+            request_id: uuid::Uuid::new_v4().to_string(),
+            workspace_handle: "workspace.second".into(),
+            conversation_id: "conversation.second".into(),
+            context_revision: "revision.1".into(),
+            prompt: "Plan a tool site".into(),
+            context: json!({}),
+            output_schema: json!({ "type": "object" }),
+        };
+        begin_active(&state, &first).unwrap();
+        assert!(matches!(
+            begin_active(&state, &second),
+            Err(CodexRuntimeError::Busy)
+        ));
+        let active = state.active.lock().unwrap();
+        assert_eq!(
+            active.as_ref().map(|turn| turn.request_id.as_str()),
+            Some(first.request_id.as_str())
+        );
+        assert!(!active.as_ref().unwrap().interrupted);
+    }
+
+    #[test]
+    fn saved_conversation_binding_requires_the_exact_revision_and_context_digest() {
+        let binding = ConversationBinding {
+            thread_id: "thread.1".into(),
+            context_revision: "revision.1".into(),
+            context_digest: "a".repeat(64),
+            updated_at: 1,
+        };
+        assert!(binding_matches_context(
+            &binding,
+            "revision.1",
+            &"a".repeat(64)
+        ));
+        assert!(!binding_matches_context(
+            &binding,
+            "revision.2",
+            &"a".repeat(64)
+        ));
+        assert!(!binding_matches_context(
+            &binding,
+            "revision.1",
+            &"b".repeat(64)
+        ));
+    }
+
+    #[test]
     fn process_is_registered_before_the_protocol_handshake() {
         let state = RuntimeStateInner::default();
         let input = CodexTurnStartInput {
@@ -2855,37 +2934,39 @@ env_key = "PRIVATE_KEY""#,
     }
 
     #[test]
-    fn structured_terminal_503_envelope_projects_only_a_closed_reason() {
-        let terminal = json!({
-            "method": "turn/completed",
-            "params": {
-                "threadId": "thread.1",
-                "turn": {
-                    "id": "turn.1",
-                    "items": [],
-                    "status": "failed",
-                    "error": {
-                        "message": "upstream response contained sk-secret-never-serialize",
-                        "additionalDetails": "private provider body",
-                        "codexErrorInfo": {
-                            "responseTooManyFailedAttempts": { "httpStatusCode": 503 }
+    fn structured_terminal_transient_envelopes_project_only_a_closed_reason() {
+        for status in [429, 502, 503, 504] {
+            let terminal = json!({
+                "method": "turn/completed",
+                "params": {
+                    "threadId": "thread.1",
+                    "turn": {
+                        "id": "turn.1",
+                        "items": [],
+                        "status": "failed",
+                        "error": {
+                            "message": "upstream response contained sk-secret-never-serialize",
+                            "additionalDetails": "private provider body",
+                            "codexErrorInfo": {
+                                "responseTooManyFailedAttempts": { "httpStatusCode": status }
+                            }
                         }
                     }
                 }
-            }
-        });
-        let reason = terminal_turn_failure_reason(&terminal, false);
-        assert_eq!(reason, StableTurnFailureReason::UpstreamUnavailable);
-        let projected = CodexPlanningEvent::Failed {
-            request_id: uuid::Uuid::new_v4().to_string(),
-            turn_id: "turn.1".into(),
-            reason,
-        };
-        let serialized = serde_json::to_string(&projected).unwrap();
-        assert!(serialized.contains("\"type\":\"failed\""));
-        assert!(serialized.contains("\"reason\":\"upstream-unavailable\""));
-        assert!(!serialized.contains("secret"));
-        assert!(!serialized.contains("private provider body"));
+            });
+            let reason = terminal_turn_failure_reason(&terminal, false);
+            assert_eq!(reason, StableTurnFailureReason::UpstreamUnavailable);
+            let projected = CodexPlanningEvent::Failed {
+                request_id: uuid::Uuid::new_v4().to_string(),
+                turn_id: "turn.1".into(),
+                reason,
+            };
+            let serialized = serde_json::to_string(&projected).unwrap();
+            assert!(serialized.contains("\"type\":\"failed\""));
+            assert!(serialized.contains("\"reason\":\"upstream-unavailable\""));
+            assert!(!serialized.contains("secret"));
+            assert!(!serialized.contains("private provider body"));
+        }
     }
 
     #[test]
@@ -2925,6 +3006,18 @@ env_key = "PRIVATE_KEY""#,
                 StableTurnFailureReason::RuntimeFailed
             );
         }
+    }
+
+    #[test]
+    fn valid_terminal_runtime_failure_is_not_misclassified_as_protocol_drift() {
+        assert!(matches!(
+            terminal_turn_failure_error(StableTurnFailureReason::RuntimeFailed),
+            CodexRuntimeError::TurnFailed
+        ));
+        assert!(matches!(
+            terminal_turn_failure_error(StableTurnFailureReason::UpstreamUnavailable),
+            CodexRuntimeError::UpstreamUnavailable
+        ));
     }
 
     #[test]
@@ -3002,6 +3095,55 @@ env_key = "PRIVATE_KEY""#,
             terminal_turn_failure_reason(&explicit_auth_failure, retryable_upstream_observed),
             StableTurnFailureReason::RuntimeFailed
         );
+    }
+
+    #[test]
+    fn codex_retry_decision_survives_generic_error_info_without_reading_prose() {
+        let retry = json!({
+            "method": "error",
+            "params": {
+                "threadId": "thread.1",
+                "turnId": "turn.1",
+                "willRetry": true,
+                "error": {
+                    "message": "opaque private provider response",
+                    "additionalDetails": "unreviewed HTML body",
+                    "codexErrorInfo": "other"
+                }
+            }
+        });
+        let terminal = json!({
+            "method": "turn/completed",
+            "params": {
+                "threadId": "thread.1",
+                "turn": {
+                    "id": "turn.1",
+                    "status": "failed",
+                    "error": {
+                        "message": "terminal private detail",
+                        "codexErrorInfo": "other"
+                    }
+                }
+            }
+        });
+        let mut observed = false;
+        observe_retryable_upstream_failure(&retry, &mut observed);
+        assert!(observed);
+        assert_eq!(
+            terminal_turn_failure_reason(&terminal, observed),
+            StableTurnFailureReason::UpstreamUnavailable
+        );
+
+        let non_retryable = json!({
+            "method": "error",
+            "params": {
+                "willRetry": false,
+                "error": { "codexErrorInfo": "unauthorized" }
+            }
+        });
+        let mut non_retryable_observed = false;
+        observe_retryable_upstream_failure(&non_retryable, &mut non_retryable_observed);
+        assert!(!non_retryable_observed);
     }
 
     #[test]

@@ -218,23 +218,9 @@ export interface VectorizeService {
   deleteApiKey(apiId: string): Promise<Result<void>>
 }
 
-/* --- Session (stub now, auth later) --- */
-
-export interface Session {
-  readonly userId: string
-  readonly isAuthenticated: boolean
-}
-
-export interface SessionService {
-  current(): Promise<Session>
-  signIn?(): Promise<Result<Session>>
-  signOut?(): Promise<Result<void>>
-}
-
 /* --- Registry --- */
 
 export interface ServiceRegistry {
-  readonly session: SessionService
   readonly cutout: CutoutService
   readonly foregroundSegmentation: ForegroundSegmentationService
   readonly assets: AssetRepository

@@ -1,4 +1,4 @@
-import { canonicalJson, sha256Bytes, sha256Json } from '@/asset-production/hash'
+import { canonicalJson, sha256Bytes } from '@/asset-production/hash'
 import type { PersistedPrototypeSuiteCandidateSet } from '@/workspace/workspace-snapshot'
 import {
   designMarkdownToCssVariables,
@@ -8,9 +8,9 @@ import {
 } from './design-md-export'
 import { parseEditableDesignMarkdown } from './design-md'
 import {
-  prototypeRouteGraphFingerprint,
   validatePrototypeSuiteCandidateSet,
 } from './prototype-suite-candidates'
+import { prototypeRouteGraphFingerprint } from './prototype-plan'
 import type { VerifiedResourcePackArtifact } from './resource-pack-production'
 import {
   prototypePageReviewRecordSchema,
@@ -28,7 +28,14 @@ export interface PrototypeDeliveryEvidence {
   readonly resourceAssetCount: number
   readonly artifactCount: number
   readonly qualityReviewStatus: 'passed' | 'attention-required'
+  readonly routeGraph: string
+  readonly designSystemMedia: PrototypeDeliveryMediaEvidence
+  readonly pageMedia: readonly PrototypeDeliveryPageMediaEvidence[]
+  readonly resourceMedia: readonly PrototypeDeliveryResourceMediaEvidence[]
+  /** Exact source material retained only by the packaged evidence sink. */
+  readonly files: readonly PrototypeDeliveryEvidenceFile[]
   readonly digests: {
+    readonly plan: string
     readonly designSystemImage: string
     readonly designMarkdown: string
     readonly cssVariables: string
@@ -46,6 +53,94 @@ export interface PrototypeDeliveryEvidence {
     readonly pageReviews: string
     readonly resourceReviews: string
   }
+}
+
+export type PrototypeDeliveryEvidenceFileRole =
+  | keyof PrototypeDeliveryEvidence['digests']
+  | 'designSystemMedia'
+  | 'pageMediaObject'
+  | 'resourceMediaObject'
+
+export interface PrototypeDeliveryEvidenceFile {
+  readonly role: PrototypeDeliveryEvidenceFileRole
+  readonly ordinal?: number
+  readonly sha256: string
+  readonly byteLength: number
+  readonly bytesBase64: string
+  readonly mediaType?: string
+  readonly width?: number
+  readonly height?: number
+}
+
+export interface PrototypeDeliveryMediaEvidence {
+  readonly mediaType: string
+  readonly width: number
+  readonly height: number
+  readonly sha256: string
+}
+
+export interface PrototypeDeliveryPageMediaEvidence extends PrototypeDeliveryMediaEvidence {
+  readonly ordinal: number
+  readonly route: string
+}
+
+export interface PrototypeDeliveryResourceMediaEvidence extends PrototypeDeliveryMediaEvidence {
+  readonly ordinal: number
+  readonly byteLength: number
+}
+
+export interface PrototypeDeliveryQualitySummary {
+  readonly candidateId: `suite-${number}`
+  readonly pageRejectedCount: number
+  readonly pageUnavailableCount: number
+  readonly resourceRejectedCount: number
+  readonly resourceUnavailableCount: number
+  readonly resourceObservationalIssueCount: number
+}
+
+/**
+ * Projects only closed quality categories and counts for packaged failure
+ * diagnosis. Review text and reviewer/provider identities stay out of the DOM
+ * and retained E2E evidence.
+ */
+export function projectPrototypeDeliveryQualitySummaries(
+  input: PersistedPrototypeSuiteCandidateSet,
+): readonly PrototypeDeliveryQualitySummary[] {
+  const validated = validatePrototypeSuiteCandidateSet(input)
+  if (!validated.ok) throw new Error(validated.error)
+
+  return validated.data.set.candidates.flatMap((candidate, candidateIndex) => {
+    if (candidate.status !== 'ready') return []
+    const artifact = validated.data.artifacts[candidate.id]
+    if (!artifact) throw new Error(`Ready prototype suite candidate "${candidate.id}" is missing evidence.`)
+
+    let pageRejectedCount = 0
+    let pageUnavailableCount = 0
+    for (const page of artifact.pages) {
+      const review = prototypePageReviewRecordSchema.parse(page.review)
+      if (review.verdict.unavailable === true) pageUnavailableCount += 1
+      else if (!review.verdict.pass) pageRejectedCount += 1
+    }
+
+    let resourceRejectedCount = 0
+    let resourceUnavailableCount = 0
+    let resourceObservationalIssueCount = 0
+    for (const asset of artifact.resourcePack.assets) {
+      const review = prototypeResourceReviewRecordSchema.parse(asset.review)
+      if (review.verdict.unavailable === true) resourceUnavailableCount += 1
+      else if (!review.verdict.pass) resourceRejectedCount += 1
+      resourceObservationalIssueCount += review.observationalIssues.length
+    }
+
+    return [{
+      candidateId: `suite-${candidateIndex + 1}` as const,
+      pageRejectedCount,
+      pageUnavailableCount,
+      resourceRejectedCount,
+      resourceUnavailableCount,
+      resourceObservationalIssueCount,
+    }]
+  })
 }
 
 /**
@@ -85,8 +180,8 @@ export async function projectPrototypeDeliveryEvidence(
 
     let attentionRequired = false
     const pageReviews = []
-    const pageMedia = []
-    for (const page of artifact.pages) {
+    const pageMedia: PrototypeDeliveryPageMediaEvidence[] = []
+    for (const [pageIndex, page] of artifact.pages.entries()) {
       const digest = await sha256Bytes(page.bytes)
       const parsedReview = prototypePageReviewRecordSchema.safeParse(page.review)
       if (!parsedReview.success || parsedReview.data.artifactSha256 !== digest) {
@@ -95,7 +190,8 @@ export async function projectPrototypeDeliveryEvidence(
       attentionRequired ||= !parsedReview.data.verdict.pass || parsedReview.data.verdict.unavailable === true
       pageReviews.push({ pageId: page.page.id, review: parsedReview.data })
       pageMedia.push({
-        pageId: page.page.id,
+        ordinal: pageIndex + 1,
+        route: page.page.route,
         mediaType: page.mediaType,
         width: page.width,
         height: page.height,
@@ -144,6 +240,8 @@ export async function projectPrototypeDeliveryEvidence(
         || verified.artifactId !== binding.artifactId
         || !/^[a-f0-9]{64}$/.test(verified.sha256)
         || verified.byteLength < 1
+        || typeof verified.bytesBase64 !== 'string'
+        || verified.bytesBase64.length < 1
       ) {
         throw new Error(`Candidate "${candidate.id}" has unverified resource bytes for "${binding.manifestItemId}".`)
       }
@@ -153,9 +251,88 @@ export async function projectPrototypeDeliveryEvidence(
       throw new Error(`Candidate "${candidate.id}" has ambiguous resource artifact evidence.`)
     }
     const markdown = artifact.designSystem.artifact.designMarkdown
+    const designSystemImageDigest = await sha256Bytes(artifact.designSystem.artifact.bytes)
+    const resourceMedia: PrototypeDeliveryResourceMediaEvidence[] = resourceArtifacts.map(
+      (resource, index) => ({
+        ordinal: index + 1,
+        mediaType: resource.mediaType,
+        width: resource.width,
+        height: resource.height,
+        byteLength: resource.byteLength,
+        sha256: resource.sha256,
+      }),
+    )
     const cssVariables = designMarkdownToCssVariables(model)
     const tailwindTheme = designMarkdownToTailwindTheme(model)
     const tokensJson = designMarkdownToTokensJson(model)
+    const plan = canonicalJson(artifact.plan)
+    const designIrTokenProjection = canonicalJson(designIrTokens)
+    const routeGraph = prototypeRouteGraphFingerprint(artifact.plan)
+    const pageMediaDocument = canonicalJson(pageMedia)
+    const manifest = canonicalJson(artifact.resourcePack.manifest)
+    const bindingsDocument = canonicalJson(bindings)
+    const resourcePack = canonicalJson(resourcePackIdentity)
+    const resourceArtifactsDocument = canonicalJson(resourceArtifacts.map((resource) => ({
+      manifestItemId: resource.manifestItemId,
+      artifactId: resource.artifactId,
+      sha256: resource.sha256,
+      mediaType: resource.mediaType,
+      width: resource.width,
+      height: resource.height,
+      byteLength: resource.byteLength,
+    })))
+    const provenanceDocument = canonicalJson(provenance)
+    const reviewDocumentText = canonicalJson(reviewDocument)
+    const pageReviewsDocument = canonicalJson(pageReviews)
+    const resourceReviewsDocument = canonicalJson(resourceReviews)
+    const textFiles = await Promise.all(([
+      ['plan', plan],
+      ['designMarkdown', markdown],
+      ['cssVariables', cssVariables],
+      ['tailwindTheme', tailwindTheme],
+      ['tokensJson', tokensJson],
+      ['designIrTokens', designIrTokenProjection],
+      ['routeGraph', routeGraph],
+      ['pageMedia', pageMediaDocument],
+      ['manifest', manifest],
+      ['bindings', bindingsDocument],
+      ['resourcePack', resourcePack],
+      ['resourceArtifacts', resourceArtifactsDocument],
+      ['provenance', provenanceDocument],
+      ['reviewDocument', reviewDocumentText],
+      ['pageReviews', pageReviewsDocument],
+      ['resourceReviews', resourceReviewsDocument],
+    ] as const).map(async ([role, content]) => evidenceTextFile(role, content)))
+    const files: PrototypeDeliveryEvidenceFile[] = [
+      ...textFiles,
+      evidenceBinaryFile({
+        role: 'designSystemMedia',
+        bytes: artifact.designSystem.artifact.bytes,
+        sha256: designSystemImageDigest,
+        mediaType: artifact.designSystem.artifact.mediaType,
+        width: artifact.designSystem.artifact.width,
+        height: artifact.designSystem.artifact.height,
+      }),
+      ...artifact.pages.map((page, index) => evidenceBinaryFile({
+        role: 'pageMediaObject',
+        ordinal: index + 1,
+        bytes: page.bytes,
+        sha256: pageMedia[index]!.sha256,
+        mediaType: page.mediaType,
+        width: page.width,
+        height: page.height,
+      })),
+      ...resourceArtifacts.map((resource, index) => ({
+        role: 'resourceMediaObject' as const,
+        ordinal: index + 1,
+        sha256: resource.sha256,
+        byteLength: resource.byteLength,
+        bytesBase64: resource.bytesBase64,
+        mediaType: resource.mediaType,
+        width: resource.width,
+        height: resource.height,
+      })),
+    ]
 
     evidence.push({
       candidateId: `suite-${candidateIndex + 1}`,
@@ -168,27 +345,80 @@ export async function projectPrototypeDeliveryEvidence(
       resourceAssetCount: artifact.resourcePack.assets.length,
       artifactCount: artifact.resourcePack.assets.length,
       qualityReviewStatus: attentionRequired ? 'attention-required' : 'passed',
+      routeGraph,
+      designSystemMedia: {
+        mediaType: artifact.designSystem.artifact.mediaType,
+        width: artifact.designSystem.artifact.width,
+        height: artifact.designSystem.artifact.height,
+        sha256: designSystemImageDigest,
+      },
+      pageMedia,
+      resourceMedia,
+      files,
       digests: {
-        designSystemImage: await sha256Bytes(artifact.designSystem.artifact.bytes),
+        plan: await sha256Text(plan),
+        designSystemImage: designSystemImageDigest,
         designMarkdown: await sha256Text(markdown),
         cssVariables: await sha256Text(cssVariables),
         tailwindTheme: await sha256Text(tailwindTheme),
         tokensJson: await sha256Text(tokensJson),
-        designIrTokens: await sha256Json(designIrTokens),
-        routeGraph: await sha256Text(prototypeRouteGraphFingerprint(artifact.plan)),
-        pageMedia: await sha256Json(pageMedia),
-        manifest: await sha256Json(artifact.resourcePack.manifest),
-        bindings: await sha256Json(bindings),
-        resourcePack: await sha256Json(resourcePackIdentity),
-        resourceArtifacts: await sha256Json(resourceArtifacts),
-        provenance: await sha256Json(provenance),
-        reviewDocument: await sha256Text(canonicalJson(reviewDocument)),
-        pageReviews: await sha256Json(pageReviews),
-        resourceReviews: await sha256Json(resourceReviews),
+        designIrTokens: await sha256Text(designIrTokenProjection),
+        routeGraph: await sha256Text(routeGraph),
+        pageMedia: await sha256Text(pageMediaDocument),
+        manifest: await sha256Text(manifest),
+        bindings: await sha256Text(bindingsDocument),
+        resourcePack: await sha256Text(resourcePack),
+        resourceArtifacts: await sha256Text(resourceArtifactsDocument),
+        provenance: await sha256Text(provenanceDocument),
+        reviewDocument: await sha256Text(reviewDocumentText),
+        pageReviews: await sha256Text(pageReviewsDocument),
+        resourceReviews: await sha256Text(resourceReviewsDocument),
       },
     })
   }
   return evidence
+}
+
+async function evidenceTextFile(
+  role: keyof PrototypeDeliveryEvidence['digests'],
+  content: string,
+): Promise<PrototypeDeliveryEvidenceFile> {
+  const bytes = new TextEncoder().encode(content)
+  return {
+    role,
+    sha256: await sha256Bytes(bytes),
+    byteLength: bytes.byteLength,
+    bytesBase64: bytesToBase64(bytes),
+  }
+}
+
+function evidenceBinaryFile(input: {
+  readonly role: 'designSystemMedia' | 'pageMediaObject'
+  readonly ordinal?: number
+  readonly bytes: Uint8Array
+  readonly sha256: string
+  readonly mediaType: string
+  readonly width: number
+  readonly height: number
+}): PrototypeDeliveryEvidenceFile {
+  return {
+    role: input.role,
+    ...(input.ordinal === undefined ? {} : { ordinal: input.ordinal }),
+    sha256: input.sha256,
+    byteLength: input.bytes.byteLength,
+    bytesBase64: bytesToBase64(input.bytes),
+    mediaType: input.mediaType,
+    width: input.width,
+    height: input.height,
+  }
+}
+
+function bytesToBase64(bytes: Uint8Array): string {
+  let binary = ''
+  for (let offset = 0; offset < bytes.length; offset += 0x8000) {
+    binary += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000))
+  }
+  return btoa(binary)
 }
 
 async function sha256Text(value: string): Promise<string> {

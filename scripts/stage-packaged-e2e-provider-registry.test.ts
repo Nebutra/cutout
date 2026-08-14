@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import { basename, join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import {
+  PACKAGED_E2E_IMAGE_MODELS,
   PACKAGED_E2E_PROVIDER_DISCOVERY_FILE,
   providerRegistryPaths,
   stageProviderRegistry,
@@ -54,6 +55,20 @@ describe('packaged E2E Provider registry staging', () => {
     const staged = JSON.parse(await readFile(destination, 'utf8'))
     expect(staged).toEqual([expect.objectContaining({ id: 'image' })])
     expect(JSON.stringify(staged)).not.toContain('forbidden')
+  })
+
+  it('allows only the closed Qwen Image 3 experiment to override staged DashScope metadata', async () => {
+    const { source, destination } = await paths()
+    await writeFile(source, JSON.stringify([{
+      id: 'qwen', kind: 'dashscope', label: 'Qwen',
+      baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+      wireProtocol: 'chat-completions', defaultModel: 'qwen-image-3.0-pro', enabled: true,
+    }]))
+
+    expect([...PACKAGED_E2E_IMAGE_MODELS]).toEqual(['qwen-image-3.0', 'qwen-image-3.0-pro'])
+    await expect(stageProviderRegistry(source, destination, 'qwen-image-3.0')).resolves.toBe(1)
+    await expect(readFile(destination, 'utf8')).resolves.toContain('"defaultModel": "qwen-image-3.0"')
+    await expect(stageProviderRegistry(source, destination, 'unreviewed-image-model')).resolves.toBe(0)
   })
 
   it('refuses symlinks, unsafe URLs, duplicate ids, and oversized registries', async () => {

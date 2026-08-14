@@ -1,7 +1,8 @@
 import { z } from 'zod'
 import { err, ok, type Result } from '@/services/types'
 
-const candidateIdSchema = z.string().min(1).max(160)
+export const candidateIdMaxLength = 160
+const candidateIdSchema = z.string().min(1).max(candidateIdMaxLength)
 const candidateTextSchema = z.string().trim().min(1).max(2_000)
 const candidateAxisSchema = z.string().trim().min(1).max(160)
 

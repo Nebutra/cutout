@@ -54,12 +54,3 @@ export type NonColorCueEvidence = z.infer<typeof nonColorCueEvidenceSchema>
 export type GovernanceReceipt = z.infer<typeof governanceReceiptSchema>
 export type PromotionTarget = z.infer<typeof promotionTargetSchema>
 export type GovernanceRepairTask = z.infer<typeof governanceRepairTaskSchema>
-
-const locationSchema = z.object({ entityId: z.string(), path: z.string() }).strict()
-export const governanceTokenSchema = z.object({ id:z.string(), name:z.string(), type:z.enum(['color','dimension','number','fontFamily','fontWeight','duration','cubicBezier','shadow','border','gradient','typography']), tier:z.enum(['primitive','semantic','component']), value:z.unknown().optional(), alias:z.string().optional(), mode:z.string(), brandLock:z.object({ approvedValue:z.unknown(), approvalId:z.string() }).strict().optional(), location:locationSchema }).strict()
-export const governancePolicySchema = z.object({ version:z.literal('design-governance-policy.v1'), id:z.string(), standards:z.object({ wcag:z.string(), dtcg:z.string(), cssColor:z.string() }).strict(), severity:z.record(z.string(),z.enum(['error','warning','advisory'])), thresholds:z.object({ perceptualDeltaE:z.number(), spacingBase:z.number().positive(), maxMotionMs:z.number().nonnegative(), minFocusArea:z.number().nonnegative() }).strict() }).strict()
-const legacyFindingSchema = z.object({ id:z.string(), ruleId:z.string(), standard:z.string(), policyVersion:z.string(), severity:z.enum(['error','warning','advisory']), blocking:z.boolean(), applicability:z.string(), message:z.string(), measurements:z.record(z.string(),z.union([z.string(),z.number(),z.boolean()])), locations:z.array(locationSchema), evidence:z.array(z.object({kind:z.string(),value:z.string()}).strict()), repairSuggestions:z.array(z.string()) }).strict()
-export const governanceReportSchema = z.object({ protocol:z.literal('design-governance-report.v1'), id:z.string(), documentId:z.string(), revisionId:z.string(), policy:governancePolicySchema, summary:z.object({errors:z.number(),warnings:z.number(),advisories:z.number(),blocking:z.boolean()}).strict(), findings:z.array(legacyFindingSchema), measurements:z.object({evaluatedRules:z.number(),evaluatedLocations:z.number()}).strict(), completedAt:z.string().datetime() }).strict()
-export type GovernanceToken = z.infer<typeof governanceTokenSchema>
-export type GovernancePolicy = z.infer<typeof governancePolicySchema>
-export type GovernanceFinding = z.infer<typeof legacyFindingSchema>

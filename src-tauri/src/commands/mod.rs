@@ -5,6 +5,7 @@ pub mod ai;
 pub mod coding_workspace;
 pub mod foreground_segmentation;
 pub mod git;
+pub mod monotonic_deadline;
 pub mod native_approval;
 pub mod packaged_e2e;
 pub mod registry_desktop;

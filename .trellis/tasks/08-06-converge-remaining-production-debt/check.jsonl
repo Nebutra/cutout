@@ -1,0 +1,4 @@
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Apply repository quality, dead-code and dependency review gates."}
+{"file":".trellis/spec/frontend/byok-provider-protocols.md","reason":"Verify every advertised image transport and credential boundary against the authoritative spec."}
+{"file":".trellis/spec/frontend/prototype-generation.md","reason":"Verify actual delivery cardinality follows the persisted Agent plan rather than test constants."}
+{"file":"docs/experiments/real-model-e2e-2026-08-05.md","reason":"Compare the new packaged proof with the prior failed live evidence without upgrading unsupported claims."}

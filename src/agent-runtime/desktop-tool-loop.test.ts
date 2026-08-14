@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   createDesktopToolLoop,
   type DesktopToolLoopRequest,
@@ -9,6 +9,13 @@ import type {
   ToolExecutor,
   ToolExecutorRegistry,
 } from "@/services/desktop-tool-executor";
+import { DESKTOP_IMAGE_TOOL_TIMEOUT_MS } from './paid-tool-timeouts'
+import { tauriBridge } from '@/platform/native'
+
+afterEach(() => {
+  vi.unstubAllGlobals()
+  vi.restoreAllMocks()
+})
 
 const capability = {
   capability: "generate-image" as const,
@@ -42,7 +49,7 @@ function input(
 function harness(
   result?: Awaited<ReturnType<ToolExecutor["execute"]>>,
   options: {
-    timeoutMs?: number;
+    timeoutMs?: Parameters<typeof createDesktopToolLoop>[0]["timeoutMs"];
     durability?: ToolDurabilityStore;
     authorize?: Parameters<typeof createDesktopToolLoop>[0]["authorize"];
   } = {},
@@ -201,7 +208,7 @@ describe("desktop tool loop", () => {
     await approval;
   });
 
-  it("auto approves by host policy and is idempotent by request id", async () => {
+  it("executes BYOK directly and is idempotent by request id", async () => {
     const h = harness();
     await h.loop.request(input());
     await h.loop.request(input());
@@ -213,6 +220,23 @@ describe("desktop tool loop", () => {
       "tool-succeeded",
       "tool-receipt-recorded",
     ]);
+  });
+
+  it("fails a missing BYOK capability without inventing a pending approval", async () => {
+    const h = harness();
+    await h.loop.request(input({
+      request: { ...input().request, providerId: "missing" },
+    }));
+
+    await expect(h.loop.settled("tool", "request")).resolves.toMatchObject({
+      ok: false,
+      error: "No host executor is available for this capability.",
+    });
+    expect(h.execute).not.toHaveBeenCalled();
+    expect(h.batches.flat()).toContainEqual(expect.objectContaining({
+      type: "tool-approval-requested",
+      pendingApproval: false,
+    }));
   });
 
   it("fails a colliding tool call without replacing the pending request", async () => {
@@ -395,5 +419,73 @@ describe("desktop tool loop", () => {
       ok: false,
       error: "Provider deadline exceeded.",
     });
+  });
+
+  it("resolves the deadline from the current paid capability", async () => {
+    const timeoutMs = vi.fn(() => 1);
+    const timed = harness(undefined, { timeoutMs });
+    timed.execute.mockImplementation(async () => new Promise(() => undefined));
+
+    await timed.loop.request(input());
+
+    expect(await timed.loop.settled("tool")).toMatchObject({
+      ok: false,
+      error: "Provider deadline exceeded.",
+    });
+    expect(timeoutMs).toHaveBeenCalledWith(
+      expect.objectContaining({
+        request: expect.objectContaining({ capability: "generate-image" }),
+      }),
+    );
+  });
+
+  it("aborts the desktop image executor from the native deadline when renderer timers stop", async () => {
+    let settleNative!: () => void;
+    const native = new Promise<void>((resolve) => {
+      settleNative = resolve;
+    });
+    const waitForMonotonicDeadline = vi
+      .spyOn(tauriBridge, "waitForMonotonicDeadline")
+      .mockReturnValue(native);
+    vi.spyOn(tauriBridge, "cancelMonotonicDeadline").mockResolvedValue(undefined);
+    vi.stubGlobal("__TAURI_INTERNALS__", { invoke: vi.fn() });
+    vi.spyOn(globalThis, "setTimeout").mockImplementation(() => 0 as never);
+
+    let executorStarted!: () => void;
+    const started = new Promise<void>((resolve) => {
+      executorStarted = resolve;
+    });
+    let executorAborted = false;
+    const timed = harness(undefined, { timeoutMs: DESKTOP_IMAGE_TOOL_TIMEOUT_MS });
+    timed.execute.mockImplementation(
+      async (execution) =>
+        new Promise((resolve) => {
+          executorStarted();
+          execution.signal.addEventListener(
+            "abort",
+            () => {
+              executorAborted = true;
+              resolve({ ok: false, error: "aborted", events: [] });
+            },
+            { once: true },
+          );
+        }),
+    );
+
+    const request = timed.loop.request(input());
+    await started;
+    settleNative();
+    await request;
+
+    expect(executorAborted).toBe(true);
+    expect(await timed.loop.settled("tool")).toMatchObject({
+      ok: false,
+      error: "Provider deadline exceeded.",
+    });
+    expect(waitForMonotonicDeadline).toHaveBeenCalledWith(
+      expect.stringMatching(/^[0-9a-f-]{36}$/),
+      DESKTOP_IMAGE_TOOL_TIMEOUT_MS,
+    );
+    expect(globalThis.setTimeout).not.toHaveBeenCalled();
   });
 });

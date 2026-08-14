@@ -12,6 +12,7 @@ import type {
 import { providerEligibleForAuto } from '@/services/ai/provider-verification'
 import type { ProviderConfig } from '@/services/ai/provider-types'
 import type { ModelDescriptor, RoutePreferences } from './capability-router'
+import type { ModelDescriptor as CapabilityModelDescriptor } from '@/services/ai/model-capabilities'
 
 export interface LockedComposerRoute {
   readonly chat: ModelAssignment
@@ -66,7 +67,7 @@ export function lockComposerRoute(input: {
   readonly assignments: ModelAssignments
   readonly providers: readonly ProviderConfig[]
   readonly hasReferenceImages: boolean
-  readonly modelCatalog?:readonly ModelDescriptor[]
+  readonly modelCatalog: readonly ModelDescriptor[]
   readonly routePreferences?:RoutePreferences
 }): LockedComposerRoute {
   const chat = lockComposerChatRoute(input)
@@ -108,10 +109,10 @@ export function lockComposerImageRoute(input: {
   readonly assignments: ModelAssignments
   readonly providers: readonly ProviderConfig[]
   readonly hasReferenceImages: boolean
-  readonly modelCatalog?: readonly ModelDescriptor[]
+  readonly modelCatalog: readonly ModelDescriptor[]
   readonly routePreferences?: RoutePreferences
 }): LockedComposerImageRoute {
-  const modelCatalog=input.modelCatalog??runtimeModelDescriptors(input.assignments,input.providers)
+  const modelCatalog = input.modelCatalog
   const imagePolicy = routeExecutionPolicy({
     model: input.model,
     thinking: input.thinking,
@@ -135,8 +136,81 @@ export function lockComposerImageRoute(input: {
   }
 }
 
-const runtimeCapabilities:Readonly<Record<string,readonly ModelDescriptor['capabilities'][number][]>>={openai:['text','vision','reasoning','tools','image-generation','image-edit'],anthropic:['text','vision','reasoning','tools'],google:['text','vision','reasoning','tools','image-generation'],gateway:['text','vision','reasoning','tools'],'openai-compatible':['text','vision','tools','image-generation','image-edit'],'cc-switch':['text','vision','reasoning','tools','image-generation','image-edit']}
-export function runtimeModelDescriptors(assignments:ModelAssignments,providers:readonly ProviderConfig[],isVerified:(providerId:string)=>boolean=providerEligibleForAuto):ModelDescriptor[]{const rows:ModelDescriptor[]=[];for(const slot of ['chat','image'] as const){const assignment=assignments[slot];if(!assignment)continue;const provider=providers.find(value=>value.id===assignment.providerId),capabilities=provider?runtimeCapabilities[provider.kind]??[]:[],reasoningProtocol=provider?.kind==='openai'||provider?.kind==='anthropic'||provider?.kind==='google'?provider.kind:assignment.reasoningProtocol;rows.push({providerId:assignment.providerId,model:assignment.model,slot,capabilities,quality:.5,cost:.5,speed:.5,region:'global',available:Boolean(provider?.enabled&&isVerified(provider.id)),...(reasoningProtocol?{reasoningProtocol}:{})})}return rows}
+const runtimeTextCapabilities: Readonly<
+  Record<string, readonly ModelDescriptor['capabilities'][number][]>
+> = {
+  openai: ['text', 'vision', 'reasoning', 'tools'],
+  anthropic: ['text', 'vision', 'reasoning', 'tools'],
+  google: ['text', 'vision', 'reasoning', 'tools'],
+  gateway: ['text', 'vision', 'reasoning', 'tools'],
+  'openai-compatible': ['text', 'vision', 'tools'],
+  'cc-switch': ['text', 'vision', 'reasoning', 'tools'],
+  dashscope: ['text', 'vision', 'reasoning', 'tools'],
+}
+
+const routerCapabilities = new Set<ModelDescriptor['capabilities'][number]>([
+  'text',
+  'vision',
+  'reasoning',
+  'tools',
+  'image-generation',
+  'image-edit',
+])
+
+/**
+ * Project the exact configured assignments into the composer router. Paid
+ * image capabilities come only from observed/verified model evidence in the
+ * authoritative capability snapshot; provider kind never grants them.
+ */
+export function runtimeModelDescriptors(
+  assignments: ModelAssignments,
+  providers: readonly ProviderConfig[],
+  isVerified: (providerId: string, model: string) => boolean = (providerId) =>
+    providerEligibleForAuto(providerId),
+  capabilityDescriptors: readonly CapabilityModelDescriptor[] = [],
+): ModelDescriptor[] {
+  const rows: ModelDescriptor[] = []
+  for (const slot of ['chat', 'image'] as const) {
+    const assignment = assignments[slot]
+    if (!assignment) continue
+    const provider = providers.find((value) => value.id === assignment.providerId)
+    const exact = capabilityDescriptors.find(
+      (value) => value.providerId === assignment.providerId && value.model === assignment.model,
+    )
+    const executableEvidence = new Set(
+      exact?.evidence
+        .filter((item) => item.kind === 'observed' || item.kind === 'verified')
+        .map((item) => item.capability) ?? [],
+    )
+    const exactCapabilities = exact?.capabilities.filter(
+      (capability): capability is ModelDescriptor['capabilities'][number] =>
+        routerCapabilities.has(capability as ModelDescriptor['capabilities'][number])
+        && executableEvidence.has(capability),
+    ) ?? []
+    const capabilities = [...new Set([
+      ...(slot === 'chat' && provider ? runtimeTextCapabilities[provider.kind] ?? [] : []),
+      ...exactCapabilities,
+    ])]
+    const reasoningProtocol = provider?.kind === 'openai'
+      || provider?.kind === 'anthropic'
+      || provider?.kind === 'google'
+      ? provider.kind
+      : assignment.reasoningProtocol
+    rows.push({
+      providerId: assignment.providerId,
+      model: assignment.model,
+      slot,
+      capabilities,
+      quality: 0.5,
+      cost: 0.5,
+      speed: 0.5,
+      region: 'global',
+      available: Boolean(provider?.enabled && isVerified(provider.id, assignment.model)),
+      ...(reasoningProtocol ? { reasoningProtocol } : {}),
+    })
+  }
+  return rows
+}
 
 export function supportsWebSearch(
   assignment: ModelAssignment,

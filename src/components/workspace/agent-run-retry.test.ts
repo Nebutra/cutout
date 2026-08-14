@@ -84,6 +84,31 @@ describe("createAgentRunRetryControl", () => {
     });
   });
 
+  it("keeps a transient Planner failure as Retry instead of projecting incomplete output as repair", () => {
+    const createAssets = vi.fn();
+    const control = createAgentRunRetryControl(
+      {
+        working: false,
+        hasRepairPlan: true,
+        retryableRunFailure: true,
+        retryableBrief: "Create a restaurant site",
+        retryPlanningRuntime: "codex-system",
+        currentError: "The planning Agent could not finish this turn.",
+        projectBrief: "Create a restaurant site",
+      },
+      createAssets,
+    );
+
+    expect(control.label).toBe("Retry");
+    control.onRetry?.();
+    expect(createAssets).toHaveBeenCalledWith("create", {
+      briefOverride: "Create a restaurant site",
+      skipToolGate: false,
+      ignoreSelectedMaterial: true,
+      retryPlanningRuntime: "codex-system",
+    });
+  });
+
   it("keeps repair-plan retries labeled Continue and in repair mode", () => {
     const createAssets = vi.fn();
     const control = createAgentRunRetryControl(
@@ -105,6 +130,7 @@ describe("createAgentRunRetryControl", () => {
   it.each([
     "Service temporarily unavailable",
     "The connection to the AI provider was interrupted. Try again to continue.",
+    "The planning Agent could not finish this turn. Try again to continue.",
   ])("restores Retry for a persisted transient error: %s", (currentError) => {
     const createAssets = vi.fn();
     const control = createAgentRunRetryControl(

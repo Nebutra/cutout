@@ -5,7 +5,7 @@
  * Settings form, and the value is stored on `ProviderConfig.defaultModel`. Model
  * catalogs drift fast; treat these as sensible starting points, not a source of
  * truth. Slug conventions:
- *   - direct providers use a bare model id (`claude-sonnet-4.6`, `gpt-5.4`)
+ *   - direct providers use a bare model id (`claude-sonnet-4.6`, `gpt-5.6-terra`)
  *   - gateway uses `provider/model` (`anthropic/claude-sonnet-4.6`)
  */
 import type { ProviderKind } from './provider-types'
@@ -13,7 +13,7 @@ import type { ProviderKind } from './provider-types'
 /** The slug pre-filled when a user picks a kind (before they override it). */
 export const DEFAULT_MODEL: Record<string, string> = {
   anthropic: 'claude-sonnet-4.6',
-  openai: 'gpt-5.4',
+  openai: 'gpt-5.6-terra',
   google: 'gemini-2.5-flash',
   gateway: 'anthropic/claude-sonnet-4.6',
   'openai-compatible': 'gpt-4o-mini',
@@ -24,15 +24,16 @@ export const DEFAULT_MODEL: Record<string, string> = {
 /** Optional suggestion lists for a Settings datalist/combobox (non-exhaustive). */
 export const SUGGESTED_MODELS: Record<string, readonly string[]> = {
   anthropic: ['claude-sonnet-4.6', 'claude-opus-4.6', 'claude-haiku-4.6'],
-  openai: ['gpt-5.4', 'gpt-5.4-mini'],
+  openai: ['gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna'],
   google: ['gemini-2.5-flash', 'gemini-2.5-pro'],
   gateway: [
     'anthropic/claude-sonnet-4.6',
-    'openai/gpt-5.4',
+    'openai/gpt-5.6-terra',
     'google/gemini-2.5-flash',
   ],
   'openai-compatible': [],
   'cc-switch': ['gpt-5.6-sol', 'gpt-image-2'],
+  xai: ['grok-4', 'grok-imagine-image-quality', 'grok-imagine-image'],
 }
 
 /**
@@ -45,9 +46,9 @@ export const SUGGESTED_MODELS: Record<string, readonly string[]> = {
  */
 export const POPULAR_MODELS: readonly string[] = [
   // OpenAI — chat / reasoning
-  'gpt-5.5',
-  'gpt-5',
-  'gpt-5-mini',
+  'gpt-5.6-sol',
+  'gpt-5.6-terra',
+  'gpt-5.6-luna',
   'gpt-4.1',
   'gpt-4o',
   'o3',
@@ -69,6 +70,8 @@ export const POPULAR_MODELS: readonly string[] = [
   'imagen-3',
   // xAI
   'grok-4',
+  'grok-imagine-image-quality',
+  'grok-imagine-image',
 ]
 
 /** Resolve the effective model for a call: explicit override → config default. */

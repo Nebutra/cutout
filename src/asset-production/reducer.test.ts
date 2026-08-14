@@ -129,6 +129,48 @@ describe('asset production reducer', () => {
     expect(Object.values(afterFinalize.runs['run:1']!.tasks).every((task) => task.status === 'cancelled')).toBe(true)
   })
 
+  it('preserves review-blocked candidate evidence when its run is cancelled', async () => {
+    const { plan, snapshot: initial } = await setup()
+    const taskId = plan.tasks[0]!.taskId
+    const candidate = artifact('a')
+    const issue = qualityIssue(
+      'slice-foreground-omitted',
+      'The final slice boxes omitted foreground pixels.',
+      'deterministic-check',
+      6,
+    )
+    let state = dispatch(initial, { type: 'task-started', runId: 'run:1', taskId, at: 3 })
+    state = dispatch(state, {
+      type: 'candidate-recorded',
+      runId: 'run:1',
+      taskId,
+      artifact: candidate,
+      at: 4,
+    })
+    state = dispatch(state, { type: 'review-started', runId: 'run:1', taskId, at: 5 })
+    state = dispatch(state, {
+      type: 'review-recorded',
+      runId: 'run:1',
+      taskId,
+      issues: [issue],
+      at: 6,
+    })
+    state = dispatch(state, { type: 'run-cancelled', runId: 'run:1', at: 7 })
+
+    expect(state.runs['run:1']).toMatchObject({
+      status: 'cancelled',
+      tasks: {
+        [taskId]: {
+          status: 'needs-review',
+          candidate,
+          issues: [issue],
+          updatedAt: 6,
+        },
+      },
+    })
+    expect(state.activeRunId).toBeUndefined()
+  })
+
   it('reports partial instead of completed when one required task fails', async () => {
     const { plan, snapshot: initial } = await setup(2)
     const [first, second] = plan.tasks.map((task) => task.taskId)

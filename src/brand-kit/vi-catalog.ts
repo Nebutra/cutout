@@ -308,6 +308,6 @@ export function createBrandViGenerationPlan(request: BrandViPlanRequest): BrandV
     requestedItemIds: [...requested],
     nodes,
     estimatedPaidActions: nodes.filter((node) => node.paidAction).length,
-    requiresApproval: nodes.some((node) => node.paidAction || node.approval.required),
+    requiresApproval: nodes.some((node) => node.approval.required),
   }
 }

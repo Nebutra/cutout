@@ -6,6 +6,7 @@ import { PermissionBroker } from '@/tool-sandbox/broker'
 
 const imageCapability: PaidToolExecutorCapability = {
   capability: 'generate-image', providerId: 'provider-1', model: 'image-1', available: true,
+  transportStrategy: 'openai-images-generations',
 }
 
 function request(
@@ -157,7 +158,11 @@ describe('desktop paid tool executor', () => {
       expect.objectContaining({ prompt: 'Complete generated page prompt' }),
     )
 
-    const edited = harness({ capability: { ...imageCapability, capability: 'edit-image' } })
+    const edited = harness({ capability: {
+      ...imageCapability,
+      capability: 'edit-image',
+      transportStrategy: 'openai-images-edits',
+    } })
     await edited.executor.execute(execution(request('edit-image', 'Complete image repair prompt')))
     expect(edited.generation.editImage).toHaveBeenCalledWith(
       expect.objectContaining({ prompt: 'Complete image repair prompt' }),
@@ -195,7 +200,11 @@ describe('desktop paid tool executor', () => {
   })
 
   it('routes edit and local cutout through the existing services without requiring a provider key for cutout', async () => {
-    const edit = harness({ capability: { ...imageCapability, capability: 'edit-image' } })
+    const edit = harness({ capability: {
+      ...imageCapability,
+      capability: 'edit-image',
+      transportStrategy: 'openai-images-edits',
+    } })
     const editRequest = {
       ...request('edit-image'),
       inputArtifactIds: ['artifact:input', 'artifact:second'],
@@ -213,6 +222,60 @@ describe('desktop paid tool executor', () => {
     expect(cutout.services.providers.status).not.toHaveBeenCalled()
     expect(cutout.services.cutout.run).toHaveBeenCalledWith(expect.objectContaining({ params: { threshold: 246, minArea: 900, mergeGap: 18, padding: 10 } }))
     expect(cutoutResult.events.at(-1)).toMatchObject({ type: 'material-recorded', material: { kind: 'cutout-slice', source: 'algorithm' } })
+  })
+
+  it('preserves every reference when Google edit uses multimodal generation', async () => {
+    const edit = harness({ capability: {
+      ...imageCapability,
+      capability: 'edit-image',
+      transportStrategy: 'google-multimodal-generate',
+    } })
+    const result = await edit.executor.execute(execution({
+      ...request('edit-image', 'Preserve layout and update the visual.'),
+      inputArtifactIds: ['artifact:input', 'artifact:second'],
+    }))
+
+    expect(result.ok).toBe(true)
+    expect(edit.generation.editImage).not.toHaveBeenCalled()
+    expect(edit.generation.generateImages).toHaveBeenCalledWith({
+      providerId: 'provider-1',
+      model: 'image-1',
+      system: 'Preserve layout and update the visual.',
+      input: [
+        { type: 'text', text: 'Create one edited image using every attached reference image.' },
+        { type: 'image', image: new Uint8Array([7]) },
+        { type: 'image', image: new Uint8Array([8]) },
+      ],
+      signal: undefined,
+    })
+  })
+
+  it('fails closed when an image capability has no matching transport strategy', async () => {
+    const generated = harness({ capability: {
+      capability: 'generate-image', providerId: 'provider-1', model: 'image-1', available: true,
+    } })
+    const result = await generated.executor.execute(execution())
+    expect(result).toMatchObject({ ok: false, error: expect.stringContaining('capability-required') })
+    expect(generated.generation.generateImages).not.toHaveBeenCalled()
+    expect(generated.generation.editImage).not.toHaveBeenCalled()
+  })
+
+  it('accepts the closed xAI generation and edit strategies', async () => {
+    const generated = harness({ capability: {
+      ...imageCapability,
+      transportStrategy: 'xai-images-generations',
+    } })
+    await expect(generated.executor.execute(execution())).resolves.toMatchObject({ ok: true })
+
+    const edited = harness({ capability: {
+      ...imageCapability,
+      capability: 'edit-image',
+      transportStrategy: 'xai-images-edits',
+    } })
+    await expect(edited.executor.execute(execution({
+      ...request('edit-image'),
+      inputArtifactIds: ['artifact:input'],
+    }))).resolves.toMatchObject({ ok: true })
   })
 
   it('publishes a cutout exactly once through the result sink after an atomic artifact batch', async () => {

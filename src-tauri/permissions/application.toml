@@ -6,7 +6,7 @@ commands.allow = ["save_assets", "save_bundle", "scan_repository"]
 [[permission]]
 identifier = "packaged-e2e"
 description = "Allows a dedicated packaged-E2E build to report a closed sanitized background journey result. Production builds return disabled."
-commands.allow = ["packaged_e2e_mode", "packaged_e2e_tick", "packaged_e2e_checkpoint", "packaged_e2e_complete"]
+commands.allow = ["packaged_e2e_mode", "packaged_e2e_tick", "packaged_e2e_checkpoint", "packaged_e2e_persist_evidence", "packaged_e2e_capture_window", "packaged_e2e_complete"]
 
 [[permission]]
 identifier = "foreground-segmentation"
@@ -14,9 +14,14 @@ description = "Allows bounded local foreground segmentation through Apple Vision
 commands.allow = ["foreground_segmentation_capabilities", "foreground_segment"]
 
 [[permission]]
+identifier = "monotonic-deadline"
+description = "Allows bounded native monotonic deadline settlement for background renderer work."
+commands.allow = ["wait_for_monotonic_deadline", "cancel_monotonic_deadline"]
+
+[[permission]]
 identifier = "provider-secrets-network"
 description = "Allows host-owned provider secret, discovery/draft and policy-checked AI transport commands."
-commands.allow = ["set_key", "key_status", "delete_key", "list_key_status", "load_providers", "save_providers", "discover_provider_candidates", "auto_configure_provider_candidate", "create_provider_draft", "check_provider_draft", "import_provider_draft", "cancel_provider_draft", "ai_proxy_request", "ai_proxy_stream", "ai_proxy_cancel", "ai_image_edit", "set_vectorizer_api_key", "vectorizer_key_status", "delete_vectorizer_api_key", "vectorize_local_vtracer", "vectorize_vectorizer_ai"]
+commands.allow = ["set_key", "key_status", "delete_key", "list_key_status", "load_providers", "save_providers", "discover_provider_candidates", "auto_configure_provider_candidate", "create_provider_draft", "check_provider_draft", "import_provider_draft", "cancel_provider_draft", "ai_proxy_request", "ai_proxy_stream", "ai_proxy_cancel", "ai_image_edit", "ai_ingest_competition_source_image", "verify_commerce_source_ingest_receipt", "create_commerce_held_out_commitment", "verify_commerce_held_out_attestation", "ai_dashscope_image", "ai_dashscope_structured_text", "ai_dashscope_vision_json", "ai_dashscope_video", "preview_game_asset_generation", "apply_game_asset_generation", "verify_game_asset_generation_authorization", "preview_game_asset_semantic_acceptance", "apply_game_asset_semantic_acceptance", "verify_game_asset_semantic_acceptance", "verify_multimodal_host_artifact", "promote_multimodal_video_playback", "set_vectorizer_api_key", "vectorizer_key_status", "delete_vectorizer_api_key", "vectorize_local_vtracer", "vectorize_vectorizer_ai"]
 
 [[permission]]
 identifier = "codex-system-runtime"

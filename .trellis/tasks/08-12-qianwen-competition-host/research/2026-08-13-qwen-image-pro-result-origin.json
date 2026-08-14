@@ -1,0 +1,15 @@
+{
+  "schema": "cutout.qianwen-result-origin-probe.v1",
+  "observedAt": "2026-08-13T04:24:00Z",
+  "model": "qwen-image-3.0-pro",
+  "operation": "image-generation-with-reference",
+  "status": "passed",
+  "resultHostname": "dashscope-a717.oss-accelerate.aliyuncs.com",
+  "allowedHostnameShape": "dashscope-[a-z0-9]+.oss-accelerate.aliyuncs.com",
+  "redaction": {
+    "apiKey": "omitted",
+    "resultPath": "omitted",
+    "query": "omitted",
+    "providerResponseIds": "omitted"
+  }
+}

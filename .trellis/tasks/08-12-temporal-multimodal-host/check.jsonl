@@ -1,0 +1,6 @@
+{"file": ".trellis/spec/frontend/byok-provider-protocols.md", "reason": "Provider route truth, secret custody and transport admission."}
+{"file": ".trellis/spec/frontend/agent-control-safety.md", "reason": "Paid execution, receipt and stale-result safety."}
+{"file": ".trellis/spec/frontend/cutout-pipeline.md", "reason": "Artifact production, QA, CAS and repair invariants."}
+{"file": ".trellis/spec/frontend/commerce-production-profile.md", "reason": "Real-Host benchmark verifier and artifact-byte evidence boundary."}
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "Vendored media tooling and evidence quality requirements."}
+{"file": ".trellis/tasks/08-12-commerce-material-agent/research/temporal-design-models.md", "reason": "Official H3/Seedance evidence and Temporal Design implications."}

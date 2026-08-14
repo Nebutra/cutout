@@ -12,9 +12,8 @@ function canonicalJson(value) {
 }
 
 // Authoritative updater platform vocabulary shared by the manifest generator,
-// the release-asset collector, and the release workflow. `darwin-aarch64` is
-// the mandatory primary anchor (first key) and the subject of the single
-// SBOM/provenance/metadata artifact fields for backward compatibility.
+// the release-asset collector, and the release workflow. `darwin-aarch64` stays
+// first so old clients can use it as the primary validation anchor.
 export const updaterPlatforms = Object.freeze({
   'darwin-aarch64': { asset: 'macos-aarch64', updaterSuffix: '.app.tar.gz' },
   'darwin-x86_64': { asset: 'macos-x86_64', updaterSuffix: '.app.tar.gz' },
@@ -93,9 +92,8 @@ export async function readSignedArtifact(artifactPath, signaturePath) {
 }
 
 function normalizeReleasePlatforms(input) {
-  const raw = Array.isArray(input.platforms) && input.platforms.length
-    ? input.platforms
-    : [{ key: primaryPlatform, artifactUrl: input.artifactUrl, signature: input.signature, artifactDigest: input.artifactDigest, signatureFile: input.signatureFile }]
+  if (!Array.isArray(input.platforms)) throw new Error('All updater platforms are required for release generation.')
+  const raw = input.platforms
   const seen = new Map()
   for (const entry of raw) {
     if (!updaterPlatforms[entry.key]) throw new Error(`Unknown updater platform: ${entry.key}`)
@@ -103,8 +101,9 @@ function normalizeReleasePlatforms(input) {
     if (!entry.artifactUrl || !entry.signature || !entry.artifactDigest) throw new Error(`Platform ${entry.key} requires artifactUrl, signature, and artifactDigest.`)
     seen.set(entry.key, entry)
   }
+  const missing = platformOrder.filter((key) => !seen.has(key))
+  if (missing.length) throw new Error(`All updater platforms are required; missing: ${missing.join(', ')}`)
   const ordered = platformOrder.filter((key) => seen.has(key)).map((key) => seen.get(key))
-  if (ordered[0]?.key !== primaryPlatform) throw new Error('darwin-aarch64 is the mandatory primary updater platform.')
   return ordered
 }
 
@@ -133,6 +132,6 @@ export function buildReleaseDocuments(input) {
   validateUpdateManifest(manifest, { expectedSignature: primary.signature, allowedHosts: input.allowedHosts, requireReleaseNotes: true })
   const sbom = { spdxVersion: 'SPDX-2.3', dataLicense: 'CC0-1.0', SPDXID: 'SPDXRef-DOCUMENT', name: `Cutout-${input.version}`, documentNamespace: `https://cutout.local/sbom/${input.version}/${primary.artifactDigest}`, creationInfo: { created: publishedAt, creators: ['Tool: cutout-update-artifacts'] }, packages: platforms.map((p) => ({ SPDXID: p.key === primaryPlatform ? 'SPDXRef-Package-Cutout' : `SPDXRef-Package-Cutout-${p.key}`, name: 'Cutout', versionInfo: input.version, downloadLocation: p.href, checksums: [{ algorithm: 'SHA256', checksumValue: p.artifactDigest }] })) }
   const provenance = { version: 'cutout.provenance.v1', subject: platforms.map((p) => ({ name: p.filename, digest: { sha256: p.artifactDigest } })), build: { builder: 'github-actions', source: input.sourceRevision, channel: input.channel, generatedAt: publishedAt }, signing: { scheme: 'Tauri updater signature', privateKeySource: 'CI secret only' } }
-  const metadata = { version: 'cutout.release-metadata.v2', releaseVersion: input.version, channel: input.channel, artifact: { url: primary.href, sha256: primary.artifactDigest, signatureFile: primary.signatureFile }, platforms: platforms.map((p) => ({ key: p.key, url: p.href, sha256: p.artifactDigest, signatureFile: p.signatureFile })), sbom: { file: 'sbom.spdx.json', sha256: sha256(JSON.stringify(sbom)) }, provenance: { file: 'provenance.json', sha256: sha256(JSON.stringify(provenance)) } }
+  const metadata = { version: 'cutout.release-metadata.v3', releaseVersion: input.version, channel: input.channel, platforms: platforms.map((p) => ({ key: p.key, url: p.href, sha256: p.artifactDigest, signatureFile: p.signatureFile })), sbom: { file: 'sbom.spdx.json', sha256: sha256(JSON.stringify(sbom)) }, provenance: { file: 'provenance.json', sha256: sha256(JSON.stringify(provenance)) } }
   return { manifest, sbom, provenance, metadata }
 }

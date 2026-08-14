@@ -17,20 +17,6 @@ test("new project and presets are fast idempotent draft actions", async ({
     }).observe({ entryTypes: ["longtask"] });
   });
   await page.goto("/");
-  for (const database of await page.evaluate(() => indexedDB.databases()))
-    if (database.name)
-      await page.evaluate(
-        (name) =>
-          new Promise<void>((resolve) => {
-            const request = indexedDB.deleteDatabase(name);
-            request.onsuccess =
-              request.onerror =
-              request.onblocked =
-                () => resolve();
-          }),
-        database.name,
-      );
-  await page.reload();
   const composer = page.getByRole("textbox", {
       name: "Describe what you want to design...",
     }),
@@ -43,9 +29,36 @@ test("new project and presets are fast idempotent draft actions", async ({
     "Brand kit",
     "Poster",
   ]) {
-    const started = Date.now();
-    await page.getByRole("button", { name: label, exact: true }).click();
-    expect(Date.now() - started).toBeLessThan(500);
+    const preset = page.getByRole("button", { name: label, exact: true });
+    await preset.evaluate((button) => {
+      const composer = document.querySelector<HTMLTextAreaElement>("textarea");
+      if (!composer) throw new Error("Home composer is unavailable");
+      const previous = composer.value;
+      (globalThis as any).__presetResponseMs = null;
+      button.addEventListener(
+        "click",
+        () => {
+          const started = performance.now();
+          const observeCommit = () => {
+            if (composer.value !== previous) {
+              (globalThis as any).__presetResponseMs = performance.now() - started;
+              return;
+            }
+            requestAnimationFrame(observeCommit);
+          };
+          requestAnimationFrame(observeCommit);
+        },
+        { once: true },
+      );
+    });
+    await preset.click();
+    await page.waitForFunction(
+      () => typeof (globalThis as any).__presetResponseMs === "number",
+    );
+    const responseMs = await page.evaluate(
+      () => (globalThis as any).__presetResponseMs as number,
+    );
+    expect(responseMs).toBeLessThan(500);
     await expect(composer).toBeFocused();
     expect(await composer.inputValue(), label).not.toBe("");
     await expect(

@@ -4,6 +4,7 @@ import { createPrototypeAssetManifest } from '@/prototype/asset-manifest'
 import { currentPrototypeExploration, currentPrototypeReviewDocument } from '@/prototype/prototype-plan.test-fixture'
 import type { CodingReceipt } from '@/coding-runtime/contracts'
 import { sha256Bytes } from '@/asset-production/hash'
+import { pngDimensionFixture } from '@/lib/raster-dimensions.test-fixture'
 import {
   designDocumentToWorkspaceSnapshot,
   projectWorkspaceSnapshotToDesignDocument,
@@ -228,7 +229,7 @@ describe('workspace Design IR projection', () => {
     const suite = restored.data.snapshot.prototypeSuiteCandidates
     expect(suite?.set.selection?.candidateId).toBe('candidate:suite:selected')
     expect(suite?.artifacts['candidate:suite:selected']?.pages[0]?.bytes)
-      .toEqual(Uint8Array.from([31, 32, 33]))
+      .toEqual(pngDimensionFixture(1440, 900, 31))
     expect(suite?.artifacts['candidate:suite:selected']?.pages[0]?.review).toEqual(pageReview)
     expect(suite?.artifacts['candidate:suite:selected']?.resourcePack.assets).toEqual([
       {
@@ -457,7 +458,7 @@ function snapshot(options: {
     prototypePages: [
       {
         page: plan().pages[0]!,
-        bytes: options.pageBytes ?? new Uint8Array([4, 5, 6]),
+        bytes: options.pageBytes ?? pngDimensionFixture(1440, 900, 4),
         mediaType: 'image/png',
         width: 1440,
         height: 900,
@@ -608,7 +609,7 @@ function snapshotWithSuite(): WorkspaceSnapshot {
           plan: suitePlan,
           pages: [{
             page: suitePlan.pages[0]!,
-            bytes: Uint8Array.from([31, 32, 33]),
+            bytes: pngDimensionFixture(1440, 900, 31),
             mediaType: 'image/png',
             width: 1440,
             height: 900,
@@ -684,7 +685,17 @@ function plan() {
         route: '/',
         purpose: 'Sell.',
         viewport: { platform: 'web', width: 1440, height: 900, scroll: 'single-screen' as const },
-        regions: [{ id: 'hero', name: 'Hero', role: 'hero', summary: 'Sell.', complexity: 'low' as const, decompositionStrategy: 'direct' as const, assetRoute: 'direct-generate' as const, assetOpportunities: [] }],
+        regions: [{
+          id: 'hero',
+          name: 'Hero',
+          role: 'hero',
+          summary: 'Sell.',
+          complexity: 'low' as const,
+          decompositionStrategy: 'direct' as const,
+          assetRoute: 'direct-generate' as const,
+          assetOutput: 'transparent-subject' as const,
+          assetOpportunities: ['hero product illustration'],
+        }],
         overlays: [],
         states: [],
         interactions: [],

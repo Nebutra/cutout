@@ -15,6 +15,7 @@ function run(input: {
   readonly candidateIds?: readonly string[]
   readonly concurrency?: number
   readonly maxTransientRetries?: number
+  readonly onRetry?: Parameters<typeof runCandidateGenerationWaves<string>>[0]['onRetry']
 }) {
   return runCandidateGenerationWaves({
     candidateIds: input.candidateIds ?? ['candidate:1', 'candidate:2', 'candidate:3'],
@@ -23,6 +24,7 @@ function run(input: {
     generate: input.generate,
     classifyFailure: (error) => error as CandidateGenerationFailure,
     isCancelled: () => false,
+    onRetry: input.onRetry,
   })
 }
 
@@ -46,6 +48,7 @@ describe('runCandidateGenerationWaves', () => {
 
   it('retries a transient failure once with a fresh attempt identity', async () => {
     const attempts: string[] = []
+    const retried = vi.fn()
     const generate = vi.fn(async ({ identity }: { readonly identity: string }) => {
       attempts.push(identity)
       if (attempts.length === 1) {
@@ -57,10 +60,15 @@ describe('runCandidateGenerationWaves', () => {
       candidateIds: ['candidate:1'],
       concurrency: 1,
       generate,
+      onRetry: retried,
     })
 
     expect(attempts).toEqual(['candidate:1', 'candidate:1:retry:1'])
     expect(generate).toHaveBeenCalledTimes(2)
+    expect(retried).toHaveBeenCalledWith(
+      expect.objectContaining({ candidateId: 'candidate:1', attempt: 1 }),
+      expect.objectContaining({ transient: true }),
+    )
     expect(result.outcomes).toMatchObject([{ status: 'ready', attempts: 2 }])
     expect(result.complete).toBe(true)
 

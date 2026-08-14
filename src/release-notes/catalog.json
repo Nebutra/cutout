@@ -2,6 +2,112 @@
   "protocol": "cutout.release-notes.catalog.v1",
   "entries": [
     {
+      "version": "0.1.20",
+      "releasedOn": "2026-08-14",
+      "locales": {
+        "en": {
+          "headline": "Reliable local AI setup and faster design production",
+          "highlights": [
+            {
+              "id": "local-ai-routing",
+              "title": "Use the AI already configured on this Mac",
+              "body": "Automatic setup now keeps verified text and image routes separate, so a working local coding Agent can supply planning while a reviewed image route supplies production."
+            },
+            {
+              "id": "keychain-boundary",
+              "title": "Keep Provider keys in the native boundary",
+              "body": "New Provider credentials are bound to the signed Cutout process in macOS Keychain. Existing legacy entries migrate only after the system permits their first read, without broader Keychain access."
+            },
+            {
+              "id": "production-throughput",
+              "title": "Spend less time before the first result",
+              "body": "Governance repair code now loads only when needed, keeping the first workspace bundle below its release budget while preserving complete production validation."
+            }
+          ]
+        },
+        "zh-CN": {
+          "headline": "更可靠的本机 AI 配置与更快的设计生产",
+          "highlights": [
+            {
+              "id": "local-ai-routing",
+              "title": "直接使用这台 Mac 已配置的 AI",
+              "body": "自动配置现在会分别保留已验证的文本和图像路由：本机 Coding Agent 可负责规划，经过审核的图像路由可负责生产。"
+            },
+            {
+              "id": "keychain-boundary",
+              "title": "让 Provider 密钥留在原生安全边界",
+              "body": "新的 Provider 凭据会绑定到 macOS 钥匙串中的已签名 Cutout 进程。旧凭据只会在系统允许首次读取后迁移，且不会扩大钥匙串访问范围。"
+            },
+            {
+              "id": "production-throughput",
+              "title": "更快得到首个可用结果",
+              "body": "治理修复代码仅在需要时加载，使首个工作区包保持在发布预算内，同时保留完整的生产校验。"
+            }
+          ]
+        },
+        "ja": {
+          "headline": "より確実なローカル AI 設定と高速なデザイン制作",
+          "highlights": [
+            {
+              "id": "local-ai-routing",
+              "title": "この Mac に設定済みの AI を使う",
+              "body": "自動設定は検証済みのテキストと画像の経路を分けて保持します。ローカルの Coding Agent が計画を担い、審査済み画像経路が制作を担います。"
+            },
+            {
+              "id": "keychain-boundary",
+              "title": "Provider キーをネイティブ境界に保持",
+              "body": "新しい Provider 認証情報は macOS Keychain の署名済み Cutout プロセスに結び付けられます。既存の旧エントリは最初の読み取りをシステムが許可した後だけ移行し、アクセス範囲は広げません。"
+            },
+            {
+              "id": "production-throughput",
+              "title": "最初の結果までを短縮",
+              "body": "ガバナンス修復コードは必要な場合だけ読み込まれるため、完全な制作検証を保ちながら最初のワークスペースのバンドルを予算内に収めます。"
+            }
+          ]
+        },
+        "fr": {
+          "headline": "Configuration IA locale fiable et production de design plus rapide",
+          "highlights": [
+            {
+              "id": "local-ai-routing",
+              "title": "Utiliser l'IA deja configuree sur ce Mac",
+              "body": "La configuration automatique conserve separement les routes texte et image verifiees : un Agent de code local peut planifier pendant qu'une route image approuvee produit les livrables."
+            },
+            {
+              "id": "keychain-boundary",
+              "title": "Garder les cles Provider dans la frontiere native",
+              "body": "Les nouvelles informations Provider sont liees au processus Cutout signe dans le Trousseau macOS. Les anciennes entrees ne migrent qu'apres la premiere lecture autorisee par le systeme, sans etendre l'acces au Trousseau."
+            },
+            {
+              "id": "production-throughput",
+              "title": "Obtenir le premier resultat plus vite",
+              "body": "Le code de reparation de gouvernance ne se charge qu'au besoin, ce qui maintient le premier bundle de l'espace de travail sous son budget de publication tout en conservant une validation complete."
+            }
+          ]
+        },
+        "es": {
+          "headline": "Configuracion local de IA fiable y produccion de diseno mas rapida",
+          "highlights": [
+            {
+              "id": "local-ai-routing",
+              "title": "Usar la IA ya configurada en este Mac",
+              "body": "La configuracion automatica mantiene separadas las rutas verificadas de texto e imagen: un Agent de codigo local puede planificar mientras una ruta de imagen aprobada produce los materiales."
+            },
+            {
+              "id": "keychain-boundary",
+              "title": "Mantener las claves Provider en el limite nativo",
+              "body": "Las nuevas credenciales Provider se vinculan al proceso Cutout firmado en el Llavero de macOS. Las entradas heredadas solo migran tras la primera lectura permitida por el sistema, sin ampliar el acceso al Llavero."
+            },
+            {
+              "id": "production-throughput",
+              "title": "Llegar antes al primer resultado",
+              "body": "El codigo de reparacion de gobernanza solo se carga cuando hace falta, manteniendo el primer bundle del espacio de trabajo dentro de su presupuesto de lanzamiento y conservando la validacion completa."
+            }
+          ]
+        }
+      }
+    },
+    {
       "version": "0.1.19",
       "releasedOn": "2026-08-05",
       "locales": {
@@ -21,7 +127,7 @@
             {
               "id": "paid-actions-without-estimates",
               "title": "Paid actions decided on facts",
-              "body": "A paid action is authorized by capability, host policy, and your explicit approval alone. A cost estimate no longer approves or refuses work, and a charged amount appears only when the Provider returns verifiable billing evidence."
+              "body": "A configured BYOK Provider is standing authorization for paid execution, so Cutout does not stop for per-call payment approval. Capability policy, observable progress, cancellation, and verifiable billing evidence remain in force."
             }
           ]
         },
@@ -41,7 +147,7 @@
             {
               "id": "paid-actions-without-estimates",
               "title": "付费动作依据事实决定",
-              "body": "付费动作仅由能力、宿主策略与你的显式批准来授权。费用预估不再批准或拒绝任何工作；只有当 Provider 返回可验证的账单证据时，才会记录实际扣费金额。"
+              "body": "已配置的 BYOK Provider 即代表持续授权，Cutout 不再为每次付费调用停下来请求批准。能力策略、可观察进度、取消能力与可验证账单证据仍然保留。"
             }
           ]
         },
@@ -61,7 +167,7 @@
             {
               "id": "paid-actions-without-estimates",
               "title": "事実に基づく有料アクション",
-              "body": "有料アクションは、機能・ホストポリシー・明示的な承認のみで認可されます。費用見積もりが処理を承認・拒否することはなくなり、課金額は Provider が検証可能な請求証跡を返した場合にのみ記録されます。"
+              "body": "設定済みの BYOK Provider を継続的な認可として扱い、呼び出しごとの支払い承認では停止しません。機能ポリシー、進捗の可視化、キャンセル、検証可能な請求証跡は維持されます。"
             }
           ]
         },
@@ -81,7 +187,7 @@
             {
               "id": "paid-actions-without-estimates",
               "title": "Des actions payantes décidées sur des faits",
-              "body": "Une action payante est autorisée uniquement par la capacité, la politique de l'hôte et votre approbation explicite. Une estimation de coût n'approuve ni ne refuse plus aucun travail, et un montant facturé n'apparaît que si le Provider renvoie une preuve de facturation vérifiable."
+              "body": "Un Provider BYOK configuré vaut autorisation permanente pour l'exécution payante : Cutout ne s'arrête plus pour une approbation à chaque appel. La politique de capacité, la progression observable, l'annulation et les preuves de facturation vérifiables restent actives."
             }
           ]
         },
@@ -101,7 +207,7 @@
             {
               "id": "paid-actions-without-estimates",
               "title": "Acciones de pago decididas con hechos",
-              "body": "Una acción de pago se autoriza solo por la capacidad, la política del host y tu aprobación explícita. Una estimación de coste ya no aprueba ni rechaza trabajo, y un importe cobrado aparece únicamente cuando el Provider devuelve evidencia de facturación verificable."
+              "body": "Un Provider BYOK configurado actúa como autorización permanente para la ejecución de pago, por lo que Cutout no se detiene para pedir aprobación en cada llamada. Se mantienen la política de capacidades, el progreso observable, la cancelación y la evidencia de facturación verificable."
             }
           ]
         }

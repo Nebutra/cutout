@@ -172,14 +172,17 @@ binary artifact bytes.
 
 `cutout.control.v1` reserves `tool.invoke` for outcome-driven tools such as
 `generate-image`, `edit-image`, and `cutout`. A request declares the intended
-result, input artifact IDs, and either `explicit` or host-policy `auto`
-approval. It never carries an API key,
+result and input artifact IDs. The desktop product always uses host-policy
+`auto`: enabling a BYOK Provider is standing authorization, so preview is an
+observation surface rather than a per-call payment gate. The legacy `explicit`
+value remains decoder-compatible for non-desktop hosts. A request never carries an API key,
 authorization header, provider configuration, arbitrary file bytes, or an
 executor-supplied receipt.
 
 Provider/model availability is a host-owned fact. The shared planner permits
-automatic execution only when paid actions are enabled and the selected
-approval mode is satisfied. A completed executor returns an auditable receipt
+desktop execution only when Provider actions are enabled and the exact route is
+available; missing capability or disabled policy fails immediately rather than
+waiting for an approval that cannot fix it. A completed executor returns an auditable receipt
 containing capability, provider/model IDs, output artifact IDs, timestamps, and
 terminal status. Actual charged amount is optional and may appear only when the
 Provider returned verifiable billing evidence; Cutout never substitutes a price
@@ -189,6 +192,7 @@ The current headless host intentionally has no provider executor. Its dry-run
 therefore returns a truthful `capability-required` plan, and apply returns a
 `capability-required` error without advancing the revision or recording a fake
 success. The packaged desktop host does execute assigned image Providers through
-the native credential/origin boundary, approval lease, paid-tool receipt, and
-content-addressed artifact store. That executor is not exported by the default
+the native credential/origin boundary, request-bound capability lease, paid-tool
+receipt, and content-addressed artifact store. The lease limits and records
+execution; it does not represent a per-call payment confirmation. That executor is not exported by the default
 headless CLI/MCP process.

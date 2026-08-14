@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/frontend/cutout-pipeline.md", "reason": "Preserve measured slicing and asset-production invariants."}
+{"file": ".trellis/spec/frontend/byok-provider-protocols.md", "reason": "Respect reviewed Provider protocol and native credential boundaries."}
+{"file": ".trellis/spec/frontend/prototype-generation.md", "reason": "Preserve Agent-authored route topology and complete suite delivery."}
+{"file": ".trellis/spec/frontend/agent-control-safety.md", "reason": "Keep progress, errors and approvals truthful and sanitized."}

@@ -20,7 +20,6 @@ import { createLocalAssetRepository } from './local/asset-repository.local'
 import { createLocalBundleRepository } from './local/bundle-repository.local'
 import { createLocalRepositorySourceService } from './local/repository-source.local'
 import { createLocalVectorizeService } from './local/vectorize-service.local'
-import { createLocalSessionService } from './local/session.local'
 import { createLocalProviderService } from './ai/provider-service.local'
 import { createLocalPromptService } from './ai/prompt-service.local'
 
@@ -42,7 +41,6 @@ export function createLocalRegistry(
     bundles: createLocalBundleRepository(bridge),
     repositorySources: createLocalRepositorySourceService(bridge),
     vectorize: createLocalVectorizeService(bridge),
-    session: createLocalSessionService(),
     providers,
     generation: createDeferredGenerationService(providers, prompts),
     prompts,

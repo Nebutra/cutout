@@ -6,41 +6,42 @@
 
 ## Overview
 
-<!--
-Document your project's component conventions here.
-
-Questions to answer:
-- What component patterns do you use?
-- How are props defined?
-- How do you handle composition?
-- What accessibility standards apply?
--->
-
-(To be filled by the team)
+Components render typed domain projections and dispatch commands; they do not
+decode persisted/provider payloads or own the authoritative workflow state.
+Shared controls come from `src/components/ui/` and visual behavior follows the
+existing quiet, work-focused application shell.
 
 ---
 
 ## Component Structure
 
-<!-- Standard structure of a component file -->
-
-(To be filled by the team)
+- Keep pure formatting/projection helpers above the component or in a neighboring
+  view-model module when reused or complex.
+- Define props, then the named component. Use composition for panels, rows and
+  disclosures rather than adding unrelated modes to a monolith.
+- Keep effects in hooks and event handlers. Rendering must be side-effect free.
+- Add the closest focused test beside the component; use Playwright for geometry,
+  focus, responsive and native-dialog behavior that jsdom cannot prove.
 
 ---
 
 ## Props Conventions
 
-<!-- How props should be defined and typed -->
-
-(To be filled by the team)
+- Use named interfaces with `readonly` fields for non-trivial props.
+- Pass domain projections and explicit callbacks, not the entire store or service
+  registry.
+- Use discriminated unions when visible states require different data.
+- Do not accept credential values, arbitrary filesystem paths or caller-authored
+  approval authority as component props.
 
 ---
 
 ## Styling Patterns
 
-<!-- How styles are applied (CSS modules, styled-components, Tailwind, etc.) -->
-
-(To be filled by the team)
+Tailwind utility classes are the default; `cn` composes conditional classes and
+shared primitives use `class-variance-authority`. Stable controls declare fixed
+dimensions. Prefer transform/opacity animation, respect reduced motion and keep
+pressed states from shifting absolutely positioned controls.
 
 ---
 
@@ -178,10 +179,38 @@ the drawer and opens a separate specimen dialog.
 Correct: `Design` toggles `designDrawerOpen`; `Deliver` uses the same rail item
 treatment but continues to open the established inline delivery workspace.
 
+### Workspace chrome restore
+
+The desktop rail (`Collapse sidebar`) and any drawer hide control are independent.
+Collapsing one or both must leave a discoverable restore on the workspace shell.
+
+- Keep `Expand sidebar` on `[data-workspace-root]`, not inside `OutputCanvas` or
+  another replaceable canvas surface. Run-error, Git review, and empty-state
+  views unmount that canvas, which would strand the user.
+- Style the restore as a chrome control (circular, bordered, background, shadow),
+  never a bare glyph on the dotted canvas.
+- When the rail and drawer are both gone, reserve the canvas top-left origin so
+  background / grid / minimap controls sit beside the restore instead of under
+  it.
+- Restoring expands the rail only. The rail remains the navigation back to
+  Agent, Files, Git, Design, and Deliver.
+- Cover hide-then-collapse and collapse-then-hide. Presence in the accessibility
+  tree is not enough if the control is `display: none` or painted under canvas
+  tools.
+
+Wrong: mount `Expand sidebar` only as the first `OutputCanvas` toolbar item.
+
+Correct: render a shell-level `Expand sidebar` whenever `sidebarCollapsed` is
+true, and reserve a toolbar slot only when the drawer is also closed.
+
 ---
 
 ## Common Mistakes
 
-<!-- Component-related mistakes your team has made -->
-
-(To be filled by the team)
+- Treating DOM presence as proof that content is visible when a drawer overlaps it.
+- Rendering duplicate controls for one action instead of one accessible button.
+- Showing inferred percentages, ETAs or completion without source evidence.
+- Nesting operational page sections in decorative cards and reducing scanability.
+- Binding `aria-pressed` to a different surface than the click handler opens.
+- Mounting the only sidebar restore control inside a canvas surface that run
+  error, review, or empty states can replace.

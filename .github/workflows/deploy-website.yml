@@ -1,0 +1,178 @@
+name: Deploy Cutout website
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "website/**"
+      - ".github/workflows/deploy-website.yml"
+      - "package.json"
+      - "pnpm-lock.yaml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-cutout-website
+  cancel-in-progress: true
+
+env:
+  CUTOUT_SITE_HOST: cutout.nebutra.com
+  CUTOUT_VERCEL_PROJECT: cutout
+
+jobs:
+  deploy:
+    name: Validate and deploy exact website revision
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+        with:
+          version: 10
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm website:validate
+
+      - name: Require deployment credentials
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CF_ZONE_ID: ${{ vars.CF_ZONE_ID }}
+        run: |
+          set -euo pipefail
+          test -n "$VERCEL_TOKEN" || { echo "::error::VERCEL_TOKEN is required"; exit 1; }
+          test -n "$VERCEL_ORG_ID" || { echo "::error::VERCEL_ORG_ID is required"; exit 1; }
+          test -n "$CLOUDFLARE_API_TOKEN" || { echo "::error::CLOUDFLARE_API_TOKEN is required"; exit 1; }
+          test -n "$CLOUDFLARE_ACCOUNT_ID" || { echo "::error::CLOUDFLARE_ACCOUNT_ID is required"; exit 1; }
+          test -n "$CF_ZONE_ID" || { echo "::error::CF_ZONE_ID is required"; exit 1; }
+
+      - name: Resolve or create the dedicated Vercel project
+        id: project
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
+        run: |
+          set -euo pipefail
+          api() {
+            curl --fail-with-body --silent --show-error \
+              -H "Authorization: Bearer $VERCEL_TOKEN" "$@"
+          }
+
+          projects_file="$(mktemp)"
+          api "https://api.vercel.com/v9/projects?teamId=${VERCEL_ORG_ID}&limit=100" > "$projects_file"
+          project_id="$(jq -r --arg name "$CUTOUT_VERCEL_PROJECT" '.projects[]? | select(.name == $name) | .id' "$projects_file" | head -n 1)"
+
+          if [ -z "$project_id" ]; then
+            create_file="$(mktemp)"
+            api -X POST -H 'Content-Type: application/json' \
+              "https://api.vercel.com/v10/projects?teamId=${VERCEL_ORG_ID}" \
+              --data "$(jq -nc --arg name "$CUTOUT_VERCEL_PROJECT" '{name:$name,framework:null}')" > "$create_file"
+            project_id="$(jq -r '.id // empty' "$create_file")"
+          fi
+
+          test -n "$project_id" || { echo "::error::Vercel project could not be resolved or created"; exit 1; }
+          echo "project_id=$project_id" >> "$GITHUB_OUTPUT"
+
+          mkdir -p website/.vercel
+          jq -nc --arg projectId "$project_id" --arg orgId "$VERCEL_ORG_ID" \
+            '{projectId:$projectId,orgId:$orgId}' > website/.vercel/project.json
+
+      - name: Embed and validate the exact public revision
+        run: |
+          set -euo pipefail
+          sed -i "s/__CUTOUT_BUILD_REVISION__/${GITHUB_SHA}/g" website/index.html
+          grep -Fq "data-build-revision=\"${GITHUB_SHA}\"" website/index.html
+
+      - name: Deploy production website
+        id: deployment
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ steps.project.outputs.project_id }}
+        run: |
+          set -euo pipefail
+          deployment_url="$(pnpm dlx vercel@56.5.0 deploy --prod --yes --archive=tgz --cwd website --token "$VERCEL_TOKEN" --scope "$VERCEL_ORG_ID" 2>&1 | tee /dev/stderr | grep -Eo 'https://[^ ]+\.vercel\.app' | tail -n 1)"
+          test -n "$deployment_url" || { echo "::error::Vercel did not return a deployment URL"; exit 1; }
+          echo "url=$deployment_url" >> "$GITHUB_OUTPUT"
+
+      - name: Bind cutout.nebutra.com to the project
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ steps.project.outputs.project_id }}
+        run: |
+          set -euo pipefail
+          response_file="$(mktemp)"
+          status="$(curl --silent --show-error -o "$response_file" -w '%{http_code}' \
+            -X POST -H "Authorization: Bearer $VERCEL_TOKEN" -H 'Content-Type: application/json' \
+            "https://api.vercel.com/v10/projects/${VERCEL_PROJECT_ID}/domains?teamId=${VERCEL_ORG_ID}" \
+            --data "$(jq -nc --arg name "$CUTOUT_SITE_HOST" '{name:$name}')")"
+          if [ "$status" != 200 ] && [ "$status" != 201 ] && ! jq -e '.error.code == "domain_already_in_use" or .error.code == "domain_already_exists"' "$response_file" >/dev/null 2>&1; then
+            echo "::error::Vercel domain binding failed with HTTP $status"
+            jq '{error: (.error | {code,message})}' "$response_file" || true
+            exit 1
+          fi
+
+      - name: Upsert Cloudflare DNS
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CF_ZONE_ID: ${{ vars.CF_ZONE_ID }}
+        run: |
+          set -euo pipefail
+          cf_api="https://api.cloudflare.com/client/v4/zones/${CF_ZONE_ID}/dns_records"
+          auth_header="Authorization: Bearer ${CLOUDFLARE_API_TOKEN}"
+
+          existing_file="$(mktemp)"
+          curl --fail-with-body --silent --show-error -H "$auth_header" \
+            "${cf_api}?name=${CUTOUT_SITE_HOST}" > "$existing_file"
+
+          while read -r record_id; do
+            test -n "$record_id" || continue
+            curl --fail-with-body --silent --show-error -X DELETE -H "$auth_header" \
+              "${cf_api}/${record_id}" >/dev/null
+          done < <(jq -r '.result[]? | select(.type != "CNAME") | .id' "$existing_file")
+
+          cname_id="$(jq -r '.result[]? | select(.type == "CNAME") | .id' "$existing_file" | head -n 1)"
+          dns_body="$(jq -nc '{type:"CNAME",name:"cutout",content:"cname.vercel-dns.com",proxied:true,ttl:1}')"
+          response_file="$(mktemp)"
+          if [ -n "$cname_id" ]; then
+            curl --fail-with-body --silent --show-error -X PUT -H "$auth_header" -H 'Content-Type: application/json' \
+              --data "$dns_body" "${cf_api}/${cname_id}" > "$response_file"
+          else
+            curl --fail-with-body --silent --show-error -X POST -H "$auth_header" -H 'Content-Type: application/json' \
+              --data "$dns_body" "$cf_api" > "$response_file"
+          fi
+          jq -e '.success == true' "$response_file" >/dev/null
+
+      - name: Prove the exact revision is live
+        env:
+          EXPECTED_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          response_file="$(mktemp)"
+          for attempt in $(seq 1 20); do
+            code="$(curl --silent --show-error -L -o "$response_file" -w '%{http_code}' \
+              --max-time 30 "https://${CUTOUT_SITE_HOST}/?revision=${EXPECTED_SHA}" || true)"
+            if [ "$code" = 200 ] \
+              && grep -Fq "data-build-revision=\"${EXPECTED_SHA}\"" "$response_file" \
+              && grep -Fq '<link rel="canonical" href="https://cutout.nebutra.com/"' "$response_file" \
+              && grep -Fq 'https://github.com/Nebutra/cutout/releases/latest' "$response_file"; then
+              echo "Verified ${CUTOUT_SITE_HOST} at ${EXPECTED_SHA}"
+              exit 0
+            fi
+            echo "Attempt ${attempt}: HTTP ${code}; exact revision not live yet"
+            sleep 12
+          done
+          echo "::error::Production never served the exact deployed revision"
+          exit 1

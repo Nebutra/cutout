@@ -2,8 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
   configure: vi.fn(),
-  setBinding: vi.fn(),
-  setDescriptors: vi.fn(),
+  setAutomaticBindings: vi.fn(),
   setVerification: vi.fn(),
 }))
 vi.mock('./provider-discovery', async (original) => ({
@@ -11,8 +10,7 @@ vi.mock('./provider-discovery', async (original) => ({
   autoConfigureProviderCandidate: mocks.configure,
 }))
 vi.mock('./model-assignment.local', () => ({
-  setCapabilityBinding: mocks.setBinding,
-  setCapabilityDescriptors: mocks.setDescriptors,
+  setAutomaticCapabilityBindings: mocks.setAutomaticBindings,
 }))
 vi.mock('./provider-verification', async (original) => ({
   ...await original<typeof import('./provider-verification')>(),
@@ -24,12 +22,24 @@ import type { AutoConfiguredProvider, ProviderDiscoveryCandidate } from './provi
 
 const configured = (
   id: string,
-  kind: 'openai-compatible' | 'cc-switch',
+  kind: 'openai-compatible' | 'cc-switch' | 'dashscope',
   models: string[],
   defaultModel = models[0]!,
   descriptors?: AutoConfiguredProvider['descriptors'],
 ): AutoConfiguredProvider => ({
-  provider: { id, kind, label: id, baseUrl: kind === 'cc-switch' ? 'http://127.0.0.1:15721/v1' : 'https://relay.example/v1', wireProtocol: kind === 'cc-switch' ? 'responses' : 'chat-completions', defaultModel, enabled: true },
+  provider: {
+    id,
+    kind,
+    label: id,
+    baseUrl: kind === 'cc-switch'
+      ? 'http://127.0.0.1:15721/v1'
+      : kind === 'dashscope'
+        ? 'https://dashscope.aliyuncs.com/compatible-mode/v1'
+        : 'https://relay.example/v1',
+    wireProtocol: kind === 'cc-switch' ? 'responses' : 'chat-completions',
+    defaultModel,
+    enabled: true,
+  },
   models,
   ...(descriptors ? { descriptors } : {}),
 })
@@ -72,6 +82,96 @@ describe('automatic AI setup', () => {
       providerId: 'cc-switch-upstream',
       model: 'gpt-image-2',
     })
+  })
+
+  it('honors a verified image Provider default without making Qwen a global default', () => {
+    const bindings = automaticBindingsFor([
+      configured('gpt', 'openai-compatible', ['gpt-5.5', 'gpt-image-2'], 'gpt-5.5'),
+      configured(
+        'qwen',
+        'dashscope',
+        ['qwen-image-3.0-pro', 'qwen-image-3.0'],
+        'qwen-image-3.0-pro',
+      ),
+    ])
+    expect(bindings['image-generation']).toEqual({
+      providerId: 'qwen',
+      model: 'qwen-image-3.0-pro',
+    })
+    expect(bindings['image-edit']).toEqual(bindings['image-generation'])
+  })
+
+  it('selects an isolated preferred text route only from authenticated catalog rows', () => {
+    const configuredProviders = [
+      configured('default', 'openai-compatible', ['gpt-5.5'], 'gpt-5.5'),
+      configured(
+        'qwen',
+        'dashscope',
+        ['qwen-image-3.0', 'qwen-plus'],
+        'qwen-image-3.0',
+      ),
+    ]
+    const normal = automaticBindingsFor(configuredProviders)
+    const isolated = automaticBindingsFor(configuredProviders, {
+      preferredTextRoutes: [{ kind: 'dashscope', model: 'qwen-plus' }],
+    })
+    const unavailable = automaticBindingsFor(configuredProviders, {
+      preferredTextRoutes: [{ kind: 'dashscope', model: 'qwen-max-not-observed' }],
+    })
+
+    expect(normal.text).toEqual({ providerId: 'default', model: 'gpt-5.5' })
+    expect(isolated.text).toEqual({ providerId: 'qwen', model: 'qwen-plus' })
+    expect(isolated.vision).toEqual(normal.vision)
+    expect(isolated.webdev).toEqual(normal.webdev)
+    expect(unavailable.text).toEqual(normal.text)
+  })
+
+  it('persists the packaged preference only after the exact model is catalog-checked', async () => {
+    const candidates = ['default', 'qwen'].map((label, index) => ({
+      id: `provider-candidate:${String.fromCharCode(97 + index).repeat(64)}`,
+      source: 'cutout-keychain', sourceLabel: 'Cutout local credentials',
+      kind: index === 1 ? 'dashscope' : 'openai-compatible', label,
+      baseUrl: index === 1
+        ? 'https://dashscope.aliyuncs.com/compatible-mode/v1'
+        : 'https://default.example/v1',
+      wireProtocol: 'chat-completions',
+      ...(index === 1 ? { modelHint: 'qwen-image-3.0' } : {}),
+      credential: { sourceType: 'keychain', available: true, importable: true },
+      warnings: [],
+    })) as ProviderDiscoveryCandidate[]
+    mocks.configure
+      .mockResolvedValueOnce(configured(
+        'default',
+        'openai-compatible',
+        ['gpt-5.5', 'gpt-image-2'],
+        'gpt-5.5',
+      ))
+      .mockResolvedValueOnce(configured(
+        'qwen',
+        'dashscope',
+        ['qwen-image-3.0', 'qwen-plus'],
+        'qwen-image-3.0',
+      ))
+
+    await expect(configureAutomaticAi(candidates, {
+      preferredTextRoutes: [{ kind: 'dashscope', model: 'qwen-plus' }],
+    })).resolves.toMatchObject({
+      bindings: {
+        text: { providerId: 'qwen', model: 'qwen-plus' },
+        'image-generation': { providerId: 'qwen', model: 'qwen-image-3.0' },
+      },
+    })
+    expect(mocks.setAutomaticBindings).toHaveBeenCalledWith(expect.objectContaining({
+      text: { providerId: 'qwen', model: 'qwen-plus' },
+    }),
+      expect.not.arrayContaining([
+        expect.objectContaining({ providerId: 'qwen', model: 'qwen-plus' }),
+      ]),
+    )
+    expect(mocks.configure.mock.calls).toEqual([
+      [candidates[0]!.id],
+      [candidates[1]!.id],
+    ])
   })
 
   it('keeps a supported compatible image route as the fallback', () => {
@@ -190,33 +290,140 @@ describe('automatic AI setup', () => {
       .mockResolvedValueOnce(configured('text', 'openai-compatible', ['gpt-5.5']))
       .mockResolvedValueOnce(configured('image', 'openai-compatible', ['gpt-image-2']))
     await expect(configureAutomaticAi(candidates)).resolves.toMatchObject({ configured: [{ provider: { id: 'text' } }, { provider: { id: 'image' } }] })
-    expect(mocks.setBinding).toHaveBeenCalledWith('webdev', { providerId: 'text', model: 'gpt-5.5' })
-    expect(mocks.setBinding).toHaveBeenCalledWith('image-generation', { providerId: 'image', model: 'gpt-image-2' })
+    expect(mocks.setAutomaticBindings).toHaveBeenCalledWith(expect.objectContaining({
+      webdev: { providerId: 'text', model: 'gpt-5.5' },
+      'image-generation': { providerId: 'image', model: 'gpt-image-2' },
+    }), expect.any(Array))
     expect(mocks.setVerification).toHaveBeenCalledTimes(2)
-    expect(mocks.setDescriptors).toHaveBeenCalledWith([
+    expect(mocks.setAutomaticBindings).toHaveBeenCalledWith(expect.any(Object), [
       expect.objectContaining({ providerId: 'image', model: 'gpt-image-2' }),
     ])
   })
 
-  it('does not probe unrelated candidates after one provider covers every task', async () => {
-    const candidates = ['a', 'b'].map((suffix) => ({
+  it('prefers exact Cutout Keychain metadata over an Agent-derived endpoint candidate', async () => {
+    const agentCandidate = {
+      id: `provider-candidate:${'a'.repeat(64)}`,
+      source: 'cc-switch', sourceLabel: 'CC Switch', kind: 'openai-compatible',
+      label: 'CC Switch Codex upstream', baseUrl: 'https://relay.example/v1',
+      wireProtocol: 'responses',
+      credential: { sourceType: 'cc-switch-db', available: true, importable: true },
+      warnings: [],
+    } as ProviderDiscoveryCandidate
+    const cutoutCandidate = {
+      id: `provider-candidate:${'b'.repeat(64)}`,
+      source: 'cutout-keychain', sourceLabel: 'Cutout local credentials',
+      kind: 'openai-compatible', label: 'MOX', baseUrl: 'https://relay.example/v1',
+      wireProtocol: 'chat-completions', modelHint: 'gpt-5.5',
+      credential: { sourceType: 'keychain', available: true, importable: true },
+      warnings: [],
+    } as ProviderDiscoveryCandidate
+    const qwenCandidate = {
+      id: `provider-candidate:${'c'.repeat(64)}`,
+      source: 'cutout-keychain', sourceLabel: 'Cutout local credentials',
+      kind: 'dashscope', label: 'Qwen Image 3',
+      baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+      wireProtocol: 'chat-completions', modelHint: 'qwen-image-3.0',
+      credential: { sourceType: 'keychain', available: true, importable: true },
+      warnings: [],
+    } as ProviderDiscoveryCandidate
+    mocks.configure
+      .mockResolvedValueOnce(configured('mox', 'openai-compatible', ['gpt-5.5']))
+      .mockResolvedValueOnce(configured(
+        'qwen',
+        'dashscope',
+        ['qwen-image-3.0'],
+        'qwen-image-3.0',
+      ))
+      .mockRejectedValueOnce({
+        code: 'unsupported',
+        message: 'The Agent-derived fallback uses an incompatible protocol.',
+      })
+
+    await expect(configureAutomaticAi([
+      agentCandidate,
+      cutoutCandidate,
+      qwenCandidate,
+    ])).resolves.toMatchObject({
+      bindings: {
+        text: { providerId: 'mox', model: 'gpt-5.5' },
+        'image-generation': { providerId: 'qwen', model: 'qwen-image-3.0' },
+      },
+    })
+    expect(mocks.configure.mock.calls).toEqual([
+      [cutoutCandidate.id],
+      [qwenCandidate.id],
+    ])
+  })
+
+  it('stops after the first Provider closes every required capability', async () => {
+    const candidates = ['a', 'b', 'c'].map((suffix) => ({
       id: `provider-candidate:${suffix.repeat(64)}`,
       source: 'cc-switch', sourceLabel: 'CC Switch', kind: 'openai-compatible', label: suffix,
       baseUrl: 'https://relay.example/v1', wireProtocol: 'responses',
       credential: { sourceType: 'cc-switch-db', available: true, importable: true }, warnings: [],
     })) as ProviderDiscoveryCandidate[]
     mocks.configure.mockResolvedValueOnce(configured(
-      'complete',
-      'openai-compatible',
-      ['gpt-5.5', 'gpt-image-2'],
-      'gpt-5.5',
-    ))
+        'complete',
+        'openai-compatible',
+        ['gpt-5.5', 'gpt-image-2'],
+        'gpt-5.5',
+      ))
 
     await expect(configureAutomaticAi(candidates)).resolves.toMatchObject({
       configured: [{ provider: { id: 'complete' } }],
     })
-    expect(mocks.configure).toHaveBeenCalledTimes(1)
-    expect(mocks.configure).toHaveBeenCalledWith(candidates[0]!.id)
+    expect(mocks.configure.mock.calls).toEqual([[candidates[0]!.id]])
+    expect(mocks.setVerification).toHaveBeenCalledTimes(1)
+    expect(mocks.setAutomaticBindings).toHaveBeenCalledWith(expect.any(Object), expect.arrayContaining([
+      expect.objectContaining({ providerId: 'complete', model: 'gpt-image-2' }),
+    ]))
+  })
+
+  it('does not probe an optional fallback once setup is usable', async () => {
+    const candidates = ['a', 'b', 'c'].map((suffix) => ({
+      id: `provider-candidate:${suffix.repeat(64)}`,
+      source: 'cc-switch', sourceLabel: 'CC Switch', kind: 'openai-compatible', label: suffix,
+      baseUrl: 'https://relay.example/v1', wireProtocol: 'responses',
+      credential: { sourceType: 'cc-switch-db', available: true, importable: true }, warnings: [],
+    })) as ProviderDiscoveryCandidate[]
+    mocks.configure.mockResolvedValueOnce(configured(
+        'complete',
+        'openai-compatible',
+        ['gpt-5.5', 'gpt-image-2'],
+        'gpt-5.5',
+      ))
+
+    await expect(configureAutomaticAi(candidates)).resolves.toMatchObject({
+      configured: [{ provider: { id: 'complete' } }],
+    })
+    expect(mocks.configure.mock.calls).toEqual([[candidates[0]!.id]])
+  })
+
+  it('does not add a stronger optional image route after capability closure', async () => {
+    const candidates = ['complete', 'generic', 'qwen'].map((label, index) => ({
+      id: `provider-candidate:${String.fromCharCode(97 + index).repeat(64)}`,
+      source: 'cutout-keychain', sourceLabel: 'Cutout local credentials',
+      kind: index === 2 ? 'dashscope' : 'openai-compatible', label,
+      baseUrl: index === 2
+        ? 'https://dashscope.aliyuncs.com/compatible-mode/v1'
+        : `https://${label}.example/v1`,
+      wireProtocol: 'chat-completions',
+      ...(index === 1 ? { modelHint: 'gpt-5.5-mini' } : {}),
+      ...(index === 2 ? { modelHint: 'qwen-image-3.0' } : {}),
+      credential: { sourceType: 'keychain', available: true, importable: true },
+      warnings: [],
+    })) as ProviderDiscoveryCandidate[]
+    mocks.configure.mockResolvedValueOnce(configured(
+        'complete',
+        'openai-compatible',
+        ['gpt-5.5', 'gpt-image-2'],
+        'gpt-5.5',
+      ))
+
+    await expect(configureAutomaticAi(candidates)).resolves.toMatchObject({
+      configured: [{ provider: { id: 'complete' } }],
+    })
+    expect(mocks.configure.mock.calls).toEqual([[candidates[0]!.id]])
   })
 
   it('continues through the reviewed CC Switch queue after the current catalog rejects auth', async () => {

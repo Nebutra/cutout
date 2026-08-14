@@ -48,6 +48,10 @@ export async function runCandidateGenerationWaves<Value>(input: {
     attempt: CandidateGenerationAttempt,
     failure: CandidateGenerationFailure,
   ) => MaybePromise
+  readonly onRetry?: (
+    attempt: CandidateGenerationAttempt,
+    failure: CandidateGenerationFailure,
+  ) => MaybePromise
   readonly onCancelled?: (attempt: CandidateGenerationAttempt) => MaybePromise
 }): Promise<CandidateGenerationWaveResult<Value>> {
   if (!Number.isInteger(input.concurrency) || input.concurrency < 1) {
@@ -80,7 +84,10 @@ export async function runCandidateGenerationWaves<Value>(input: {
           throw error
         }
         const failure = input.classifyFailure(error)
-        if (failure.transient && attempt <= input.maxTransientRetries) continue
+        if (failure.transient && attempt <= input.maxTransientRetries) {
+          await input.onRetry?.(candidateAttempt, failure)
+          continue
+        }
         await input.onFailed?.(candidateAttempt, failure)
         return { candidateId, status: 'failed', attempts: attempt, failure }
       }

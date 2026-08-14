@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   classifyGenerationError,
   isRouteWideGenerationFailure,
+  runWithTransientGenerationRetry,
 } from "./generation-error";
 
 describe("classifyGenerationError", () => {
@@ -14,17 +15,95 @@ describe("classifyGenerationError", () => {
     "Upstream request failed",
     "HTTP 500 from provider",
     "HTTP 503 from provider",
+    "HTTP 429: quota for this API key is temporarily exhausted",
+    "Request failed with status code 429: API key quota reached",
     "Another planning turn is already active",
     "Planning runtime transport failed",
     "Planning runtime timed out",
     "Planning runtime upstream is unavailable",
     "The saved planning conversation is stale",
     "Planning runtime output did not match the required schema",
+    "The planning Agent could not finish this turn. Try again to continue.",
+    "Progressive planner outline transport failed.",
   ])("marks transient provider failures as retryable: %s", (message) => {
     expect(classifyGenerationError(message)).toMatchObject({
       kind: "transient",
       retryable: true,
     });
+  });
+
+  it("keeps a generic native turn failure non-retryable without reviewed transient evidence", () => {
+    expect(classifyGenerationError("Planning runtime turn failed")).toMatchObject({
+      kind: "unknown",
+      retryable: false,
+    });
+  });
+
+  it.each([408, 500, 502, 503, 504])(
+    "lets explicit HTTP %s transport status override arbitrary response prose",
+    (status) => {
+      expect(classifyGenerationError(
+        `HTTP ${status}: this API key and schema are mentioned only in upstream prose`,
+      )).toMatchObject({
+        kind: "transient",
+        retryable: true,
+      });
+    },
+  );
+
+  it("does not accept prose appended to the closed structured failure grammar", () => {
+    expect(classifyGenerationError(
+      "Structured output failed: native-schema=transport. upstream prose",
+    )).toMatchObject({
+      kind: "configuration",
+      retryable: false,
+    });
+  });
+
+  it.each([
+    ["Structured output failed: native-schema=transport.", "transient", true],
+    ["Structured output failed: native-schema=rate-limited.", "transient", true],
+    ["Structured output failed: native-schema=authentication.", "credential", false],
+    ["Structured output failed: native-schema=policy.", "policy", false],
+    ["Structured output failed: native-schema=aborted.", "cancelled", false],
+    ["Structured output failed: native-schema=schema-mismatch.", "configuration", false],
+    ["Structured output failed: native-schema=schema-mismatch; forced-tool=transport.", "transient", true],
+    ["Structured output failed: native-schema=authentication; forced-tool=transport.", "credential", false],
+    ["Structured output failed: native-schema=policy; forced-tool=transport.", "policy", false],
+    ["Structured output failed: native-schema=transport; forced-tool=aborted.", "cancelled", false],
+  ] as const)(
+    "classifies the closed structured-attempt signal without reading Provider prose: %s",
+    (message, kind, retryable) => {
+      expect(classifyGenerationError(message)).toMatchObject({ kind, retryable });
+    },
+  );
+
+  it.each([
+    ["HTTP 401: this API key is invalid", "credential"],
+    ["HTTP 403: this API key is blocked by policy", "policy"],
+  ] as const)(
+    "lets explicit HTTP auth/policy status override overlapping prose: %s",
+    (message, kind) => {
+      expect(classifyGenerationError(message)).toMatchObject({
+        kind,
+        retryable: false,
+      });
+    },
+  );
+
+  it("keeps invalid Planner graph details private and offers a bounded new attempt", () => {
+    for (const message of [
+      'Progressive planner produced an invalid prototype plan: Flow "checkout" step references unknown interaction "submit-secret-id" on page "landing".',
+      'Progressive planner page repair remained invalid: Interaction "submit-secret-id" references an unknown page.',
+      'Progressive planner closure repair remained invalid: Flow "checkout" step references unknown interaction "submit-secret-id" on page "landing".',
+    ]) {
+      expect(classifyGenerationError(message)).toEqual({
+        kind: "configuration",
+        displayMessage:
+          "The Agent could not finish a valid page navigation plan. Retry to continue.",
+        retryable: true,
+      });
+    }
   });
 
   it.each([
@@ -64,6 +143,54 @@ describe("classifyGenerationError", () => {
       });
     },
   );
+});
+
+describe("runWithTransientGenerationRetry", () => {
+  it("retries one transient failure with a fresh attempt number", async () => {
+    const attempts: number[] = [];
+    await expect(runWithTransientGenerationRetry({
+      maxRetries: 1,
+      run: async (attempt) => {
+        attempts.push(attempt);
+        if (attempt === 1) throw new Error("HTTP 502 bad gateway");
+        return "ready";
+      },
+    })).resolves.toBe("ready");
+    expect(attempts).toEqual([1, 2]);
+  });
+
+  it("retries an explicit 429 even when the Provider body mentions an API key", async () => {
+    let calls = 0;
+    await expect(runWithTransientGenerationRetry({
+      maxRetries: 1,
+      run: async () => {
+        calls += 1;
+        if (calls === 1) {
+          throw new Error("HTTP 429: quota for this API key is temporarily exhausted");
+        }
+        return "ready";
+      },
+    })).resolves.toBe("ready");
+    expect(calls).toBe(2);
+  });
+
+  it("does not retry output, configuration, or cancellation failures", async () => {
+    for (const message of [
+      "The model returned no image.",
+      "HTTP 400 invalid request",
+      "Operation aborted",
+    ]) {
+      let calls = 0;
+      await expect(runWithTransientGenerationRetry({
+        maxRetries: 1,
+        run: async () => {
+          calls += 1;
+          throw new Error(message);
+        },
+      })).rejects.toThrow(message);
+      expect(calls).toBe(1);
+    }
+  });
 });
 
 describe("isRouteWideGenerationFailure", () => {

@@ -1,0 +1,64 @@
+{
+  "schema": "cutout.multimodal-live-probe.v1",
+  "identity": {
+    "id": "probe:qwen-gate-a:2026-08-13",
+    "revision": "probe:qwen-gate-a:2026-08-13:revision:1"
+  },
+  "observedAt": "2026-08-13T01:34:27Z",
+  "scope": "minimum-route-probe",
+  "credential": {
+    "providerKind": "dashscope",
+    "cutoutKeychainProviderId": "dashscope-qwen-image3",
+    "present": true,
+    "secretIncluded": false
+  },
+  "results": [
+    {
+      "capability": "structured-text",
+      "model": "qwen3.8-max",
+      "status": "passed",
+      "mediaType": "application/json",
+      "byteLength": 55,
+      "sha256": "830797e81607fc982de39bda2f94b0fa895bc45296e9aadc9e06c256e21d1b14",
+      "decoded": true
+    },
+    {
+      "capability": "image-generation",
+      "model": "qwen-image-3.0",
+      "status": "passed",
+      "mediaType": "image/png",
+      "byteLength": 1115737,
+      "sha256": "d057c4cea0a14bf5257be523fa09b1b57882c44d769865271797ad9c5b73f7ff",
+      "width": 1024,
+      "height": 1024,
+      "decoded": true
+    },
+    {
+      "capability": "text-to-video",
+      "model": "wan2.6-t2v",
+      "status": "passed",
+      "mediaType": "video/mp4",
+      "byteLength": 1977517,
+      "sha256": "587c27f873145d6518b1a6adca6d9048fa30964fd794517205cfd0b54b0128a8",
+      "width": 1920,
+      "height": 1080,
+      "durationSeconds": 5.007007,
+      "frameRate": "30/1",
+      "videoCodec": "h264",
+      "audioCodec": "aac",
+      "decoded": true,
+      "playable": true
+    }
+  ],
+  "redaction": {
+    "apiKey": "omitted",
+    "providerResponseIds": "omitted",
+    "remoteUrls": "omitted",
+    "localPaths": "omitted"
+  },
+  "limitations": [
+    "This proves one real structured-text, image, and video route execution only.",
+    "It is not the complete eleven-Outcome Commerce production rehearsal.",
+    "Commerce real-Host benchmark metrics remain blocked until trusted Host receipts and retained artifact bytes pass the product verifier."
+  ]
+}

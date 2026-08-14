@@ -13,6 +13,45 @@ export interface GenerationErrorClassification {
   readonly retryable: boolean;
 }
 
+const STRUCTURED_GENERATION_ATTEMPTS = [
+  "native-schema",
+  "forced-tool",
+  "text-json",
+  "repair-json",
+] as const;
+
+const STRUCTURED_GENERATION_FAILURE_CATEGORIES = [
+  "aborted",
+  "authentication",
+  "policy",
+  "rate-limited",
+  "endpoint-misconfigured",
+  "transport",
+  "unsupported",
+  "output-missing",
+  "invalid-json",
+  "schema-mismatch",
+  "provider-rejected",
+  "unknown",
+] as const;
+
+export type StructuredGenerationAttempt =
+  (typeof STRUCTURED_GENERATION_ATTEMPTS)[number];
+
+export type StructuredGenerationFailureCategory =
+  (typeof STRUCTURED_GENERATION_FAILURE_CATEGORIES)[number];
+
+export interface StructuredGenerationAttemptFailure {
+  readonly attempt: StructuredGenerationAttempt;
+  readonly category: StructuredGenerationFailureCategory;
+}
+
+export interface TransientGenerationRetryInput<T> {
+  readonly maxRetries: number;
+  readonly signal?: AbortSignal;
+  readonly run: (attempt: number) => Promise<T>;
+}
+
 const CANCELLATION_PATTERNS = [
   /aborterror/i,
   /operation aborted/i,
@@ -90,6 +129,22 @@ const RETRYABLE_PLANNING_RUNTIME_PATTERNS = [
   /^planning runtime upstream is unavailable$/i,
   /^the saved planning conversation is stale$/i,
   /^planning runtime output did not match the required schema$/i,
+  // This is Cutout's own fixed presentation of a closed native transient
+  // result. It is not provider prose and lets restored workspace state retain
+  // the original retry eligibility after a renderer restart.
+  /^the planning agent could not finish this turn\. try again to continue\.$/i,
+  // The progressive Planner intentionally removes raw Provider prose at its
+  // streaming boundary. Preserve that closed transport classification so the
+  // workspace can offer the same bounded run-level recovery as a direct
+  // native runtime failure.
+  /^progressive planner (?:outline|design-foundation|design-exploration|page|closure) transport failed\.?$/i,
+];
+
+const RETRYABLE_PLANNER_OUTPUT_PATTERNS = [
+  /^Progressive planner produced an invalid prototype plan:/i,
+  /^Progressive planner merge did not match the prototype schema:/i,
+  /^Progressive planner page (?:details|repair) remained invalid:/i,
+  /^Progressive planner closure repair remained invalid:/i,
 ];
 
 const TRANSIENT_PATTERNS = [
@@ -114,8 +169,67 @@ const TRANSIENT_PATTERNS = [
   /\b(?:408|429|500|502|503|504)\b.*(?:internal server error|too many requests|bad gateway|service unavailable|gateway timeout)/i,
 ];
 
+const TIMEOUT_PATTERNS = [
+  /timed out/i,
+  /timeout/i,
+  /deadline exceeded/i,
+  /gateway timeout/i,
+];
+
+const EXPLICIT_HTTP_STATUS_PATTERN =
+  /\b(?:http(?:\s+status)?(?:\s+code)?|status(?:\s+code)?)\s*(?:[:=]\s*)?(401|403|408|429|500|502|503|504)\b/i;
+
 function matchesAny(message: string, patterns: readonly RegExp[]): boolean {
   return patterns.some((pattern) => pattern.test(message));
+}
+
+function isStructuredGenerationAttempt(
+  value: string,
+): value is StructuredGenerationAttempt {
+  return (STRUCTURED_GENERATION_ATTEMPTS as readonly string[]).includes(value);
+}
+
+function isStructuredGenerationFailureCategory(
+  value: string,
+): value is StructuredGenerationFailureCategory {
+  return (STRUCTURED_GENERATION_FAILURE_CATEGORIES as readonly string[]).includes(value);
+}
+
+function closedStructuredFailureCategory(
+  message: string,
+): StructuredGenerationFailureCategory | null {
+  const prefix = "Structured output failed: ";
+  if (!message.startsWith(prefix) || !message.endsWith(".")) return null;
+  const body = message.slice(prefix.length, -1);
+  if (body.length === 0) return null;
+  const categories: StructuredGenerationFailureCategory[] = [];
+  for (const entry of body.split("; ")) {
+    const parts = entry.split("=");
+    if (
+      parts.length !== 2 ||
+      !isStructuredGenerationAttempt(parts[0]!) ||
+      !isStructuredGenerationFailureCategory(parts[1]!)
+    ) return null;
+    categories.push(parts[1]);
+  }
+  if (categories.includes("aborted")) return "aborted";
+  const terminal = categories.find((category) =>
+    category === "authentication" ||
+    category === "policy" ||
+    category === "rate-limited" ||
+    category === "endpoint-misconfigured" ||
+    category === "transport" ||
+    category === "provider-rejected"
+  );
+  return terminal ?? categories.at(-1) ?? null;
+}
+
+export function structuredGenerationFailureText(
+  failures: readonly StructuredGenerationAttemptFailure[],
+): string {
+  return `Structured output failed: ${failures
+    .map(({ attempt, category }) => `${attempt}=${category}`)
+    .join("; ")}.`;
 }
 
 export function classifyGenerationError(
@@ -127,6 +241,87 @@ export function classifyGenerationError(
     return {
       kind: "cancelled",
       displayMessage: normalized || "Generation stopped.",
+      retryable: false,
+    };
+  }
+
+  // A typed HTTP status is stronger evidence than free-form Provider prose.
+  // In particular, rate-limit bodies often mention the affected API key or
+  // quota; that wording must not turn an explicit 429 into an auth failure.
+  const explicitHttpStatus = normalized.match(EXPLICIT_HTTP_STATUS_PATTERN)?.[1];
+  if (explicitHttpStatus === "401") {
+    return {
+      kind: "credential",
+      displayMessage:
+        "The selected AI provider needs a valid API key. Open Settings and update the provider.",
+      retryable: false,
+    };
+  }
+  if (explicitHttpStatus === "403") {
+    return {
+      kind: "policy",
+      displayMessage: normalized || "The request was denied by policy.",
+      retryable: false,
+    };
+  }
+  if (explicitHttpStatus === "429") {
+    return {
+      kind: "transient",
+      displayMessage:
+        "The connection to the AI provider was interrupted. Try again to continue.",
+      retryable: true,
+    };
+  }
+  if (
+    explicitHttpStatus === "408" ||
+    explicitHttpStatus === "500" ||
+    explicitHttpStatus === "502" ||
+    explicitHttpStatus === "503" ||
+    explicitHttpStatus === "504"
+  ) {
+    return {
+      kind: "transient",
+      displayMessage:
+        "The connection to the AI provider was interrupted. Try again to continue.",
+      retryable: true,
+    };
+  }
+
+  const structuredFailure = closedStructuredFailureCategory(normalized);
+  if (structuredFailure === "aborted") {
+    return {
+      kind: "cancelled",
+      displayMessage: "Generation stopped.",
+      retryable: false,
+    };
+  }
+  if (structuredFailure === "authentication") {
+    return {
+      kind: "credential",
+      displayMessage:
+        "The selected AI provider needs a valid API key. Open Settings and update the provider.",
+      retryable: false,
+    };
+  }
+  if (structuredFailure === "policy") {
+    return {
+      kind: "policy",
+      displayMessage: "The request was denied by policy.",
+      retryable: false,
+    };
+  }
+  if (structuredFailure === "rate-limited" || structuredFailure === "transport") {
+    return {
+      kind: "transient",
+      displayMessage:
+        "The connection to the AI provider was interrupted. Try again to continue.",
+      retryable: true,
+    };
+  }
+  if (structuredFailure !== null) {
+    return {
+      kind: "configuration",
+      displayMessage: "The AI response could not be processed. Try again to continue.",
       retryable: false,
     };
   }
@@ -165,6 +360,15 @@ export function classifyGenerationError(
     };
   }
 
+  if (matchesAny(normalized, RETRYABLE_PLANNER_OUTPUT_PATTERNS)) {
+    return {
+      kind: "configuration",
+      displayMessage:
+        "The Agent could not finish a valid page navigation plan. Retry to continue.",
+      retryable: true,
+    };
+  }
+
   if (matchesAny(normalized, CONFIGURATION_PATTERNS)) {
     return {
       kind: "configuration",
@@ -199,8 +403,38 @@ export function classifyGenerationError(
   };
 }
 
+/** Execute one logical remote generation node with a finite transient-only retry budget. */
+export async function runWithTransientGenerationRetry<T>(
+  input: TransientGenerationRetryInput<T>,
+): Promise<T> {
+  if (!Number.isInteger(input.maxRetries) || input.maxRetries < 0) {
+    throw new Error("Transient generation retry count must be a non-negative integer.");
+  }
+  for (let attempt = 1; attempt <= input.maxRetries + 1; attempt += 1) {
+    input.signal?.throwIfAborted();
+    try {
+      return await input.run(attempt);
+    } catch (error) {
+      input.signal?.throwIfAborted();
+      const message = error instanceof Error ? error.message : String(error);
+      if (
+        attempt > input.maxRetries ||
+        classifyGenerationError(message).kind !== "transient"
+      ) {
+        throw error;
+      }
+    }
+  }
+  throw new Error("Transient generation retry exhausted without a terminal result.");
+}
+
 export function userFacingGenerationError(message: string): string {
   return classifyGenerationError(message).displayMessage;
+}
+
+/** Exact timeout evidence used by bulk-route health; other transient pressure stays distinct. */
+export function isGenerationTimeoutFailure(message: string): boolean {
+  return matchesAny(message.trim(), TIMEOUT_PATTERNS);
 }
 
 /** Failures that apply to the selected Provider route, not one candidate prompt. */

@@ -22,21 +22,27 @@ const MODEL = 'chat-only-model'
 const storage = installE2eLocalStorage()
 const uploadedBytes = Uint8Array.of(82, 73, 70, 70, 9, 8, 7, 6)
 const decodedImages: Blob[] = []
+const cutoutBitmaps: ImageBitmap[] = []
+let loadedBitmap: ImageBitmap
 
-vi.mock('@/services/ai/model-assignment.local', () => ({
-  loadCapabilityBindings: async () => ({
+vi.mock('@/services/ai/model-assignment.local', () => {
+  const loadBindings = async () => ({
     version: 'model-assignments.v2' as const,
     bindings: {
       text: { providerId: PROVIDER_ID, model: MODEL },
       vision: { providerId: PROVIDER_ID, model: MODEL },
     },
     descriptors: [],
-  }),
+  })
+  return {
+  loadCapabilityBindings: loadBindings,
+  loadRuntimeCapabilityBindings: loadBindings,
   loadAssignments: async (): Promise<ModelAssignments> => ({
     chat: { providerId: PROVIDER_ID, model: MODEL },
   }),
   setAssignment: async () => ({}),
-}))
+  }
+})
 
 ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -84,9 +90,10 @@ function registry(
 ): ServiceRegistry {
   const notUsed = async (): Promise<never> => { throw new Error('not used in this test') }
   return {
-    session: { current: async () => ({ userId: 'test', isAuthenticated: false }) },
     cutout: {
-      run: async () => ok({
+      run: async (input) => {
+        cutoutBitmaps.push(input.bitmap)
+        return ok({
         slices: [{
           id: 'slice-1',
           index: 0,
@@ -95,7 +102,8 @@ function registry(
           width: 8,
           height: 8,
         }],
-      }),
+        })
+      },
     },
     foregroundSegmentation: {
       capabilities: async () => ok({ available: false, platform: 'test', backend: 'unavailable', reason: 'capability-required' }),
@@ -169,9 +177,11 @@ describe('loaded material Agent routing', () => {
   beforeEach(async () => {
     storage.clear()
     decodedImages.length = 0
+    cutoutBitmaps.length = 0
     getStoreState().resetProject()
+    loadedBitmap = { width: 16, height: 16, close() {} } as ImageBitmap
     getStoreState().loadImage({
-      bitmap: { width: 16, height: 16, close() {} } as ImageBitmap,
+      bitmap: loadedBitmap,
       encodedImage: new Blob([uploadedBytes], { type: 'image/webp' }),
       name: 'sheet.png',
       autoAnalyze: false,
@@ -221,20 +231,23 @@ describe('loaded material Agent routing', () => {
     const send = host.querySelector<HTMLButtonElement>('[aria-label="Send"]')!
     await act(async () => { send.click() })
 
-    const approve = await waitFor(() => [...host!.querySelectorAll<HTMLButtonElement>('button')]
-      .find((button) => button.textContent?.trim() === 'Approve'))
-    expect(approve).toBeTruthy()
-    await act(async () => { approve!.click() })
-
+    // Local slicing is non-billable and runs under the user's standing local
+    // authorization; the route must complete without an approval dialog.
+    expect([...host.querySelectorAll<HTMLButtonElement>('button')]
+      .some((button) => button.textContent?.trim() === 'Approve')).toBe(false)
     expect(await waitFor(() => getStoreState().analysis.slices.length === 1)).toBe(true)
     expect(getStoreState().workspaceSnapshot?.prototypePlan).toBeNull()
     expect(getStoreState().analysis.slices[0]).toMatchObject({
       id: 'slice-1',
       readiness: 'ready',
     })
-    const routedSource = decodedImages.find((image) => image.type === 'image/webp')
-    expect(routedSource).toBeDefined()
-    expect(new Uint8Array(await routedSource!.arrayBuffer())).toEqual(uploadedBytes)
+    // Direct slicing consumes the loaded bitmap. It must not need a lossy
+    // decode/re-encode of the original bytes before entering the Cutout seam.
+    expect(cutoutBitmaps).toHaveLength(1)
+    expect(cutoutBitmaps[0]).toMatchObject({
+      width: loadedBitmap.width,
+      height: loadedBitmap.height,
+    })
   }, 15_000)
 
   it('fails with capability-required on unsupported hosts without approval or prototype fallthrough', async () => {

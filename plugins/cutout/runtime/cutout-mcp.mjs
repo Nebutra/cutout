@@ -4310,8 +4310,6 @@ var err = (error) => ({
 	ok: false,
 	error
 });
-//#endregion
-//#region src/candidate-selection/contracts.ts
 var candidateIdSchema = string().min(1).max(160);
 var candidateTextSchema = string().trim().min(1).max(2e3);
 var candidateAxisSchema = string().trim().min(1).max(160);
@@ -4489,11 +4487,20 @@ function normalizeText(value) {
 }
 //#endregion
 //#region src/prototype/prototype-plan.ts
+var prototypeNavigateActionSchema = object({
+	type: literal("navigate"),
+	targetPageId: string().min(1)
+});
+var prototypeExternalActionSchema = object({
+	type: literal("external"),
+	destination: string().min(1)
+});
+var prototypeNoopActionSchema = object({
+	type: literal("none"),
+	reason: string().min(1)
+});
 var prototypeActionSchema = discriminatedUnion("type", [
-	object({
-		type: literal("navigate"),
-		targetPageId: string().min(1)
-	}),
+	prototypeNavigateActionSchema,
 	object({
 		type: literal("open-overlay"),
 		targetOverlayId: string().min(1)
@@ -4502,14 +4509,8 @@ var prototypeActionSchema = discriminatedUnion("type", [
 		type: literal("change-state"),
 		targetStateId: string().min(1)
 	}),
-	object({
-		type: literal("external"),
-		destination: string().min(1)
-	}),
-	object({
-		type: literal("none"),
-		reason: string().min(1)
-	})
+	prototypeExternalActionSchema,
+	prototypeNoopActionSchema
 ]);
 var prototypeInteractionSchema = object({
 	id: string().min(1),
@@ -4547,6 +4548,7 @@ var prototypeRegionSchema = object({
 		"board-cutout",
 		"ignore-code-ui"
 	]).default("board-cutout"),
+	assetOutput: _enum(["transparent-subject", "rectangular-media"]).optional(),
 	assetOpportunities: array(string().min(1)).default([])
 });
 var prototypePageSchema = object({
@@ -4615,113 +4617,6 @@ var prototypeDesignSystemSchema = object({
 	assetDirection: string().min(1),
 	exploration: candidateExplorationDecisionSchema
 });
-var prototypePlanningMaterialIdentityShape = {
-	id: string().min(1),
-	name: string().min(1),
-	description: string().min(1)
-};
-var prototypePlanningBoardGroupIdSchema = string().trim().min(1).max(80);
-/** The shape is structural so Provider tool schemas expose the conditional
-* requirement before execution. */
-var prototypePlanningMaterialSchema = discriminatedUnion("production", [object({
-	...prototypePlanningMaterialIdentityShape,
-	production: literal("board-cutout"),
-	boardGroupId: prototypePlanningBoardGroupIdSchema.describe("Required route-local id for the coherent atomic family sharing this board.")
-}).strict(), object({
-	...prototypePlanningMaterialIdentityShape,
-	production: literal("direct-generate")
-}).strict()]);
-var prototypePlanningRouteSchema = prototypePageSchema.pick({
-	id: true,
-	name: true,
-	route: true,
-	purpose: true,
-	viewport: true
-}).extend({ materials: array(prototypePlanningMaterialSchema).describe("Zero or more non-UI visual materials genuinely worth reusing on this route. Do not include cards, forms, navigation, buttons, tables, or other code-reproducible UI.") }).superRefine((route, context) => {
-	const materialIds = /* @__PURE__ */ new Set();
-	for (const [materialIndex, material] of route.materials.entries()) {
-		if (materialIds.has(material.id)) context.addIssue({
-			code: "custom",
-			path: [
-				"materials",
-				materialIndex,
-				"id"
-			],
-			message: `Duplicate material id "${material.id}" on route "${route.route}".`
-		});
-		materialIds.add(material.id);
-	}
-});
-var prototypePlanningSeedSchema = object({
-	product: object({
-		name: string().min(1),
-		projectName: string().min(1).max(32).optional(),
-		summary: string().min(1),
-		audience: string().min(1),
-		primaryGoal: string().min(1),
-		platform: string().min(1)
-	}),
-	rationale: string().trim().min(1).max(2e3),
-	suites: array(object({
-		direction: candidateDirectionSchema,
-		pages: array(prototypePlanningRouteSchema).min(1).max(12)
-	}).strict()).min(1).max(8)
-}).strict().superRefine((seed, context) => {
-	const directionIds = /* @__PURE__ */ new Set();
-	const routeGraphs = /* @__PURE__ */ new Set();
-	for (const [suiteIndex, suite] of seed.suites.entries()) {
-		if (directionIds.has(suite.direction.id)) context.addIssue({
-			code: "custom",
-			path: [
-				"suites",
-				suiteIndex,
-				"direction",
-				"id"
-			],
-			message: `Duplicate direction id "${suite.direction.id}".`
-		});
-		directionIds.add(suite.direction.id);
-		const ids = /* @__PURE__ */ new Set();
-		const routes = /* @__PURE__ */ new Set();
-		for (const [pageIndex, page] of suite.pages.entries()) {
-			if (ids.has(page.id)) context.addIssue({
-				code: "custom",
-				path: [
-					"suites",
-					suiteIndex,
-					"pages",
-					pageIndex,
-					"id"
-				],
-				message: `Duplicate page id "${page.id}".`
-			});
-			if (routes.has(page.route)) context.addIssue({
-				code: "custom",
-				path: [
-					"suites",
-					suiteIndex,
-					"pages",
-					pageIndex,
-					"route"
-				],
-				message: `Duplicate route "${page.route}".`
-			});
-			ids.add(page.id);
-			routes.add(page.route);
-		}
-		const graph = JSON.stringify(suite.pages.map(({ route }) => route));
-		if (routeGraphs.has(graph)) context.addIssue({
-			code: "custom",
-			path: [
-				"suites",
-				suiteIndex,
-				"pages"
-			],
-			message: "Every suite must use a distinct route graph."
-		});
-		routeGraphs.add(graph);
-	}
-});
 var prototypePlanSchema = object({
 	version: literal("prototype-plan.v0"),
 	product: object({
@@ -4736,13 +4631,72 @@ var prototypePlanSchema = object({
 	pages: array(prototypePageSchema).min(1).max(12),
 	flows: array(prototypeFlowSchema).min(1),
 	reviewDocument: prototypeReviewDocumentSchema,
-	/** Agent-authored compact input used to derive corresponding suite alternatives. */
-	planningSeed: prototypePlanningSeedSchema.optional(),
 	humanLoop: prototypeHumanLoopSchema.default({
 		mode: "continue",
 		rationale: "The requirement is clear enough to proceed."
 	})
 });
+var prototypeRouteGraphIdentityActionSchema = discriminatedUnion("type", [
+	object({
+		type: literal("navigate"),
+		targetPage: number().int().nonnegative()
+	}).strict(),
+	object({
+		type: literal("open-overlay"),
+		targetOverlay: number().int().nonnegative()
+	}).strict(),
+	object({
+		type: literal("change-state"),
+		targetState: number().int().nonnegative()
+	}).strict(),
+	object({
+		type: literal("external"),
+		destination: string().min(1)
+	}).strict(),
+	object({
+		type: literal("none"),
+		reason: string().min(1)
+	}).strict()
+]);
+object({
+	version: literal("prototype-route-graph.v1"),
+	pages: array(object({
+		name: string().min(1),
+		route: string().min(1),
+		purpose: string().min(1),
+		regions: array(object({
+			name: string().min(1),
+			role: string().min(1),
+			summary: string().min(1)
+		}).strict()).min(1),
+		overlays: array(object({
+			name: string().min(1),
+			purpose: string().min(1)
+		}).strict()),
+		states: array(object({
+			name: string().min(1),
+			purpose: string().min(1)
+		}).strict()),
+		interactions: array(object({
+			label: string().min(1),
+			trigger: prototypeInteractionSchema.shape.trigger,
+			sourceRegion: number().int().nonnegative().nullable(),
+			sourceElement: string().min(1),
+			intent: string().min(1),
+			action: prototypeRouteGraphIdentityActionSchema
+		}).strict())
+	}).strict()).min(1).max(12),
+	flows: array(object({
+		name: string().min(1),
+		goal: string().min(1),
+		startPage: number().int().nonnegative(),
+		steps: array(object({
+			fromPage: number().int().nonnegative(),
+			interaction: number().int().nonnegative(),
+			toPage: number().int().nonnegative().nullable()
+		}).strict())
+	}).strict()).min(1)
+}).strict();
 function validatePrototypePlan(plan) {
 	const pageIds = /* @__PURE__ */ new Set();
 	const pageRoutes = /* @__PURE__ */ new Set();
@@ -4783,7 +4737,7 @@ function validatePrototypePlan(plan) {
 			const interaction = page.interactions.find((item) => item.id === step.interactionId);
 			if (!interaction) return err(`Flow "${flow.id}" step references unknown interaction "${step.interactionId}" on page "${step.fromPageId}".`);
 			if (step.toPageId && !pageIds.has(step.toPageId)) return err(`Flow "${flow.id}" step points to unknown page "${step.toPageId}".`);
-			if (interaction.action.type === "navigate" && step.toPageId && interaction.action.targetPageId !== step.toPageId) return err(`Flow "${flow.id}" step "${step.interactionId}" target does not match the interaction target.`);
+			if (interaction.action.type === "navigate" && interaction.action.targetPageId !== step.toPageId) return err(`Flow "${flow.id}" step "${step.interactionId}" target does not match the interaction target.`);
 		}
 	}
 	const humanLoop = plan.humanLoop;
@@ -4813,6 +4767,248 @@ function reachablePages(plan) {
 	}
 	return seen;
 }
+//#endregion
+//#region src/asset-production/contracts.ts
+var id$2 = string().min(1).max(240);
+var sha256$3 = string().regex(/^[a-f0-9]{64}$/);
+var timestamp = number().int().nonnegative();
+var assetProductionRouteSchema = _enum([
+	"board-cutout",
+	"direct-generate",
+	"import-cutout"
+]);
+var productionArtifactRefSchema = object({
+	artifactId: id$2,
+	sha256: sha256$3,
+	mediaType: string().min(1).max(120),
+	width: number().int().positive(),
+	height: number().int().positive()
+}).strict();
+var sourceRevisionSchema = object({
+	projectRevisionId: id$2,
+	designSystemArtifactId: id$2.optional(),
+	pageArtifacts: array(object({
+		pageId: id$2,
+		artifactId: id$2,
+		sha256: sha256$3
+	}).strict())
+}).strict();
+var assetProductionTaskSchema = object({
+	taskId: id$2,
+	manifestItemId: id$2,
+	pageId: id$2,
+	regionId: id$2,
+	route: assetProductionRouteSchema,
+	required: boolean(),
+	output: object({
+		mediaType: literal("image/png"),
+		subjectCount: literal(1),
+		transparent: boolean()
+	}).strict(),
+	boardGroupId: id$2.optional(),
+	label: string().min(1).max(240).optional(),
+	description: string().min(1).max(2e3).optional()
+}).strict();
+var boardLayoutManifestSchema = object({
+	version: literal("asset-board-layout.v1"),
+	boardGroupId: id$2,
+	taskIds: array(id$2).min(1),
+	slots: array(object({
+		taskId: id$2,
+		normalizedBounds: object({
+			x: number().min(0).max(1),
+			y: number().min(0).max(1),
+			width: number().positive().max(1),
+			height: number().positive().max(1)
+		}).strict()
+	}).strict()).min(1)
+}).strict().superRefine((manifest, context) => {
+	const taskIds = new Set(manifest.taskIds);
+	const slotIds = manifest.slots.map((slot) => slot.taskId);
+	if (taskIds.size !== manifest.taskIds.length) context.addIssue({
+		code: "custom",
+		message: "Board task ids must be unique."
+	});
+	if (new Set(slotIds).size !== slotIds.length) context.addIssue({
+		code: "custom",
+		message: "Board slot task ids must be unique."
+	});
+	if (slotIds.length !== manifest.taskIds.length || slotIds.some((taskId) => !taskIds.has(taskId))) context.addIssue({
+		code: "custom",
+		message: "Board slots must cover every board task exactly once."
+	});
+	for (const slot of manifest.slots) if (slot.normalizedBounds.x + slot.normalizedBounds.width > 1 || slot.normalizedBounds.y + slot.normalizedBounds.height > 1) context.addIssue({
+		code: "custom",
+		message: `Board slot ${slot.taskId} exceeds normalized bounds.`
+	});
+});
+var assetProductionPlanSchema = object({
+	version: literal("asset-production-plan.v1"),
+	planId: id$2,
+	planHash: sha256$3,
+	sourceRevision: sourceRevisionSchema,
+	tasks: array(assetProductionTaskSchema),
+	boardLayouts: array(boardLayoutManifestSchema),
+	ignoredManifestItemIds: array(id$2),
+	createdAt: timestamp
+}).strict().superRefine((plan, context) => {
+	const taskIds = plan.tasks.map((task) => task.taskId);
+	const manifestIds = plan.tasks.map((task) => task.manifestItemId);
+	if (new Set(taskIds).size !== taskIds.length) context.addIssue({
+		code: "custom",
+		message: "Asset production task ids must be unique."
+	});
+	if (new Set(manifestIds).size !== manifestIds.length) context.addIssue({
+		code: "custom",
+		message: "Manifest items must map to one production task."
+	});
+	const boardTaskIds = new Set(plan.boardLayouts.flatMap((layout) => layout.taskIds));
+	for (const task of plan.tasks) {
+		if (task.route === "board-cutout" && (!task.boardGroupId || !boardTaskIds.has(task.taskId))) context.addIssue({
+			code: "custom",
+			message: `Board task ${task.taskId} has no board layout.`
+		});
+		if (task.route !== "board-cutout" && task.boardGroupId) context.addIssue({
+			code: "custom",
+			message: `Non-board task ${task.taskId} cannot declare a board group.`
+		});
+	}
+});
+var productionIssueSchema = object({
+	code: string().min(1).max(120),
+	kind: _enum([
+		"integrity",
+		"quality",
+		"warning"
+	]),
+	message: string().min(1).max(2e3),
+	waivable: boolean(),
+	source: _enum([
+		"runtime",
+		"deterministic-check",
+		"model-review",
+		"user"
+	]),
+	recordedAt: timestamp
+}).strict().superRefine((issue, context) => {
+	if (issue.kind === "integrity" && issue.waivable) context.addIssue({
+		code: "custom",
+		message: "Integrity issues cannot be waivable."
+	});
+});
+var sliceCoverageSchema = object({
+	totalForegroundPixelCount: number().int().nonnegative(),
+	retainedForegroundPixelCount: number().int().nonnegative(),
+	omittedForegroundPixelCount: number().int().nonnegative(),
+	retainedRatio: number().min(0).max(1)
+}).strict().superRefine((coverage, context) => {
+	if (coverage.retainedForegroundPixelCount + coverage.omittedForegroundPixelCount !== coverage.totalForegroundPixelCount) context.addIssue({
+		code: "custom",
+		message: "Slice coverage retained and omitted pixels must equal the detected total."
+	});
+	const expectedRatio = coverage.totalForegroundPixelCount === 0 ? 1 : coverage.retainedForegroundPixelCount / coverage.totalForegroundPixelCount;
+	if (Math.abs(coverage.retainedRatio - expectedRatio) > 1e-9) context.addIssue({
+		code: "custom",
+		message: "Slice coverage ratio must match its pixel counts."
+	});
+});
+var productionTaskEvidenceSchema = object({
+	sourceArtifactId: id$2.optional(),
+	maskArtifactId: id$2.optional(),
+	bounds: object({
+		x: number().nonnegative(),
+		y: number().nonnegative(),
+		width: number().positive(),
+		height: number().positive()
+	}).strict().optional(),
+	cutoutParams: object({
+		threshold: number(),
+		minArea: number(),
+		mergeGap: number(),
+		padding: number()
+	}).strict().optional(),
+	boardDiagnostics: object({
+		borderWhiteRatio: number().min(0).max(1),
+		whiteRatio: number().min(0).max(1),
+		compliant: boolean()
+	}).strict().optional(),
+	sliceCoverage: sliceCoverageSchema.optional(),
+	qaVerdict: object({
+		pass: boolean(),
+		failures: array(string().min(1).max(2e3)),
+		unavailable: boolean().optional()
+	}).strict().optional(),
+	providerRoute: string().min(1).max(240).optional(),
+	lineage: object({
+		previousRunId: id$2,
+		previousTaskId: id$2,
+		previousArtifactSha256: sha256$3
+	}).strict().optional()
+}).strict();
+var productionDecisionReceiptSchema = object({
+	version: literal("asset-production-decision.v1"),
+	receiptId: id$2,
+	taskId: id$2,
+	artifactSha256: sha256$3,
+	projectRevisionId: id$2,
+	decision: _enum(["approve", "waive"]),
+	issueCodes: array(string().min(1)).min(1),
+	actor: object({
+		kind: _enum(["human", "agent"]),
+		id: id$2
+	}).strict(),
+	decidedAt: timestamp
+}).strict();
+var productionTaskStateSchema = object({
+	taskId: id$2,
+	status: _enum([
+		"queued",
+		"generating",
+		"candidate-ready",
+		"reviewing",
+		"accepted",
+		"cutting",
+		"verifying",
+		"ready",
+		"needs-review",
+		"waived",
+		"failed",
+		"cancelled"
+	]),
+	attempt: number().int().nonnegative(),
+	candidate: productionArtifactRefSchema.optional(),
+	output: productionArtifactRefSchema.optional(),
+	issues: array(productionIssueSchema),
+	decision: productionDecisionReceiptSchema.optional(),
+	evidence: productionTaskEvidenceSchema.optional(),
+	origin: literal("native"),
+	updatedAt: timestamp
+}).strict();
+var assetProductionRunSchema = object({
+	runId: id$2,
+	planId: id$2,
+	planHash: sha256$3,
+	status: _enum([
+		"planned",
+		"running",
+		"partial",
+		"needs-review",
+		"completed",
+		"failed",
+		"cancelled"
+	]),
+	tasks: record(string(), productionTaskStateSchema),
+	startedAt: timestamp,
+	completedAt: timestamp.optional()
+}).strict();
+object({
+	version: literal("asset-production-snapshot.v1"),
+	revision: number().int().nonnegative(),
+	plans: record(string(), assetProductionPlanSchema),
+	runs: record(string(), assetProductionRunSchema),
+	activePlanId: id$2.optional(),
+	activeRunId: id$2.optional()
+}).strict();
 //#endregion
 //#region src/design-ir/schema.ts
 /**
@@ -5091,6 +5287,7 @@ var materialProductionEvidenceSchema = object({
 		whiteRatio: number().min(0).max(1),
 		compliant: boolean()
 	}).strict().optional(),
+	sliceCoverage: sliceCoverageSchema.optional(),
 	qaVerdict: object({
 		pass: boolean(),
 		failures: array(string().min(1).max(2e3)),
@@ -12560,7 +12757,7 @@ var routeSchema = object({
 }).strict();
 var prototypeReviewVerdictSchema = object({
 	pass: boolean(),
-	failures: array(string().min(1).max(2e3)),
+	failures: array(string().min(1).max(500)).max(8),
 	unavailable: boolean().optional()
 }).strict();
 var prototypePageReviewRecordSchema = object({
@@ -12604,231 +12801,6 @@ function designSystemMarkdownValidationError(designMarkdown) {
 	if (!model.controls.some((control) => control.kind === "color")) return "Design system documentation has no color tokens.";
 	return null;
 }
-//#endregion
-//#region src/asset-production/contracts.ts
-var id$2 = string().min(1).max(240);
-var sha256$3 = string().regex(/^[a-f0-9]{64}$/);
-var timestamp = number().int().nonnegative();
-var assetProductionRouteSchema = _enum([
-	"board-cutout",
-	"direct-generate",
-	"import-cutout"
-]);
-var productionArtifactRefSchema = object({
-	artifactId: id$2,
-	sha256: sha256$3,
-	mediaType: string().min(1).max(120),
-	width: number().int().positive(),
-	height: number().int().positive()
-}).strict();
-var sourceRevisionSchema = object({
-	projectRevisionId: id$2,
-	designSystemArtifactId: id$2.optional(),
-	pageArtifacts: array(object({
-		pageId: id$2,
-		artifactId: id$2,
-		sha256: sha256$3
-	}).strict())
-}).strict();
-var assetProductionTaskSchema = object({
-	taskId: id$2,
-	manifestItemId: id$2,
-	pageId: id$2,
-	regionId: id$2,
-	route: assetProductionRouteSchema,
-	required: boolean(),
-	output: object({
-		mediaType: literal("image/png"),
-		subjectCount: literal(1),
-		transparent: boolean()
-	}).strict(),
-	boardGroupId: id$2.optional(),
-	label: string().min(1).max(240).optional(),
-	description: string().min(1).max(2e3).optional()
-}).strict();
-var boardLayoutManifestSchema = object({
-	version: literal("asset-board-layout.v1"),
-	boardGroupId: id$2,
-	taskIds: array(id$2).min(1),
-	slots: array(object({
-		taskId: id$2,
-		normalizedBounds: object({
-			x: number().min(0).max(1),
-			y: number().min(0).max(1),
-			width: number().positive().max(1),
-			height: number().positive().max(1)
-		}).strict()
-	}).strict()).min(1)
-}).strict().superRefine((manifest, context) => {
-	const taskIds = new Set(manifest.taskIds);
-	const slotIds = manifest.slots.map((slot) => slot.taskId);
-	if (taskIds.size !== manifest.taskIds.length) context.addIssue({
-		code: "custom",
-		message: "Board task ids must be unique."
-	});
-	if (new Set(slotIds).size !== slotIds.length) context.addIssue({
-		code: "custom",
-		message: "Board slot task ids must be unique."
-	});
-	if (slotIds.length !== manifest.taskIds.length || slotIds.some((taskId) => !taskIds.has(taskId))) context.addIssue({
-		code: "custom",
-		message: "Board slots must cover every board task exactly once."
-	});
-	for (const slot of manifest.slots) if (slot.normalizedBounds.x + slot.normalizedBounds.width > 1 || slot.normalizedBounds.y + slot.normalizedBounds.height > 1) context.addIssue({
-		code: "custom",
-		message: `Board slot ${slot.taskId} exceeds normalized bounds.`
-	});
-});
-var assetProductionPlanSchema = object({
-	version: literal("asset-production-plan.v1"),
-	planId: id$2,
-	planHash: sha256$3,
-	sourceRevision: sourceRevisionSchema,
-	tasks: array(assetProductionTaskSchema),
-	boardLayouts: array(boardLayoutManifestSchema),
-	ignoredManifestItemIds: array(id$2),
-	createdAt: timestamp
-}).strict().superRefine((plan, context) => {
-	const taskIds = plan.tasks.map((task) => task.taskId);
-	const manifestIds = plan.tasks.map((task) => task.manifestItemId);
-	if (new Set(taskIds).size !== taskIds.length) context.addIssue({
-		code: "custom",
-		message: "Asset production task ids must be unique."
-	});
-	if (new Set(manifestIds).size !== manifestIds.length) context.addIssue({
-		code: "custom",
-		message: "Manifest items must map to one production task."
-	});
-	const boardTaskIds = new Set(plan.boardLayouts.flatMap((layout) => layout.taskIds));
-	for (const task of plan.tasks) {
-		if (task.route === "board-cutout" && (!task.boardGroupId || !boardTaskIds.has(task.taskId))) context.addIssue({
-			code: "custom",
-			message: `Board task ${task.taskId} has no board layout.`
-		});
-		if (task.route !== "board-cutout" && task.boardGroupId) context.addIssue({
-			code: "custom",
-			message: `Non-board task ${task.taskId} cannot declare a board group.`
-		});
-	}
-});
-var productionIssueSchema = object({
-	code: string().min(1).max(120),
-	kind: _enum([
-		"integrity",
-		"quality",
-		"warning"
-	]),
-	message: string().min(1).max(2e3),
-	waivable: boolean(),
-	source: _enum([
-		"runtime",
-		"deterministic-check",
-		"model-review",
-		"user"
-	]),
-	recordedAt: timestamp
-}).strict().superRefine((issue, context) => {
-	if (issue.kind === "integrity" && issue.waivable) context.addIssue({
-		code: "custom",
-		message: "Integrity issues cannot be waivable."
-	});
-});
-var productionTaskEvidenceSchema = object({
-	sourceArtifactId: id$2.optional(),
-	maskArtifactId: id$2.optional(),
-	bounds: object({
-		x: number().nonnegative(),
-		y: number().nonnegative(),
-		width: number().positive(),
-		height: number().positive()
-	}).strict().optional(),
-	cutoutParams: object({
-		threshold: number(),
-		minArea: number(),
-		mergeGap: number(),
-		padding: number()
-	}).strict().optional(),
-	boardDiagnostics: object({
-		borderWhiteRatio: number().min(0).max(1),
-		whiteRatio: number().min(0).max(1),
-		compliant: boolean()
-	}).strict().optional(),
-	qaVerdict: object({
-		pass: boolean(),
-		failures: array(string().min(1).max(2e3)),
-		unavailable: boolean().optional()
-	}).strict().optional(),
-	providerRoute: string().min(1).max(240).optional(),
-	lineage: object({
-		previousRunId: id$2,
-		previousTaskId: id$2,
-		previousArtifactSha256: sha256$3
-	}).strict().optional()
-}).strict();
-var productionDecisionReceiptSchema = object({
-	version: literal("asset-production-decision.v1"),
-	receiptId: id$2,
-	taskId: id$2,
-	artifactSha256: sha256$3,
-	projectRevisionId: id$2,
-	decision: _enum(["approve", "waive"]),
-	issueCodes: array(string().min(1)).min(1),
-	actor: object({
-		kind: _enum(["human", "agent"]),
-		id: id$2
-	}).strict(),
-	decidedAt: timestamp
-}).strict();
-var productionTaskStateSchema = object({
-	taskId: id$2,
-	status: _enum([
-		"queued",
-		"generating",
-		"candidate-ready",
-		"reviewing",
-		"accepted",
-		"cutting",
-		"verifying",
-		"ready",
-		"needs-review",
-		"waived",
-		"failed",
-		"cancelled"
-	]),
-	attempt: number().int().nonnegative(),
-	candidate: productionArtifactRefSchema.optional(),
-	output: productionArtifactRefSchema.optional(),
-	issues: array(productionIssueSchema),
-	decision: productionDecisionReceiptSchema.optional(),
-	evidence: productionTaskEvidenceSchema.optional(),
-	origin: literal("native"),
-	updatedAt: timestamp
-}).strict();
-var assetProductionRunSchema = object({
-	runId: id$2,
-	planId: id$2,
-	planHash: sha256$3,
-	status: _enum([
-		"planned",
-		"running",
-		"partial",
-		"needs-review",
-		"completed",
-		"failed",
-		"cancelled"
-	]),
-	tasks: record(string(), productionTaskStateSchema),
-	startedAt: timestamp,
-	completedAt: timestamp.optional()
-}).strict();
-object({
-	version: literal("asset-production-snapshot.v1"),
-	revision: number().int().nonnegative(),
-	plans: record(string(), assetProductionPlanSchema),
-	runs: record(string(), assetProductionRunSchema),
-	activePlanId: id$2.optional(),
-	activeRunId: id$2.optional()
-}).strict();
 //#endregion
 //#region src/design-ir/workspace-projection.ts
 var PROTOTYPE_SUITE_MATERIAL_VERSION = "cutout.prototype-suite-material.v1";
@@ -13103,6 +13075,21 @@ object({
 	...providerConfigFields
 }).superRefine(addDraftWireProtocolIssue);
 //#endregion
+//#region src/services/ai/image-route-assessment.ts
+var imageAdapterStrategySchema = _enum([
+	"openai-images-generations",
+	"openai-images-edits",
+	"xai-images-generations",
+	"xai-images-edits",
+	"google-multimodal-generate",
+	"dashscope-native-image-generation",
+	"dashscope-native-image-edit"
+]);
+[...Object.keys({
+	"grok-imagine-image": ["image-generation", "image-edit"],
+	"grok-imagine-image-quality": ["image-generation", "image-edit"]
+})];
+//#endregion
 //#region src/control-protocol/paid-tool-contract.ts
 var CREDENTIAL_VALUE = /(?:\b(?:sk|rk|pk)-[A-Za-z0-9_-]{8,}\b|\bBearer\s+[A-Za-z0-9._~+/-]+\b)/i;
 var safeText$1 = string().refine((value) => !CREDENTIAL_VALUE.test(value), "Credential-shaped values are not accepted.");
@@ -13132,7 +13119,8 @@ object({
 	capability: paidToolCapabilitySchema,
 	providerId: safeText$1.min(1).max(160),
 	model: safeText$1.min(1).max(300),
-	available: boolean()
+	available: boolean(),
+	transportStrategy: imageAdapterStrategySchema.optional()
 }).strict();
 function planPaidTool(request, capability, policy, hasExplicitApproval) {
 	const base = {
@@ -13216,6 +13204,11 @@ var missingRequirementSchema = object({
 	count: number().int().nonnegative(),
 	label: string()
 }).strict();
+var prototypePageReviewIdentitySchema = {
+	suiteCandidateId: string().min(1).max(240),
+	pageId: string().min(1).max(240),
+	attempt: number().int().min(1).max(16)
+};
 var agentRunEventSchema = discriminatedUnion("type", [
 	runEventBaseSchema.extend({
 		type: literal("run-started"),
@@ -13324,6 +13317,20 @@ var agentRunEventSchema = discriminatedUnion("type", [
 	runEventBaseSchema.extend({
 		type: literal("material-recorded"),
 		material: materialEvidenceSchema
+	}).strict(),
+	runEventBaseSchema.extend({
+		type: literal("prototype-page-review-started"),
+		...prototypePageReviewIdentitySchema
+	}).strict(),
+	runEventBaseSchema.extend({
+		type: literal("prototype-page-review-passed"),
+		...prototypePageReviewIdentitySchema
+	}).strict(),
+	runEventBaseSchema.extend({
+		type: literal("prototype-page-review-rejected"),
+		...prototypePageReviewIdentitySchema,
+		failures: array(string().min(1).max(500)).max(8),
+		unavailable: boolean()
 	}).strict(),
 	runEventBaseSchema.extend({
 		type: literal("capability-fallback"),
@@ -13621,6 +13628,9 @@ function reduceActiveRun(run, event) {
 			materials: run.materials.some((item) => item.id === event.material.id) ? run.materials.map((item) => item.id === event.material.id ? event.material : item) : [...run.materials, event.material]
 		};
 		case "capability-fallback":
+		case "prototype-page-review-started":
+		case "prototype-page-review-passed":
+		case "prototype-page-review-rejected":
 		case "agent-message": return run;
 		case "outcome-evaluated": return {
 			...run,
@@ -19555,104 +19565,6 @@ object({
 		message: "Brand-lock repairs require human approval."
 	});
 });
-var locationSchema = object({
-	entityId: string(),
-	path: string()
-}).strict();
-object({
-	id: string(),
-	name: string(),
-	type: _enum([
-		"color",
-		"dimension",
-		"number",
-		"fontFamily",
-		"fontWeight",
-		"duration",
-		"cubicBezier",
-		"shadow",
-		"border",
-		"gradient",
-		"typography"
-	]),
-	tier: _enum([
-		"primitive",
-		"semantic",
-		"component"
-	]),
-	value: unknown().optional(),
-	alias: string().optional(),
-	mode: string(),
-	brandLock: object({
-		approvedValue: unknown(),
-		approvalId: string()
-	}).strict().optional(),
-	location: locationSchema
-}).strict();
-var governancePolicySchema = object({
-	version: literal("design-governance-policy.v1"),
-	id: string(),
-	standards: object({
-		wcag: string(),
-		dtcg: string(),
-		cssColor: string()
-	}).strict(),
-	severity: record(string(), _enum([
-		"error",
-		"warning",
-		"advisory"
-	])),
-	thresholds: object({
-		perceptualDeltaE: number(),
-		spacingBase: number().positive(),
-		maxMotionMs: number().nonnegative(),
-		minFocusArea: number().nonnegative()
-	}).strict()
-}).strict();
-var legacyFindingSchema = object({
-	id: string(),
-	ruleId: string(),
-	standard: string(),
-	policyVersion: string(),
-	severity: _enum([
-		"error",
-		"warning",
-		"advisory"
-	]),
-	blocking: boolean(),
-	applicability: string(),
-	message: string(),
-	measurements: record(string(), union([
-		string(),
-		number(),
-		boolean()
-	])),
-	locations: array(locationSchema),
-	evidence: array(object({
-		kind: string(),
-		value: string()
-	}).strict()),
-	repairSuggestions: array(string())
-}).strict();
-object({
-	protocol: literal("design-governance-report.v1"),
-	id: string(),
-	documentId: string(),
-	revisionId: string(),
-	policy: governancePolicySchema,
-	summary: object({
-		errors: number(),
-		warnings: number(),
-		advisories: number(),
-		blocking: boolean()
-	}).strict(),
-	findings: array(legacyFindingSchema),
-	measurements: object({
-		evaluatedRules: number(),
-		evaluatedLocations: number()
-	}).strict(),
-	completedAt: string().datetime()
-}).strict();
 //#endregion
 //#region src/design-governance/color.ts
 function parseCssColor(input) {

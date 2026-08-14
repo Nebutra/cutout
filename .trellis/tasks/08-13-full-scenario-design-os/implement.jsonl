@@ -1,0 +1,5 @@
+{"file":".trellis/tasks/08-13-full-scenario-design-os/research/first-principles.md","reason":"Defines the irreducible design lifecycle, plural typed IR model, coverage axes and Design OS litmus test."}
+{"file":".trellis/tasks/08-13-full-scenario-design-os/research/commerce-session-promotion-analysis.md","reason":"Separates reusable Commerce rehearsal laws from competition-only Host and Profile bindings."}
+{"file":".trellis/spec/frontend/design-os-kernel.md","reason":"Canonical Kernel contracts, ownership boundaries, promotion rules and compatibility requirements."}
+{"file":".trellis/spec/frontend/design-os-benchmark.md","reason":"Versioned evidence maturity, derived readiness and critical-regression semantics."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Required cross-layer data-flow, authority and validation analysis for the program."}

@@ -23,6 +23,10 @@ const MAX_CC_SWITCH_DB_BYTES: u64 = 256 * 1024 * 1024;
 const MAX_CC_SWITCH_CANDIDATES: usize = 32;
 const MAX_DRAFTS: usize = 32;
 const DRAFT_TTL: Duration = Duration::from_secs(10 * 60);
+// A hint is honored only after the authenticated catalog confirms the exact
+// model id. It prevents automatic imports from retaining the obsolete 5.5
+// relay default while still failing closed on a relay without this revision.
+const REVIEWED_RELAY_TEXT_MODEL_HINT: &str = "gpt-5.6-terra";
 const CODEX_CC_SWITCH_PROVIDER_ID: &str = "ccswitch";
 const CC_SWITCH_DB_LOCATION: &str = "~/.cc-switch/cc-switch.db";
 const CC_SWITCH_DB_SCHEMA_ID: &str = "cc-switch-db-codex-failover-v1";
@@ -1185,14 +1189,14 @@ fn discover_environment_with(
             "MOX_BASE_URL",
             "MOX",
             "https://aigw.mox.ktvsky.com/v1",
-            "gpt-5.5",
+            REVIEWED_RELAY_TEXT_MODEL_HINT,
         ),
         (
             "TDS_API_KEY",
             "TDS_BASE_URL",
             "TDS Router",
             "https://router.tds.cc.cd/v1",
-            "gpt-5.5",
+            REVIEWED_RELAY_TEXT_MODEL_HINT,
         ),
     ] {
         if read_environment(env).is_none() {
@@ -1278,30 +1282,73 @@ fn cutout_provider_metadata_paths(
     paths
 }
 
+#[derive(Default)]
+struct CutoutProviderRows {
+    rows: Vec<serde_json::Value>,
+    readable_files: usize,
+    invalid_files: usize,
+}
+
 fn cutout_provider_rows_at(
     config_dir: &Path,
     include_packaged_e2e_discovery: bool,
-) -> Vec<serde_json::Value> {
-    cutout_provider_metadata_paths(config_dir, include_packaged_e2e_discovery)
-        .into_iter()
-        .filter_map(|path| read_exact_config(&path).ok().flatten())
-        .filter_map(|raw| serde_json::from_str::<Vec<serde_json::Value>>(&raw).ok())
-        .flatten()
-        .collect()
+) -> CutoutProviderRows {
+    let mut result = CutoutProviderRows::default();
+    for path in cutout_provider_metadata_paths(config_dir, include_packaged_e2e_discovery) {
+        match read_exact_config(&path) {
+            Ok(Some(raw)) => {
+                result.readable_files += 1;
+                match serde_json::from_str::<Vec<serde_json::Value>>(&raw) {
+                    Ok(rows) => result.rows.extend(rows),
+                    Err(_) => result.invalid_files += 1,
+                }
+            }
+            Ok(None) => {}
+            Err(_) => result.invalid_files += 1,
+        }
+    }
+    result
+}
+
+#[derive(Default)]
+struct CutoutKeychainDiscovery {
+    candidates: Vec<ProviderCandidate>,
+    metadata_rows: usize,
+    readable_files: usize,
+    invalid_files: usize,
+    keys_present: usize,
+    keys_missing: usize,
+    key_errors: usize,
 }
 
 fn discover_cutout_keychain_at(
     config_dir: &Path,
     include_packaged_e2e_discovery: bool,
-    has_key: impl Fn(&str) -> bool,
-) -> Vec<ProviderCandidate> {
-    cutout_provider_rows_at(config_dir, include_packaged_e2e_discovery)
-        .into_iter()
-        .filter_map(|row| {
-            let id = row.get("id")?.as_str()?;
-            if !has_key(id) {
-                return None;
+    key_presence: impl Fn(&str) -> Result<bool, keys::KeyError>,
+) -> CutoutKeychainDiscovery {
+    let provider_rows = cutout_provider_rows_at(config_dir, include_packaged_e2e_discovery);
+    let mut discovery = CutoutKeychainDiscovery {
+        metadata_rows: provider_rows.rows.len(),
+        readable_files: provider_rows.readable_files,
+        invalid_files: provider_rows.invalid_files,
+        ..CutoutKeychainDiscovery::default()
+    };
+    for row in provider_rows.rows {
+        let Some(id) = row.get("id").and_then(serde_json::Value::as_str) else {
+            continue;
+        };
+        match key_presence(id) {
+            Ok(true) => discovery.keys_present += 1,
+            Ok(false) => {
+                discovery.keys_missing += 1;
+                continue;
             }
+            Err(_) => {
+                discovery.key_errors += 1;
+                continue;
+            }
+        }
+        let candidate = (|| {
             Some(ProviderCandidate {
                 id: candidate_id(&["cutout-keychain", id]),
                 source: "cutout-keychain".into(),
@@ -1331,19 +1378,46 @@ fn discover_cutout_keychain_at(
                 },
                 warnings: vec![],
             })
-        })
-        .collect()
+        })();
+        if let Some(candidate) = candidate {
+            discovery.candidates.push(candidate);
+        }
+    }
+    discovery
 }
 
 fn discover_cutout_keychain<R: Runtime>(app: &AppHandle<R>) -> Vec<ProviderCandidate> {
     let Ok(config_dir) = app.path().app_config_dir() else {
         return vec![];
     };
-    discover_cutout_keychain_at(
+    let discovery = discover_cutout_keychain_at(
         &config_dir,
         crate::commands::packaged_e2e::enabled(),
-        keys::has_key_exact,
-    )
+        keys::key_presence_exact,
+    );
+    if discovery.readable_files > 0 {
+        crate::commands::packaged_e2e::native_checkpoint("ai-native-cutout-registry-read");
+    }
+    if discovery.invalid_files > 0 {
+        crate::commands::packaged_e2e::native_checkpoint("ai-native-cutout-registry-invalid");
+    }
+    if discovery.metadata_rows > 0 && discovery.keys_present > 0 {
+        crate::commands::packaged_e2e::native_checkpoint("ai-native-cutout-keychain-key-present");
+    }
+    if discovery.keys_missing > 0 {
+        crate::commands::packaged_e2e::native_checkpoint(
+            "ai-native-cutout-keychain-some-key-missing",
+        );
+    }
+    if discovery.key_errors > 0 {
+        crate::commands::packaged_e2e::native_checkpoint("ai-native-cutout-keychain-key-error");
+    }
+    if !discovery.candidates.is_empty() {
+        crate::commands::packaged_e2e::native_checkpoint(
+            "ai-native-cutout-keychain-candidate-created",
+        );
+    }
+    discovery.candidates
 }
 
 fn cutout_source_id_at(
@@ -1414,6 +1488,11 @@ fn finalize_candidates(
     candidates.retain(|candidate| match validate_candidate(candidate) {
         Ok(()) => true,
         Err(error) => {
+            if candidate.source == "cutout-keychain" {
+                crate::commands::packaged_e2e::native_checkpoint(
+                    "ai-native-cutout-keychain-candidate-filtered",
+                );
+            }
             first_error.get_or_insert(error);
             false
         }
@@ -1540,6 +1619,52 @@ fn normalize_protocol_base_url(
     Ok(parsed.to_string().trim_end_matches('/').to_owned())
 }
 
+fn provider_matches_binding(
+    provider: &ProviderConfig,
+    supplied_kind: ProviderKind,
+    supplied_base_url: &str,
+    supplied_wire_protocol: Option<ProviderWireProtocol>,
+) -> Result<bool, DiscoveryError> {
+    if provider.kind != supplied_kind {
+        return Ok(false);
+    }
+    let effective_wire = provider
+        .kind
+        .effective_wire_protocol(provider.wire_protocol)
+        .map_err(DiscoveryError::UnsupportedWireProtocol)?;
+    if effective_wire != supplied_wire_protocol {
+        return Ok(false);
+    }
+    let Some(effective_base) = provider
+        .base_url
+        .as_deref()
+        .or_else(|| ai_proxy::default_base_url(provider.kind))
+    else {
+        return Ok(false);
+    };
+    Ok(normalize_protocol_base_url(effective_base, effective_wire)?
+        == normalize_protocol_base_url(supplied_base_url, supplied_wire_protocol)?)
+}
+
+fn unique_existing_provider<'a>(
+    configured: &'a [ProviderConfig],
+    kind: ProviderKind,
+    base_url: &str,
+    wire_protocol: Option<ProviderWireProtocol>,
+) -> Result<Option<&'a ProviderConfig>, DiscoveryError> {
+    let mut matched = None;
+    for provider in configured {
+        if !provider_matches_binding(provider, kind, base_url, wire_protocol)? {
+            continue;
+        }
+        if matched.is_some() {
+            return Err(DiscoveryError::Conflict);
+        }
+        matched = Some(provider);
+    }
+    Ok(matched)
+}
+
 fn validate_existing_provider_binding<R: Runtime>(
     app: &AppHandle<R>,
     provider_id: &str,
@@ -1553,18 +1678,10 @@ fn validate_existing_provider_binding<R: Runtime>(
         .iter()
         .find(|provider| provider.id == provider_id)
         .ok_or(DiscoveryError::CandidateMissing)?;
-    let effective_wire = provider
-        .kind
-        .effective_wire_protocol(provider.wire_protocol)
-        .map_err(DiscoveryError::UnsupportedWireProtocol)?;
-    let effective_base = provider
-        .base_url
-        .as_deref()
-        .or_else(|| ai_proxy::default_base_url(provider.kind));
-    if provider.kind.as_str() != supplied_kind
-        || effective_base != Some(supplied_base_url)
-        || effective_wire != supplied_wire_protocol
-    {
+    let kind: ProviderKind =
+        serde_json::from_value(serde_json::Value::String(supplied_kind.to_owned()))
+            .map_err(|error| DiscoveryError::Parse(error.to_string()))?;
+    if !provider_matches_binding(provider, kind, supplied_base_url, supplied_wire_protocol)? {
         return Err(DiscoveryError::NotImportable);
     }
     Ok(())
@@ -1842,7 +1959,7 @@ async fn check_draft<R: Runtime>(
     // protocol-specific auth, URL normalization, and exhaustive SDK adapters.
     let secret = resolve_draft_secret(app, draft).await?;
     let url = format!("{}/models", draft.base_url.trim_end_matches('/'));
-    let response = ai_proxy::request_with_secret(
+    let response = ai_proxy::request_with_secret_timeout(
         &draft.kind,
         draft.wire_protocol,
         &url,
@@ -1850,6 +1967,7 @@ async fn check_draft<R: Runtime>(
         Default::default(),
         None,
         &secret,
+        ai_proxy::AUTOMATIC_CATALOG_TIMEOUT_SECS,
     )
     .await
     .map_err(discovery_request_error)?;
@@ -1990,7 +2108,14 @@ fn checkpoint_automatic_error(error: &DiscoveryError) {
         DiscoveryError::CatalogMalformed | DiscoveryError::CatalogUnsupported => {
             "ai-native-catalog-invalid"
         }
-        DiscoveryError::Request(_) => "ai-native-catalog-request-failed",
+        DiscoveryError::Request(_) => {
+            crate::commands::packaged_e2e::native_checkpoint("ai-native-catalog-request-failed");
+            crate::commands::packaged_e2e::native_checkpoint(&format!(
+                "ai-native-catalog-request-{}",
+                request_failure_cause(error)
+            ));
+            return;
+        }
         DiscoveryError::CandidateMissing | DiscoveryError::NotImportable => {
             "ai-native-credential-missing"
         }
@@ -2109,6 +2234,26 @@ async fn checked_automatic_draft<R: Runtime>(
     }
 }
 
+fn existing_provider_revalidation_draft(
+    provider_id: String,
+    kind: String,
+    base_url: String,
+    wire_protocol: Option<ProviderWireProtocol>,
+) -> ProviderDraftSession {
+    ProviderDraftSession {
+        created_at: Instant::now(),
+        kind,
+        base_url,
+        wire_protocol,
+        candidate_id: None,
+        provider_id: Some(provider_id),
+        secret: None,
+        candidate_fingerprint: None,
+        candidate_secret_revision: None,
+        checked_models: None,
+    }
+}
+
 /// Atomically turns one reviewed local credential into a verified Cutout
 /// Provider. The secret is resolved, checked, and stored entirely in Rust.
 #[tauri::command]
@@ -2154,15 +2299,16 @@ pub async fn auto_configure_provider_candidate<R: Runtime>(
     )?;
     let base_url = normalize_protocol_base_url(&base_url, wire_protocol)?;
     crate::commands::packaged_e2e::native_checkpoint("ai-native-binding-normalized");
-    let provider_id = automatic_provider_id(&candidate.id)?;
     let configured = providers::load_providers_sync(&app)
         .map_err(|error| DiscoveryError::Persistence(error.to_string()))?;
     crate::commands::packaged_e2e::native_checkpoint("ai-native-config-loaded");
+    let existing = unique_existing_provider(&configured, kind, &base_url, wire_protocol)?.cloned();
+    let provider_id = match &existing {
+        Some(provider) => provider.id.clone(),
+        None => automatic_provider_id(&candidate.id)?,
+    };
 
-    if let Some(existing) = configured
-        .iter()
-        .find(|provider| provider.id == provider_id)
-    {
+    if let Some(existing) = existing {
         validate_existing_provider_binding(
             &app,
             &provider_id,
@@ -2170,18 +2316,12 @@ pub async fn auto_configure_provider_candidate<R: Runtime>(
             &base_url,
             wire_protocol,
         )?;
-        let draft = ProviderDraftSession {
-            created_at: Instant::now(),
-            kind: candidate.kind.clone(),
+        let draft = existing_provider_revalidation_draft(
+            provider_id,
+            candidate.kind.clone(),
             base_url,
             wire_protocol,
-            candidate_id: None,
-            provider_id: Some(provider_id),
-            secret: None,
-            candidate_fingerprint: None,
-            candidate_secret_revision: None,
-            checked_models: None,
-        };
+        );
         let models = match checked_automatic_draft(&app, &draft).await {
             Ok(models) => {
                 checkpoint_reviewed_relay_catalog(&candidate, None);
@@ -2201,7 +2341,7 @@ pub async fn auto_configure_provider_candidate<R: Runtime>(
             ));
         }
         return Ok(AutoConfiguredProvider {
-            provider: existing.clone(),
+            provider: existing,
             models,
         });
     }
@@ -2253,8 +2393,11 @@ pub async fn auto_configure_provider_candidate<R: Runtime>(
         default_model: automatic_default_model(&candidate, &models)?,
         enabled: true,
     };
-    keys::store_imported_key(&provider_id, &secret)
-        .map_err(|_| DiscoveryError::Keychain("credential vault write failed".into()))?;
+    keys::store_imported_key(&provider_id, &secret).map_err(|_| {
+        let error = DiscoveryError::Keychain("credential vault write failed".into());
+        checkpoint_automatic_error(&error);
+        error
+    })?;
     crate::commands::packaged_e2e::native_checkpoint("ai-native-key-stored");
     let mut next = configured;
     next.push(provider.clone());
@@ -2319,7 +2462,10 @@ mod tests {
             Some("https://aigw.mox.ktvsky.com/v1")
         );
         assert_eq!(mox.wire_protocol.as_deref(), Some("chat-completions"));
-        assert_eq!(mox.model_hint.as_deref(), Some("gpt-5.5"));
+        assert_eq!(
+            mox.model_hint.as_deref(),
+            Some(REVIEWED_RELAY_TEXT_MODEL_HINT)
+        );
         assert_eq!(mox.credential.reference.as_deref(), Some("MOX_API_KEY"));
         assert!(mox.credential.importable);
         assert!(!candidates
@@ -2352,9 +2498,20 @@ mod tests {
             cutout_provider_metadata_paths(config_dir.path(), false),
             vec![canonical.clone()]
         );
-        assert!(discover_cutout_keychain_at(config_dir.path(), false, |_| true).is_empty());
+        assert!(
+            discover_cutout_keychain_at(config_dir.path(), false, |_| Ok(true))
+                .candidates
+                .is_empty()
+        );
 
-        let candidates = discover_cutout_keychain_at(config_dir.path(), true, |id| id == "mox");
+        let discovery = discover_cutout_keychain_at(config_dir.path(), true, |id| Ok(id == "mox"));
+        let candidates = discovery.candidates;
+        assert_eq!(discovery.readable_files, 2);
+        assert_eq!(discovery.invalid_files, 0);
+        assert_eq!(discovery.metadata_rows, 1);
+        assert_eq!(discovery.keys_present, 1);
+        assert_eq!(discovery.keys_missing, 0);
+        assert_eq!(discovery.key_errors, 0);
         assert_eq!(candidates.len(), 1);
         assert_eq!(candidates[0].source, "cutout-keychain");
         assert_eq!(candidates[0].label, "MOX");
@@ -2370,6 +2527,13 @@ mod tests {
         assert!(!serde_json::to_string(&candidates)
             .unwrap()
             .contains("credential-sentinel-must-not-serialize"));
+
+        let unavailable =
+            discover_cutout_keychain_at(config_dir.path(), true, |_| Err(keys::KeyError::Keychain));
+        assert!(unavailable.candidates.is_empty());
+        assert_eq!(unavailable.keys_present, 0);
+        assert_eq!(unavailable.keys_missing, 0);
+        assert_eq!(unavailable.key_errors, 1);
     }
 
     use tempfile::TempDir;
@@ -3265,6 +3429,86 @@ wire_api = "unsupported-completions"
             .unwrap(),
             "https://relay.example/api/openai"
         );
+    }
+
+    #[test]
+    fn automatic_setup_reuses_one_normalized_existing_provider_binding() {
+        let configured = vec![ProviderConfig {
+            id: "existing-keychain-provider".into(),
+            kind: ProviderKind::Openai,
+            label: "Existing OpenAI".into(),
+            base_url: None,
+            wire_protocol: None,
+            default_model: "gpt-5".into(),
+            enabled: true,
+        }];
+
+        let matched = unique_existing_provider(
+            &configured,
+            ProviderKind::Openai,
+            "https://api.openai.com/",
+            Some(ProviderWireProtocol::Responses),
+        )
+        .unwrap()
+        .unwrap();
+
+        assert_eq!(matched.id, "existing-keychain-provider");
+        assert_ne!(
+            matched.id,
+            automatic_provider_id(&candidate_id(&["agent-openai"])).unwrap()
+        );
+        assert!(unique_existing_provider(
+            &configured,
+            ProviderKind::Openai,
+            "https://api.openai.com/v1",
+            Some(ProviderWireProtocol::ChatCompletions),
+        )
+        .unwrap()
+        .is_none());
+
+        let draft = existing_provider_revalidation_draft(
+            matched.id.clone(),
+            matched.kind.as_str().into(),
+            "https://api.openai.com/v1".into(),
+            Some(ProviderWireProtocol::Responses),
+        );
+        assert_eq!(
+            draft.provider_id.as_deref(),
+            Some("existing-keychain-provider")
+        );
+        assert!(draft.candidate_id.is_none());
+        assert!(draft.secret.is_none());
+    }
+
+    #[test]
+    fn automatic_setup_rejects_an_ambiguous_existing_provider_binding() {
+        let provider = ProviderConfig {
+            id: "first".into(),
+            kind: ProviderKind::OpenaiCompatible,
+            label: "First".into(),
+            base_url: Some("https://relay.example".into()),
+            wire_protocol: Some(ProviderWireProtocol::Responses),
+            default_model: "gpt-5".into(),
+            enabled: true,
+        };
+        let configured = vec![
+            provider.clone(),
+            ProviderConfig {
+                id: "second".into(),
+                base_url: Some("https://relay.example/v1/".into()),
+                ..provider
+            },
+        ];
+
+        assert!(matches!(
+            unique_existing_provider(
+                &configured,
+                ProviderKind::OpenaiCompatible,
+                "https://relay.example/v1",
+                Some(ProviderWireProtocol::Responses),
+            ),
+            Err(DiscoveryError::Conflict)
+        ));
     }
 
     #[test]

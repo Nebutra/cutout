@@ -76,19 +76,20 @@ describe('signed update artifact policy', () => {
   })
 
   it('generates hash, SBOM and provenance metadata from verified sidecars', () => {
-    const value = fixture(), base = { channel: 'stable', version: '1.2.0', publishedAt: '2026-07-15T00:00:00.000Z', artifactUrl: 'https://releases.example.test/Cutout.app.tar.gz', signature: value.signature, signatureFile: 'Cutout.app.tar.gz.sig', artifactDigest: sha256(value.artifact), sourceRevision: 'abc123', allowedHosts: ['releases.example.test'], releaseNotes: reviewedNotes() }
+    const value = multiFixture(), base = { channel: 'stable', version: '1.2.0', publishedAt: '2026-07-15T00:00:00.000Z', platforms: value.platforms, sourceRevision: 'abc123', allowedHosts: ['releases.example.test'], releaseNotes: reviewedNotes() }
     const generated = buildReleaseDocuments(base)
-    expect(generated).toMatchObject({ manifest: { version: '1.2.0' }, sbom: { spdxVersion: 'SPDX-2.3' }, provenance: { version: 'cutout.provenance.v1' }, metadata: { version: 'cutout.release-metadata.v2' } })
+    expect(generated).toMatchObject({ manifest: { version: '1.2.0' }, sbom: { spdxVersion: 'SPDX-2.3' }, provenance: { version: 'cutout.provenance.v1' }, metadata: { version: 'cutout.release-metadata.v3' } })
     expect(generated).not.toHaveProperty('rollout')
     expect(generated).not.toHaveProperty('rollback')
-    expect(generated.metadata.artifact.sha256).toBe(sha256(value.artifact))
+    expect(generated.metadata).not.toHaveProperty('artifact')
+    expect(generated.metadata.platforms[0].sha256).toBe(value.platforms[0]?.artifactDigest)
   })
 
   it('derives readable plain text and structured updater notes from one reviewed entry', async () => {
-    const value = fixture('0.1.19')
+    const value = multiFixture('0.1.19')
     const catalog = await loadReleaseNotesCatalog(undefined, { requireAllLocales: true })
     const releaseNotes = projectReleaseNotesEntry(requireReleaseNotesEntry(catalog, '0.1.19'))
-    const generated = buildReleaseDocuments({ channel: 'stable', version: '0.1.19', publishedAt: '2026-08-04T00:00:00.000Z', artifactUrl: 'https://releases.example.test/Cutout.app.tar.gz', signature: value.signature, signatureFile: 'Cutout.app.tar.gz.sig', artifactDigest: sha256(value.artifact), allowedHosts: ['releases.example.test'], releaseNotes })
+    const generated = buildReleaseDocuments({ channel: 'stable', version: '0.1.19', publishedAt: '2026-08-04T00:00:00.000Z', platforms: value.platforms, allowedHosts: ['releases.example.test'], releaseNotes })
     expect(generated.manifest.notes).toContain('See what Agent preparation is doing')
     expect(generated.manifest.notes).not.toContain('cutout.release-notes')
     expect(generated.manifest.cutoutReleaseNotes).toEqual(releaseNotes)
@@ -124,7 +125,7 @@ describe('signed update artifact policy', () => {
   it('requires darwin-aarch64 as the mandatory primary platform', () => {
     const { platforms } = multiFixture()
     const withoutPrimary = platforms.filter((p) => p.key !== 'darwin-aarch64').map(({ key, artifactUrl, signature, artifactDigest, signatureFile }) => ({ key, artifactUrl, signature, artifactDigest, signatureFile }))
-    expect(() => buildReleaseDocuments({ channel: 'stable', version: '1.2.0', publishedAt: '2026-07-15T00:00:00.000Z', platforms: withoutPrimary, allowedHosts: ['releases.example.test'], releaseNotes: reviewedNotes() })).toThrow('darwin-aarch64')
+    expect(() => buildReleaseDocuments({ channel: 'stable', version: '1.2.0', publishedAt: '2026-07-15T00:00:00.000Z', platforms: withoutPrimary, allowedHosts: ['releases.example.test'], releaseNotes: reviewedNotes() })).toThrow('missing: darwin-aarch64')
   })
 
   it('fails closed when a non-primary platform is insecure or unsigned', () => {
@@ -160,36 +161,30 @@ describe('signed update artifact policy', () => {
     const result = spawnSync(process.execPath, [...commonArgs, '--release-notes-catalog', 'src/release-notes/catalog.json', '--require-all-locales', '--output', join(root, 'out')], { cwd: process.cwd(), encoding: 'utf8' })
     expect(result.status, result.stderr).toBe(0)
     const manifest = JSON.parse(await readFile(join(root, 'out', 'stable', 'latest.json'), 'utf8'))
+    const directory = join(root, 'out', 'stable')
+    const metadata = JSON.parse(await readFile(join(directory, 'release-metadata.json'), 'utf8'))
     expect(Object.keys(manifest.platforms)).toEqual(['darwin-aarch64', 'darwin-x86_64', 'windows-x86_64', 'linux-x86_64'])
     expect(manifest.platforms['windows-x86_64'].url).toBe('https://releases.example.test/windows-x86_64-Cutout-setup.exe')
+    expect(manifest.notes).toMatch(/^Readable preparation and honest paid-action decisions/m)
+    expect(metadata).not.toHaveProperty('artifact')
+    expect(metadata.platforms).toHaveLength(4)
+    expect(metadata.sbom.sha256).toBe(sha256(await readFile(join(directory, 'sbom.spdx.json'))))
+    expect(metadata.provenance.sha256).toBe(sha256(await readFile(join(directory, 'provenance.json'))))
     expect(() => validateUpdateManifest(manifest, { allowedHosts: ['releases.example.test'] })).not.toThrow()
   })
 
-  it('writes a self-consistent release directory through the production CLI', async () => {
+  it('rejects retired single-artifact generation flags', async () => {
     const value = fixture('0.1.19'), root = await mkdtemp(join(tmpdir(), 'cutout-update-')), artifact = join(root, 'Cutout.app.tar.gz')
     await writeFile(artifact, value.artifact); await writeFile(`${artifact}.sig`, value.signature)
     const result = spawnSync(process.execPath, ['scripts/update-artifacts.mjs', 'generate', '--artifact', artifact, '--version', '0.1.19', '--channel', 'beta', '--artifact-url', 'https://releases.example.test/Cutout.app.tar.gz', '--allowed-hosts', 'releases.example.test', '--release-notes-catalog', 'src/release-notes/catalog.json', '--require-all-locales', '--output', join(root, 'out')], { cwd: process.cwd(), encoding: 'utf8' })
-    expect(result.status, result.stderr).toBe(0)
-    const directory = join(root, 'out', 'beta'), metadata = JSON.parse(await readFile(join(directory, 'release-metadata.json'), 'utf8'))
-    expect(metadata.sbom.sha256).toBe(sha256(await readFile(join(directory, 'sbom.spdx.json'))))
-    expect(metadata.provenance.sha256).toBe(sha256(await readFile(join(directory, 'provenance.json'))))
-    await expect(readFile(join(directory, 'rollout.json'), 'utf8')).rejects.toThrow()
-    await expect(readFile(join(directory, 'rollback.json'), 'utf8')).rejects.toThrow()
-    const manifest = JSON.parse(await readFile(join(directory, 'latest.json'), 'utf8'))
-    expect(() => validateUpdateManifest(manifest, { expectedSignature: value.signature, allowedHosts: ['releases.example.test'] })).not.toThrow()
+    expect(result.status).not.toBe(0)
+    expect(result.stderr).toContain('--artifact is retired')
   })
 
-  it('generates catalog-backed updater metadata through the production CLI', async () => {
-    const value = fixture('0.1.19'), root = await mkdtemp(join(tmpdir(), 'cutout-update-notes-')), artifact = join(root, 'Cutout.app.tar.gz')
-    await writeFile(artifact, value.artifact); await writeFile(`${artifact}.sig`, value.signature)
-    const result = spawnSync(process.execPath, ['scripts/update-artifacts.mjs', 'generate', '--artifact', artifact, '--version', '0.1.19', '--channel', 'stable', '--artifact-url', 'https://releases.example.test/Cutout.app.tar.gz', '--allowed-hosts', 'releases.example.test', '--release-notes-catalog', 'src/release-notes/catalog.json', '--require-all-locales', '--output', join(root, 'out')], { cwd: process.cwd(), encoding: 'utf8' })
-    expect(result.status, result.stderr).toBe(0)
-    const manifestPath = join(root, 'out', 'stable', 'latest.json')
-    const manifest = JSON.parse(await readFile(manifestPath, 'utf8'))
-    expect(manifest.notes).toMatch(/^Readable preparation and honest paid-action decisions/m)
-    expect(manifest.cutoutReleaseNotes).toMatchObject({ protocol: 'cutout.release-notes.v1', version: '0.1.19' })
-    const validate = spawnSync(process.execPath, ['scripts/update-artifacts.mjs', 'validate', '--manifest', manifestPath, '--allowed-hosts', 'releases.example.test', '--release-notes-catalog', 'src/release-notes/catalog.json', '--require-release-notes', '--require-all-locales'], { cwd: process.cwd(), encoding: 'utf8' })
-    expect(validate.status, validate.stderr).toBe(0)
+  it('rejects incomplete multi-platform release generation while reading old manifests', () => {
+    const value = multiFixture()
+    expect(() => buildReleaseDocuments({ channel: 'stable', version: '1.2.0', publishedAt: '2026-07-15T00:00:00.000Z', platforms: value.platforms.slice(0, 1), allowedHosts: ['releases.example.test'], releaseNotes: reviewedNotes() })).toThrow('All updater platforms are required')
+    expect(() => validateUpdateManifest(fixture().manifest, { allowedHosts: ['releases.example.test'] })).not.toThrow()
   })
 
   it.each(['--rollout', '--previous-version', '--previous-manifest-url'])('rejects unsupported release policy flag %s', (flag) => {

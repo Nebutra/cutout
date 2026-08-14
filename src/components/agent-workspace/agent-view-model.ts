@@ -246,7 +246,7 @@ function buildFeed(input: AgentViewModelInput): readonly AgentFeedItem[] {
   })
   const activePreparation = selectActivePreparationEvent(input.runEvents)
   const hasLiveAgentText = Boolean(input.liveAgentMessage?.text.trim())
-  const liveAgentMessage = input.liveAgentMessage
+  const liveAgentMessage = !input.runError && input.liveAgentMessage
     && (!input.working || !activePreparation || hasLiveAgentText)
     ? input.liveAgentMessage
     : null
@@ -264,7 +264,7 @@ function buildFeed(input: AgentViewModelInput): readonly AgentFeedItem[] {
   const preparationProgress = activePreparation
     ? projectPreparationProgress(input.runEvents, activePreparation, input.preparationDetail)
     : undefined
-  const preparationActivityItem: AgentFeedItem[] = input.working && !hasLiveAgentText && activePreparation
+  const preparationActivityItem: AgentFeedItem[] = !input.runError && input.working && !hasLiveAgentText && activePreparation
     ? [{
         id: activePreparation.eventId,
         type: 'message',
@@ -283,7 +283,7 @@ function buildFeed(input: AgentViewModelInput): readonly AgentFeedItem[] {
     : []
   const activeStage = input.stages.find((stage) => stage.status === 'running')
   const hasDurableActivity = Boolean(projectExecutionTimeline(input.runEvents))
-  const activityItem: AgentFeedItem[] = input.working && !input.liveAgentMessage && !activePreparation && !hasDurableActivity && (input.preparing || activeStage)
+  const activityItem: AgentFeedItem[] = !input.runError && input.working && !input.liveAgentMessage && !activePreparation && !hasDurableActivity && (input.preparing || activeStage)
     ? [{
         id: `runtime:activity:${activeStage?.id ?? input.workflowPhase}`,
         type: 'message',
@@ -744,6 +744,12 @@ function feedItemFromRunEvent(event: AgentRunEvent): readonly AgentFeedItem[] {
         materialKind: event.material.kind,
         provenance: event.material.source,
       }]
+    case 'prototype-page-review-started':
+    case 'prototype-page-review-passed':
+    case 'prototype-page-review-rejected':
+      // Per-page review activity is shown in the expandable suite progress UI.
+      // Keep the durable evidence out of the conversation feed.
+      return []
     case 'capability-fallback':
       return [{
         id: event.eventId,

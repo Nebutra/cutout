@@ -29,6 +29,8 @@ import { focusSettingsTarget, type SettingsTarget } from './settings-ui'
 import type { LocalizedReleaseNotes } from '@/updater/contracts'
 import type { ReleaseNotesView } from '@/updater/release-notes'
 
+const PACKAGED_E2E = import.meta.env.VITE_CUTOUT_PACKAGED_E2E === '1'
+
 interface SettingsDialogProps {
   readonly open: boolean
   readonly onOpenChange: (open: boolean) => void
@@ -62,7 +64,10 @@ export function SettingsDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="h-[min(46rem,calc(100dvh-1rem))] w-[calc(100vw-1rem)] min-w-0 max-w-3xl gap-0 overflow-hidden p-0 sm:h-[min(46rem,calc(100dvh-3rem))]">
+      <DialogContent
+        className="h-[min(46rem,calc(100dvh-1rem))] w-[calc(100vw-1rem)] min-w-0 max-w-3xl gap-0 overflow-hidden p-0 sm:h-[min(46rem,calc(100dvh-3rem))]"
+        onOpenAutoFocus={PACKAGED_E2E ? (event) => event.preventDefault() : undefined}
+      >
         <DialogTitle className="sr-only">
           <Trans id="settings.menu_label">Settings</Trans>
         </DialogTitle>

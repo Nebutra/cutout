@@ -15,7 +15,11 @@ test("Deliver always returns to the same stateful project workspace", async ({ p
   const brief = "Return to this exact canvas and Agent state";
   await page.getByRole("textbox", { name: "Describe what you want to design..." }).fill(brief);
   await page.getByRole("button", { name: "Create from brief" }).click();
-  await expect(page.getByText("No result yet", { exact: true })).toBeVisible();
+  const outcomeState = page.getByRole("heading", { name: "Run needs attention" });
+  await expect(outcomeState).toBeVisible();
+  await expect(page.getByRole("main").getByText(
+    "Configure a chat/vision model before generating.",
+  )).toBeVisible();
   const composer = page.getByRole("textbox", { name: "Message the Agent" });
   const submittedMessage = page.locator('[data-slot="user-message"]');
   await expect(submittedMessage).toContainText(brief);
@@ -45,7 +49,7 @@ test("Deliver always returns to the same stateful project workspace", async ({ p
 
     await back.click();
     await expect(deliver).toHaveCount(0);
-    await expect(page.getByText("No result yet", { exact: true })).toBeVisible();
+    await expect(outcomeState).toBeVisible();
     await expect(submittedMessage).toContainText(brief);
     await expect(composer).toHaveValue("");
     await expect(workspace).toHaveAttribute("data-persistence-probe", "same-node");

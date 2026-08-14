@@ -1,5 +1,7 @@
 import type { Locator, Page, TestInfo } from '@playwright/test'
+import { readFileSync } from 'node:fs'
 import { expect, test } from './local-state.fixture'
+import { projectCount } from './project-storage'
 import { fingerprint } from '../../src/design-ir/fingerprint'
 import { projectWorkspaceSnapshotToDesignDocument } from '../../src/design-ir/workspace-projection'
 import {
@@ -60,27 +62,12 @@ async function createProjectWithWorkspace(
   await expect(composer).toBeVisible()
   await composer.fill(projectName)
   await page.getByRole('button', { name: 'Create from brief' }).click()
-  await expect.poll(() => page.evaluate(async () => {
-    const db = await new Promise<IDBDatabase>((resolve, reject) => {
-      const request = indexedDB.open('cutout-projects', 1)
-      request.onsuccess = () => resolve(request.result)
-      request.onerror = () => reject(request.error)
-    })
-    try {
-      return await new Promise<number>((resolve, reject) => {
-        const request = db.transaction('projects', 'readonly').objectStore('projects').count()
-        request.onsuccess = () => resolve(request.result)
-        request.onerror = () => reject(request.error)
-      })
-    } finally {
-      db.close()
-    }
-  })).toBeGreaterThan(0)
+  await expect.poll(() => projectCount(page)).toBeGreaterThan(0)
   const stop = page.getByRole('button', { name: 'Stop' })
   await stop.waitFor({ state: 'visible', timeout: 3_000 }).then(() => stop.click()).catch(() => undefined)
   const identity = await page.evaluate(async () => {
     const db = await new Promise<IDBDatabase>((resolve, reject) => {
-      const request = indexedDB.open('cutout-projects', 1)
+      const request = indexedDB.open('cutout-projects')
       request.onsuccess = () => resolve(request.result)
       request.onerror = () => reject(request.error)
     })
@@ -137,7 +124,7 @@ async function createProjectWithWorkspace(
   )
   const project = await page.evaluate(async ({ fixture, projectName, designDocument, designDocumentContentHash }) => {
     const db = await new Promise<IDBDatabase>((resolve, reject) => {
-      const request = indexedDB.open('cutout-projects', 1)
+      const request = indexedDB.open('cutout-projects')
       request.onsuccess = () => resolve(request.result)
       request.onerror = () => reject(request.error)
     })
@@ -196,6 +183,9 @@ const fixturePng = Array.from(Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
   'base64',
 ))
+const prototypePagePng = Array.from(readFileSync(
+  new URL('./fixtures/prototype-1440x900.png', import.meta.url),
+))
 
 function candidateDesignMarkdown(primary: string) {
   return [
@@ -253,12 +243,17 @@ function directionWorkspace() {
 }
 
 function completedWorkspace() {
-  const bytes = [137,80,78,71,13,10,26,10,0,0,0,13,73,72,68,82,0,0,0,1,0,0,0,1,8,6,0,0,0,31,21,196,137,0,0,0,13,73,68,65,84,8,215,99,248,207,192,240,31,0,5,0,1,255,137,153,61,29,0,0,0,0,73,69,78,68,174,66,96,130]
   const finishedPlan = plan({ mode: 'continue', rationale: 'Direction is resolved.' })
   return baseWorkspace({
     workflowPhase: 'idle', prototypePlan: finishedPlan,
-    prototypeDesignSystem: { name: 'Northstar system', designMarkdown: '# Northstar', bytes, mediaType: 'image/png', width: 1, height: 1 },
-    prototypePages: finishedPlan.pages.map((page: Record<string, unknown>) => ({ page, bytes, mediaType: 'image/png', width: 1, height: 1 })),
+    prototypeDesignSystem: { name: 'Northstar system', designMarkdown: '# Northstar', bytes: fixturePng, mediaType: 'image/png', width: 1, height: 1 },
+    prototypePages: finishedPlan.pages.map((page: Record<string, unknown>) => ({
+      page,
+      bytes: prototypePagePng,
+      mediaType: 'image/png',
+      width: 1440,
+      height: 900,
+    })),
     selectedPrototypePageId: 'home', namingStatus: 'done',
   })
 }
@@ -377,6 +372,14 @@ test.beforeEach(async ({ page }) => {
   await openStableHome(page)
 })
 
+test.afterEach(async ({ page }) => {
+  const stop = page.getByRole('button', { name: 'Stop' })
+  if (await stop.isVisible()) {
+    await stop.click()
+    await expect(stop).toBeHidden()
+  }
+})
+
 test('Home has one primary need entry and recent work remains reachable', async ({ page }, testInfo) => {
   const main = page.getByRole('main')
   const composer = page.getByPlaceholder('Describe what you want to design...')
@@ -453,14 +456,14 @@ test('conversational Agent replies stay in the panel and never cover the canvas'
   await expect(page.locator('[data-sonner-toast]').filter({ hasText: 'Build it anyway' })).toHaveCount(0)
 
   const containmentTolerance = 1
-  const contained = await Promise.all([panel.boundingBox(), reply.boundingBox()]).then(([panelBox, replyBox]) =>
-    Boolean(panelBox && replyBox
+  await expect.poll(async () => {
+    const [panelBox, replyBox] = await Promise.all([panel.boundingBox(), reply.boundingBox()])
+    return Boolean(panelBox && replyBox
       && replyBox.x >= panelBox.x - containmentTolerance
       && replyBox.x + replyBox.width <= panelBox.x + panelBox.width + containmentTolerance
       && replyBox.y >= panelBox.y - containmentTolerance
-      && replyBox.y + replyBox.height <= panelBox.y + panelBox.height + containmentTolerance),
-  )
-  expect(contained).toBe(true)
+      && replyBox.y + replyBox.height <= panelBox.y + panelBox.height + containmentTolerance)
+  }).toBe(true)
 })
 
 test('design details open in the left workspace drawer and do not leak internals by default', async ({ page }, testInfo) => {

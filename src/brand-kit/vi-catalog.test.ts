@@ -47,6 +47,7 @@ describe('Brand VI catalog v1', () => {
     expect(full.requestedItemIds).toHaveLength(BRAND_VI_CATALOG.items.length)
     expect(full.estimatedPaidActions).toBeGreaterThan(0)
     expect(full.requiresApproval).toBe(true)
+    expect(full.requiresApproval).toBe(full.nodes.some((node) => node.approval.required))
   })
 
   it('expands dependencies, locks approved masters, and orders every dependency before its consumer', () => {

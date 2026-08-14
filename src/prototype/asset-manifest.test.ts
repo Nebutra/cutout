@@ -99,4 +99,40 @@ describe('prototype asset manifest', () => {
     ])
     expect(manifest.assets.some((asset) => asset.regionName === 'Filters')).toBe(false)
   })
+
+  it('does not invent fallback assets for an empty reusable-material region', () => {
+    const emptyPlan: PrototypePlan = {
+      ...plan,
+      pages: [{
+        ...plan.pages[0]!,
+        regions: [{
+          ...plan.pages[0]!.regions[0]!,
+          assetRoute: 'board-cutout',
+          assetOpportunities: [],
+        }],
+      }],
+    }
+
+    const manifest = createPrototypeAssetManifest(emptyPlan, emptyPlan.pages)
+
+    expect(manifest.pages[0]?.assets).toEqual([])
+    expect(manifest.assets).toEqual([])
+  })
+
+  it('preserves the Agent-authored direct output contract', () => {
+    const rectangularPlan: PrototypePlan = {
+      ...plan,
+      pages: [{
+        ...plan.pages[0]!,
+        regions: [{
+          ...plan.pages[0]!.regions[0]!,
+          assetOutput: 'rectangular-media',
+          assetOpportunities: ['complete destination photograph'],
+        }],
+      }],
+    }
+
+    expect(createPrototypeAssetManifest(rectangularPlan, rectangularPlan.pages).assets)
+      .toMatchObject([{ assetOutput: 'rectangular-media' }])
+  })
 })

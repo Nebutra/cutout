@@ -1,5 +1,5 @@
 /**
- * The definitive "can the Agent deliver what the user wants" proof: renders
+ * Opt-in live-Provider checkpoint: renders
  * the ACTUAL `IntentWorkspace` component, types a real build brief, and drives
  * the WHOLE generation pipeline against a live gateway — real tool-gate
  * classification, real `planPrototype`, real design-system image generation,
@@ -11,8 +11,10 @@
  * `createGatewayGenerationService` (only the model adapter's fetch and the two
  * image endpoints are redirected from Tauri to the gateway — see the testkit).
  *
- * SCOPE BOUNDARY: this stops at the generated prototype (design system +
- * pages). The downstream deconstruct→cutout-slices step needs
+ * SCOPE BOUNDARY: this measures the non-deterministic upstream planning and
+ * prototype-generation path only. The mandatory complete-delivery proof is
+ * `prototype-all-routes.e2e.test.tsx`; this live benchmark stops at the generated
+ * prototype because downstream deconstruct→cutout-slices needs
  * `createImageBitmap`/OffscreenCanvas/the analysis Web Worker, which jsdom
  * cannot run; that step is covered by `runDeconstructMockup`'s own unit tests
  * and the `src/algorithm` suite. A minimal `createImageBitmap` stub keeps the
@@ -51,7 +53,13 @@ import { installE2eLocalStorage } from './intent-workspace.e2e.testkit'
 const RUN = process.env.CUTOUT_RUN_PIPELINE_BENCHMARK === '1'
 const verificationStorage = installE2eLocalStorage()
 
-vi.mock('@/services/ai/model-assignment.local', () => ({
+vi.mock('@/services/ai/model-assignment.local', () => {
+  const loadBindings = async () => ({
+    version: 'model-assignments.v2' as const,
+    bindings: {},
+    descriptors: [],
+  })
+  return {
   loadAssignments: async (): Promise<ModelAssignments> => ({
     chat: { providerId: GATEWAY_PROVIDER_ID, model: GATEWAY_CHAT_MODEL },
     image: { providerId: GATEWAY_PROVIDER_ID, model: GATEWAY_IMAGE_MODEL },
@@ -60,11 +68,8 @@ vi.mock('@/services/ai/model-assignment.local', () => ({
   // `useCapabilityBindings` (hooks/queries/ai-settings.ts) reads these three.
   // Routing here comes from `loadAssignments` above, so the binding table stays
   // empty; it only has to be a schema-valid `model-assignments.v2` value.
-  loadCapabilityBindings: async () => ({
-    version: 'model-assignments.v2' as const,
-    bindings: {},
-    descriptors: [],
-  }),
+  loadCapabilityBindings: loadBindings,
+  loadRuntimeCapabilityBindings: loadBindings,
   setCapabilityBinding: async () => ({
     version: 'model-assignments.v2' as const,
     bindings: {},
@@ -75,7 +80,8 @@ vi.mock('@/services/ai/model-assignment.local', () => ({
     bindings: {},
     descriptors: [],
   }),
-}))
+  }
+})
 
 // The gateway generation service transitively imports the Tauri proxy fetch;
 // its `invoke` is never called (text rides the injected adapter, images ride
@@ -110,7 +116,6 @@ function fakeRegistry(key: string, base: string): ServiceRegistry {
     throw new Error('not used in this test')
   }
   return {
-    session: { current: async () => ({ userId: 'test', isAuthenticated: false }) },
     cutout: { run: async () => err('not used in this test') },
     foregroundSegmentation: {
       capabilities: async () => ok({ available: false, platform: 'test', backend: 'unavailable', reason: 'capability-required' }),
@@ -271,13 +276,19 @@ describe.skipIf(!RUN)('brief → prototype delivery — rendered IntentWorkspace
       // one generated page committed to the store (lands during
       // generatePrototypeSuite, before the canvas-dependent deconstruct step).
       let answeredQuestions = 0
-      const deadline = Date.now() + 840_000
+      const pollingStartedAt = Date.now()
+      const deadline = pollingStartedAt + 840_000
+      const stageHistory: Array<{ phase: string; elapsedMs: number }> = []
       let delivered: ReturnType<typeof getStoreState>['workspaceSnapshot'] = null
       while (Date.now() < deadline) {
         await act(async () => {
           await new Promise((resolve) => setTimeout(resolve, 500))
         })
         const snapshot = getStoreState().workspaceSnapshot
+        const phase = snapshot?.workflowPhase ?? 'unavailable'
+        if (stageHistory.at(-1)?.phase !== phase) {
+          stageHistory.push({ phase, elapsedMs: Date.now() - pollingStartedAt })
+        }
         const plannedPageCount = snapshot?.prototypePlan?.pages.length ?? 0
         if (
           snapshot?.prototypeDesignSystem
@@ -311,7 +322,8 @@ describe.skipIf(!RUN)('brief → prototype delivery — rendered IntentWorkspace
             `humanLoop=${s?.prototypePlan?.humanLoop.mode ?? 'n/a'} ` +
             `planPages=${s?.prototypePlan?.pages.length ?? 0} ` +
             `designSystem=${Boolean(s?.prototypeDesignSystem)} ` +
-            `pages=${s?.prototypePages?.length ?? 0}`,
+            `pages=${s?.prototypePages?.length ?? 0} ` +
+            `stageHistory=${JSON.stringify(stageHistory)}`,
         )
       }
       expect(delivered).toBeTruthy()

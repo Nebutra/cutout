@@ -1,0 +1,6 @@
+{"file": ".trellis/spec/frontend/design-os-kernel.md", "reason": "Verify the Profile remains declarative and preserves Kernel authority, lifecycle and conformance."}
+{"file": ".trellis/spec/frontend/cutout-pipeline.md", "reason": "Verify production evidence, QA, CAS and targeted repair behavior."}
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "Verify provenance, source quality, implementation quality and required tests."}
+{"file": ".trellis/spec/frontend/type-safety.md", "reason": "Verify strict schemas and fail-closed external-data handling."}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "Trace normalized facts through policy, planning, receipts, evaluation and deliverables."}
+{"file": ".trellis/tasks/08-12-commerce-material-agent/research/competition-contract.md", "reason": "Check semantic coverage against the competition contract without leaking Host-only naming or scoring into the Profile."}

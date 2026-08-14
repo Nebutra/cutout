@@ -6,6 +6,7 @@
  * interpreted.
  */
 import { LazyStore } from '@tauri-apps/plugin-store'
+import { hasNativeDesktopHost } from '@/platform/runtime'
 import {
   type ModelAssignment,
   type ModelAssignments,
@@ -74,6 +75,11 @@ export function createCapabilityBindingsRepository(host: BindingsStore) {
 const bindingsRepository = createCapabilityBindingsRepository(store)
 
 export const loadCapabilityBindings = () => bindingsRepository.load()
+export const loadRuntimeCapabilityBindings = (
+  browserProjection?: CapabilityBindings,
+) => hasNativeDesktopHost()
+  ? bindingsRepository.load()
+  : Promise.resolve(browserProjection ?? emptyBindings())
 export const setCapabilityBinding = (
   task: ModelTaskKind,
   assignment: ModelAssignment,
@@ -87,6 +93,21 @@ export const setCapabilityDescriptors = async (
     ...(await bindingsRepository.load()),
     descriptors,
   })
+
+/**
+ * Persist the complete automatic-routing projection as one snapshot.  Automatic
+ * setup discovers a provider, its verified catalog, and every binding as a
+ * single outcome; writing each field independently exposes partial routing and
+ * turns one setup action into several native Store round trips.
+ */
+export const setAutomaticCapabilityBindings = (
+  bindings: CapabilityBindings['bindings'],
+  descriptors: CapabilityBindings['descriptors'],
+) => bindingsRepository.write({
+  version: 'model-assignments.v2',
+  bindings,
+  descriptors,
+})
 
 /** Load the primary assignment projection. Missing/invalid/unavailable → `{}`. */
 export async function loadAssignments(): Promise<ModelAssignments> {

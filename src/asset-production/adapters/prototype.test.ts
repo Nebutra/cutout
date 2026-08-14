@@ -91,9 +91,9 @@ describe('prototype production adapter', () => {
       height: 20,
     }
     const warning = observationalIssue(
-      'board-qa-rejected',
-      'The board has minor visual inconsistencies.',
-      'model-review',
+      'board-background-noncompliant',
+      'The board background needs review.',
+      'deterministic-check',
       3,
     )
     for (const task of plan.tasks) {
@@ -114,7 +114,7 @@ describe('prototype production adapter', () => {
       expect.arrayContaining([
         expect.objectContaining({
           status: 'ready',
-          issues: [expect.objectContaining({ code: 'board-qa-rejected', kind: 'warning' })],
+          issues: [expect.objectContaining({ code: 'board-background-noncompliant', kind: 'warning' })],
         }),
       ]),
     )
@@ -142,6 +142,47 @@ describe('prototype production adapter', () => {
     expect(state.runs['run:failure']?.status).toBe('cancelled')
   })
 
+  it('cancels incomplete authority without discarding a needs-review candidate', async () => {
+    const manifest = createPrototypeAssetManifest(prototypePlan, prototypePlan.pages)
+    const plan = await compilePrototypeProductionPlan({
+      projectRevisionId: 'revision:1', manifest,
+      pages: [{ page: prototypePlan.pages[0]!, artifactId: 'artifact:home', bytes: new Uint8Array([1]) }],
+      createdAt: 1,
+    })
+    const task = plan.tasks.find((candidate) => candidate.route === 'board-cutout')!
+    const artifact = {
+      artifactId: 'artifact:review-candidate',
+      sha256: 'c'.repeat(64),
+      mediaType: 'image/png',
+      width: 20,
+      height: 20,
+    }
+    let state = beginPrototypeProduction({
+      snapshot: emptyAssetProductionSnapshot(), plan, runId: 'run:review-cancelled', at: 2,
+    })
+    state = publishPrototypeTaskArtifact({
+      snapshot: state,
+      runId: 'run:review-cancelled',
+      taskId: task.taskId,
+      artifact,
+      reviewIssues: [qualityIssue('slice-foreground-omitted', 'Foreground coverage is incomplete.', 'deterministic-check', 3)],
+      verificationIssues: [qualityIssue('slice-foreground-omitted', 'Foreground coverage is incomplete.', 'deterministic-check', 3)],
+      at: 3,
+    })
+
+    state = cancelPrototypeProduction(state, 'run:review-cancelled', 4)
+
+    expect(state.runs['run:review-cancelled']).toMatchObject({
+      status: 'cancelled',
+      tasks: {
+        [task.taskId]: {
+          status: 'needs-review',
+          candidate: artifact,
+        },
+      },
+    })
+  })
+
   it('builds one-subject direct generation and review contracts', async () => {
     const manifest = createPrototypeAssetManifest(prototypePlan, prototypePlan.pages)
     const plan = await compilePrototypeProductionPlan({
@@ -159,6 +200,42 @@ describe('prototype production adapter', () => {
     expect(prompt).toContain('exactly one standalone visual asset')
     expect(prompt).toContain('Transparent background')
     expect(prototypeDirectAssetChecklist(task)).toHaveLength(4)
+  })
+
+  it('builds a full-bleed contract for rectangular direct media', async () => {
+    const rectangularPlan = {
+      ...prototypePlan,
+      pages: prototypePlan.pages.map((page) => ({
+        ...page,
+        regions: page.regions.map((region) => region.assetRoute === 'direct-generate'
+          ? { ...region, assetOutput: 'rectangular-media' as const }
+          : region),
+      })),
+    }
+    const manifest = createPrototypeAssetManifest(rectangularPlan, rectangularPlan.pages)
+    const plan = await compilePrototypeProductionPlan({
+      projectRevisionId: 'revision:1', manifest,
+      pages: [{
+        page: rectangularPlan.pages[0]!,
+        artifactId: 'artifact:home',
+        bytes: new Uint8Array([1]),
+      }],
+      createdAt: 1,
+    })
+    const task = plan.tasks.find((candidate) => candidate.route === 'direct-generate')!
+    const prompt = prototypeDirectAssetPrompt({
+      task,
+      page: rectangularPlan.pages[0]!,
+      styleSummary: rectangularPlan.designSystem.styleSummary,
+      assetDirection: rectangularPlan.designSystem.assetDirection,
+    })
+
+    expect(task.output.transparent).toBe(false)
+    expect(prompt).toContain('complete full-bleed rectangular visual')
+    expect(prompt).toContain('No transparent corners, rounded mask')
+    expect(prototypeDirectAssetChecklist(task).join('\n')).toContain(
+      'complete uncropped rectangular media fills the canvas edge to edge',
+    )
   })
 
   it('carries an accepted artifact only between runs of the same plan', async () => {

@@ -8,6 +8,7 @@ const provider = {
   id: 'openai',
   kind: 'openai',
   label: 'Team OpenAI',
+  baseUrl: 'https://api.openai.com/v1',
   wireProtocol: 'responses' as const,
   defaultModel: 'gpt-5',
   enabled: true,
@@ -115,6 +116,7 @@ describe('AiSection', () => {
   afterEach(() => {
     act(() => root.unmount())
     host.remove()
+    vi.unstubAllEnvs()
     vi.clearAllMocks()
   })
 
@@ -149,6 +151,7 @@ describe('AiSection', () => {
     const ready = {
       status: 'ready' as const,
       verifiedProviders: [provider],
+      automaticCandidates: [],
       importableCandidates: [],
       rows: [
         { capability: 'planning' as const, status: 'ready' as const, evidence: { installed: true, authenticated: true, capability: 'proven' as const, execution: 'unproven' as const } },
@@ -171,6 +174,7 @@ describe('AiSection', () => {
           setup={{
             status: 'action-required',
             verifiedProviders: [],
+            automaticCandidates: [],
             importableCandidates: [],
             rows: [
               {
@@ -260,6 +264,7 @@ describe('AiSection', () => {
       </I18nProvider>,
     ))
     await vi.waitFor(() => expect(mocks.automaticSetup).toHaveBeenCalledOnce())
+    expect(mocks.automaticSetup.mock.calls[0]).toHaveLength(1)
 
     expect(mocks.refetchQueries).toHaveBeenCalledWith({
       queryKey: ['ai-settings', 'capability-bindings'],
@@ -277,6 +282,80 @@ describe('AiSection', () => {
     await act(async () => assignmentsRefreshed)
     await vi.waitFor(() => {
       expect(host.querySelector('[data-ai-automatic-busy="false"]')).not.toBeNull()
+    })
+  })
+
+  it('keeps packaged E2E automatic setup capability-neutral', async () => {
+    vi.stubEnv('VITE_CUTOUT_PACKAGED_E2E', '1')
+    const candidate = {
+      id: `provider-candidate:${'c'.repeat(64)}`,
+      source: 'cutout-keychain',
+      sourceLabel: 'Cutout local credentials',
+      kind: 'dashscope' as const,
+      label: 'Qwen Image 3',
+      baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+      wireProtocol: 'chat-completions' as const,
+      modelHint: 'qwen-image-3.0',
+      credential: {
+        sourceType: 'keychain' as const,
+        available: true,
+        importable: true,
+      },
+      warnings: [],
+    }
+    const query = { isPending: false, isLoading: false, isError: false, refetch: vi.fn() }
+    mocks.providers.mockReturnValue({ ...query, data: [] })
+    mocks.bindings.mockReturnValue({
+      ...query,
+      data: { version: 'model-assignments.v2', bindings: {} },
+    })
+    mocks.discovery.mockReturnValue({ ...query, data: [candidate] })
+    mocks.verifications.mockReturnValue({})
+
+    await act(async () => root.render(
+      <I18nProvider i18n={i18n}>
+        <AiSection />
+      </I18nProvider>,
+    ))
+
+    await vi.waitFor(() => {
+      expect(mocks.automaticSetup).toHaveBeenCalledWith([candidate])
+    })
+  })
+
+  it('automatically revalidates a deduplicated configured Provider candidate', async () => {
+    const candidate = {
+      id: `provider-candidate:${'b'.repeat(64)}`,
+      source: 'cutout-keychain',
+      sourceLabel: 'Cutout local credentials',
+      kind: 'openai' as const,
+      label: 'Team OpenAI',
+      baseUrl: 'https://api.openai.com/v1/',
+      wireProtocol: 'responses' as const,
+      credential: {
+        sourceType: 'keychain' as const,
+        available: true,
+        importable: true,
+      },
+      warnings: [],
+    }
+    const query = { isPending: false, isLoading: false, isError: false, refetch: vi.fn() }
+    mocks.providers.mockReturnValue({ ...query, data: [provider] })
+    mocks.bindings.mockReturnValue({
+      ...query,
+      data: { version: 'model-assignments.v2', bindings: {} },
+    })
+    mocks.discovery.mockReturnValue({ ...query, data: [candidate] })
+    mocks.verifications.mockReturnValue({})
+
+    await act(async () => root.render(
+      <I18nProvider i18n={i18n}>
+        <AiSection />
+      </I18nProvider>,
+    ))
+
+    await vi.waitFor(() => {
+      expect(mocks.automaticSetup).toHaveBeenCalledWith([candidate])
     })
   })
 

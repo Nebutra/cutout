@@ -22,6 +22,8 @@ export interface VerifiedResourcePackArtifact {
   readonly width: number
   readonly height: number
   readonly byteLength: number
+  /** Packaged-E2E only: exact store bytes, encoded for the native evidence sink. */
+  readonly bytesBase64: string
 }
 
 export function resolveResourcePackProductionRun(
@@ -105,8 +107,17 @@ export async function verifyResourcePackProductionArtifacts(input: {
       width: output.width,
       height: output.height,
       byteLength: stored.bytes.byteLength,
+      bytesBase64: bytesToBase64(stored.bytes),
     }
   }))
+}
+
+function bytesToBase64(bytes: Uint8Array): string {
+  let binary = ''
+  for (let offset = 0; offset < bytes.length; offset += 0x8000) {
+    binary += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000))
+  }
+  return btoa(binary)
 }
 
 function completedRunMatchesResourcePack(

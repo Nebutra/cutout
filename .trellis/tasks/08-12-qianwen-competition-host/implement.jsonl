@@ -1,0 +1,6 @@
+{"_example": "Fill with {\"file\": \"<path>\", \"reason\": \"<why>\"}. Put spec/research files only — no code paths. Run `python3 .trellis/scripts/get_context.py --mode packages` to list available specs. Delete this line once real entries are added."}
+{"file": ".trellis/spec/frontend/agent-control-safety.md", "reason": "Pre-authorization, path, receipt and headless safety rules."}
+{"file": ".trellis/spec/frontend/byok-provider-protocols.md", "reason": "DashScope/provider network and credential boundaries."}
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "Packaging, vendoring, provenance and validation quality."}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "Cross-host and package data-flow review."}
+{"file": ".trellis/tasks/08-12-commerce-material-agent/research/competition-contract.md", "reason": "Exact runtime, output, scoring and sample constraints."}

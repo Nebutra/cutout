@@ -1,0 +1,180 @@
+{
+  "schema": "cutout.commerce-multimodal-rehearsal.v1",
+  "identity": {
+    "id": "rehearsal:commerce:qwen:2026-08-13",
+    "revision": "rehearsal:commerce:qwen:2026-08-13:revision:1"
+  },
+  "observedAt": "2026-08-13",
+  "input": {
+    "fixtureSha256": "fa83f6c22fbc1c452c94e8e0f7e764cc35290175adbde26b7a0d34c8bc62cfb8",
+    "productId": "3887087154767",
+    "category": "women-shirt",
+    "identityLocks": [
+      "lavender-color",
+      "chiffon-material",
+      "classic-pointed-collar",
+      "dropped-shoulders",
+      "straight-full-length-sleeves",
+      "narrow-flat-button-cuffs",
+      "six-small-white-front-buttons",
+      "straight-relaxed-body",
+      "curved-hem"
+    ]
+  },
+  "providerRoutes": [
+    {
+      "model": "qwen3.8-max",
+      "operation": "structured-text",
+      "availability": "passed"
+    },
+    {
+      "model": "qwen-image-3.0",
+      "operation": "image-generation",
+      "availability": "passed"
+    },
+    {
+      "model": "wan2.6-t2v",
+      "operation": "text-to-video",
+      "availability": "passed"
+    },
+    {
+      "model": "wan2.6-t2v",
+      "operation": "first-frame-conditioned-video",
+      "availability": "passed",
+      "wireEvidence": "input.media[type=first_frame]"
+    },
+    {
+      "model": "wan2.6-r2v",
+      "operation": "reference-to-video",
+      "availability": "failed",
+      "failureClass": "provider-request-contract-mismatch",
+      "diagnostic": "The provider rejected the CLI request because reference_urls or reference_video_urls were absent."
+    }
+  ],
+  "retainedArtifacts": [
+    {
+      "role": "main-image",
+      "sha256": "be08e8142fc96fadda777a5d30138022f37ab98a36aa061df21dc0de763447e2",
+      "mediaType": "image/png",
+      "byteLength": 860187,
+      "width": 1024,
+      "height": 1024,
+      "decoded": true
+    },
+    {
+      "role": "detail-image:1",
+      "sha256": "45bea4967b5e848b6807bbd9bea9c109072aff5659ebd5ab14564ebc52306de9",
+      "mediaType": "image/png",
+      "byteLength": 1057584,
+      "width": 1024,
+      "height": 1024,
+      "decoded": true
+    },
+    {
+      "role": "detail-image:2",
+      "sha256": "af0547bc5da9b25e5970a515aeba10e52caa9c9344b997a325c229bda0307230",
+      "mediaType": "image/png",
+      "byteLength": 1133388,
+      "width": 1024,
+      "height": 1024,
+      "decoded": true
+    },
+    {
+      "role": "detail-image:3",
+      "sha256": "d2ca4ff0a7d7e8cc17b7992bae98ec82a70a31ce725845acdf9616a437e5a526",
+      "mediaType": "image/png",
+      "byteLength": 1317118,
+      "width": 1024,
+      "height": 1024,
+      "decoded": true
+    },
+    {
+      "role": "detail-image:4",
+      "sha256": "2c07de77bd98aae64a991d1726b4aedf47006a45ae3f58a983ff26d33a7e424f",
+      "mediaType": "image/png",
+      "byteLength": 939946,
+      "width": 1024,
+      "height": 1024,
+      "decoded": true
+    },
+    {
+      "role": "detail-image:5",
+      "sha256": "dd80b27375c2a3c4df6d7d3662bbe4adfdc197612cdf413902547223026cf1fe",
+      "mediaType": "image/png",
+      "byteLength": 1297182,
+      "width": 1024,
+      "height": 1024,
+      "decoded": true
+    },
+    {
+      "role": "product-video:first-frame-conditioned",
+      "sha256": "54a3b827eed844c3f2ac91364eeb9aaa563723a6bd62ced76fe715fec5865298",
+      "mediaType": "video/mp4",
+      "byteLength": 2902489,
+      "width": 1920,
+      "height": 1080,
+      "durationSeconds": 5.007007,
+      "frameRate": "30/1",
+      "videoCodec": "h264",
+      "audioCodec": "aac",
+      "fullDecode": "passed",
+      "nativePlaybackPromotion": "passed",
+      "nativePlaybackDecoder": "avfoundation-asset-image-generator-v1",
+      "nativeRepresentativeFrames": 3,
+      "nativeNonBlankFrames": 3
+    }
+  ],
+  "semanticEvaluation": {
+    "mainAndDetailImages": {
+      "status": "failed",
+      "blockingDrift": [
+        "Some generated images change chiffon into a coarse linen-like texture."
+      ]
+    },
+    "firstFrameConditionedVideo": {
+      "status": "failed",
+      "reviewers": ["human-contact-sheet", "qwen3.5-omni-plus"],
+      "blockingDrift": [
+        "Straight dropped-shoulder sleeves became gathered puff sleeves.",
+        "The relaxed straight body became more fitted.",
+        "Garment construction and proportions no longer match the locked product."
+      ]
+    }
+  },
+  "schedulerObservations": {
+    "imageParallelism": {
+      "fiveSimultaneousRequests": "three-rate-limited",
+      "twoSimultaneousRequests": "passed"
+    },
+    "cliConcurrentFlag": "duplicates-complete-requests",
+    "requiredCutoutBehavior": [
+      "Do not map CLI concurrency to scheduler concurrency.",
+      "Reduce concurrency after 429 and recover gradually.",
+      "Count success only after retained nonempty decodable hashed bytes."
+    ]
+  },
+  "benchmark": {
+    "providerRoutes": {
+      "passed": 3,
+      "total": 3
+    },
+    "retainedMediaArtifacts": {
+      "passed": 7,
+      "total": 7
+    },
+    "technicalVideoQa": "passed",
+    "productIdentityQa": "failed",
+    "completeCommerceOutcomeClosure": "blocked",
+    "cutoutRealHost": {
+      "passed": 0,
+      "total": 8
+    },
+    "productionReady": false
+  },
+  "redaction": {
+    "apiKey": "omitted",
+    "providerResponseIds": "omitted",
+    "remoteUrls": "omitted",
+    "localPaths": "omitted"
+  }
+}

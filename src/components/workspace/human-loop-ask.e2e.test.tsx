@@ -68,7 +68,13 @@ const MODEL = 'gpt-5.5'
 const PROVIDER_ID = 'test-provider'
 const verificationStorage = installE2eLocalStorage()
 
-vi.mock('@/services/ai/model-assignment.local', () => ({
+vi.mock('@/services/ai/model-assignment.local', () => {
+  const loadBindings = async () => ({
+    version: 'model-assignments.v2' as const,
+    bindings: {},
+    descriptors: [],
+  })
+  return {
   loadAssignments: async (): Promise<ModelAssignments> => ({
     chat: { providerId: PROVIDER_ID, model: MODEL },
     image: { providerId: PROVIDER_ID, model: MODEL },
@@ -77,11 +83,8 @@ vi.mock('@/services/ai/model-assignment.local', () => ({
   // `useCapabilityBindings` (hooks/queries/ai-settings.ts) reads these three.
   // Routing comes from `loadAssignments` above, so the binding table stays
   // empty; it only has to be a schema-valid `model-assignments.v2` value.
-  loadCapabilityBindings: async () => ({
-    version: 'model-assignments.v2' as const,
-    bindings: {},
-    descriptors: [],
-  }),
+  loadCapabilityBindings: loadBindings,
+  loadRuntimeCapabilityBindings: loadBindings,
   setCapabilityBinding: async () => ({
     version: 'model-assignments.v2' as const,
     bindings: {},
@@ -92,7 +95,8 @@ vi.mock('@/services/ai/model-assignment.local', () => ({
     bindings: {},
     descriptors: [],
   }),
-}))
+  }
+})
 
 function required(name: string): string {
   const value = process.env[name]
@@ -177,7 +181,6 @@ function realGenerateWithTools(key: string, base: string) {
 function fakeRegistry(key: string, base: string): ServiceRegistry {
   const notUsed = async (): Promise<never> => { throw new Error('not used in this test') }
   return {
-    session: { current: async () => ({ userId: 'test', isAuthenticated: false }) },
     cutout: { run: async () => err('not used in this test') },
     foregroundSegmentation: {
       capabilities: async () => ok({ available: false, platform: 'test', backend: 'unavailable', reason: 'capability-required' }),

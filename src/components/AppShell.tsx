@@ -36,7 +36,6 @@ import type { DesignOsWorkbenchModel } from "@/components/design-os-workbench/De
 import type { TokenValueChange } from "@/design-kit";
 import type { DesignOsCapabilityContext } from "@/components/design-os/model";
 import type { LiveDesignOsArtifacts } from "@/components/design-os-workbench/live-model";
-import { buildTokenContrastGovernance } from "@/components/design-os-workbench/token-governance";
 import { LibraryUIProvider } from "@/components/library/library-ui";
 import { useAnalysisBridge } from "@/hooks/useAnalysisBridge";
 import { useAutoRun } from "@/hooks/useAutoRun";
@@ -93,6 +92,8 @@ import {
   type WorkspaceNavigation,
   type WorkspaceNavigationSession,
 } from "@/workspace/navigation";
+import type { WorkspaceWorkbenchLaunchOptions } from "@/workspace/scenario-launch";
+import type { GameAssetLaunchRequest } from "@/game-asset-profile";
 import { cn } from "@/lib/utils";
 import {
   withViewTransition,
@@ -151,6 +152,13 @@ const DesignOsWorkbench = lazy(() =>
   import("@/components/design-os-workbench/DesignOsWorkbench").then(
     (module) => ({
       default: module.DesignOsWorkbench,
+    }),
+  ),
+);
+const GameAssetProductionPanel = lazy(() =>
+  import("@/components/design-os-workbench/GameAssetProductionPanel").then(
+    (module) => ({
+      default: module.GameAssetProductionPanel,
     }),
   ),
 );
@@ -419,6 +427,7 @@ export function AppShell() {
   const activeRecordRef = useRef<LocalProjectRecord | null>(null);
   const restoringRef = useRef(false);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const projectWriteBlockedRef = useRef(new Set<string>());
   const saveInFlightRef = useRef<{
     readonly projectId: string;
     readonly promise: Promise<boolean>;
@@ -477,6 +486,7 @@ export function AppShell() {
   const saveActiveProjectNow = useCallback(
     async (projectId = activeProjectId): Promise<boolean> => {
       if (!projectId) return true;
+      if (projectWriteBlockedRef.current.has(projectId)) return true;
       if (saveTimerRef.current) {
         clearTimeout(saveTimerRef.current);
         saveTimerRef.current = null;
@@ -563,6 +573,9 @@ export function AppShell() {
       const rows = result.data.filter(
         (project) => !isDisposableEmptyProject(project),
       );
+      for (const project of rows) {
+        if (project.archivedAt) projectWriteBlockedRef.current.add(project.id);
+      }
       const disposable = result.data.filter(isDisposableEmptyProject);
       if (disposable.length > 0) {
         await Promise.all(
@@ -574,7 +587,8 @@ export function AppShell() {
       dispatchProjectShell({
         type: "projects-loaded",
         projects: rows,
-        activeProjectId: rows[0]?.id ?? null,
+        activeProjectId:
+          rows.find((project) => !project.archivedAt)?.id ?? null,
       });
     },
     [projectRepository],
@@ -756,8 +770,16 @@ export function AppShell() {
   ]);
   const [designOsDefaultTab, setDesignOsDefaultTab] =
     useState<DesignOsWorkbenchTab>("overview");
+  const [gameAssetLaunch, setGameAssetLaunch] =
+    useState<GameAssetLaunchRequest>();
   const openDesignOs = useCallback(
-    (tab: DesignOsWorkbenchTab = "overview") => {
+    (
+      tab: DesignOsWorkbenchTab = "overview",
+      options?: WorkspaceWorkbenchLaunchOptions,
+    ) => {
+      if (tab === "game-assets") {
+        setGameAssetLaunch(options?.gameAssetLaunch);
+      }
       const navigation = navigationForWorkbenchTab(tab);
       const surface = projectWorkspaceSurface(navigation);
       if (surface.surface === "inline-main") {
@@ -944,7 +966,7 @@ export function AppShell() {
             brandViRun: createBrandViRun(planned.data),
           });
           toast.info("Brand VI plan is ready for review", {
-            description: `${planned.data.nodes.length} dependency-ordered items; paid and master actions require item approval.`,
+            description: `${planned.data.nodes.length} dependency-ordered items; brand and production decisions require item review.`,
           });
           return;
         }
@@ -1805,6 +1827,13 @@ export function AppShell() {
   const startProjectWithBrief = useCallback(
     (brief: string, attachments: readonly File[] = []) => {
       void (async () => {
+        // Scenario recognition is only needed after the user submits Home's
+        // composer. Keep the profile registry out of the first-paint bundle.
+        const {
+          createGameAssetLaunchRequest,
+          routeWorkspaceSubmission,
+        } = await import("@/workspace/scenario-launch");
+        const submissionRoute = routeWorkspaceSubmission(brief);
         const project = await newProject();
         const state = getStoreState();
         state.setBrief(brief);
@@ -1831,12 +1860,34 @@ export function AppShell() {
             license: { kind: "proprietary", holder: "Project owner" },
           });
         }
+        if (submissionRoute.kind === "game-assets") {
+          const imageAttachments = attachments.filter((file) =>
+            file.type.startsWith("image/"),
+          );
+          const reference = imageAttachments.length === 1
+            ? {
+                name: imageAttachments[0]!.name,
+                mediaType: imageAttachments[0]!.type,
+                bytes: new Uint8Array(
+                  await imageAttachments[0]!.arrayBuffer(),
+                ),
+              }
+            : undefined;
+          openDesignOs("game-assets", {
+            gameAssetLaunch: createGameAssetLaunchRequest(
+              submissionRoute.intent,
+              reference ? [reference] : [],
+            ),
+          });
+          await saveActiveProjectNow(project.id);
+          return;
+        }
         if (inputs.length) await prepareWorkbenchSources(inputs);
         state.requestAgentRun("create-assets");
         await saveActiveProjectNow(project.id);
       })();
     },
-    [newProject, prepareWorkbenchSources, saveActiveProjectNow],
+    [newProject, openDesignOs, prepareWorkbenchSources, saveActiveProjectNow],
   );
   const importBoardIntoNewProject = useCallback(() => {
     pickFile((file) => {
@@ -1848,16 +1899,21 @@ export function AppShell() {
   }, [importFile, newProject, pickFile]);
   const deleteProject = useCallback(
     async (id: string) => {
-      const removed = await projectRepository.remove(id);
-      if (isErr(removed)) {
-        toast.error("Could not delete project", { description: removed.error });
-        return;
-      }
-
       if (saveTimerRef.current) {
         clearTimeout(saveTimerRef.current);
         saveTimerRef.current = null;
       }
+      projectWriteBlockedRef.current.add(id);
+      const pending = saveInFlightRef.current;
+      if (pending?.projectId === id) await pending.promise;
+
+      const removed = await projectRepository.remove(id);
+      if (isErr(removed)) {
+        projectWriteBlockedRef.current.delete(id);
+        toast.error("Could not delete project", { description: removed.error });
+        return;
+      }
+
       if (activeProjectId === id) {
         restoringRef.current = true;
         activeRecordRef.current = null;
@@ -1884,30 +1940,31 @@ export function AppShell() {
         });
         return false;
       }
+      projectWriteBlockedRef.current.add(id);
       const archived = await projectRepository.archive(id, Date.now());
       if (isErr(archived)) {
+        projectWriteBlockedRef.current.delete(id);
         toast.error("Could not archive project", {
           description: archived.error,
         });
         return false;
       }
 
-      if (activeProjectId === id) {
+      const archivingActive = activeProjectId === id;
+      if (archivingActive) {
         restoringRef.current = true;
         activeRecordRef.current = null;
         resetProject();
       }
 
-      withViewTransition(() =>
-        dispatchProjectShell({
-          type: "project-archived",
-          project: projectSummaryFromRecord(archived.data),
-        }),
-      );
-      if (activeProjectId === id) {
-        queueMicrotask(() => {
-          restoringRef.current = false;
-        });
+      const action = {
+        type: "project-archived",
+        project: projectSummaryFromRecord(archived.data),
+      } as const;
+      try {
+        await withViewTransitionApplied(() => dispatchProjectShell(action));
+      } finally {
+        if (archivingActive) restoringRef.current = false;
       }
       toast.success("Project archived");
       return true;
@@ -1924,6 +1981,7 @@ export function AppShell() {
         return;
       }
 
+      projectWriteBlockedRef.current.delete(id);
       dispatchProjectShell({
         type: "project-updated",
         project: projectSummaryFromRecord(restored.data),
@@ -2049,6 +2107,9 @@ export function AppShell() {
   // createGovernanceRepairTask/rerunGovernanceRepair orchestration.
   const handleGovernanceRepair = useCallback(async () => {
     if (!designDocument) return;
+    const { buildTokenContrastGovernance } = await import(
+      "@/components/design-os-workbench/token-governance"
+    );
     const current = buildTokenContrastGovernance(designDocument.tokens, Date.now());
     if (!current) {
       toast.message("No color tokens to check for contrast.");
@@ -2061,9 +2122,7 @@ export function AppShell() {
       toast.success("Governance re-checked — all color-contrast checks pass.");
       return;
     }
-    const { createGovernanceRepairTask, rerunGovernanceRepair } = await import(
-      "@/design-governance"
-    );
+    const { createGovernanceRepairTask, rerunGovernanceRepair } = await import("@/design-governance");
     try {
       const task = createGovernanceRepairTask(current.receipt, current.scenarios);
       const result = await rerunGovernanceRepair(task, {
@@ -2269,13 +2328,25 @@ export function AppShell() {
                 : "h-[min(48rem,88vh)] w-[calc(100vw-1rem)] max-w-5xl",
             )}>
               <DialogHeader className="sr-only">
-                <DialogTitle>System inspector</DialogTitle>
+                <DialogTitle>
+                  {designOsDefaultTab === "game-assets"
+                    ? "Game asset production"
+                    : "System inspector"}
+                </DialogTitle>
                 <DialogDescription>
-                  Inspect project sources, specimens, workflows, and authorized integrations.
+                  {designOsDefaultTab === "game-assets"
+                    ? "Generate, review, and retain Qwen game asset frames."
+                    : "Inspect project sources, specimens, workflows, and authorized integrations."}
                 </DialogDescription>
               </DialogHeader>
-              <div className="min-h-0 flex-1">
-                {designOsModel ? (
+              <div className="min-h-0 min-w-0 flex-1 overflow-hidden">
+                {designOsDefaultTab === "game-assets" ? (
+                  <Suspense fallback={<DeferredSurfaceFallback label="Loading Game assets" />}>
+                    <div className="h-full overflow-y-auto p-3 sm:p-4">
+                      <GameAssetProductionPanel launch={gameAssetLaunch} />
+                    </div>
+                  </Suspense>
+                ) : designOsModel ? (
                   <Suspense fallback={<DeferredSurfaceFallback label="Loading system inspector" />}>
                     <DesignOsWorkbench
                       key={designOsDefaultTab}

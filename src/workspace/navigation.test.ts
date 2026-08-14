@@ -78,6 +78,7 @@ describe("workspace navigation IA", () => {
     for (const tab of [
       "overview",
       "sources",
+      "commerce",
       "specimen",
       "figma",
       "workflows",

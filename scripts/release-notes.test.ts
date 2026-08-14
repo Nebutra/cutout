@@ -36,10 +36,10 @@ function catalog(entries: unknown[] = [entry()]) {
 }
 
 describe('release-note catalog', () => {
-  it('loads the reviewed v0.1.19 entry with all five shipped locales and no historical backfill', async () => {
+  it('loads the reviewed v0.1.20 entry with all five shipped locales and no historical backfill', async () => {
     const loaded = await loadReleaseNotesCatalog(undefined, { requireAllLocales: true })
-    expect(loaded.entries.map((value) => value.version)).toEqual(['0.1.19'])
-    expect(Object.keys(requireReleaseNotesEntry(loaded, '0.1.19').locales)).toEqual(RELEASE_NOTES_LOCALES)
+    expect(loaded.entries.map((value) => value.version)).toEqual(['0.1.20', '0.1.19'])
+    expect(Object.keys(requireReleaseNotesEntry(loaded, '0.1.20').locales)).toEqual(RELEASE_NOTES_LOCALES)
     expect(findReleaseNotesEntry(loaded, '0.1.16')).toBeUndefined()
   })
 
@@ -107,7 +107,7 @@ describe('release-note catalog', () => {
 
   it('renders all release inputs through the CLI from one exact entry', async () => {
     const output = await mkdtemp(join(tmpdir(), 'cutout-release-notes-'))
-    const result = spawnSync(process.execPath, ['scripts/release-notes.mjs', 'render', '--version', '0.1.19', '--output', output, '--require-all-locales'], { cwd: process.cwd(), encoding: 'utf8' })
+    const result = spawnSync(process.execPath, ['scripts/release-notes.mjs', 'render', '--version', '0.1.20', '--output', output, '--require-all-locales'], { cwd: process.cwd(), encoding: 'utf8' })
     expect(result.status, result.stderr).toBe(0)
     const [plainText, updater, bundled, github] = await Promise.all([
       readFile(join(output, 'updater-notes.txt'), 'utf8'),
@@ -116,8 +116,8 @@ describe('release-note catalog', () => {
       readFile(join(output, 'github-release.md'), 'utf8'),
     ])
     expect(JSON.parse(updater)).toEqual(JSON.parse(bundled))
-    expect(plainText).toContain('See what Agent preparation is doing')
-    expect(plainText).toContain('A more tolerant Codex runtime')
-    expect(github).toContain('Cutout v0\\.1\\.19')
+    expect(plainText).toContain('Use the AI already configured on this Mac')
+    expect(plainText).toContain('Keep Provider keys in the native boundary')
+    expect(github).toContain('Cutout v0\\.1\\.20')
   })
 })
