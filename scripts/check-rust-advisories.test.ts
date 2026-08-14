@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { validateRustAdvisoryReport } from './check-rust-advisories.mjs'
+import { validateRustAdvisoryReport } from './rust-advisory-report.mjs'
 
 function report(list: unknown[]) {
   return { vulnerabilities: { count: list.length, found: list.length > 0, list }, warnings: {} }
