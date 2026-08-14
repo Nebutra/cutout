@@ -2,55 +2,27 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-const nativeEntry = readFileSync(
-  resolve(process.cwd(), 'src-tauri/src/lib.rs'),
-  'utf8',
-)
-const frontendEntry = readFileSync(resolve(process.cwd(), 'src/main.tsx'), 'utf8')
-const settingsDialog = readFileSync(
-  resolve(process.cwd(), 'src/components/settings/SettingsDialog.tsx'),
-  'utf8',
-)
-const packagedE2eRunner = readFileSync(
-  resolve(process.cwd(), 'src/packaged-e2e/runner.ts'),
-  'utf8',
-)
-const packagedE2eCommand = readFileSync(
-  resolve(process.cwd(), 'src-tauri/src/commands/packaged_e2e.rs'),
-  'utf8',
-)
-const nativeDeadlineCommand = readFileSync(
-  resolve(process.cwd(), 'src-tauri/src/commands/monotonic_deadline.rs'),
-  'utf8',
-)
-const codexSystemCommand = readFileSync(
-  resolve(process.cwd(), 'src-tauri/src/commands/ai/codex_system.rs'),
-  'utf8',
-)
-const applicationPermission = readFileSync(
-  resolve(process.cwd(), 'src-tauri/permissions/application.toml'),
-  'utf8',
-)
-const e2eConfig = JSON.parse(readFileSync(
-  resolve(process.cwd(), 'src-tauri/tauri.e2e.conf.json'),
-  'utf8',
-)) as { bundle?: { macOS?: { infoPlist?: string } } }
-const e2eInfoPlist = readFileSync(
-  resolve(process.cwd(), 'src-tauri/Info.e2e.plist'),
-  'utf8',
-)
-const buildScript = readFileSync(
-  resolve(process.cwd(), 'scripts/build-packaged-e2e-macos.sh'),
-  'utf8',
-)
-const smokeScript = readFileSync(
-  resolve(process.cwd(), 'scripts/smoke-packaged-macos.sh'),
-  'utf8',
-)
-const evidenceValidator = readFileSync(
-  resolve(process.cwd(), 'scripts/validate-packaged-e2e-evidence.mjs'),
-  'utf8',
-)
+function readSource(path: string): string {
+  // Git may check these source files out with CRLF on Windows. The contracts
+  // assert source structure, not platform-specific line-ending bytes.
+  return readFileSync(resolve(process.cwd(), path), 'utf8').replace(/\r\n/gu, '\n')
+}
+
+const nativeEntry = readSource('src-tauri/src/lib.rs')
+const frontendEntry = readSource('src/main.tsx')
+const settingsDialog = readSource('src/components/settings/SettingsDialog.tsx')
+const packagedE2eRunner = readSource('src/packaged-e2e/runner.ts')
+const packagedE2eCommand = readSource('src-tauri/src/commands/packaged_e2e.rs')
+const nativeDeadlineCommand = readSource('src-tauri/src/commands/monotonic_deadline.rs')
+const codexSystemCommand = readSource('src-tauri/src/commands/ai/codex_system.rs')
+const applicationPermission = readSource('src-tauri/permissions/application.toml')
+const e2eConfig = JSON.parse(readSource('src-tauri/tauri.e2e.conf.json')) as {
+  bundle?: { macOS?: { infoPlist?: string } }
+}
+const e2eInfoPlist = readSource('src-tauri/Info.e2e.plist')
+const buildScript = readSource('scripts/build-packaged-e2e-macos.sh')
+const smokeScript = readSource('scripts/smoke-packaged-macos.sh')
+const evidenceValidator = readSource('scripts/validate-packaged-e2e-evidence.mjs')
 
 function quotedValues(source: string): string[] {
   return [...source.matchAll(/'([^']+)'/gu)].map((match) => match[1]!)
@@ -147,10 +119,14 @@ describe('packaged E2E macOS window lifecycle', () => {
   })
 
   it('shows the production window without waiting on a hidden animation frame', () => {
+    const firstTreeCommit = frontendEntry.indexOf('flushSync(() => root.render(app))')
+    const productionWindowShow = frontendEntry.indexOf('await getCurrentWindow().show()')
+
     expect(frontendEntry).toContain('const isTauriWindow =')
     expect(frontendEntry).toContain('if (packagedE2e || isTauriWindow)')
     expect(frontendEntry).toContain('if (isTauriWindow)')
-    expect(frontendEntry).toContain('await getCurrentWindow().show()')
+    expect(firstTreeCommit).toBeGreaterThan(0)
+    expect(productionWindowShow).toBeGreaterThan(firstTreeCommit)
     expect(frontendEntry).not.toContain('requestAnimationFrame')
   })
 
