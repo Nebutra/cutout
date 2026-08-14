@@ -557,8 +557,6 @@ test('Canvas keeps a responsive safe area while workspace panels change', async 
     }
   })
 
-  await page.getByRole('button', { name: 'Toggle minimap' }).click()
-  await expect(page.locator('.react-flow__minimap')).toBeVisible()
   await fit.click()
   await page.waitForTimeout(250)
   const baseline = await geometry()

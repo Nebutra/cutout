@@ -55,6 +55,8 @@ describe("workspace rail source contract", () => {
     expect(source).toContain('onOpenDesignOs("game-assets")');
     expect(source).not.toContain("Advanced design system");
     expect(source).not.toContain("group/advanced");
+    expect(source).not.toContain("Toggle minimap");
+    expect(source).not.toContain("cutout.canvas-minimap");
     expect(source).toContain('<WorkspaceDockHeader');
   });
 

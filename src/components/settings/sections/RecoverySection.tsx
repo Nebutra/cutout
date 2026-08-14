@@ -118,7 +118,6 @@ export function RecoverySection() {
               WORKSPACE_NAVIGATION_KEY,
               "cutout.canvas-background",
               "cutout.canvas-grid",
-              "cutout.canvas-minimap",
             ]);
             toast.success(
               t({ id: "settings.recovery.ui_reset", message: "UI state reset" }),

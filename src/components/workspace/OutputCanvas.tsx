@@ -18,7 +18,6 @@ import {
   Background,
   BackgroundVariant,
   Handle,
-  MiniMap,
   Panel,
   Position,
   type NodeProps,
@@ -86,7 +85,6 @@ export interface OutputCanvasProps {
   readonly branchRequestCount?: number
   readonly creativeBranches?: readonly CreativeBranchRequest[]
   readonly onSaveToLibrary?: (item: CanvasImageItem) => void
-  readonly showMinimap?: boolean
   readonly showGrid?: boolean
   readonly background?: string | null
   readonly emptyHint?: string
@@ -273,7 +271,6 @@ export function OutputCanvas({
   creativeBranches = [],
   onSaveToLibrary,
   librarySavedMaterialIds,
-  showMinimap = false,
   showGrid = true,
   background = null,
   emptyHint,
@@ -366,7 +363,6 @@ export function OutputCanvas({
         inspector: { open: right > 0, size: right },
         bottomOverlay: { open: bottom > 0, size: bottom },
         bottomToolbar: { width: toolbarBounds?.width ?? 0, height: (toolbarBounds?.height ?? 0) + 24, open: Boolean(toolbarBounds) },
-        minimap: { width: showMinimap ? 200 : 0, height: showMinimap ? 150 : 0, open: showMinimap },
         gap: 12,
       })
       const previous = safeAreaRef.current
@@ -388,7 +384,7 @@ export function OutputCanvas({
     if (workspace) mutationObserver.observe(workspace, { attributes: true, childList: true, subtree: true, attributeFilter: ['class', 'style', 'data-workspace-panel'] })
     window.addEventListener('resize', measure)
     return () => { observer.disconnect(); mutationObserver.disconnect(); window.removeEventListener('resize', measure) }
-  }, [instance, showMinimap])
+  }, [instance])
 
   const fitView = useCallback((options: { readonly nodes?: typeof nodes; readonly padding?: number; readonly maxZoom?: number; readonly duration?: number } = {}) => {
     if (!instance) return
@@ -686,19 +682,6 @@ export function OutputCanvas({
           </div>
           </div>
         </Panel>
-        {showMinimap ? (
-          <MiniMap
-            className="!m-0"
-            pannable
-            zoomable
-            bgColor="var(--card)"
-            maskColor="var(--background)"
-            nodeColor="var(--muted-foreground)"
-            nodeStrokeColor="var(--border)"
-            position="top-left"
-            style={{ transform: `translate(${safeArea.controlAnchors.minimap.x}px, ${safeArea.controlAnchors.minimap.y}px)` }}
-          />
-        ) : null}
       </ReactFlow>
       {itemCount === 0 && emptyHint ? (
         <div

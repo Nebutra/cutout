@@ -30,7 +30,6 @@ import {
   Grid3x3,
   GitBranch,
   History,
-  Map as MapIcon,
   PanelLeft,
   PanelLeftClose,
   PanelLeftOpen,
@@ -899,13 +898,6 @@ export function IntentWorkspace({
   const [canvasBackground, setCanvasBackground] = useState<string | null>(
     readCanvasBackground,
   );
-  const [minimapVisible, setMinimapVisible] = useState(() => {
-    try {
-      return localStorage.getItem("cutout.canvas-minimap") === "1";
-    } catch {
-      return false;
-    }
-  });
   const [gridVisible, setGridVisible] = useState(() => {
     try {
       return localStorage.getItem("cutout.canvas-grid") !== "0";
@@ -6311,31 +6303,6 @@ export function IntentWorkspace({
       >
         <Grid3x3 className="size-4" />
       </button>
-      <button
-        type="button"
-        aria-label="Toggle minimap"
-        title="Minimap"
-        aria-pressed={minimapVisible}
-        className={cn(
-          "flex size-8 items-center justify-center rounded-full border bg-background/95 shadow-[0_2px_10px_rgb(0_0_0/0.10)] backdrop-blur transition-all hover:scale-105",
-          minimapVisible
-            ? "border-foreground/30 text-foreground"
-            : "border-border/70 text-muted-foreground hover:border-foreground/25 hover:text-foreground",
-        )}
-        onClick={() => {
-          setMinimapVisible((visible) => {
-            const next = !visible;
-            try {
-              localStorage.setItem("cutout.canvas-minimap", next ? "1" : "0");
-            } catch {
-              // best-effort persistence only
-            }
-            return next;
-          });
-        }}
-      >
-        <MapIcon className="size-4" />
-      </button>
     </>
   );
 
@@ -7023,7 +6990,6 @@ export function IntentWorkspace({
             <section className="flex h-full min-h-0 flex-col bg-background" aria-label="Git branch comparison"><header className="flex h-12 shrink-0 items-center gap-3 border-b border-border px-4"><GitBranch className="size-4 text-muted-foreground" /><div className="min-w-0 flex-1"><div className="truncate text-sm font-medium">{gitReview.comparison.base} ↔ {gitReview.comparison.compare}</div><div className="text-[11px] text-muted-foreground">{gitReview.comparison.baseOnly} base-only · {gitReview.comparison.compareOnly} compare-only commits</div></div><Button type="button" variant="ghost" size="icon" className="size-7" aria-label="Close branch comparison" onClick={() => setGitReview(undefined)}><X className="size-3.5" /></Button></header><div className="min-h-0 flex-1 overflow-auto p-5"><h3 className="mb-2 text-xs font-medium uppercase text-muted-foreground">Changed files · {gitReview.comparison.files.length}</h3>{gitReview.comparison.files.map((file) => <div key={`${file.status}:${file.path}`} className="flex max-w-3xl items-center gap-3 border-b border-border/60 px-2 py-2 text-sm"><span className="w-8 shrink-0 font-mono text-xs text-muted-foreground">{file.status}</span><span className="min-w-0 flex-1 truncate">{file.path}</span></div>)}</div></section>
           ) : <OutputSurface
             canvasBackground={canvasBackground}
-            showMinimap={minimapVisible}
             showGrid={gridVisible}
             canvasToolbar={canvasToolbar}
             canvasActions={{
@@ -8768,7 +8734,6 @@ function repairForMaterialImpact(
 
 function OutputSurface({
   canvasBackground,
-  showMinimap,
   showGrid,
   canvasToolbar,
   canvasActions,
@@ -8813,7 +8778,6 @@ function OutputSurface({
   creativeBranches,
 }: {
   readonly canvasBackground: string | null;
-  readonly showMinimap: boolean;
   readonly showGrid: boolean;
   readonly canvasToolbar: ReactNode;
   readonly canvasActions: NonNullable<OutputCanvasProps["actions"]>;
@@ -9064,7 +9028,6 @@ function OutputSurface({
     return (
       <div className="relative h-full min-h-0">
         <OutputCanvas
-          showMinimap={showMinimap}
           showGrid={showGrid}
           background={canvasBackground}
           toolbar={canvasToolbar}
@@ -9267,7 +9230,6 @@ function OutputSurface({
     return (
       <div className="relative h-full min-h-0">
         <OutputCanvas
-          showMinimap={showMinimap}
           showGrid={showGrid}
           background={canvasBackground}
           toolbar={canvasToolbar}
@@ -9286,7 +9248,6 @@ function OutputSurface({
   return (
     <div className="relative h-full min-h-0">
       <OutputCanvas
-        showMinimap={showMinimap}
         showGrid={showGrid}
         background={canvasBackground}
         toolbar={canvasToolbar}
