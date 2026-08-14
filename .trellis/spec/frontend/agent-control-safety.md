@@ -44,11 +44,12 @@ receipts. `.cutout` state and provenance remain authoritative.
   approval token as authority. The native host presents an OS-level warning
   confirmation after preview and emits the receipt approval id only after the
   user approves it.
-- Desktop paid-tool requests always require explicit approval. They carry no
-  predicted cost, budget ceiling, or persisted user allowance. A shared host
-  policy may use `auto`, but this is policy authorization rather than a
-  cost-threshold decision. Optional `receipt.charged` evidence is recorded only
-  when backed by verifiable Provider billing evidence.
+- Desktop BYOK paid-tool requests execute directly after capability and Provider
+  policy checks. Provider configuration is standing authorization; preview and
+  run events are observation, cancellation and evidence surfaces, never per-call
+  payment gates. Missing capability or disabled policy fails immediately.
+  Optional `receipt.charged` evidence is recorded only when backed by verifiable
+  Provider billing evidence.
 - Desktop-local `cutout` and `semantic-cutout` require only the `paid` scope;
   they never require or imply a provider credential. Semantic availability is
   checked immediately before artifact writes and approval so unsupported hosts

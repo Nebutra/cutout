@@ -156,13 +156,19 @@ function planDistinctSuiteTopologies<Request, Plan>(input: {
   duplicate identities, unknown edge endpoints and pages unreachable from every
   Agent-authored journey entry before any page expansion. Independent route details expand under
   the shared concurrency ceiling; the orchestrator then discards page-authored
-  cross-page drift and compiles the exact outline edges into the settled pages
-  before closure validates flows and review documents. A monolithic structured plan
+  cross-page drift and compiles the exact outline edges into the settled pages.
+  It deterministically projects flows and Markdown review documents from those
+  same entries and edges, then runs final plan validation. A closure must never
+  invoke a second model turn to restate authoritative navigation. A monolithic structured plan
   is reserved for an explicitly bounded one-to-three-page scope; absence of a
   count is never evidence that the task is small. The page count remains context,
   not a quota: either path may return a different justified topology.
   The closed streaming form is `CUTOUT_OUTLINE_V2`; V1 is not accepted because
   it had no edge authority and could not prove reachability before expansion.
+  A compatible text route may wrap one otherwise exact V2 payload in a single
+  `text`, `plaintext`, or `tsv` Markdown fence. The parser removes only that
+  lossless outer wrapper and rejects prose, multiple fences, unterminated
+  output, or any nonconforming protocol field.
 - Every alternative suite authors its own complete topology for its direction.
   The resolved brief and Design System direction supply product intent, not a
   page-count quota; sibling suites may and should differ in route count when
@@ -403,6 +409,14 @@ function planDistinctSuiteTopologies<Request, Plan>(input: {
   native watchdog and at terminal native boundaries. The pulse is harness-only,
   accepts no caller script/window input, and never activates, focuses, or orders
   the window forward; foreground ownership remains externally sampled.
+- Packaged E2E owns every outer journey, retry-grace, and Design System candidate
+  owner deadline through the same native monotonic bridge. A long journey is a
+  sequence of bounded native segments, never a `performance.now()` or renderer
+  timer loop. Each active candidate-stage handle is cancelled on its terminal
+  projection; expiry invokes the product Run cancel control, which aborts the
+  owning lease and native Proxy request. It must settle every sibling out of
+  `provider-executing` before evidence records failure, and it must not start a
+  paid retry after the expiry signal.
 - A single-turn planning runtime acquires one renderer-wide session before the
   complete Plan deadline starts. Its independent page expansion uses runtime
   parallelism one, so no page-stage deadline elapses while that page is queued
@@ -610,12 +624,13 @@ function planDistinctSuiteTopologies<Request, Plan>(input: {
 | One structured Planner stage exceeds 180 seconds | abort and return the named stage timeout; do not wait for the adapter indefinitely |
 | The complete Planner exceeds 300 seconds | abort every active stage and return the total planning timeout |
 | One page detail contains an invalid local/cross-page reference | repair only that page once, preserving authored cardinality; never replay sibling page expansion |
-| Closure references an interaction that no settled page authored | repair only flows once with a runtime-closed page/interaction schema; preserve flow identity, step cardinality, and review documents; never regenerate pages |
-| Page or closure repair remains invalid | fail closed with a safe graph diagnostic and retain the original technical reason only in local diagnostics |
+| An outline edge cannot be compiled into its settled source page | fail closed with a safe graph diagnostic; never ask a model to repair or recreate authoritative navigation |
+| Page repair remains invalid | fail closed with a safe graph diagnostic and retain the original technical reason only in local diagnostics |
 | A Planner run fails while a live progress label remains | clear ephemeral output at run settlement and suppress every pending feed projection when the terminal error exists |
 | Any Planner deadline expires in packaged E2E | retain the closed `planner-timeout` diagnostic and the latest bounded Planner/pipeline checkpoints across renderer, native progress, and external evidence validation |
 | A Vision QA review exceeds 180 seconds | abort its exact review signal, retain an unavailable verdict, and spend no replacement image call |
 | A desktop paid-tool deadline expires while renderer timers are stopped | settle from the native 315-second owner and propagate abort to the executor |
+| A Design System candidate remains in one owner stage past its packaged E2E deadline | settle from the native stage handle, cancel the owning Agent run, abort registered native requests, and require every candidate to leave `provider-executing` |
 | A native desktop deadline command is missing, denied, or rejected | fail closed immediately; never fall back to a throttled renderer timer |
 | Native Planner work has settled but the hidden WebView has not drained its invoke completion | use the fixed packaged-only background pulse; if checkpoints still stall with no live child, fail the release run rather than waiting for the outer budget |
 | Every suite is ready/failed but the run stays busy past the settlement grace | cancel the residual run and fail packaged evidence as orchestration state |
@@ -686,11 +701,12 @@ function planDistinctSuiteTopologies<Request, Plan>(input: {
   accepts distinct fingerprints without extra calls, and spends exactly one
   serial repair only for a collision.
 - Planner integrity tests: an invalid page-local or cross-page reference repairs
-  only its owning page; an unknown closure interaction repairs only closure;
-  both repair budgets are one; a second invalid result fails closed; and
-  credential, cancellation, policy, timeout, transport, or schema failures
-  never start graph repair. The final `validatePrototypePlan` check remains the
-  authoritative defense even after all staged checks pass.
+  only its owning page; deterministic closure compilation uses only the accepted
+  outline entries and edges and never makes a closure Provider call; a second
+  invalid page result fails closed; and credential, cancellation, policy,
+  timeout, transport, or schema failures never start graph repair. The final
+  `validatePrototypePlan` check remains the authoritative defense even after all
+  staged checks pass.
 - Planner routing tests: a natural business brief with no page count starts with
   the closed outline stream before any structured expansion, while explicit
   one-to-three-page briefs retain the bounded monolithic path. Chinese count
@@ -706,6 +722,10 @@ function planDistinctSuiteTopologies<Request, Plan>(input: {
 - Native deadline tests: duration and opaque-handle validation, duplicate
   rejection, cancellation cleanup, permission/handler allowlisting, desktop
   fail-closed behavior, and browser-only fallback remain executable.
+- Packaged candidate-deadline regression: with renderer timers disabled, a
+  native Design System provider-stage expiry produces the exact owner diagnostic;
+  a ready/failed/cancelled projection releases its native handle without a
+  spurious later cancellation.
 - Packaged lifecycle regression: the background watchdog and terminal native
   Planner boundaries invoke only the fixed no-op renderer pulse; source checks
   reject activation, focus, front-ordering, or a caller-provided script surface.

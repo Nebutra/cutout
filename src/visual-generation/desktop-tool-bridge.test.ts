@@ -52,7 +52,7 @@ describe("desktop visual tool bridge", () => {
     );
   });
 
-  it("requires explicit approval for each paid request", async () => {
+  it("keeps each BYOK request observable without a per-call confirmation", async () => {
     let requested: Parameters<DesktopToolLoop["request"]>[0] | undefined;
     const loop: DesktopToolLoop = {
       request: vi.fn(async (input) => { requested = input }),
@@ -84,7 +84,7 @@ describe("desktop visual tool bridge", () => {
     })).rejects.toThrow("stop");
 
     expect(requested?.request).toMatchObject({
-      approvalPolicy: "explicit",
+      approvalPolicy: "auto",
     });
   });
 });

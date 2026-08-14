@@ -208,7 +208,7 @@ describe("desktop tool loop", () => {
     await approval;
   });
 
-  it("auto approves by host policy and is idempotent by request id", async () => {
+  it("executes BYOK directly and is idempotent by request id", async () => {
     const h = harness();
     await h.loop.request(input());
     await h.loop.request(input());
@@ -220,6 +220,23 @@ describe("desktop tool loop", () => {
       "tool-succeeded",
       "tool-receipt-recorded",
     ]);
+  });
+
+  it("fails a missing BYOK capability without inventing a pending approval", async () => {
+    const h = harness();
+    await h.loop.request(input({
+      request: { ...input().request, providerId: "missing" },
+    }));
+
+    await expect(h.loop.settled("tool", "request")).resolves.toMatchObject({
+      ok: false,
+      error: "No host executor is available for this capability.",
+    });
+    expect(h.execute).not.toHaveBeenCalled();
+    expect(h.batches.flat()).toContainEqual(expect.objectContaining({
+      type: "tool-approval-requested",
+      pendingApproval: false,
+    }));
   });
 
   it("fails a colliding tool call without replacing the pending request", async () => {

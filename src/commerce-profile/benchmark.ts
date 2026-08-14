@@ -4,12 +4,16 @@ import {
   verifyCommerceProductionRehearsalBundle,
   type VerifiedCommerceProductionRehearsal,
 } from './rehearsal'
+import {
+  verifyCommerceHeldOutProductionRehearsal,
+  type CommerceHeldOutAdmission,
+} from './held-out'
 
 export const COMMERCE_BENCHMARK_SCHEMA = 'commerce.profile-benchmark.v1' as const
 export const COMMERCE_BENCHMARK_ID = 'benchmark:commerce-profile:p1-p7' as const
-export const COMMERCE_BENCHMARK_VERSION = 1 as const
+export const COMMERCE_BENCHMARK_VERSION = 2 as const
 
-export const commerceBenchmarkTierSchema = z.enum(['deterministic', 'mocked-host', 'real-host'])
+export const commerceBenchmarkTierSchema = z.enum(['deterministic', 'real-host'])
 export type CommerceBenchmarkTier = z.infer<typeof commerceBenchmarkTierSchema>
 
 export const commerceBenchmarkStatusSchema = z.enum(['passed', 'failed', 'blocked'])
@@ -54,24 +58,6 @@ const metricDefinitions = [
     label: 'Removable Commerce Profile Kernel composition',
     assertionIds: ['semantic-role-and-lock-closure', 'bounded-kernel-plan-and-removable-registry'],
     passEvidenceKinds: ['deterministic-test-run'],
-  },
-  {
-    id: 'p6.mocked-deliverable-closure', acceptanceCriterion: 'P6', tier: 'mocked-host',
-    label: 'Mocked Host deliverable and usability closure',
-    assertionIds: ['accepted-receipts-and-role-closure', 'copy-image-video-usability-gates-pass'],
-    passEvidenceKinds: ['mocked-host-receipt'],
-  },
-  {
-    id: 'p6.mocked-targeted-repair', acceptanceCriterion: 'P6', tier: 'mocked-host',
-    label: 'Mocked Host targeted repair preserves siblings',
-    assertionIds: ['failed-frontier-only-repairs', 'accepted-sibling-artifacts-remain-stable'],
-    passEvidenceKinds: ['mocked-host-receipt'],
-  },
-  {
-    id: 'p7.mocked-strategy-evidence', acceptanceCriterion: 'P7', tier: 'mocked-host',
-    label: 'Mocked strategy cites run and repair evidence',
-    assertionIds: ['facts-plan-routes-and-validations-cited', 'receipts-and-repair-history-cited'],
-    passEvidenceKinds: ['mocked-host-receipt'],
   },
   {
     id: 'p6.real-text-execution', acceptanceCriterion: 'P6', tier: 'real-host',
@@ -126,7 +112,6 @@ const metricDefinitions = [
 export const COMMERCE_BENCHMARK_METRICS: readonly CommerceBenchmarkMetricDefinition[] = metricDefinitions
 export const COMMERCE_BENCHMARK_TIERS: readonly CommerceBenchmarkTier[] = [
   'deterministic',
-  'mocked-host',
   'real-host',
 ]
 
@@ -151,16 +136,6 @@ const deterministicTestRunReferenceSchema = z.object({
   kind: z.literal('deterministic-test-run'),
   binding: metricBindingSchema.extend({
     testIds: z.array(recordIdSchema).min(1).max(100),
-  }).strict(),
-}).strict()
-
-const mockedHostReceiptReferenceSchema = z.object({
-  ...evidenceReferenceBase,
-  kind: z.literal('mocked-host-receipt'),
-  binding: metricBindingSchema.extend({
-    receiptId: recordIdSchema,
-    capabilityId: recordIdSchema,
-    artifactIds: z.array(recordIdSchema).min(1).max(100),
   }).strict(),
 }).strict()
 
@@ -197,7 +172,6 @@ const hostCapabilityAuditReferenceSchema = z.object({
 
 export const commerceBenchmarkEvidenceReferenceSchema = z.discriminatedUnion('kind', [
   deterministicTestRunReferenceSchema,
-  mockedHostReceiptReferenceSchema,
   realHostReceiptReferenceSchema,
   artifactBytesReferenceSchema,
   hostCapabilityAuditReferenceSchema,
@@ -264,7 +238,7 @@ export const commerceProfileBenchmarkReportSchema = z.object({
   metrics: z.array(reportMetricSchema).min(1).max(100),
   summary: z.object({
     overall: countSummarySchema,
-    tiers: z.array(z.object({ tier: commerceBenchmarkTierSchema }).extend(countSummarySchema.shape).strict()).length(3),
+    tiers: z.array(z.object({ tier: commerceBenchmarkTierSchema }).extend(countSummarySchema.shape).strict()).length(2),
     productionReady: z.boolean(),
     productionFrontier: z.array(z.object({
       metricId: recordIdSchema,
@@ -657,7 +631,9 @@ export async function createCommerceProfileBenchmarkReportFromRehearsal(input: {
 }> {
   const rehearsal = await verifyCommerceProductionRehearsalBundle(input.rehearsalBundle)
   return {
-    report: createVerifiedCommerceReport(input.baselineReport, rehearsal),
+    // Bundle contract verification alone is not benchmark admission. This
+    // compatibility path intentionally retains the blocked durable baseline.
+    report: decodeCommerceProfileBenchmarkReport(input.baselineReport),
     rehearsal,
   }
 }
@@ -674,6 +650,39 @@ export async function decodeCommerceProfileBenchmarkReportFromRehearsal(input: {
   const candidate = commerceProfileBenchmarkReportSchema.parse(input.report)
   if (canonical(candidate) !== canonical(expected.report)) {
     throw new Error('Commerce real-Host report does not match its reverified rehearsal bundle.')
+  }
+  return expected.report
+}
+
+export async function createCommerceProfileBenchmarkReportFromHeldOutRehearsal(input: {
+  readonly baselineReport: unknown
+  readonly rehearsalBundle: unknown
+  readonly commitment: unknown
+  readonly evaluatorAttestation: unknown
+}): Promise<{
+  readonly report: CommerceProfileBenchmarkReport
+  readonly rehearsal: VerifiedCommerceProductionRehearsal
+  readonly admission: CommerceHeldOutAdmission
+}> {
+  const verified = await verifyCommerceHeldOutProductionRehearsal(input)
+  return {
+    report: createVerifiedCommerceReport(input.baselineReport, verified.rehearsal),
+    rehearsal: verified.rehearsal,
+    admission: verified.admission,
+  }
+}
+
+export async function decodeCommerceProfileBenchmarkReportFromHeldOutRehearsal(input: {
+  readonly report: unknown
+  readonly baselineReport: unknown
+  readonly rehearsalBundle: unknown
+  readonly commitment: unknown
+  readonly evaluatorAttestation: unknown
+}): Promise<CommerceProfileBenchmarkReport> {
+  const expected = await createCommerceProfileBenchmarkReportFromHeldOutRehearsal(input)
+  const candidate = commerceProfileBenchmarkReportSchema.parse(input.report)
+  if (canonical(candidate) !== canonical(expected.report)) {
+    throw new Error('Commerce real-Host report does not match its admitted held-out rehearsal bundle.')
   }
   return expected.report
 }

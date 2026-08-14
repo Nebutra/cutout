@@ -1,5 +1,9 @@
 import { invoke } from '@tauri-apps/api/core'
 import { DESKTOP_IMAGE_TOOL_TIMEOUT_MS } from '@/agent-runtime/paid-tool-timeouts'
+import {
+  createMonotonicDeadline,
+  type MonotonicDeadline,
+} from '@/platform/monotonic-deadline'
 import { parsePrototypeRouteGraphFingerprint } from '@/prototype/prototype-plan'
 import type { PackagedE2eDesignCandidateOwnerStage } from './design-candidate-owner'
 
@@ -336,6 +340,20 @@ export function createPackagedE2eCandidateOwnerWatch(): PackagedE2eCandidateOwne
 
 const candidateOwnerWatch = createPackagedE2eCandidateOwnerWatch()
 
+interface PackagedE2eCandidateOwnerDeadlineMonitor {
+  readonly active: Map<PackagedE2eDesignCandidateProgress['candidateId'], {
+    readonly stage: Exclude<PackagedE2eDesignCandidateOwnerStage, 'queued' | 'terminal'>
+    readonly deadline: MonotonicDeadline
+  }>
+  diagnostic?: PackagedE2eFailureDiagnostic
+}
+
+export function createPackagedE2eCandidateOwnerDeadlineMonitor(): PackagedE2eCandidateOwnerDeadlineMonitor {
+  return { active: new Map() }
+}
+
+const candidateOwnerDeadlineMonitor = createPackagedE2eCandidateOwnerDeadlineMonitor()
+
 export interface PackagedE2eSuiteSettlementWatch {
   settledWhileWorkingSince?: number
 }
@@ -345,6 +363,64 @@ export function createPackagedE2eSuiteSettlementWatch(): PackagedE2eSuiteSettlem
 }
 
 const suiteSettlementWatch = createPackagedE2eSuiteSettlementWatch()
+
+/**
+ * Background WKWebViews may stop advancing performance.now() and JavaScript
+ * timers. Candidate deadlines must therefore be owned by the native monotonic
+ * bridge, while this projection remains a pure, deterministic test seam.
+ */
+export function observePackagedE2eCandidateOwnerDeadlines(
+  progress: readonly PackagedE2eDesignCandidateProgress[],
+  monitor: PackagedE2eCandidateOwnerDeadlineMonitor = candidateOwnerDeadlineMonitor,
+): PackagedE2eFailureDiagnostic | undefined {
+  const observed = new Set(progress.map(({ candidateId }) => candidateId))
+  for (const [candidateId, active] of monitor.active) {
+    if (observed.has(candidateId)) continue
+    active.deadline.cancel()
+    monitor.active.delete(candidateId)
+  }
+
+  for (const candidate of progress) {
+    if (candidate.ownerStage === 'queued' || candidate.ownerStage === 'terminal') {
+      const active = monitor.active.get(candidate.candidateId)
+      active?.deadline.cancel()
+      monitor.active.delete(candidate.candidateId)
+      continue
+    }
+    const active = monitor.active.get(candidate.candidateId)
+    if (active?.stage === candidate.ownerStage) continue
+    active?.deadline.cancel()
+    const deadline = createMonotonicDeadline(
+      PACKAGED_E2E_CANDIDATE_OWNER_DEADLINES_MS[candidate.ownerStage],
+    )
+    const entry = { stage: candidate.ownerStage, deadline }
+    monitor.active.set(candidate.candidateId, entry)
+    void deadline.elapsed.then((elapsed) => {
+      if (!elapsed || monitor.active.get(candidate.candidateId) !== entry) return
+      monitor.diagnostic ??= candidateOwnerTimeoutDiagnostic(entry.stage)
+    })
+  }
+  return monitor.diagnostic
+}
+
+export function cancelPackagedE2eCandidateOwnerDeadlines(
+  monitor: PackagedE2eCandidateOwnerDeadlineMonitor = candidateOwnerDeadlineMonitor,
+): void {
+  for (const { deadline } of monitor.active.values()) deadline.cancel()
+  monitor.active.clear()
+  monitor.diagnostic = undefined
+}
+
+function candidateOwnerTimeoutDiagnostic(
+  stage: Exclude<PackagedE2eDesignCandidateOwnerStage, 'queued' | 'terminal'>,
+): PackagedE2eFailureDiagnostic {
+  switch (stage) {
+    case 'preparing': return 'candidate-preparation-timeout'
+    case 'awaiting-approval': return 'candidate-approval-timeout'
+    case 'provider-executing': return 'candidate-provider-timeout'
+    case 'post-processing': return 'candidate-post-processing-timeout'
+  }
+}
 
 export function observePackagedE2eSuiteSettlement(
   progress: readonly PackagedE2ePrototypeSuiteProgress[],
@@ -408,6 +484,7 @@ export function packagedE2ePlanningReady(setup: HTMLElement | null): boolean {
 
 export async function runPackagedE2e(): Promise<void> {
   const captures: PackagedE2eCaptureEvidence[] = []
+  resetPackagedE2eDeadlineState()
   try {
     await pass('bootstrap')
     await waitFor(() => document.querySelector('#root')?.childElementCount)
@@ -652,7 +729,15 @@ export async function runPackagedE2e(): Promise<void> {
         : readWorkspaceFailureDiagnostic(workspace),
       ...(plannerProgress ? { plannerProgress } : {}),
     })
+  } finally {
+    resetPackagedE2eDeadlineState()
   }
+}
+
+function resetPackagedE2eDeadlineState(): void {
+  candidateOwnerWatch.active.clear()
+  suiteSettlementWatch.settledWhileWorkingSince = undefined
+  cancelPackagedE2eCandidateOwnerDeadlines()
 }
 
 export class JourneyFailure extends Error {
@@ -1770,71 +1855,85 @@ function failureCode(error: unknown): FailureCode {
 }
 
 async function waitFor<T>(read: () => T, timeoutMs = 30_000): Promise<NonNullable<T>> {
-  const deadlineExpired = monotonicDeadline(timeoutMs)
-  while (!deadlineExpired()) {
-    const value = read()
-    if (value) return value as NonNullable<T>
-    await yieldToUi()
+  const deadline = createPackagedE2eDeadline(timeoutMs)
+  try {
+    while (!deadline.expired()) {
+      const value = read()
+      if (value) return value as NonNullable<T>
+      await yieldToUi()
+    }
+    throw new Error('packaged-e2e-timeout')
+  } finally {
+    deadline.cancel()
   }
-  throw new Error('packaged-e2e-timeout')
 }
 
 async function waitForJourney(read: () => boolean, timeoutMs: number): Promise<void> {
-  const deadlineExpired = monotonicDeadline(timeoutMs)
-  let retryUiSettlingSince: number | undefined
-  while (!deadlineExpired()) {
-    await checkpointPipelineStage()
-    await checkpointPlannerStage()
-    await checkpointDesignCandidateStages()
-    await checkpointPrototypeSuiteStages()
-    const candidateDiagnostic = observePackagedE2eCandidateOwners(
-      readWorkspaceDesignCandidateProgress(
+  const deadline = createPackagedE2eDeadline(timeoutMs)
+  let retryUiGrace: PackagedE2eDeadline | undefined
+  try {
+    while (!deadline.expired()) {
+      await checkpointPipelineStage()
+      await checkpointPlannerStage()
+      await checkpointDesignCandidateStages()
+      await checkpointPrototypeSuiteStages()
+      const candidateProgress = readWorkspaceDesignCandidateProgress(
         document.querySelector<HTMLElement>('[data-workspace-root]'),
-      ),
-    )
-    if (candidateDiagnostic) {
-      const cancelled = await cancelPackagedE2eActiveRun()
-      throw new JourneyFailure(
-        'design-candidates-ready',
-        'journey-timeout',
-        cancelled ? candidateDiagnostic : 'orchestration-state',
       )
-    }
-    const workspace = document.querySelector<HTMLElement>('[data-workspace-root]')
-    if (observePackagedE2eSuiteSettlement(
-      readWorkspacePrototypeSuiteProgress(workspace),
-      workspace?.dataset.agentWorking === 'true',
-    )) {
-      await cancelPackagedE2eActiveRun()
-      throw new JourneyFailure(
-        'prototype-suite-ready',
-        'journey-timeout',
-        'orchestration-state',
-      )
-    }
-    if (retryPendingRun()) {
-      retryUiSettlingSince = undefined
-      await pass('run-retried')
-      await waitFor(
-        () => hasRetryRunStarted(workspaceRoot()),
-        2 * 60_000,
-      )
-      continue
-    }
-    retryUiSettlingSince = retryUiGraceStartedAt(
-      workspaceRoot(),
-      retryUiSettlingSince,
-    )
-    if (retryUiSettlingSince !== undefined
-      && performance.now() - retryUiSettlingSince < PACKAGED_E2E_RETRY_UI_GRACE_MS) {
+      const candidateDiagnostic = observePackagedE2eCandidateOwnerDeadlines(candidateProgress)
+        ?? observePackagedE2eCandidateOwners(candidateProgress)
+      if (candidateDiagnostic) {
+        const cancelled = await cancelPackagedE2eActiveRun()
+        throw new JourneyFailure(
+          'design-candidates-ready',
+          'journey-timeout',
+          cancelled ? candidateDiagnostic : 'orchestration-state',
+        )
+      }
+      const workspace = document.querySelector<HTMLElement>('[data-workspace-root]')
+      if (observePackagedE2eSuiteSettlement(
+        readWorkspacePrototypeSuiteProgress(workspace),
+        workspace?.dataset.agentWorking === 'true',
+      )) {
+        await cancelPackagedE2eActiveRun()
+        throw new JourneyFailure(
+          'prototype-suite-ready',
+          'journey-timeout',
+          'orchestration-state',
+        )
+      }
+      if (retryPendingRun()) {
+        retryUiGrace?.cancel()
+        retryUiGrace = undefined
+        await pass('run-retried')
+        await waitFor(
+          () => hasRetryRunStarted(workspaceRoot()),
+          2 * 60_000,
+        )
+        continue
+      }
+      if (workspaceRoot().dataset.runFailed === 'true'
+        && workspaceRoot().dataset.agentWorking === 'false') {
+        retryUiGrace ??= createPackagedE2eDeadline(PACKAGED_E2E_RETRY_UI_GRACE_MS)
+        if (!retryUiGrace.expired()) {
+          await yieldToUi()
+          continue
+        }
+        retryUiGrace.cancel()
+        retryUiGrace = undefined
+      } else {
+        retryUiGrace?.cancel()
+        retryUiGrace = undefined
+      }
+      if (read()) return
+      approvePendingTools()
       await yieldToUi()
-      continue
     }
-    if (read()) return
-    approvePendingTools()
-    await yieldToUi()
+    throw new Error('packaged-e2e-journey-timeout')
+  } finally {
+    deadline.cancel()
+    retryUiGrace?.cancel()
   }
-  throw new Error('packaged-e2e-journey-timeout')
 }
 
 export async function cancelPackagedE2eActiveRun(): Promise<boolean> {
@@ -1871,6 +1970,43 @@ export function monotonicDeadline(
 ): () => boolean {
   const deadline = now() + timeoutMs
   return () => now() >= deadline
+}
+
+interface PackagedE2eDeadline {
+  expired(): boolean
+  cancel(): void
+}
+
+/** Native deadlines cap at ten minutes. Long journey budgets compose bounded
+ * native segments so a background renderer never becomes the clock owner. */
+export function createPackagedE2eDeadline(timeoutMs: number): PackagedE2eDeadline {
+  if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 1) {
+    throw new Error('packaged-e2e-timeout-invalid')
+  }
+  const maximumSegmentMs = 10 * 60_000
+  let expired = false
+  let cancelled = false
+  let current: MonotonicDeadline | undefined
+  void (async () => {
+    let remaining = timeoutMs
+    while (remaining > 0 && !cancelled) {
+      const segment = Math.min(remaining, maximumSegmentMs)
+      const deadline = createMonotonicDeadline(segment)
+      current = deadline
+      const elapsed = await deadline.elapsed
+      if (!elapsed || cancelled) return
+      remaining -= segment
+    }
+    if (!cancelled) expired = true
+  })()
+  return {
+    expired: () => expired,
+    cancel: () => {
+      if (cancelled) return
+      cancelled = true
+      current?.cancel()
+    },
+  }
 }
 
 export function readWorkspaceDesignCandidateProgress(

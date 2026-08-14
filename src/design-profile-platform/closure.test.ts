@@ -72,7 +72,6 @@ function manifestContent(input: {
       : [],
     requiredRoleClosures: [],
     identityBindings: [],
-    fixtures: [],
   }
 }
 

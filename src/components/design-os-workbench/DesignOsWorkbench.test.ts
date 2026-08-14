@@ -138,6 +138,7 @@ describe("DesignOsWorkbench", () => {
     expect(html).not.toContain(">Design OS<");
     expect(html).toContain("Overview");
     expect(html).toContain("Sources");
+    expect(html).toContain("Game assets");
     expect(html).toContain("Figma");
     expect(html).not.toContain(">Kits</button>");
     expect(html).not.toContain(">Components</button>");

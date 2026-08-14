@@ -4,9 +4,14 @@ use std::time::Duration;
 use hmac::{Hmac, Mac};
 use keyring::{Entry, Error as KeyringError};
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 use sha2::{Digest, Sha256};
+use tauri::AppHandle;
 
 use super::ai_proxy::ProxyError;
+use super::commerce_held_out::{
+    held_out_request_hash, recover_held_out_response, settle_held_out_response,
+};
 
 const SERVICE: &str = "com.nebutra.cutout";
 const RECEIPT_KEY_ACCOUNT: &str = "host:multimodal-receipt:v1";
@@ -21,6 +26,8 @@ const PLAYBACK_DECODER: &str = "avfoundation-asset-image-generator-v1";
 pub struct MultimodalHostContext {
     pub request_id: String,
     pub run_id: String,
+    #[serde(default)]
+    pub held_out_commitment_hash: Option<String>,
     pub semantic_role: Option<String>,
     pub node_id: Option<String>,
     pub capability_id: Option<String>,
@@ -52,6 +59,8 @@ pub struct MultimodalArtifactEvidence {
 #[serde(rename_all = "camelCase")]
 pub struct PlaybackPromotionEvidence {
     pub source_receipt_hash: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_held_out_commitment_hash: Option<String>,
     pub decoder: String,
     pub representative_frames: u32,
     pub non_blank_frames: u32,
@@ -65,6 +74,8 @@ struct MultimodalReceiptPayload {
     receipt_id: String,
     request_id: String,
     run_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    held_out_commitment_hash: Option<String>,
     provider_id: String,
     provider_kind: String,
     model: String,
@@ -92,6 +103,8 @@ pub struct MultimodalHostReceipt {
     pub receipt_hash: String,
     pub request_id: String,
     pub run_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub held_out_commitment_hash: Option<String>,
     pub provider_id: String,
     pub provider_kind: String,
     pub model: String,
@@ -119,6 +132,7 @@ impl MultimodalHostReceipt {
             receipt_id: self.receipt_id.clone(),
             request_id: self.request_id.clone(),
             run_id: self.run_id.clone(),
+            held_out_commitment_hash: self.held_out_commitment_hash.clone(),
             provider_id: self.provider_id.clone(),
             provider_kind: self.provider_kind.clone(),
             model: self.model.clone(),
@@ -137,11 +151,50 @@ impl MultimodalHostReceipt {
             playback_promotion: self.playback_promotion.clone(),
         }
     }
+
+    pub(crate) fn run_id(&self) -> &str {
+        &self.run_id
+    }
+
+    pub(crate) fn held_out_commitment_hash(&self) -> Option<&str> {
+        self.held_out_commitment_hash.as_deref()
+    }
+
+    pub(crate) fn started_at(&self) -> u64 {
+        self.started_at
+    }
+
+    pub(crate) fn completed_at(&self) -> u64 {
+        self.completed_at
+    }
+
+    pub(crate) fn receipt_hash(&self) -> &str {
+        &self.receipt_hash
+    }
+
+    pub(crate) fn playback_source_receipt_hash(&self) -> Option<&str> {
+        self.playback_promotion
+            .as_ref()
+            .map(|promotion| promotion.source_receipt_hash.as_str())
+    }
+
+    pub(crate) fn semantic_role(&self) -> Option<&str> {
+        self.semantic_role.as_deref()
+    }
+
+    pub(crate) fn node_id(&self) -> Option<&str> {
+        self.node_id.as_deref()
+    }
 }
 
 fn signing_key_cache() -> &'static Mutex<Option<Vec<u8>>> {
     static CACHE: OnceLock<Mutex<Option<Vec<u8>>>> = OnceLock::new();
     CACHE.get_or_init(|| Mutex::new(None))
+}
+
+#[cfg(test)]
+pub(crate) fn install_ephemeral_test_signing_key() {
+    *signing_key_cache().lock().unwrap() = Some(vec![0x5a; 32]);
 }
 
 fn signing_key() -> Result<Vec<u8>, ProxyError> {
@@ -258,8 +311,12 @@ fn validate_route_binding(
     }
     let wan27 = model == "wan2.7-i2v-2026-04-25";
     let image_to_video = operation == "image-to-video";
+    let qwen_vl = model == "qwen3-vl-plus";
+    let vision_ocr = operation == "vision-ocr";
     if wan27 != image_to_video
         || (image_to_video && (accepted_reference_artifact_ids.len() != 1 || lock_ids.is_empty()))
+        || qwen_vl != vision_ocr
+        || (vision_ocr && (accepted_reference_artifact_ids.len() != 1 || lock_ids.is_empty()))
     {
         return Err(ProxyError::Request(
             "multimodal image-to-video receipt binding is invalid".into(),
@@ -311,6 +368,7 @@ pub fn issue_receipt(
         receipt_id,
         request_id: context.request_id.clone(),
         run_id: context.run_id.clone(),
+        held_out_commitment_hash: context.held_out_commitment_hash.clone(),
         provider_id: provider_id.to_string(),
         provider_kind: "dashscope".into(),
         model: model.to_string(),
@@ -341,6 +399,10 @@ pub fn issue_receipt(
         || !validate_identifier(&payload.provider_id)
         || !validate_identifier(&payload.model)
         || payload
+            .held_out_commitment_hash
+            .as_deref()
+            .is_some_and(|value| decode_hex(value).is_none())
+        || payload
             .semantic_role
             .iter()
             .chain(payload.node_id.iter())
@@ -355,12 +417,13 @@ pub fn issue_receipt(
     }
     let receipt_hash = sha256(&payload_bytes(&payload)?);
     let signature = sign_hash(&receipt_hash, &signing_key()?)?;
-    Ok(MultimodalHostReceipt {
+    let receipt = MultimodalHostReceipt {
         protocol: payload.protocol,
         receipt_id: payload.receipt_id,
         receipt_hash,
         request_id: payload.request_id,
         run_id: payload.run_id,
+        held_out_commitment_hash: payload.held_out_commitment_hash,
         provider_id: payload.provider_id,
         provider_kind: payload.provider_kind,
         model: payload.model,
@@ -378,10 +441,11 @@ pub fn issue_receipt(
         remote_task_id_hash: payload.remote_task_id_hash,
         playback_promotion: payload.playback_promotion,
         signature,
-    })
+    };
+    Ok(receipt)
 }
 
-fn verify_receipt(
+pub(crate) fn verify_receipt(
     receipt: &MultimodalHostReceipt,
     artifact_bytes: &[u8],
 ) -> Result<MultimodalArtifactEvidence, ProxyError> {
@@ -425,6 +489,8 @@ fn validate_playback_promotion(receipt: &MultimodalHostReceipt) -> Result<(), Pr
                 && promotion.representative_frames == 3
                 && promotion.non_blank_frames == promotion.representative_frames
                 && decode_hex(&promotion.source_receipt_hash).is_some()
+                && promotion.source_held_out_commitment_hash
+                    == receipt.held_out_commitment_hash
                 && decode_hex(&promotion.pixel_evidence_hash).is_some() =>
         {
             Ok(())
@@ -509,6 +575,7 @@ fn issue_playback_receipt(
         ),
         request_id: source.request_id.clone(),
         run_id: source.run_id.clone(),
+        held_out_commitment_hash: source.held_out_commitment_hash.clone(),
         provider_id: source.provider_id.clone(),
         provider_kind: source.provider_kind.clone(),
         model: source.model.clone(),
@@ -526,6 +593,7 @@ fn issue_playback_receipt(
         remote_task_id_hash: source.remote_task_id_hash.clone(),
         playback_promotion: Some(PlaybackPromotionEvidence {
             source_receipt_hash: source.receipt_hash.clone(),
+            source_held_out_commitment_hash: source.held_out_commitment_hash.clone(),
             decoder: PLAYBACK_DECODER.into(),
             representative_frames: 3,
             non_blank_frames,
@@ -540,6 +608,7 @@ fn issue_playback_receipt(
         receipt_hash,
         request_id: payload.request_id,
         run_id: payload.run_id,
+        held_out_commitment_hash: payload.held_out_commitment_hash,
         provider_id: payload.provider_id,
         provider_kind: payload.provider_kind,
         model: payload.model,
@@ -684,11 +753,47 @@ pub async fn verify_multimodal_host_artifact(
     verify_receipt(&receipt, &artifact_bytes)
 }
 
-#[tauri::command]
-pub async fn promote_multimodal_video_playback(
+pub(crate) async fn promote_multimodal_video_playback_inner(
+    app: Option<&AppHandle>,
     receipt: MultimodalHostReceipt,
     artifact_bytes: Vec<u8>,
 ) -> Result<MultimodalHostReceipt, ProxyError> {
+    let replay = if let Some(commitment_hash) = receipt.held_out_commitment_hash.as_deref() {
+        let app = app.ok_or_else(|| {
+            ProxyError::Request(
+                "held-out playback promotion requires the native replay store".into(),
+            )
+        })?;
+        let node_id = receipt.node_id.as_deref().ok_or_else(|| {
+            ProxyError::Request(
+                "held-out playback promotion requires an exact native Plan node".into(),
+            )
+        })?;
+        let slot_id = format!("playback-promotion:{node_id}");
+        let request_hash = held_out_request_hash(&json!({
+            "operation": "multimodal-playback-promotion",
+            "sourceReceiptHash": receipt.receipt_hash,
+            "artifactSha256": sha256(&artifact_bytes),
+        }))?;
+        if let Some(response) = recover_held_out_response(
+            app,
+            commitment_hash,
+            &receipt.run_id,
+            &slot_id,
+            &request_hash,
+        )? {
+            return Ok(response);
+        }
+        Some((
+            app,
+            commitment_hash.to_string(),
+            receipt.run_id.clone(),
+            slot_id,
+            request_hash,
+        ))
+    } else {
+        None
+    };
     if artifact_bytes.is_empty() || artifact_bytes.len() > MAX_PLAYBACK_BYTES {
         return Err(ProxyError::Request(
             "video playback artifact exceeds the bounded input contract".into(),
@@ -710,13 +815,34 @@ pub async fn promote_multimodal_video_playback(
                 ProxyError::Request("AVFoundation playback verification timed out".into())
             })?
             .map_err(|_| ProxyError::Request("AVFoundation playback worker failed".into()))??;
-    issue_playback_receipt(
+    let promoted = issue_playback_receipt(
         &receipt,
         pixel_evidence_hash,
         non_blank_frames,
         started_at,
         unix_millis()?,
-    )
+    )?;
+    if let Some((app, commitment_hash, run_id, slot_id, request_hash)) = replay {
+        return settle_held_out_response(
+            app,
+            &commitment_hash,
+            &run_id,
+            &slot_id,
+            &request_hash,
+            &promoted.receipt_hash,
+            &promoted,
+        );
+    }
+    Ok(promoted)
+}
+
+#[tauri::command]
+pub async fn promote_multimodal_video_playback(
+    app: AppHandle,
+    receipt: MultimodalHostReceipt,
+    artifact_bytes: Vec<u8>,
+) -> Result<MultimodalHostReceipt, ProxyError> {
+    promote_multimodal_video_playback_inner(Some(&app), receipt, artifact_bytes).await
 }
 
 fn unix_millis() -> Result<u64, ProxyError> {
@@ -799,6 +925,32 @@ mod tests {
     }
 
     #[test]
+    fn playback_promotion_retains_the_signed_held_out_commitment() {
+        let mut source = unsigned_test_receipt();
+        source.held_out_commitment_hash = Some("e".repeat(64));
+        let promoted = issue_playback_receipt(&source, "f".repeat(64), 3, 3, 4).unwrap();
+        assert_eq!(
+            promoted.held_out_commitment_hash,
+            source.held_out_commitment_hash
+        );
+        assert_eq!(
+            promoted
+                .playback_promotion
+                .as_ref()
+                .and_then(|value| value.source_held_out_commitment_hash.as_deref()),
+            source.held_out_commitment_hash.as_deref(),
+        );
+        assert!(validate_playback_promotion(&promoted).is_ok());
+        let mut drifted = promoted;
+        drifted
+            .playback_promotion
+            .as_mut()
+            .unwrap()
+            .source_held_out_commitment_hash = Some("0".repeat(64));
+        assert!(validate_playback_promotion(&drifted).is_err());
+    }
+
+    #[test]
     fn blank_pixel_buffers_fail_closed() {
         assert!(!frame_is_non_blank(&[0; 16], 2, 2, 8, 4));
         assert!(!frame_is_non_blank(
@@ -847,6 +999,7 @@ mod tests {
             receipt_hash: "b".repeat(64),
             request_id: "request:test".into(),
             run_id: "run:test".into(),
+            held_out_commitment_hash: None,
             provider_id: "provider:test".into(),
             provider_kind: "dashscope".into(),
             model: "wan2.6-t2v".into(),

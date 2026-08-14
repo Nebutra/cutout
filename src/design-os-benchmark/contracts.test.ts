@@ -32,17 +32,16 @@ describe('Design OS evidence benchmark', () => {
     const report = await currentReport()
 
     expect(report.summary).toEqual({
-      overall: { total: 17, passed: 8, failed: 0, blocked: 9, ready: false },
-      coverage: { passed: 8, total: 17, basisPoints: 4_706 },
+      overall: { total: 14, passed: 5, failed: 0, blocked: 9, ready: false },
+      coverage: { passed: 5, total: 14, basisPoints: 3_571 },
       stages: [
         { stage: 'contract', total: 5, passed: 5, failed: 0, blocked: 0, ready: true },
-        { stage: 'conformance', total: 3, passed: 3, failed: 0, blocked: 0, ready: true },
         { stage: 'real-host', total: 8, passed: 0, failed: 0, blocked: 8, ready: false },
         { stage: 'production-rehearsal', total: 1, passed: 0, failed: 0, blocked: 1, ready: false },
       ],
-      maturity: 'conformance',
+      maturity: 'contract',
       nextStage: 'real-host',
-      criticalFrontier: report.metrics.slice(8, 16).map((metric) => ({
+      criticalFrontier: report.metrics.slice(5, 13).map((metric) => ({
         metricId: metric.id,
         stage: 'real-host',
         status: 'blocked',
@@ -90,6 +89,51 @@ describe('Design OS evidence benchmark', () => {
     expect(() => decodeDesignOsBenchmarkReport(summarized)).toThrow(/summary must be derived/)
   })
 
+  it('rejects old v1 and conformance-shaped reports as current evidence', async () => {
+    const oldV1 = clone(await currentReport())
+    oldV1.benchmark.version = 1
+    expect(() => decodeDesignOsBenchmarkReport(oldV1)).toThrow(/Unsupported Design OS benchmark/)
+
+    const oldStage = clone(await currentReport()) as unknown as { summary: { stages: unknown[] } }
+    oldStage.summary.stages.splice(1, 0, {
+      stage: 'conformance', total: 3, passed: 3, failed: 0, blocked: 0, ready: true,
+    })
+    expect(() => decodeDesignOsBenchmarkReport(oldStage)).toThrow()
+  })
+
+  it('keeps the normal decoder fail-closed for a caller-authored rehearsal pass', async () => {
+    const passed = clone(await currentReport())
+    const rehearsal = passed.metrics.at(-1)!
+    rehearsal.status = 'passed'
+    delete rehearsal.diagnostic
+    settleSummary(passed)
+
+    expect(() => decodeDesignOsBenchmarkReport(passed))
+      .toThrow(/requires the native held-out rehearsal decoder/)
+
+    const blockedWithAdmission = clone(await currentReport())
+    const blockedAudit = blockedWithAdmission.metrics.at(-1)!
+    if (blockedAudit.source.kind !== 'profile-capability-audit') throw new Error('Missing audit fixture.')
+    blockedAudit.source.admission = {
+      protocol: 'cutout.commerce-held-out-admission.v2',
+      challengeId: 'challenge:caller',
+      challengeHash: 'd'.repeat(64),
+      evaluatorKeyId: 'evaluator:caller',
+      hostBuildVersion: '0.1.20',
+      commitmentId: 'commitment:caller',
+      commitmentHash: 'a'.repeat(64),
+      attestationId: 'attestation:caller',
+      inputManifestHash: 'b'.repeat(64),
+      runId: 'run:caller',
+      bundleHash: 'c'.repeat(64),
+      commitmentIssuedAt: 1,
+      evaluatorCompletedAt: 2,
+      deliverableCount: 11,
+    }
+    expect(() => decodeDesignOsBenchmarkReport(blockedWithAdmission))
+      .toThrow(/cannot carry admission evidence/)
+  })
+
   it('strictly decodes the Profile source before projection and binds its canonical hash', async () => {
     const tamperedCommerce = structuredClone(commerceCurrent)
     tamperedCommerce.summary.productionReady = true
@@ -116,7 +160,7 @@ describe('Design OS evidence benchmark', () => {
     settleSummary(report)
 
     const decoded = decodeDesignOsBenchmarkReport(report)
-    expect(decoded.summary.coverage.passed).toBe(15)
+    expect(decoded.summary.coverage.passed).toBe(12)
     expect(decoded.summary.maturity).toBe('unproven')
     expect(decoded.summary.nextStage).toBe('contract')
     expect(decoded.summary.productionReady).toBe(false)
@@ -126,14 +170,14 @@ describe('Design OS evidence benchmark', () => {
     const baseline = await currentReport()
     const prior = clone(baseline)
     prior.identity = { id: 'benchmark-run:prior', revision: 'benchmark-run:prior:revision:1' }
-    const priorMetric = prior.metrics[7]!
+    const priorMetric = prior.metrics[4]!
     priorMetric.status = 'blocked'
     priorMetric.diagnostic = { code: 'not-yet-proven', message: 'Evidence was not yet available.' }
     settleSummary(prior)
 
     const progress = compareDesignOsBenchmarkReports(prior, baseline)
-    expect(progress.newlyPassed).toEqual([baseline.metrics[7]!.id])
-    expect(progress.stageTransitions).toEqual([{ stage: 'conformance', from: 'not-ready', to: 'ready' }])
+    expect(progress.newlyPassed).toEqual([baseline.metrics[4]!.id])
+    expect(progress.stageTransitions).toEqual([{ stage: 'contract', from: 'not-ready', to: 'ready' }])
     expect(progress.coverageDeltaBasisPoints).toBeGreaterThan(0)
     expect(progress.releaseRegression).toBe(false)
 
@@ -147,15 +191,8 @@ describe('Design OS evidence benchmark', () => {
     delete rehearsalMetric.diagnostic
     settleSummary(regressed)
 
-    const comparison = compareDesignOsBenchmarkReports(baseline, regressed)
-    expect(comparison.regressions).toEqual([contractMetric.id])
-    expect(comparison.criticalRegressions).toEqual([contractMetric.id])
-    expect(comparison.newlyPassed).toEqual([rehearsalMetric.id])
-    expect(comparison.stageTransitions).toEqual([
-      { stage: 'contract', from: 'ready', to: 'not-ready' },
-      { stage: 'production-rehearsal', from: 'not-ready', to: 'ready' },
-    ])
-    expect(comparison.releaseRegression).toBe(true)
+    expect(() => compareDesignOsBenchmarkReports(baseline, regressed))
+      .toThrow(/requires the native held-out rehearsal decoder/)
   })
 
   it('rejects an incompatible benchmark ruler before comparison', async () => {

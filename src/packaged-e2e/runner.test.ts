@@ -15,6 +15,9 @@ import {
   cancelPackagedE2eActiveRun,
   collectPackagedE2eOutcome,
   createPackagedE2eCandidateOwnerWatch,
+  createPackagedE2eCandidateOwnerDeadlineMonitor,
+  observePackagedE2eCandidateOwnerDeadlines,
+  cancelPackagedE2eCandidateOwnerDeadlines,
   createPackagedE2eRetryTracker,
   hasAttentionRequiredDeliveryEvidence,
   hasCompleteDeliveryEvidence,
@@ -51,9 +54,12 @@ import {
 } from './runner'
 import { projectPackagedE2eDesignCandidateOwnerStage } from './design-candidate-owner'
 import { prototypeRouteGraphFingerprint } from '@/prototype/prototype-plan'
+import { tauriBridge } from '@/platform/native'
 
 afterEach(() => {
   document.body.replaceChildren()
+  vi.unstubAllGlobals()
+  vi.restoreAllMocks()
 })
 
 function makeVisible(element: HTMLElement): void {
@@ -841,6 +847,61 @@ describe('packaged E2E failure diagnostics', () => {
       ...progress[0], status: 'ready', ownerStage: 'terminal',
     }], watch, 50_001)).toBeUndefined()
     expect(watch.active.size).toBe(0)
+  })
+
+  it('settles a stalled candidate owner from the native clock when renderer timers are frozen', async () => {
+    let settleNative!: () => void
+    const native = new Promise<void>((resolve) => {
+      settleNative = resolve
+    })
+    const nativeWait = vi.spyOn(tauriBridge, 'waitForMonotonicDeadline')
+      .mockReturnValue(native)
+    const nativeCancel = vi.spyOn(tauriBridge, 'cancelMonotonicDeadline')
+      .mockResolvedValue(undefined)
+    vi.stubGlobal('__TAURI_INTERNALS__', { invoke: vi.fn() })
+    const rendererTimer = vi.spyOn(globalThis, 'setTimeout')
+      .mockImplementation(() => 0 as never)
+    const monitor = createPackagedE2eCandidateOwnerDeadlineMonitor()
+    const progress = [{
+      candidateId: 'design-3' as const,
+      status: 'generating' as const,
+      ownerStage: 'provider-executing' as const,
+    }]
+
+    expect(observePackagedE2eCandidateOwnerDeadlines(progress, monitor)).toBeUndefined()
+    expect(nativeWait).toHaveBeenCalledWith(
+      expect.stringMatching(/^[0-9a-f-]{36}$/),
+      PACKAGED_E2E_CANDIDATE_OWNER_DEADLINES_MS['provider-executing'],
+    )
+    expect(rendererTimer).not.toHaveBeenCalled()
+
+    settleNative()
+    await Promise.resolve()
+    await Promise.resolve()
+
+    expect(observePackagedE2eCandidateOwnerDeadlines(progress, monitor))
+      .toBe('candidate-provider-timeout')
+    cancelPackagedE2eCandidateOwnerDeadlines(monitor)
+    expect(monitor.active.size).toBe(0)
+    expect(nativeCancel).not.toHaveBeenCalled()
+  })
+
+  it('cancels an owner deadline when that candidate reaches a terminal state', () => {
+    const nativeWait = vi.spyOn(tauriBridge, 'waitForMonotonicDeadline')
+      .mockReturnValue(new Promise<void>(() => undefined))
+    const nativeCancel = vi.spyOn(tauriBridge, 'cancelMonotonicDeadline')
+      .mockResolvedValue(undefined)
+    vi.stubGlobal('__TAURI_INTERNALS__', { invoke: vi.fn() })
+    const monitor = createPackagedE2eCandidateOwnerDeadlineMonitor()
+
+    observePackagedE2eCandidateOwnerDeadlines([{
+      candidateId: 'design-3', status: 'generating', ownerStage: 'provider-executing',
+    }], monitor)
+    const deadlineId = nativeWait.mock.calls[0]![0]
+    expect(observePackagedE2eCandidateOwnerDeadlines([{
+      candidateId: 'design-3', status: 'ready', ownerStage: 'terminal',
+    }], monitor)).toBeUndefined()
+    expect(nativeCancel).toHaveBeenCalledWith(deadlineId)
   })
 
   it('cancels a timed-out owner through the real Agent run control', async () => {

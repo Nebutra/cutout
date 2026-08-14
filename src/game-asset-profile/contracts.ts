@@ -4,6 +4,17 @@ import { recordIdSchema, schemaReferenceSchema, sha256Schema } from '@/design-os
 export const GAME_ASSET_PROFILE_ID = 'profile:game-asset-production' as const
 export const GAME_ASSET_PROFILE_VERSION = '1.0.0' as const
 
+export function compareGameAssetEvidenceIdentity(left: string, right: string): number {
+  const leftBytes = new TextEncoder().encode(left)
+  const rightBytes = new TextEncoder().encode(right)
+  const length = Math.min(leftBytes.length, rightBytes.length)
+  for (let index = 0; index < length; index += 1) {
+    const difference = leftBytes[index]! - rightBytes[index]!
+    if (difference !== 0) return difference
+  }
+  return leftBytes.length - rightBytes.length
+}
+
 export const gameAssetKindSchema = z.enum([
   'player', 'npc', 'creature', 'prop', 'fx', 'projectile', 'impact', 'layered-map',
 ])
@@ -40,6 +51,18 @@ export const gameAssetRoleSchema = z.object({
   expectedAnchor: z.object({ x: z.number().finite(), y: z.number().finite() }).strict(),
 }).strict()
 export type GameAssetRole = z.infer<typeof gameAssetRoleSchema>
+
+export const gameAssetAlphaBoundsSchema = z.object({
+  x: z.number().int().nonnegative(),
+  y: z.number().int().nonnegative(),
+  width: z.number().int().positive(),
+  height: z.number().int().positive(),
+}).strict()
+
+export const gameAssetAnchorPointSchema = z.object({
+  x: z.number().finite(),
+  y: z.number().finite(),
+}).strict()
 
 export const gameAssetPlanSchema = z.object({
   version: z.literal('game-asset.plan.v1'),
@@ -86,14 +109,9 @@ export const observedGameAssetFrameSchema = z.object({
   contentHash: sha256Schema,
   decodedWidth: z.number().int().positive().max(16_384),
   decodedHeight: z.number().int().positive().max(16_384),
-  alphaBounds: z.object({
-    x: z.number().int().nonnegative(),
-    y: z.number().int().nonnegative(),
-    width: z.number().int().positive(),
-    height: z.number().int().positive(),
-  }).strict(),
+  alphaBounds: gameAssetAlphaBoundsSchema,
   edgeContact: z.boolean(),
-  anchor: z.object({ x: z.number().finite(), y: z.number().finite() }).strict(),
+  anchor: gameAssetAnchorPointSchema,
   identityLock: gameAssetEvidenceReferenceSchema,
   scaleLock: gameAssetEvidenceReferenceSchema,
   anchorLock: gameAssetEvidenceReferenceSchema,
@@ -145,13 +163,6 @@ export const gameAssetEvaluationSchema = z.object({
   }).strict()).max(100_000),
 }).strict()
 export type GameAssetEvaluation = z.infer<typeof gameAssetEvaluationSchema>
-
-export const gameAssetMaturityEvidenceSchema = z.object({
-  version: z.literal('game-asset.maturity-evidence.v1'),
-  profileId: z.literal(GAME_ASSET_PROFILE_ID),
-  reportId: recordIdSchema,
-}).strict()
-export type GameAssetMaturityEvidence = z.infer<typeof gameAssetMaturityEvidenceSchema>
 
 export const gameMapLayerSchema = z.enum(['base', 'props', 'actors', 'foreground', 'collision', 'zones', 'preview'])
 export const layeredGameMapManifestSchema = z.object({

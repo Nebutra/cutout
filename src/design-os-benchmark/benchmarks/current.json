@@ -2,7 +2,7 @@
   "schema": "design-os.benchmark-report.v1",
   "benchmark": {
     "id": "benchmark:design-os:production-maturity",
-    "version": 1
+    "version": 2
   },
   "identity": {
     "id": "benchmark-run:design-os:current",
@@ -17,13 +17,13 @@
         "schema": "commerce.profile-benchmark.v1",
         "benchmark": {
           "id": "benchmark:commerce-profile:p1-p7",
-          "version": 1
+          "version": 2
         },
         "identity": {
           "id": "benchmark-run:current",
           "revision": "benchmark-run:current:revision:1"
         },
-        "contentHash": "caa9fbf6f94b70b298ccb4879168568a7ecfbf81dedd0b423b008a15d03ee085"
+        "contentHash": "d98bfdd7f189c628f2b8ad33e5d8a540c08b168e273a718f9468d72ca12f6e3c"
       }
     }
   ],
@@ -91,45 +91,6 @@
         "kind": "profile-report-metric",
         "sourceReportId": "source-report:commerce:benchmark-run:current",
         "sourceMetricId": "p5.kernel-profile-composition"
-      }
-    },
-    {
-      "id": "commerce.conformance.deliverable-closure",
-      "profileId": "commerce",
-      "stage": "conformance",
-      "label": "Mocked deliverable closure",
-      "critical": true,
-      "status": "passed",
-      "source": {
-        "kind": "profile-report-metric",
-        "sourceReportId": "source-report:commerce:benchmark-run:current",
-        "sourceMetricId": "p6.mocked-deliverable-closure"
-      }
-    },
-    {
-      "id": "commerce.conformance.targeted-repair",
-      "profileId": "commerce",
-      "stage": "conformance",
-      "label": "Mocked targeted repair",
-      "critical": true,
-      "status": "passed",
-      "source": {
-        "kind": "profile-report-metric",
-        "sourceReportId": "source-report:commerce:benchmark-run:current",
-        "sourceMetricId": "p6.mocked-targeted-repair"
-      }
-    },
-    {
-      "id": "commerce.conformance.strategy-evidence",
-      "profileId": "commerce",
-      "stage": "conformance",
-      "label": "Mocked strategy evidence",
-      "critical": true,
-      "status": "passed",
-      "source": {
-        "kind": "profile-report-metric",
-        "sourceReportId": "source-report:commerce:benchmark-run:current",
-        "sourceMetricId": "p7.mocked-strategy-evidence"
       }
     },
     {
@@ -288,30 +249,22 @@
   ],
   "summary": {
     "overall": {
-      "total": 17,
-      "passed": 8,
+      "total": 14,
+      "passed": 5,
       "failed": 0,
       "blocked": 9,
       "ready": false
     },
     "coverage": {
-      "passed": 8,
-      "total": 17,
-      "basisPoints": 4706
+      "passed": 5,
+      "total": 14,
+      "basisPoints": 3571
     },
     "stages": [
       {
         "stage": "contract",
         "total": 5,
         "passed": 5,
-        "failed": 0,
-        "blocked": 0,
-        "ready": true
-      },
-      {
-        "stage": "conformance",
-        "total": 3,
-        "passed": 3,
         "failed": 0,
         "blocked": 0,
         "ready": true
@@ -333,7 +286,7 @@
         "ready": false
       }
     ],
-    "maturity": "conformance",
+    "maturity": "contract",
     "nextStage": "real-host",
     "criticalFrontier": [
       {

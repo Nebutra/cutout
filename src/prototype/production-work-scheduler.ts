@@ -12,12 +12,21 @@ export interface PrototypeProductionScheduler {
   /** Shared by page, direct-asset, board, and same-Provider review calls. */
   readonly scheduleImage: AsyncLimiter
   /** Stable suite lanes are served round-robin under the shared image ceiling. */
-  readonly imageLane: (laneId: string, route?: ImageRouteHealthKey) => AsyncLimiter
+  readonly imageLane: (laneId: string, route?: ImageRouteHealthKey) => ImageWorkLimiter
   /** Same-Provider non-image work shares the ceiling without changing image-route health. */
   readonly providerLane: (laneId: string) => AsyncLimiter
   /** Asset Production snapshots currently have one revisioned publication owner. */
   readonly scheduleAssetProduction: AsyncLimiter
 }
+
+/**
+ * A queued image item becomes observable only once it owns an execution slot.
+ * Callers use that boundary for paid-work lifecycle state, not enqueue time.
+ */
+export type ImageWorkLimiter = <T>(
+  run: () => Promise<T>,
+  onStarted?: () => void,
+) => Promise<T>
 
 export interface PrototypeProductionSchedulerOptions {
   /** Terminal route failures close queued work without cancelling paid calls already in flight. */
@@ -32,6 +41,7 @@ const IMAGE_SUCCESSES_PER_CONCURRENCY_RECOVERY = 2
 
 interface QueuedImageWork<T = unknown> {
   readonly run: () => Promise<T>
+  readonly onStarted?: () => void
   readonly route?: ImageRouteHealthKey
   readonly affectsImageHealth: boolean
   readonly resolve: (value: T) => void
@@ -71,6 +81,7 @@ export function createPrototypeProductionScheduler(
     activeImageWork += 1
     if (work.route) activeRouteWork.push(work.route)
     void (async () => {
+      work.onStarted?.()
       if (imageCircuitFailure !== undefined) throw imageCircuitFailure
       try {
         const result = work.route && options.imageRouteHealth
@@ -151,11 +162,13 @@ export function createPrototypeProductionScheduler(
     run: () => Promise<T>,
     route?: ImageRouteHealthKey,
     affectsImageHealth = true,
+    onStarted?: () => void,
   ): Promise<T> =>
     new Promise<T>((resolve, reject) => {
       const queue = imageQueues.get(laneId)
       const work: QueuedImageWork<T> = {
         run,
+        ...(onStarted ? { onStarted } : {}),
         ...(route ? { route } : {}),
         affectsImageHealth,
         resolve,
@@ -170,9 +183,9 @@ export function createPrototypeProductionScheduler(
       pumpImages()
     })
 
-  const imageLane = (laneId: string, route?: ImageRouteHealthKey): AsyncLimiter => {
+  const imageLane = (laneId: string, route?: ImageRouteHealthKey): ImageWorkLimiter => {
     const stableLaneId = laneId.trim() || 'shared'
-    return (run) => enqueueImage(stableLaneId, run, route)
+    return (run, onStarted) => enqueueImage(stableLaneId, run, route, true, onStarted)
   }
 
   return {

@@ -32,6 +32,22 @@ branch.
 - Cutout's public capability contract currently declares no video-processing
   pipeline, no arbitrary path writes, and no public Godot or Unity project
   exporter. Planning must not represent those capabilities as implemented.
+- The Game Asset Profile now has a strict native desktop runner. Native preview
+  binds the exact request closure; single-use apply directly owns real BYOK
+  Provider execution without a per-call payment confirmation; returned receipts
+  and original bytes are retained, passed
+  through a versioned deterministic white-border Cutout processor, and
+  reverified byte-for-byte before processed-frame pixel evidence is accepted.
+- Post-generation semantic acceptance is separately signed only after the
+  retained output set is displayed for review, native code re-verifies the exact
+  generation evidence, and the local user confirms reference continuity, role
+  readability and style consistency for every role. Missing acceptance remains
+  blocked and cannot be replaced by caller-authored approval.
+- The System inspector now has a real Game assets workbench. It builds a retained
+  action plan from the user's reference image, previews the exact native paid
+  request, displays processed output bytes and evaluator findings, requires an
+  explicit per-role semantic review, and persists the signed bundle. Reopening a
+  stored run re-verifies its receipts and bytes instead of trusting saved status.
 
 ## Requirements
 
@@ -124,21 +140,62 @@ branch.
 - Do not change `cutout.agent-capabilities.json`, CLI, MCP, manifests, or docs
   until the corresponding end-to-end surface is executable and validated.
 
+### R7. Real-only production rehearsal
+
+- Add an official desktop Game Asset runner whose preview is a canonical digest
+  of the exact run, plan, role prompts, reference-byte hashes, locks, Provider,
+  model, output constraints and bounded role closure.
+- The native Host must consume that preview once, run the exact observed request
+  closure directly under the configured BYOK Provider policy, retain a unique
+  execution identity, and sign an authorization receipt over both the request
+  closure and returned native receipt/artifact identities. Generation preview
+  exposes `executionMode: 'byok-direct'`; it contains no renderer boolean or
+  caller-authored approval id.
+- Persist the original returned bytes, processed transparent PNG bytes, native
+  receipts and processing evidence in the rehearsal bundle. Reverification must
+  authenticate both signatures, reproduce each processed PNG byte-for-byte from
+  its original source, and reconstruct hashes, media type, decoded dimensions
+  and pixel geometry from those bytes.
+- Compute alpha bounds, edge contact and anchor geometry deterministically from
+  decoded pixels. Model or human review may judge identity continuity, action
+  readability and style, but must not author pixel facts.
+- Keep production rehearsal and promotion blocked until every declared role has
+  real retained evidence plus an independently attributable semantic acceptance
+  receipt. API success, route identity, a fixture or a test double is not that
+  evidence.
+- Fixtures and mocks may exercise strict decoding, rejection, cancellation and
+  replay behavior only. They must never set Game maturity, production readiness,
+  rehearsal completion or shared-surface promotion to passed.
+
+### R8. Intent-first scenario launch
+
+- Users describe the desired result before choosing a scenario. Explicit Game
+  Asset deliverables route locally from both Home and the project composer into
+  the real Game production workbench without requiring a chat model.
+- Intent routing pre-fills reviewable controls only. It cannot preview, execute,
+  approve, score, or promote a run.
+- Exactly one attached image may become the retained master reference. Multiple
+  images require explicit selection; the router must not guess identity authority.
+- `Create -> Game assets` remains a visible fallback, not the primary workflow.
+
 ## Acceptance Criteria
 
-- [ ] A fixture brief compiles into a deterministic sprite-family graph with
-      separate idle, run, attack-body, attack-FX, and delivery-atlas nodes.
+- [ ] A contract case compiles into a deterministic sprite-family graph with
+      separate idle, run, attack-body, attack-FX, and delivery-atlas nodes;
+      this proves graph conformance only.
 - [ ] Changing the accepted master scale/identity revision stales dependent body
       actions and atlases, but not unrelated props or map terrain.
-- [ ] A deterministic processor turns a fixed raw grid fixture into ordered
-      transparent frames plus sheet/preview artifacts and emits reproducible QA
-      measurements for empty frames, edge touch, anchor drift, and scale drift.
-- [ ] A fixture whose decoded dimensions or frame timing differs from the request
+- [ ] A deterministic processor turns retained real Host output bytes into
+      ordered transparent frames plus sheet/preview artifacts and emits
+      reproducible QA measurements for empty frames, edge touch, anchor drift,
+      and scale drift. Fixed bytes may additionally test determinism but cannot
+      satisfy the real-Host criterion.
+- [ ] A retained artifact whose decoded dimensions or frame timing differs from the request
       records the observed values, blocks incompatible slicing/delivery, and does
       not let requested values masquerade as receipt or QA truth.
 - [ ] A quality-rejected action cannot satisfy the family outcome; retrying that
       action preserves accepted sibling hashes.
-- [ ] A layered-map fixture distinguishes base/reference/object/preview artifacts,
+- [ ] A layered-map contract case distinguishes base/reference/object/preview artifacts,
       validates structured placements/collision/zones, and composes a preview from
       the same accepted runtime objects described by its manifest.
 - [ ] A runtime-neutral bundle round-trips through schema validation, uses only
@@ -152,11 +209,26 @@ branch.
 - [ ] Game Asset evidence maturity and Outcome quality decode from independent,
       versioned reports; raising a quality score cannot advance Host/rehearsal
       maturity, and valid Host receipts cannot manufacture sprite quality.
+- [ ] The desktop runner previews one exact bounded Game request closure before
+      apply, consumes the preview once without paid confirmation, invokes the
+      real native image route, and returns retained bytes plus a signed execution
+      receipt that independently rebinds every generation receipt and artifact.
+- [ ] A complete real run is independently reverified from retained signatures
+      and bytes. Missing native authorization, altered prompts/references/locks,
+      receipt drift, byte drift, duplicate role output, missing semantic
+      acceptance or a partial run remains blocked.
+- [ ] No test fixture, mocked native verifier, synthetic Provider response or
+      caller-authored score/readiness field can satisfy real-Host, production-
+      rehearsal or promotion acceptance.
 - [ ] Public Agent capability validation passes only after any genuinely shipped
       operations, formats, CLI/MCP tools, manifest, and docs are synchronized.
-- [ ] Focused unit, malformed-contract, dependency/repair, and deterministic
-      fixture tests pass together with `pnpm agent:validate`, type-check, lint,
-      and relevant existing production/Kernel suites.
+- [x] A natural-language Game Asset brief from Home or the project composer opens
+      the Game workbench with extracted action/direction/frame controls, bypasses
+      the generic Agent run, and binds only one unambiguous image attachment.
+- [ ] Focused unit, malformed-contract, dependency/repair and deterministic-
+      bytes tests pass together with native source tests, `pnpm agent:validate`,
+      type-check, lint, and relevant existing production/Kernel suites. Any real-
+      Host claim additionally cites a retained run rather than test output.
 
 ## Out Of Scope
 

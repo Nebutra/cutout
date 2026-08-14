@@ -479,18 +479,34 @@ export interface StrictProjectionAdapter<Output> {
   readonly project: (decodedSource: unknown) => Output
 }
 
+export interface EvidenceVerificationAdapter {
+  readonly profileId: string
+  readonly ruler: z.infer<typeof rulerReferenceSchema>
+  readonly sourceSchema: z.ZodType
+  readonly verifyAndProject: (decodedSource: unknown) => Promise<EvidenceBenchmarkProjection>
+}
+
 export class EvidenceBenchmarkAdapterRegistry extends TrustedBindingRegistry<
   'evidence-benchmark-adapter',
-  StrictProjectionAdapter<EvidenceBenchmarkProjection>
+  EvidenceVerificationAdapter
 > {
   constructor() {
-    super('evidence-benchmark-adapter', isProjectionAdapter)
+    super('evidence-benchmark-adapter', isEvidenceVerificationAdapter)
   }
 
-  project(reference: ProfileBindingReference, source: unknown): EvidenceBenchmarkProjection {
+  async verifyAndProject(
+    reference: ProfileBindingReference,
+    source: unknown,
+  ): Promise<EvidenceBenchmarkProjection> {
     const adapter = this.require(reference).implementation
     const decoded = adapter.sourceSchema.parse(source)
-    const projection = evidenceBenchmarkProjectionSchema.parse(adapter.project(structuredClone(decoded)))
+    const pendingProjection = adapter.verifyAndProject(
+      deepFreeze(structuredClone(decoded)),
+    )
+    if (!isPromiseLike(pendingProjection)) {
+      throw new Error('Evidence maturity verification must return an asynchronous result.')
+    }
+    const projection = evidenceBenchmarkProjectionSchema.parse(await pendingProjection)
     assertProjectionIdentity(adapter, projection)
     return projection
   }
@@ -568,8 +584,28 @@ function isProjectionAdapter(value: unknown): value is StrictProjectionAdapter<n
     && rulerReferenceSchema.safeParse(candidate.ruler).success
 }
 
+function isEvidenceVerificationAdapter(value: unknown): value is EvidenceVerificationAdapter {
+  if (!hasFunction(value, 'verifyAndProject') || value === null || typeof value !== 'object') return false
+  const candidate = value as Partial<EvidenceVerificationAdapter>
+  return isAsyncFunction(candidate.verifyAndProject)
+    && candidate.sourceSchema instanceof z.ZodType
+    && recordIdSchema.safeParse(candidate.profileId).success
+    && rulerReferenceSchema.safeParse(candidate.ruler).success
+}
+
+const asyncFunctionPrototype = Object.getPrototypeOf(async () => undefined)
+
+function isAsyncFunction(value: unknown): value is (...args: readonly unknown[]) => Promise<unknown> {
+  return typeof value === 'function' && Object.getPrototypeOf(value) === asyncFunctionPrototype
+}
+
+function isPromiseLike(value: unknown): value is PromiseLike<unknown> {
+  return value !== null && (typeof value === 'object' || typeof value === 'function')
+    && typeof (value as { readonly then?: unknown }).then === 'function'
+}
+
 function assertProjectionIdentity(
-  adapter: StrictProjectionAdapter<unknown>,
+  adapter: Pick<StrictProjectionAdapter<unknown>, 'profileId' | 'ruler'>,
   projection: Pick<EvidenceBenchmarkProjection, 'profileId' | 'ruler'>,
 ): void {
   if (projection.profileId !== adapter.profileId

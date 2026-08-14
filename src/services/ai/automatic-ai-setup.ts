@@ -4,8 +4,7 @@ import {
   type ProviderDiscoveryCandidate,
 } from './provider-discovery'
 import {
-  setCapabilityBinding,
-  setCapabilityDescriptors,
+  setAutomaticCapabilityBindings,
 } from './model-assignment.local'
 import type { ModelTaskKind } from './model-capabilities'
 import type { ModelAssignment } from './model-assignment-types'
@@ -13,9 +12,7 @@ import { setProviderVerification } from './provider-verification'
 import {
   assessImageRoute,
   exactImageRouteDescriptor,
-  imageRouteRecommendationRank,
   isImageModelNominationCandidate,
-  isPrototypeProductionImageModel,
   reviewedCatalogImageDescriptors,
   sortImageRouteRecommendations,
 } from './image-route-assessment'
@@ -33,8 +30,6 @@ const REQUIRED_AUTOMATIC_TASKS = [
   'image-edit',
 ] as const satisfies readonly ModelTaskKind[]
 
-const AUTOMATIC_FALLBACK_PROBE_LIMIT = 1
-
 export interface AutomaticTextRoutePreference {
   readonly kind: ProviderKind
   readonly model: string
@@ -44,6 +39,15 @@ export interface AutomaticAiSetupOptions {
   readonly preferredTextRoutes?: readonly AutomaticTextRoutePreference[]
 }
 
+function hasPreferredTextRoute(
+  bindings: Readonly<Partial<Record<ModelTaskKind, ModelAssignment>>>,
+  options: AutomaticAiSetupOptions,
+): boolean {
+  return options.preferredTextRoutes?.some((preference) => (
+    bindings.text?.model === preference.model
+  )) ?? false
+}
+
 function credentialAuthorityPriority(candidate: ProviderDiscoveryCandidate): number {
   // Cutout-owned Provider metadata carries the exact persisted wire protocol
   // for its matching Keychain credential. Agent configs remain reusable, but
@@ -51,30 +55,10 @@ function credentialAuthorityPriority(candidate: ProviderDiscoveryCandidate): num
   return candidate.source === 'cutout-keychain' ? 1 : 0
 }
 
-function fallbackProbePriority(candidate: ProviderDiscoveryCandidate): number {
-  const model = candidate.modelHint
-  if (!model) return 0
-  const recommendation = imageRouteRecommendationRank(model, 'refinement')
-  if (isPrototypeProductionImageModel(model)) return 2_000 + recommendation
-  if (isImageModelNominationCandidate(model)) return 1_000 + recommendation
-  return 0
-}
-
 function takeNextAutomaticCandidate(
   pending: ProviderDiscoveryCandidate[],
-  requiredCoverageReady: boolean,
 ): ProviderDiscoveryCandidate | undefined {
-  if (!requiredCoverageReady) return pending.shift()
-  let selectedIndex = 0
-  let selectedPriority = fallbackProbePriority(pending[0]!)
-  for (let index = 1; index < pending.length; index += 1) {
-    const priority = fallbackProbePriority(pending[index]!)
-    if (priority > selectedPriority) {
-      selectedIndex = index
-      selectedPriority = priority
-    }
-  }
-  return pending.splice(selectedIndex, 1)[0]
+  return pending.shift()
 }
 
 export interface AutomaticAiSetupResult {
@@ -164,17 +148,14 @@ export async function configureAutomaticAi(
       credentialAuthorityPriority(b.candidate) - credentialAuthorityPriority(a.candidate)
       || a.index - b.index)
     .map(({ candidate }) => candidate)
-  let fallbackProbeAttempts = 0
   while (pending.length > 0) {
     const currentBindings = automaticBindingsFor(configured, options)
     const requiredCoverageReady = REQUIRED_AUTOMATIC_TASKS.every(
       (task) => currentBindings[task],
     )
-    if (requiredCoverageReady) {
-      if (fallbackProbeAttempts >= AUTOMATIC_FALLBACK_PROBE_LIMIT) break
-      fallbackProbeAttempts += 1
-    }
-    const candidate = takeNextAutomaticCandidate(pending, requiredCoverageReady)
+    if (requiredCoverageReady && hasPreferredTextRoute(currentBindings, options)) break
+    if (requiredCoverageReady && !options.preferredTextRoutes?.length) break
+    const candidate = takeNextAutomaticCandidate(pending)
     if (!candidate) break
     try {
       configured.push(await autoConfigureProviderCandidate(candidate.id))
@@ -186,9 +167,7 @@ export async function configureAutomaticAi(
     throw new Error(failures[0] ?? 'No reusable local AI credential could be configured.')
   }
   const bindings = automaticBindingsFor(configured, options)
-  for (const [task, assignment] of Object.entries(bindings) as [ModelTaskKind, ModelAssignment][]) {
-    await setCapabilityBinding(task, assignment)
-  }
+  await setAutomaticCapabilityBindings(bindings, automaticDescriptorsFor(configured))
   for (const { provider, models } of configured) {
     setProviderVerification(provider.id, {
       status: 'verified',
@@ -197,7 +176,6 @@ export async function configureAutomaticAi(
       checkedAt: new Date().toISOString(),
     })
   }
-  await setCapabilityDescriptors(automaticDescriptorsFor(configured))
   return { configured, bindings }
 }
 

@@ -1,5 +1,6 @@
 import {
   GAME_ASSET_PROFILE_ID,
+  compareGameAssetEvidenceIdentity,
   gameAssetEvaluationSchema,
   gameAssetEvaluationInputSchema,
   gameAssetPlanSchema,
@@ -66,11 +67,12 @@ export function evaluateGameAssetFrames(inputValue: GameAssetEvaluationInput): G
       }
     }
   }
-  const failedRoleIds = [...new Set(findings.map(({ roleId }) => roleId))].sort()
+  const failedRoleIds = [...new Set(findings.map(({ roleId }) => roleId))]
+    .sort(compareGameAssetEvidenceIdentity)
   const acceptedArtifacts = frames
     .filter(({ roleId }) => !failedRoleIds.includes(roleId))
     .map(({ roleId, artifactId, artifactRevision, contentHash }) => ({ roleId, artifactId, artifactRevision, contentHash }))
-    .sort((left, right) => left.roleId.localeCompare(right.roleId))
+    .sort((left, right) => compareGameAssetEvidenceIdentity(left.roleId, right.roleId))
   return gameAssetEvaluationSchema.parse({
     version: 'game-asset.evaluation.v1',
     profileId: GAME_ASSET_PROFILE_ID,

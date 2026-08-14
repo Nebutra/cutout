@@ -1,6 +1,6 @@
 [package]
 name = "app"
-version = "0.1.19"
+version = "0.1.20"
 default-run = "app"
 description = "Local-first AI design production workspace"
 authors = ["Nebutra Team"]
@@ -68,6 +68,7 @@ tempfile = "3"
 # falls back to a process-local mock that does NOT persist across restarts).
 [target.'cfg(target_os = "macos")'.dependencies]
 keyring = { version = "3", features = ["apple-native"] }
+core-foundation = "0.10"
 security-framework = "3"
 security-framework-sys = "2"
 objc2 = "0.6.2"

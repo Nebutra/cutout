@@ -2,7 +2,7 @@
   "name": "cutout",
   "private": true,
   "license": "Apache-2.0",
-  "version": "0.1.19",
+  "version": "0.1.20",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -13,6 +13,7 @@
     "agent:validate": "node scripts/validate-agent-capabilities.mjs && node scripts/validate-product-skills.mjs && node scripts/validate-codex-plugin.mjs",
     "benchmark:design-os": "node scripts/design-os-benchmark.mjs",
     "benchmark:design-os:update": "node scripts/design-os-benchmark.mjs --write",
+    "commerce:evaluator": "node scripts/commerce-held-out-evaluator.mjs",
     "plugin:build": "node scripts/build-codex-plugin.mjs",
     "plugin:validate": "node scripts/validate-codex-plugin.mjs",
     "brand:sync": "node scripts/brand-assets.mjs sync",

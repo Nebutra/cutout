@@ -89,7 +89,7 @@ export function desktopToolCapabilitiesForSnapshot(
   })
 }
 
-export function createExplicitDesktopPaidToolRequest(input: {
+export function createDesktopPaidToolRequest(input: {
   readonly capability: PaidToolCapability
   readonly intent: string
   readonly prompt: string
@@ -102,7 +102,7 @@ export function createExplicitDesktopPaidToolRequest(input: {
     prompt: input.prompt,
     image: input.image,
     inputArtifactIds: input.inputArtifactIds,
-    approvalPolicy: 'explicit',
+    approvalPolicy: 'auto',
   })
 }
 
@@ -139,9 +139,9 @@ export function useDesktopToolLoop(input: {
     })
     return () => { current = false }
   }, [input.services.foregroundSegmentation])
-  const authorize = useCallback(async (runId: string, requestId: string, request: PaidToolRequest, approvalId: string) => {
+  const authorize = useCallback(async (runId: string, requestId: string, request: PaidToolRequest, authorizationId: string) => {
     const requestDigest = await digestRequest({ runId, requestId, revision: state.current.revision, request })
-    const issuedAt = Date.now(), lease = permissionBroker.issue({ version: 'cutout.capability-lease.v1', leaseId: `lease:${requestId}`, approvalId, subject: runId, requestDigest, scopes: isLocalCutout(request.capability) ? ['paid'] : ['paid', 'credential'], workspaceRoot: 'authorized-workspace', allowedPaths: [], allowedCommands: [], allowedHosts: [], limits: { maxDurationMs: 600_000, maxBytes: 100_000_000, maxProcesses: 1 }, issuedAt, expiresAt: issuedAt + 600_000 })
+    const issuedAt = Date.now(), lease = permissionBroker.issue({ version: 'cutout.capability-lease.v1', leaseId: `lease:${requestId}`, approvalId: authorizationId, subject: runId, requestDigest, scopes: isLocalCutout(request.capability) ? ['paid'] : ['paid', 'credential'], workspaceRoot: 'authorized-workspace', allowedPaths: [], allowedCommands: [], allowedHosts: [], limits: { maxDurationMs: 600_000, maxBytes: 100_000_000, maxProcesses: 1 }, issuedAt, expiresAt: issuedAt + 600_000 })
     return { capabilityLeaseId: lease.leaseId, requestDigest }
   }, [permissionBroker])
   const capabilities = useCallback((): readonly PaidToolExecutorCapability[] => {
@@ -172,11 +172,11 @@ export function useDesktopToolLoop(input: {
       append: (events) => state.current.append(events),
       timeoutMs: (request) =>
         desktopPaidToolTimeoutMs(request.request.capability),
-      authorize: (request, approvalId) => authorize(
+      authorize: (request, authorizationId) => authorize(
         request.runId,
         request.requestId,
         request.request,
-        approvalId,
+        authorizationId,
       ),
     })
   }, [authorize, capabilities, permissionBroker])
@@ -205,7 +205,7 @@ export function useDesktopToolLoop(input: {
     const inputIds = await Promise.all((invocation.inputs ?? []).map((artifact) => artifacts.current!.write({ ...artifact, source: 'edit-image', runId: invocation.runId })))
     invocation.signal?.throwIfAborted()
     const requestId = crypto.randomUUID()
-    const request = createExplicitDesktopPaidToolRequest({
+    const request = createDesktopPaidToolRequest({
       capability: invocation.capability,
       intent: invocation.intent,
       prompt: invocation.prompt,

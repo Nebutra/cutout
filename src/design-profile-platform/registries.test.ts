@@ -62,7 +62,7 @@ describe('Design Profile trusted binding registries', () => {
     })).not.toBe(firstHash)
   })
 
-  it('registers each typed catalog under exact owner and implementation hash identity', () => {
+  it('registers each typed catalog under exact owner and implementation hash identity', async () => {
     const registries = createProfileBindingRegistries()
     const compiler = { compile: () => [] }
     const evaluator = {
@@ -93,7 +93,7 @@ describe('Design Profile trusted binding registries', () => {
       profileId: 'profile:fixture',
       ruler: { id: 'ruler:evidence', version: 1, digest: digestA },
       sourceSchema: z.object({ status: z.enum(['passed', 'failed', 'blocked']) }).strict(),
-      project: (source: unknown) => ({
+      verifyAndProject: async (source: unknown) => ({
         profileId: 'profile:fixture',
         ruler: { id: 'ruler:evidence', version: 1, digest: digestA },
         metrics: [{
@@ -149,10 +149,10 @@ describe('Design Profile trusted binding registries', () => {
     expect(registries.inspectors.registration('inspector:fixture', '1.0.0')?.implementation).toBe(presentation)
     expect(registries.semanticActions.registration('action:fixture', '1.0.0')?.implementation).toBe(semanticAction)
     expect(registries.delivery.registration('delivery:fixture', '1.0.0')?.implementation).toEqual(delivery)
-    expect(registries.evidenceBenchmarkAdapters.project(
+    expect((await registries.evidenceBenchmarkAdapters.verifyAndProject(
       reference('evidence-benchmark-adapter', 'benchmark:fixture'),
       { status: 'passed' },
-    ).metrics[0]?.status).toBe('passed')
+    )).metrics[0]?.status).toBe('passed')
     expect(registries.outcomeScorecardAdapters.project(
       reference('outcome-scorecard-adapter', 'scorecard:fixture'),
       { score: 8 },
@@ -331,13 +331,17 @@ describe('Design Profile trusted binding registries', () => {
     expect(JSON.stringify(commands)).not.toContain('function')
   })
 
-  it('strictly decodes adapter inputs and rejects caller-authored projection fields', () => {
-    const project = vi.fn(() => ({
-      profileId: 'profile:fixture',
-      ruler: { id: 'ruler:evidence', version: 1, digest: digestA },
-      metrics: [],
-      productionReady: true,
-    }))
+  it('requires asynchronous evidence verification and rejects caller-authored projection fields', async () => {
+    let verificationCalls = 0
+    const verifyAndProject = async () => {
+      verificationCalls += 1
+      return {
+        profileId: 'profile:fixture',
+        ruler: { id: 'ruler:evidence', version: 1, digest: digestA },
+        metrics: [],
+        productionReady: true,
+      }
+    }
     const evidence = new EvidenceBenchmarkAdapterRegistry()
     evidence.register({
       ...registration('evidence-benchmark-adapter', 'benchmark:strict'),
@@ -345,19 +349,19 @@ describe('Design Profile trusted binding registries', () => {
         profileId: 'profile:fixture',
         ruler: { id: 'ruler:evidence', version: 1, digest: digestA },
         sourceSchema: z.object({ id: z.string() }).strict(),
-        project,
+        verifyAndProject,
       },
     })
 
-    expect(() => evidence.project(
+    await expect(evidence.verifyAndProject(
       reference('evidence-benchmark-adapter', 'benchmark:strict'),
       { id: 'source', extra: true },
-    )).toThrow()
-    expect(project).not.toHaveBeenCalled()
-    expect(() => evidence.project(
+    )).rejects.toThrow()
+    expect(verificationCalls).toBe(0)
+    await expect(evidence.verifyAndProject(
       reference('evidence-benchmark-adapter', 'benchmark:strict'),
       { id: 'source' },
-    )).toThrow()
+    )).rejects.toThrow()
 
     const drifting = new EvidenceBenchmarkAdapterRegistry()
     drifting.register({
@@ -366,15 +370,45 @@ describe('Design Profile trusted binding registries', () => {
         profileId: 'profile:fixture',
         ruler: { id: 'ruler:evidence', version: 1, digest: digestA },
         sourceSchema: z.object({}).strict(),
-        project: () => ({
+        verifyAndProject: async () => ({
           profileId: 'profile:other',
           ruler: { id: 'ruler:changed', version: 2, digest: digestB },
           metrics: [],
         }),
       },
     })
-    expect(() => drifting.project(reference('evidence-benchmark-adapter', 'benchmark:drifting'), {}))
-      .toThrow(/frozen ruler identity/)
+    await expect(drifting.verifyAndProject(reference('evidence-benchmark-adapter', 'benchmark:drifting'), {}))
+      .rejects.toThrow(/frozen ruler identity/)
+
+    const synchronousRegistration = {
+      ...registration('evidence-benchmark-adapter', 'benchmark:synchronous'),
+      implementation: {
+        profileId: 'profile:fixture',
+        ruler: { id: 'ruler:evidence', version: 1, digest: digestA },
+        sourceSchema: z.object({}).strict(),
+        project: () => ({ profileId: 'profile:fixture', ruler: { id: 'ruler:evidence', version: 1, digest: digestA }, metrics: [] }),
+      },
+    }
+    expect(() => evidence.register(
+      synchronousRegistration as unknown as Parameters<typeof evidence.register>[0],
+    )).toThrow(/Invalid evidence-benchmark-adapter implementation/)
+
+    const disguisedSynchronousRegistration = {
+      ...registration('evidence-benchmark-adapter', 'benchmark:disguised-synchronous'),
+      implementation: {
+        profileId: 'profile:fixture',
+        ruler: { id: 'ruler:evidence', version: 1, digest: digestA },
+        sourceSchema: z.object({}).strict(),
+        verifyAndProject: () => ({
+          profileId: 'profile:fixture',
+          ruler: { id: 'ruler:evidence', version: 1, digest: digestA },
+          metrics: [],
+        }),
+      },
+    }
+    expect(() => evidence.register(
+      disguisedSynchronousRegistration as unknown as Parameters<typeof evidence.register>[0],
+    )).toThrow(/Invalid evidence-benchmark-adapter implementation/)
 
     expect(() => evidenceBenchmarkProjectionSchema.parse({
       profileId: 'profile:fixture',

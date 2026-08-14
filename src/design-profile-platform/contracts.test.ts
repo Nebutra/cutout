@@ -72,7 +72,6 @@ function manifestContent(overrides: Partial<ProfileManifestContent> = {}): Profi
       requiredRoleIds: ['role:primary'],
       evaluatorBindingId: 'evaluator:fixture',
     }],
-    fixtures: [],
     ...overrides,
   }
 }

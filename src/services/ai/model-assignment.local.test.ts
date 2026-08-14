@@ -19,6 +19,7 @@ vi.mock('@tauri-apps/plugin-store', () => ({
 import {
   loadAssignments,
   loadRuntimeCapabilityBindings,
+  setAutomaticCapabilityBindings,
   setAssignment,
   clearAssignment,
 } from './model-assignment.local'
@@ -46,6 +47,34 @@ describe('model-assignment.local', () => {
     expect(await loadAssignments()).toEqual({
       chat: { providerId: 'p1', model: 'm1' },
       image: { providerId: 'p2', model: 'm2' },
+    })
+  })
+
+  it('atomically replaces automatic routing bindings and exact descriptors', async () => {
+    await setAssignment('chat', { providerId: 'old', model: 'old-model' })
+
+    await setAutomaticCapabilityBindings({
+      text: { providerId: 'planner', model: 'qwen-plus' },
+      'image-generation': { providerId: 'image', model: 'qwen-image-3.0' },
+      'image-edit': { providerId: 'image', model: 'qwen-image-3.0' },
+    }, [{
+      providerId: 'image',
+      model: 'qwen-image-3.0',
+      capabilities: ['image-generation', 'image-edit'],
+      source: 'verified-catalog',
+      evidence: [{ capability: 'image-generation', kind: 'verified', sourceId: 'catalog' }],
+    }])
+
+    expect(mem.get('ai.capabilityBindings')).toMatchObject({
+      bindings: {
+        text: { providerId: 'planner', model: 'qwen-plus' },
+        'image-generation': { providerId: 'image', model: 'qwen-image-3.0' },
+      },
+      descriptors: [expect.objectContaining({ providerId: 'image', model: 'qwen-image-3.0' })],
+    })
+    expect(await loadAssignments()).toEqual({
+      chat: { providerId: 'planner', model: 'qwen-plus' },
+      image: { providerId: 'image', model: 'qwen-image-3.0' },
     })
   })
 

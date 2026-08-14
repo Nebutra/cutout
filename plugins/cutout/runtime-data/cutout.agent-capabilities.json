@@ -4,7 +4,7 @@
   "product": {
     "name": "Cutout",
     "positioning": "Agent-native Design OS with a visual workbench and repo-native control plane",
-    "packageVersion": "0.1.19"
+    "packageVersion": "0.1.20"
   },
   "protocol": {
     "control": "cutout.control.v1",
@@ -71,7 +71,7 @@
     { "type": "coding.execute", "modes": ["dry-run", "apply"], "effect": "provider-required", "approval": "policy-and-explicit-id", "notes": "The desktop app binds a verified Provider backend to a host-managed workspace and exact previewed patch. The bundled CLI/MCP headless host still requires injected adapters and otherwise returns capability-required." },
     { "type": "coding.review", "modes": ["dry-run", "apply"], "effect": "provider-required", "approval": "policy-and-explicit-id", "notes": "Review is a versioned CodingTask, never arbitrary shell or an unscoped repository read." },
     { "type": "coding.repair", "modes": ["dry-run", "apply"], "effect": "provider-required", "approval": "policy-and-explicit-id", "notes": "Repair consumes prior evidence and stays revision-, path-, command-, time-, and byte-budget scoped." },
-    { "type": "tool.invoke", "modes": ["dry-run", "apply"], "effect": "provider-required", "approval": "paid-tool-contract", "notes": "The desktop app executes assigned image Providers through the native secret/origin boundary and content-addressed artifact store. No executor exists in the default CLI/MCP headless host, whose apply returns capability-required." }
+    { "type": "tool.invoke", "modes": ["dry-run", "apply"], "effect": "provider-required", "approval": "none", "notes": "The desktop app executes enabled BYOK image Providers directly through the native secret/origin boundary and content-addressed artifact store; preview and run receipts are observation, not per-call payment gates. No executor exists in the default CLI/MCP headless host, whose apply returns capability-required." }
   ],
   "cli": {
     "command": "pnpm cutout --project <root>",
@@ -85,8 +85,8 @@
   },
   "policy": {
     "defaultMode": "dry-run",
-    "applyRequires": ["operation enabled by .cutout policy", "host-issued short-lived single-use approval lease bound to operation, preview digest, and expected revision"],
-    "paidActions": "Execution intent and approval policy are declared by cutout.control.v1; the desktop executor can require a short-lived capability lease, while the current headless host has no paid-tool executor.",
+    "applyRequires": ["operation enabled by .cutout policy", "durable mutations bind a host-issued short-lived single-use approval lease to the operation, preview digest, and expected revision"],
+    "paidActions": "An enabled desktop BYOK Provider is standing authorization for Provider execution. Requests execute without per-call paid confirmation while previews, lifecycle events, cancellation, retained artifacts and signed receipts remain observable; the current headless host has no paid-tool executor.",
     "secrets": "Control requests, manifests and receipts reject or redact credential-shaped values; provider credentials stay in the native local credential store, auth headers are assembled in Rust, and credentials are never part of this manifest.",
     "filesystemBoundary": "Controlled paths resolve below the canonical selected project root and reject absolute paths, parent traversal and symlink components; generated writes stay below .cutout/exports and use no caller-selected destination.",
     "permissionBroker": "Host-issued cutout.capability-lease.v1 leases bind subject, request digest, approval id, scopes, paths, commands, hosts, budgets and expiry. Durable approval-lease state is HMAC-authenticated with a host key outside the workspace, and desktop writes require native confirmation rather than a caller-authored approval string; revocation, expiry, tampering and replay fail closed and authorization produces an immutable receipt.",

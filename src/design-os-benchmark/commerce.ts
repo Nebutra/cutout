@@ -1,18 +1,54 @@
 import {
   createCommerceProfileBenchmarkReportFromRehearsal,
+  createCommerceProfileBenchmarkReportFromHeldOutRehearsal,
   decodeCommerceProfileBenchmarkReport,
   type CommerceProfileBenchmarkReport,
 } from '@/commerce-profile/benchmark'
+import type { CommerceHeldOutAdmission } from '@/commerce-profile/held-out'
 import { canonicalJson, fingerprint } from '@/design-ir/fingerprint'
 import {
   DESIGN_OS_BENCHMARK_RULER,
   assembleDesignOsBenchmarkReport,
   decodeDesignOsBenchmarkReport,
+  deriveDesignOsBenchmarkSummary,
+  designOsBenchmarkReportSchema,
   type DesignOsBenchmarkReport,
 } from './contracts'
 
 const COMMERCE_PROFILE_ID = 'commerce'
 const REHEARSAL_METRIC_ID = 'commerce.production-rehearsal.complete-run'
+
+function admitProductionRehearsalAudit(input: {
+  readonly report: DesignOsBenchmarkReport
+  readonly sourceReportId: string
+  readonly admission: CommerceHeldOutAdmission
+}): DesignOsBenchmarkReport {
+  const rehearsalDefinition = DESIGN_OS_BENCHMARK_RULER.metrics.find((metric) => (
+    metric.id === REHEARSAL_METRIC_ID
+  ))
+  const metric = input.report.metrics.find((candidate) => candidate.id === REHEARSAL_METRIC_ID)
+  if (!rehearsalDefinition || rehearsalDefinition.sourceMetricId
+    || !rehearsalDefinition.auditFindingCode
+    || !metric || metric.source.kind !== 'profile-capability-audit'
+    || metric.source.sourceReportId !== input.sourceReportId
+    || metric.source.findingCode !== rehearsalDefinition.auditFindingCode
+    || metric.status !== 'blocked') {
+    throw new Error('Design OS production rehearsal admission requires the exact blocked audit frontier.')
+  }
+  const metrics = input.report.metrics.map((candidate) => candidate.id === REHEARSAL_METRIC_ID
+    ? {
+        ...candidate,
+        status: 'passed' as const,
+        source: { ...candidate.source, admission: input.admission },
+        diagnostic: undefined,
+      }
+    : candidate)
+  return designOsBenchmarkReportSchema.parse({
+    ...input.report,
+    metrics,
+    summary: deriveDesignOsBenchmarkSummary(metrics),
+  })
+}
 
 export async function createDesignOsBenchmarkFromCommerce(input: {
   readonly commerceReport: unknown
@@ -22,14 +58,12 @@ export async function createDesignOsBenchmarkFromCommerce(input: {
   return createDesignOsBenchmarkFromDecodedCommerce({
     commerce,
     identity: input.identity,
-    rehearsalVerified: false,
   })
 }
 
 async function createDesignOsBenchmarkFromDecodedCommerce(input: {
   readonly commerce: CommerceProfileBenchmarkReport
   readonly identity: { readonly id: string; readonly revision: string }
-  readonly rehearsalVerified: boolean
 }): Promise<DesignOsBenchmarkReport> {
   const commerce = input.commerce
   const profileDefinition = DESIGN_OS_BENCHMARK_RULER.profiles.find((profile) => (
@@ -56,15 +90,7 @@ async function createDesignOsBenchmarkFromDecodedCommerce(input: {
       if (!definition.auditFindingCode) {
         throw new Error(`Commerce audit finding is missing for ${definition.id}.`)
       }
-      return input.rehearsalVerified ? {
-        id: definition.id,
-        status: 'passed' as const,
-        source: {
-          kind: 'profile-capability-audit' as const,
-          sourceReportId,
-          findingCode: definition.auditFindingCode,
-        },
-      } : {
+      return {
         id: definition.id,
         status: 'blocked' as const,
         source: {
@@ -120,7 +146,6 @@ export async function createDesignOsBenchmarkFromCommerceRehearsal(input: {
   return createDesignOsBenchmarkFromDecodedCommerce({
     commerce: report,
     identity: input.identity,
-    rehearsalVerified: true,
   })
 }
 
@@ -134,6 +159,45 @@ export async function decodeDesignOsBenchmarkFromCommerceRehearsal(input: {
   const candidate = decodeDesignOsBenchmarkReport(input.report)
   if (canonicalJson(candidate) !== canonicalJson(expected)) {
     throw new Error('Design OS report does not match its reverified Commerce rehearsal bundle.')
+  }
+  return expected
+}
+
+export async function createDesignOsBenchmarkFromCommerceHeldOutRehearsal(input: {
+  readonly baselineCommerceReport: unknown
+  readonly rehearsalBundle: unknown
+  readonly commitment: unknown
+  readonly evaluatorAttestation: unknown
+  readonly identity: { readonly id: string; readonly revision: string }
+}): Promise<DesignOsBenchmarkReport> {
+  const { report, admission } = await createCommerceProfileBenchmarkReportFromHeldOutRehearsal({
+    baselineReport: input.baselineCommerceReport,
+    rehearsalBundle: input.rehearsalBundle,
+    commitment: input.commitment,
+    evaluatorAttestation: input.evaluatorAttestation,
+  })
+  const projected = await createDesignOsBenchmarkFromDecodedCommerce({
+    commerce: report,
+    identity: input.identity,
+  })
+  const sourceReportId = projected.profiles.find((profile) => profile.id === COMMERCE_PROFILE_ID)
+    ?.sourceReport.id
+  if (!sourceReportId) throw new Error('Admitted Commerce source report is missing.')
+  return admitProductionRehearsalAudit({ report: projected, sourceReportId, admission })
+}
+
+export async function decodeDesignOsBenchmarkFromCommerceHeldOutRehearsal(input: {
+  readonly report: unknown
+  readonly baselineCommerceReport: unknown
+  readonly rehearsalBundle: unknown
+  readonly commitment: unknown
+  readonly evaluatorAttestation: unknown
+  readonly identity: { readonly id: string; readonly revision: string }
+}): Promise<DesignOsBenchmarkReport> {
+  const expected = await createDesignOsBenchmarkFromCommerceHeldOutRehearsal(input)
+  const candidate = designOsBenchmarkReportSchema.parse(input.report)
+  if (canonicalJson(candidate) !== canonicalJson(expected)) {
+    throw new Error('Design OS report does not match its admitted held-out Commerce rehearsal.')
   }
   return expected
 }

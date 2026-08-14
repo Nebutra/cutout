@@ -56,6 +56,16 @@ export interface MultimodalDesktopHost extends MultimodalHostVerifier {
     readonly context: MultimodalHostContext
     readonly signal?: AbortSignal
   }): Promise<MultimodalHostArtifactBytes>
+  visionJson(input: {
+    readonly providerId: string
+    readonly model: 'qwen3-vl-plus'
+    readonly system: string
+    readonly prompt: string
+    readonly outputSchema: Readonly<Record<string, unknown>>
+    readonly referenceBytes: Uint8Array
+    readonly context: MultimodalHostContext
+    readonly signal?: AbortSignal
+  }): Promise<MultimodalHostArtifactBytes>
   image(input: {
     readonly providerId: string
     readonly model: 'qwen-image-3.0' | 'qwen-image-3.0-pro'
@@ -82,7 +92,7 @@ export interface MultimodalDesktopHost extends MultimodalHostVerifier {
 
 export interface MultimodalNativeTransport {
   invokeCancellable(
-    command: 'ai_dashscope_structured_text' | 'ai_dashscope_image' | 'ai_dashscope_video',
+    command: 'ai_dashscope_structured_text' | 'ai_dashscope_vision_json' | 'ai_dashscope_image' | 'ai_dashscope_video',
     args: Record<string, unknown>,
     signal?: AbortSignal,
   ): Promise<unknown>
@@ -132,7 +142,7 @@ function assertPlaybackPromotionIdentity(
   promoted: MultimodalHostReceipt,
 ): void {
   const scalarIdentity = [
-    'requestId', 'runId', 'providerId', 'providerKind', 'model', 'routeId', 'operation',
+    'requestId', 'runId', 'heldOutCommitmentHash', 'providerId', 'providerKind', 'model', 'routeId', 'operation',
     'semanticRole', 'nodeId', 'capabilityId', 'status', 'remoteTaskIdHash',
   ] as const
   const scalarDrift = scalarIdentity.some((key) => source[key] !== promoted[key])
@@ -189,6 +199,28 @@ export function createMultimodalDesktopHost(
         input.signal,
       ))
       assertReceipt(result.receipt, { ...input, operation: 'structured-text' })
+      return { receipt: result.receipt, bytes: base64ToBytes(result.data) }
+    },
+    async visionJson(input) {
+      assertRoute(input.model, 'vision-ocr')
+      const context = multimodalHostContextSchema.parse(input.context)
+      if (context.acceptedReferenceArtifactIds.length !== 1) {
+        throw new Error('Vision JSON requires one retained accepted image reference.')
+      }
+      const result = singleResultSchema.parse(await transport.invokeCancellable(
+        'ai_dashscope_vision_json',
+        {
+          providerId: input.providerId,
+          model: input.model,
+          system: input.system,
+          prompt: input.prompt,
+          outputSchema: input.outputSchema,
+          referenceImage: Array.from(input.referenceBytes),
+          hostContext: context,
+        },
+        input.signal,
+      ))
+      assertReceipt(result.receipt, { ...input, operation: 'vision-ocr' })
       return { receipt: result.receipt, bytes: base64ToBytes(result.data) }
     },
     async image(input) {
@@ -266,7 +298,10 @@ export function operationForCommerceRole(role: string): MultimodalOperation {
     return multimodalOperationSchema.parse('structured-text')
   }
   if (role === 'main-image' || role.startsWith('detail-image:')) {
-    return multimodalOperationSchema.parse('image-generation')
+    // Every Commerce image is reference-conditioned: the main image binds the
+    // evaluator-selected source, and details additionally bind the retained
+    // main image through the frozen Outcome DAG.
+    return multimodalOperationSchema.parse('image-edit')
   }
   // Commerce video is reference-conditioned. Capability resolution must fail
   // closed until the Host owns the Provider object URL for that exact image.

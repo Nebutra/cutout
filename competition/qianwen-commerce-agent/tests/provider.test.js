@@ -1,12 +1,12 @@
 import assert from 'node:assert/strict'
-import { lstat, mkdir, rm, symlink } from 'node:fs/promises'
+import { lstat, mkdir, readFile, readdir, rename, rm, symlink } from 'node:fs/promises'
 import { join } from 'node:path'
 import { after, test } from 'node:test'
 import { DashScopeClient } from '../lib/provider.js'
 import { LIMITS } from '../lib/contracts.js'
 import { main } from '../agent.js'
 import { fixtureDirectories } from './helpers.js'
-import { createLogger, createWorkspace } from '../lib/filesystem.js'
+import { assertOutputAvailable, authorizeRoots, createLogger, createWorkspace } from '../lib/filesystem.js'
 
 const cleanup = []
 after(async () => { await Promise.all(cleanup.map((path) => rm(path, { recursive: true, force: true }))) })
@@ -103,6 +103,25 @@ test('failed production leaves no official output filename', async () => {
   assert.deepEqual(await readdir(fixture.output), ['.qianwen-agent-work'])
 })
 
+test('interrupted exact publication is recovered into authenticated stage for restart', async () => {
+  const fixture = await fixtureDirectories(); cleanup.push(fixture.root)
+  const outputInfo = await lstat(fixture.output)
+  const outputRoot = {
+    resolved: fixture.output, canonical: fixture.output, device: outputInfo.dev, inode: outputInfo.ino,
+  }
+  const planHash = '9'.repeat(64)
+  const workspace = await createWorkspace(outputRoot, planHash, 'test-key')
+  const name = 'main_image.png'
+  const source = join(workspace.stageRoot, name)
+  await (await import('node:fs/promises')).writeFile(source, Buffer.from('retained-completed-bytes'))
+  await rename(source, join(fixture.output, name))
+
+  await assert.doesNotReject(assertOutputAvailable(outputRoot))
+  const resumed = await createWorkspace(outputRoot, planHash, 'test-key')
+  assert.deepEqual(await readdir(fixture.output), ['.qianwen-agent-work'])
+  assert.equal((await readFile(join(resumed.stageRoot, name), 'utf8')), 'retained-completed-bytes')
+})
+
 test('workspace and log symlink components are rejected', async () => {
   const fixture = await fixtureDirectories(); cleanup.push(fixture.root)
   const external = join(fixture.root, 'external')
@@ -125,4 +144,15 @@ test('workspace and log symlink components are rejected', async () => {
     resolved: bindingFixture.output, canonical: bindingFixture.output,
     device: bindingOutputInfo.dev, inode: bindingOutputInfo.ino,
   }, 'b'.repeat(64), 'test-key'), /bounded regular file/)
+
+  const parentFixture = await fixtureDirectories(); cleanup.push(parentFixture.root)
+  const actualParent = join(parentFixture.root, 'actual-parent')
+  const nestedInput = join(actualParent, 'nested-input')
+  await mkdir(actualParent)
+  await mkdir(nestedInput)
+  const parentAlias = join(parentFixture.root, 'parent-alias')
+  await symlink(actualParent, parentAlias)
+  await assert.rejects(authorizeRoots({
+    inputRoot: join(parentAlias, 'nested-input'), outputRoot: parentFixture.output, logRoot: parentFixture.logs,
+  }), /symlinked directory component/)
 })

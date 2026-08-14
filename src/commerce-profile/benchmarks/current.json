@@ -2,7 +2,7 @@
   "schema": "commerce.profile-benchmark.v1",
   "benchmark": {
     "id": "benchmark:commerce-profile:p1-p7",
-    "version": 1
+    "version": 2
   },
   "identity": {
     "id": "benchmark-run:current",
@@ -168,108 +168,6 @@
             "testIds": [
               "test:semantic-role-and-lock-closure",
               "test:bounded-kernel-plan-and-removable-registry"
-            ]
-          }
-        }
-      ],
-      "diagnostics": []
-    },
-    {
-      "id": "p6.mocked-deliverable-closure",
-      "acceptanceCriterion": "P6",
-      "tier": "mocked-host",
-      "label": "Mocked Host deliverable and usability closure",
-      "status": "passed",
-      "assertions": [
-        {
-          "id": "accepted-receipts-and-role-closure",
-          "verdict": "passed"
-        },
-        {
-          "id": "copy-image-video-usability-gates-pass",
-          "verdict": "passed"
-        }
-      ],
-      "evidenceReferences": [
-        {
-          "id": "evidence:p6.mocked-deliverable-closure",
-          "revision": "evidence:p6.mocked-deliverable-closure:revision:1",
-          "contentHash": "159d6d933216b30f0c74df5cb01e5bdebd0a8f6aad64653a1163e20307efa8ee",
-          "kind": "mocked-host-receipt",
-          "binding": {
-            "metricId": "p6.mocked-deliverable-closure",
-            "receiptId": "receipt:p6.mocked-deliverable-closure",
-            "capabilityId": "capability:p6.mocked-deliverable-closure",
-            "artifactIds": [
-              "artifact:p6.mocked-deliverable-closure"
-            ]
-          }
-        }
-      ],
-      "diagnostics": []
-    },
-    {
-      "id": "p6.mocked-targeted-repair",
-      "acceptanceCriterion": "P6",
-      "tier": "mocked-host",
-      "label": "Mocked Host targeted repair preserves siblings",
-      "status": "passed",
-      "assertions": [
-        {
-          "id": "failed-frontier-only-repairs",
-          "verdict": "passed"
-        },
-        {
-          "id": "accepted-sibling-artifacts-remain-stable",
-          "verdict": "passed"
-        }
-      ],
-      "evidenceReferences": [
-        {
-          "id": "evidence:p6.mocked-targeted-repair",
-          "revision": "evidence:p6.mocked-targeted-repair:revision:1",
-          "contentHash": "159d6d933216b30f0c74df5cb01e5bdebd0a8f6aad64653a1163e20307efa8ee",
-          "kind": "mocked-host-receipt",
-          "binding": {
-            "metricId": "p6.mocked-targeted-repair",
-            "receiptId": "receipt:p6.mocked-targeted-repair",
-            "capabilityId": "capability:p6.mocked-targeted-repair",
-            "artifactIds": [
-              "artifact:p6.mocked-targeted-repair"
-            ]
-          }
-        }
-      ],
-      "diagnostics": []
-    },
-    {
-      "id": "p7.mocked-strategy-evidence",
-      "acceptanceCriterion": "P7",
-      "tier": "mocked-host",
-      "label": "Mocked strategy cites run and repair evidence",
-      "status": "passed",
-      "assertions": [
-        {
-          "id": "facts-plan-routes-and-validations-cited",
-          "verdict": "passed"
-        },
-        {
-          "id": "receipts-and-repair-history-cited",
-          "verdict": "passed"
-        }
-      ],
-      "evidenceReferences": [
-        {
-          "id": "evidence:p7.mocked-strategy-evidence",
-          "revision": "evidence:p7.mocked-strategy-evidence:revision:1",
-          "contentHash": "159d6d933216b30f0c74df5cb01e5bdebd0a8f6aad64653a1163e20307efa8ee",
-          "kind": "mocked-host-receipt",
-          "binding": {
-            "metricId": "p7.mocked-strategy-evidence",
-            "receiptId": "receipt:p7.mocked-strategy-evidence",
-            "capabilityId": "capability:p7.mocked-strategy-evidence",
-            "artifactIds": [
-              "artifact:p7.mocked-strategy-evidence"
             ]
           }
         }
@@ -751,8 +649,8 @@
   ],
   "summary": {
     "overall": {
-      "total": 16,
-      "passed": 8,
+      "total": 13,
+      "passed": 5,
       "failed": 0,
       "blocked": 8,
       "ready": false
@@ -762,14 +660,6 @@
         "tier": "deterministic",
         "total": 5,
         "passed": 5,
-        "failed": 0,
-        "blocked": 0,
-        "ready": true
-      },
-      {
-        "tier": "mocked-host",
-        "total": 3,
-        "passed": 3,
         "failed": 0,
         "blocked": 0,
         "ready": true

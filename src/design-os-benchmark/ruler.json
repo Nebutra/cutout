@@ -2,11 +2,10 @@
   "schema": "design-os.benchmark-ruler.v1",
   "benchmark": {
     "id": "benchmark:design-os:production-maturity",
-    "version": 1
+    "version": 2
   },
   "stages": [
     { "id": "contract", "label": "Contract" },
-    { "id": "conformance", "label": "Conformance" },
     { "id": "real-host", "label": "Real Host" },
     { "id": "production-rehearsal", "label": "Production Rehearsal" }
   ],
@@ -17,7 +16,7 @@
       "sourceSchema": "commerce.profile-benchmark.v1",
       "sourceBenchmark": {
         "id": "benchmark:commerce-profile:p1-p7",
-        "version": 1
+        "version": 2
       }
     }
   ],
@@ -61,30 +60,6 @@
       "label": "Removable Kernel/Profile composition",
       "critical": true,
       "sourceMetricId": "p5.kernel-profile-composition"
-    },
-    {
-      "id": "commerce.conformance.deliverable-closure",
-      "profileId": "commerce",
-      "stage": "conformance",
-      "label": "Mocked deliverable closure",
-      "critical": true,
-      "sourceMetricId": "p6.mocked-deliverable-closure"
-    },
-    {
-      "id": "commerce.conformance.targeted-repair",
-      "profileId": "commerce",
-      "stage": "conformance",
-      "label": "Mocked targeted repair",
-      "critical": true,
-      "sourceMetricId": "p6.mocked-targeted-repair"
-    },
-    {
-      "id": "commerce.conformance.strategy-evidence",
-      "profileId": "commerce",
-      "stage": "conformance",
-      "label": "Mocked strategy evidence",
-      "critical": true,
-      "sourceMetricId": "p7.mocked-strategy-evidence"
     },
     {
       "id": "commerce.real-host.text-execution",

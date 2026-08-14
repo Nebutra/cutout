@@ -2,11 +2,11 @@
 
 ## Current Host Rehearsal
 
-- Host version: `1.0.1`.
-- Held-out DashScope run completed in `807527ms` with exactly eleven published
+- Host version: `1.0.2`.
+- Fresh held-out DashScope Run 6 completed in `944276ms` with exactly eleven published
   outputs and internal A1-A7 closure.
 - Offline completed-output digest:
-  `d76d9e261384273c15370796495af25ae93d930f6f063d147f8955a843c0bd6d`.
+  `e3ccaf41326ead168c732b3455c7768f8816f135fc61c10184921bbac47761b9`.
 - Six of six images decoded at `1024 x 1024`; manual review preserved the
   supplied purple SKU, loose silhouette, collar, button, cuff, material, and
   sibling identity across main/detail roles.
@@ -28,9 +28,14 @@
 
 ## Quality Gates
 
-- Package tests: 19/19 on macOS and Debian 12 amd64 / Node 22.23.2.
+- Package tests: 26/26 on macOS and Debian 12 amd64 / Node 22.23.2.
 - Package validator: 17 files, dependency-free runtime, canonical projection
   hashes current.
+- Final ZIP: `qianwen-commerce-agent-1.0.2.zip`, `61652` compressed bytes,
+  `203831` uncompressed file bytes, SHA-256
+  `21de8f008bf4fe48f3c848d2ec7cb552c3deb2b8e5b36307e49723df8b65a4de`.
+- The ZIP itself passed `--version`, 26/26 tests, and package validation from a
+  read-only mount in Debian 12 amd64 / Node 22.23.2 with networking disabled.
 - Commerce/Design OS/Multimodal tests: 70/70.
 - `pnpm lint`, strict TypeScript, `pnpm build`, `cargo check`,
   `cargo fmt --check`, `pnpm agent:validate`, and `git diff --check` passed.
@@ -40,5 +45,5 @@
 The competition Host rehearsal proves this package, not the public Cutout
 headless surface. It has no canonical signed `.cutout` source-ingest and
 Provider receipt bundle, so it is not imported as a trusted Commerce production
-rehearsal. Design OS correctly remains `8/17`, maturity `conformance`, and
+rehearsal. Design OS correctly remains `5/14`, maturity `contract`, and
 `productionReady=false` until that separate signed evidence path completes.

@@ -119,3 +119,46 @@ test("collapsing the workspace rail does not leave a dead gutter beside the Agen
       : Number.POSITIVE_INFINITY;
   }).toBeLessThanOrEqual(1);
 });
+
+test("hiding the Agent and collapsing the rail still leaves a visible sidebar restore", async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== "desktop-chrome");
+  await createProject(page, "Sidebar restore affordance");
+
+  const rail = page.getByRole("navigation", { name: "Workspace panels" });
+  const railFrame = page.locator("[data-workspace-rail]");
+  const expand = page.getByRole("button", { name: "Expand sidebar" });
+  const drawer = page.locator('[data-workspace-panel="agent-drawer"]');
+  await expect(rail).toBeVisible();
+  await expect(drawer).toBeVisible();
+
+  await page.getByRole("button", { name: "Hide Agent" }).click();
+  await expect(drawer).toHaveCount(0);
+  await expect(rail).toBeVisible();
+  await expect(expand).toHaveCount(0);
+
+  await page.getByRole("button", { name: "Collapse sidebar" }).click();
+  await expect.poll(async () => (await railFrame.boundingBox())?.width).toBe(0);
+  await expect(expand).toBeVisible();
+  const restore = await expand.boundingBox();
+  expect(restore).toBeTruthy();
+  expect(restore!.width).toBeGreaterThanOrEqual(28);
+  expect(restore!.height).toBeGreaterThanOrEqual(28);
+
+  await expand.click();
+  await expect(rail).toBeVisible();
+  await expect(expand).toHaveCount(0);
+  await expect(rail.getByRole("button", { name: "Agent", exact: true })).toBeVisible();
+
+  await rail.getByRole("button", { name: "Agent", exact: true }).click();
+  await expect(drawer).toBeVisible();
+  await page.getByRole("button", { name: "Collapse sidebar" }).click();
+  await expect.poll(async () => (await railFrame.boundingBox())?.width).toBe(0);
+  await expect(drawer).toBeVisible();
+  await page.getByRole("button", { name: "Hide Agent" }).click();
+  await expect(drawer).toHaveCount(0);
+  await expect(expand).toBeVisible();
+  await expand.click();
+  await expect(rail).toBeVisible();
+});

@@ -4,11 +4,10 @@ import rulerInput from './ruler.json' with { type: 'json' }
 export const DESIGN_OS_BENCHMARK_SCHEMA = 'design-os.benchmark-report.v1' as const
 export const DESIGN_OS_BENCHMARK_COMPARISON_SCHEMA = 'design-os.benchmark-comparison.v1' as const
 export const DESIGN_OS_BENCHMARK_ID = 'benchmark:design-os:production-maturity' as const
-export const DESIGN_OS_BENCHMARK_VERSION = 1 as const
+export const DESIGN_OS_BENCHMARK_VERSION = 2 as const
 
 export const designOsBenchmarkStageSchema = z.enum([
   'contract',
-  'conformance',
   'real-host',
   'production-rehearsal',
 ])
@@ -16,7 +15,6 @@ export type DesignOsBenchmarkStage = z.infer<typeof designOsBenchmarkStageSchema
 
 export const DESIGN_OS_BENCHMARK_STAGES: readonly DesignOsBenchmarkStage[] = Object.freeze([
   'contract',
-  'conformance',
   'real-host',
   'production-rehearsal',
 ])
@@ -92,6 +90,22 @@ const capabilityAuditSourceSchema = z.object({
   kind: z.literal('profile-capability-audit'),
   sourceReportId: idSchema,
   findingCode: idSchema,
+  admission: z.object({
+    protocol: idSchema,
+    challengeId: idSchema,
+    challengeHash: sha256Schema,
+    evaluatorKeyId: idSchema,
+    hostBuildVersion: idSchema,
+    commitmentId: idSchema,
+    commitmentHash: sha256Schema,
+    attestationId: idSchema,
+    inputManifestHash: sha256Schema,
+    runId: idSchema,
+    bundleHash: sha256Schema,
+    commitmentIssuedAt: z.number().int().nonnegative(),
+    evaluatorCompletedAt: z.number().int().nonnegative(),
+    deliverableCount: z.literal(11),
+  }).strict().optional(),
 }).strict()
 
 const metricSourceSchema = z.discriminatedUnion('kind', [
@@ -359,6 +373,15 @@ export function decodeDesignOsBenchmarkReport(input: unknown): DesignOsBenchmark
     } else if (metric.source.kind !== 'profile-capability-audit'
       || metric.source.findingCode !== definition.auditFindingCode) {
       throw new Error(`Design OS benchmark audit source drifted for ${metric.id}.`)
+    }
+    if (!definition.sourceMetricId && metric.status === 'passed') {
+      throw new Error(
+        `Design OS audit metric ${metric.id} requires the native held-out rehearsal decoder.`,
+      )
+    }
+    if (!definition.sourceMetricId && metric.status !== 'passed'
+      && metric.source.kind === 'profile-capability-audit' && metric.source.admission) {
+      throw new Error(`Non-passing Design OS audit metric ${metric.id} cannot carry admission evidence.`)
     }
   })
   const expectedSummary = deriveDesignOsBenchmarkSummary(report.metrics)

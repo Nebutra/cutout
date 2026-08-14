@@ -40,6 +40,7 @@ describe("workspace rail source contract", () => {
     );
     expect(source).toContain('<DeliveryWorkspaceDock');
     expect(source).toContain('data-workspace-panel={');
+    expect(source).toContain('label="Create"');
   });
 
   it("keeps detailed surfaces secondary to their workspace drawers", () => {
@@ -49,6 +50,11 @@ describe("workspace rail source contract", () => {
     expect(source).toContain('Open delivery workspace');
     expect(source).toContain('onOpenDesignOs("delivery")');
     expect(source).toContain('Open system inspector');
+    expect(source).toContain('Game assets');
+    expect(source).toContain('Generate and review sprite frames with Qwen');
+    expect(source).toContain('onOpenDesignOs("game-assets")');
+    expect(source).not.toContain("Advanced design system");
+    expect(source).not.toContain("group/advanced");
     expect(source).toContain('<WorkspaceDockHeader');
   });
 
@@ -60,5 +66,20 @@ describe("workspace rail source contract", () => {
     expect(source).toContain("flex size-12 shrink-0 flex-col");
     expect(source).toContain("focus-visible:ring-2");
     expect(source).toContain("focus-visible:ring-ring");
+  });
+
+  it("never leaves a chrome-less expand control as the only way back", () => {
+    expect(source).toContain("workspaceSidebarRestore");
+    expect(source).toContain("sidebarRestore.showRestore");
+    expect(source).toContain("sidebarRestore.reserveToolbarSlot");
+    expect(source).toContain('<ExpandSidebarButton');
+    expect(source).toContain('aria-label="Expand sidebar"');
+    expect(source).toContain(
+      "rounded-full border border-foreground/30 bg-background/95",
+    );
+    expect(source).not.toContain("group/expand");
+    expect(source).not.toMatch(
+      /Expand sidebar[\s\S]{0,240}pointer-events-none opacity-0/,
+    );
   });
 });

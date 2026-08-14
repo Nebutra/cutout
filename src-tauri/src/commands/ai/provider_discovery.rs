@@ -23,6 +23,10 @@ const MAX_CC_SWITCH_DB_BYTES: u64 = 256 * 1024 * 1024;
 const MAX_CC_SWITCH_CANDIDATES: usize = 32;
 const MAX_DRAFTS: usize = 32;
 const DRAFT_TTL: Duration = Duration::from_secs(10 * 60);
+// A hint is honored only after the authenticated catalog confirms the exact
+// model id. It prevents automatic imports from retaining the obsolete 5.5
+// relay default while still failing closed on a relay without this revision.
+const REVIEWED_RELAY_TEXT_MODEL_HINT: &str = "gpt-5.6-terra";
 const CODEX_CC_SWITCH_PROVIDER_ID: &str = "ccswitch";
 const CC_SWITCH_DB_LOCATION: &str = "~/.cc-switch/cc-switch.db";
 const CC_SWITCH_DB_SCHEMA_ID: &str = "cc-switch-db-codex-failover-v1";
@@ -1185,14 +1189,14 @@ fn discover_environment_with(
             "MOX_BASE_URL",
             "MOX",
             "https://aigw.mox.ktvsky.com/v1",
-            "gpt-5.5",
+            REVIEWED_RELAY_TEXT_MODEL_HINT,
         ),
         (
             "TDS_API_KEY",
             "TDS_BASE_URL",
             "TDS Router",
             "https://router.tds.cc.cd/v1",
-            "gpt-5.5",
+            REVIEWED_RELAY_TEXT_MODEL_HINT,
         ),
     ] {
         if read_environment(env).is_none() {
@@ -1955,7 +1959,7 @@ async fn check_draft<R: Runtime>(
     // protocol-specific auth, URL normalization, and exhaustive SDK adapters.
     let secret = resolve_draft_secret(app, draft).await?;
     let url = format!("{}/models", draft.base_url.trim_end_matches('/'));
-    let response = ai_proxy::request_with_secret(
+    let response = ai_proxy::request_with_secret_timeout(
         &draft.kind,
         draft.wire_protocol,
         &url,
@@ -1963,6 +1967,7 @@ async fn check_draft<R: Runtime>(
         Default::default(),
         None,
         &secret,
+        ai_proxy::AUTOMATIC_CATALOG_TIMEOUT_SECS,
     )
     .await
     .map_err(discovery_request_error)?;
@@ -2457,7 +2462,10 @@ mod tests {
             Some("https://aigw.mox.ktvsky.com/v1")
         );
         assert_eq!(mox.wire_protocol.as_deref(), Some("chat-completions"));
-        assert_eq!(mox.model_hint.as_deref(), Some("gpt-5.5"));
+        assert_eq!(
+            mox.model_hint.as_deref(),
+            Some(REVIEWED_RELAY_TEXT_MODEL_HINT)
+        );
         assert_eq!(mox.credential.reference.as_deref(), Some("MOX_API_KEY"));
         assert!(mox.credential.importable);
         assert!(!candidates

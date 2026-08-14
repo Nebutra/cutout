@@ -47,6 +47,10 @@ use super::providers::{
 
 const DEFAULT_BUFFERED_TIMEOUT_SECS: u64 = 120;
 const GENERATION_BUFFERED_TIMEOUT_SECS: u64 = 300;
+/// Auto-discovery must establish an immediately usable route, not wait behind
+/// a stale optional local relay. Interactive connection verification retains
+/// the regular catalog budget below.
+pub(crate) const AUTOMATIC_CATALOG_TIMEOUT_SECS: u64 = 20;
 const PACKAGED_E2E_HTTPS_PROXY_ENV: &str = "CUTOUT_PACKAGED_E2E_HTTPS_PROXY";
 
 /// Active native proxy requests keyed by a renderer-created opaque UUID. The
@@ -759,15 +763,44 @@ pub(crate) async fn request_with_secret(
     body: Option<String>,
     secret: &str,
 ) -> Result<ProxyResponse, ProxyError> {
+    request_with_secret_timeout(
+        kind,
+        wire_protocol,
+        url,
+        method,
+        headers,
+        body,
+        secret,
+        buffered_timeout_for_url(url),
+    )
+    .await
+}
+
+/// Same secret-bound request boundary with a caller-selected, bounded timeout.
+/// Used only for automatic credential discovery; normal user-invoked checks and
+/// paid execution retain their established timeout policy.
+pub(crate) async fn request_with_secret_timeout(
+    kind: &str,
+    wire_protocol: Option<ProviderWireProtocol>,
+    url: &str,
+    method: &str,
+    headers: HashMap<String, String>,
+    body: Option<String>,
+    secret: &str,
+    timeout_secs: u64,
+) -> Result<ProxyResponse, ProxyError> {
+    if timeout_secs == 0 || timeout_secs > GENERATION_BUFFERED_TIMEOUT_SECS {
+        return Err(ProxyError::Request(
+            "request timeout is outside the reviewed bound".into(),
+        ));
+    }
     enforce_host(kind, url)?;
     let target = enforce_resolved_host(kind, url).await?;
     let provider_kind = parse_provider_kind(kind)?;
     let (method, header_map) =
         build_method_and_headers(provider_kind, wire_protocol, method, headers, secret)?;
 
-    // Bound the whole call. Image endpoints use a longer cap; text/model probes
-    // keep the shorter default so a bad relay does not hang the app.
-    let client = build_client_for_target(Some(buffered_timeout_for_url(&url)), &target)?;
+    let client = build_client_for_target(Some(timeout_secs), &target)?;
     let mut req = client.request(method, url).headers(header_map);
     if let Some(body) = body {
         req = req.body(body);

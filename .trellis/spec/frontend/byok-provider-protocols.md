@@ -295,6 +295,10 @@ Finder-launched desktop apps commonly do not inherit shell environment
 variables. A provider being present in a local tool config therefore does not
 prove that its `env_key` is reusable by Cutout.
 
+On macOS, a generic-password item created by a broad Keyring convenience API
+can ask on every read even when it belongs to Cutout. Provider credentials need
+a Cutout-scoped access rule, not a weaker login-Keychain policy.
+
 The clean packaged macOS VM harness may project an existing host-owned Cutout
 Provider credential into the ephemeral VM Keychain only through the audited
 stdin-to-Keychain helper. The helper uses the stable `com.nebutra.cutout`
@@ -306,6 +310,11 @@ Developer ID Team partition; a binary-only ACL without that partition list is
 not sufficient for a signed packaged app to read the item through securityd.
 The product still discovers and imports that credential through its normal
 native candidate path; harness provisioning is not capability evidence.
+
+The packaged journey does not alter text-route selection for a throughput
+experiment. A text route and an image route are independently verified
+capabilities: an image-only credential cannot be promoted to conversational or
+planning work merely because its catalog contains a text-looking model name.
 
 ### 2. Signatures
 
@@ -332,6 +341,11 @@ struct CredentialPreview {
     available: bool,
     importable: bool,
 }
+
+// Native-only: no secret is returned through IPC.
+read_secret(provider_id: &str) -> Result<String, KeyError>
+store_imported_key(provider_id: &str, secret: &str) -> Result<(), KeyError>
+delete_imported_key(provider_id: &str) -> Result<(), KeyError>
 ```
 
 Provider drafts carry only `candidateId`; connection checks and imports resolve
@@ -374,6 +388,16 @@ the current secret again inside Rust.
 - Imported secrets are persisted through Cutout's native OS credential vault;
   on macOS this is Keychain. The renderer receives only key status and may use
   platform-neutral visible copy such as `Cutout local credentials`.
+- On macOS, each `com.nebutra.cutout` / `provider:<id>` generic-password item
+  is first created through the native `SecItem` path so `securityd` retains its
+  signed-app partition metadata, then receives a Security.framework ACL for
+  the current signed Cutout process. Updating a credential applies that same
+  ACL before changing the secret. A legacy item is migrated only after a
+  successful normal read; a failed migration preserves the item and returns
+  the opaque vault failure.
+  The app must never grant arbitrary applications, the full login Keychain, or
+  a caller-provided executable access. Secrets remain outside IPC, logs,
+  environment variables, command arguments, and Provider metadata.
 - A Codex root-level CC Switch profile is importable only when `base_url` is
   exactly `http://127.0.0.1:15721/v1`, `wire_api` is exactly `responses`, the
   auth file contains a non-empty top-level `OPENAI_API_KEY`, and neither
@@ -426,6 +450,9 @@ the current secret again inside Rust.
 | Imported `cc-switch` route is absent from renderer text/image capability or OpenAI image-endpoint selection | Treat as a contract bug; keep the shared Provider-kind predicate, runtime descriptors, DAG/pipeline routing, and generation/editing transports aligned |
 | Candidate disappears before draft check/import | Return `credential-missing` |
 | Secret-store read/import fails | Return opaque `credential-unavailable` |
+| New macOS Provider credential | Create only the stable service/account item with the current signed Cutout ACL |
+| Legacy item readable after one OS confirmation | Best-effort migrate its ACL; preserve successful read even if the migration is refused |
+| ACL creation/update fails | Keep the prior secret unchanged; delete a newly created incomplete item; return opaque vault failure |
 
 ### 5. Good / Base / Bad Cases
 
@@ -436,6 +463,10 @@ the current secret again inside Rust.
 - Bad: serialize `auth.json`, an API-key prefix, or a masked key into the
   candidate to make the frontend perform secret selection.
 - Bad: import Codex access/refresh tokens as OpenAI API keys.
+- Good: a signed Cutout restart reads its own migrated Provider credential
+  without presenting a Keychain confirmation dialog.
+- Bad: implement “always allow” by weakening the login Keychain or granting
+  every local executable access to Cutout's Provider items.
 
 ### 6. Tests Required
 
@@ -463,6 +494,10 @@ the current secret again inside Rust.
   profile, stays bound to the auth-file API key, ignores experimental bearer
   material, rejects ambiguous Provider tables, and never rebinds another
   root-level upstream credential to public OpenAI.
+- macOS-only unit coverage validates stable service/account scoping and opaque
+  errors; a signed packaged VM run verifies normal discovery, native secret
+  read, catalog check, persistence, and absence of `SecurityAgent`. The test
+  must use a dedicated VM Keychain item and may not modify the host Keychain.
 
 ### 7. Wrong vs Correct
 
@@ -474,6 +509,21 @@ let available = env_key.and_then(std::env::var_os).is_some();
 
 This treats a shell-only environment variable as the only possible Codex
 credential and fails for normal desktop launches.
+
+#### Wrong
+
+```rust
+// Gives every process access, or relies on a password prompt for every read.
+keyring_entry.set_password(secret)?;
+```
+
+#### Correct
+
+```rust
+// macOS only: bind this one stable Provider item to the calling signed Cutout
+// process through Security.framework, while keeping the secret native-owned.
+store_imported_key(provider_id, secret)?;
+```
 
 #### Correct
 

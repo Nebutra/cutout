@@ -538,6 +538,7 @@ export async function runProduction({ provider, workspace, outputRoot, facts, ca
     const inspection = inspectDocument(bytes, locale.file)
     await assertWorkspaceIdentity(workspace)
     await atomicWrite(join(workspace.stageRoot, locale.file), bytes)
+    await assertWorkspaceIdentity(workspace)
     documents.push({ file: locale.file, ...inspection, forbidden: FORBIDDEN_COPY.test(bytes.toString('utf8')), localeValid: plan.locales[locale.key].languageValid })
   }
   const repairs = images.filter((image) => image.repaired).map((image) => image.artifact.file)
@@ -545,6 +546,7 @@ export async function runProduction({ provider, workspace, outputRoot, facts, ca
   const strategyInspection = inspectDocument(strategyBytes, 'strategy_document.md')
   await assertWorkspaceIdentity(workspace)
   await atomicWrite(join(workspace.stageRoot, 'strategy_document.md'), strategyBytes)
+  await assertWorkspaceIdentity(workspace)
   documents.push({ file: 'strategy_document.md', ...strategyInspection, forbidden: false, localeValid: true })
 
   const names = [...documents.map((document) => document.file), ...imageFiles, video.artifact.file]

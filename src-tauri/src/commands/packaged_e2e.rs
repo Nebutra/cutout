@@ -1579,12 +1579,14 @@ pub(crate) fn pulse_background_renderer(_app: &tauri::AppHandle) -> Result<(), S
     Ok(())
 }
 
-/// Keep the dedicated E2E WebView behind the user's work even while renderer
-/// progress is temporarily busy handling Provider completions or screenshots.
+/// Keep the dedicated E2E WebView responsive while the isolated window remains
+/// non-activating. Background setup already applies `Prohibited`, non-focusable
+/// and ordered-back AppKit state. Re-entering `with_webview` synchronously from
+/// the watchdog can contend with a renderer-originated Tauri invoke and stall
+/// both sides, so the steady-state watchdog only schedules the fixed pulse.
 #[cfg(target_os = "macos")]
 pub(crate) fn start_background_window_watchdog(app: tauri::AppHandle) {
     std::thread::spawn(move || loop {
-        let _ = keep_window_background(&app);
         let _ = pulse_background_renderer(&app);
         std::thread::sleep(Duration::from_millis(250));
     });
@@ -1604,12 +1606,12 @@ pub async fn packaged_e2e_tick(app: tauri::AppHandle) -> Result<(), String> {
         return Err("packaged-e2e-disabled".into());
     }
     #[cfg(target_os = "macos")]
-    keep_window_background(&app)?;
+    pulse_background_renderer(&app)?;
     #[cfg(not(target_os = "macos"))]
     let _ = app;
     tokio::time::sleep(std::time::Duration::from_millis(50)).await;
     #[cfg(target_os = "macos")]
-    keep_window_background(&app)?;
+    pulse_background_renderer(&app)?;
     Ok(())
 }
 

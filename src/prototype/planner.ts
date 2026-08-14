@@ -8,13 +8,10 @@ import { createMonotonicDeadline } from '@/platform/monotonic-deadline'
 import { z } from 'zod'
 import {
   generatedPrototypePlanSchema,
-  prototypeFlowSchema,
-  prototypeFlowStepSchema,
   prototypeHumanLoopSchema,
   prototypeInteractionSchema,
   prototypeDesignSystemSchema,
   prototypePageSchema,
-  prototypeReviewDocumentSchema,
   validatePrototypePlan,
   type PrototypePlan,
 } from './prototype-plan'
@@ -28,6 +25,7 @@ export const PROTOTYPE_DESIGN_SYSTEM_MAX_PARALLELISM = 3
 export const PROTOTYPE_PLANNER_PAGE_MAX_PARALLELISM = 3
 export const PROTOTYPE_PLANNER_STAGE_TIMEOUT_MS = 180_000
 export const PROTOTYPE_PLANNER_TOTAL_TIMEOUT_MS = 300_000
+export const PROTOTYPE_PROGRESSIVE_PLANNER_MAX_TIMEOUT_MS = 10 * 60_000
 export const PROGRESSIVE_OUTLINE_TEXT_MAX_BYTES = 32_768
 
 export interface PlanPrototypeParams {
@@ -52,6 +50,34 @@ export interface PrototypePlanningProgress {
     | 'complete'
   readonly completedPages: number
   readonly totalPages: number
+}
+
+/**
+ * The route graph is Agent-authored, so its page count is unknowable before
+ * outline completion. Size the remaining DAG budget from that resolved graph
+ * instead of treating five minutes as an implicit fixed-page product limit.
+ * Every individual turn keeps its stricter stage deadline and the full journey
+ * remains capped at twenty minutes.
+ */
+export function progressivePlannerTimeoutMs(
+  pageCount: number,
+  pageParallelism = PROTOTYPE_PLANNER_PAGE_MAX_PARALLELISM,
+): number {
+  if (!Number.isInteger(pageCount) || pageCount < 1 || pageCount > 12) {
+    throw new Error('Progressive planner page count is outside the supported range.')
+  }
+  if (!Number.isInteger(pageParallelism)
+    || pageParallelism < 1
+    || pageParallelism > PROTOTYPE_PLANNER_PAGE_MAX_PARALLELISM) {
+    throw new Error('Progressive planner page parallelism is outside the supported range.')
+  }
+  const pageWaves = Math.ceil(pageCount / pageParallelism)
+  const expectedMs =
+    PROTOTYPE_PLANNER_TOTAL_TIMEOUT_MS + pageWaves * 30_000
+  return Math.min(
+    PROTOTYPE_PROGRESSIVE_PLANNER_MAX_TIMEOUT_MS,
+    Math.max(PROTOTYPE_PLANNER_TOTAL_TIMEOUT_MS, expectedMs),
+  )
 }
 
 async function runPlannerResultWithDeadline<T>(input: {
@@ -249,14 +275,8 @@ const progressiveDesignExplorationSchema = z.object({
   directions: z.array(candidateDirectionSchema).min(1).max(8),
 })
 
-const progressivePrototypeClosureSchema = z.object({
-  flows: z.array(prototypeFlowSchema).min(1),
-  reviewDocument: prototypeReviewDocumentSchema,
-})
-
 type ProgressivePrototypeOutline = z.infer<typeof progressivePrototypeOutlineSchema>
 type ProgressivePage = PrototypePlan['pages'][number]
-type ProgressiveClosure = z.infer<typeof progressivePrototypeClosureSchema>
 
 type ProgressivePageDetailIssueCode =
   | 'page-id-drift'
@@ -286,21 +306,6 @@ interface ProgressivePageShape {
   readonly states: number
   readonly interactions: number
   readonly assetOpportunities: number
-}
-
-type ProgressiveClosureIssueCode =
-  | 'flow-start-page'
-  | 'flow-entry-mismatch'
-  | 'flow-source-page'
-  | 'flow-interaction'
-  | 'flow-target-page'
-  | 'flow-target-mismatch'
-  | 'unreachable-page'
-
-interface ProgressiveClosureIssue {
-  readonly owner: 'closure'
-  readonly code: ProgressiveClosureIssueCode
-  readonly message: string
 }
 
 const PROGRESSIVE_OUTLINE_SYSTEM = [
@@ -364,20 +369,6 @@ const PROGRESSIVE_PAGE_REPAIR_SYSTEM = [
   'Do not add or remove regions, overlays, states, interactions, or reusable asset opportunities. Do not return sibling pages.',
 ].join(' ')
 
-const PROGRESSIVE_CLOSURE_SYSTEM = [
-  'You are Cutout\'s prototype journey reviewer.',
-  'Author reachable flows using only the supplied page and interaction ids, plus two complete Markdown review documents.',
-  'Do not add, remove, or rename routes.',
-].join(' ')
-
-const PROGRESSIVE_CLOSURE_REPAIR_SYSTEM = [
-  'You are Cutout\'s prototype journey closure repairer.',
-  'Repair only the supplied flows so every reference is valid and every outlined page is reachable.',
-  'Use only the supplied page and interaction ids. Do not add, remove, rename, or rewrite any page or interaction.',
-  'Preserve every flow id, name, goal, and step count. The orchestrator preserves the review documents.',
-  'Return only the complete repaired flows.',
-].join(' ')
-
 const PROGRESSIVE_OUTLINE_MAX_TOKENS = 8_000
 const PROGRESSIVE_OUTLINE_TEXT_MAX_TOKENS = 4_000
 // Header/version/product + 12 pages + 12 entries + 48 edges + ASK +
@@ -387,7 +378,6 @@ const PROGRESSIVE_OUTLINE_TEXT_MAX_LINES = 81
 const PROGRESSIVE_OUTLINE_TEXT_TIMEOUT_MS = 120_000
 const PROGRESSIVE_DESIGN_MAX_TOKENS = 8_000
 const PROGRESSIVE_PAGE_MAX_TOKENS = 12_000
-const PROGRESSIVE_CLOSURE_MAX_TOKENS = 20_000
 
 export function composePrototypeRequirement(
   brief: string,
@@ -669,13 +659,27 @@ function protocolInteger(value: string): number | null {
   return Number.isInteger(parsed) && parsed > 0 && parsed <= 8192 ? parsed : null
 }
 
+/**
+ * Some compatible text routes retain an otherwise exact protocol inside one
+ * Markdown fence. Accept only that lossless wrapper; explanatory prose,
+ * multiple fences, and unterminated output remain outside the closed grammar.
+ */
+function unwrapProgressiveOutlineProtocol(output: string): string {
+  const normalized = output
+    .replace(/^\uFEFF/u, '')
+    .replace(/\r\n/gu, '\n')
+    .trim()
+  const fenced = /^```(?:text|plaintext|tsv)?\n([\s\S]*)\n```$/iu.exec(normalized)
+  return fenced?.[1].trim() ?? normalized
+}
+
 function parseProgressiveOutlineText(
   output: string,
 ): Result<ProgressivePrototypeOutline> {
   if (new TextEncoder().encode(output).byteLength > PROGRESSIVE_OUTLINE_TEXT_MAX_BYTES) {
     return progressiveOutlineTextFailure('oversized')
   }
-  const lines = output.replace(/\r\n/gu, '\n').split('\n')
+  const lines = unwrapProgressiveOutlineProtocol(output).split('\n')
   while (lines.at(-1) === '') lines.pop()
   if (
     lines.length < 5
@@ -1073,6 +1077,79 @@ function compileProgressiveRouteEdges(
   return ok(compiled)
 }
 
+function progressivePageNavigationContext(
+  outline: ProgressivePrototypeOutline,
+  target: z.infer<typeof progressivePageOutlineSchema>,
+): string {
+  return JSON.stringify({
+    product: outline.product,
+    routes: outline.pages.map(({ id, name, route }) => ({ id, name, route })),
+    entryPageIds: outline.entryPageIds,
+    incomingEdges: outline.edges.filter(({ toPageId }) => toPageId === target.id),
+    outgoingEdges: outline.edges.filter(({ fromPageId }) => fromPageId === target.id),
+  })
+}
+
+function compileProgressiveClosure(
+  outline: ProgressivePrototypeOutline,
+): Pick<PrototypePlan, 'flows' | 'reviewDocument'> {
+  const pageById = new Map(outline.pages.map((page) => [page.id, page]))
+  const edgeLines = outline.edges.map((edge) => {
+    const source = pageById.get(edge.fromPageId)
+    const target = pageById.get(edge.toPageId)
+    return `- ${source?.name ?? edge.fromPageId} (${source?.route ?? edge.fromPageId}) -- ${edge.label} --> ${target?.name ?? edge.toPageId} (${target?.route ?? edge.toPageId})`
+  })
+  const routeLines = outline.pages.map((page) =>
+    `- ${page.name} (${page.route}): ${page.purpose}`,
+  )
+  const entryLines = outline.entryPageIds.map((pageId) => {
+    const page = pageById.get(pageId)
+    return `- ${page?.name ?? pageId} (${page?.route ?? pageId})`
+  })
+  const flows = outline.entryPageIds.map((startPageId, index) => ({
+    id: `route-journey-${index + 1}`,
+    name: `Route journey ${index + 1}`,
+    goal: outline.product.primaryGoal,
+    startPageId,
+    steps: outline.edges.map((edge) => ({
+      fromPageId: edge.fromPageId,
+      interactionId: edge.id,
+      toPageId: edge.toPageId,
+    })),
+  }))
+  return {
+    flows,
+    reviewDocument: {
+      format: 'markdown',
+      primaryFlow: [
+        `# ${outline.product.name} primary journey`,
+        '',
+        `Goal: ${outline.product.primaryGoal}`,
+        '',
+        'Entry routes:',
+        ...entryLines,
+        '',
+        'Authoritative navigation:',
+        ...(edgeLines.length > 0 ? edgeLines : ['- No cross-route navigation is required.']),
+      ].join('\n'),
+      fullPlan: [
+        `# ${outline.product.name} route plan`,
+        '',
+        outline.product.summary,
+        '',
+        'Routes:',
+        ...routeLines,
+        '',
+        'Journey entries:',
+        ...entryLines,
+        '',
+        'Authoritative navigation:',
+        ...(edgeLines.length > 0 ? edgeLines : ['- No cross-route navigation is required.']),
+      ].join('\n'),
+    },
+  }
+}
+
 function progressivePageShape(page: ProgressivePage): ProgressivePageShape {
   return {
     regions: page.regions.length,
@@ -1338,219 +1415,6 @@ async function repairProgressivePage(input: {
     : repaired
 }
 
-function progressiveClosureIssue(
-  pages: readonly ProgressivePage[],
-  closure: ProgressiveClosure,
-  entryPageIds: readonly string[],
-): ProgressiveClosureIssue | null {
-  const pageIds = new Set(pages.map(({ id }) => id))
-  const entryIds = new Set(entryPageIds)
-  const byId = new Map(pages.map((page) => [page.id, page]))
-  for (const flow of closure.flows) {
-    if (!pageIds.has(flow.startPageId)) {
-      return {
-        owner: 'closure',
-        code: 'flow-start-page',
-        message: `Flow "${flow.id}" starts at unknown page "${flow.startPageId}".`,
-      }
-    }
-    if (!entryIds.has(flow.startPageId)) {
-      return {
-        owner: 'closure',
-        code: 'flow-entry-mismatch',
-        message: `Flow "${flow.id}" changes the authoritative route entry to "${flow.startPageId}".`,
-      }
-    }
-    for (const step of flow.steps) {
-      const source = byId.get(step.fromPageId)
-      if (!source) {
-        return {
-          owner: 'closure',
-          code: 'flow-source-page',
-          message: `Flow "${flow.id}" references unknown page "${step.fromPageId}".`,
-        }
-      }
-      const interaction = source.interactions.find(({ id }) => id === step.interactionId)
-      if (!interaction) {
-        return {
-          owner: 'closure',
-          code: 'flow-interaction',
-          message: `Flow "${flow.id}" step references unknown interaction "${step.interactionId}" on page "${step.fromPageId}".`,
-        }
-      }
-      if (step.toPageId && !pageIds.has(step.toPageId)) {
-        return {
-          owner: 'closure',
-          code: 'flow-target-page',
-          message: `Flow "${flow.id}" step points to unknown page "${step.toPageId}".`,
-        }
-      }
-      if (
-        interaction.action.type === 'navigate'
-        && interaction.action.targetPageId !== step.toPageId
-      ) {
-        return {
-          owner: 'closure',
-          code: 'flow-target-mismatch',
-          message: `Flow "${flow.id}" step "${step.interactionId}" target does not match the interaction target.`,
-        }
-      }
-    }
-  }
-
-  const flowStartIds = new Set(closure.flows.map(({ startPageId }) => startPageId))
-  const missingEntry = entryPageIds.find((pageId) => !flowStartIds.has(pageId))
-  if (missingEntry) {
-    return {
-      owner: 'closure',
-      code: 'flow-entry-mismatch',
-      message: `Prototype flows omit authoritative route entry "${missingEntry}".`,
-    }
-  }
-
-  const reachable = new Set<string>()
-  const queue = closure.flows.map(({ startPageId }) => startPageId)
-  while (queue.length > 0) {
-    const pageId = queue.shift() as string
-    if (reachable.has(pageId)) continue
-    reachable.add(pageId)
-    for (const interaction of byId.get(pageId)?.interactions ?? []) {
-      if (interaction.action.type === 'navigate') {
-        queue.push(interaction.action.targetPageId)
-      }
-    }
-  }
-  const unreachable = pages.find(({ id }) => !reachable.has(id))
-  return unreachable
-    ? {
-        owner: 'closure',
-        code: 'unreachable-page',
-        message: `Prototype has unreachable pages: ${pages
-          .filter(({ id }) => !reachable.has(id))
-          .map(({ id }) => id)
-          .join(', ')}.`,
-      }
-    : null
-}
-
-function progressiveClosureInput(input: {
-  readonly params: PlanPrototypeParams
-  readonly requirement: string
-  readonly pages: readonly ProgressivePage[]
-  readonly entryPageIds: readonly string[]
-  readonly system: string
-  readonly invalidClosure?: ProgressiveClosure
-  readonly issue?: ProgressiveClosureIssue
-}): GenerateInput {
-  return progressiveInput(
-    input.params,
-    input.system,
-    [
-      'Original requirement:',
-      input.requirement,
-      '',
-      'Pages and interaction ids JSON:',
-      JSON.stringify(input.pages.map((page) => ({
-        id: page.id,
-        name: page.name,
-        route: page.route,
-        purpose: page.purpose,
-        interactions: page.interactions.map((interaction) => ({
-          id: interaction.id,
-          action: interaction.action,
-        })),
-      }))),
-      '',
-      'Authoritative route entry page ids JSON:',
-      JSON.stringify(input.entryPageIds),
-      ...(input.invalidClosure && input.issue ? [
-        '',
-        'Invalid closure JSON:',
-        JSON.stringify(input.invalidClosure),
-        '',
-        'Structured closure validation issue JSON:',
-        JSON.stringify(input.issue),
-      ] : []),
-    ].join('\n'),
-    PROGRESSIVE_CLOSURE_MAX_TOKENS,
-  )
-}
-
-function progressiveClosureRepairSchema(
-  pages: readonly ProgressivePage[],
-  invalidClosure: ProgressiveClosure,
-  entryPageIds: readonly string[],
-): z.ZodType<{ readonly flows: ProgressiveClosure['flows'] }> | null {
-  const pageIds = pages.map(({ id }) => id)
-  if (pageIds.length === 0 || entryPageIds.length === 0) return null
-  const pageIdSchema = z.enum(pageIds as [string, ...string[]])
-  const entryPageIdSchema = z.enum(entryPageIds as [string, ...string[]])
-  const stepVariants = pages.flatMap((page) => page.interactions.map((interaction) =>
-    z.object({
-      fromPageId: z.literal(page.id),
-      interactionId: z.literal(interaction.id),
-      toPageId: interaction.action.type === 'navigate'
-        ? z.literal(interaction.action.targetPageId)
-        : pageIdSchema.optional(),
-    }).strict()))
-
-  const stepSchema: z.ZodType<ProgressiveClosure['flows'][number]['steps'][number]> | null =
-    stepVariants.length === 1
-      ? stepVariants[0]!
-    : stepVariants.length > 1
-      ? z.union(stepVariants as [
-          (typeof stepVariants)[number],
-          (typeof stepVariants)[number],
-          ...(typeof stepVariants)[number][],
-        ])
-      : null
-
-  const flowSchemas: z.ZodType<ProgressiveClosure['flows'][number]>[] = []
-  for (const flow of invalidClosure.flows) {
-    if (flow.steps.length > 0 && !stepSchema) return null
-    const steps = stepSchema
-      ? z.array(stepSchema).length(flow.steps.length)
-      : z.array(prototypeFlowStepSchema).length(0)
-    flowSchemas.push(z.object({
-      id: z.literal(flow.id),
-      name: z.literal(flow.name),
-      goal: z.literal(flow.goal),
-      startPageId: entryPageIdSchema,
-      steps,
-    }).strict())
-  }
-
-  const flowSchema = flowSchemas.length === 1
-    ? flowSchemas[0]!
-    : z.union(flowSchemas as [
-        (typeof flowSchemas)[number],
-        (typeof flowSchemas)[number],
-        ...(typeof flowSchemas)[number][],
-      ])
-  const expectedFlowIds = new Set(invalidClosure.flows.map(({ id }) => id))
-  return z.object({
-    flows: z.array(flowSchema).length(flowSchemas.length).superRefine((flows, context) => {
-      const actualFlowIds = new Set(flows.map(({ id }) => id))
-      if (
-        actualFlowIds.size !== expectedFlowIds.size
-        || [...expectedFlowIds].some((id) => !actualFlowIds.has(id))
-      ) {
-        context.addIssue({
-          code: 'custom',
-          message: 'Closure repair must preserve every authored flow exactly once.',
-        })
-      }
-      const actualEntryIds = new Set(flows.map(({ startPageId }) => startPageId))
-      if (entryPageIds.some((pageId) => !actualEntryIds.has(pageId))) {
-        context.addIssue({
-          code: 'custom',
-          message: 'Closure repair must preserve every authoritative route entry.',
-        })
-      }
-    }),
-  }).strict() as z.ZodType<{ readonly flows: ProgressiveClosure['flows'] }>
-}
-
 async function planPrototypeProgressively(
   generation: Pick<GenerationService, 'generateObject' | 'streamText'>,
   params: PlanPrototypeParams,
@@ -1569,6 +1433,29 @@ async function planPrototypeProgressively(
   if (outline.humanLoop.mode === 'ask') {
     return ok(progressiveAskPlan(params.brief, params.intent, outline))
   }
+
+  return runPlannerResultWithDeadline({
+    parentSignal: params.signal,
+    timeoutMs: progressivePlannerTimeoutMs(
+      outline.pages.length,
+      params.pageParallelism ?? PROTOTYPE_PLANNER_PAGE_MAX_PARALLELISM,
+    ),
+    timeoutMessage: 'Prototype planning timed out.',
+    run: (signal) => planPrototypeProgressivelyFromOutline(
+      generation,
+      { ...params, signal },
+      requirement,
+      outline,
+    ),
+  })
+}
+
+async function planPrototypeProgressivelyFromOutline(
+  generation: Pick<GenerationService, 'generateObject' | 'streamText'>,
+  params: PlanPrototypeParams,
+  requirement: string,
+  outline: ProgressivePrototypeOutline,
+): Promise<Result<PrototypePlan>> {
 
   const outlineContext = JSON.stringify({
     product: outline.product,
@@ -1673,13 +1560,8 @@ async function planPrototypeProgressively(
             '',
             'Choose zero or more reusable non-UI asset opportunities for this page based on genuine reuse value. Do not target a fixed per-page count from the brief.',
             '',
-            'Complete route outline JSON:',
-            JSON.stringify({
-              product: outline.product,
-              pages: outline.pages,
-              entryPageIds: outline.entryPageIds,
-              edges: outline.edges,
-            }),
+            'Target route navigation context JSON:',
+            progressivePageNavigationContext(outline, page),
             '',
             'Expand only this exact page outline JSON:',
             JSON.stringify(page),
@@ -1751,65 +1633,7 @@ async function planPrototypeProgressively(
     completedPages: pages.length,
     totalPages: outline.pages.length,
   })
-  const closureResult = await generatePlannerObject(
-    generation,
-    params,
-    'closure',
-    progressiveClosureInput({
-      params,
-      requirement,
-      pages,
-      entryPageIds: outline.entryPageIds,
-      system: PROGRESSIVE_CLOSURE_SYSTEM,
-    }),
-    progressivePrototypeClosureSchema,
-  )
-  if (isErr(closureResult)) {
-    return progressiveStageFailure('closure', closureResult.error)
-  }
-
-  let closure = closureResult.data
-  const closureIssue = progressiveClosureIssue(pages, closure, outline.entryPageIds)
-  if (closureIssue) {
-    const repairSchema = progressiveClosureRepairSchema(
-      pages,
-      closure,
-      outline.entryPageIds,
-    )
-    if (!repairSchema) {
-      return err(`Progressive planner closure repair remained invalid: ${closureIssue.message}`)
-    }
-    const repair = await generatePlannerObject(
-      generation,
-      params,
-      'closure repair',
-      progressiveClosureInput({
-        params,
-        requirement,
-        pages,
-        entryPageIds: outline.entryPageIds,
-        system: PROGRESSIVE_CLOSURE_REPAIR_SYSTEM,
-        invalidClosure: closure,
-        issue: closureIssue,
-      }),
-      repairSchema,
-    )
-    if (isErr(repair)) return repair
-    closure = {
-      flows: repair.data.flows,
-      reviewDocument: closure.reviewDocument,
-    }
-    const remainingIssue = progressiveClosureIssue(
-      pages,
-      closure,
-      outline.entryPageIds,
-    )
-    if (remainingIssue) {
-      return err(
-        `Progressive planner closure repair remained invalid: ${remainingIssue.message}`,
-      )
-    }
-  }
+  const closure = compileProgressiveClosure(outline)
 
   const combined = generatedPrototypePlanSchema.safeParse({
     version: outline.version,
@@ -1920,6 +1744,19 @@ export async function planPrototype(
   generation: Pick<GenerationService, 'generateObject' | 'streamText'>,
   params: PlanPrototypeParams,
 ): Promise<Result<PrototypePlan>> {
+  const brief = params.brief.trim()
+  if (brief.length === 0) return err('A requirement brief is required.')
+  if (params.pageParallelism !== undefined && (
+    !Number.isInteger(params.pageParallelism)
+    || params.pageParallelism < 1
+    || params.pageParallelism > PROTOTYPE_PLANNER_PAGE_MAX_PARALLELISM
+  )) {
+    return err('Prototype planner page parallelism is outside the supported range.')
+  }
+  const explicitPages = explicitPrototypePageCount(brief)
+  if (explicitPages === null || explicitPages >= 4) {
+    return planPrototypeProgressively(generation, { ...params, brief })
+  }
   return runPlannerResultWithDeadline({
     parentSignal: params.signal,
     timeoutMs: PROTOTYPE_PLANNER_TOTAL_TIMEOUT_MS,

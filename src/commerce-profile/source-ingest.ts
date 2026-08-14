@@ -2,6 +2,7 @@ import { invoke } from '@tauri-apps/api/core'
 import { z } from 'zod'
 import { base64ToBytes } from '@/lib/image'
 import { multimodalArtifactEvidenceSchema } from '@/multimodal-host/contracts'
+import { invokeCancellableProxy } from '@/services/ai/tauri-fetch'
 
 export const COMMERCE_SOURCE_INGEST_PROTOCOL = 'cutout.commerce-source-ingest-receipt.v1' as const
 export const COMMERCE_SOURCE_ORIGIN = 'https://aib-innovation-oss.oss-accelerate.aliyuncs.com' as const
@@ -28,6 +29,7 @@ export const commerceSourceIngestReceiptSchema = z.object({
   receiptHash: sha256Schema,
   requestId: recordIdSchema,
   runId: recordIdSchema,
+  heldOutCommitmentHash: sha256Schema.optional(),
   factId: recordIdSchema,
   sourceFile: z.string().min(1).max(512),
   sourcePointer: z.string().startsWith('/').max(2_000),
@@ -71,14 +73,25 @@ export async function sha256CommerceSourceUrl(sourceUrl: string): Promise<string
 export async function ingestCompetitionCommerceSourceImage(input: {
   readonly requestId: string
   readonly runId: string
+  readonly heldOutCommitmentHash?: string
   readonly factId: string
   readonly sourceFile: string
   readonly sourcePointer: string
   readonly sourceUrl: string
+  readonly signal?: AbortSignal
 }): Promise<CommerceSourceIngestArtifact> {
-  const result = commerceSourceIngestResultSchema.parse(await invoke(
+  const result = commerceSourceIngestResultSchema.parse(await invokeCancellableProxy(
     'ai_ingest_competition_source_image',
-    input,
+    {
+      operationRequestId: input.requestId,
+      runId: input.runId,
+      heldOutCommitmentHash: input.heldOutCommitmentHash,
+      factId: input.factId,
+      sourceFile: input.sourceFile,
+      sourcePointer: input.sourcePointer,
+      sourceUrl: input.sourceUrl,
+    },
+    input.signal,
   ))
   const bytes = base64ToBytes(result.data)
   if (result.mediaType !== result.receipt.artifact.mediaType

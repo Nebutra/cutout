@@ -193,6 +193,8 @@ describe('multimodal desktop Host', () => {
   })
 
   it('does not silently route Commerce product video through text-to-video', () => {
+    expect(operationForCommerceRole('main-image')).toBe('image-edit')
+    expect(operationForCommerceRole('detail-image:1')).toBe('image-edit')
     expect(operationForCommerceRole('product-video')).toBe('image-to-video')
   })
 

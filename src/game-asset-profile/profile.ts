@@ -1,8 +1,8 @@
 import { z } from 'zod'
-import { fingerprint } from '@/design-ir/fingerprint'
-import { canonicalJson } from '@/design-ir/fingerprint'
+import { canonicalJson, fingerprint } from '@/design-ir/fingerprint'
+import type { ArtifactGraph, EvidenceGraph, OutcomeNode } from '@/design-os-kernel/contracts'
 import { registerDomainSchema, type SchemaRegistry } from '@/design-os-kernel/registry'
-import type { ArtifactGraph } from '@/design-os-kernel/contracts'
+import type { ProfileProposalDraft } from '@/design-profile-platform/brief'
 import {
   DESIGN_PROFILE_MANIFEST_PROTOCOL,
   createDesignProfileManifest,
@@ -12,30 +12,56 @@ import {
 } from '@/design-profile-platform/contracts'
 import {
   fingerprintTrustedImplementation,
-  type ProfileCompilerInput,
-  type ProfileEvaluator,
-  type ProfileBindingRegistries,
   type PresentationProjection,
+  type ProfileBindingRegistries,
+  type ProfileCompilerInput,
   type SemanticActionRequest,
 } from '@/design-profile-platform/registries'
 import {
   GAME_ASSET_PROFILE_ID,
   GAME_ASSET_PROFILE_VERSION,
-  gameAssetEvaluationSchema,
+  acceptedGameAssetArtifactSchema,
+  compareGameAssetEvidenceIdentity,
   gameAssetEvaluationInputSchema,
+  gameAssetEvaluationSchema,
   gameAssetPlanSchema,
-  observedGameAssetFrameSchema,
   layeredGameMapManifestSchema,
-  type GameAssetEvaluationInput,
+  observedGameAssetFrameSchema,
   type GameAssetPlan,
 } from './contracts'
 import { evaluateGameAssetFrames } from './evaluation'
+import {
+  fingerprintGameAssetRehearsalVerifier,
+  gameAssetProductionRehearsalBundleSchema,
+  verifyGameAssetProductionRehearsalBundle,
+} from './rehearsal'
 
 const GAME_ASSET_RECIPE = { id: 'game-asset.production-recipe', version: 1 } as const
 const GAME_ASSET_PLAN_SCHEMA = { id: 'game-asset.plan', version: 1 } as const
 const GAME_ASSET_FRAME_SCHEMA = { id: 'game-asset.frame', version: 1 } as const
+const GAME_ASSET_EVALUATION_SCHEMA = { id: 'game-asset.evaluation', version: 1 } as const
+const GAME_ASSET_LAYERED_MAP_SCHEMA = { id: 'game-asset.layered-map', version: 1 } as const
+const GAME_ASSET_REPAIR_ACTION_ID = 'action:game-asset-repair' as const
+const GAME_ASSET_CAPABILITY_ID = 'capability:image-generation' as const
+const GAME_ASSET_SCORECARD_RULER = { id: 'ruler:game-asset-quality', version: 1 } as const
 
-async function compileGameAssetBrief(input: ProfileCompilerInput) {
+const gameAssetRepairParametersSchema = z.object({
+  failedRoleIds: z.array(z.string().min(1)).min(1).max(20_000),
+  acceptedArtifacts: z.array(acceptedGameAssetArtifactSchema).max(20_000),
+}).strict().superRefine((parameters, context) => {
+  if (new Set(parameters.failedRoleIds).size !== parameters.failedRoleIds.length) {
+    context.addIssue({ code: 'custom', message: 'Game Asset repair role ids must be unique.' })
+  }
+  if (new Set(parameters.acceptedArtifacts.map(({ roleId }) => roleId)).size !== parameters.acceptedArtifacts.length) {
+    context.addIssue({ code: 'custom', message: 'Accepted Game Asset repair siblings must have unique role ids.' })
+  }
+  const acceptedRoleIds = new Set(parameters.acceptedArtifacts.map(({ roleId }) => roleId))
+  if (parameters.failedRoleIds.some((roleId) => acceptedRoleIds.has(roleId))) {
+    context.addIssue({ code: 'custom', message: 'A failed Game Asset role cannot also be retained as an accepted sibling.' })
+  }
+})
+
+async function compileGameAssetBrief(input: ProfileCompilerInput): Promise<readonly ProfileProposalDraft[]> {
   const requested = input.brief.deliverables.filter((deliverable) => (
     deliverable.schema?.id === GAME_ASSET_PLAN_SCHEMA.id
     && deliverable.schema.version === GAME_ASSET_PLAN_SCHEMA.version
@@ -47,15 +73,15 @@ async function compileGameAssetBrief(input: ProfileCompilerInput) {
   ))
   return Promise.all(planEvidence.map(async (evidence) => {
     const plan = gameAssetPlanSchema.parse(evidence.value)
-    assertGameAssetPlanEvidenceClosure(plan, input.brief.evidence)
     const planHash = await fingerprint(plan)
+    assertGameAssetPlanEvidenceClosure(plan, evidence, input.brief.evidence, planHash)
     return {
       id: `proposal:${plan.id}`,
       score: 1,
       scoreReasons: ['The requested Game Asset deliverable has an exact typed plan and evidence closure.'],
       requiredUnknownIds: [],
       capabilities: [{
-        id: 'capability:image-generation',
+        id: GAME_ASSET_CAPABILITY_ID,
         required: true,
         reason: 'Produces candidate frames for deterministic evaluation and atlas assembly.',
       }],
@@ -109,41 +135,121 @@ function exactGameAssetReferences(plan: GameAssetPlan) {
     }
     byIdentity.set(key, reference)
   }
-  return [...byIdentity.values()].sort((left, right) => (
-    `${left.id}@${left.revision}`.localeCompare(`${right.id}@${right.revision}`)
+  return [...byIdentity.values()].sort((left, right) => compareGameAssetEvidenceIdentity(
+    `${left.id}@${left.revision}`,
+    `${right.id}@${right.revision}`,
+  ))
+}
+
+function hasExactGameAssetEvidenceReference(
+  reference: ReturnType<typeof exactGameAssetReferences>[number],
+  evidenceNodes: EvidenceGraph['body']['nodes'],
+): boolean {
+  return evidenceNodes.some((candidate) => (
+    candidate.id === reference.id
+    && candidate.revision === reference.revision
+    && candidate.provenance.some(({ contentHash }) => contentHash === reference.contentHash)
+  ))
+}
+
+function missingGameAssetEvidenceReferences(
+  plan: GameAssetPlan,
+  evidenceNodes: EvidenceGraph['body']['nodes'],
+) {
+  return exactGameAssetReferences(plan).filter((reference) => (
+    !hasExactGameAssetEvidenceReference(reference, evidenceNodes)
+  ))
+}
+
+function hasExactGameAssetPlanEvidence(
+  plan: GameAssetPlan,
+  outcome: OutcomeNode,
+  evidenceNodes: EvidenceGraph['body']['nodes'],
+): boolean {
+  const sources = outcome.provenance.filter(({ relation }) => relation === 'compiled-from-plan')
+  if (sources.length !== 1 || !sources[0]?.contentHash) return false
+  const source = sources[0]
+  return evidenceNodes.some((candidate) => (
+    candidate.id === source.sourceId
+    && candidate.revision === source.revision
+    && canonicalJson(candidate.schema) === canonicalJson(GAME_ASSET_PLAN_SCHEMA)
+    && canonicalJson(candidate.value) === canonicalJson(plan)
+    && candidate.provenance.some(({ contentHash }) => contentHash === source.contentHash)
   ))
 }
 
 function assertGameAssetPlanEvidenceClosure(
   plan: GameAssetPlan,
+  planEvidence: ProfileCompilerInput['brief']['evidence'][number],
   evidenceNodes: ProfileCompilerInput['brief']['evidence'],
+  planHash: string,
 ): void {
-  for (const reference of exactGameAssetReferences(plan)) {
-    const evidence = evidenceNodes.find((candidate) => (
-      candidate.id === reference.id
-      && candidate.revision === reference.revision
-      && candidate.provenance.some(({ contentHash }) => contentHash === reference.contentHash)
-    ))
-    if (!evidence) {
-      throw new Error(`Game Asset plan evidence is missing or stale: ${reference.id}@${reference.revision}`)
-    }
+  if (!planEvidence.provenance.some(({ contentHash }) => contentHash === planHash)) {
+    throw new Error(`Game Asset plan evidence does not retain the exact plan hash: ${planEvidence.id}@${planEvidence.revision}`)
+  }
+  for (const reference of missingGameAssetEvidenceReferences(plan, evidenceNodes)) {
+    throw new Error(`Game Asset plan evidence is missing or stale: ${reference.id}@${reference.revision}`)
   }
 }
 
-function evaluateGameAssetProfile(input: Parameters<ProfileEvaluator<GameAssetEvaluationInput>['evaluate']>[0]) {
-  const evaluation = evaluateGameAssetFrames(input.parameters)
+function evaluateGameAssetProfile(
+  input: {
+    readonly parameters: unknown
+    readonly outcome: OutcomeNode
+    readonly evidenceGraph: EvidenceGraph
+    readonly artifactGraph: ArtifactGraph
+  },
+) {
+  const parameters = gameAssetEvaluationInputSchema.parse(input.parameters)
+  const evaluation = evaluateGameAssetFrames(parameters)
+  const outcomePlan = gameAssetPlanSchema.safeParse(input.outcome.payload)
+  const outcomeBound = outcomePlan.success
+    && canonicalJson(outcomePlan.data) === canonicalJson(parameters.plan)
+  const planEvidenceBound = hasExactGameAssetPlanEvidence(
+    parameters.plan,
+    input.outcome,
+    input.evidenceGraph.body.nodes,
+  )
+  const missingEvidence = missingGameAssetEvidenceReferences(parameters.plan, input.evidenceGraph.body.nodes)
+  const evidenceBound = missingEvidence.length === 0
   const artifactById = new Map(input.artifactGraph.body.nodes.map((artifact) => [artifact.id, artifact]))
-  const accepted = evaluation.acceptedArtifacts.filter((candidate) => {
+  const artifactBound = evaluation.acceptedArtifacts.filter((candidate) => {
     const artifact = artifactById.get(candidate.artifactId)
-    return artifact
+    return artifact?.accepted === true
       && artifact.revision === candidate.artifactRevision
       && artifact.contentHash === candidate.contentHash
       && canonicalJson(artifact.schema) === canonicalJson(GAME_ASSET_FRAME_SCHEMA)
   })
+  const accepted = outcomeBound && planEvidenceBound && evidenceBound ? artifactBound : []
   const bindingFailures = evaluation.acceptedArtifacts.filter((candidate) => (
-    !accepted.some(({ roleId }) => roleId === candidate.roleId)
+    !artifactBound.some(({ roleId }) => roleId === candidate.roleId)
   ))
   const reasons = [
+    ...(!outcomeBound ? [{
+      code: 'outcome-plan-binding-mismatch',
+      message: `Game Asset evaluation input is not the exact plan carried by Outcome ${input.outcome.id}.`,
+      nodeId: input.outcome.id,
+      dependencyPath: [input.outcome.id],
+      evidence: [{ key: 'planId', value: evaluation.planId }],
+    }] : []),
+    ...(!planEvidenceBound ? [{
+      code: 'plan-evidence-graph-binding-mismatch',
+      message: `Game Asset plan evidence is missing or stale in the authoritative EvidenceGraph for ${input.outcome.id}.`,
+      nodeId: input.outcome.id,
+      dependencyPath: [input.outcome.id],
+      evidence: [{ key: 'planId', value: evaluation.planId }],
+    }] : []),
+    ...missingEvidence.map((reference) => ({
+      code: 'evidence-graph-binding-mismatch',
+      message: `Game Asset evidence is missing or stale in the authoritative EvidenceGraph: ${reference.id}@${reference.revision}.`,
+      nodeId: input.outcome.id,
+      dependencyPath: [input.outcome.id, reference.id],
+      evidence: [
+        { key: 'evidenceId', value: reference.id },
+        { key: 'evidenceRevision', value: reference.revision },
+        { key: 'evidenceContentHash', value: reference.contentHash },
+      ],
+    })),
     ...evaluation.findings.map((finding) => ({
       code: finding.code,
       message: finding.message,
@@ -153,7 +259,7 @@ function evaluateGameAssetProfile(input: Parameters<ProfileEvaluator<GameAssetEv
     })),
     ...bindingFailures.map((failure) => ({
       code: 'artifact-graph-binding-mismatch',
-      message: `Observed frame ${failure.roleId} does not match its authoritative ArtifactGraph revision and hash.`,
+      message: `Observed frame ${failure.roleId} does not match an accepted authoritative ArtifactGraph revision and hash.`,
       nodeId: input.outcome.id,
       dependencyPath: [input.outcome.id, failure.roleId],
       evidence: [{ key: 'artifactId', value: failure.artifactId }],
@@ -172,35 +278,178 @@ function projectGameAssetPlan(input: unknown): PresentationProjection {
     title: plan.assetId,
     summary: `${plan.roles.length} declared game asset roles`,
     metadata: { kind: plan.kind, view: plan.view, roles: plan.roles.length },
-    actionIds: ['action:game-asset-repair'],
+    actionIds: [GAME_ASSET_REPAIR_ACTION_ID],
   }
 }
 
 function compileGameAssetRepair(request: SemanticActionRequest) {
-  const parameters = z.object({ failedRoleIds: z.array(z.string().min(1)).min(1) }).strict()
-    .parse(request.parameters)
+  const parameters = gameAssetRepairParametersSchema.parse(request.parameters)
   return [{
-    id: 'command:repair-game-asset-role',
+    id: 'command:game-asset-repair',
     kind: 'request-repair' as const,
     subject: request.subject,
     parameters,
-    requiredCapabilityIds: ['capability:image-generation'],
+    requiredCapabilityIds: [GAME_ASSET_CAPABILITY_ID],
   }]
 }
 
-function projectGameAssetOutcomeScore(source: unknown) {
-  const evaluation = evaluateGameAssetFrames(gameAssetEvaluationInputSchema.parse(source))
-  const total = evaluation.acceptedArtifacts.length + evaluation.failedRoleIds.length
+function projectGameAssetOutcomeScore(source: unknown, rulerDigest: string) {
+  const input = gameAssetEvaluationInputSchema.parse(source)
+  const evaluation = evaluateGameAssetFrames(input)
+  const evidenceIds = [...new Set([
+    input.plan.id,
+    ...input.frames.map(({ artifactRevision }) => artifactRevision),
+    ...exactGameAssetReferences(input.plan).map(({ revision }) => revision),
+  ])].sort()
   return {
     profileId: GAME_ASSET_PROFILE_ID,
-    ruler: { id: 'ruler:game-asset-quality', version: 1, digest: '' },
+    ruler: { ...GAME_ASSET_SCORECARD_RULER, digest: rulerDigest },
     criteria: [{
       id: 'criterion:role-closure',
       score: evaluation.acceptedArtifacts.length,
-      maximumScore: Math.max(1, total),
-      evidenceIds: [evaluation.planId],
+      maximumScore: input.plan.roles.length,
+      evidenceIds,
     }],
   }
+}
+
+function createGameAssetScorecardProjector(rulerDigest: string) {
+  return (source: unknown) => projectGameAssetOutcomeScore(source, rulerDigest)
+}
+
+function registerGameAssetSchemas(registry: SchemaRegistry): void {
+  registerDomainSchema(registry, {
+    reference: GAME_ASSET_PLAN_SCHEMA,
+    category: 'outcome',
+    schema: gameAssetPlanSchema,
+    canonicalOwner: 'cutout:game-asset-profile',
+  })
+  registerDomainSchema(registry, {
+    reference: GAME_ASSET_FRAME_SCHEMA,
+    category: 'outcome',
+    schema: observedGameAssetFrameSchema,
+    canonicalOwner: 'cutout:game-asset-profile',
+  })
+  registerDomainSchema(registry, {
+    reference: GAME_ASSET_EVALUATION_SCHEMA,
+    category: 'evaluator',
+    schema: gameAssetEvaluationSchema,
+    canonicalOwner: 'cutout:game-asset-profile',
+  })
+  registerDomainSchema(registry, {
+    reference: GAME_ASSET_LAYERED_MAP_SCHEMA,
+    category: 'outcome',
+    schema: layeredGameMapManifestSchema,
+    canonicalOwner: 'cutout:game-asset-profile',
+  })
+}
+
+const gameAssetCompilerImplementation = { compile: compileGameAssetBrief }
+const gameAssetEvaluatorImplementation = {
+  outcomeSchemas: [GAME_ASSET_PLAN_SCHEMA],
+  artifactSchemas: [GAME_ASSET_FRAME_SCHEMA],
+  inputSchema: gameAssetEvaluationInputSchema,
+  evaluate: evaluateGameAssetProfile,
+}
+const gameAssetPresentationImplementation = {
+  schema: GAME_ASSET_PLAN_SCHEMA,
+  fallbackPriority: 10,
+  inputSchema: gameAssetPlanSchema,
+  project: projectGameAssetPlan,
+}
+const gameAssetSemanticActionImplementation = { compile: compileGameAssetRepair }
+const gameAssetDeliveryImplementation = {
+  formatId: 'game-asset.atlas-manifest.v1',
+  mediaType: 'application/json',
+  artifactSchemas: [GAME_ASSET_FRAME_SCHEMA, GAME_ASSET_LAYERED_MAP_SCHEMA],
+  requiredTargetAdapterIds: [],
+}
+
+interface GameAssetImplementationHashes {
+  readonly schemas: string
+  readonly compiler: string
+  readonly evaluator: string
+  readonly renderer: string
+  readonly inspector: string
+  readonly action: string
+  readonly delivery: string
+  readonly scorecard: string
+  readonly retainedEvidenceVerifier: string
+}
+
+async function fingerprintGameAssetImplementations(): Promise<GameAssetImplementationHashes> {
+  const [schemas, compiler, evaluator, renderer, inspector, action, delivery, scorecard, retainedEvidenceVerifier] = await Promise.all([
+    fingerprintTrustedImplementation({
+      id: 'implementation:game-asset-schemas',
+      functions: [registerGameAssetSchemas],
+      schemas: [gameAssetPlanSchema, observedGameAssetFrameSchema, gameAssetEvaluationSchema, layeredGameMapManifestSchema],
+      constants: [GAME_ASSET_PLAN_SCHEMA, GAME_ASSET_FRAME_SCHEMA, GAME_ASSET_EVALUATION_SCHEMA, GAME_ASSET_LAYERED_MAP_SCHEMA],
+    }),
+    fingerprintTrustedImplementation({
+      id: 'implementation:game-asset-compiler',
+      functions: [
+        compileGameAssetBrief,
+        compareGameAssetEvidenceIdentity,
+        exactGameAssetReferences,
+        hasExactGameAssetEvidenceReference,
+        missingGameAssetEvidenceReferences,
+        assertGameAssetPlanEvidenceClosure,
+      ],
+      schemas: [gameAssetPlanSchema],
+      constants: [GAME_ASSET_RECIPE, GAME_ASSET_PLAN_SCHEMA, GAME_ASSET_CAPABILITY_ID],
+    }),
+    fingerprintTrustedImplementation({
+      id: 'implementation:game-asset-evaluator',
+      functions: [
+        evaluateGameAssetProfile,
+        compareGameAssetEvidenceIdentity,
+        exactGameAssetReferences,
+        hasExactGameAssetEvidenceReference,
+        missingGameAssetEvidenceReferences,
+        hasExactGameAssetPlanEvidence,
+        evaluateGameAssetFrames,
+      ],
+      schemas: [gameAssetEvaluationInputSchema, gameAssetEvaluationSchema, gameAssetPlanSchema, observedGameAssetFrameSchema],
+      constants: [GAME_ASSET_PLAN_SCHEMA, GAME_ASSET_FRAME_SCHEMA],
+    }),
+    fingerprintTrustedImplementation({
+      id: 'implementation:game-asset-renderer',
+      functions: [projectGameAssetPlan],
+      schemas: [gameAssetPlanSchema],
+      constants: [GAME_ASSET_PLAN_SCHEMA, GAME_ASSET_REPAIR_ACTION_ID],
+    }),
+    fingerprintTrustedImplementation({
+      id: 'implementation:game-asset-inspector',
+      functions: [projectGameAssetPlan],
+      schemas: [gameAssetPlanSchema],
+      constants: [GAME_ASSET_PLAN_SCHEMA, GAME_ASSET_REPAIR_ACTION_ID],
+    }),
+    fingerprintTrustedImplementation({
+      id: 'implementation:game-asset-repair-action',
+      functions: [compileGameAssetRepair],
+      schemas: [gameAssetRepairParametersSchema],
+      constants: [GAME_ASSET_CAPABILITY_ID],
+    }),
+    fingerprintTrustedImplementation({
+      id: 'implementation:game-asset-delivery',
+      schemas: [observedGameAssetFrameSchema, layeredGameMapManifestSchema],
+      constants: [gameAssetDeliveryImplementation],
+    }),
+    fingerprintTrustedImplementation({
+      id: 'implementation:game-asset-scorecard',
+      functions: [
+        createGameAssetScorecardProjector,
+        projectGameAssetOutcomeScore,
+        compareGameAssetEvidenceIdentity,
+        exactGameAssetReferences,
+        evaluateGameAssetFrames,
+      ],
+      schemas: [gameAssetEvaluationInputSchema, gameAssetEvaluationSchema],
+      constants: [GAME_ASSET_SCORECARD_RULER],
+    }),
+    fingerprintGameAssetRehearsalVerifier(),
+  ])
+  return { schemas, compiler, evaluator, renderer, inspector, action, delivery, scorecard, retainedEvidenceVerifier }
 }
 
 export interface GameAssetProfilePackage {
@@ -208,12 +457,16 @@ export interface GameAssetProfilePackage {
   readonly registrations: readonly RegisteredProfileBinding[]
   readonly registerTrustedSchemas: (registry: SchemaRegistry) => void
   readonly registerTrustedBindings: (registries: ProfileBindingRegistries) => void
+  readonly retainedEvidenceVerifier: {
+    readonly implementationHash: string
+    readonly sourceSchema: typeof gameAssetProductionRehearsalBundleSchema
+    readonly verify: typeof verifyGameAssetProductionRehearsalBundle
+  }
 }
 
 export async function createGameAssetProfilePackage(): Promise<GameAssetProfilePackage> {
-  const hashes = Object.fromEntries(await Promise.all(Object.entries(implementationSources)
-    .map(async ([key, value]) => [key, await fingerprint(value)]))) as Record<keyof typeof implementationSources, string>
-  const reference = <Kind extends 'schema' | 'compiler' | 'evaluator' | 'renderer' | 'inspector' | 'semantic-action' | 'delivery' | 'evidence-benchmark-adapter' | 'outcome-scorecard-adapter'>(
+  const hashes = await fingerprintGameAssetImplementations()
+  const reference = <Kind extends RegisteredProfileBinding['kind']>(
     kind: Kind,
     id: string,
     implementationHash: string,
@@ -224,9 +477,8 @@ export async function createGameAssetProfilePackage(): Promise<GameAssetProfileP
     evaluator: reference('evaluator', 'evaluator:game-asset', hashes.evaluator),
     renderer: reference('renderer', 'renderer:game-asset', hashes.renderer),
     inspector: reference('inspector', 'inspector:game-asset', hashes.inspector),
-    action: reference('semantic-action', 'action:game-asset-repair', hashes.action),
+    action: reference('semantic-action', GAME_ASSET_REPAIR_ACTION_ID, hashes.action),
     delivery: reference('delivery', 'delivery:game-asset-atlas', hashes.delivery),
-    evidence: reference('evidence-benchmark-adapter', 'benchmark-adapter:game-asset', hashes.evidence),
     scorecard: reference('outcome-scorecard-adapter', 'scorecard:game-asset', hashes.scorecard),
   }
   const content: ProfileManifestContent = {
@@ -245,10 +497,10 @@ export async function createGameAssetProfilePackage(): Promise<GameAssetProfileP
     semanticActions: [refs.action],
     deliveries: [refs.delivery],
     migrations: [],
-    evidenceBenchmarkAdapters: [refs.evidence],
+    evidenceBenchmarkAdapters: [],
     outcomeScorecardAdapters: [refs.scorecard],
     capabilityRequirements: [{
-      capabilityId: 'capability:image-generation',
+      capabilityId: GAME_ASSET_CAPABILITY_ID,
       required: true,
       reason: 'Produces raw visual candidates; deterministic post-processing remains a separate graph stage.',
     }],
@@ -257,7 +509,7 @@ export async function createGameAssetProfilePackage(): Promise<GameAssetProfileP
       id: 'roles:game-asset-frame-family',
       roles: [{
         roleId: 'role:game-asset-frame',
-        outputSchema: { id: 'game-asset.frame', version: 1 },
+        outputSchema: GAME_ASSET_FRAME_SCHEMA,
         cardinality: { minimum: 1, maximum: 10_000 },
         constraintIds: ['constraint:identity', 'constraint:scale', 'constraint:anchor', 'constraint:reference-lineage'],
       }],
@@ -281,7 +533,6 @@ export async function createGameAssetProfilePackage(): Promise<GameAssetProfileP
       requiredRoleIds: ['role:game-asset-frame'],
       evaluatorBindingId: refs.evaluator.id,
     }],
-    fixtures: [],
   }
   const manifest = await createDesignProfileManifest(content)
   const registrations = Object.values(refs).map((binding) => ({
@@ -303,146 +554,51 @@ export async function createGameAssetProfilePackage(): Promise<GameAssetProfileP
   return {
     manifest,
     registrations,
-    registerTrustedSchemas(registry) {
-      registerDomainSchema(registry, {
-        reference: { id: 'game-asset.plan', version: 1 },
-        category: 'outcome',
-        schema: gameAssetPlanSchema,
-        canonicalOwner: 'cutout:game-asset-profile',
-      })
-      registerDomainSchema(registry, {
-        reference: { id: 'game-asset.evaluation', version: 1 },
-        category: 'evaluator',
-        schema: gameAssetEvaluationSchema,
-        canonicalOwner: 'cutout:game-asset-profile',
-      })
-      registerDomainSchema(registry, {
-        reference: { id: 'game-asset.layered-map', version: 1 },
-        category: 'outcome',
-        schema: layeredGameMapManifestSchema,
-        canonicalOwner: 'cutout:game-asset-profile',
-      })
+    retainedEvidenceVerifier: {
+      implementationHash: hashes.retainedEvidenceVerifier,
+      sourceSchema: gameAssetProductionRehearsalBundleSchema,
+      verify: verifyGameAssetProductionRehearsalBundle,
     },
+    registerTrustedSchemas: registerGameAssetSchemas,
     registerTrustedBindings(registries) {
       registries.compilers.register({
         ...registrationFor(refs.compiler),
         kind: 'compiler',
-        implementation: { compile: () => [] },
+        implementation: gameAssetCompilerImplementation,
       })
       registries.evaluators.register({
         ...registrationFor(refs.evaluator),
         kind: 'evaluator',
-        implementation: {
-          outcomeSchemas: [{ id: 'game-asset.plan', version: 1 }],
-          artifactSchemas: [{ id: 'game-asset.frame', version: 1 }],
-          inputSchema: gameAssetEvaluationInputSchema,
-          evaluate: ({ parameters, outcome }) => {
-            const parsed = gameAssetEvaluationInputSchema.parse(parameters)
-            const evaluation = evaluateGameAssetFrames(parsed)
-            return {
-              status: evaluation.status === 'passed' ? 'passed' : evaluation.status === 'needs-repair' ? 'repairable' : 'blocked',
-              artifactIds: evaluation.acceptedArtifacts.map(({ artifactId }) => artifactId),
-              reasons: evaluation.findings.map((finding) => ({
-                code: finding.code,
-                message: finding.message,
-                nodeId: outcome.id,
-                dependencyPath: [outcome.id, finding.roleId],
-                evidence: [{ key: 'roleId', value: finding.roleId }],
-              })),
-            }
-          },
-        },
+        implementation: gameAssetEvaluatorImplementation,
       })
-      const presentation = {
-        schema: { id: 'game-asset.plan', version: 1 },
-        fallbackPriority: 10,
-        inputSchema: gameAssetPlanSchema,
-        project: (input: unknown) => {
-          const plan = gameAssetPlanSchema.parse(input)
-          return {
-            title: plan.assetId,
-            summary: `${plan.roles.length} declared game asset roles`,
-            metadata: { kind: plan.kind, view: plan.view, roles: plan.roles.length },
-            actionIds: [refs.action.id],
-          }
-        },
-      }
-      registries.renderers.register({ ...registrationFor(refs.renderer), kind: 'renderer', implementation: presentation })
-      registries.inspectors.register({ ...registrationFor(refs.inspector), kind: 'inspector', implementation: presentation })
+      registries.renderers.register({
+        ...registrationFor(refs.renderer),
+        kind: 'renderer',
+        implementation: gameAssetPresentationImplementation,
+      })
+      registries.inspectors.register({
+        ...registrationFor(refs.inspector),
+        kind: 'inspector',
+        implementation: gameAssetPresentationImplementation,
+      })
       registries.semanticActions.register({
         ...registrationFor(refs.action),
         kind: 'semantic-action',
-        implementation: { compile: (request) => [{
-          id: 'command:repair-game-asset-role',
-          kind: 'request-repair',
-          subject: request.subject,
-          parameters: request.parameters,
-          requiredCapabilityIds: ['capability:image-generation'],
-        }] },
+        implementation: gameAssetSemanticActionImplementation,
       })
       registries.delivery.register({
         ...registrationFor(refs.delivery),
         kind: 'delivery',
-        implementation: {
-          formatId: 'game-asset.atlas-manifest.v1',
-          mediaType: 'application/json',
-          artifactSchemas: [
-            { id: 'game-asset.frame', version: 1 },
-            { id: 'game-asset.layered-map', version: 1 },
-          ],
-          requiredTargetAdapterIds: [],
-        },
+        implementation: gameAssetDeliveryImplementation,
       })
       registries.outcomeScorecardAdapters.register({
         ...registrationFor(refs.scorecard),
         kind: 'outcome-scorecard-adapter',
         implementation: {
           profileId: GAME_ASSET_PROFILE_ID,
-          ruler: { id: 'ruler:game-asset-quality', version: 1, digest: hashes.scorecard },
+          ruler: { ...GAME_ASSET_SCORECARD_RULER, digest: hashes.scorecard },
           sourceSchema: gameAssetEvaluationInputSchema,
-          project: (source) => {
-            const evaluation = evaluateGameAssetFrames(gameAssetEvaluationInputSchema.parse(source))
-            const total = evaluation.acceptedArtifacts.length + evaluation.failedRoleIds.length
-            return {
-              profileId: GAME_ASSET_PROFILE_ID,
-              ruler: { id: 'ruler:game-asset-quality', version: 1, digest: hashes.scorecard },
-              criteria: [{
-                id: 'criterion:role-closure',
-                score: evaluation.acceptedArtifacts.length,
-                maximumScore: Math.max(1, total),
-                evidenceIds: [evaluation.planId],
-              }],
-            }
-          },
-        },
-      })
-      registries.evidenceBenchmarkAdapters.register({
-        ...registrationFor(refs.evidence),
-        kind: 'evidence-benchmark-adapter',
-        implementation: {
-          profileId: GAME_ASSET_PROFILE_ID,
-          ruler: { id: 'ruler:game-asset-maturity', version: 1, digest: hashes.evidence },
-          sourceSchema: gameAssetMaturityEvidenceSchema,
-          project: (source) => {
-            const evidence = gameAssetMaturityEvidenceSchema.parse(source)
-            return {
-              profileId: GAME_ASSET_PROFILE_ID,
-              ruler: { id: 'ruler:game-asset-maturity', version: 1, digest: hashes.evidence },
-              metrics: [{
-                id: 'metric:contract-closure',
-                status: 'blocked' as const,
-                evidenceIds: [evidence.reportId],
-              }, {
-                id: 'metric:cross-host-conformance',
-                status: 'blocked' as const,
-                evidenceIds: [evidence.reportId],
-              }, {
-                id: 'metric:sibling-preserving-repair',
-                status: 'blocked' as const,
-                evidenceIds: [evidence.reportId],
-              }],
-            }
-          },
+          project: createGameAssetScorecardProjector(hashes.scorecard),
         },
       })
     },
@@ -451,7 +607,7 @@ export async function createGameAssetProfilePackage(): Promise<GameAssetProfileP
 
 export const gameAssetProfileSchemas = Object.freeze({
   plan: gameAssetPlanSchema,
+  frame: observedGameAssetFrameSchema,
   evaluation: gameAssetEvaluationSchema,
   layeredMap: layeredGameMapManifestSchema,
-  deliveryProjection: z.object({ manifestId: z.string().min(1), contentHash: z.string().regex(/^[a-f0-9]{64}$/) }).strict(),
 })

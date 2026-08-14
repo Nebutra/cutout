@@ -285,7 +285,7 @@ describe('AiSection', () => {
     })
   })
 
-  it('requests the exact Qwen text preference only in the packaged E2E build', async () => {
+  it('keeps packaged E2E automatic setup capability-neutral', async () => {
     vi.stubEnv('VITE_CUTOUT_PACKAGED_E2E', '1')
     const candidate = {
       id: `provider-candidate:${'c'.repeat(64)}`,
@@ -319,9 +319,7 @@ describe('AiSection', () => {
     ))
 
     await vi.waitFor(() => {
-      expect(mocks.automaticSetup).toHaveBeenCalledWith([candidate], {
-        preferredTextRoutes: [{ kind: 'dashscope', model: 'qwen-plus' }],
-      })
+      expect(mocks.automaticSetup).toHaveBeenCalledWith([candidate])
     })
   })
 

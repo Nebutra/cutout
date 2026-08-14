@@ -50,9 +50,12 @@ function turnResult(args: { input: { requestId: string; contextRevision: string 
 beforeEach(() => invokeMock.mockReset())
 
 describe('planning runtime boundary', () => {
-  it('prefers capability-proven Codex and otherwise uses a direct route', () => {
+  it('uses a capability-proven Codex runtime for its first bounded Planner turn', () => {
     const direct = { providerId: 'openai', model: 'gpt-5' }
-    expect(selectPlanningRuntime({ codex: proven, direct })).toMatchObject({ runtimeId: 'codex-system' })
+    expect(selectPlanningRuntime({ codex: proven, direct }))
+      .toMatchObject({ runtimeId: 'codex-system' })
+    expect(selectPlanningRuntime({ codex: { ...proven, execution: 'succeeded' }, direct }))
+      .toMatchObject({ runtimeId: 'codex-system' })
     expect(selectPlanningRuntime({ codex: { ...proven, capability: 'unsupported', reason: 'protocol-unsupported' }, direct }))
       .toEqual({ runtimeId: 'direct-provider', ...direct })
     expect(selectPlanningRuntime({ codex: { ...proven, execution: 'failed', lastFailure: 'upstream-unavailable' }, direct }))

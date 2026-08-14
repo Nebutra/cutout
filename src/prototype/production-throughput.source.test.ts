@@ -92,4 +92,24 @@ describe('prototype production throughput wiring', () => {
     expect(candidateGeneration).toContain('prototypeDesignMarkdown(')
     expect(candidateGeneration).not.toContain('synthesizeDesignMarkdownFromReference(')
   })
+
+  it('canaries Design System candidates through the exact-route production scheduler', () => {
+    const start = workspaceSource.indexOf('async function generatePrototypeDesignSystemCandidates(')
+    const end = workspaceSource.indexOf('async function streamConversationalReply(', start)
+    const candidateGeneration = workspaceSource.slice(start, end)
+
+    expect(candidateGeneration).toContain('createPrototypeProductionScheduler(')
+    expect(candidateGeneration).toContain('candidateScheduler.imageLane(')
+    expect(candidateGeneration).toContain('imageRouteHealthKey(')
+    expect(candidateGeneration).toContain('return scheduleCandidate(')
+    expect(candidateGeneration).toContain('() => generatePrototypeDesignSystem(')
+    expect(candidateGeneration).toContain('status: "generating"')
+    expect(candidateGeneration).toContain('reduceImageConcurrencyAfter: (error) =>')
+  })
+
+  it('creates a new Design System candidate set when a failed candidate run is retried', () => {
+    expect(workspaceSource).toContain('restartDesignSystemCandidates?: boolean;')
+    expect(workspaceSource).toContain('? { restartDesignSystemCandidates: true }')
+    expect(workspaceSource).toContain(': options.restartDesignSystemCandidates')
+  })
 })

@@ -453,7 +453,11 @@ export function selectPlanningRuntime(input: {
     && input.codex.capability === 'proven'
     && (
       input.retryCodex
-      || (input.codex.execution !== 'failed' && input.codex.execution !== 'stale')
+      // A successful probe proves the bounded zero-tool runtime contract. Its
+      // first real Planner turn is the execution proof, so routing it to a
+      // weaker direct Provider first would create an impossible bootstrap.
+      || input.codex.execution === 'unproven'
+      || input.codex.execution === 'succeeded'
     )
   ) {
     return { runtimeId: 'codex-system', evidence: input.codex }

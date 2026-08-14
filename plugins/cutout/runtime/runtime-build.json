@@ -1,6 +1,6 @@
 {
   "protocol": "cutout.codex-plugin-runtime.v1",
-  "packageVersion": "0.1.19",
+  "packageVersion": "0.1.20",
   "sourceHashes": {
     "node_modules/.pnpm/@tauri-apps+api@2.11.1/node_modules/@tauri-apps/api/core.js": "b2187a1c0c0a25806dc64f8823757ce553c09d3bbe3e409bd05cab32e245f1c9",
     "node_modules/.pnpm/@tauri-apps+api@2.11.1/node_modules/@tauri-apps/api/external/tslib/tslib.es6.js": "76dace0a1ae47c1d3e604591b8a15db2f534b776009b9e68e786dae7fe763f70",
@@ -116,7 +116,7 @@
     "src/asset-production/runtime.ts": "02d183f2f88d17ada544f13a173bec0c90531f2513e48fcade9866a5a28779a6",
     "src/brand-kit/compiler.ts": "504602c00381b8095917b1ecf5dbf48a4fecdadba161d3a861e88fa7a85ad62c",
     "src/brand-kit/index.ts": "2f12ee6ddbacb9e882a22ca135da32897627c65a30b5a938ec32496c660a9868",
-    "src/brand-kit/vi-catalog.ts": "0f9cdca5f159e5531be0693888337fd713a7501fbbdbb9ee977cb576f30dfd31",
+    "src/brand-kit/vi-catalog.ts": "3a722de3a8e029fcb44ab2a64a3035acf8768a236f208120fc74ba40d659e819",
     "src/candidate-selection/contracts.ts": "65151a43a127c28e5cbdc54000a58b31bc5fed40ea0cfb2fba238f2a104b3eed",
     "src/coding-runtime/authorized-host.ts": "b29094e43ab827951f3b7c9a6354cb1a79eb580505de4b57432556e2328e0aa2",
     "src/coding-runtime/contracts.ts": "5667d3b90acc8093554c8033becbcf8ef7603cbb6d36d200885473c5aabd8867",

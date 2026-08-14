@@ -16,9 +16,12 @@ use super::ai_proxy::{
     build_client_for_target, enforce_host, enforce_resolved_host, request_error_message,
     request_with_secret, run_cancellable_proxy_request, AiProxyCancellationState, ProxyError,
 };
+use super::commerce_held_out::{
+    held_out_request_hash, recover_held_out_response, settle_held_out_response,
+};
 use super::keys::read_secret;
 use super::multimodal_receipt::{
-    artifact_evidence, issue_receipt, MultimodalArtifactEvidence, MultimodalHostContext,
+    artifact_evidence, issue_receipt, sha256, MultimodalArtifactEvidence, MultimodalHostContext,
     MultimodalHostReceipt,
 };
 use super::providers::{load_providers_sync, ProviderKind, ProviderWireProtocol};
@@ -32,6 +35,7 @@ const DASHSCOPE_UPLOAD_ENDPOINT: &str = "https://dashscope.aliyuncs.com/api/v1/u
 const DASHSCOPE_TASK_ENDPOINT: &str = "https://dashscope.aliyuncs.com/api/v1/tasks";
 const MAX_JSON_BYTES: usize = 2 * 1024 * 1024;
 const MAX_VIDEO_BYTES: usize = 64 * 1024 * 1024;
+const MAX_VISION_IMAGE_BYTES: usize = 10 * 1024 * 1024;
 const MAX_ATTEMPTS: usize = 3;
 const MAX_POLLS: usize = 80;
 const WORKFLOW_TIMEOUT_SECS: u64 = 600;
@@ -55,7 +59,7 @@ struct DashScopeUploadPolicy {
     x_oss_forbid_overwrite: String,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DashScopeStructuredTextResult {
     media_type: String,
@@ -63,7 +67,7 @@ pub struct DashScopeStructuredTextResult {
     receipt: MultimodalHostReceipt,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DashScopeVideoResult {
     media_type: String,
@@ -178,24 +182,70 @@ fn validate_common_text(value: &str, maximum: usize, label: &str) -> Result<(), 
     Ok(())
 }
 
-async fn structured_text(
+fn vision_reference_content(bytes: &[u8]) -> Result<Value, ProxyError> {
+    if bytes.is_empty() || bytes.len() > MAX_VIDEO_BYTES {
+        return Err(ProxyError::Request(
+            "DashScope vision reference exceeds its byte limit".into(),
+        ));
+    }
+    let (content_type, media_type) = match image::guess_format(bytes) {
+        Ok(image::ImageFormat::Png) if bytes.len() <= MAX_VISION_IMAGE_BYTES => {
+            ("image_url", "image/png")
+        }
+        Ok(image::ImageFormat::Jpeg) if bytes.len() <= MAX_VISION_IMAGE_BYTES => {
+            ("image_url", "image/jpeg")
+        }
+        Ok(image::ImageFormat::WebP) if bytes.len() <= MAX_VISION_IMAGE_BYTES => {
+            ("image_url", "image/webp")
+        }
+        _ if inspect_mp4(bytes).is_ok() => ("video_url", "video/mp4"),
+        _ => {
+            return Err(ProxyError::Request(
+                "DashScope vision reference format is unsupported".into(),
+            ))
+        }
+    };
+    let url = format!(
+        "data:{media_type};base64,{}",
+        base64::engine::general_purpose::STANDARD.encode(bytes)
+    );
+    Ok(if content_type == "image_url" {
+        json!({ "type": "image_url", "image_url": { "url": url } })
+    } else {
+        json!({ "type": "video_url", "video_url": { "url": url } })
+    })
+}
+
+async fn structured_json(
     app: AppHandle,
     provider_id: String,
     model: String,
+    operation: &'static str,
     system: String,
     prompt: String,
     output_schema: Value,
+    reference_image: Option<Vec<u8>>,
     host_context: MultimodalHostContext,
 ) -> Result<DashScopeStructuredTextResult, ProxyError> {
-    let started_at = unix_millis()?;
-    validate_provider_binding(&app, &provider_id)?;
-    if model != "qwen3.8-max" {
-        return Err(ProxyError::Request(
-            "unsupported DashScope structured-text model contract".into(),
-        ));
-    }
-    validate_common_text(&system, 200_000, "structured-text system prompt")?;
-    validate_common_text(&prompt, 200_000, "structured-text prompt")?;
+    let reference_content = match (operation, model.as_str(), reference_image.as_deref()) {
+        ("structured-text", "qwen3.8-max", None) => None,
+        ("vision-ocr", "qwen3-vl-plus", Some(bytes)) => {
+            let expected = format!("artifact:sha256:{}", sha256(bytes));
+            if host_context.accepted_reference_artifact_ids.as_slice() != [expected] {
+                return Err(ProxyError::Request(
+                    "DashScope vision reference does not match its signed Host context".into(),
+                ));
+            }
+            Some(vision_reference_content(bytes)?)
+        }
+        _ => {
+            return Err(ProxyError::Request(format!(
+                "unsupported DashScope {operation} model contract"
+            )))
+        }
+    };
+    validate_common_text(&system, 200_000, &format!("{operation} system prompt"))?;
+    validate_common_text(&prompt, 200_000, &format!("{operation} prompt"))?;
     let schema_bytes = serde_json::to_vec(&output_schema)
         .map_err(|_| ProxyError::Request("invalid structured output schema".into()))?;
     if schema_bytes.len() > 256 * 1024 || !output_schema.is_object() {
@@ -203,12 +253,53 @@ async fn structured_text(
             "invalid structured output schema".into(),
         ));
     }
+    let replay = if let Some(commitment_hash) = host_context.held_out_commitment_hash.as_deref() {
+        let node_id = host_context.node_id.as_deref().ok_or_else(|| {
+            ProxyError::Request(
+                "held-out multimodal receipt requires an exact native Plan node".into(),
+            )
+        })?;
+        let slot_id = format!("multimodal:{node_id}");
+        let request_hash = held_out_request_hash(&json!({
+            "operation": operation,
+            "providerId": provider_id,
+            "model": model,
+            "system": system,
+            "prompt": prompt,
+            "outputSchema": output_schema,
+            "referenceImageSha256": reference_image.as_deref().map(sha256),
+            "hostContext": host_context,
+        }))?;
+        if let Some(response) = recover_held_out_response(
+            &app,
+            commitment_hash,
+            &host_context.run_id,
+            &slot_id,
+            &request_hash,
+        )? {
+            return Ok(response);
+        }
+        Some((commitment_hash.to_string(), slot_id, request_hash))
+    } else {
+        None
+    };
+    validate_provider_binding(&app, &provider_id)?;
+    let started_at = unix_millis()?;
     let secret = read_secret(&provider_id).map_err(ProxyError::from)?;
+    let user_content = reference_content.map_or_else(
+        || Value::String(prompt.clone()),
+        |reference| {
+            json!([
+                reference,
+                { "type": "text", "text": prompt }
+            ])
+        },
+    );
     let body = json!({
         "model": model,
         "messages": [
             { "role": "system", "content": system },
-            { "role": "user", "content": prompt }
+            { "role": "user", "content": user_content }
         ],
         "response_format": {
             "type": "json_schema",
@@ -258,17 +349,29 @@ async fn structured_text(
         &host_context,
         &provider_id,
         &model,
-        "structured-text",
+        operation,
         artifact_evidence(&bytes, "application/json", None, None),
         started_at,
         unix_millis()?,
         None,
     )?;
-    Ok(DashScopeStructuredTextResult {
+    let result = DashScopeStructuredTextResult {
         media_type: "application/json".into(),
         data: base64::engine::general_purpose::STANDARD.encode(bytes),
         receipt,
-    })
+    };
+    if let Some((commitment_hash, slot_id, request_hash)) = replay {
+        return settle_held_out_response(
+            &app,
+            &commitment_hash,
+            &host_context.run_id,
+            &slot_id,
+            &request_hash,
+            &result.receipt.receipt_hash,
+            &result,
+        );
+    }
+    Ok(result)
 }
 
 fn auth_headers() -> HeaderMap {
@@ -741,7 +844,6 @@ async fn video(
     reference_image: Option<Vec<u8>>,
     host_context: MultimodalHostContext,
 ) -> Result<DashScopeVideoResult, ProxyError> {
-    let started_at = unix_millis()?;
     validate_common_text(&prompt, 200_000, "video prompt")?;
     validate_video_contract(
         &model,
@@ -752,7 +854,40 @@ async fn video(
         &host_context,
     )?;
     validate_video_reference(&model, reference_image.as_deref(), &host_context)?;
+    let replay = if let Some(commitment_hash) = host_context.held_out_commitment_hash.as_deref() {
+        let node_id = host_context.node_id.as_deref().ok_or_else(|| {
+            ProxyError::Request(
+                "held-out multimodal receipt requires an exact native Plan node".into(),
+            )
+        })?;
+        let slot_id = format!("multimodal:{node_id}");
+        let request_hash = held_out_request_hash(&json!({
+            "operation": "video",
+            "providerId": provider_id,
+            "model": model,
+            "prompt": prompt,
+            "resolution": resolution,
+            "ratio": ratio,
+            "durationSeconds": duration_seconds,
+            "seed": seed,
+            "referenceImageSha256": reference_image.as_deref().map(sha256),
+            "hostContext": host_context,
+        }))?;
+        if let Some(response) = recover_held_out_response(
+            &app,
+            commitment_hash,
+            &host_context.run_id,
+            &slot_id,
+            &request_hash,
+        )? {
+            return Ok(response);
+        }
+        Some((commitment_hash.to_string(), slot_id, request_hash))
+    } else {
+        None
+    };
     validate_provider_binding(&app, &provider_id)?;
+    let started_at = unix_millis()?;
     let secret = read_secret(&provider_id).map_err(ProxyError::from)?;
     let mut headers = auth_headers();
     inject_secret(&mut headers, &secret)?;
@@ -897,6 +1032,17 @@ async fn video(
     // Keep cancellation armed through download validation, receipt signing,
     // and result construction so a dropped/late workflow cannot publish.
     remote_cancel.disarm();
+    if let Some((commitment_hash, slot_id, request_hash)) = replay {
+        return settle_held_out_response(
+            &app,
+            &commitment_hash,
+            &host_context.run_id,
+            &slot_id,
+            &request_hash,
+            &result.receipt.receipt_hash,
+            &result,
+        );
+    }
     Ok(result)
 }
 
@@ -915,18 +1061,54 @@ pub async fn ai_dashscope_structured_text(
     run_cancellable_proxy_request(&cancellations, request_id, async move {
         tokio::time::timeout(
             Duration::from_secs(WORKFLOW_TIMEOUT_SECS),
-            structured_text(
+            structured_json(
                 app,
                 provider_id,
                 model,
+                "structured-text",
                 system,
                 prompt,
                 output_schema,
+                None,
                 host_context,
             ),
         )
         .await
         .map_err(|_| ProxyError::Request("DashScope structured-text workflow timed out".into()))?
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn ai_dashscope_vision_json(
+    app: AppHandle,
+    cancellations: State<'_, AiProxyCancellationState>,
+    request_id: Option<String>,
+    provider_id: String,
+    model: String,
+    system: String,
+    prompt: String,
+    output_schema: Value,
+    reference_image: Vec<u8>,
+    host_context: MultimodalHostContext,
+) -> Result<DashScopeStructuredTextResult, ProxyError> {
+    run_cancellable_proxy_request(&cancellations, request_id, async move {
+        tokio::time::timeout(
+            Duration::from_secs(WORKFLOW_TIMEOUT_SECS),
+            structured_json(
+                app,
+                provider_id,
+                model,
+                "vision-ocr",
+                system,
+                prompt,
+                output_schema,
+                Some(reference_image),
+                host_context,
+            ),
+        )
+        .await
+        .map_err(|_| ProxyError::Request("DashScope vision workflow timed out".into()))?
     })
     .await
 }
@@ -1032,6 +1214,7 @@ mod tests {
         let context = MultimodalHostContext {
             request_id: "request:wan27".into(),
             run_id: "run:wan27".into(),
+            held_out_commitment_hash: None,
             semantic_role: Some("product-video".into()),
             node_id: Some("outcome:product-video".into()),
             capability_id: Some("capability:image-to-video".into()),
@@ -1142,6 +1325,7 @@ mod tests {
         let context = MultimodalHostContext {
             request_id: "request:retained-video-smoke".into(),
             run_id: "run:retained-video-smoke".into(),
+            held_out_commitment_hash: None,
             semantic_role: Some("product-video".into()),
             node_id: Some("outcome:commerce:product-video".into()),
             capability_id: Some("capability:video-generation".into()),
@@ -1159,12 +1343,14 @@ mod tests {
             None,
         )
         .expect("issue retained MP4 fixture receipt");
-        let promoted = crate::commands::ai::multimodal_receipt::promote_multimodal_video_playback(
-            receipt,
-            bytes.clone(),
-        )
-        .await
-        .expect("promote retained MP4 fixture playback");
+        let promoted =
+            crate::commands::ai::multimodal_receipt::promote_multimodal_video_playback_inner(
+                None,
+                receipt,
+                bytes.clone(),
+            )
+            .await
+            .expect("promote retained MP4 fixture playback");
         assert_eq!(promoted.artifact.playback_verified, Some(true));
         assert_eq!(
             promoted

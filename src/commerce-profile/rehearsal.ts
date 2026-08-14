@@ -182,6 +182,7 @@ export function commerceDagReferenceLockId(binding: CommerceDagReferenceBinding)
 export const commerceProductionRehearsalArtifactSchema = z.object({
   semanticRole: commerceSemanticRoleSchema,
   receipt: multimodalHostReceiptSchema,
+  playbackSourceReceipt: multimodalHostReceiptSchema.optional(),
   artifactBytesBase64: base64Schema,
   deliveryBytesBase64: base64Schema.optional(),
   semanticQa: retainedSemanticQaSchema.optional(),
@@ -266,6 +267,38 @@ export interface VerifiedCommerceProductionRehearsal {
   readonly evaluation: CommerceEvaluationResult
   readonly sourceMaterials: readonly Omit<CommerceRehearsalSourceMaterial, 'artifactBytesBase64'>[]
   readonly artifacts: readonly VerifiedCommerceRehearsalArtifact[]
+}
+
+export function assertCommerceHeldOutReceiptCommitmentClosure(
+  bundle: CommerceProductionRehearsalBundle,
+  heldOutCommitmentHash: string,
+): void {
+  const expected = sha256Schema.parse(heldOutCommitmentHash)
+  for (const material of bundle.sourceMaterials) {
+    if (material.ingestReceipt.heldOutCommitmentHash !== expected) {
+      throw new Error(`Commerce source receipt ${material.ingestReceipt.receiptId} is missing the exact held-out commitment binding.`)
+    }
+  }
+  for (const artifact of bundle.artifacts) {
+    if (artifact.receipt.playbackPromotion) {
+      if (!artifact.playbackSourceReceipt
+        || artifact.playbackSourceReceipt.heldOutCommitmentHash !== expected
+        || artifact.receipt.playbackPromotion.sourceReceiptHash
+          !== artifact.playbackSourceReceipt.receiptHash) {
+        throw new Error(`Commerce playback source receipt ${artifact.receipt.receiptId} is missing the exact held-out commitment binding.`)
+      }
+    }
+    if (artifact.receipt.heldOutCommitmentHash !== expected) {
+      throw new Error(`Commerce Provider receipt ${artifact.receipt.receiptId} is missing the exact held-out commitment binding.`)
+    }
+    if (artifact.semanticQa && artifact.semanticQa.receipt.heldOutCommitmentHash !== expected) {
+      throw new Error(`Commerce semantic-QA receipt ${artifact.semanticQa.receipt.receiptId} is missing the exact held-out commitment binding.`)
+    }
+    if (artifact.receipt.playbackPromotion
+      && artifact.receipt.playbackPromotion.sourceHeldOutCommitmentHash !== expected) {
+      throw new Error(`Commerce playback receipt ${artifact.receipt.receiptId} is missing the exact held-out commitment binding.`)
+    }
+  }
 }
 
 function bytesFromBase64(value: string): Uint8Array {
@@ -376,7 +409,11 @@ async function assertFrozenCommerceDocuments(bundle: CommerceProductionRehearsal
   await assertCanonicalDocument(bundle.plan, compiled.plan, 'Rehearsal Plan')
 }
 
-async function signedRunBindings(bundle: CommerceProductionRehearsalBundle): Promise<readonly string[]> {
+export async function createCommerceRehearsalRunBindings(
+  bundle: Pick<CommerceProductionRehearsalBundle,
+    'identity' | 'categoryCatalog' | 'attributeCatalog' | 'sourceMaterials'
+    | 'evidenceGraph' | 'outcomeGraph' | 'contract' | 'plan'>,
+): Promise<readonly string[]> {
   const catalogHashes = await Promise.all([
     sha256Bytes(new TextEncoder().encode(bundle.categoryCatalog)),
     sha256Bytes(new TextEncoder().encode(bundle.attributeCatalog)),
@@ -478,6 +515,7 @@ async function verifySourceMaterials(
 
 async function verifyRetainedArtifact(input: {
   readonly receipt: MultimodalHostReceipt
+  readonly playbackSourceReceipt?: MultimodalHostReceipt
   readonly bytes: Uint8Array
   readonly label: string
 }): Promise<VerifiedCommerceRehearsalBytes> {
@@ -623,8 +661,12 @@ function assertUnique(values: readonly string[], label: string): void {
 
 export async function verifyCommerceProductionRehearsalBundle(
   input: unknown,
+  options: { readonly heldOutCommitmentHash?: string } = {},
 ): Promise<VerifiedCommerceProductionRehearsal> {
   const bundle = commerceProductionRehearsalBundleSchema.parse(input)
+  if (options.heldOutCommitmentHash) {
+    assertCommerceHeldOutReceiptCommitmentClosure(bundle, options.heldOutCommitmentHash)
+  }
   exactArray(
     bundle.artifacts.map((artifact) => artifact.semanticRole),
     COMMERCE_SEMANTIC_ROLES,
@@ -632,7 +674,7 @@ export async function verifyCommerceProductionRehearsalBundle(
   )
   const sourceMaterials = await verifySourceMaterials(bundle)
   await assertFrozenCommerceDocuments(bundle)
-  const runBindings = await signedRunBindings(bundle)
+  const runBindings = await createCommerceRehearsalRunBindings(bundle)
   const categoryIndex = buildCategoryIndex(bundle.categoryCatalog)
   const attributeIndex = buildAttributeIndex(bundle.attributeCatalog, categoryIndex)
   const nodeByRole = new Map(bundle.outcomeGraph.body.nodes.map((node) => [
@@ -651,6 +693,7 @@ export async function verifyCommerceProductionRehearsalBundle(
     const sourceBytes = bytesFromBase64(retained.artifactBytesBase64)
     const sourceEvidence = await verifyRetainedArtifact({
       receipt: retained.receipt,
+      playbackSourceReceipt: retained.playbackSourceReceipt,
       bytes: sourceBytes,
       label: `Commerce artifact ${retained.semanticRole}`,
     })

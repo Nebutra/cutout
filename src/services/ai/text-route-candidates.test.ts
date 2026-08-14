@@ -37,21 +37,7 @@ describe('verified text route candidates', () => {
     ])
   })
 
-  it('makes Qwen-first an exact packaged-E2E experiment rather than a product default', () => {
-    expect(verifiedTextRouteCandidates({
-      preferred: { providerId: 'mox', model: 'gpt-5.5' },
-      providers,
-      verifications,
-      preferPackagedE2eQwen: true,
-    })[0]).toEqual({ providerId: 'qwen', model: 'qwen-plus' })
-    expect(verifiedTextRouteCandidates({
-      preferred: { providerId: 'mox', model: 'gpt-5.5' },
-      providers,
-      verifications,
-    })[0]).toEqual({ providerId: 'mox', model: 'gpt-5.5' })
-  })
-
-  it('does not manufacture a Qwen candidate when qwen-plus lacks catalog evidence', () => {
+  it('never reorders verified routes for a packaged-E2E-only experiment', () => {
     expect(verifiedTextRouteCandidates({
       preferred: { providerId: 'mox', model: 'gpt-5.5' },
       providers,
@@ -62,7 +48,6 @@ describe('verified text route candidates', () => {
           models: ['qwen-image-3.0-pro'], checkedAt,
         },
       },
-      preferPackagedE2eQwen: true,
     })).toEqual([{ providerId: 'mox', model: 'gpt-5.5' }])
   })
 })

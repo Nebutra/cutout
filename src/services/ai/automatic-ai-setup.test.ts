@@ -2,8 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
   configure: vi.fn(),
-  setBinding: vi.fn(),
-  setDescriptors: vi.fn(),
+  setAutomaticBindings: vi.fn(),
   setVerification: vi.fn(),
 }))
 vi.mock('./provider-discovery', async (original) => ({
@@ -11,8 +10,7 @@ vi.mock('./provider-discovery', async (original) => ({
   autoConfigureProviderCandidate: mocks.configure,
 }))
 vi.mock('./model-assignment.local', () => ({
-  setCapabilityBinding: mocks.setBinding,
-  setCapabilityDescriptors: mocks.setDescriptors,
+  setAutomaticCapabilityBindings: mocks.setAutomaticBindings,
 }))
 vi.mock('./provider-verification', async (original) => ({
   ...await original<typeof import('./provider-verification')>(),
@@ -163,15 +161,17 @@ describe('automatic AI setup', () => {
         'image-generation': { providerId: 'qwen', model: 'qwen-image-3.0' },
       },
     })
-    expect(mocks.setBinding).toHaveBeenCalledWith(
-      'text',
-      { providerId: 'qwen', model: 'qwen-plus' },
-    )
-    expect(mocks.setDescriptors).toHaveBeenCalledWith(
+    expect(mocks.setAutomaticBindings).toHaveBeenCalledWith(expect.objectContaining({
+      text: { providerId: 'qwen', model: 'qwen-plus' },
+    }),
       expect.not.arrayContaining([
         expect.objectContaining({ providerId: 'qwen', model: 'qwen-plus' }),
       ]),
     )
+    expect(mocks.configure.mock.calls).toEqual([
+      [candidates[0]!.id],
+      [candidates[1]!.id],
+    ])
   })
 
   it('keeps a supported compatible image route as the fallback', () => {
@@ -290,10 +290,12 @@ describe('automatic AI setup', () => {
       .mockResolvedValueOnce(configured('text', 'openai-compatible', ['gpt-5.5']))
       .mockResolvedValueOnce(configured('image', 'openai-compatible', ['gpt-image-2']))
     await expect(configureAutomaticAi(candidates)).resolves.toMatchObject({ configured: [{ provider: { id: 'text' } }, { provider: { id: 'image' } }] })
-    expect(mocks.setBinding).toHaveBeenCalledWith('webdev', { providerId: 'text', model: 'gpt-5.5' })
-    expect(mocks.setBinding).toHaveBeenCalledWith('image-generation', { providerId: 'image', model: 'gpt-image-2' })
+    expect(mocks.setAutomaticBindings).toHaveBeenCalledWith(expect.objectContaining({
+      webdev: { providerId: 'text', model: 'gpt-5.5' },
+      'image-generation': { providerId: 'image', model: 'gpt-image-2' },
+    }), expect.any(Array))
     expect(mocks.setVerification).toHaveBeenCalledTimes(2)
-    expect(mocks.setDescriptors).toHaveBeenCalledWith([
+    expect(mocks.setAutomaticBindings).toHaveBeenCalledWith(expect.any(Object), [
       expect.objectContaining({ providerId: 'image', model: 'gpt-image-2' }),
     ])
   })
@@ -350,77 +352,54 @@ describe('automatic AI setup', () => {
     expect(mocks.configure.mock.calls).toEqual([
       [cutoutCandidate.id],
       [qwenCandidate.id],
-      [agentCandidate.id],
     ])
   })
 
-  it('probes one independently verified fallback after required coverage, then stops', async () => {
+  it('stops after the first Provider closes every required capability', async () => {
     const candidates = ['a', 'b', 'c'].map((suffix) => ({
       id: `provider-candidate:${suffix.repeat(64)}`,
       source: 'cc-switch', sourceLabel: 'CC Switch', kind: 'openai-compatible', label: suffix,
       baseUrl: 'https://relay.example/v1', wireProtocol: 'responses',
       credential: { sourceType: 'cc-switch-db', available: true, importable: true }, warnings: [],
     })) as ProviderDiscoveryCandidate[]
-    mocks.configure
-      .mockResolvedValueOnce(configured(
+    mocks.configure.mockResolvedValueOnce(configured(
         'complete',
         'openai-compatible',
         ['gpt-5.5', 'gpt-image-2'],
         'gpt-5.5',
       ))
-      .mockResolvedValueOnce(configured(
-        'fallback',
-        'openai-compatible',
-        ['gpt-5.5-mini', 'gpt-image-1.5'],
-        'gpt-5.5-mini',
-      ))
-
-    await expect(configureAutomaticAi(candidates)).resolves.toMatchObject({
-      configured: [
-        { provider: { id: 'complete' } },
-        { provider: { id: 'fallback' } },
-      ],
-    })
-    expect(mocks.configure.mock.calls).toEqual([
-      [candidates[0]!.id],
-      [candidates[1]!.id],
-    ])
-    expect(mocks.setVerification).toHaveBeenCalledTimes(2)
-    expect(mocks.setDescriptors).toHaveBeenCalledWith(expect.arrayContaining([
-      expect.objectContaining({ providerId: 'complete', model: 'gpt-image-2' }),
-      expect.objectContaining({ providerId: 'fallback', model: 'gpt-image-1.5' }),
-    ]))
-  })
-
-  it('bounds the fallback probe even when the extra candidate fails verification', async () => {
-    const candidates = ['a', 'b', 'c'].map((suffix) => ({
-      id: `provider-candidate:${suffix.repeat(64)}`,
-      source: 'cc-switch', sourceLabel: 'CC Switch', kind: 'openai-compatible', label: suffix,
-      baseUrl: 'https://relay.example/v1', wireProtocol: 'responses',
-      credential: { sourceType: 'cc-switch-db', available: true, importable: true }, warnings: [],
-    })) as ProviderDiscoveryCandidate[]
-    mocks.configure
-      .mockResolvedValueOnce(configured(
-        'complete',
-        'openai-compatible',
-        ['gpt-5.5', 'gpt-image-2'],
-        'gpt-5.5',
-      ))
-      .mockRejectedValueOnce({
-        code: 'unauthorized',
-        message: 'Fallback authentication failed.',
-      })
 
     await expect(configureAutomaticAi(candidates)).resolves.toMatchObject({
       configured: [{ provider: { id: 'complete' } }],
     })
-    expect(mocks.configure.mock.calls).toEqual([
-      [candidates[0]!.id],
-      [candidates[1]!.id],
-    ])
+    expect(mocks.configure.mock.calls).toEqual([[candidates[0]!.id]])
+    expect(mocks.setVerification).toHaveBeenCalledTimes(1)
+    expect(mocks.setAutomaticBindings).toHaveBeenCalledWith(expect.any(Object), expect.arrayContaining([
+      expect.objectContaining({ providerId: 'complete', model: 'gpt-image-2' }),
+    ]))
   })
 
-  it('spends the bounded fallback probe on the strongest task-fit image candidate', async () => {
+  it('does not probe an optional fallback once setup is usable', async () => {
+    const candidates = ['a', 'b', 'c'].map((suffix) => ({
+      id: `provider-candidate:${suffix.repeat(64)}`,
+      source: 'cc-switch', sourceLabel: 'CC Switch', kind: 'openai-compatible', label: suffix,
+      baseUrl: 'https://relay.example/v1', wireProtocol: 'responses',
+      credential: { sourceType: 'cc-switch-db', available: true, importable: true }, warnings: [],
+    })) as ProviderDiscoveryCandidate[]
+    mocks.configure.mockResolvedValueOnce(configured(
+        'complete',
+        'openai-compatible',
+        ['gpt-5.5', 'gpt-image-2'],
+        'gpt-5.5',
+      ))
+
+    await expect(configureAutomaticAi(candidates)).resolves.toMatchObject({
+      configured: [{ provider: { id: 'complete' } }],
+    })
+    expect(mocks.configure.mock.calls).toEqual([[candidates[0]!.id]])
+  })
+
+  it('does not add a stronger optional image route after capability closure', async () => {
     const candidates = ['complete', 'generic', 'qwen'].map((label, index) => ({
       id: `provider-candidate:${String.fromCharCode(97 + index).repeat(64)}`,
       source: 'cutout-keychain', sourceLabel: 'Cutout local credentials',
@@ -434,30 +413,17 @@ describe('automatic AI setup', () => {
       credential: { sourceType: 'keychain', available: true, importable: true },
       warnings: [],
     })) as ProviderDiscoveryCandidate[]
-    mocks.configure
-      .mockResolvedValueOnce(configured(
+    mocks.configure.mockResolvedValueOnce(configured(
         'complete',
         'openai-compatible',
         ['gpt-5.5', 'gpt-image-2'],
         'gpt-5.5',
       ))
-      .mockResolvedValueOnce(configured(
-        'qwen',
-        'dashscope',
-        ['qwen-image-3.0', 'qwen-image-3.0-pro'],
-        'qwen-image-3.0',
-      ))
 
     await expect(configureAutomaticAi(candidates)).resolves.toMatchObject({
-      configured: [
-        { provider: { id: 'complete' } },
-        { provider: { id: 'qwen' } },
-      ],
+      configured: [{ provider: { id: 'complete' } }],
     })
-    expect(mocks.configure.mock.calls).toEqual([
-      [candidates[0]!.id],
-      [candidates[2]!.id],
-    ])
+    expect(mocks.configure.mock.calls).toEqual([[candidates[0]!.id]])
   })
 
   it('continues through the reviewed CC Switch queue after the current catalog rejects auth', async () => {

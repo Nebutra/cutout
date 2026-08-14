@@ -94,6 +94,21 @@ export const setCapabilityDescriptors = async (
     descriptors,
   })
 
+/**
+ * Persist the complete automatic-routing projection as one snapshot.  Automatic
+ * setup discovers a provider, its verified catalog, and every binding as a
+ * single outcome; writing each field independently exposes partial routing and
+ * turns one setup action into several native Store round trips.
+ */
+export const setAutomaticCapabilityBindings = (
+  bindings: CapabilityBindings['bindings'],
+  descriptors: CapabilityBindings['descriptors'],
+) => bindingsRepository.write({
+  version: 'model-assignments.v2',
+  bindings,
+  descriptors,
+})
+
 /** Load the primary assignment projection. Missing/invalid/unavailable → `{}`. */
 export async function loadAssignments(): Promise<ModelAssignments> {
   try {

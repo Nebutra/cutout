@@ -100,6 +100,13 @@ export const multimodalRouteDescriptorSchema = z.object({
       nativePlaybackPromotion: z.literal('passed'),
       semanticIdentityReview: z.literal('passed'),
     }).strict().optional(),
+    observedStructuredOutputs: z.array(z.object({
+      inputMediaType: z.enum(['image/png', 'video/mp4']),
+      outputSha256: sha256Schema,
+      mediaType: z.literal('application/json'),
+      schemaValid: z.literal(true),
+      referenceBinding: z.literal('native-inline-image-bytes'),
+    }).strict()).min(1).max(4).optional(),
   }).strict(),
   hostCapability: hostCapabilitySchema,
   requiredReferenceBinding: z.enum([
@@ -127,6 +134,15 @@ export const multimodalRouteDescriptorSchema = z.object({
   if (route.operation === 'image-edit' && !route.inputModalities.includes('image')) {
     context.addIssue({ code: 'custom', message: 'Image edit requires image input.' })
   }
+  if (route.operation === 'vision-ocr'
+    && (route.inputModalities.join(',') !== 'text,image,video'
+      || route.limits.maximumInputReferences !== 1
+      || route.requiredReferenceBinding !== 'native-inline-image-bytes')) {
+    context.addIssue({
+      code: 'custom',
+      message: 'Vision OCR requires one native inline image reference.',
+    })
+  }
   if (route.operation === 'image-to-video'
     && (route.inputModalities.join(',') !== 'text,image'
       || route.limits.maximumInputReferences !== 1
@@ -146,6 +162,7 @@ export type MultimodalRouteDescriptor = z.infer<typeof multimodalRouteDescriptor
 export const multimodalHostContextSchema = z.object({
   requestId: recordIdSchema,
   runId: recordIdSchema,
+  heldOutCommitmentHash: sha256Schema.optional(),
   semanticRole: recordIdSchema.optional(),
   nodeId: recordIdSchema.optional(),
   capabilityId: recordIdSchema.optional(),
@@ -199,6 +216,7 @@ export type MultimodalArtifactEvidence = z.infer<typeof multimodalArtifactEviden
 
 export const playbackPromotionEvidenceSchema = z.object({
   sourceReceiptHash: sha256Schema,
+  sourceHeldOutCommitmentHash: sha256Schema.optional(),
   decoder: z.literal('avfoundation-asset-image-generator-v1'),
   representativeFrames: z.literal(3),
   nonBlankFrames: z.literal(3),
@@ -212,6 +230,7 @@ export const multimodalHostReceiptSchema = z.object({
   receiptHash: sha256Schema,
   requestId: recordIdSchema,
   runId: recordIdSchema,
+  heldOutCommitmentHash: sha256Schema.optional(),
   providerId: safeTextSchema.max(160),
   providerKind: z.literal('dashscope'),
   model: safeTextSchema.max(300),
@@ -254,6 +273,13 @@ export const multimodalHostReceiptSchema = z.object({
   }
   if (receipt.playbackPromotion && receipt.artifact.mediaType !== 'video/mp4') {
     context.addIssue({ code: 'custom', message: 'Playback promotion is valid only for MP4 video.' })
+  }
+  if (receipt.playbackPromotion
+    && receipt.playbackPromotion.sourceHeldOutCommitmentHash !== receipt.heldOutCommitmentHash) {
+    context.addIssue({
+      code: 'custom',
+      message: 'Playback promotion must retain the source receipt held-out commitment binding.',
+    })
   }
 })
 export type MultimodalHostReceipt = z.infer<typeof multimodalHostReceiptSchema>
@@ -298,7 +324,7 @@ export const QWEN_GATE_A_ROUTES: readonly MultimodalRouteDescriptor[] = Object.f
     providerKind: 'dashscope',
     model: 'qwen3-vl-plus',
     operation: 'vision-ocr',
-    inputModalities: ['text', 'image'],
+    inputModalities: ['text', 'image', 'video'],
     transport: 'dashscope-compatible-chat-completions',
     limits: {
       maximumInputReferences: 1,
@@ -307,12 +333,30 @@ export const QWEN_GATE_A_ROUTES: readonly MultimodalRouteDescriptor[] = Object.f
       supportedResolutions: [],
       nativeAudio: false,
     },
-    evidence: { status: 'capability-required', sourceId: 'route-requires-live-vl-host-probe' },
-    hostCapability: {
-      status: 'capability-required',
-      requirement: 'An exact native VL/OCR Host probe has not been retained.',
+    evidence: {
+      status: 'verified',
+      sourceId: 'live-probe:qwen3-vl-plus:vision-json:2026-08-14',
+      observedAt: '2026-08-14T01:39:10Z',
+      observedStructuredOutputs: [
+        {
+          inputMediaType: 'image/png',
+          outputSha256: '86ca954903651baff0bfed125b4c21df368cfb9426314b951801b5610fc5a8b8',
+          mediaType: 'application/json',
+          schemaValid: true,
+          referenceBinding: 'native-inline-image-bytes',
+        },
+        {
+          inputMediaType: 'video/mp4',
+          outputSha256: 'a6595fc7c719c23c6c3a0b85cba54d339dcf7de0244aeb6c3aa633d8a5f26cb9',
+          mediaType: 'application/json',
+          schemaValid: true,
+          referenceBinding: 'native-inline-image-bytes',
+        },
+      ],
     },
-    executable: false,
+    hostCapability: { status: 'available' },
+    requiredReferenceBinding: 'native-inline-image-bytes',
+    executable: true,
   }),
   ...(['image-generation', 'image-edit'] as const).map((operation) => (
     multimodalRouteDescriptorSchema.parse({

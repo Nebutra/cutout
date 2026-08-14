@@ -158,14 +158,23 @@ describe('portable multimodal Host contracts', () => {
     }
   })
 
-  it('keeps VL/OCR capability-required until its own Host probe closes', () => {
+  it('admits VL/OCR only with retained image and video structured-output probes', () => {
     const vl = QWEN_GATE_A_ROUTES.find((route) => route.operation === 'vision-ocr')
-    expect(vl).toMatchObject({ executable: false, evidence: { status: 'capability-required' } })
+    expect(vl).toMatchObject({
+      executable: true,
+      evidence: {
+        status: 'verified',
+        observedStructuredOutputs: [
+          { inputMediaType: 'image/png', schemaValid: true },
+          { inputMediaType: 'video/mp4', schemaValid: true },
+        ],
+      },
+    })
     expect(resolveVerifiedMultimodalRoute({
       providerKind: 'dashscope',
       model: 'qwen3-vl-plus',
       operation: 'vision-ocr',
-    })).toBeUndefined()
+    })).toEqual(vl)
   })
 
   it('rejects generic capability labels that drift from exact operations', () => {

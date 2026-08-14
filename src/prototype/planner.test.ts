@@ -14,6 +14,7 @@ import {
   PROTOTYPE_PLANNER_PAGE_MAX_PARALLELISM,
   PROTOTYPE_PLANNER_STAGE_TIMEOUT_MS,
   PROTOTYPE_PLANNER_TOTAL_TIMEOUT_MS,
+  progressivePlannerTimeoutMs,
 } from './planner'
 import {
   generatedPrototypePlanSchema,
@@ -370,11 +371,74 @@ function progressiveDesignExplorationFor(plan: PrototypePlan) {
   }
 }
 
-function progressiveClosureFor(plan: PrototypePlan) {
-  if (!plan.reviewDocument) throw new Error('Expected a benchmark review document.')
+function progressivePlanFor(plan: PrototypePlan): PrototypePlan {
+  const outline = progressiveOutlineFor(plan)
+  const pageById = new Map(outline.pages.map((page) => [page.id, page]))
+  const edgeLines = outline.edges.map((edge) => {
+    const source = pageById.get(edge.fromPageId)!
+    const target = pageById.get(edge.toPageId)!
+    return `- ${source.name} (${source.route}) -- ${edge.label} --> ${target.name} (${target.route})`
+  })
+  const routeLines = outline.pages.map((page) => `- ${page.name} (${page.route}): ${page.purpose}`)
+  const entryLines = outline.entryPageIds.map((pageId) => {
+    const page = pageById.get(pageId)!
+    return `- ${page.name} (${page.route})`
+  })
   return {
-    flows: plan.flows,
-    reviewDocument: plan.reviewDocument,
+    ...plan,
+    pages: plan.pages.map((page) => ({
+      ...page,
+      interactions: [
+        ...page.interactions.filter(({ action }) => action.type !== 'navigate'),
+        ...outline.edges.filter(({ fromPageId }) => fromPageId === page.id).map((edge) => ({
+          id: edge.id,
+          label: edge.label,
+          trigger: edge.trigger,
+          sourceElement: edge.sourceElement,
+          intent: edge.intent,
+          action: { type: 'navigate' as const, targetPageId: edge.toPageId },
+        })),
+      ],
+    })),
+    flows: outline.entryPageIds.map((startPageId, index) => ({
+      id: `route-journey-${index + 1}`,
+      name: `Route journey ${index + 1}`,
+      goal: outline.product.primaryGoal,
+      startPageId,
+      steps: outline.edges.map((edge) => ({
+        fromPageId: edge.fromPageId,
+        interactionId: edge.id,
+        toPageId: edge.toPageId,
+      })),
+    })),
+    reviewDocument: {
+      format: 'markdown',
+      primaryFlow: [
+        `# ${outline.product.name} primary journey`,
+        '',
+        `Goal: ${outline.product.primaryGoal}`,
+        '',
+        'Entry routes:',
+        ...entryLines,
+        '',
+        'Authoritative navigation:',
+        ...(edgeLines.length > 0 ? edgeLines : ['- No cross-route navigation is required.']),
+      ].join('\n'),
+      fullPlan: [
+        `# ${outline.product.name} route plan`,
+        '',
+        outline.product.summary,
+        '',
+        'Routes:',
+        ...routeLines,
+        '',
+        'Journey entries:',
+        ...entryLines,
+        '',
+        'Authoritative navigation:',
+        ...(edgeLines.length > 0 ? edgeLines : ['- No cross-route navigation is required.']),
+      ].join('\n'),
+    },
   }
 }
 
@@ -565,11 +629,11 @@ describe('planPrototype', () => {
 
   it('preserves heterogeneous Agent-authored material scope progressively', async () => {
     const plan = createBenchmarkPlan()
+    const expected = progressivePlanFor(plan)
     const generateObject = mockGenerateSequence(
       ok(progressiveDesignFoundationFor(plan)),
       ok(progressiveDesignExplorationFor(plan)),
       ...plan.pages.map((page) => ok(page)),
-      ok(progressiveClosureFor(plan)),
     )
     const generateText = mockGenerateText(ok(progressiveOutlineProtocolFor(plan)))
     const result = await planPrototype(fakeGeneration(generateObject, generateText), {
@@ -578,8 +642,8 @@ describe('planPrototype', () => {
       brief: PROGRESSIVE_TEST_BRIEF,
     })
 
-    expect(result).toEqual(ok(plan))
-    expect(generateObject).toHaveBeenCalledTimes(9)
+    expect(result).toEqual(ok(expected))
+    expect(generateObject).toHaveBeenCalledTimes(8)
     expect(generateObject.mock.calls.map(([input]) => input.maxOutputTokens)).toEqual([
       8_000,
       8_000,
@@ -589,7 +653,6 @@ describe('planPrototype', () => {
       12_000,
       12_000,
       12_000,
-      20_000,
     ])
     expect(generateObject.mock.calls.every(([input]) => input.reasoningEffort === 'low')).toBe(true)
     expect(result.ok && result.data.pages).toHaveLength(6)
@@ -610,11 +673,11 @@ describe('planPrototype', () => {
 
   it('outlines a natural business intent before any structured expansion', async () => {
     const plan = createBenchmarkPlan()
+    const expected = progressivePlanFor(plan)
     const generateObject = mockGenerateSequence(
       ok(progressiveDesignFoundationFor(plan)),
       ok(progressiveDesignExplorationFor(plan)),
       ...plan.pages.map((page) => ok(page)),
-      ok(progressiveClosureFor(plan)),
     )
     const generateText = mockGenerateText(ok(progressiveOutlineProtocolFor(plan)))
 
@@ -624,9 +687,9 @@ describe('planPrototype', () => {
       brief: '为一家现代餐厅设计完整官网，覆盖顾客从了解品牌到到店用餐的真实旅程。',
     })
 
-    expect(result).toEqual(ok(plan))
+    expect(result).toEqual(ok(expected))
     expect(generateText).toHaveBeenCalledTimes(1)
-    expect(generateObject).toHaveBeenCalledTimes(2 + plan.pages.length + 1)
+    expect(generateObject).toHaveBeenCalledTimes(2 + plan.pages.length)
     expect(generateText.mock.invocationCallOrder[0])
       .toBeLessThan(generateObject.mock.invocationCallOrder[0]!)
     expect(generateObject.mock.calls[0]![1]).not.toBe(generatedPrototypePlanSchema)
@@ -634,6 +697,7 @@ describe('planPrototype', () => {
 
   it('expands independent route pages with bounded parallelism', async () => {
     const plan = createBenchmarkPlan()
+    const expected = progressivePlanFor(plan)
     let objectCall = 0
     let activePages = 0
     let maximumActivePages = 0
@@ -645,9 +709,6 @@ describe('planPrototype', () => {
       objectCall += 1
       if (call === 0) return ok(progressiveDesignFoundationFor(plan)) as Result<T>
       if (call === 1) return ok(progressiveDesignExplorationFor(plan)) as Result<T>
-      if (call === plan.pages.length + 2) {
-        return ok(progressiveClosureFor(plan)) as Result<T>
-      }
       activePages += 1
       maximumActivePages = Math.max(maximumActivePages, activePages)
       await Promise.resolve()
@@ -664,12 +725,13 @@ describe('planPrototype', () => {
       brief: PROGRESSIVE_TEST_BRIEF,
     })
 
-    expect(result).toEqual(ok(plan))
+    expect(result).toEqual(ok(expected))
     expect(maximumActivePages).toBe(PROTOTYPE_PLANNER_PAGE_MAX_PARALLELISM)
   })
 
   it('lets a single-turn runtime serialize pages before stage deadlines begin', async () => {
     const plan = createBenchmarkPlan()
+    const expected = progressivePlanFor(plan)
     let objectCall = 0
     let activePages = 0
     let maximumActivePages = 0
@@ -680,7 +742,6 @@ describe('planPrototype', () => {
       const call = objectCall++
       if (call === 0) return ok(progressiveDesignFoundationFor(plan)) as Result<T>
       if (call === 1) return ok(progressiveDesignExplorationFor(plan)) as Result<T>
-      if (call === plan.pages.length + 2) return ok(progressiveClosureFor(plan)) as Result<T>
       activePages += 1
       maximumActivePages = Math.max(maximumActivePages, activePages)
       await Promise.resolve()
@@ -697,7 +758,7 @@ describe('planPrototype', () => {
       pageParallelism: 1,
     })
 
-    expect(result).toEqual(ok(plan))
+    expect(result).toEqual(ok(expected))
     expect(maximumActivePages).toBe(1)
   })
 
@@ -714,11 +775,11 @@ describe('planPrototype', () => {
 
   it('parses a bounded Agent-authored six-route outline before schema generation', async () => {
     const plan = createBenchmarkPlan()
+    const expected = progressivePlanFor(plan)
     const generateObject = mockGenerateSequence(
       ok(progressiveDesignFoundationFor(plan)),
       ok(progressiveDesignExplorationFor(plan)),
       ...plan.pages.map((page) => ok(page)),
-      ok(progressiveClosureFor(plan)),
     )
     const generateText = mockGenerateText(ok(progressiveOutlineProtocolFor(plan)))
 
@@ -728,7 +789,7 @@ describe('planPrototype', () => {
       brief: PROGRESSIVE_TEST_BRIEF,
     })
 
-    expect(result).toEqual(ok(plan))
+    expect(result).toEqual(ok(expected))
     expect(generateText).toHaveBeenCalledTimes(1)
     expect(generateText.mock.calls[0]![0].maxOutputTokens).toBe(4_000)
     expect(generateText.mock.calls[0]![0].system).toContain('CUTOUT_OUTLINE_V2')
@@ -826,7 +887,6 @@ describe('planPrototype', () => {
       ok(progressiveDesignFoundationFor(plan)),
       ok(progressiveDesignExplorationFor(plan)),
       ...plan.pages.map((page) => ok(page)),
-      ok(progressiveClosureFor(plan)),
     )
     const result = await planPrototype(fakeGeneration(
       generateObject,
@@ -837,7 +897,7 @@ describe('planPrototype', () => {
       brief: `${PROGRESSIVE_TEST_BRIEF} Cover the complete journey.`,
     })
 
-    expect(result).toEqual(ok(plan))
+    expect(result).toEqual(ok(progressivePlanFor(plan)))
     expect(result.ok && result.data.pages).toHaveLength(5)
   })
 
@@ -882,6 +942,26 @@ describe('planPrototype', () => {
       askPlan.pages.map((page) => page.route),
     )
     expect(generateObject).not.toHaveBeenCalled()
+  })
+
+  it('accepts exactly one fenced closed outline protocol from compatible text routes', async () => {
+    const plan = createBenchmarkPlan()
+    const generateObject = mockGenerateSequence(
+      ok(progressiveDesignFoundationFor(plan)),
+      ok(progressiveDesignExplorationFor(plan)),
+      ...plan.pages.map((page) => ok(page)),
+    )
+    const result = await planPrototype(fakeGeneration(
+      generateObject,
+      mockGenerateText(ok(`\n\`\`\`tsv\n${progressiveOutlineProtocolFor(plan)}\n\`\`\`\n`)),
+    ), {
+      providerId: 'p',
+      model: 'm',
+      brief: PROGRESSIVE_TEST_BRIEF,
+    })
+
+    expect(result).toEqual(ok(progressivePlanFor(plan)))
+    expect(generateObject).toHaveBeenCalledTimes(2 + plan.pages.length)
   })
 
   it('uses schema generation only when the bounded line protocol is invalid', async () => {
@@ -966,6 +1046,7 @@ describe('planPrototype', () => {
 
   it('compiles exact outline navigation and discards page-authored navigate drift', async () => {
     const plan = createBenchmarkPlan()
+    const expected = progressivePlanFor(plan)
     const driftedPages = plan.pages.map((page, index) => ({
       ...page,
       interactions: index === 0
@@ -980,7 +1061,6 @@ describe('planPrototype', () => {
       ok(progressiveDesignFoundationFor(plan)),
       ok(progressiveDesignExplorationFor(plan)),
       ...driftedPages.map((page) => ok(page)),
-      ok(progressiveClosureFor(plan)),
     )
     const result = await planPrototype(fakeGeneration(
       generateObject,
@@ -991,7 +1071,7 @@ describe('planPrototype', () => {
       brief: PROGRESSIVE_TEST_BRIEF,
     })
 
-    expect(result).toEqual(ok(plan))
+    expect(result).toEqual(ok(expected))
     expect(result.ok && result.data.pages[0]!.interactions).toEqual(
       plan.pages[0]!.interactions,
     )
@@ -1227,14 +1307,27 @@ describe('planPrototype', () => {
         model: 'm',
         brief: PROGRESSIVE_TEST_BRIEF,
       })
-      await vi.advanceTimersByTimeAsync(PROTOTYPE_PLANNER_TOTAL_TIMEOUT_MS)
+      const budget = progressivePlannerTimeoutMs(
+        plan.pages.length,
+        PROTOTYPE_PLANNER_PAGE_MAX_PARALLELISM,
+      )
+      await vi.advanceTimersByTimeAsync(budget)
 
       await expect(pending).resolves.toEqual(err('Prototype planning timed out.'))
-      expect(objectCall).toBe(2)
+      // The bounded budget scales with the resolved graph, so it can advance
+      // into page expansion before it cancels the complete journey.
+      expect(objectCall).toBeGreaterThan(2)
       expect(latestSignal?.aborted).toBe(true)
     } finally {
       vi.useRealTimers()
     }
+  })
+
+  it('derives progressive budget from the resolved topology and runtime parallelism', () => {
+    expect(progressivePlannerTimeoutMs(1, 3)).toBe(PROTOTYPE_PLANNER_TOTAL_TIMEOUT_MS + 30_000)
+    expect(progressivePlannerTimeoutMs(11, 1)).toBe(10 * 60_000)
+    expect(progressivePlannerTimeoutMs(11, 3)).toBe(PROTOTYPE_PLANNER_TOTAL_TIMEOUT_MS + 120_000)
+    expect(() => progressivePlannerTimeoutMs(13)).toThrow('page count')
   })
 
   it('preserves a transport failure from the text fallback', async () => {
@@ -1308,6 +1401,7 @@ describe('planPrototype', () => {
 
   it('repairs only the progressive page whose route identity changed', async () => {
     const plan = createBenchmarkPlan()
+    const expected = progressivePlanFor(plan)
     const changedPages = plan.pages.map((page, index) => index === 2
       ? { ...page, purpose: 'A changed purpose.' }
       : page)
@@ -1316,7 +1410,6 @@ describe('planPrototype', () => {
       ok(progressiveDesignExplorationFor(plan)),
       ...changedPages.map((page) => ok(page)),
       ok(plan.pages[2]!),
-      ok(progressiveClosureFor(plan)),
     )
     const result = await planPrototype(fakeGeneration(
       generateObject,
@@ -1327,8 +1420,8 @@ describe('planPrototype', () => {
       brief: PROGRESSIVE_TEST_BRIEF,
     })
 
-    expect(result).toEqual(ok(plan))
-    expect(generateObject).toHaveBeenCalledTimes(10)
+    expect(result).toEqual(ok(expected))
+    expect(generateObject).toHaveBeenCalledTimes(9)
     const repairInput = generateObject.mock.calls[8]![0]
     expect(repairInput.system).toContain('page integrity repairer')
     expect(repairInput.input?.[0]).toEqual(expect.objectContaining({
@@ -1339,6 +1432,7 @@ describe('planPrototype', () => {
 
   it('repairs one page-local reference without changing authored counts', async () => {
     const plan = createBenchmarkPlan()
+    const expected = progressivePlanFor(plan)
     const invalidPage = {
       ...plan.pages[3]!,
       interactions: plan.pages[3]!.interactions.map((interaction) => ({
@@ -1351,7 +1445,6 @@ describe('planPrototype', () => {
       ok(progressiveDesignExplorationFor(plan)),
       ...plan.pages.map((page, index) => ok(index === 3 ? invalidPage : page)),
       ok(plan.pages[3]!),
-      ok(progressiveClosureFor(plan)),
     )
 
     const result = await planPrototype(fakeGeneration(
@@ -1363,8 +1456,8 @@ describe('planPrototype', () => {
       brief: PROGRESSIVE_TEST_BRIEF,
     })
 
-    expect(result).toEqual(ok(plan))
-    expect(generateObject).toHaveBeenCalledTimes(10)
+    expect(result).toEqual(ok(expected))
+    expect(generateObject).toHaveBeenCalledTimes(9)
     expect(generateObject.mock.calls[8]![0].input?.[0]).toEqual(
       expect.objectContaining({
         type: 'text',
@@ -1409,23 +1502,13 @@ describe('planPrototype', () => {
     expect(viewportGeneration).toHaveBeenCalledTimes(9)
   })
 
-  it('repairs only a closure with an unknown page interaction reference', async () => {
+  it('compiles closure directly from the authoritative outline without another Provider call', async () => {
     const plan = createBenchmarkPlan()
-    const closure = progressiveClosureFor(plan)
+    const expected = progressivePlanFor(plan)
     const generateObject = mockGenerateSequence(
       ok(progressiveDesignFoundationFor(plan)),
       ok(progressiveDesignExplorationFor(plan)),
       ...plan.pages.map((page) => ok(page)),
-      ok({
-        ...closure,
-        flows: [{
-          ...closure.flows[0]!,
-          steps: closure.flows[0]!.steps.map((step, index) => index === 0
-            ? { ...step, interactionId: 'missing-interaction' }
-            : step),
-        }],
-      }),
-      ok({ flows: closure.flows }),
     )
     const result = await planPrototype(fakeGeneration(
       generateObject,
@@ -1436,200 +1519,16 @@ describe('planPrototype', () => {
       brief: PROGRESSIVE_TEST_BRIEF,
     })
 
-    expect(result).toEqual(ok(plan))
-    expect(generateObject).toHaveBeenCalledTimes(10)
-    const repairInput = generateObject.mock.calls[9]![0]
-    expect(repairInput.system).toContain('journey closure repairer')
-    expect(repairInput.system).toContain('orchestrator preserves the review documents')
-    expect(repairInput.input?.[0]).toEqual(expect.objectContaining({
-      type: 'text',
-      text: expect.stringContaining('"code":"flow-interaction"'),
-    }))
-    const repairSchema = generateObject.mock.calls[9]![1]
-    expect(repairSchema.safeParse({ flows: closure.flows }).success).toBe(true)
-    expect(repairSchema.safeParse({
-      flows: [{
-        ...closure.flows[0]!,
-        steps: closure.flows[0]!.steps.map((step, index) => index === 0
-          ? { ...step, interactionId: 'edit-timeline' }
-          : step),
-      }],
-    }).success).toBe(false)
-    expect(repairSchema.safeParse({
-      flows: [{
-        ...closure.flows[0]!,
-        steps: closure.flows[0]!.steps.map((step, index) => index === 0
-          ? { ...step, fromPageId: 'page-2' }
-          : step),
-      }],
-    }).success).toBe(false)
-    expect(repairSchema.safeParse({
-      flows: [{
-        ...closure.flows[0]!,
-        steps: closure.flows[0]!.steps.map((step, index) => index === 0
-          ? { ...step, toPageId: 'page-3' }
-          : step),
-      }],
-    }).success).toBe(false)
-    expect(result.ok && result.data.reviewDocument).toEqual(closure.reviewDocument)
+    expect(result).toEqual(ok(expected))
+    expect(generateObject).toHaveBeenCalledTimes(2 + plan.pages.length)
+    expect(result.ok && result.data.flows).toEqual(expected.flows)
+    expect(result.ok && result.data.reviewDocument).toEqual(expected.reviewDocument)
     const pageExpansionSystems = generateObject.mock.calls
       .slice(2, 2 + plan.pages.length)
       .map(([input]) => input.system)
     expect(pageExpansionSystems.every((system) =>
       system?.includes('prototype page architect'))).toBe(true)
-    expect(generateObject.mock.calls.slice(2 + plan.pages.length)
-      .some(([input]) => input.system?.includes('prototype page architect'))).toBe(false)
-  })
-
-  it('repairs a closure that omits the target of a navigation step', async () => {
-    const plan = createBenchmarkPlan()
-    const closure = progressiveClosureFor(plan)
-    const generateObject = mockGenerateSequence(
-      ok(progressiveDesignFoundationFor(plan)),
-      ok(progressiveDesignExplorationFor(plan)),
-      ...plan.pages.map((page) => ok(page)),
-      ok({
-        ...closure,
-        flows: [{
-          ...closure.flows[0]!,
-          steps: closure.flows[0]!.steps.map((step, index) => index === 0
-            ? { fromPageId: step.fromPageId, interactionId: step.interactionId }
-            : step),
-        }],
-      }),
-      ok({ flows: closure.flows }),
-    )
-
-    const result = await planPrototype(fakeGeneration(
-      generateObject,
-      mockGenerateText(ok(progressiveOutlineProtocolFor(plan))),
-    ), {
-      providerId: 'p',
-      model: 'm',
-      brief: PROGRESSIVE_TEST_BRIEF,
-    })
-
-    expect(result).toEqual(ok(plan))
-    expect(generateObject).toHaveBeenCalledTimes(10)
-    expect(generateObject.mock.calls[9]![0].input?.[0]).toEqual(
-      expect.objectContaining({
-        type: 'text',
-        text: expect.stringContaining('"code":"flow-target-mismatch"'),
-      }),
-    )
-  })
-
-  it('repairs a closure that redefines the authoritative route entry', async () => {
-    const plan = createBenchmarkPlan()
-    const closure = progressiveClosureFor(plan)
-    const invalidClosure = {
-      ...closure,
-      flows: [{ ...closure.flows[0]!, startPageId: 'page-2' }],
-    }
-    const generateObject = mockGenerateSequence(
-      ok(progressiveDesignFoundationFor(plan)),
-      ok(progressiveDesignExplorationFor(plan)),
-      ...plan.pages.map((page) => ok(page)),
-      ok(invalidClosure),
-      ok({ flows: closure.flows }),
-    )
-
-    const result = await planPrototype(fakeGeneration(
-      generateObject,
-      mockGenerateText(ok(progressiveOutlineProtocolFor(plan))),
-    ), {
-      providerId: 'p',
-      model: 'm',
-      brief: PROGRESSIVE_TEST_BRIEF,
-    })
-
-    expect(result).toEqual(ok(plan))
-    const repairInput = generateObject.mock.calls[9]![0].input?.[0]
-    expect(repairInput).toEqual(expect.objectContaining({
-      type: 'text',
-      text: expect.stringContaining('"code":"flow-entry-mismatch"'),
-    }))
-    const repairSchema = generateObject.mock.calls[9]![1]
-    expect(repairSchema.safeParse({ flows: closure.flows }).success).toBe(true)
-    expect(repairSchema.safeParse({ flows: invalidClosure.flows }).success).toBe(false)
-  })
-
-  it('bounds closure repair and fails closed when its graph remains invalid', async () => {
-    const plan = createBenchmarkPlan()
-    const closure = progressiveClosureFor(plan)
-    const invalidClosure = {
-      ...closure,
-      flows: [{
-        ...closure.flows[0]!,
-        steps: [{
-          fromPageId: 'page-1',
-          interactionId: 'submit-trip-intent',
-          toPageId: 'page-2',
-        }],
-      }],
-    }
-    const generateObject = mockGenerateSequence(
-      ok(progressiveDesignFoundationFor(plan)),
-      ok(progressiveDesignExplorationFor(plan)),
-      ...plan.pages.map((page) => ok(page)),
-      ok(invalidClosure),
-      ok({ flows: invalidClosure.flows }),
-    )
-
-    const result = await planPrototype(fakeGeneration(
-      generateObject,
-      mockGenerateText(ok(progressiveOutlineProtocolFor(plan))),
-    ), {
-      providerId: 'p',
-      model: 'm',
-      brief: PROGRESSIVE_TEST_BRIEF,
-    })
-
-    expect(result).toEqual(err(
-      'Progressive planner closure repair remained invalid: '
-        + 'Flow "benchmark-journey" step references unknown interaction '
-        + '"submit-trip-intent" on page "page-1".',
-    ))
-    expect(generateObject).toHaveBeenCalledTimes(10)
-  })
-
-  it.each([
-    'API_KEY_REQUIRED',
-    'AbortError: operation aborted',
-    'Prototype planner closure repair timed out.',
-    'request failed: network unavailable',
-  ])('does not retry a closure repair failure: %s', async (failure) => {
-    const plan = createBenchmarkPlan()
-    const closure = progressiveClosureFor(plan)
-    const generateObject = mockGenerateSequence(
-      ok(progressiveDesignFoundationFor(plan)),
-      ok(progressiveDesignExplorationFor(plan)),
-      ...plan.pages.map((page) => ok(page)),
-      ok({
-        ...closure,
-        flows: [{
-          ...closure.flows[0]!,
-          steps: [{
-            fromPageId: 'page-1',
-            interactionId: 'missing-interaction',
-            toPageId: 'page-2',
-          }],
-        }],
-      }),
-      err(failure),
-    )
-
-    const result = await planPrototype(fakeGeneration(
-      generateObject,
-      mockGenerateText(ok(progressiveOutlineProtocolFor(plan))),
-    ), {
-      providerId: 'p',
-      model: 'm',
-      brief: PROGRESSIVE_TEST_BRIEF,
-    })
-
-    expect(result).toEqual(err(failure))
-    expect(generateObject).toHaveBeenCalledTimes(10)
+    expect(generateObject.mock.calls.slice(2 + plan.pages.length)).toHaveLength(0)
   })
 
   it('fails closed without a second page repair when two page details are invalid', async () => {

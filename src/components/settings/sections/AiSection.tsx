@@ -105,13 +105,7 @@ export function AiSection() {
     setAutomaticBusy(true)
     setAutomaticError(undefined)
     try {
-      if (import.meta.env.VITE_CUTOUT_PACKAGED_E2E === '1') {
-        await configureAutomaticAi(candidates, {
-          preferredTextRoutes: [{ kind: 'dashscope', model: 'qwen-plus' }],
-        })
-      } else {
-        await configureAutomaticAi(candidates)
-      }
+      await configureAutomaticAi(candidates)
       await Promise.all([
         providers.refetch(),
         discovery.refetch(),

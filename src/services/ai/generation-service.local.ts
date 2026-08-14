@@ -500,9 +500,17 @@ function extractJson(text: string): string {
   if (starts.length === 0) return source
 
   const start = Math.min(...starts)
-  const open = source[start]
-  const close = open === '{' ? '}' : ']'
-  let depth = 0
+  const closingDelimiters: Record<string, '}' | ']'> = {
+    '{': '}',
+    '[': ']',
+  }
+  const closing = closingDelimiters[source[start]]
+  if (!closing) return source.slice(start)
+
+  // Track every JSON container, not just the outer delimiter. A nested array
+  // or object must consume exactly its own closing delimiter before the root
+  // value is considered complete.
+  const expectedClosers: Array<'}' | ']'> = []
   let inString = false
   let escaped = false
 
@@ -514,11 +522,14 @@ function extractJson(text: string): string {
       else if (char === '"') inString = false
       continue
     }
-    if (char === '"') inString = true
-    else if (char === open) depth += 1
-    else if (char === close) {
-      depth -= 1
-      if (depth === 0) return source.slice(start, i + 1)
+    if (char === '"') {
+      inString = true
+    } else if (char === '{' || char === '[') {
+      expectedClosers.push(closingDelimiters[char])
+    } else if (char === '}' || char === ']') {
+      if (expectedClosers.at(-1) !== char) return source.slice(start)
+      expectedClosers.pop()
+      if (expectedClosers.length === 0) return source.slice(start, i + 1)
     }
   }
 

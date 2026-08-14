@@ -21,5 +21,7 @@ describe("settings section grouping", () => {
     expect(sidebar).not.toMatch(/section_advanced|'advanced'/);
     expect(dialog).not.toMatch(/AdvancedSection|section === 'advanced'/);
     expect(sidebar).toContain("settings.section_updates_support");
+    expect(dialog).toContain("VITE_CUTOUT_PACKAGED_E2E === '1'");
+    expect(dialog).toContain('onOpenAutoFocus={PACKAGED_E2E');
   });
 });

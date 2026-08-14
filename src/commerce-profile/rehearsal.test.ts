@@ -8,6 +8,7 @@ import {
 } from './benchmark'
 import { createCommerceRehearsalFixture } from './rehearsal.test-fixture'
 import type { CommerceProductionRehearsalBundle } from './rehearsal'
+import { assertCommerceHeldOutReceiptCommitmentClosure } from './rehearsal'
 import {
   createDesignOsBenchmarkFromCommerceRehearsal,
   decodeDesignOsBenchmarkFromCommerceRehearsal,
@@ -22,13 +23,13 @@ vi.mock('./source-ingest', async (importOriginal) => ({
   verifyNativeCommerceSourceIngestReceipt: vi.fn(),
 }))
 
-describe('trusted Commerce real-Host production rehearsal', () => {
+describe('Commerce rehearsal verifier contract (fixture only; not benchmark evidence)', () => {
   beforeEach(() => {
     vi.mocked(verifyNativeMultimodalHostArtifact).mockReset()
     vi.mocked(verifyNativeCommerceSourceIngestReceipt).mockReset()
   })
 
-  function armNativeVerifier(bundle: CommerceProductionRehearsalBundle): void {
+  function substituteNativeVerifierForContractTest(bundle: CommerceProductionRehearsalBundle): void {
     const receipts = bundle.artifacts.flatMap((artifact) => [
       artifact.receipt,
       ...(artifact.semanticQa ? [artifact.semanticQa.receipt] : []),
@@ -42,9 +43,9 @@ describe('trusted Commerce real-Host production rehearsal', () => {
     vi.mocked(verifyNativeCommerceSourceIngestReceipt).mockImplementation(async ({ receipt }) => receipt)
   }
 
-  it('derives all real-Host passes only after complete signed receipt, byte, graph, Plan, lock, QA, and evaluation closure', async () => {
+  it('requires complete receipt, byte, graph, Plan, lock, QA, and evaluation closure before deriving real-Host statuses', async () => {
     const fixture = await createCommerceRehearsalFixture()
-    armNativeVerifier(fixture.bundle)
+    substituteNativeVerifierForContractTest(fixture.bundle)
     const { report, rehearsal } = await createCommerceProfileBenchmarkReportFromRehearsal({
       baselineReport: currentCommerce,
       rehearsalBundle: fixture.bundle,
@@ -73,22 +74,19 @@ describe('trusted Commerce real-Host production rehearsal', () => {
     })])
     expect(rehearsal.evaluation).toMatchObject({ ready: true, validArtifactIds: expect.any(Array) })
     expect(rehearsal.evaluation.validArtifactIds).toHaveLength(11)
-    expect(report.summary).toMatchObject({
-      overall: { total: 16, passed: 16, failed: 0, blocked: 0, ready: true },
-      productionReady: true,
-    })
     expect(report.summary.tiers.at(-1)).toEqual({
-      tier: 'real-host', total: 8, passed: 8, failed: 0, blocked: 0, ready: true,
+      tier: 'real-host', total: 8, passed: 0, failed: 0, blocked: 8, ready: false,
     })
     const videoMetric = report.metrics.find((metric) => metric.id === 'p6.real-video-execution')!
-    expect(videoMetric.evidenceReferences.find((reference) => (
-      reference.kind === 'real-host-receipt'
-      && reference.binding.receiptId === video.receipt.receiptId
-    ))).toMatchObject({
-      binding: { dagReferences: video.dagReferenceBindings },
+    expect(videoMetric).toMatchObject({
+      status: 'blocked',
+      evidenceReferences: [{
+        kind: 'host-capability-audit',
+        binding: { findingCode: 'real-host-evidence-unavailable' },
+      }],
     })
-    expect(() => decodeCommerceProfileBenchmarkReport(report)).toThrow(/trusted Host verification contract/)
-    armNativeVerifier(fixture.bundle)
+    expect(decodeCommerceProfileBenchmarkReport(report)).toEqual(report)
+    substituteNativeVerifierForContractTest(fixture.bundle)
     await expect(decodeCommerceProfileBenchmarkReportFromRehearsal({
       report,
       baselineReport: currentCommerce,
@@ -108,7 +106,7 @@ describe('trusted Commerce real-Host production rehearsal', () => {
       ;(target as Record<typeof field, typeof value>)[field] = foreign![field]
       ;(foreign as Record<typeof field, typeof value>)[field] = value
     }
-    armNativeVerifier(unrelated)
+    substituteNativeVerifierForContractTest(unrelated)
 
     await expect(createCommerceProfileBenchmarkReportFromRehearsal({
       baselineReport: currentCommerce,
@@ -134,7 +132,7 @@ describe('trusted Commerce real-Host production rehearsal', () => {
     ]) {
       const drift = structuredClone(fixture.bundle)
       mutate(drift)
-      armNativeVerifier(drift)
+      substituteNativeVerifierForContractTest(drift)
       await expect(createCommerceProfileBenchmarkReportFromRehearsal({
         baselineReport: currentCommerce,
         rehearsalBundle: drift,
@@ -147,7 +145,7 @@ describe('trusted Commerce real-Host production rehearsal', () => {
     const omitted = structuredClone(fixture.bundle)
     const main = omitted.artifacts.find((artifact) => artifact.semanticRole === 'main-image')!
     main.receipt.acceptedReferenceArtifactIds = main.receipt.acceptedReferenceArtifactIds.slice(1)
-    armNativeVerifier(omitted)
+    substituteNativeVerifierForContractTest(omitted)
     await expect(createCommerceProfileBenchmarkReportFromRehearsal({
       baselineReport: currentCommerce,
       rehearsalBundle: omitted,
@@ -159,7 +157,7 @@ describe('trusted Commerce real-Host production rehearsal', () => {
       detail.receipt.acceptedReferenceArtifactIds.at(-1)!,
       ...detail.receipt.acceptedReferenceArtifactIds.slice(0, -1),
     ]
-    armNativeVerifier(reordered)
+    substituteNativeVerifierForContractTest(reordered)
     await expect(createCommerceProfileBenchmarkReportFromRehearsal({
       baselineReport: currentCommerce,
       rehearsalBundle: reordered,
@@ -168,7 +166,7 @@ describe('trusted Commerce real-Host production rehearsal', () => {
 
   it('rejects tampered retained bytes before they can reach Commerce evaluation', async () => {
     const fixture = await createCommerceRehearsalFixture()
-    armNativeVerifier(fixture.bundle)
+    substituteNativeVerifierForContractTest(fixture.bundle)
     const tampered = structuredClone(fixture.bundle)
     tampered.artifacts[0]!.artifactBytesBase64 = btoa('{"tampered":true}')
 
@@ -180,10 +178,10 @@ describe('trusted Commerce real-Host production rehearsal', () => {
 
   it('rejects receipt reuse, frozen Plan drift, and incomplete signed semantic QA', async () => {
     const fixture = await createCommerceRehearsalFixture()
-    armNativeVerifier(fixture.bundle)
+    substituteNativeVerifierForContractTest(fixture.bundle)
     const reused = structuredClone(fixture.bundle)
     reused.artifacts[1]!.receipt = structuredClone(reused.artifacts[0]!.receipt)
-    armNativeVerifier(reused)
+    substituteNativeVerifierForContractTest(reused)
     await expect(createCommerceProfileBenchmarkReportFromRehearsal({
       baselineReport: currentCommerce, rehearsalBundle: reused,
     })).rejects.toThrow()
@@ -196,7 +194,7 @@ describe('trusted Commerce real-Host production rehearsal', () => {
 
     const missingQa = structuredClone(fixture.bundle)
     delete missingQa.artifacts.find((artifact) => artifact.semanticRole === 'main-image')!.semanticQa
-    armNativeVerifier(missingQa)
+    substituteNativeVerifierForContractTest(missingQa)
     await expect(createCommerceProfileBenchmarkReportFromRehearsal({
       baselineReport: currentCommerce, rehearsalBundle: missingQa,
     })).rejects.toThrow(/requires signed semantic QA/)
@@ -220,10 +218,10 @@ describe('trusted Commerce real-Host production rehearsal', () => {
 
   it('rejects signed context lock drift and caller-tampered durable readiness', async () => {
     const fixture = await createCommerceRehearsalFixture()
-    armNativeVerifier(fixture.bundle)
+    substituteNativeVerifierForContractTest(fixture.bundle)
     const lockDrift = structuredClone(fixture.bundle)
     lockDrift.artifacts[0]!.receipt.lockIds = lockDrift.artifacts[0]!.receipt.lockIds.slice(0, 2)
-    armNativeVerifier(lockDrift)
+    substituteNativeVerifierForContractTest(lockDrift)
     await expect(createCommerceProfileBenchmarkReportFromRehearsal({
       baselineReport: currentCommerce, rehearsalBundle: lockDrift,
     })).rejects.toThrow(/locks must match the exact Commerce rehearsal closure/)
@@ -231,18 +229,18 @@ describe('trusted Commerce real-Host production rehearsal', () => {
     const referenceDrift = structuredClone(fixture.bundle)
     const video = referenceDrift.artifacts.find((artifact) => artifact.semanticRole === 'product-video')!
     video.receipt.acceptedReferenceArtifactIds = []
-    armNativeVerifier(referenceDrift)
+    substituteNativeVerifierForContractTest(referenceDrift)
     await expect(createCommerceProfileBenchmarkReportFromRehearsal({
       baselineReport: currentCommerce, rehearsalBundle: referenceDrift,
     })).rejects.toThrow()
 
-    armNativeVerifier(fixture.bundle)
+    substituteNativeVerifierForContractTest(fixture.bundle)
     const { report } = await createCommerceProfileBenchmarkReportFromRehearsal({
       baselineReport: currentCommerce, rehearsalBundle: fixture.bundle,
     })
     const tamperedReport = structuredClone(report)
-    tamperedReport.summary.productionReady = false
-    armNativeVerifier(fixture.bundle)
+    tamperedReport.summary.productionReady = true
+    substituteNativeVerifierForContractTest(fixture.bundle)
     await expect(decodeCommerceProfileBenchmarkReportFromRehearsal({
       report: tamperedReport,
       baselineReport: currentCommerce,
@@ -250,12 +248,12 @@ describe('trusted Commerce real-Host production rehearsal', () => {
     })).rejects.toThrow(/does not match its reverified rehearsal bundle/)
   })
 
-  it('passes the Design OS rehearsal gate only through the reverified Commerce bundle', async () => {
+  it('does not admit the fixture verifier contract as held-out rehearsal proof', async () => {
     const fixture = await createCommerceRehearsalFixture()
-    armNativeVerifier(fixture.bundle)
+    substituteNativeVerifierForContractTest(fixture.bundle)
     const identity = {
-      id: 'benchmark-run:design-os:trusted-fixture',
-      revision: 'benchmark-run:design-os:trusted-fixture:revision:1',
+      id: 'benchmark-run:design-os:verifier-contract-fixture',
+      revision: 'benchmark-run:design-os:verifier-contract-fixture:revision:1',
     }
     const report = await createDesignOsBenchmarkFromCommerceRehearsal({
       baselineCommerceReport: currentCommerce,
@@ -263,17 +261,11 @@ describe('trusted Commerce real-Host production rehearsal', () => {
       identity,
     })
 
-    expect(report.summary).toMatchObject({
-      overall: { total: 17, passed: 17, failed: 0, blocked: 0, ready: true },
-      coverage: { passed: 17, total: 17, basisPoints: 10_000 },
-      maturity: 'production-rehearsal',
-      nextStage: null,
-      productionReady: true,
-    })
+    expect(report.summary.productionReady).toBe(false)
     expect(report.summary.stages.at(-1)).toEqual({
-      stage: 'production-rehearsal', total: 1, passed: 1, failed: 0, blocked: 0, ready: true,
+      stage: 'production-rehearsal', total: 1, passed: 0, failed: 0, blocked: 1, ready: false,
     })
-    armNativeVerifier(fixture.bundle)
+    substituteNativeVerifierForContractTest(fixture.bundle)
     await expect(decodeDesignOsBenchmarkFromCommerceRehearsal({
       report,
       baselineCommerceReport: currentCommerce,
@@ -283,12 +275,64 @@ describe('trusted Commerce real-Host production rehearsal', () => {
 
     const rebound = structuredClone(report)
     rebound.identity = { id: 'caller:ready', revision: 'caller:ready:revision:1' }
-    armNativeVerifier(fixture.bundle)
+    substituteNativeVerifierForContractTest(fixture.bundle)
     await expect(decodeDesignOsBenchmarkFromCommerceRehearsal({
       report: rebound,
       baselineCommerceReport: currentCommerce,
       rehearsalBundle: fixture.bundle,
       identity,
     })).rejects.toThrow(/does not match its reverified Commerce rehearsal bundle/)
+  })
+
+  it('requires the same held-out commitment on every source, Provider, QA, and playback receipt', async () => {
+    const { bundle } = await createCommerceRehearsalFixture()
+    const commitmentHash = 'a'.repeat(64)
+    for (const material of bundle.sourceMaterials) {
+      material.ingestReceipt.heldOutCommitmentHash = commitmentHash
+    }
+    for (const artifact of bundle.artifacts) {
+      artifact.receipt.heldOutCommitmentHash = commitmentHash
+      if (artifact.semanticQa) artifact.semanticQa.receipt.heldOutCommitmentHash = commitmentHash
+      if (artifact.receipt.playbackPromotion) {
+        artifact.receipt.playbackPromotion.sourceHeldOutCommitmentHash = commitmentHash
+        artifact.playbackSourceReceipt = {
+          ...structuredClone(artifact.receipt),
+          receiptId: `${artifact.receipt.receiptId}:source`,
+          receiptHash: artifact.receipt.playbackPromotion.sourceReceiptHash,
+          artifact: { ...artifact.receipt.artifact, playbackVerified: false },
+          playbackPromotion: undefined,
+        }
+      }
+    }
+    expect(() => assertCommerceHeldOutReceiptCommitmentClosure(bundle, commitmentHash)).not.toThrow()
+
+    const mutations: Array<{
+      readonly label: string
+      readonly apply: (candidate: CommerceProductionRehearsalBundle) => void
+    }> = [
+      { label: 'source', apply: (candidate) => { delete candidate.sourceMaterials[0]!.ingestReceipt.heldOutCommitmentHash } },
+      { label: 'Provider', apply: (candidate) => { delete candidate.artifacts[0]!.receipt.heldOutCommitmentHash } },
+      {
+        label: 'semantic-QA',
+        apply: (candidate) => {
+          delete candidate.artifacts.find((artifact) => artifact.semanticQa)!.semanticQa!.receipt.heldOutCommitmentHash
+        },
+      },
+      {
+        label: 'playback',
+        apply: (candidate) => {
+          delete candidate.artifacts.find((artifact) => artifact.playbackSourceReceipt)!
+            .playbackSourceReceipt!.heldOutCommitmentHash
+        },
+      },
+    ]
+    for (const mutation of mutations) {
+      const candidate = structuredClone(bundle)
+      mutation.apply(candidate)
+      expect(
+        () => assertCommerceHeldOutReceiptCommitmentClosure(candidate, commitmentHash),
+        mutation.label,
+      ).toThrow(new RegExp(mutation.label, 'i'))
+    }
   })
 })

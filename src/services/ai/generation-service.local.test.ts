@@ -260,6 +260,52 @@ describe('GenerationService.generateObject', () => {
     )
   })
 
+  it('preserves nested JSON containers in the plain-text fallback', async () => {
+    streamTextMock
+      .mockReturnValueOnce({
+        output: Promise.reject(new Error('No output generated. Check the stream for errors.')),
+      })
+      .mockReturnValueOnce({
+        toolCalls: Promise.reject(new Error('Structured tool output did not match the schema')),
+      })
+      .mockReturnValueOnce({
+        text: Promise.resolve([
+          'Here is the requested plan:',
+          '```json',
+          '{"routes":[{"id":"home","regions":["hero",{"name":"cta ] }"}]}]}',
+          '```',
+          'Use this object exactly.',
+        ].join('\n')),
+      })
+
+    const generation = createLocalGenerationService(
+      providersWith([cfg()]),
+      prompts,
+    )
+    const schema = z.object({
+      routes: z.array(z.object({
+        id: z.string(),
+        regions: z.array(z.union([z.string(), z.object({ name: z.string() })])),
+      })),
+    })
+
+    await expect(generation.generateObject(
+      {
+        providerId: 'p1',
+        model: 'chat-model',
+        promptRef: { id: 'test-json' },
+        input: [{ type: 'text', text: 'brief' }],
+      },
+      schema,
+    )).resolves.toEqual(ok({
+      routes: [{
+        id: 'home',
+        regions: ['hero', { name: 'cta ] }' }],
+      }],
+    }))
+    expect(streamTextMock).toHaveBeenCalledTimes(3)
+  })
+
   it('uses a forced schema tool when provider structured output is unavailable', async () => {
     streamTextMock
       .mockReturnValueOnce({

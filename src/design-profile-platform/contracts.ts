@@ -204,13 +204,6 @@ export const profileRoleOutputSchema = z.object({
 })
 export type ProfileRoleOutput = z.infer<typeof profileRoleOutputSchema>
 
-const fixtureReferenceSchema = z.object({
-  id: declarativeIdSchema,
-  kind: z.enum(['conformance', 'benchmark', 'outcome-scorecard']),
-  schema: declarativeSchemaReferenceSchema,
-  contentHash: sha256Schema,
-}).strict()
-
 function uniqueBy<T>(values: readonly T[], key: (value: T) => string): boolean {
   return new Set(values.map(key)).size === values.length
 }
@@ -237,7 +230,6 @@ const profileManifestContentBaseSchema = z.object({
   libraryRequirements: z.array(profileLibraryRequirementSchema).max(1_000),
   requiredRoleClosures: z.array(requiredRoleClosureSchema).max(1_000),
   identityBindings: z.array(identityContinuityBindingSchema).max(10_000),
-  fixtures: z.array(fixtureReferenceSchema).max(10_000),
 }).strict()
 
 function validateManifestContent(
@@ -262,9 +254,6 @@ function validateManifestContent(
   }
   if (!uniqueBy(manifest.identityBindings, (binding) => binding.id)) {
     context.addIssue({ code: 'custom', message: 'Profile identity binding ids must be unique.' })
-  }
-  if (!uniqueBy(manifest.fixtures, (fixture) => fixture.id)) {
-    context.addIssue({ code: 'custom', message: 'Profile fixture ids must be unique.' })
   }
   const forbiddenPayload = findForbiddenManifestPayload(manifest)
   if (forbiddenPayload) {
@@ -407,7 +396,6 @@ export function normalizeProfileManifestContent(input: unknown): ProfileManifest
       ...binding,
       requiredRoleIds: [...binding.requiredRoleIds].sort(),
     })),
-    fixtures: sortByKey(manifest.fixtures, (value) => value.id),
   })
 }
 

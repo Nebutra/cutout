@@ -4,6 +4,7 @@ import process from 'node:process'
 import { createServer } from 'vite'
 
 const root = process.cwd()
+const packagePath = resolve(root, 'package.json')
 const commercePath = resolve(root, 'src/commerce-profile/benchmarks/current.json')
 const snapshotPath = resolve(root, 'src/design-os-benchmark/benchmarks/current.json')
 const identity = {
@@ -17,10 +18,16 @@ function canonical(value) {
   return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${canonical(value[key])}`).join(',')}}`
 }
 
+const packageManifest = JSON.parse(await readFile(packagePath, 'utf8'))
+if (typeof packageManifest.version !== 'string' || packageManifest.version.length === 0) {
+  throw new Error('Cutout package version is invalid.')
+}
+
 const server = await createServer({
   root,
   configFile: false,
   appType: 'custom',
+  define: { __CUTOUT_VERSION__: JSON.stringify(packageManifest.version) },
   server: { middlewareMode: true, hmr: false },
   resolve: { alias: { '@': resolve(root, 'src') } },
   logLevel: 'error',

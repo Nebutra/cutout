@@ -52,6 +52,22 @@ describe('prototype production work scheduler', () => {
     expect(started).toEqual(['a1', 'a2', 'b1', 'a3', 'b2'])
   })
 
+  it('reports image work only when it receives an execution slot', async () => {
+    const scheduler = createPrototypeProductionScheduler(1)
+    const image = scheduler.imageLane('candidate-lane')
+    const started: string[] = []
+    let releaseFirst!: () => void
+    const firstHeld = new Promise<void>((resolve) => { releaseFirst = resolve })
+
+    const first = image(async () => { await firstHeld }, () => started.push('first'))
+    const second = image(async () => undefined, () => started.push('second'))
+
+    await vi.waitFor(() => expect(started).toEqual(['first']))
+    releaseFirst()
+    await Promise.all([first, second])
+    expect(started).toEqual(['first', 'second'])
+  })
+
   it('reduces future concurrency after transient pressure without discarding queued siblings', async () => {
     const transient = new Error('HTTP 429 from provider')
     const scheduler = createPrototypeProductionScheduler(2, {

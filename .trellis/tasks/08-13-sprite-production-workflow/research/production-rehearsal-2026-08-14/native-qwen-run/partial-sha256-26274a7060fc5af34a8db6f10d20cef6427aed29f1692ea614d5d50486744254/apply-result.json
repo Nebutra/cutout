@@ -1,0 +1,6 @@
+{
+  "status": "partial",
+  "outputs": [],
+  "authorization": null,
+  "error": "request failed: DashScope result URL policy rejected for host dashscope-a717.oss-accelerate.aliyuncs.com: host not allowed for this provider kind"
+}

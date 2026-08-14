@@ -12,6 +12,7 @@ pub fn run() {
         .manage(commands::registry_desktop::RegistryDesktopState::default())
         .manage(commands::agent_host::AgentHostDesktopState::default())
         .manage(commands::ai::ai_proxy::AiProxyCancellationState::default())
+        .manage(commands::ai::game_asset_generation::GameAssetGenerationState::default())
         .manage(commands::ai::codex_system::CodexSystemRuntimeState::default())
         .manage(commands::monotonic_deadline::MonotonicDeadlineState::default());
     #[cfg(desktop)]
@@ -83,9 +84,18 @@ pub fn run() {
             commands::ai::image_edit::ai_image_edit,
             commands::ai::commerce_source_ingest::ai_ingest_competition_source_image,
             commands::ai::commerce_source_ingest::verify_commerce_source_ingest_receipt,
+            commands::ai::commerce_held_out::create_commerce_held_out_commitment,
+            commands::ai::commerce_held_out::verify_commerce_held_out_attestation,
             commands::ai::dashscope_image::ai_dashscope_image,
             commands::ai::dashscope_multimodal::ai_dashscope_structured_text,
+            commands::ai::dashscope_multimodal::ai_dashscope_vision_json,
             commands::ai::dashscope_multimodal::ai_dashscope_video,
+            commands::ai::game_asset_generation::preview_game_asset_generation,
+            commands::ai::game_asset_generation::apply_game_asset_generation,
+            commands::ai::game_asset_generation::verify_game_asset_generation_authorization,
+            commands::ai::game_asset_generation::preview_game_asset_semantic_acceptance,
+            commands::ai::game_asset_generation::apply_game_asset_semantic_acceptance,
+            commands::ai::game_asset_generation::verify_game_asset_semantic_acceptance,
             commands::ai::multimodal_receipt::verify_multimodal_host_artifact,
             commands::ai::multimodal_receipt::promote_multimodal_video_playback,
             // PNG → SVG vectorization
@@ -165,10 +175,11 @@ pub fn run() {
                 use objc2_app_kit::NSApplication;
                 use objc2_foundation::{NSActivityOptions, NSProcessInfo, NSString};
 
-                // The packaged journey runs in an isolated macOS VM session.
-                // Accessory keeps WebKit timers alive without adding a Dock icon;
-                // the host user's foreground is outside this Aqua session.
-                app.set_activation_policy(tauri::ActivationPolicy::Accessory);
+                // This dedicated evidence bundle must never become the active
+                // application on the user's desktop. Prohibited is stronger
+                // than an accessory policy: AppKit cannot promote it while
+                // WebKit still renders the non-interactive background window.
+                app.set_activation_policy(tauri::ActivationPolicy::Prohibited);
                 let main_thread = MainThreadMarker::new()
                     .ok_or("packaged E2E setup must run on the macOS main thread")?;
                 NSApplication::sharedApplication(main_thread).unhideWithoutActivation();
@@ -183,7 +194,6 @@ pub fn run() {
                     .get_webview_window("main")
                     .ok_or("packaged E2E main window is unavailable")?;
                 window.set_focusable(false)?;
-                window.show()?;
                 commands::packaged_e2e::initialize_window_background(app.handle())?;
                 commands::packaged_e2e::start_background_window_watchdog(app.handle().clone());
                 if !window.is_visible()? || window.is_focused()? {

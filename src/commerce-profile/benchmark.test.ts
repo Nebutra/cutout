@@ -20,9 +20,6 @@ const CURRENT_EVIDENCE_HASH_BY_METRIC: Readonly<Record<string, string>> = {
   'p3.catalog-closure': '0690a4223a590f007a420b4697a004eeb54a96158c1da7479ce829908eec9f5f',
   'p4.offline-policy-gates': '0690a4223a590f007a420b4697a004eeb54a96158c1da7479ce829908eec9f5f',
   'p5.kernel-profile-composition': '235a8e790959cbd1fe1c1e0c2df6d4a8029ba1c7843fc18ac167c40299bb2839',
-  'p6.mocked-deliverable-closure': '159d6d933216b30f0c74df5cb01e5bdebd0a8f6aad64653a1163e20307efa8ee',
-  'p6.mocked-targeted-repair': '159d6d933216b30f0c74df5cb01e5bdebd0a8f6aad64653a1163e20307efa8ee',
-  'p7.mocked-strategy-evidence': '159d6d933216b30f0c74df5cb01e5bdebd0a8f6aad64653a1163e20307efa8ee',
 }
 const CURRENT_HOST_AUDIT_HASH = '6f53d2b7e254518b2742e3e32c1573f3882af394c1037034749e0add421ea758'
 const REAL_METRIC_IDS = COMMERCE_BENCHMARK_METRICS
@@ -50,18 +47,6 @@ function referenceFor(
       ...base,
       kind: 'deterministic-test-run',
       binding: { metricId: metric.id, testIds: metric.assertionIds.map((id) => `test:${id}`) },
-    }]
-  }
-  if (metric.tier === 'mocked-host') {
-    return [{
-      ...base,
-      kind: 'mocked-host-receipt',
-      binding: {
-        metricId: metric.id,
-        receiptId: `receipt:${metric.id}`,
-        capabilityId: `capability:${metric.id}`,
-        artifactIds: [`artifact:${metric.id}`],
-      },
     }]
   }
   const receiptId = `receipt:${metric.id}`
@@ -138,14 +123,13 @@ describe('Commerce Profile benchmark (P8)', () => {
     )}\n`)
   }
 
-  it('separates deterministic, mocked, and unavailable real-Host evidence without claiming production readiness', () => {
+  it('separates deterministic contract evidence from unavailable real-Host evidence', () => {
     const report = createCommerceProfileBenchmarkReport(currentEvidenceSet())
 
     expect(report.summary).toEqual({
-      overall: { total: 16, passed: 8, failed: 0, blocked: 8, ready: false },
+      overall: { total: 13, passed: 5, failed: 0, blocked: 8, ready: false },
       tiers: [
         { tier: 'deterministic', total: 5, passed: 5, failed: 0, blocked: 0, ready: true },
-        { tier: 'mocked-host', total: 3, passed: 3, failed: 0, blocked: 0, ready: true },
         { tier: 'real-host', total: 8, passed: 0, failed: 0, blocked: 8, ready: false },
       ],
       productionReady: false,
@@ -153,30 +137,25 @@ describe('Commerce Profile benchmark (P8)', () => {
     })
   })
 
-  it('never promotes mocked success to real production readiness', () => {
+  it('has no simulated Host tier, metric, or evidence kind in the current scoring surface', () => {
     const report = createCommerceProfileBenchmarkReport(currentEvidenceSet())
-    expect(report.summary.tiers.find((tier) => tier.tier === 'mocked-host')?.ready).toBe(true)
+    expect(report.metrics).toHaveLength(13)
+    expect(JSON.stringify(report)).not.toContain('mocked-host')
     expect(report.summary.productionReady).toBe(false)
   })
 
-  it('rejects a forged real-Host pass backed only by a mocked receipt', () => {
-    const evidence = currentEvidenceSet()
-    const realMetric = evidence.metrics.find((metric) => metric.metricId === REAL_METRIC_IDS[0])!
-    realMetric.assertions = realMetric.assertions.map((assertion) => ({ id: assertion.id, verdict: 'passed' }))
-    realMetric.evidenceReferences = [{
-      id: `evidence:${realMetric.metricId}`,
-      revision: `evidence:${realMetric.metricId}:revision:1`,
-      contentHash: HASH,
-      kind: 'mocked-host-receipt',
-      binding: {
-        metricId: realMetric.metricId,
-        receiptId: 'receipt:mocked',
-        capabilityId: 'capability:mocked',
-        artifactIds: ['artifact:mocked'],
-      },
-    }]
+  it('rejects old v1 and mock-shaped reports as current evidence', () => {
+    const current = createCommerceProfileBenchmarkReport(currentEvidenceSet())
+    const oldV1 = clone(current)
+    ;(oldV1.benchmark as Record<string, unknown>).version = 1
+    expect(() => decodeCommerceProfileBenchmarkReport(oldV1)).toThrow(/benchmark identity/)
 
-    expect(() => createCommerceProfileBenchmarkReport(evidence)).toThrow(/requires real-host-receipt evidence/)
+    const simulatedHost = clone(current)
+    const realMetric = (simulatedHost.metrics as Array<Record<string, unknown>>)
+      .find((metric) => metric.id === REAL_METRIC_IDS[0])!
+    realMetric.tier = 'mocked-host'
+
+    expect(() => decodeCommerceProfileBenchmarkReport(simulatedHost)).toThrow()
   })
 
   it('rejects real artifact bytes that are not bound to the real receipt and artifact', () => {
@@ -233,28 +212,27 @@ describe('Commerce Profile benchmark (P8)', () => {
   it('reports deterministic ordered transitions, newly passed metrics, and regressions', () => {
     const prior = createCommerceProfileBenchmarkReport(evidenceSet({
       'p1.product-facts-normalization': 'failed',
-      'p6.mocked-deliverable-closure': 'passed',
       ...Object.fromEntries(REAL_METRIC_IDS.map((id) => [id, 'blocked'])),
     }, { id: 'benchmark-run:prior', revision: 'benchmark-run:prior:revision:1' }))
     const current = createCommerceProfileBenchmarkReport(evidenceSet({
       'p1.product-facts-normalization': 'passed',
-      'p6.mocked-deliverable-closure': 'failed',
+      'p2.fact-citation-closure': 'failed',
       ...Object.fromEntries(REAL_METRIC_IDS.map((id) => [id, 'blocked'])),
     }, { id: 'benchmark-run:next', revision: 'benchmark-run:next:revision:1' }))
 
     const comparison = compareCommerceProfileBenchmarkReports(prior, current)
     expect(comparison.transitions).toEqual([
       { metricId: 'p1.product-facts-normalization', tier: 'deterministic', from: 'failed', to: 'passed' },
-      { metricId: 'p6.mocked-deliverable-closure', tier: 'mocked-host', from: 'passed', to: 'failed' },
+      { metricId: 'p2.fact-citation-closure', tier: 'deterministic', from: 'passed', to: 'failed' },
     ])
     expect(comparison.newlyPassed).toEqual(['p1.product-facts-normalization'])
-    expect(comparison.regressions).toEqual(['p6.mocked-deliverable-closure'])
+    expect(comparison.regressions).toEqual(['p2.fact-citation-closure'])
   })
 
   it('rejects incompatible benchmark identity and metric closure', () => {
     const prior = createCommerceProfileBenchmarkReport(currentEvidenceSet())
     const incompatibleIdentity = clone(prior)
-    ;(incompatibleIdentity.benchmark as Record<string, unknown>).version = 2
+    ;(incompatibleIdentity.benchmark as Record<string, unknown>).version = 1
     expect(() => compareCommerceProfileBenchmarkReports(incompatibleIdentity, prior)).toThrow(/benchmark identity/)
 
     const incompatibleClosure = clone(prior)

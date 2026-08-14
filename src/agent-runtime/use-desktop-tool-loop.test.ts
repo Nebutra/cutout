@@ -1,15 +1,15 @@
 import { describe, expect, it, vi } from 'vitest'
 import { ok, type ForegroundSegmentationService } from '@/services/types'
 import {
-  createExplicitDesktopPaidToolRequest,
+  createDesktopPaidToolRequest,
   desktopToolCapabilitiesForSnapshot,
   probeForegroundSegmentationCapability,
 } from './use-desktop-tool-loop'
 import { capabilityBindingsSchema } from '@/services/ai/model-capabilities'
 
 describe('desktop paid tool request', () => {
-  it('requires explicit approval for the selected host route', () => {
-    const request = createExplicitDesktopPaidToolRequest({
+  it('executes the selected BYOK host route without a per-call confirmation', () => {
+    const request = createDesktopPaidToolRequest({
       capability: 'generate-image',
       intent: 'Generate the approved hero',
       prompt: 'Render the approved hero.',
@@ -17,12 +17,12 @@ describe('desktop paid tool request', () => {
     })
 
     expect(request).toMatchObject({
-      approvalPolicy: 'explicit',
+      approvalPolicy: 'auto',
     })
   })
 
-  it('keeps explicit approval independent of pricing metadata', () => {
-    const request = createExplicitDesktopPaidToolRequest({
+  it('keeps direct execution independent of pricing metadata', () => {
+    const request = createDesktopPaidToolRequest({
       capability: 'edit-image',
       intent: 'Edit the approved image',
       prompt: 'Edit the approved image.',
@@ -30,7 +30,7 @@ describe('desktop paid tool request', () => {
     })
 
     expect(request).toMatchObject({
-      approvalPolicy: 'explicit',
+      approvalPolicy: 'auto',
     })
   })
 

@@ -16,6 +16,13 @@ grants Host authority or makes a Provider operation available.
 
 ```ts
 createDesignOsBenchmarkFromCommerce({ commerceReport, identity }): Promise<DesignOsBenchmarkReport>
+createDesignOsBenchmarkFromCommerceHeldOutRehearsal({
+  baselineCommerceReport,
+  rehearsalBundle,
+  commitment,
+  evaluatorAttestation,
+  identity,
+}): Promise<DesignOsBenchmarkReport>
 decodeDesignOsBenchmarkReport(input): DesignOsBenchmarkReport
 compareDesignOsBenchmarkReports(prior, current): DesignOsBenchmarkComparison
 ```
@@ -31,8 +38,8 @@ supported current-snapshot writer.
   Changing a label, stage, criticality, source metric, audit finding, metric or
   Profile requires a new ruler version. Each metric has exactly one Profile
   metric or capability-audit source. Incompatible rulers cannot be compared.
-- Maturity stages are ordered and contiguous: `contract -> conformance ->
-  real-host -> production-rehearsal`. A later stage cannot skip or compensate
+- Maturity stages are ordered and contiguous: `contract -> real-host ->
+  production-rehearsal`. A later stage cannot skip or compensate
   for a non-ready earlier stage.
 - `passed`, `failed` and `blocked` remain distinct. Blocked means required
   trustworthy evidence or capability is unavailable. It is not partial credit.
@@ -51,14 +58,49 @@ supported current-snapshot writer.
 - Comparisons derive metric transitions, stage readiness transitions, newly
   passed metrics, all regressions, critical regressions, coverage delta and
   maturity movement. Stored comparison summaries are never accepted as input.
-- Commerce v1 contributes five Contract metrics, three Conformance metrics,
-  eight Real-Host metrics and one explicit Production-Rehearsal audit gate.
-  The current truthful baseline is Contract `5/5`, Conformance `3/3`, Real Host
-  `0/8`, Rehearsal `0/1`, maturity `conformance`, coverage `8/17`.
+- Commerce v2 contributes five Contract metrics, eight Real-Host metrics and one
+  explicit Production-Rehearsal audit gate. Simulated Host execution is excluded
+  from definitions, reports, snapshots, coverage, maturity and user-facing output.
+  The current truthful baseline is Contract `5/5`, Real Host `0/8`, Rehearsal
+  `0/1`, maturity `contract`, coverage `5/14` (`35.71%`).
 - Commerce real-host passage requires the exact eleven-artifact role closure,
   signed receipt/byte/role/node/lock/Plan bindings, internal Commerce evaluation,
   semantic media QA, playable video and a durable re-verifiable bundle. Native
   receipt authenticity alone cannot pass a Commerce benchmark metric.
+- That bundle advances the real-host stage only. The production-rehearsal gate
+  additionally requires independently re-verifiable evidence that the input
+  was held out from development and prior rehearsals; a caller-authored label or
+  bundle identity cannot establish that fact.
+- Production-rehearsal admission uses a dedicated decoder, not a mode flag on
+  the normal report decoder. It requires a native Keychain-HMAC pre-run
+  commitment over the exact v2 challenge, configured evaluator key id,
+  authoritative Host build version, selected input manifest, Run and timestamp,
+  then Rust Minisign-verifies an independent evaluator attestation over that
+  same build version, commitment and completed Commerce bundle hash. Final
+  admission and capability-audit evidence expose the exact compiled version;
+  legacy v1, missing or drifted versions are rejected.
+  The normal decoder rejects a passing audit metric, and fixture/mocked native
+  verifiers contribute no benchmark evidence.
+- Native replay state makes the evaluator challenge single-use: exact retries
+  within its validity window recover one registered commitment, each held-out
+  execution slot can settle only one successful signed receipt, and admission seals the exact receipt
+  ledger to one bundle and evaluator completion. Run-id binding by itself is
+  not sufficient single-attempt authority.
+- Commerce now has an executable desktop production runner and real verified
+  structured-text, reference-conditioned image, vision-JSON and image-to-video
+  routes. Route probes and a pending runner bundle are capability evidence, not
+  benchmark evidence. They change no metric until the independent evaluator
+  completion is native-admitted against the exact bundle and replay ledger.
+- Durable replay responses prevent a lost renderer reply from forcing another
+  paid attempt: the signed response is persisted before the Keychain slot, and
+  exact retry recovers the original bytes. This strengthens run integrity but
+  does not itself pass a metric.
+- A callable runner without an operator is not production evidence. The desktop
+  Commerce surface must import a strictly decoded evaluator-owned package,
+  execute or replay-recover the exact Run, export pending evidence, import the
+  evaluator completion and invoke native admission. External evaluator tooling
+  and UI availability remain capability surfaces and change no metric by
+  themselves.
 
 ### 4. Validation And Error Matrix
 
@@ -72,14 +114,19 @@ supported current-snapshot writer.
 | Snapshot differs from regenerated Profile projection | offline command fails as stale |
 | Profile source cannot strictly decode | do not publish a Design OS report |
 | Commerce has receipts but lacks eleven-role/evaluation/QA closure | keep real-host and rehearsal blocked |
+| Complete signed Commerce bundle lacks independent held-out-input evidence | pass eligible real-host metrics but keep rehearsal blocked |
+| Runner returns a pending completion request or a live route probe succeeds | change no metric; retain the durable `5/14` baseline |
+| Held-out admission omits or drifts the signed Host build version | reject admission and keep the durable `5/14` baseline |
+| Exact paid response is recovered after IPC loss | accept it only inside the same committed Run/slot/request; do not count recovery as a second execution |
+| Rehearsal audit is marked passed outside native held-out admission | normal decoder rejects the report |
 
 ### 5. Good / Base / Bad Cases
 
 - Good: strictly decode the current Commerce report, project its fixed source
   metrics through the Commerce adapter, hash the normalized report, regenerate
   the Design OS snapshot and compare it canonically before publishing progress.
-- Base: deterministic and mocked Commerce evidence is complete while real Host
-  evidence is absent. The report truthfully records maturity `conformance`,
+- Base: deterministic Commerce evidence is complete while real Host evidence is
+  absent. The report truthfully records maturity `contract`,
   exposes the eight real-Host blockers and keeps production readiness false.
 - Bad: edit a Design OS snapshot's metric statuses and regenerate its summary,
   count an API success as usable material, let a later stage compensate for a
@@ -95,6 +142,9 @@ supported current-snapshot writer.
   critical regression and incompatible-ruler comparison.
 - Clean-checkout snapshot directory creation and stable JSON round-trip.
 - Commerce normal decoder continues to reject every untrusted real-host pass.
+- Commerce runner/probe fixtures are explicitly non-benchmark; only a real
+  native admission fixture backed by an evaluator-signed unseen run may derive
+  newly passed metrics.
 
 ### 7. Wrong vs Correct
 
@@ -110,4 +160,16 @@ const report = await createDesignOsBenchmarkFromCommerce({
 })
 assertCanonicalSnapshotMatch(report, persistedSnapshot)
 publishProgress(report)
+```
+
+```ts
+// Wrong: executable route coverage is projected as benchmark progress.
+if (runnerRoutes.every((route) => route.executable)) markRealHostPassed()
+
+// Correct: capability and maturity remain separate authorities.
+const pending = await runCommerceHeldOutProduction(input)
+return pending.completionRequest
+// The independent evaluator returns its signature out of band. No benchmark
+// write occurs until createDesignOsBenchmarkFromCommerceHeldOutRehearsal
+// performs dedicated native held-out admission.
 ```

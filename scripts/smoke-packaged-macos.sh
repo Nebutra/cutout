@@ -201,7 +201,11 @@ assert_e2e_is_not_frontmost() {
   local current_bundle_id
   frontmost_sample_count=$((frontmost_sample_count + 1))
   current_bundle_id="$(frontmost_bundle_id)"
-  if [[ -n "$current_bundle_id" && "$current_bundle_id" != "$baseline_frontmost_bundle_id" ]]; then
+  # The user is free to switch between foreground applications while the
+  # isolated run is working. Only this dedicated bundle becoming frontmost is
+  # a violation; comparing every sample to the original foreground app turns
+  # normal user activity into a false E2E failure.
+  if [[ "$current_bundle_id" == "$e2e_bundle_id" ]]; then
     frontmost_change_count=$((frontmost_change_count + 1))
     frontmost_consecutive_change_count=$((frontmost_consecutive_change_count + 1))
     if ((frontmost_consecutive_change_count > frontmost_max_consecutive_change_count)); then

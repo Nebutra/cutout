@@ -7,6 +7,10 @@ const nativeEntry = readFileSync(
   'utf8',
 )
 const frontendEntry = readFileSync(resolve(process.cwd(), 'src/main.tsx'), 'utf8')
+const settingsDialog = readFileSync(
+  resolve(process.cwd(), 'src/components/settings/SettingsDialog.tsx'),
+  'utf8',
+)
 const packagedE2eRunner = readFileSync(
   resolve(process.cwd(), 'src/packaged-e2e/runner.ts'),
   'utf8',
@@ -63,18 +67,21 @@ describe('packaged E2E macOS window lifecycle', () => {
     const lifecycle = nativeEntry.slice(guard, migration)
 
     expect(guard).toBeGreaterThan(0)
-    expect(lifecycle).toContain('ActivationPolicy::Accessory')
+    expect(lifecycle).toContain('ActivationPolicy::Prohibited')
     expect(lifecycle).toContain('unhideWithoutActivation()')
     expect(lifecycle).toContain('NSActivityOptions::UserInitiatedAllowingIdleSystemSleep')
     expect(lifecycle).toContain('window.set_focusable(false)?')
-    expect(lifecycle).toContain('window.show()?')
     expect(lifecycle).toContain('initialize_window_background(app.handle())?')
     expect(lifecycle).toContain('start_background_window_watchdog(app.handle().clone())')
     expect(lifecycle).toContain('!window.is_visible()? || window.is_focused()?')
     expect(lifecycle).toContain('native_checkpoint("webview-renderable")')
+    expect(lifecycle).not.toContain('window.show()?')
     expect(nativeEntry.slice(migration)).not.toContain('window.show()?')
     expect(nativeEntry.slice(migration)).not.toContain('unhideWithoutActivation()')
-    expect(nativeEntry).not.toContain('ActivationPolicy::Prohibited')
+    expect(nativeEntry).not.toContain('ActivationPolicy::Accessory')
+    expect(settingsDialog).toContain("VITE_CUTOUT_PACKAGED_E2E === '1'")
+    expect(settingsDialog).toContain('onOpenAutoFocus={PACKAGED_E2E')
+    expect(settingsDialog).toContain('(event) => event.preventDefault()')
   })
 
   it('declares and verifies background activation before native setup runs', () => {
@@ -135,7 +142,8 @@ describe('packaged E2E macOS window lifecycle', () => {
     expect(frontendEntry).toContain('window-probe-surface-failed')
     expect(frontendEntry).toContain('window-probe-surface-ready')
     expect(nativeEntry).toContain('commands::packaged_e2e::packaged_e2e_mode')
-    expect(smokeScript).not.toMatch(/\[\[ "\$\(frontmost_bundle_id\)" != "\$e2e_bundle_id" \]\] \|\|/u)
+    expect(smokeScript).toContain('[[ "$current_bundle_id" == "$e2e_bundle_id" ]]')
+    expect(smokeScript).not.toContain('"$current_bundle_id" != "$baseline_frontmost_bundle_id"')
   })
 
   it('keeps screenshot capture fixed-path and disabled outside packaged E2E', () => {
@@ -161,6 +169,18 @@ describe('packaged E2E macOS window lifecycle', () => {
     expect(packagedE2eCommand).toContain('pub(crate) fn start_background_window_watchdog')
     expect(packagedE2eCommand).toContain('pub(crate) fn pulse_background_renderer')
     expect(packagedE2eCommand).toContain('eval("void globalThis.performance.now()")')
+    const watchdog = packagedE2eCommand.slice(
+      packagedE2eCommand.indexOf('pub(crate) fn start_background_window_watchdog'),
+      packagedE2eCommand.indexOf('#[tauri::command]\npub async fn packaged_e2e_mode'),
+    )
+    const tick = packagedE2eCommand.slice(
+      packagedE2eCommand.indexOf('pub async fn packaged_e2e_tick'),
+      packagedE2eCommand.indexOf('#[tauri::command]\npub async fn packaged_e2e_checkpoint'),
+    )
+    expect(watchdog).toContain('pulse_background_renderer(&app)')
+    expect(watchdog).not.toContain('keep_window_background(&app)')
+    expect(tick).toContain('pulse_background_renderer(&app)?')
+    expect(tick).not.toContain('keep_window_background(&app)?')
     expect(packagedE2eCommand).not.toContain('activateIgnoringOtherApps')
     expect(packagedE2eCommand).not.toContain('makeKeyAndOrderFront')
     expect(packagedE2eCommand).not.toContain('orderFrontRegardless')

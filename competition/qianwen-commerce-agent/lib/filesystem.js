@@ -1,11 +1,10 @@
 import { constants as fsConstants } from 'node:fs'
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto'
-import { lstat, mkdir, open, readFile, readdir, realpath, rename, rm, writeFile } from 'node:fs/promises'
-import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
+import { lstat, mkdir, open, readdir, realpath, rename, rm, writeFile } from 'node:fs/promises'
+import { basename, dirname, isAbsolute, join, parse, relative, resolve, sep } from 'node:path'
 import { AgentError, LIMITS, exactOutputName, invariant, sha256, stableJson } from './contracts.js'
 
 const CREDENTIAL_PATTERN = /(?:\bBearer\s+[A-Za-z0-9._~+/-]{12,}|\bsk-[A-Za-z0-9_-]{16,}|\bAKIA[A-Z0-9]{16}\b|(?:api[_-]?key|secret[_-]?key)\s*[:=]\s*["']?[A-Za-z0-9._~+/-]{12,})/i
-const SIGNED_QUERY_PATTERN = /https?:\/\/[^\s<>)\]`]+[?&](?:x-amz-[a-z0-9-]+|signature|sig|token|access[_-]?key|credential|expires)=/i
 
 export function deriveCheckpointKey(apiKey, planHash) {
   invariant(typeof apiKey === 'string' && apiKey.trim() && typeof planHash === 'string' && /^[a-f0-9]{64}$/.test(planHash),
@@ -26,6 +25,30 @@ function verifyCheckpointRecord(record, key, label) {
   const expected = Buffer.from(checkpointMac(value, key), 'hex')
   invariant(timingSafeEqual(actual, expected), 'invalid-checkpoint', `${label} authentication failed.`)
   return value
+}
+
+async function readBoundedLocalFile(path, maximumBytes, label) {
+  const info = await lstat(path)
+  invariant(info.isFile() && !info.isSymbolicLink() && info.size > 0 && info.size <= maximumBytes,
+    'invalid-checkpoint', `${label} must be a bounded regular file.`)
+  const handle = await open(path, fsConstants.O_RDONLY | (fsConstants.O_NOFOLLOW ?? 0))
+  try {
+    const before = await handle.stat()
+    invariant(before.isFile() && before.dev === info.dev && before.ino === info.ino && before.size === info.size,
+      'path-identity-changed', `${label} changed before reading.`)
+    const bytes = Buffer.alloc(before.size)
+    let offset = 0
+    while (offset < bytes.length) {
+      const result = await handle.read(bytes, offset, bytes.length - offset, offset)
+      invariant(result.bytesRead > 0, 'invalid-checkpoint', `${label} ended unexpectedly.`)
+      offset += result.bytesRead
+    }
+    const after = await handle.stat()
+    invariant(after.dev === before.dev && after.ino === before.ino && after.size === before.size
+      && after.mtimeMs === before.mtimeMs,
+    'path-identity-changed', `${label} changed while reading.`)
+    return bytes
+  } finally { await handle.close() }
 }
 
 export function parsePromptPaths(prompt) {
@@ -51,8 +74,23 @@ export function parsePromptPaths(prompt) {
   return { inputRoot, outputRoot }
 }
 
+async function assertNoSymlinkPathComponents(path, label, includeLeaf) {
+  const normalized = resolve(path)
+  const root = parse(normalized).root
+  const parts = relative(root, normalized).split(sep).filter(Boolean)
+  const maximum = includeLeaf ? parts.length : Math.max(0, parts.length - 1)
+  let current = root
+  for (const part of parts.slice(0, maximum)) {
+    current = join(current, part)
+    const info = await lstat(current).catch(() => undefined)
+    invariant(info?.isDirectory() && !info.isSymbolicLink(),
+      'invalid-path', `${label} path contains an unavailable or symlinked directory component.`)
+  }
+}
+
 async function assertDirectoryRoot(path, label, createLeaf = false) {
   const resolved = resolve(path)
+  await assertNoSymlinkPathComponents(resolved, label, false)
   let info
   try {
     info = await lstat(resolved)
@@ -64,6 +102,7 @@ async function assertDirectoryRoot(path, label, createLeaf = false) {
     await mkdir(resolved, { mode: 0o700 })
     info = await lstat(resolved)
   }
+  await assertNoSymlinkPathComponents(resolved, label, true)
   invariant(info.isDirectory() && !info.isSymbolicLink(), 'invalid-path', `${label} must be a non-symlink directory.`)
   const canonical = await realpath(resolved)
   return { resolved, canonical, device: info.dev, inode: info.ino }
@@ -153,9 +192,8 @@ export async function inventoryInputs(inputRoot) {
     const bytes = await readBoundedRegularFile(inputRoot, path, LIMITS.maximumInputFileBytes)
     totalBytes += bytes.length
     invariant(totalBytes <= LIMITS.maximumInputBytes, 'invalid-input', 'Input aggregate exceeds the byte limit.')
-    const text = bytes.toString('utf8')
-    invariant(!CREDENTIAL_PATTERN.test(text) && !SIGNED_QUERY_PATTERN.test(text),
-      'credential-shaped-input', 'Credential-shaped or signed-URL content is forbidden in task input.')
+    invariant(!CREDENTIAL_PATTERN.test(bytes.toString('utf8')),
+      'credential-shaped-input', 'Credential-shaped content is forbidden in task input.')
     records.push({ path, bytes, sha256: sha256(bytes) })
   }
   await assertRootIdentity(inputRoot, 'Input')
@@ -191,12 +229,14 @@ export function createLogger(logRoot, apiKey) {
       const safe = Object.fromEntries(Object.entries(fields).map(([key, value]) => [key, redact(value)]))
       const line = `${JSON.stringify({ time: new Date().toISOString(), event, ...safe })}\n`
       tail = tail.then(async () => {
+        await assertRootIdentity(logRoot, 'Log')
         const handle = await open(file, fsConstants.O_WRONLY | fsConstants.O_APPEND | fsConstants.O_CREAT | (fsConstants.O_NOFOLLOW ?? 0), 0o600)
         try {
           const info = await handle.stat()
           invariant(info.isFile(), 'invalid-log-path', 'Agent log must be a regular file.')
           await handle.writeFile(line, 'utf8')
         } finally { await handle.close() }
+        await assertRootIdentity(logRoot, 'Log')
       })
       return tail
     },
@@ -206,6 +246,7 @@ export function createLogger(logRoot, apiKey) {
 
 export async function createWorkspace(outputRoot, planHash, apiKey) {
   const checkpointKey = deriveCheckpointKey(apiKey, planHash)
+  await assertRootIdentity(outputRoot, 'Output')
   const workRoot = join(outputRoot.canonical, '.qianwen-agent-work')
   await mkdir(workRoot, { recursive: true, mode: 0o700 })
   const info = await lstat(workRoot)
@@ -213,11 +254,8 @@ export async function createWorkspace(outputRoot, planHash, apiKey) {
   const bindingPath = join(workRoot, 'binding.json')
   let binding
   try {
-    const bindingInfo = await lstat(bindingPath)
-    invariant(bindingInfo.isFile() && !bindingInfo.isSymbolicLink()
-      && bindingInfo.size > 0 && bindingInfo.size <= LIMITS.maximumJsonResponseBytes,
-    'invalid-checkpoint', 'Checkpoint binding must be a bounded regular file.')
-    binding = verifyCheckpointRecord(JSON.parse(await readFile(bindingPath, 'utf8')), checkpointKey, 'Checkpoint binding')
+    const bytes = await readBoundedLocalFile(bindingPath, LIMITS.maximumJsonResponseBytes, 'Checkpoint binding')
+    binding = verifyCheckpointRecord(JSON.parse(bytes.toString('utf8')), checkpointKey, 'Checkpoint binding')
   } catch (error) {
     if (error?.code !== 'ENOENT') {
       if (error instanceof AgentError) throw error
@@ -235,8 +273,8 @@ export async function createWorkspace(outputRoot, planHash, apiKey) {
   const checkpointRoot = join(workRoot, 'checkpoints')
   await mkdir(stageRoot, { recursive: true, mode: 0o700 })
   await mkdir(checkpointRoot, { recursive: true, mode: 0o700 })
-  const identities = {}
-  for (const [path, label, key] of [[workRoot, 'Work', 'work'], [stageRoot, 'Stage', 'stage'], [checkpointRoot, 'Checkpoint', 'checkpoint']]) {
+  const identities = { work: { dev: info.dev, inode: info.ino } }
+  for (const [path, label, key] of [[stageRoot, 'Stage', 'stage'], [checkpointRoot, 'Checkpoint', 'checkpoint']]) {
     const directory = await lstat(path)
     invariant(directory.isDirectory() && !directory.isSymbolicLink(), 'invalid-output', `${label} directory must be a non-symlink directory.`)
     identities[key] = { dev: directory.dev, inode: directory.ino }
@@ -246,6 +284,7 @@ export async function createWorkspace(outputRoot, planHash, apiKey) {
   invariant(interrupted.length <= 11 && interrupted.every(exactOutputName),
     'invalid-publication', 'Interrupted publication contains an invalid output name.')
   for (const name of interrupted) {
+    await assertRootIdentity(outputRoot, 'Output')
     const source = join(outputRoot.canonical, name)
     const target = join(stageRoot, name)
     const [sourceInfo, targetInfo] = await Promise.all([
@@ -255,6 +294,7 @@ export async function createWorkspace(outputRoot, planHash, apiKey) {
       'invalid-publication', `Interrupted publication cannot be recovered safely: ${name}`)
     await rename(source, target)
   }
+  await assertRootIdentity(outputRoot, 'Output')
   await assertWorkspaceIdentity(workspace)
   return workspace
 }
@@ -282,10 +322,8 @@ export async function readCheckpoint(workspace, id) {
   try {
     await assertWorkspaceIdentity(workspace)
     const path = join(workspace.checkpointRoot, `${id}.json`)
-    const info = await lstat(path)
-    invariant(info.isFile() && !info.isSymbolicLink() && info.size > 0 && info.size <= LIMITS.maximumJsonResponseBytes,
-      'invalid-checkpoint', `Checkpoint must be a bounded regular file: ${id}`)
-    const value = verifyCheckpointRecord(JSON.parse(await readFile(path, 'utf8')), workspace.checkpointKey, `Checkpoint ${id}`)
+    const bytes = await readBoundedLocalFile(path, LIMITS.maximumJsonResponseBytes, `Checkpoint ${id}`)
+    const value = verifyCheckpointRecord(JSON.parse(bytes.toString('utf8')), workspace.checkpointKey, `Checkpoint ${id}`)
     invariant(value?.schema === 'qianwen.node-checkpoint.v1' && value.id === id, 'invalid-checkpoint', `Checkpoint is malformed: ${id}`)
     await assertWorkspaceIdentity(workspace)
     return value
@@ -321,16 +359,27 @@ export async function publishExact(outputRoot, workspace, names) {
   try {
     for (const name of names.sort()) {
       await assertWorkspaceIdentity(workspace)
+      await assertRootIdentity(outputRoot, 'Output')
       await rename(join(workspace.stageRoot, name), join(outputRoot.canonical, name))
       moved.push(name)
     }
     await assertWorkspaceIdentity(workspace)
-    await rm(workspace.workRoot, { recursive: true })
-    const finalEntries = (await readdir(outputRoot.canonical)).sort()
-    invariant(finalEntries.length === names.length && finalEntries.every((name, index) => name === [...names].sort()[index]),
-      'invalid-publication', 'Published output closure is not exact.')
+    await assertRootIdentity(outputRoot, 'Output')
+    const intermediateEntries = (await readdir(outputRoot.canonical)).sort()
+    const expectedIntermediate = ['.qianwen-agent-work', ...names].sort()
+    invariant(intermediateEntries.length === expectedIntermediate.length
+      && intermediateEntries.every((name, index) => name === expectedIntermediate[index]),
+    'invalid-publication', 'Publication intermediate closure is not exact.')
   } catch (error) {
-    for (const name of moved) await rm(join(outputRoot.canonical, name), { force: true }).catch(() => {})
+    for (const name of moved.reverse()) {
+      await rename(join(outputRoot.canonical, name), join(workspace.stageRoot, name)).catch(() => {})
+    }
     throw error
   }
+  await assertWorkspaceIdentity(workspace)
+  await assertRootIdentity(outputRoot, 'Output')
+  await rm(workspace.workRoot, { recursive: true })
+  const finalEntries = (await readdir(outputRoot.canonical)).sort()
+  invariant(finalEntries.length === names.length && finalEntries.every((name, index) => name === [...names].sort()[index]),
+    'invalid-publication', 'Published output closure is not exact.')
 }

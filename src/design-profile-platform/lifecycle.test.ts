@@ -50,7 +50,6 @@ function content(id: string, version: string, input: {
     libraryRequirements: [],
     requiredRoleClosures: [],
     identityBindings: [],
-    fixtures: [],
   }
 }
 

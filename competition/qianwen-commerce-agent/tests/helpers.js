@@ -1,5 +1,5 @@
 import { createServer } from 'node:http'
-import { mkdtemp, mkdir, writeFile } from 'node:fs/promises'
+import { mkdtemp, mkdir, realpath, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { deflateSync } from 'node:zlib'
@@ -46,7 +46,7 @@ export function mp4Fixture(width = 1440, height = 1440) {
 }
 
 export async function fixtureDirectories() {
-  const root = await mkdtemp(join(tmpdir(), 'qianwen-agent-test-'))
+  const root = await realpath(await mkdtemp(join(tmpdir(), 'qianwen-agent-test-')))
   const input = join(root, 'input')
   const output = join(root, 'output')
   const logs = join(root, 'logs')

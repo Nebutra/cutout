@@ -20,11 +20,14 @@ use super::ai_proxy::{
     build_client_for_target, enforce_host, enforce_resolved_host, request_error_message,
     run_cancellable_proxy_request, AiProxyCancellationState, ProxyError,
 };
+use super::commerce_held_out::{
+    held_out_request_hash, recover_held_out_response, settle_held_out_response,
+};
 use super::keys::read_secret;
 use super::multimodal_receipt::{
-    artifact_evidence, issue_receipt, MultimodalHostContext, MultimodalHostReceipt,
+    artifact_evidence, issue_receipt, sha256, MultimodalHostContext, MultimodalHostReceipt,
 };
-use super::providers::{load_providers_sync, ProviderKind, ProviderWireProtocol};
+use super::providers::{load_providers_sync, ProviderConfig, ProviderKind, ProviderWireProtocol};
 
 const DASHSCOPE_COMPATIBLE_BASE: &str = "https://dashscope.aliyuncs.com/compatible-mode/v1";
 const DASHSCOPE_IMAGE_ENDPOINT: &str =
@@ -40,7 +43,7 @@ const IMAGE_3_MAX_REQUEST_IMAGES: usize = 3;
 const LEGACY_MAX_REQUEST_IMAGES: usize = 32;
 const MAX_ATTEMPTS: usize = 3;
 const MAX_POLLS: usize = 80;
-const WORKFLOW_TIMEOUT_SECS: u64 = 300;
+const WORKFLOW_TIMEOUT_SECS: u64 = 600;
 
 #[derive(Debug, Clone, Copy, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "kebab-case")]
@@ -86,17 +89,17 @@ const LEGACY_ASYNC_CONTRACT: DashScopeNativeContract = DashScopeNativeContract {
     max_total_input_bytes: LEGACY_MAX_TOTAL_INPUT_BYTES,
 };
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DashScopeImageAsset {
-    media_type: String,
-    data: String,
+    pub(crate) media_type: String,
+    pub(crate) data: String,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct DashScopeImageResult {
-    images: Vec<DashScopeImageAsset>,
-    receipts: Vec<MultimodalHostReceipt>,
+    pub(crate) images: Vec<DashScopeImageAsset>,
+    pub(crate) receipts: Vec<MultimodalHostReceipt>,
 }
 
 #[derive(Debug)]
@@ -164,12 +167,13 @@ impl Drop for RemoteTaskCancel {
     }
 }
 
-fn validate_provider_binding(app: &AppHandle, provider_id: &str) -> Result<(), ProxyError> {
-    let provider = load_providers_sync(app)
-        .map_err(|_| ProxyError::ProviderNotConfigured)?
-        .into_iter()
-        .find(|provider| provider.id == provider_id)
-        .ok_or(ProxyError::ProviderNotConfigured)?;
+pub(crate) fn validate_provider_record(
+    provider: &ProviderConfig,
+    provider_id: &str,
+) -> Result<(), ProxyError> {
+    if provider.id != provider_id {
+        return Err(ProxyError::ProviderNotConfigured);
+    }
     if !provider.enabled {
         return Err(ProxyError::ProviderDisabled);
     }
@@ -187,6 +191,15 @@ fn validate_provider_binding(app: &AppHandle, provider_id: &str) -> Result<(), P
         return Err(ProxyError::ProviderBinding);
     }
     Ok(())
+}
+
+fn validate_provider_binding(app: &AppHandle, provider_id: &str) -> Result<(), ProxyError> {
+    let provider = load_providers_sync(app)
+        .map_err(|_| ProxyError::ProviderNotConfigured)?
+        .into_iter()
+        .find(|provider| provider.id == provider_id)
+        .ok_or(ProxyError::ProviderNotConfigured)?;
+    validate_provider_record(&provider, provider_id)
 }
 
 fn validate_request(
@@ -585,24 +598,46 @@ fn enforce_result_url(url: &str) -> Result<(), ProxyError> {
     let parsed = reqwest::Url::parse(url).map_err(|_| ProxyError::BadUrl)?;
     let host = parsed.host_str().ok_or(ProxyError::BadUrl)?;
     let labels = host.split('.').collect::<Vec<_>>();
-    let allowed_host = matches!(labels.as_slice(), [result, region, "aliyuncs", "com"]
+    let regional_result_host = matches!(labels.as_slice(), [result, region, "aliyuncs", "com"]
         if result.strip_prefix("dashscope-result-").is_some_and(|value| !value.is_empty())
             && region.strip_prefix("oss-cn-").is_some_and(|value| !value.is_empty()));
+    let accelerated_result_host = matches!(labels.as_slice(), [bucket, "oss-accelerate", "aliyuncs", "com"]
+    if bucket.strip_prefix("dashscope-").is_some_and(|token| {
+        !token.is_empty()
+            && token.len() <= 32
+            && token
+                .bytes()
+                .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'-')
+            && !token.starts_with('-')
+            && !token.ends_with('-')
+    }));
     if parsed.scheme() != "https"
         || parsed.port().is_some()
         || !parsed.username().is_empty()
         || parsed.password().is_some()
         || parsed.fragment().is_some()
-        || !allowed_host
+        || !(regional_result_host || accelerated_result_host)
     {
         return Err(ProxyError::DisallowedHost);
     }
     enforce_host("dashscope", url)
 }
 
+fn result_origin_error(stage: &str, url: &str, error: ProxyError) -> ProxyError {
+    let host = reqwest::Url::parse(url)
+        .ok()
+        .and_then(|parsed| parsed.host_str().map(str::to_string))
+        .unwrap_or_else(|| "invalid-url".into());
+    ProxyError::Request(format!(
+        "DashScope result {stage} rejected for host {host}: {error}"
+    ))
+}
+
 async fn download_image(url: &str) -> Result<(DashScopeImageAsset, Vec<u8>, u32, u32), ProxyError> {
-    enforce_result_url(url)?;
-    let target = enforce_resolved_host("dashscope", url).await?;
+    enforce_result_url(url).map_err(|error| result_origin_error("URL policy", url, error))?;
+    let target = enforce_resolved_host("dashscope", url)
+        .await
+        .map_err(|error| result_origin_error("DNS policy", url, error))?;
     let client = build_client_for_target(Some(120), &target)?;
     for attempt in 0..MAX_ATTEMPTS {
         match client.get(url).send().await {
@@ -670,7 +705,7 @@ fn detect_image_media_type(bytes: &[u8]) -> Option<&'static str> {
     }
 }
 
-async fn execute(
+pub(crate) async fn execute(
     app: AppHandle,
     provider_id: String,
     operation: DashScopeImageOperation,
@@ -680,11 +715,96 @@ async fn execute(
     size: Option<String>,
     host_context: Option<MultimodalHostContext>,
 ) -> Result<DashScopeImageResult, ProxyError> {
-    let started_at = unix_millis()?;
+    validate_request(operation, &model, &prompt, &images, size.as_deref())?;
+    validate_reference_bindings(operation, &images, host_context.as_ref())?;
+    let replay = if let Some(context) = host_context
+        .as_ref()
+        .filter(|context| context.held_out_commitment_hash.is_some())
+    {
+        let commitment_hash = context.held_out_commitment_hash.as_deref().unwrap();
+        let node_id = context.node_id.as_deref().ok_or_else(|| {
+            ProxyError::Request(
+                "held-out multimodal receipt requires an exact native Plan node".into(),
+            )
+        })?;
+        let slot_id = format!("multimodal:{node_id}");
+        let operation_id = match operation {
+            DashScopeImageOperation::Generation => "image-generation",
+            DashScopeImageOperation::Edit => "image-edit",
+        };
+        let image_hashes = images.iter().map(|image| sha256(image)).collect::<Vec<_>>();
+        let request_hash = held_out_request_hash(&json!({
+            "operation": operation_id,
+            "providerId": provider_id,
+            "model": model,
+            "prompt": prompt,
+            "inputImageSha256": image_hashes,
+            "size": size,
+            "hostContext": context,
+        }))?;
+        if let Some(response) = recover_held_out_response(
+            &app,
+            commitment_hash,
+            &context.run_id,
+            &slot_id,
+            &request_hash,
+        )? {
+            return Ok(response);
+        }
+        Some((
+            commitment_hash.to_string(),
+            context.run_id.clone(),
+            slot_id,
+            request_hash,
+        ))
+    } else {
+        None
+    };
     validate_provider_binding(&app, &provider_id)?;
+    let secret = read_secret(&provider_id).map_err(ProxyError::from)?;
+    let result = execute_bound(
+        provider_id,
+        operation,
+        model,
+        prompt,
+        images,
+        size,
+        host_context,
+        secret,
+    )
+    .await?;
+    if let Some((commitment_hash, run_id, slot_id, request_hash)) = replay {
+        if result.images.len() != 1 || result.receipts.len() != 1 {
+            return Err(ProxyError::Request(
+                "held-out image execution requires exactly one retained output".into(),
+            ));
+        }
+        return settle_held_out_response(
+            &app,
+            &commitment_hash,
+            &run_id,
+            &slot_id,
+            &request_hash,
+            &result.receipts[0].receipt_hash,
+            &result,
+        );
+    }
+    Ok(result)
+}
+
+pub(crate) async fn execute_bound(
+    provider_id: String,
+    operation: DashScopeImageOperation,
+    model: String,
+    prompt: String,
+    images: Vec<Vec<u8>>,
+    size: Option<String>,
+    host_context: Option<MultimodalHostContext>,
+    secret: String,
+) -> Result<DashScopeImageResult, ProxyError> {
     let contract = validate_request(operation, &model, &prompt, &images, size.as_deref())?;
     validate_reference_bindings(operation, &images, host_context.as_ref())?;
-    let secret = read_secret(&provider_id).map_err(ProxyError::from)?;
+    let started_at = unix_millis()?;
     enforce_host("dashscope", DASHSCOPE_IMAGE_ENDPOINT)?;
     let target = enforce_resolved_host("dashscope", DASHSCOPE_IMAGE_ENDPOINT).await?;
     let client = build_client_for_target(Some(120), &target)?;
@@ -740,10 +860,11 @@ async fn execute(
                     }
                     assets.push(asset);
                 }
-                return Ok(DashScopeImageResult {
+                let result = DashScopeImageResult {
                     images: assets,
                     receipts,
-                });
+                };
+                return Ok(result);
             }
             ParsedOutput::Pending(ref task_id) => {
                 if poll + 1 == MAX_POLLS {
@@ -912,6 +1033,7 @@ mod tests {
         let context = MultimodalHostContext {
             request_id: "request:image-edit".into(),
             run_id: "run:commerce".into(),
+            held_out_commitment_hash: None,
             semantic_role: Some("main-image".into()),
             node_id: Some("outcome:commerce:main-image:step:1".into()),
             capability_id: Some("capability:commerce-image".into()),
@@ -1072,6 +1194,10 @@ mod tests {
             "https://dashscope-result-wlcb.oss-cn-wulanchabu.aliyuncs.com/a.png?Expires=1"
         )
         .is_ok());
+        assert!(enforce_result_url(
+            "https://dashscope-a717.oss-accelerate.aliyuncs.com/a.png?Expires=1&Signature=x"
+        )
+        .is_ok());
         assert!(enforce_result_url("https://evil.aliyuncs.com/a.png").is_err());
         assert!(enforce_result_url(
             "http://dashscope-result-sh.oss-cn-shanghai.aliyuncs.com/a.png"
@@ -1083,6 +1209,14 @@ mod tests {
         .is_err());
         assert!(enforce_result_url(
             "https://dashscope-result-sh.extra.oss-cn-shanghai.aliyuncs.com/a.png"
+        )
+        .is_err());
+        assert!(enforce_result_url(
+            "https://dashscope-a717.oss-accelerate.aliyuncs.com.evil.test/a.png"
+        )
+        .is_err());
+        assert!(enforce_result_url(
+            "https://dashscope-a717.extra.oss-accelerate.aliyuncs.com/a.png"
         )
         .is_err());
         assert!(

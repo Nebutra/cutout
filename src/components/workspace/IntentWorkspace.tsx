@@ -14,11 +14,11 @@ import { useQueryClient } from "@tanstack/react-query";
 import {
   Boxes,
   Check,
-  ChevronUp,
   ChevronRight,
   Copy,
   Download,
   Files as FilesIcon,
+  Gamepad2,
   ImageIcon,
   Layers3,
   Loader2,
@@ -33,6 +33,7 @@ import {
   Map as MapIcon,
   PanelLeft,
   PanelLeftClose,
+  PanelLeftOpen,
   Plus,
   RefreshCw,
   Route,
@@ -282,6 +283,12 @@ import {
 } from "@/material-processing/process-uploaded-material-tool";
 import { CanvasBackgroundPicker } from "./CanvasBackgroundPicker";
 import { readCanvasBackground, writeCanvasBackground } from "./canvas-background";
+import { workspaceSidebarRestore } from "./sidebar-restore";
+import {
+  createGameAssetLaunchRequest,
+  routeWorkspaceSubmission,
+  type WorkspaceWorkbenchLaunchOptions,
+} from "@/workspace/scenario-launch";
 import {
   withCanvasAnnotations,
   type CanvasAnnotation,
@@ -596,7 +603,10 @@ export function IntentWorkspace({
   onOpenDesignOs = () => {},
   projectId,
 }: {
-  readonly onOpenDesignOs?: (tab?: "overview" | "delivery" | "specimen") => void;
+  readonly onOpenDesignOs?: (
+    tab?: "overview" | "delivery" | "game-assets" | "specimen",
+    options?: WorkspaceWorkbenchLaunchOptions,
+  ) => void;
   readonly projectId?: string | null;
 }) {
   const { t } = useLingui();
@@ -1464,12 +1474,26 @@ export function IntentWorkspace({
       const resumableDesignSystem = failedDesignCandidate
         ? prototypeDesignSystemCandidates?.artifacts[failedDesignCandidate.id]
         : prototypeDesignSystem;
+      // A Design System candidate set belongs to one failed paid-work attempt.
+      // Keep the authoritative Planner result, but remove its terminal visual
+      // projection as soon as Retry takes ownership. Reusing those failed
+      // candidates makes the UI look stuck and lets stale tool state leak into
+      // the next attempt.
+      if (!prototypeSuiteCandidates && prototypeDesignSystemCandidates?.set.candidates.some(
+        (candidate) => candidate.status === "failed" || candidate.status === "cancelled",
+      )) {
+        setPrototypeDesignSystemCandidates(null);
+        setPrototypeDesignSystem(null);
+      }
       return createAssets(mode, {
         ...options,
         ...(mode === "create" && retryableRunSourceEventId
           ? { retrySourceEventId: retryableRunSourceEventId }
           : {}),
         ...(prototypeSuiteCandidates ? { ignoreSelectedMaterial: true } : {}),
+        ...(!prototypeSuiteCandidates && prototypeDesignSystemCandidates?.set.candidates.some(
+          (candidate) => candidate.status === "failed" || candidate.status === "cancelled",
+        ) ? { restartDesignSystemCandidates: true } : {}),
         ...(mode === "create" && prototypeSuiteCandidates &&
             resumableDesignSystem && prototypeDesignSystemCandidates
           ? {
@@ -1898,6 +1922,8 @@ export function IntentWorkspace({
       retryPlanningRuntime?: RetryPlanningRuntime;
       /** Reuse the original submitted turn while a new run owns this attempt. */
       retrySourceEventId?: string;
+      /** Start a fresh paid Design System candidate set from an accepted Planner result. */
+      restartDesignSystemCandidates?: boolean;
     } = {},
   ): Promise<void> {
     const baseText = (options.briefOverride ?? brief).trim();
@@ -2005,7 +2031,6 @@ export function IntentWorkspace({
       preferred: assignmentTable.chat,
       providers: providerList,
       verifications: providerVerifications,
-      preferPackagedE2eQwen: import.meta.env.VITE_CUTOUT_PACKAGED_E2E === "1",
     });
     const selectedTextRoute = textRouteHealth.prefer(textCandidates)[0];
     const runAssignmentTable: ModelAssignments = selectedTextRoute
@@ -2024,6 +2049,9 @@ export function IntentWorkspace({
     const codexEvidence = await probeCodexSystemRuntime().catch(() => undefined);
     const systemPlanning = selectPlanningRuntime({
       codex: codexEvidence,
+      direct: selectedTextRoute
+        ? { providerId: selectedTextRoute.providerId, model: selectedTextRoute.model }
+        : undefined,
       retryCodex:
         options.retryPlanningRuntime === "codex-system" || mode === "repair",
     })?.runtimeId === "codex-system";
@@ -2497,6 +2525,8 @@ export function IntentWorkspace({
         {
           startFresh: regenerationDecision
             ? regenerationDecision.forceRegenerateDesignSystem
+            : options.restartDesignSystemCandidates
+              ? true
             : !repair &&
               hasSlices &&
               isPrototypeSuiteComplete(
@@ -5490,21 +5520,69 @@ export function IntentWorkspace({
       candidateSet.set.proposal.bounds.maxParallelism,
       candidateIds.length,
     );
+    // Candidate directions are distinct creative work, but they often share one
+    // exact image route. Send them through the production scheduler so a cold
+    // or pressured Provider is canaried by one request before more paid work is
+    // admitted. The Agent still owns the candidate count and plan concurrency.
+    const referencesPresent = attachments.length > 0 || Boolean(materialReference);
+    const scheduledRoute = referencesPresent
+      ? currentPrototypeImageEditRoute(image)
+      : currentPrototypeImageGenerationRoute(image);
+    if (!scheduledRoute) {
+      throw new Error(
+        referencesPresent
+          ? "Prototype production requires a reviewed image-edit route for the supplied references."
+          : "Prototype production requires a reviewed gpt-image-2 or qwen-image-3.0 generation route.",
+      );
+    }
+    const candidateScheduler = createPrototypeProductionScheduler(
+      PROTOTYPE_GENERATION_CONCURRENCY,
+      {
+        stopQueuedImageWorkAfter: (error) => {
+          const kind = classifyGenerationError(errorMessage(error)).kind;
+          return kind === "credential" || kind === "configuration";
+        },
+        reduceImageConcurrencyAfter: (error) =>
+          classifyGenerationError(errorMessage(error)).kind === "transient",
+        imageRouteHealth,
+      },
+    );
+    const scheduleCandidate = candidateScheduler.imageLane(
+      "design-system-candidates",
+      imageRouteHealthKey(
+        scheduledRoute,
+        referencesPresent ? "image-edit" : "image-generation",
+      ),
+    );
     const execution = await runCandidateGenerationWaves({
       candidateIds,
       concurrency,
       maxTransientRetries: DESIGN_SYSTEM_TRANSIENT_RETRIES,
       generate: async ({ candidateId, attempt }) => {
         const direction = directionForCandidate(candidateSet, candidateId);
-        return generatePrototypeDesignSystem(
-          plan,
-          image,
-          designMarkdown,
-          materialReference,
-          lease,
-          candidateId,
-          attempt,
-          direction,
+        return scheduleCandidate(
+          () => generatePrototypeDesignSystem(
+            plan,
+            image,
+            designMarkdown,
+            materialReference,
+            lease,
+            candidateId,
+            attempt,
+            direction,
+          ),
+          () => {
+            publish(updatePrototypeDesignSystemCandidate(candidateSet, candidateId, {
+              status: "generating",
+            }));
+            const stepId = attemptStepId(candidateId, attempt);
+            emitRunEvent(runId, {
+              type: "step-started",
+              stepId,
+              label: "Generate Design System direction",
+              detail: `Direction ${candidatePosition.get(candidateId) ?? 1}/${candidateIds.length}, attempt ${attempt}.`,
+            }, { eventId: `${stepId}:started` });
+          },
         );
       },
       classifyFailure: (error) => {
@@ -5519,17 +5597,10 @@ export function IntentWorkspace({
         isAgentRunCancelled(error) ||
         lease.controller.signal.aborted ||
         !agentRunCoordinatorRef.current.isActive(lease),
-      onAttemptStart: ({ candidateId, attempt }) => {
-        publish(updatePrototypeDesignSystemCandidate(candidateSet, candidateId, {
-          status: "generating",
-        }));
-        const stepId = attemptStepId(candidateId, attempt);
-        emitRunEvent(runId, {
-          type: "step-started",
-          stepId,
-          label: "Generate Design System direction",
-          detail: `Direction ${candidatePosition.get(candidateId) ?? 1}/${candidateIds.length}, attempt ${attempt}.`,
-        }, { eventId: `${stepId}:started` });
+      onAttemptStart: () => {
+        // The scheduler owns admission. Keeping the candidate planned until it
+        // receives an image slot prevents queued work from impersonating a
+        // stalled provider call in the visible production lifecycle.
       },
       onReady: ({ candidateId, attempt }, artifact) => {
         publish(updatePrototypeDesignSystemCandidate(candidateSet, candidateId, {
@@ -6198,8 +6269,16 @@ export function IntentWorkspace({
     }
   }
 
+  const sidebarRestore = workspaceSidebarRestore({
+    sidebarCollapsed,
+    drawerOpen: Boolean(activeWorkspacePanel),
+  });
+  const expandSidebar = () => setSidebarCollapsed(false);
   const canvasToolbar = (
     <>
+      {sidebarRestore.reserveToolbarSlot ? (
+        <span aria-hidden="true" className="hidden size-8 lg:block" />
+      ) : null}
       <CanvasBackgroundPicker
         value={canvasBackground}
         onChange={(hex) => {
@@ -6525,18 +6604,12 @@ export function IntentWorkspace({
         />
       </div>
 
-      <button
-        type="button"
-        aria-label="Expand sidebar"
-        title="Expand sidebar"
-        className={cn(
-          "group/expand absolute left-3 top-3 z-40 hidden size-8 items-center justify-center text-foreground transition-opacity duration-300 hover:opacity-70 lg:flex",
-          sidebarCollapsed ? "opacity-100" : "pointer-events-none opacity-0",
-        )}
-        onClick={() => setSidebarCollapsed(false)}
-      >
-        <PanelLeft className="size-4" />
-      </button>
+      {sidebarRestore.showRestore ? (
+        <ExpandSidebarButton
+          className="absolute left-3 top-3 z-40"
+          onClick={expandSidebar}
+        />
+      ) : null}
 
       <div
         data-testid="workspace-drawer"
@@ -6570,6 +6643,10 @@ export function IntentWorkspace({
             onOpenSystem={() => {
               setActiveWorkspacePanel(null);
               onOpenDesignOs("overview");
+            }}
+            onOpenGameAssets={() => {
+              setActiveWorkspacePanel(null);
+              onOpenDesignOs("game-assets");
             }}
             onClose={() => setActiveWorkspacePanel(null)}
             onOpenSpecimen={() => {
@@ -6730,6 +6807,22 @@ export function IntentWorkspace({
                     return;
                   }
                   setBrief(consumed.submitted);
+                  const submissionRoute = routeWorkspaceSubmission(
+                    consumed.submitted,
+                  );
+                  if (submissionRoute.kind === "game-assets") {
+                    onOpenDesignOs("game-assets", {
+                      gameAssetLaunch: createGameAssetLaunchRequest(
+                        submissionRoute.intent,
+                        attachments.map((attachment) => ({
+                          name: attachment.name,
+                          mediaType: attachment.mediaType,
+                          bytes: attachment.bytes,
+                        })),
+                      ),
+                    });
+                    return;
+                  }
                   void createAssets("create", {
                     briefOverride: consumed.submitted,
                   });
@@ -7295,6 +7388,7 @@ function DesignMarkdownInspector({
   importedDesignMarkdown,
   onChange,
   onOpenSystem,
+  onOpenGameAssets,
   onClose,
   onOpenSpecimen,
 }: {
@@ -7304,6 +7398,7 @@ function DesignMarkdownInspector({
   readonly importedDesignMarkdown: DesignMarkdownAsset;
   readonly onChange: (content: string) => void;
   readonly onOpenSystem: () => void;
+  readonly onOpenGameAssets: () => void;
   readonly onClose: () => void;
   readonly onOpenSpecimen?: () => void;
 }) {
@@ -7363,18 +7458,32 @@ function DesignMarkdownInspector({
       )}
     >
       <WorkspaceDockHeader
-        title="Design system"
-        context="Canvas"
-        closeLabel="Close design inspector"
+        title="Create"
+        context="Project"
+        closeLabel="Close Create"
         onClose={onClose}
       />
 
       <div className="min-h-0 flex-1 overflow-y-auto">
-        <details className="group/advanced">
-          <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between border-b border-border px-4 text-xs font-medium text-muted-foreground hover:text-foreground">
-            Advanced design system
-            <ChevronUp className="size-3.5 rotate-180 transition-transform group-open/advanced:rotate-0" />
-          </summary>
+        <section className="border-b border-border p-4">
+          <p className="text-xs font-medium text-muted-foreground">Production</p>
+          <button
+            type="button"
+            onClick={onOpenGameAssets}
+            className="mt-2 flex min-h-14 w-full items-center gap-3 rounded-md border border-border px-3 text-left outline-none transition-colors hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-muted">
+              <Gamepad2 aria-hidden="true" className="size-4" />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-sm font-medium">Game assets</span>
+              <span className="mt-0.5 block text-xs text-muted-foreground">
+                Generate and review sprite frames with Qwen
+              </span>
+            </span>
+            <ChevronRight aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />
+          </button>
+        </section>
         <section className="border-b border-border p-4">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
@@ -7507,7 +7616,6 @@ function DesignMarkdownInspector({
             </div>
           </section>
         )}
-        </details>
       </div>
     </aside>
   );
@@ -10691,6 +10799,29 @@ function composePrototypeSuiteAlternativeRequirement(
   ].join("\n");
 }
 
+function ExpandSidebarButton({
+  className,
+  onClick,
+}: {
+  readonly className?: string;
+  readonly onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      aria-label="Expand sidebar"
+      title="Expand sidebar"
+      className={cn(
+        "hidden size-8 items-center justify-center rounded-full border border-foreground/30 bg-background/95 text-foreground shadow-[0_2px_10px_rgb(0_0_0/0.10)] backdrop-blur transition-all hover:scale-105 lg:flex",
+        className,
+      )}
+      onClick={onClick}
+    >
+      <PanelLeftOpen className="size-4" />
+    </button>
+  );
+}
+
 function WorkspaceRail({
   agentActive,
   onToggleAgent,
@@ -10762,7 +10893,7 @@ function WorkspaceRail({
       />
       <RailItem
         icon={<PanelLeft className="size-4" />}
-        label="Design"
+        label="Create"
         active={inspectorActive}
         disabled={drawerControlsDisabled}
         onClick={onOpenDesign}

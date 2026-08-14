@@ -15,11 +15,11 @@ estimates (`estimates X USD`, amounts, currencies presented as charges).
 is billing them. Provider billing is the only source of truth.
 
 **Boundary**: Paid-tool requests, plans, visual DAGs, Agent run events, and
-delivery previews carry no predicted cost or budget ceiling. The desktop app
-does not expose a billing or cost-management preference: every desktop paid
-request requires explicit approval. A shared host policy may use
-`approvalPolicy: 'auto'`, but automatic authorization is a host policy decision,
-not a cost-threshold decision. An optional `receipt.charged` value may be
+delivery previews carry no predicted cost or budget ceiling. Enabling a BYOK
+Provider is standing authorization for Provider calls, so desktop paid requests
+use `approvalPolicy: 'auto'` and never show a per-call billing confirmation.
+Preview and run events exist for observation, cancellation and evidence, not for
+approval. An optional `receipt.charged` value may be
 recorded only after execution and only when it is backed by verifiable Provider
 billing evidence; Cutout must never infer it from a model, capability, plan, or
 request.
@@ -29,21 +29,23 @@ request.
 detail: safe(`${event.label} has an estimated provider charge of $0.08.`, 500)
 
 // Correct
-detail: safe(`${event.label} requires your approval before it can run.`, 500)
+detail: safe(`${event.label} is running with your configured BYOK Provider.`, 500)
 ```
 
 ## Contract: Approval notifications gate on `pendingApproval`
 
 - `tool-approval-requested` events require `pendingApproval: boolean`.
-- `src/agent-runtime/desktop-tool-loop.ts` sets
-  `pendingApproval: !(plan.executable && Boolean(capability))` - true only when the
-  active approval policy will not immediately authorize execution.
+- Product-owned desktop calls always set `pendingApproval: false` and execute
+  immediately when capability and host policy are available.
+- Missing capability and disabled host policy settle as failures. They are never
+  mislabeled as approval requests.
 - `notificationFromAgentEvent` (`src/services/local/local-notifications.ts`) returns
   `null` unless `pendingApproval === true`. Host-authorized calls must not produce an
   "Approval needed" notification.
 
-**Tests**: `src/services/local/local-notifications.test.ts` asserts auto-approved →
-null, and pending → notification with no `USD|estimates|$|¥` in title/detail.
+**Tests**: `src/services/local/local-notifications.test.ts` asserts direct BYOK
+execution -> null, and legacy/external pending approval -> notification with no
+`USD|estimates|$|¥` in title/detail.
 
 ## Contract: Transport failures name the gateway origin
 

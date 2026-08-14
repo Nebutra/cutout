@@ -10,11 +10,8 @@ export interface VerifiedTextRouteCandidatesInput {
   readonly preferred?: ModelAssignment
   readonly providers: readonly ProviderConfig[]
   readonly verifications: Readonly<Record<string, ProviderVerification>>
-  /** Packaged-E2E throughput experiment only; never set for product routing. */
-  readonly preferPackagedE2eQwen?: boolean
 }
 
-const PACKAGED_E2E_QWEN_TEXT_MODEL = 'qwen-plus'
 const TEXT_MODEL_NOMINATION =
   /(?:gpt|claude|gemini|qwen|deepseek|kimi|moonshot|mistral|llama|codex|chat)/i
 
@@ -57,13 +54,5 @@ export function verifiedTextRouteCandidates(
     }
   }
 
-  if (!input.preferPackagedE2eQwen) return candidates
-  const qwenIndex = candidates.findIndex((assignment) => {
-    const provider = input.providers.find(({ id }) => id === assignment.providerId)
-    return provider?.kind === 'dashscope'
-      && assignment.model === PACKAGED_E2E_QWEN_TEXT_MODEL
-  })
-  if (qwenIndex <= 0) return candidates
-  const [qwen] = candidates.splice(qwenIndex, 1)
-  return [qwen!, ...candidates]
+  return candidates
 }

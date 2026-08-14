@@ -132,7 +132,7 @@ describe('capability-first AI setup projection', () => {
     })
   })
 
-  it('keeps planning usable while identifying only missing image capabilities', () => {
+  it('uses a capability-proven Codex runtime before its first execution receipt', () => {
     const textOnly = capabilityBindingsSchema.parse({
       version: 'model-assignments.v2',
       bindings: { text: { providerId: 'openai', model: 'gpt-5' } },
@@ -193,7 +193,7 @@ describe('capability-first AI setup projection', () => {
     expect(projectAiSetup(input({ bindingsState: 'pending' })).status).toBe('checking')
   })
 
-  it('keeps only missing direct image capabilities checking while discovery is pending', () => {
+  it('keeps missing image capabilities checking while discovery is pending', () => {
     const result = projectAiSetup(input({ runtime: codex, discoveryState: 'pending' }))
     expect(result.rows.map((row) => [row.capability, row.status])).toEqual([
       ['planning', 'ready'],
@@ -223,7 +223,10 @@ describe('capability-first AI setup projection', () => {
   it('keeps reviewed importable API-key candidates separate from runtime auth', () => {
     const result = projectAiSetup(input({ candidates: [candidate], runtime: codex }))
     expect(result.importableCandidates).toEqual([candidate])
-    expect(result.rows[0].adapter?.id).toBe('codex-system')
+    expect(result.rows[0].adapter).toMatchObject({
+      id: 'codex-system',
+      kind: 'system-runtime',
+    })
   })
 
   it('does not offer a discovered credential as a duplicate configured connection', () => {

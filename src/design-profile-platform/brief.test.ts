@@ -142,7 +142,7 @@ async function installedProfiles(entries: readonly {
     compilers: [compilerReference(entry.compilerId, entry.implementationHash)],
     recipes: [], policies: [], evaluators: [], renderers: [], inspectors: [], semanticActions: [],
     deliveries: [], migrations: [], evidenceBenchmarkAdapters: [], outcomeScorecardAdapters: [],
-    capabilityRequirements: [], libraryRequirements: [], requiredRoleClosures: [], identityBindings: [], fixtures: [],
+    capabilityRequirements: [], libraryRequirements: [], requiredRoleClosures: [], identityBindings: [],
   })))
   const closure = await resolveProfileClosure({
     kernelVersion: '1.2.0',

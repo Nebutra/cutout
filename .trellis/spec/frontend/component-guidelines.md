@@ -179,6 +179,30 @@ the drawer and opens a separate specimen dialog.
 Correct: `Design` toggles `designDrawerOpen`; `Deliver` uses the same rail item
 treatment but continues to open the established inline delivery workspace.
 
+### Workspace chrome restore
+
+The desktop rail (`Collapse sidebar`) and any drawer hide control are independent.
+Collapsing one or both must leave a discoverable restore on the workspace shell.
+
+- Keep `Expand sidebar` on `[data-workspace-root]`, not inside `OutputCanvas` or
+  another replaceable canvas surface. Run-error, Git review, and empty-state
+  views unmount that canvas, which would strand the user.
+- Style the restore as a chrome control (circular, bordered, background, shadow),
+  never a bare glyph on the dotted canvas.
+- When the rail and drawer are both gone, reserve the canvas top-left origin so
+  background / grid / minimap controls sit beside the restore instead of under
+  it.
+- Restoring expands the rail only. The rail remains the navigation back to
+  Agent, Files, Git, Design, and Deliver.
+- Cover hide-then-collapse and collapse-then-hide. Presence in the accessibility
+  tree is not enough if the control is `display: none` or painted under canvas
+  tools.
+
+Wrong: mount `Expand sidebar` only as the first `OutputCanvas` toolbar item.
+
+Correct: render a shell-level `Expand sidebar` whenever `sidebarCollapsed` is
+true, and reserve a toolbar slot only when the drawer is also closed.
+
 ---
 
 ## Common Mistakes
@@ -188,3 +212,5 @@ treatment but continues to open the established inline delivery workspace.
 - Showing inferred percentages, ETAs or completion without source evidence.
 - Nesting operational page sections in decorative cards and reducing scanability.
 - Binding `aria-pressed` to a different surface than the click handler opens.
+- Mounting the only sidebar restore control inside a canvas surface that run
+  error, review, or empty states can replace.
