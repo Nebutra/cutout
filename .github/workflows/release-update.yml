@@ -202,9 +202,8 @@ jobs:
           chmod 0600 "$apple_api_key_path"
       - name: Build signed and notarized macOS bundles
         if: runner.os == 'macOS'
-        uses: tauri-apps/tauri-action@1deb371b0cd8bd54025b384f1cd735e725c4060f
+        shell: bash
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
@@ -212,12 +211,7 @@ jobs:
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
           APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
           APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
-        with:
-          tauriScript: pnpm tauri
-          args: --config src-tauri/tauri.release.conf.json --target ${{ matrix.target }} --bundles ${{ matrix.bundles }}
-          uploadUpdaterJson: false
-          uploadWorkflowArtifacts: false
-          uploadUpdaterSignatures: false
+        run: bash scripts/build-macos-release.sh "${{ matrix.target }}" "${{ matrix.bundles }}"
       - name: Build non-macOS bundles
         if: runner.os != 'macOS'
         uses: tauri-apps/tauri-action@1deb371b0cd8bd54025b384f1cd735e725c4060f
