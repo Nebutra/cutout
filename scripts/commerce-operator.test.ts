@@ -143,7 +143,7 @@ describe('Commerce operator release identity', () => {
     expect(runner).toContain('`-R=${NATIVE_HOST_MACOS_REQUIREMENT}`')
   })
 
-  it('keeps product, Cargo, Tauri, capability, and plugin versions at 0.1.21', async () => {
+  it('keeps product, Cargo, Tauri, capability, and plugin versions at 0.1.22', async () => {
     const [pkg, tauri, capabilities, bundledCapabilities, plugin, runtimeBuild, cargo] = await Promise.all([
       readFile('package.json', 'utf8').then(JSON.parse),
       readFile('src-tauri/tauri.conf.json', 'utf8').then(JSON.parse),
@@ -153,13 +153,13 @@ describe('Commerce operator release identity', () => {
       readFile('plugins/cutout/runtime/runtime-build.json', 'utf8').then(JSON.parse),
       readFile('src-tauri/Cargo.toml', 'utf8'),
     ])
-    expect(pkg.version).toBe('0.1.21')
+    expect(pkg.version).toBe('0.1.22')
     expect(tauri.version).toBe(pkg.version)
     expect(capabilities.product.packageVersion).toBe(pkg.version)
     expect(bundledCapabilities).toEqual(capabilities)
     expect(plugin.version).toBe(pkg.version)
     expect(runtimeBuild.packageVersion).toBe(pkg.version)
-    expect(cargo).toMatch(/^version = "0\.1\.21"$/m)
+    expect(cargo).toMatch(/^version = "0\.1\.22"$/m)
   })
 
   it('fails the release build before compilation when the evaluator trust root is absent', () => {
