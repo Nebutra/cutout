@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.1.21 - 2026-08-17
+
+- Make Agent and Canvas the primary Design OS workflow while keeping Project
+  files, Git, DESIGN.md, delivery details, and diagnostics progressively
+  available as secondary tools on desktop and mobile.
+- Add bounded Commerce Project production and held-out operator paths with
+  localized material DAGs, retained bytes, exact receipts, stale-result
+  blocking, replay recovery, and native evidence admission.
+- Add reviewable multi-action Game Asset families and layered map production
+  with targeted repair, deterministic native previews, runtime manifests, and
+  content-addressed candidate bundles.
+
 ## 0.1.20 - 2026-08-14
 
 - Improve automatic local AI setup so verified text and image routes are
@@ -15,7 +27,7 @@
 - Show Agent preparation as four named phases — context, runtime, response, validation — inside one compact disclosure, instead of a single opaque wait.
 - Negotiate a supported Codex version range and generated-schema features rather than pinning one exact version, and report turn failures as a closed set of causes instead of a generic terminal error.
 - Discover a bounded Codex Provider failover queue instead of only the current entry.
-- Decide paid actions from capability, host policy, and explicit approval alone; cost estimates no longer authorize or refuse work, and a charged amount is recorded only when the Provider returns verifiable billing evidence.
+- Decide Provider execution from capability, host policy, and explicit approval alone; advisory estimates no longer authorize or refuse work, and receipts retain only Provider-returned verifiable execution evidence.
 
 ## 0.1.18 - 2026-08-04
 
@@ -99,7 +111,7 @@
 
 - Added a message-level Regenerate action for the latest completed Agent response without duplicating the source user turn.
 - Clear superseded run failures as soon as a retry or regeneration attempt is accepted, preventing stale `Run stopped` and `No result yet` states.
-- Kept message regeneration isolated from run-level recovery and paid-tool retry contracts.
+- Kept message regeneration isolated from run-level recovery and Provider-tool retry contracts.
 
 ## 0.1.3 - 2026-07-22
 
@@ -112,7 +124,7 @@
 - Restored Retry for interrupted Agent runs after reopening a project, preserving the original brief and existing approval boundaries.
 - Unified Design and Deliver navigation, refined the Git workspace drawer, and aligned compact integration icons.
 - Added common custom provider protocol families and strengthened explicit model-routing coverage.
-- Removed desktop paid-operation auto-continue preferences so every paid tool action requires explicit approval.
+- Removed desktop Provider-operation auto-continue preferences so every Provider tool execution requires explicit approval.
 - Added Developer ID signing, Apple notarization/stapling, four-platform updater verification, and hardened immutable GitHub Release publication.
 
 ## 0.1.1 - 2026-07-21
@@ -125,7 +137,7 @@
 
 ## 0.1.0 - 2026-07-20
 
-- Added outcome-first multi-turn Agent runtime, governed paid actions, and observable repair loops.
+- Added outcome-first multi-turn Agent runtime, governed Provider execution, and observable repair loops.
 - Added Brand VI Kit, Design System Kit, component, starter, Registry, workflow pack, and unified delivery contracts.
 - Added external Coding Agent CLI/MCP control and Design Governance evidence gates.
 - Added Global Library source-blob projection and transactional macOS Registry installation.

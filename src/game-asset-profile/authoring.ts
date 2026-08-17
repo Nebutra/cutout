@@ -239,8 +239,9 @@ export async function authorGameAssetActionRun(
       prompt: [
         input.prompt,
         `Create only frame ${role.frameIndex + 1} of ${input.frameCount} for the ${input.action} action facing ${input.direction}.`,
+        'Render exactly ONE character in exactly ONE pose. This is one isolated frame, not a sprite sheet, sequence, contact sheet, comparison, or before/after image.',
         `Use the accepted reference exactly for identity, silhouette language, palette, and ${input.view} view.`,
-        `One complete subject on a pure white background. No text, border, grid, labels, shadows crossing the canvas edge, or extra subjects.`,
+        `One complete subject on a flat, uniform pure magenta (#FF00FF) chroma-key background edge-to-edge. Do not use magenta in the subject. No text, border, grid, labels, ground plane, cast shadow, background-colored halo, sticker outline, or extra subjects.`,
         `Output ${input.frameWidth}x${input.frameHeight}; keep the subject near ${input.expectedAlphaWidth}x${input.expectedAlphaHeight} pixels with the ${input.anchor} anchor stable.`,
       ].join('\n'),
     })),

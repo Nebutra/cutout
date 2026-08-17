@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { pathToFileURL } from 'node:url'
-import { resolve } from 'node:path'
+import { isAbsolute, resolve } from 'node:path'
 import { AgentError, LIMITS, VERSION, invariant, sha256, stableJson } from './lib/contracts.js'
 import { buildAttributeIndex, buildCategoryIndex, normalizeProduct } from './lib/data.js'
 import {
@@ -28,10 +28,13 @@ export async function main(argv = process.argv.slice(2), environment = process.e
     && !apiKey.includes('\r') && !apiKey.includes('\n') && !apiKey.includes('\0'),
     'credential-missing', 'DASHSCOPE_API_KEY is required and must be a bounded single-line value.')
   const logRoot = environment.AGENT_LOG_DIR
-  invariant(typeof logRoot === 'string' && logRoot.trim(), 'invalid-log-path', 'AGENT_LOG_DIR is required.')
+  invariant(logRoot === undefined || (typeof logRoot === 'string' && logRoot.trim()
+    && Buffer.byteLength(logRoot) <= LIMITS.maximumPathBytes && isAbsolute(logRoot)
+    && !logRoot.includes('\r') && !logRoot.includes('\n') && !logRoot.includes('\0')),
+  'invalid-log-path', 'AGENT_LOG_DIR must be a bounded absolute single-line path when provided.')
   const baseUrl = environment.DASHSCOPE_BASE_URL || environment.OPENAI_BASE_URL || undefined
   const { inputRoot, outputRoot } = parsePromptPaths(args.prompt)
-  const roots = await authorizeRoots({ inputRoot, outputRoot, logRoot: resolve(logRoot) })
+  const roots = await authorizeRoots({ inputRoot, outputRoot, logRoot: logRoot ? resolve(logRoot) : undefined })
   const logger = createLogger(roots.logs, apiKey)
   try {
     await logger.write('run_started', { version: VERSION, inputRootHash: sha256(roots.input.canonical), outputRootHash: sha256(roots.output.canonical) })
@@ -71,7 +74,8 @@ const invokedPath = process.argv[1] ? pathToFileURL(resolve(process.argv[1])).hr
 if (invokedPath === import.meta.url) {
   main().then((code) => { process.exitCode = code }).catch((error) => {
     const code = error instanceof AgentError ? error.code : 'internal-error'
-    process.stderr.write(`Agent failed (${code}). See AGENT_LOG_DIR/agent.log for details.\n`)
+    const logHint = process.env.AGENT_LOG_DIR ? ' See AGENT_LOG_DIR/agent.log for details.' : ''
+    process.stderr.write(`Agent failed (${code}).${logHint}\n`)
     process.exitCode = 1
   })
 }

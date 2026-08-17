@@ -1,9 +1,9 @@
-import type { PaidToolReceipt } from '@/control-protocol/paid-tool-contract'
+import type { ProviderToolReceipt } from '@/control-protocol/provider-tool-contract'
 import { computeLibraryContentHash, type GlobalLibraryItem, type GlobalLibraryStore, type IndexedDbLibraryBlobStore } from '@/global-library'
 
 export interface MoreLikeRequest { readonly requestId:string; readonly instruction:string; readonly parent:Pick<GlobalLibraryItem,'id'|'version'|'contentSha256'> }
 export interface MoreLikeGeneratedArtifact { readonly path:string; readonly mediaType:string; readonly bytes:Uint8Array }
-export interface MoreLikeExecutor { execute(request:MoreLikeRequest):Promise<{readonly receipt:PaidToolReceipt;readonly artifacts:readonly MoreLikeGeneratedArtifact[]}> }
+export interface MoreLikeExecutor { execute(request:MoreLikeRequest):Promise<{readonly receipt:ProviderToolReceipt;readonly artifacts:readonly MoreLikeGeneratedArtifact[]}> }
 
 export async function executeMoreLike(input:{readonly request:MoreLikeRequest;readonly parent:GlobalLibraryItem;readonly executor:MoreLikeExecutor;readonly blobs:IndexedDbLibraryBlobStore;readonly library:GlobalLibraryStore;readonly now?:string}){
   if(input.request.parent.id!==input.parent.id||input.request.parent.version!==input.parent.version||input.request.parent.contentSha256!==input.parent.contentSha256)throw new Error('More-like-this parent lock is stale.')

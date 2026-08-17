@@ -76,6 +76,7 @@ import type { EverythingInput } from "@/ingestion/everything-inbox";
 import type { NativeRepositoryScanResult } from "@/platform/native";
 import type { RepositoryIngestMetadata } from "@/components/design-os-workbench/SourceIngestDialog";
 import {
+  createEmptyWorkspaceSnapshot,
   isWorkspaceSnapshotEmpty,
   textFingerprint,
   workspaceSnapshotFingerprint,
@@ -92,7 +93,10 @@ import {
   type WorkspaceNavigation,
   type WorkspaceNavigationSession,
 } from "@/workspace/navigation";
-import type { WorkspaceWorkbenchLaunchOptions } from "@/workspace/scenario-launch";
+import type {
+  CanvasProfileLaunch,
+  WorkspaceWorkbenchLaunchOptions,
+} from "@/workspace/scenario-launch";
 import type { GameAssetLaunchRequest } from "@/game-asset-profile";
 import { cn } from "@/lib/utils";
 import {
@@ -155,14 +159,6 @@ const DesignOsWorkbench = lazy(() =>
     }),
   ),
 );
-const GameAssetProductionPanel = lazy(() =>
-  import("@/components/design-os-workbench/GameAssetProductionPanel").then(
-    (module) => ({
-      default: module.GameAssetProductionPanel,
-    }),
-  ),
-);
-
 function deliverySurfaceTab(tab: string): DesignOsWorkbenchTab | null {
   switch (tab) {
     case "delivery":
@@ -373,6 +369,7 @@ export function AppShell() {
       s.brief,
     ),
   );
+  const projectBrief = useStore((s) => s.brief);
   const workspaceFingerprint = useStore(workspaceAutosaveFingerprint);
   // A new snapshot object may contain binary material whose byte length is
   // unchanged. Keep the reference as an autosave dependency; the canonical IR
@@ -732,9 +729,12 @@ export function AppShell() {
           authoring: workspaceSnapshot?.designOsAuthoring,
           deliveryPlan: workspaceSnapshot?.deliveryPlan,
           deliveryReceipt: workspaceSnapshot?.deliveryReceipt,
+          commerceProjectLifecycle:
+            workspaceSnapshot?.commerceProjectLifecycle,
           ...(authoringPreview ? { authoringPreview } : {}),
         },
       ),
+      brief: projectBrief,
       workflowPacks: [],
       ...(specimenKit
         ? {
@@ -765,13 +765,19 @@ export function AppShell() {
     workspaceSnapshot?.designOsAuthoring,
     workspaceSnapshot?.deliveryPlan,
     workspaceSnapshot?.deliveryReceipt,
+    workspaceSnapshot?.commerceProjectLifecycle,
     authoringPreview,
     designOsModelFactory,
+    projectBrief,
   ]);
   const [designOsDefaultTab, setDesignOsDefaultTab] =
     useState<DesignOsWorkbenchTab>("overview");
   const [gameAssetLaunch, setGameAssetLaunch] =
     useState<GameAssetLaunchRequest>();
+  const [pendingCanvasProfileLaunch, setPendingCanvasProfileLaunch] = useState<{
+    readonly projectId: string;
+    readonly launch: CanvasProfileLaunch;
+  }>();
   const openDesignOs = useCallback(
     (
       tab: DesignOsWorkbenchTab = "overview",
@@ -1167,7 +1173,7 @@ export function AppShell() {
         });
         toast.info(
           `${changes.length} token value change${changes.length === 1 ? "" : "s"} detected in demo.html`,
-          { description: "Review and apply in the Specimen tab." },
+          { description: "Review and apply in the Project Review stage." },
         );
       })();
     },
@@ -1811,6 +1817,7 @@ export function AppShell() {
     activeRecordRef.current = project;
     lastSavedFingerprintRef.current = "";
     workspaceReturnToRef.current = agentNavigation;
+    setPendingCanvasProfileLaunch(undefined);
     setWorkspaceNavigation(agentNavigation);
     await withViewTransitionApplied(() => {
       resetProject();
@@ -1873,11 +1880,26 @@ export function AppShell() {
                 ),
               }
             : undefined;
-          openDesignOs("game-assets", {
-            gameAssetLaunch: createGameAssetLaunchRequest(
+          setPendingCanvasProfileLaunch({
+            projectId: project.id,
+            launch: {
+              kind: "game-assets",
+              launch: createGameAssetLaunchRequest(
               submissionRoute.intent,
               reference ? [reference] : [],
             ),
+            },
+          });
+          await saveActiveProjectNow(project.id);
+          return;
+        }
+        if (submissionRoute.kind === "commerce") {
+          setPendingCanvasProfileLaunch({
+            projectId: project.id,
+            launch: {
+              kind: "commerce",
+              sourceText: submissionRoute.intent.sourceText,
+            },
           });
           await saveActiveProjectNow(project.id);
           return;
@@ -1887,7 +1909,7 @@ export function AppShell() {
         await saveActiveProjectNow(project.id);
       })();
     },
-    [newProject, openDesignOs, prepareWorkbenchSources, saveActiveProjectNow],
+    [newProject, prepareWorkbenchSources, saveActiveProjectNow],
   );
   const importBoardIntoNewProject = useCallback(() => {
     pickFile((file) => {
@@ -2182,6 +2204,18 @@ export function AppShell() {
       setWorkspaceNavigation({ version: 2, mode: "agent" });
     },
     onAddDeliveryDestination: () => openSettings({section:'integrations',anchor:'connections'}),
+    onOpenProductCanvas: () => {
+      setDesignOsOpen(false);
+      setWorkspaceNavigation({ version: 2, mode: "canvas" });
+    },
+    onCommerceLifecycleChange: (record) => {
+      const state = getStoreState();
+      const snapshot = state.workspaceSnapshot ?? createEmptyWorkspaceSnapshot();
+      state.setWorkspaceSnapshot({
+        ...snapshot,
+        commerceProjectLifecycle: record ?? null,
+      });
+    },
   };
 
   return (
@@ -2285,6 +2319,18 @@ export function AppShell() {
                       key={projectVersion}
                       projectId={activeProjectId}
                       onOpenDesignOs={openDesignOs}
+                      initialProfileLaunch={
+                        pendingCanvasProfileLaunch?.projectId === activeProjectId
+                          ? pendingCanvasProfileLaunch.launch
+                          : undefined
+                      }
+                      onProfileLaunchConsumed={() => {
+                        setPendingCanvasProfileLaunch((current) =>
+                          current?.projectId === activeProjectId
+                            ? undefined
+                            : current,
+                        );
+                      }}
                     />
                   </Suspense>
                 </div>
@@ -2321,33 +2367,17 @@ export function AppShell() {
             </Suspense>
           ) : null}
           <Dialog open={designOsOpen} onOpenChange={setDesignOsOpen}>
-            <DialogContent className={cn(
-              "min-w-0 gap-0 overflow-hidden p-0",
-              designOsDefaultTab === "specimen"
-                ? "h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-[calc(100vw-1rem)]"
-                : "h-[min(48rem,88vh)] w-[calc(100vw-1rem)] max-w-5xl",
-            )}>
+            <DialogContent className="h-[min(48rem,88vh)] w-[calc(100vw-1rem)] min-w-0 max-w-5xl gap-0 overflow-hidden p-0">
               <DialogHeader className="sr-only">
-                <DialogTitle>
-                  {designOsDefaultTab === "game-assets"
-                    ? "Game asset production"
-                    : "System inspector"}
-                </DialogTitle>
+                <DialogTitle>Project workbench</DialogTitle>
                 <DialogDescription>
-                  {designOsDefaultTab === "game-assets"
-                    ? "Generate, review, and retain Qwen game asset frames."
-                    : "Inspect project sources, specimens, workflows, and authorized integrations."}
+                  Move from project brief and sources through production, review,
+                  delivery, and system inspection.
                 </DialogDescription>
               </DialogHeader>
               <div className="min-h-0 min-w-0 flex-1 overflow-hidden">
-                {designOsDefaultTab === "game-assets" ? (
-                  <Suspense fallback={<DeferredSurfaceFallback label="Loading Game assets" />}>
-                    <div className="h-full overflow-y-auto p-3 sm:p-4">
-                      <GameAssetProductionPanel launch={gameAssetLaunch} />
-                    </div>
-                  </Suspense>
-                ) : designOsModel ? (
-                  <Suspense fallback={<DeferredSurfaceFallback label="Loading system inspector" />}>
+                {designOsModel ? (
+                  <Suspense fallback={<DeferredSurfaceFallback label="Loading project workbench" />}>
                     <DesignOsWorkbench
                       key={designOsDefaultTab}
                       model={designOsModel}
@@ -2355,6 +2385,7 @@ export function AppShell() {
                       surfaceMode="inspector"
                       className="h-full"
                       callbacks={workbenchCallbacks}
+                      gameAssetLaunch={gameAssetLaunch}
                     />
                   </Suspense>
                 ) : (

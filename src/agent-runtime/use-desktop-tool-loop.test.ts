@@ -1,15 +1,15 @@
 import { describe, expect, it, vi } from 'vitest'
 import { ok, type ForegroundSegmentationService } from '@/services/types'
 import {
-  createDesktopPaidToolRequest,
+  createDesktopProviderToolRequest,
   desktopToolCapabilitiesForSnapshot,
   probeForegroundSegmentationCapability,
 } from './use-desktop-tool-loop'
 import { capabilityBindingsSchema } from '@/services/ai/model-capabilities'
 
-describe('desktop paid tool request', () => {
+describe('desktop Provider tool request', () => {
   it('executes the selected BYOK host route without a per-call confirmation', () => {
-    const request = createDesktopPaidToolRequest({
+    const request = createDesktopProviderToolRequest({
       capability: 'generate-image',
       intent: 'Generate the approved hero',
       prompt: 'Render the approved hero.',
@@ -22,7 +22,7 @@ describe('desktop paid tool request', () => {
   })
 
   it('keeps direct execution independent of pricing metadata', () => {
-    const request = createDesktopPaidToolRequest({
+    const request = createDesktopProviderToolRequest({
       capability: 'edit-image',
       intent: 'Edit the approved image',
       prompt: 'Edit the approved image.',
@@ -34,7 +34,7 @@ describe('desktop paid tool request', () => {
     })
   })
 
-  it('resolves paid image capabilities from one coherent fresh runtime snapshot', () => {
+  it('resolves Provider image capabilities from one coherent fresh runtime snapshot', () => {
     const stale = desktopToolCapabilitiesForSnapshot({
       providers: [],
       assignments: {},

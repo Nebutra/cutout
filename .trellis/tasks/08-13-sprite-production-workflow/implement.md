@@ -15,14 +15,15 @@
       blocked and do not register a Game maturity adapter.
 - [x] Add deterministic pixel inspection for alpha bounds, edge contact and
       declared anchor policy from decoded real output bytes. Retain both the
-      original Provider bytes and the versioned white-border Cutout PNG, and
+      original Provider bytes and the versioned processed Cutout PNG, and
       reproduce the latter byte-for-byte during verification. Do not route these
       facts through model-authored JSON.
 - [x] Keep mocks and fixtures confined to strict decoder/rejection/replay tests.
       A real-Host or rehearsal success assertion requires an actual retained run.
 - [x] Route explicit Game Asset intent from Home and the project composer into
       the real workbench without a chat-model dependency. Keep routing advisory,
-      bind only one unambiguous image reference, and retain Create as fallback.
+      bind only one unambiguous image reference, and keep scenario selection out
+      of the Create drawer.
 - [x] Compile one retained real Qwen reference into the exact GUI preview payload
       and pass the same JSON through native `preview_request` without GUI
       automation. This proves request closure only, not paid apply or rehearsal.
@@ -45,6 +46,65 @@
       source/output geometry and hashes under the run's `normalized-v2/`
       directory. This is real-source algorithm evidence; it does not mint a new
       Host authorization, semantic acceptance, rehearsal completion or maturity.
+- [x] Review primary SOTA implementations and deployment licenses instead of
+      extending the white-flood heuristic. Benchmark BEN2 Base, Apple Vision,
+      ToonOut/vision.cpp and PyMatting against retained real Qwen source bytes;
+      record model revision/hash, platform runtime, latency and failure modes in
+      `research/sota-cutout-decision.md`.
+- [x] Upgrade controlled-board generation to v4: measured high-chroma board,
+      BT.601 trimap alpha, MIT PyMatting multi-level foreground reconstruction,
+      then the existing deterministic trim/contain/anchor transform. Preserve
+      v3/v2/v1 implementation identities for exact replay. The shared Rust core
+      processes the retained 1024x1024 Qwen source in 84ms on Apple M4 Pro and
+      passes black/white/gray/checkerboard visual QC without a Provider call.
+- [x] Give Qwen Image 3 one 540-second synchronous write attempt inside the
+      600-second role budget. Disable automatic POST retry without idempotency;
+      keep bounded retry only for safe reads/downloads and return unsigned
+      partial evidence on timeout.
+- [x] Complete a new four-role Qwen run through the v4 native processor and
+      retain its original bytes, native receipts, deterministic processed PNGs
+      and reverified signed generation authorization. The successful real run is
+      content-addressed by authorization hash
+      `0adb8d00d19cab1a8cbfbf87689e7b2b275aab9817a217fbe0eb6841fb4bb386`;
+      all four 1024x1024 outputs avoid canvas edges, share the declared feet
+      anchor, and pass white/gray/black/checkerboard visual edge QC. The run took
+      703.83 seconds through `qwen-image-3.0-pro` and processor v4. This proves the
+      native BYOK generation/cutout boundary, not semantic acceptance or Profile
+      maturity.
+- [x] Reprocess the same four retained real Qwen source PNGs through v5 with zero
+      Provider calls after visual QC exposed source-board leakage that reduced
+      v4 subject heights to 707/800/800/715px. The perimeter-derived thresholds
+      are 292.25/216/64/328.5; v5 produces four 800px-high subjects, preserves the
+      declared feet anchor, avoids every delivery edge, and passes white/gray/
+      black/checkerboard QC. Preserve the signed v4 run and implementation for
+      replay; the offline v5 outputs are real-source algorithm evidence, not a
+      retroactively signed authorization.
+- [x] Complete a fresh four-role native Qwen run through current v5 in 567.38
+      seconds and reverify its signed authorization hash
+      `e411fdc7f5716996685b910c367f159b6b67b2a7020001ab141911d0d515ac4c`.
+      All four real outputs pass adaptive-border processing, retained-byte replay,
+      alpha-envelope, anchor and edge checks. Visual review correctly leaves the
+      bundle unaccepted because `role:run:right:3` contains two complete subjects;
+      generation-path success is not semantic delivery acceptance.
+- [x] Close the native single-role repair loop. The retained real repair used the
+      historical v1 preview/v3 authorization; current previews use v2 and current
+      authorizations use v4 with the complete retained-evidence summary. Native
+      preview re-verifies the parent
+      authorization and retained bytes; apply invokes Qwen only for the selected
+      strict subset, binds parent/preserved lineage, merges the complete ordered
+      role closure and rejects any preserved sibling byte drift. Repair the real
+      v5 duplicate `role:run:right:3` with one Qwen call in 232.61 seconds. The new
+      signed authorization hash is
+      `c2669f54b1d02bc60d2b8bea7a20f9e54584b01a8af80363eab5b5d1c9255cf3`;
+      frames 0-2 are byte-identical to parent `e411fdc7...`, and the replacement
+      is one complete subject with 800px alpha height, feet at `(512, 912)` and no
+      edge contact. A subsequent current v2/v4 real attempt timed out without an
+      authorization and remains unsigned under
+      `partial-repair-sha256-d6b9a05293691f86e6151486ce146368c8b8349bfe69b0ea80df394a214b55a0`;
+      it is not current-protocol production proof and was not automatically retried.
+- [ ] Obtain separate native semantic acceptance for the exact repaired v3
+      output set. Do not derive it from the signed generation authorization,
+      automated pixel checks, this task record, or an assistant-authored review.
 - [x] Admit the observed DashScope accelerated OSS result origin without
       broadening beyond its exact HTTPS bucket/domain shape, retain failed
       attempts for diagnosis, and align per-role timeouts with real Qwen latency.
@@ -62,6 +122,9 @@
 - [x] Add deterministic single-frame alpha-bound trimming, aspect-preserving
       envelope normalization, anchor placement on a stable delivery canvas, and
       signed cross-layer raster evidence with legacy replay.
+- [x] Compose ordered processed frames into a deterministic transparent atlas,
+      bind each cell, observed anchor, frame hash and frozen action timing policy,
+      and fail on non-contiguous animation indices or plan/output drift.
 - [ ] Decode and bind observed dimensions/alpha/frame timing to receipts and QA;
       add request-versus-output mismatch byte cases that block incompatible work.
 - [ ] Integrate candidate selection and revision-bound locks without changing the
@@ -73,8 +136,34 @@
 - [ ] Add a compact workbench projection for family progress, blockers, compare,
       lock, and preview using existing material/review interaction patterns.
 
+### Gate 1B: Multi-action sprite family
+
+- [ ] Add `game-asset.family-plan.v1`, `game-asset.action-clip.v1`,
+      `game-asset.scale-profile.v1` and `game-asset.family-bundle.v1` without
+      widening or reinterpreting the atomic `game-asset.plan.v1` contract.
+- [ ] Compile natural-language character requests into independent atomic action/
+      direction groups. Split attack body, projectile, impact and wide detached FX
+      unless the target runtime explicitly admits shared oversized cells.
+- [ ] Let one accepted idle/run clip derive a content-addressed grounded scale and
+      anchor profile. Require compatible body clips to reuse its exact revision;
+      airborne/FX clips declare different compatibility and anchor policies.
+- [ ] Orchestrate preview/apply/review/repair per atomic action group. A failed
+      group must not call the Provider for accepted siblings or change their bytes,
+      receipts, revisions or hashes.
+- [ ] Compile accepted clips into a multi-animation neutral family bundle with
+      deterministic atlas packing, timing, action loop/one-shot metadata and
+      body/FX origin relationships.
+- [ ] Project family graph state into the existing workbench: master identity,
+      action progress, blockers, stale dependencies, runtime preview and delivery.
+      Keep scenario selection out of Create.
+
 ## Gate 2: Layered-map vertical slice
 
+- [ ] Add `game-map.production-plan.v1` with `tile`, `scene`, `side-scroll`,
+      `grid`, `room-chunk` and `baked-scene` modes. Each mode declares its visual
+      model, object model, geometry/collision, zones/exits, camera and outputs.
+- [ ] Add `game-map.runtime-manifest.v1` while preserving the shallow
+      `game-asset.layered-map.v1` schema for compatibility and inspection.
 - [ ] Add base/reference/object-library/placement/collision/zone/scene-hook schemas
       and compile them into independently repairable graph nodes.
 - [ ] Add compact prop-pack and terrain-atlas slicing with deterministic evidence.
@@ -84,11 +173,23 @@
       placement manifest; prove a dressed reference cannot satisfy delivery.
 - [ ] Add a workbench map projection that distinguishes reference, runtime layers,
       debug geometry, and final preview.
+- [ ] Complete retained real `scene` and `tile` deliveries before representing map
+      production as real-host or accepted-delivery coverage. Other modes may enter
+      at contract maturity first but remain individually visible in the ledger.
 
 ## Gate 3: Managed bundle delivery
 
-- [ ] Define and round-trip `game-asset.bundle.v1` with relative logical names,
+- [x] Define and round-trip `game-asset.bundle.v1` with relative logical names,
       content hashes, provenance, policy version, and preview binding.
+      Reverify and compile the retained real repaired Qwen bundle with zero
+      Provider calls into a 4096x1024 candidate atlas. Its atlas hash is
+      `25866da5ca0704ebb4f6209f6851654552d127077d629d4b3c84f2d398cf3161`;
+      candidate status remains explicit because semantic acceptance is absent.
+      Recompile the same retained bytes through the optimized current compiler
+      with zero Provider calls in 93.46 seconds. The current manifest binds the
+      native `previewId`, repair `runId`, receipt identity and exact atlas bytes;
+      its bundle hash is
+      `22191cf0d8c09fb0df15e2c66fa3615218416d1bc96d4d27d375633ff5ca8dec`.
 - [ ] Add a dry-run plan and explicit approved apply below the managed game-assets
       export root; reject absolute paths, traversal, symlinks, stale revisions,
       approval mismatch, replay, and bundle mutation.
@@ -98,26 +199,68 @@
       schema, protocol/CLI/MCP surfaces, skills, and docs in the same change and
       run `pnpm agent:validate`.
 
-## Gate 4: Optional adapters after MVP
+## Gate 4: Managed engine adapters
 
-- [ ] Add a managed Godot exporter from the accepted neutral bundle if selected as
-      the first engine adapter; validate scene/resource references in a fixture.
-- [ ] Evaluate a Unity-shaped managed exporter independently; do not couple it to
-      Godot contracts or claim existing-project mutation.
-- [ ] Add video-to-sprite only after an authorized video capability, deterministic
-      frame extraction, cancellation/budget enforcement, and media QA are real.
+- [ ] Add `game-engine.adapter-plan.v1` over one exact accepted neutral bundle
+      identity; preview every output path/hash before managed apply.
+- [ ] Add a managed Godot data/animation adapter and minimal preview scene. Validate
+      every resource reference and animation frame without claiming gameplay code
+      or existing-project mutation.
+- [ ] Add an independent Unity-shaped atlas/import/animation adapter over the same
+      neutral bundle. Do not share engine-specific schema or assumptions with the
+      Godot adapter.
+- [ ] Hand project-specific integration to the Coding Profile through a typed brief
+      and its own authority boundary; engine adapter success cannot authorize code
+      mutation or deployment.
+
+## Gate 5: Temporal ingestion
+
+- [ ] Keep video-to-sprite unavailable until an authorized video Host can retain
+      exact input/output bytes, receipts, cancellation and budgets.
+- [ ] Add `game-temporal-ingest.v1` and a deterministic decoder/sampler that binds
+      frame timestamps and bytes, then sends derived frames through existing Game
+      raster QA and neutral delivery.
+- [ ] Prove video identity/style drift remains attributed quality evidence rather
+      than being rewritten as deterministic acceptance.
+
+## Gate 6: Replacement coverage ledger
+
+- [ ] Add `game-asset.coverage-ledger.v1` with per-upstream-outcome states
+      `unsupported`, `contract`, `real-host`, and `accepted-delivery` plus exact
+      evidence references.
+- [ ] Populate the ledger only through owning verifiers. Schema tests, fixtures,
+      docs and caller-authored readiness may advance at most to `contract`.
+- [ ] Declare Agent Sprite Forge replacement complete only when every required
+      Sprite, Map, engine-handoff and video outcome reaches accepted delivery, or
+      when the user explicitly narrows the required outcome set in the PRD.
+
+## Child Task Ownership
+
+- `.trellis/tasks/08-14-multi-action-sprite-family`: aggregate action planning,
+  scale profile, family acceptance and multi-animation bundle.
+- `.trellis/tasks/08-14-layered-game-map-production`: six map modes, structured
+  runtime manifests, deterministic composition and real scene/tile rehearsals.
+- `.trellis/tasks/08-14-managed-game-engine-adapters`: accepted neutral bundle to
+  independently validated Godot/Unity managed packages.
+- `.trellis/tasks/08-14-temporal-game-asset-ingestion`: retained video decode and
+  sampling into the normal Game clip/family path.
+- `.trellis/tasks/08-14-agent-sprite-forge-coverage-ledger`: pinned outcome
+  inventory, owning proof adapters and derived replacement result.
 
 ## Validation
 
-- [ ] Run focused profile schema, compiler, raster processor, policy, graph impact,
+- [x] Run focused profile schema, compiler, raster processor, policy, graph impact,
       repair, preview composition, and managed-export tests.
 - [ ] Run existing asset-production, candidate-selection, Design OS Kernel,
       ArtifactGraph, project persistence/recovery, and Agent workbench tests.
 - [x] Run type-check, lint, dependency/security checks relevant to any new raster
-      dependency, and `rtk git diff --check`.
+      dependency, `rtk git diff --check`, production frontend build, and the full
+      Tauri debug application link build without bundling.
 - [x] Run `pnpm agent:validate` for any actual Agent-surface change.
 - [ ] Perform desktop visual verification at supported desktop sizes; verify long
       action/asset names do not resize stable controls or overlap evidence panels.
+      Frontend E2E was intentionally not run at the user's request; this remains
+      open rather than being replaced by a mocked visual claim.
 
 ## Risk And Rollback Points
 

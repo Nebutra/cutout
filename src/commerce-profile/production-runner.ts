@@ -1,9 +1,6 @@
-import { invoke } from '@tauri-apps/api/core'
 import { z } from 'zod'
 import { canonicalJson, fingerprint } from '@/design-ir/fingerprint'
 import {
-  createMultimodalDesktopHost,
-  type MultimodalDesktopHost,
   type MultimodalHostArtifactBytes,
 } from '@/multimodal-host'
 import {
@@ -27,7 +24,6 @@ import {
   COMMERCE_HELD_OUT_ATTESTATION_PROTOCOL,
   commerceHeldOutCommitmentSchema,
   commerceHeldOutCompletionRequestSchema,
-  createCommerceHeldOutCommitment,
   createCommerceHeldOutInputManifest,
   type CommerceHeldOutChallengeSelection,
   type CommerceHeldOutCommitment,
@@ -57,14 +53,15 @@ import {
   type CommerceProductionRehearsalBundle,
   type CommerceRehearsalSourceMaterial,
 } from './rehearsal'
-import {
-  COMMERCE_SOURCE_ORIGIN,
-  COMMERCE_SOURCE_PATH_PREFIX,
-  ingestCompetitionCommerceSourceImage,
-} from './source-ingest'
+import { resolveCommerceSourcePolicy } from './source-ingest'
 import { buildCommerceStrategyDocument } from './strategy'
 import { validateLocalizedDescription } from './policies'
-import { providerConfigsSchema, type ProviderConfig } from '@/services/ai/provider-types'
+import type { ProviderConfig } from '@/services/ai/provider-types'
+import {
+  createCommerceProductionDesktopHost,
+  type CommerceProductionCoreHost,
+  type CommerceProductionHost,
+} from './production-host'
 
 const textEncoder = new TextEncoder()
 const textDecoder = new TextDecoder('utf-8', { fatal: true })
@@ -179,8 +176,48 @@ export interface CommerceRunnerReferenceArtifact {
   readonly bytes: Uint8Array
 }
 
-interface RuntimeArtifact extends CommerceRunnerReferenceArtifact {
+export interface CommerceProductionExecutionArtifact extends CommerceRunnerReferenceArtifact {
   readonly retained: CommerceProductionRehearsalBundle['artifacts'][number]
+}
+
+export type CommerceProductionExecutionEvent =
+  | {
+      readonly type: 'step-started'
+      readonly semanticRole: CommerceSemanticRole
+      readonly completed: number
+      readonly total: number
+    }
+  | {
+      readonly type: 'deliverable-completed'
+      readonly semanticRole: CommerceSemanticRole
+      readonly completed: number
+      readonly total: number
+      readonly artifact: CommerceProductionExecutionArtifact
+    }
+
+export interface CommerceProductionExecutionInput {
+  readonly providerId: string
+  readonly runId: string
+  readonly heldOutCommitmentHash?: string
+  readonly facts: ProductFacts
+  readonly categoryCatalog: string
+  readonly attributeCatalog: string
+  readonly sourceArtifacts: readonly {
+    readonly artifactId: string
+    readonly bytes: Uint8Array
+  }[]
+  readonly evidenceGraph: CommerceProductionRehearsalBundle['evidenceGraph']
+  readonly outcomeGraph: CommerceProductionRehearsalBundle['outcomeGraph']
+  readonly contract: CommerceProductionRehearsalBundle['contract']
+  readonly plan: CommerceProductionRehearsalBundle['plan']
+  readonly runBindings: readonly string[]
+  readonly host: CommerceProductionCoreHost
+  readonly signal?: AbortSignal
+  readonly onProgress?: (event: CommerceProductionExecutionEvent) => void | Promise<void>
+}
+
+export interface CommerceProductionExecutionResult {
+  readonly artifacts: CommerceProductionRehearsalBundle['artifacts']
 }
 
 export interface CommerceRunnerMediaReferenceClosure {
@@ -325,21 +362,7 @@ export function assertCommerceProductionSourceDescriptor(source: {
     || containsControl(source.sourcePointer)) {
     throw new Error('Commerce source lineage is not accepted by the native source-ingest policy.')
   }
-  let parsed: URL
-  try {
-    parsed = new URL(source.sourceDescriptor)
-  } catch {
-    throw new Error('Commerce source descriptor must be a canonical reviewed HTTPS URL.')
-  }
-  if (parsed.href !== source.sourceDescriptor
-    || parsed.protocol !== 'https:'
-    || parsed.origin !== COMMERCE_SOURCE_ORIGIN
-    || parsed.port !== ''
-    || parsed.username !== ''
-    || parsed.password !== ''
-    || parsed.hash !== ''
-    || !parsed.pathname.startsWith(COMMERCE_SOURCE_PATH_PREFIX)
-    || parsed.pathname.length <= COMMERCE_SOURCE_PATH_PREFIX.length) {
+  if (!resolveCommerceSourcePolicy(source.sourceDescriptor)) {
     throw new Error('Commerce source descriptor is outside the exact native source-ingest policy.')
   }
 }
@@ -389,13 +412,6 @@ export async function preflightCommerceProductionDocuments(input: {
   })
 }
 
-async function preflightCommerceProductionProvider(providerId: string): Promise<void> {
-  const providers = providerConfigsSchema.parse(await invoke<unknown>('load_providers'))
-  const provider = providers.find((candidate) => candidate.id === providerId)
-  const hasKey = await invoke<boolean>('key_status', { providerId })
-  assertCommerceProductionProviderAuthority(provider, hasKey)
-}
-
 async function requestId(runId: string, nodeId: string, kind: string): Promise<string> {
   return `request:sha256:${await fingerprint({ runId, nodeId, kind })}`
 }
@@ -407,7 +423,7 @@ async function deterministicSeed(runId: string, role: CommerceSemanticRole): Pro
 
 function planContext(input: {
   readonly runId: string
-  readonly commitmentHash: string
+  readonly commitmentHash?: string
   readonly semanticRole: CommerceSemanticRole
   readonly nodeId: string
   readonly capabilityId: string
@@ -418,7 +434,7 @@ function planContext(input: {
   return {
     requestId: input.requestId,
     runId: input.runId,
-    heldOutCommitmentHash: input.commitmentHash,
+    ...(input.commitmentHash ? { heldOutCommitmentHash: input.commitmentHash } : {}),
     semanticRole: input.semanticRole,
     nodeId: input.nodeId,
     capabilityId: input.capabilityId,
@@ -584,7 +600,7 @@ export function assertCommerceRunnerReceiptClosure(
 }
 
 async function authenticatedResult(
-  host: MultimodalDesktopHost,
+  host: CommerceProductionCoreHost,
   result: MultimodalHostArtifactBytes,
 ): Promise<MultimodalHostArtifactBytes> {
   const verified = await host.verify(result)
@@ -619,10 +635,10 @@ function descriptionPrompt(input: {
 }
 
 async function produceDescription(input: {
-  readonly host: MultimodalDesktopHost
+  readonly host: CommerceProductionCoreHost
   readonly providerId: string
   readonly runId: string
-  readonly commitmentHash: string
+  readonly commitmentHash?: string
   readonly role: Extract<CommerceSemanticRole, `localized-description:${string}`>
   readonly planNode: CommerceProductionRehearsalBundle['plan']['body']['nodes'][number]
   readonly outcomeNode: CommerceProductionRehearsalBundle['outcomeGraph']['body']['nodes'][number]
@@ -634,7 +650,7 @@ async function produceDescription(input: {
   readonly attributeIndex: ReturnType<typeof buildAttributeIndex>
   readonly runBindings: readonly string[]
   readonly signal?: AbortSignal
-}): Promise<{ artifact: RuntimeArtifact; description: LocalizedDescription }> {
+}): Promise<{ artifact: CommerceProductionExecutionArtifact; description: LocalizedDescription }> {
   const locale = commerceOutcomePayloadSchema.parse(input.outcomeNode.payload)
   if (locale.kind !== 'localized-description') throw new Error(`Commerce ${input.role} is not a description node.`)
   const result = await input.host.structuredText({
@@ -667,6 +683,8 @@ async function produceDescription(input: {
     || Object.keys(description.catalogAttributes).length > 0) {
     throw new Error(`Commerce ${input.role} drifted from its offered catalog closure.`)
   }
+  const delivery = textEncoder.encode(renderCommerceStructuredDelivery(description))
+  const publicationArtifactId = `artifact:sha256:${await sha256Bytes(delivery)}`
   const findings = validateLocalizedDescription({
     outcomeNodeId: input.outcomeNode.id,
     description,
@@ -674,15 +692,13 @@ async function produceDescription(input: {
     policy: policyForOutcome(input.outcomeNode),
     categoryIndex: input.categoryIndex,
     attributeIndex: input.attributeIndex,
-    artifactId: authenticated.receipt.artifact.artifactId,
-    mediaType: authenticated.receipt.artifact.mediaType,
-    byteLength: authenticated.bytes.byteLength,
+    artifactId: publicationArtifactId,
+    mediaType: 'text/markdown',
+    byteLength: delivery.byteLength,
   })
   if (findings.length > 0) {
     throw new Error(`Commerce ${input.role} failed deterministic policy: ${findings.map((finding) => finding.code).join(', ')}`)
   }
-  const delivery = textEncoder.encode(renderCommerceStructuredDelivery(description))
-  const publicationArtifactId = `artifact:sha256:${await sha256Bytes(delivery)}`
   return {
     description,
     artifact: {
@@ -719,11 +735,35 @@ function mediaPrompt(role: CommerceSemanticRole, facts: readonly unknown[]): str
   })
 }
 
+export function commerceSemanticQaRoleConstraints(
+  role: CommerceSemanticRole,
+): readonly string[] {
+  if (role.startsWith('detail-image:')) {
+    return [
+      'Judge product identity from visible evidence in this role-appropriate detail crop.',
+      'Off-frame whole-product features are not contradictions and must not fail identity by themselves.',
+      'Set productIdentityVerified true only when at least two visible identity cues agree with the supplied facts and no visible cue conflicts.',
+      'A useful close crop, alternate camera angle, or clean alternate background may preserve the creative direction.',
+    ]
+  }
+  if (role === 'main-image') {
+    return [
+      'The main image must keep the full product and its defining visible identity cues inspectable.',
+    ]
+  }
+  if (role === 'product-video') {
+    return [
+      'The video must preserve the same product identity across the inspected frames without morphing or scene-cut drift.',
+    ]
+  }
+  return []
+}
+
 async function produceSemanticQa(input: {
-  readonly host: MultimodalDesktopHost
+  readonly host: CommerceProductionCoreHost
   readonly providerId: string
   readonly runId: string
-  readonly commitmentHash: string
+  readonly commitmentHash?: string
   readonly role: CommerceSemanticRole
   readonly planNodeId: string
   readonly source: MultimodalHostArtifactBytes
@@ -765,7 +805,8 @@ async function produceSemanticQa(input: {
         'Replace visualReviewLabels with concise observed labels; at least one label is required.',
         'Set each verification boolean from the visible media. False is allowed and must fail the run.',
         'Overlay text passes only when no unsupported or malformed text is visible.',
-        'Product identity and creative direction pass only when the source identity is preserved.',
+        'A visible contradiction with the supplied identity facts must fail product identity.',
+        ...commerceSemanticQaRoleConstraints(input.role),
         'Return JSON only.',
       ],
     }),
@@ -794,7 +835,7 @@ async function produceSemanticQa(input: {
   }
 }
 
-function capabilityReceipt(artifact: RuntimeArtifact, planNode: CommerceProductionRehearsalBundle['plan']['body']['nodes'][number]): CapabilityReceipt {
+function capabilityReceipt(artifact: CommerceProductionExecutionArtifact, planNode: CommerceProductionRehearsalBundle['plan']['body']['nodes'][number]): CapabilityReceipt {
   return capabilityReceiptSchema.parse({
     id: artifact.retained.receipt.receiptId,
     nodeId: planNode.id,
@@ -806,20 +847,309 @@ function capabilityReceipt(artifact: RuntimeArtifact, planNode: CommerceProducti
   })
 }
 
+export async function executeCommerceProduction(
+  input: CommerceProductionExecutionInput,
+): Promise<CommerceProductionExecutionResult> {
+  const categoryIndex = buildCategoryIndex(input.categoryCatalog)
+  const attributeIndex = buildAttributeIndex(input.attributeCatalog, categoryIndex)
+  const categories = selectCommerceProductionCategoryCandidates(input.facts, categoryIndex.categories)
+  const compactFacts = compactFactsForModel(input.facts)
+  const sourceBytesByArtifact = new Map(
+    input.sourceArtifacts.map((source) => [source.artifactId, source.bytes] as const),
+  )
+  if (sourceBytesByArtifact.size !== input.sourceArtifacts.length) {
+    throw new Error('Commerce production source artifact ids must be unique.')
+  }
+  const outcomeByRole = new Map(input.outcomeGraph.body.nodes.map((node) => [
+    commerceOutcomePayloadSchema.parse(node.payload).semanticRole,
+    node,
+  ]))
+  const planByRole = new Map(input.plan.body.nodes.map((node) => {
+    const outcome = input.outcomeGraph.body.nodes.find((candidate) => candidate.id === node.outcomeNodeId)!
+    return [commerceOutcomePayloadSchema.parse(outcome.payload).semanticRole, node] as const
+  }))
+  const runtimeByPlanNode = new Map<string, CommerceProductionExecutionArtifact>()
+  const retainedByRole = new Map<CommerceSemanticRole, CommerceProductionExecutionArtifact>()
+  const primaryReceipts: CapabilityReceipt[] = []
+  const qaReceiptIds: string[] = []
+  const qaRouteIds: string[] = []
+  let completed = 0
+  const emitStarted = async (semanticRole: CommerceSemanticRole) => {
+    await input.onProgress?.({
+      type: 'step-started',
+      semanticRole,
+      completed,
+      total: COMMERCE_SEMANTIC_ROLES.length,
+    })
+  }
+  const emitCompleted = async (artifact: CommerceProductionExecutionArtifact) => {
+    completed += 1
+    await input.onProgress?.({
+      type: 'deliverable-completed',
+      semanticRole: artifact.semanticRole,
+      completed,
+      total: COMMERCE_SEMANTIC_ROLES.length,
+      artifact,
+    })
+  }
+
+  let fixedCategoryId: string | undefined
+  for (const role of COMMERCE_SEMANTIC_ROLES.filter((candidate) => candidate.startsWith('localized-description:'))) {
+    await emitStarted(role)
+    const planNode = planByRole.get(role)!
+    const outcomeNode = outcomeByRole.get(role)!
+    const produced = await produceDescription({
+      host: input.host,
+      providerId: input.providerId,
+      runId: input.runId,
+      ...(input.heldOutCommitmentHash
+        ? { commitmentHash: input.heldOutCommitmentHash }
+        : {}),
+      role: role as Extract<CommerceSemanticRole, `localized-description:${string}`>,
+      planNode,
+      outcomeNode,
+      facts: input.facts,
+      compactFacts,
+      categories: fixedCategoryId
+        ? categories.filter((category) => category.id === fixedCategoryId)
+        : categories,
+      ...(fixedCategoryId ? { fixedCategoryId } : {}),
+      categoryIndex,
+      attributeIndex,
+      runBindings: input.runBindings,
+      signal: input.signal,
+    })
+    fixedCategoryId = produced.description.categoryId
+    runtimeByPlanNode.set(planNode.id, produced.artifact)
+    retainedByRole.set(role, produced.artifact)
+    primaryReceipts.push(capabilityReceipt(produced.artifact, planNode))
+    await emitCompleted(produced.artifact)
+  }
+
+  for (const role of COMMERCE_SEMANTIC_ROLES.filter((candidate) => candidate === 'main-image' || candidate.startsWith('detail-image:'))) {
+    await emitStarted(role)
+    const planNode = planByRole.get(role)!
+    const references = await createCommerceRunnerMediaReferenceClosure({
+      semanticRole: role as CommerceRunnerMediaRole,
+      planNode,
+      sourceBytesByArtifact,
+      runtimeByPlanNode,
+      runBindings: input.runBindings,
+    })
+    const outputs = await input.host.image({
+      providerId: input.providerId,
+      model: COMMERCE_PRODUCTION_RUNNER_MODELS.image,
+      operation: 'image-edit',
+      prompt: mediaPrompt(role, compactFacts),
+      referenceBytes: references.referenceBytes,
+      size: '1024x1024',
+      context: planContext({
+        runId: input.runId,
+        ...(input.heldOutCommitmentHash
+          ? { commitmentHash: input.heldOutCommitmentHash }
+          : {}),
+        semanticRole: role,
+        nodeId: planNode.id,
+        capabilityId: planNode.capabilityId,
+        acceptedReferenceArtifactIds: references.acceptedReferenceArtifactIds,
+        lockIds: references.lockIds,
+        requestId: await requestId(input.runId, planNode.id, 'primary'),
+      }),
+      signal: input.signal,
+    })
+    if (outputs.length !== 1) throw new Error(`Commerce ${role} did not return exactly one retained image.`)
+    const authenticated = await authenticatedResult(input.host, outputs[0]!)
+    const qa = await produceSemanticQa({
+      host: input.host,
+      providerId: input.providerId,
+      runId: input.runId,
+      ...(input.heldOutCommitmentHash
+        ? { commitmentHash: input.heldOutCommitmentHash }
+        : {}),
+      role,
+      planNodeId: planNode.id,
+      source: authenticated,
+      runBindings: input.runBindings,
+      compactFacts,
+      signal: input.signal,
+    })
+    const artifact: CommerceProductionExecutionArtifact = {
+      semanticRole: role,
+      planNodeId: planNode.id,
+      publicationArtifactId: authenticated.receipt.artifact.artifactId,
+      bytes: authenticated.bytes,
+      retained: {
+        semanticRole: role,
+        receipt: authenticated.receipt,
+        artifactBytesBase64: bytesToBase64(authenticated.bytes),
+        semanticQa: qa.retained,
+      },
+    }
+    runtimeByPlanNode.set(planNode.id, artifact)
+    retainedByRole.set(role, artifact)
+    primaryReceipts.push(capabilityReceipt(artifact, planNode))
+    qaReceiptIds.push(qa.retained.receipt.receiptId)
+    qaRouteIds.push(qa.retained.receipt.routeId)
+    await emitCompleted(artifact)
+  }
+
+  const videoRole = 'product-video' as const
+  await emitStarted(videoRole)
+  const videoPlanNode = planByRole.get(videoRole)!
+  const videoReferences = await createCommerceRunnerMediaReferenceClosure({
+    semanticRole: videoRole,
+    planNode: videoPlanNode,
+    sourceBytesByArtifact,
+    runtimeByPlanNode,
+    runBindings: input.runBindings,
+  })
+  const videoSourceBytes = videoReferences.referenceBytes[0]
+  if (!videoSourceBytes || videoReferences.referenceBytes.length !== 1) {
+    throw new Error('Commerce product video requires the exact retained main image dependency.')
+  }
+  const videoResult = await input.host.video({
+    providerId: input.providerId,
+    model: COMMERCE_PRODUCTION_RUNNER_MODELS.video,
+    prompt: mediaPrompt(videoRole, compactFacts),
+    resolution: '1080P',
+    ratio: '16:9',
+    durationSeconds: 5,
+    seed: await deterministicSeed(input.runId, videoRole),
+    referenceBytes: videoSourceBytes,
+    context: planContext({
+      runId: input.runId,
+      ...(input.heldOutCommitmentHash
+        ? { commitmentHash: input.heldOutCommitmentHash }
+        : {}),
+      semanticRole: videoRole,
+      nodeId: videoPlanNode.id,
+      capabilityId: videoPlanNode.capabilityId,
+      acceptedReferenceArtifactIds: videoReferences.acceptedReferenceArtifactIds,
+      lockIds: videoReferences.lockIds,
+      requestId: await requestId(input.runId, videoPlanNode.id, 'primary'),
+    }),
+    signal: input.signal,
+  })
+  const authenticatedVideo = await authenticatedResult(input.host, videoResult)
+  const videoQa = await produceSemanticQa({
+    host: input.host,
+    providerId: input.providerId,
+    runId: input.runId,
+    ...(input.heldOutCommitmentHash
+      ? { commitmentHash: input.heldOutCommitmentHash }
+      : {}),
+    role: videoRole,
+    planNodeId: videoPlanNode.id,
+    source: authenticatedVideo,
+    runBindings: input.runBindings,
+    compactFacts,
+    signal: input.signal,
+  })
+  const videoArtifact: CommerceProductionExecutionArtifact = {
+    semanticRole: videoRole,
+    planNodeId: videoPlanNode.id,
+    publicationArtifactId: authenticatedVideo.receipt.artifact.artifactId,
+    bytes: authenticatedVideo.bytes,
+    retained: {
+      semanticRole: videoRole,
+      receipt: authenticatedVideo.receipt,
+      playbackSourceReceipt: videoResult.receipt,
+      artifactBytesBase64: bytesToBase64(authenticatedVideo.bytes),
+      semanticQa: videoQa.retained,
+    },
+  }
+  runtimeByPlanNode.set(videoPlanNode.id, videoArtifact)
+  retainedByRole.set(videoRole, videoArtifact)
+  primaryReceipts.push(capabilityReceipt(videoArtifact, videoPlanNode))
+  qaReceiptIds.push(videoQa.retained.receipt.receiptId)
+  qaRouteIds.push(videoQa.retained.receipt.routeId)
+  await emitCompleted(videoArtifact)
+
+  const strategyRole = 'strategy-document' as const
+  await emitStarted(strategyRole)
+  const strategyPlanNode = planByRole.get(strategyRole)!
+  const strategyBase = buildCommerceStrategyDocument({
+    facts: input.facts,
+    plan: input.plan,
+    receipts: primaryReceipts,
+    findings: [],
+  })
+  const expectedStrategy: StrategyDocument = strategyDocumentSchema.parse({
+    ...strategyBase,
+    routeIds: [...new Set([...strategyBase.routeIds, ...qaRouteIds])].sort(),
+    receiptIds: [...strategyBase.receiptIds, ...qaReceiptIds].sort(),
+  })
+  const strategyReferenceArtifactIds = resolveCommerceRunnerStrategyReferences(
+    strategyPlanNode,
+    runtimeByPlanNode,
+  )
+  const strategyResult = await input.host.structuredText({
+    providerId: input.providerId,
+    model: COMMERCE_PRODUCTION_RUNNER_MODELS.structuredText,
+    system: 'You are a bounded evidence compiler. Return the supplied strategy object unchanged and emit no prose.',
+    prompt: JSON.stringify({
+      task: 'Return exactly expectedStrategy under the supplied JSON schema.',
+      expectedStrategy,
+      constraints: ['Do not add, remove, reorder, summarize, or rewrite evidence ids or narrative claims.'],
+    }),
+    outputSchema: z.toJSONSchema(strategyDocumentSchema) as Readonly<Record<string, unknown>>,
+    context: planContext({
+      runId: input.runId,
+      ...(input.heldOutCommitmentHash
+        ? { commitmentHash: input.heldOutCommitmentHash }
+        : {}),
+      semanticRole: strategyRole,
+      nodeId: strategyPlanNode.id,
+      capabilityId: strategyPlanNode.capabilityId,
+      acceptedReferenceArtifactIds: strategyReferenceArtifactIds,
+      lockIds: input.runBindings,
+      requestId: await requestId(input.runId, strategyPlanNode.id, 'primary'),
+    }),
+    signal: input.signal,
+  })
+  const authenticatedStrategy = await authenticatedResult(input.host, strategyResult)
+  const strategy = strategyDocumentSchema.parse(decodeJsonBytes(authenticatedStrategy.bytes, strategyRole))
+  if (canonicalJson(strategy) !== canonicalJson(expectedStrategy)) {
+    throw new Error('Commerce strategy Provider output drifted from the exact evidence closure.')
+  }
+  const strategyDelivery = textEncoder.encode(renderCommerceStructuredDelivery(strategy))
+  const strategyArtifact: CommerceProductionExecutionArtifact = {
+    semanticRole: strategyRole,
+    planNodeId: strategyPlanNode.id,
+    publicationArtifactId: `artifact:sha256:${await sha256Bytes(strategyDelivery)}`,
+    bytes: authenticatedStrategy.bytes,
+    retained: {
+      semanticRole: strategyRole,
+      receipt: authenticatedStrategy.receipt,
+      artifactBytesBase64: bytesToBase64(authenticatedStrategy.bytes),
+      deliveryBytesBase64: bytesToBase64(strategyDelivery),
+    },
+  }
+  runtimeByPlanNode.set(strategyPlanNode.id, strategyArtifact)
+  retainedByRole.set(strategyRole, strategyArtifact)
+  await emitCompleted(strategyArtifact)
+
+  const retainedArtifacts = COMMERCE_SEMANTIC_ROLES.map((role) => {
+    const retained = retainedByRole.get(role)?.retained
+    if (!retained) throw new Error(`Commerce runner did not retain ${role}.`)
+    return retained
+  })
+  assertCommerceRunnerReceiptClosure(retainedArtifacts)
+
+  return { artifacts: retainedArtifacts }
+}
+
 export async function runCommerceHeldOutProduction(
   input: CommerceHeldOutProductionRunnerInput,
-  host: MultimodalDesktopHost = createMultimodalDesktopHost(),
+  host: CommerceProductionHost = createCommerceProductionDesktopHost(),
 ): Promise<CommerceHeldOutPendingAdmission> {
   const facts = productFactsSchema.parse(input.facts)
   const categoryCatalog = z.string().min(2).max(8 * 1024 * 1024).parse(input.categoryCatalog)
   const attributeCatalog = z.string().min(2).max(8 * 1024 * 1024).parse(input.attributeCatalog)
   assertCommerceProductionSourceSelection(facts, input.selectedSourceFactIds)
   assertCommerceProductionRunnerRoutes()
-  await preflightCommerceProductionProvider(input.providerId)
-  const categoryIndex = buildCategoryIndex(categoryCatalog)
-  const attributeIndex = buildAttributeIndex(attributeCatalog, categoryIndex)
-  const categories = selectCommerceProductionCategoryCandidates(facts, categoryIndex.categories)
-  const compactFacts = compactFactsForModel(facts)
+  const providerPreflight = await host.preflightProvider(input.providerId)
+  assertCommerceProductionProviderAuthority(providerPreflight.provider, providerPreflight.hasKey)
   const evidenceGraph = createCommerceEvidenceGraph({ facts })
   const outcomeGraph = createCommerceOutcomeGraph({ facts })
   const inputManifest = await createCommerceHeldOutInputManifest({
@@ -837,16 +1167,16 @@ export async function runCommerceHeldOutProduction(
     outcomeGraph,
     selectedSources: inputManifest.selectedSources,
   })
-  const commitment = await createCommerceHeldOutCommitment({
+  const commitment = await host.createCommitment({
     evaluatorChallenge: input.evaluatorChallenge,
     inputManifest,
   })
   const runId = commitment.runId
 
   const sourceMaterials: CommerceRehearsalSourceMaterial[] = []
-  const sourceBytesByArtifact = new Map<string, Uint8Array>()
+  const sourceArtifacts: Array<{ artifactId: string; bytes: Uint8Array }> = []
   for (const selected of inputManifest.selectedSources) {
-    const source = await ingestCompetitionCommerceSourceImage({
+    const source = await host.ingestSource({
       requestId: await requestId(runId, selected.factId, 'source-ingest'),
       runId,
       heldOutCommitmentHash: commitment.commitmentHash,
@@ -877,7 +1207,7 @@ export async function runCommerceHeldOutProduction(
       artifactBytesBase64: bytesToBase64(source.bytes),
     })
     sourceMaterials.push(material)
-    sourceBytesByArtifact.set(material.artifactId, source.bytes)
+    sourceArtifacts.push({ artifactId: material.artifactId, bytes: source.bytes })
   }
 
   const { contract, plan } = await compileCommerceProduction({
@@ -895,236 +1225,22 @@ export async function runCommerceHeldOutProduction(
     contract,
     plan,
   })
-  const outcomeByRole = new Map(outcomeGraph.body.nodes.map((node) => [
-    commerceOutcomePayloadSchema.parse(node.payload).semanticRole,
-    node,
-  ]))
-  const planByRole = new Map(plan.body.nodes.map((node) => {
-    const outcome = outcomeGraph.body.nodes.find((candidate) => candidate.id === node.outcomeNodeId)!
-    return [commerceOutcomePayloadSchema.parse(outcome.payload).semanticRole, node] as const
-  }))
-  const runtimeByPlanNode = new Map<string, RuntimeArtifact>()
-  const retainedByRole = new Map<CommerceSemanticRole, RuntimeArtifact>()
-  const primaryReceipts: CapabilityReceipt[] = []
-  const qaReceiptIds: string[] = []
-  const qaRouteIds: string[] = []
-
-  let fixedCategoryId: string | undefined
-  for (const role of COMMERCE_SEMANTIC_ROLES.filter((candidate) => candidate.startsWith('localized-description:'))) {
-    const planNode = planByRole.get(role)!
-    const outcomeNode = outcomeByRole.get(role)!
-    const produced = await produceDescription({
-      host,
-      providerId: input.providerId,
-      runId,
-      commitmentHash: commitment.commitmentHash,
-      role: role as Extract<CommerceSemanticRole, `localized-description:${string}`>,
-      planNode,
-      outcomeNode,
-      facts,
-      compactFacts,
-      categories: fixedCategoryId
-        ? categories.filter((category) => category.id === fixedCategoryId)
-        : categories,
-      ...(fixedCategoryId ? { fixedCategoryId } : {}),
-      categoryIndex,
-      attributeIndex,
-      runBindings,
-      signal: input.signal,
-    })
-    fixedCategoryId = produced.description.categoryId
-    runtimeByPlanNode.set(planNode.id, produced.artifact)
-    retainedByRole.set(role, produced.artifact)
-    primaryReceipts.push(capabilityReceipt(produced.artifact, planNode))
-  }
-
-  for (const role of COMMERCE_SEMANTIC_ROLES.filter((candidate) => candidate === 'main-image' || candidate.startsWith('detail-image:'))) {
-    const planNode = planByRole.get(role)!
-    const references = await createCommerceRunnerMediaReferenceClosure({
-      semanticRole: role as CommerceRunnerMediaRole,
-      planNode,
-      sourceBytesByArtifact,
-      runtimeByPlanNode,
-      runBindings,
-    })
-    const outputs = await host.image({
-      providerId: input.providerId,
-      model: COMMERCE_PRODUCTION_RUNNER_MODELS.image,
-      operation: 'image-edit',
-      prompt: mediaPrompt(role, compactFacts),
-      referenceBytes: references.referenceBytes,
-      size: '1024x1024',
-      context: planContext({
-        runId,
-        commitmentHash: commitment.commitmentHash,
-        semanticRole: role,
-        nodeId: planNode.id,
-        capabilityId: planNode.capabilityId,
-        acceptedReferenceArtifactIds: references.acceptedReferenceArtifactIds,
-        lockIds: references.lockIds,
-        requestId: await requestId(runId, planNode.id, 'primary'),
-      }),
-      signal: input.signal,
-    })
-    if (outputs.length !== 1) throw new Error(`Commerce ${role} did not return exactly one retained image.`)
-    const authenticated = await authenticatedResult(host, outputs[0]!)
-    const qa = await produceSemanticQa({
-      host,
-      providerId: input.providerId,
-      runId,
-      commitmentHash: commitment.commitmentHash,
-      role,
-      planNodeId: planNode.id,
-      source: authenticated,
-      runBindings,
-      compactFacts,
-      signal: input.signal,
-    })
-    const artifact: RuntimeArtifact = {
-      semanticRole: role,
-      planNodeId: planNode.id,
-      publicationArtifactId: authenticated.receipt.artifact.artifactId,
-      bytes: authenticated.bytes,
-      retained: {
-        semanticRole: role,
-        receipt: authenticated.receipt,
-        artifactBytesBase64: bytesToBase64(authenticated.bytes),
-        semanticQa: qa.retained,
-      },
-    }
-    runtimeByPlanNode.set(planNode.id, artifact)
-    retainedByRole.set(role, artifact)
-    primaryReceipts.push(capabilityReceipt(artifact, planNode))
-    qaReceiptIds.push(qa.retained.receipt.receiptId)
-    qaRouteIds.push(qa.retained.receipt.routeId)
-  }
-
-  const videoRole = 'product-video' as const
-  const videoPlanNode = planByRole.get(videoRole)!
-  const videoReferences = await createCommerceRunnerMediaReferenceClosure({
-    semanticRole: videoRole,
-    planNode: videoPlanNode,
-    sourceBytesByArtifact,
-    runtimeByPlanNode,
-    runBindings,
-  })
-  const videoSourceBytes = videoReferences.referenceBytes[0]
-  if (!videoSourceBytes || videoReferences.referenceBytes.length !== 1) {
-    throw new Error('Commerce product video requires the exact retained main image dependency.')
-  }
-  const videoResult = await host.video({
-    providerId: input.providerId,
-    model: COMMERCE_PRODUCTION_RUNNER_MODELS.video,
-    prompt: mediaPrompt(videoRole, compactFacts),
-    resolution: '1080P',
-    ratio: '16:9',
-    durationSeconds: 5,
-    seed: await deterministicSeed(runId, videoRole),
-    referenceBytes: videoSourceBytes,
-    context: planContext({
-      runId,
-      commitmentHash: commitment.commitmentHash,
-      semanticRole: videoRole,
-      nodeId: videoPlanNode.id,
-      capabilityId: videoPlanNode.capabilityId,
-      acceptedReferenceArtifactIds: videoReferences.acceptedReferenceArtifactIds,
-      lockIds: videoReferences.lockIds,
-      requestId: await requestId(runId, videoPlanNode.id, 'primary'),
-    }),
-    signal: input.signal,
-  })
-  const authenticatedVideo = await authenticatedResult(host, videoResult)
-  const videoQa = await produceSemanticQa({
-    host,
+  const execution = await executeCommerceProduction({
     providerId: input.providerId,
     runId,
-    commitmentHash: commitment.commitmentHash,
-    role: videoRole,
-    planNodeId: videoPlanNode.id,
-    source: authenticatedVideo,
+    heldOutCommitmentHash: commitment.commitmentHash,
+    facts,
+    categoryCatalog,
+    attributeCatalog,
+    sourceArtifacts,
+    evidenceGraph,
+    outcomeGraph,
+    contract,
+    plan,
     runBindings,
-    compactFacts,
+    host,
     signal: input.signal,
   })
-  const videoArtifact: RuntimeArtifact = {
-    semanticRole: videoRole,
-    planNodeId: videoPlanNode.id,
-    publicationArtifactId: authenticatedVideo.receipt.artifact.artifactId,
-    bytes: authenticatedVideo.bytes,
-    retained: {
-      semanticRole: videoRole,
-      receipt: authenticatedVideo.receipt,
-      playbackSourceReceipt: videoResult.receipt,
-      artifactBytesBase64: bytesToBase64(authenticatedVideo.bytes),
-      semanticQa: videoQa.retained,
-    },
-  }
-  runtimeByPlanNode.set(videoPlanNode.id, videoArtifact)
-  retainedByRole.set(videoRole, videoArtifact)
-  primaryReceipts.push(capabilityReceipt(videoArtifact, videoPlanNode))
-  qaReceiptIds.push(videoQa.retained.receipt.receiptId)
-  qaRouteIds.push(videoQa.retained.receipt.routeId)
-
-  const strategyRole = 'strategy-document' as const
-  const strategyPlanNode = planByRole.get(strategyRole)!
-  const strategyBase = buildCommerceStrategyDocument({ facts, plan, receipts: primaryReceipts, findings: [] })
-  const expectedStrategy: StrategyDocument = strategyDocumentSchema.parse({
-    ...strategyBase,
-    routeIds: [...new Set([...strategyBase.routeIds, ...qaRouteIds])].sort(),
-    receiptIds: [...strategyBase.receiptIds, ...qaReceiptIds].sort(),
-  })
-  const strategyReferenceArtifactIds = resolveCommerceRunnerStrategyReferences(
-    strategyPlanNode,
-    runtimeByPlanNode,
-  )
-  const strategyResult = await host.structuredText({
-    providerId: input.providerId,
-    model: COMMERCE_PRODUCTION_RUNNER_MODELS.structuredText,
-    system: 'You are a bounded evidence compiler. Return the supplied strategy object unchanged and emit no prose.',
-    prompt: JSON.stringify({
-      task: 'Return exactly expectedStrategy under the supplied JSON schema.',
-      expectedStrategy,
-      constraints: ['Do not add, remove, reorder, summarize, or rewrite evidence ids or narrative claims.'],
-    }),
-    outputSchema: z.toJSONSchema(strategyDocumentSchema) as Readonly<Record<string, unknown>>,
-    context: planContext({
-      runId,
-      commitmentHash: commitment.commitmentHash,
-      semanticRole: strategyRole,
-      nodeId: strategyPlanNode.id,
-      capabilityId: strategyPlanNode.capabilityId,
-      acceptedReferenceArtifactIds: strategyReferenceArtifactIds,
-      lockIds: runBindings,
-      requestId: await requestId(runId, strategyPlanNode.id, 'primary'),
-    }),
-    signal: input.signal,
-  })
-  const authenticatedStrategy = await authenticatedResult(host, strategyResult)
-  const strategy = strategyDocumentSchema.parse(decodeJsonBytes(authenticatedStrategy.bytes, strategyRole))
-  if (canonicalJson(strategy) !== canonicalJson(expectedStrategy)) {
-    throw new Error('Commerce strategy Provider output drifted from the exact evidence closure.')
-  }
-  const strategyDelivery = textEncoder.encode(renderCommerceStructuredDelivery(strategy))
-  const strategyArtifact: RuntimeArtifact = {
-    semanticRole: strategyRole,
-    planNodeId: strategyPlanNode.id,
-    publicationArtifactId: `artifact:sha256:${await sha256Bytes(strategyDelivery)}`,
-    bytes: authenticatedStrategy.bytes,
-    retained: {
-      semanticRole: strategyRole,
-      receipt: authenticatedStrategy.receipt,
-      artifactBytesBase64: bytesToBase64(authenticatedStrategy.bytes),
-      deliveryBytesBase64: bytesToBase64(strategyDelivery),
-    },
-  }
-  retainedByRole.set(strategyRole, strategyArtifact)
-
-  const retainedArtifacts = COMMERCE_SEMANTIC_ROLES.map((role) => {
-    const retained = retainedByRole.get(role)?.retained
-    if (!retained) throw new Error(`Commerce runner did not retain ${role}.`)
-    return retained
-  })
-  assertCommerceRunnerReceiptClosure(retainedArtifacts)
 
   const bundle = commerceProductionRehearsalBundleSchema.parse({
     schema: 'commerce.production-rehearsal.v1',
@@ -1138,10 +1254,11 @@ export async function runCommerceHeldOutProduction(
     outcomeGraph,
     contract,
     plan,
-    artifacts: retainedArtifacts,
+    artifacts: execution.artifacts,
   })
   const verified = await verifyCommerceProductionRehearsalBundle(bundle, {
     heldOutCommitmentHash: commitment.commitmentHash,
+    host,
   })
   return {
     schema: 'commerce.held-out-pending-admission.v1',

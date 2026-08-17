@@ -369,6 +369,30 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "real-only bridge for replaying one exact renderer bundle request through the native atomic exporter"]
+    fn writes_external_bundle_request_through_native_atomic_export() {
+        let request_path = std::env::var("CUTOUT_REAL_GAME_MAP_BUNDLE_REQUEST")
+            .expect("CUTOUT_REAL_GAME_MAP_BUNDLE_REQUEST is required");
+        let export_root = std::env::var("CUTOUT_REAL_GAME_MAP_BUNDLE_ROOT")
+            .expect("CUTOUT_REAL_GAME_MAP_BUNDLE_ROOT is required");
+        let result_path = std::env::var("CUTOUT_REAL_GAME_MAP_BUNDLE_RESULT")
+            .expect("CUTOUT_REAL_GAME_MAP_BUNDLE_RESULT is required");
+        let input: BundleInput = serde_json::from_slice(
+            &std::fs::read(&request_path).expect("could not read external Game Map bundle request"),
+        )
+        .expect("external Game Map bundle request is invalid");
+        let receipt = write_bundle_to_root(Path::new(&export_root), &input)
+            .expect("external Game Map bundle failed native atomic export");
+        std::fs::write(
+            &result_path,
+            serde_json::to_vec_pretty(&receipt)
+                .expect("could not encode external Game Map bundle receipt"),
+        )
+        .expect("could not retain external Game Map bundle receipt");
+        println!("REAL_GAME_MAP_BUNDLE_RESULT={result_path}");
+    }
+
+    #[test]
     fn rejects_traversal_absolute_backslash_duplicate_and_file_directory_conflicts() {
         for path in ["../escape", "/absolute", "a/../../b", "a\\b", "a//b", "./a"] {
             assert!(

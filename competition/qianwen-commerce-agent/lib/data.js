@@ -1,4 +1,4 @@
-import { AgentError, invariant, sha256, stableJson } from './contracts.js'
+import { AgentError, IMAGE_ROLES, invariant, sha256, stableJson } from './contracts.js'
 
 const PRODUCT_MARKERS = new Set([
   'productId', 'product_id', 'itemId', 'item_id', 'offerId', 'offer_id', 'subject', 'title', 'productTitle',
@@ -20,6 +20,73 @@ const ATTRIBUTE_KEYS = ['key', 'name', 'attributeName', 'attribute_name', 'attrN
 const ATTRIBUTE_VALUES = ['value', 'attributeValue', 'attribute_value', 'attrValue', 'attr_value', 'propertyValue', 'property_value', 'propValue', 'prop_value']
 const SKU_IDS = ['skuId', 'sku_id', 'id', 'specId', 'spec_id']
 
+const GARMENT_TYPES = Object.freeze([
+  Object.freeze({ id: 'dress', pattern: /(?:连衣裙|dress)/iu }),
+  Object.freeze({ id: 'skirt', pattern: /(?:半身裙|百褶裙|大摆裙|长裙|短裙|skirt)/iu }),
+  Object.freeze({ id: 'shorts', pattern: /(?:短裤|五分裤|沙滩裤|裤衩|shorts)/iu }),
+  Object.freeze({ id: 't-shirt', pattern: /(?:t\s*恤|tee(?:\s*shirt)?|t-shirt)/iu }),
+  Object.freeze({ id: 'shirt', pattern: /(?:衬衫|衬衣|雪纺衫|shirt|blouse)/iu }),
+  Object.freeze({ id: 'sweater', pattern: /(?:毛衣|针织衫|针织套头衫|开衫|sweater|cardigan|pullover)/iu }),
+  Object.freeze({ id: 'jacket', pattern: /(?:夹克|飞行服|棒球服|工装|jacket)/iu }),
+  Object.freeze({ id: 'coat', pattern: /(?:外套|大衣|风衣|coat|overcoat)/iu }),
+  Object.freeze({ id: 'top', pattern: /(?:上衣|打底衫|罩衣|top)/iu }),
+])
+const SPECIAL_CONTEXTS = Object.freeze([
+  Object.freeze({ id: 'sport', pattern: /(?:体育专用|运动服|高尔夫|篮球|足球|排球|橄榄球|曲棍球|瑜伽|跑步|骑行|网球|健身|舞蹈|滑雪|冲浪|sports?|golf|basketball|football|yoga|running|cycling|tennis)/iu }),
+  Object.freeze({ id: 'maternity', pattern: /(?:孕妇|孕产|哺乳|maternity|nursing)/iu }),
+  Object.freeze({ id: 'underwear', pattern: /(?:内衣|内裤|文胸|睡衣|家居服|lingerie|underwear|bra|sleepwear)/iu }),
+  Object.freeze({ id: 'swim', pattern: /(?:泳衣|泳装|游泳|沙滩泳|swimwear|swimsuit)/iu }),
+  Object.freeze({ id: 'costume', pattern: /(?:角色扮演|情趣|新奇服装|cosplay|costume)/iu }),
+  Object.freeze({ id: 'traditional', pattern: /(?:传统服饰|中东传统|罩袍|纱丽|traditional|abaya)/iu }),
+  Object.freeze({ id: 'workwear', pattern: /(?:工作服|工装|制服|防护服|军服|workwear|uniform)/iu }),
+  Object.freeze({ id: 'outdoor', pattern: /(?:户外|登山|徒步|露营|outdoor|hiking)/iu }),
+  Object.freeze({ id: 'denim', pattern: /(?:牛仔|denim)/iu }),
+  Object.freeze({ id: 'leather', pattern: /(?:皮革|人造革|leather)/iu }),
+  Object.freeze({ id: 'wool', pattern: /(?:羊毛|毛呢|呢料|兔毛|皮草|wool|fur)/iu }),
+  Object.freeze({ id: 'down', pattern: /(?:羽绒|down)/iu }),
+  Object.freeze({ id: 'fleece', pattern: /(?:抓绒|fleece)/iu }),
+  Object.freeze({ id: 'quilted', pattern: /(?:绗缝|quilted)/iu }),
+])
+const ATTRIBUTE_CONCEPTS = Object.freeze([
+  Object.freeze({ id: 'color', pattern: /^(?:颜色|色彩|色号|color|colour)$/iu }),
+  Object.freeze({ id: 'size', pattern: /^(?:尺码|尺寸|号型|适合身高|size|sizing|height)$/iu }),
+  Object.freeze({ id: 'material', pattern: /^(?:材质|材质名称|面料|面料名称|(?:主|次|辅|里)?面料成分\d*|(?:主|次|辅|里)料成分|material|fabric|composition)$/iu }),
+  Object.freeze({ id: 'pattern', pattern: /^(?:图案(?:花纹)?|花型|印花|pattern|print)$/iu }),
+  Object.freeze({ id: 'sleeve-length', pattern: /^(?:袖长|sleeve\s*length)$/iu }),
+  Object.freeze({ id: 'sleeve-type', pattern: /^(?:袖型|袖口|cuff|sleeve\s*type)$/iu }),
+  Object.freeze({ id: 'top-length', pattern: /^(?:衣长|top\s*length)$/iu }),
+  Object.freeze({ id: 'skirt-length', pattern: /^(?:裙长|半裙长|skirt\s*length)$/iu }),
+  Object.freeze({ id: 'pants-length', pattern: /^(?:裤长|pants?\s*length|shorts?\s*length)$/iu }),
+  Object.freeze({ id: 'fit', pattern: /^(?:版型|廓形|fit)$/iu }),
+  Object.freeze({ id: 'waist', pattern: /^(?:腰型|腰围|腰带|waist)$/iu }),
+  Object.freeze({ id: 'collar', pattern: /^(?:领型|领口|衣领(?:类型)?|collar|neckline)$/iu }),
+  Object.freeze({ id: 'closure', pattern: /^(?:门襟|闭合方式|closure|fastening)$/iu }),
+  Object.freeze({ id: 'season', pattern: /^(?:季节|适用季节|适合季节|season)$/iu }),
+  Object.freeze({ id: 'style', pattern: /^(?:风格|风格类型|款式|style)$/iu }),
+])
+const IMAGE_ROLE_SOURCE_POLICIES = Object.freeze({
+  'detail-1': Object.freeze([
+    Object.freeze({ role: 'product-image', ordinal: 'first' }),
+    Object.freeze({ role: 'description-image', ordinal: 'first' }),
+  ]),
+  'detail-2': Object.freeze([
+    Object.freeze({ role: 'description-image', ordinal: 'first' }),
+    Object.freeze({ role: 'product-image', ordinal: 'first' }),
+  ]),
+  'detail-3': Object.freeze([
+    Object.freeze({ role: 'description-image', ordinal: 'second' }),
+    Object.freeze({ role: 'product-image', ordinal: 'second' }),
+  ]),
+  'detail-4': Object.freeze([
+    Object.freeze({ role: 'product-image', ordinal: 'last' }),
+    Object.freeze({ role: 'description-image', ordinal: 'first' }),
+  ]),
+  'detail-5': Object.freeze([
+    Object.freeze({ role: 'description-image', ordinal: 'last' }),
+    Object.freeze({ role: 'product-image', ordinal: 'last' }),
+  ]),
+})
+
 function object(value) { return value !== null && typeof value === 'object' && !Array.isArray(value) }
 function first(value, keys) {
   if (!object(value)) return undefined
@@ -33,6 +100,66 @@ function text(value) {
 }
 function pointer(base, segment) { return `${base}/${String(segment).replaceAll('~', '~0').replaceAll('/', '~1')}` }
 function normalized(value) { return String(value).normalize('NFKC').trim().replace(/\s+/g, ' ').toLocaleLowerCase('en-US') }
+function dense(value) { return normalized(value).replace(/[^\p{L}\p{N}]+/gu, '') }
+function concepts(value, definitions) { return new Set(definitions.filter(({ pattern }) => pattern.test(value)).map(({ id }) => id)) }
+function audience(value) {
+  const input = normalized(value)
+  const child = /(?:儿童|童装|男童|女童|宝宝|婴幼|小童|中童|大童|boys?|girls?|kids?|children)/iu.test(input)
+  const female = /(?:男女童|女童|女孩|女装|女士|女式|女款|淑女|胖\s*mm|胖妹妹|性别\s*[:：]?\s*女|(?:衫|衣|裙|裤|外套)女(?:春|夏|秋|冬|款)?|women|woman|female|girls?)/iu.test(input)
+  const male = /(?:男女童|男童|男孩|男装|男士|男式|男款|潮男|性别\s*[:：]?\s*男|men|man|male|boys?)/iu.test(input)
+  if (child && female && male) return 'child-unisex'
+  if (child && female) return 'child-female'
+  if (child && male) return 'child-male'
+  if (child) return 'child-unisex'
+  if (female && !male) return 'adult-female'
+  if (male && !female) return 'adult-male'
+  return undefined
+}
+function audienceCompatibility(source, candidate) {
+  if (!source || !candidate) return 0
+  if (source === candidate) return 180
+  if (source === 'child-unisex' && candidate.startsWith('child-')) return 150
+  if (candidate === 'child-unisex' && source.startsWith('child-')) return 120
+  if (source.startsWith('child-') !== candidate.startsWith('child-')) return -700
+  return -600
+}
+function ngrams(value, size = 2) {
+  const input = [...dense(value)]
+  if (input.length < size) return new Set(input)
+  return new Set(Array.from({ length: input.length - size + 1 }, (_, index) => input.slice(index, index + size).join('')))
+}
+function overlapRatio(source, candidate) {
+  const left = ngrams(source)
+  const right = ngrams(candidate)
+  if (!left.size || !right.size) return 0
+  let overlap = 0
+  for (const gram of right) if (left.has(gram)) overlap += 1
+  return overlap / right.size
+}
+function canonicalAttributeKey(value) {
+  return ATTRIBUTE_CONCEPTS.find(({ pattern }) => pattern.test(normalized(value)))?.id
+}
+function canonicalSize(value) {
+  return dense(value)
+    .replace(/^cn/, '')
+    .replace(/^xxxl$/, '3xl')
+    .replace(/^xxl$/, '2xl')
+    .replace(/^xxxxl$/, '4xl')
+    .replace(/^xxxxxl$/, '5xl')
+}
+function evidenceValue(definition, sourceFact) {
+  if (definition.customizable) return sourceFact.value
+  const source = dense(sourceFact.value)
+  const key = canonicalAttributeKey(definition.key)
+  return definition.values.find((value) => {
+    const candidate = dense(value)
+    if (candidate === source) return true
+    if (key === 'size' && canonicalSize(candidate) === canonicalSize(source)) return true
+    if (key === 'color') return false
+    return candidate.length >= 2 && source.length >= 2
+      && (source.includes(candidate) || candidate.includes(source))
+  })
+}
 function safeUrl(value) {
   const descriptor = text(value) ?? (object(value)
     ? text(first(value, ['url', 'src', 'imageUrl', 'image_url', 'skuImageUrl', 'sku_image_url', 'videoUrl', 'video_url'])?.value)
@@ -176,6 +303,48 @@ export function normalizeProduct(record) {
   return Object.freeze({ ...facts, digest: sha256(stableJson(facts)) })
 }
 
+function selectOrdinal(values, ordinal) {
+  if (!values.length) return undefined
+  if (ordinal === 'last') return values.at(-1)
+  if (ordinal === 'second') return values[Math.min(1, values.length - 1)]
+  return values[0]
+}
+
+export function planImageRoleSources(facts) {
+  const anchor = facts.identityAnchor
+  invariant(anchor?.role === 'product-image'
+    && facts.imageReferences.some((reference) => reference.url === anchor.url
+      && reference.pointer === anchor.pointer && reference.role === anchor.role),
+  'missing-product-media', 'Image role planning requires the bound explicit product-image identity anchor.')
+  const eligible = facts.imageReferences.filter((reference) => reference.url !== anchor.url
+    && ['product-image', 'description-image'].includes(reference.role))
+  return Object.freeze(IMAGE_ROLES.map((role) => {
+    if (role.id === 'main') return Object.freeze({
+      roleId: role.id, roleLabel: role.label, purpose: role.purpose,
+      identityAnchor: anchor, supportingReference: undefined,
+      supportMode: 'identity-anchor', preferenceIndex: undefined,
+    })
+    const policy = IMAGE_ROLE_SOURCE_POLICIES[role.id]
+    invariant(policy, 'invalid-media-role', `Missing source policy for image role: ${role.id}`)
+    let supportingReference
+    let preferenceIndex
+    for (const [index, preference] of policy.entries()) {
+      const candidates = eligible.filter((reference) => reference.role === preference.role)
+      const candidate = selectOrdinal(candidates, preference.ordinal)
+      if (!candidate) continue
+      supportingReference = candidate
+      preferenceIndex = index
+      break
+    }
+    return Object.freeze({
+      roleId: role.id, roleLabel: role.label, purpose: role.purpose,
+      identityAnchor: anchor, supportingReference,
+      supportMode: supportingReference ? (preferenceIndex === 0 ? 'primary-source' : 'secondary-source') : 'identity-anchor-fallback',
+      preferenceIndex,
+    })
+  }))
+}
+
 function scalar(value) { return text(value) ?? (object(value) ? text(first(value, ['valueNameAlias', 'value_name_alias', 'value', 'attrValue', 'attr_value', 'id', 'name', 'label'])?.value) : undefined) }
 function parseJson(record, label) {
   try { return JSON.parse(record.bytes.toString('utf8')) } catch { throw new AgentError('invalid-catalog', `${label} JSON is malformed.`) }
@@ -217,13 +386,17 @@ export function buildCategoryIndex(record) {
     invariant(!category.parentId || byId.has(category.parentId), 'invalid-catalog', `Unknown category parent: ${category.id}`)
     const seen = new Set([category.id])
     let cursor = category
+    const lineage = [category]
     while (cursor.parentId) {
       invariant(!seen.has(cursor.parentId), 'invalid-catalog', `Category cycle detected: ${category.id}`)
-      seen.add(cursor.parentId); cursor = byId.get(cursor.parentId)
+      seen.add(cursor.parentId); cursor = byId.get(cursor.parentId); lineage.unshift(cursor)
     }
     const leaf = !parentIds.has(category.id)
     invariant(explicitLeaf.get(category.id) !== true || leaf, 'invalid-catalog', `Category leaf flag conflicts with hierarchy: ${category.id}`)
     category.leaf = leaf
+    category.pathIds = lineage.map((entry) => entry.id)
+    category.pathNames = lineage.map((entry) => entry.name)
+    category.path = category.pathNames.join(' > ')
   }
   categories.sort((left, right) => left.id.localeCompare(right.id))
   return Object.freeze({ schema: 'commerce.category-index.v1', sourceFile: record.path, sourceSha256: record.sha256, categories, byId })
@@ -316,33 +489,59 @@ export function buildAttributeIndex(record, categoryIndex) {
   return Object.freeze({ schema: 'commerce.attribute-index.v1', sourceFile: record.path, sourceSha256: record.sha256, definitions })
 }
 
-function tokens(value) {
-  return new Set(normalized(value).split(/[^\p{L}\p{N}]+/u).filter((token) => token.length > 1))
-}
 export function catalogCandidates(facts, categoryIndex, maximum = 30) {
-  const source = [facts.category?.value, facts.title.value, facts.description?.value].filter(Boolean).join(' ')
-  const sourceNormalized = normalized(source)
-  const sourceTokens = tokens(source)
+  const source = [
+    facts.category?.value,
+    facts.title.value,
+    ...facts.attributes.map(({ key, value }) => `${key}: ${value}`),
+    ...facts.skus.flatMap((sku) => sku.attributes).slice(0, 100).map(({ key, value }) => `${key}: ${value}`),
+  ].filter(Boolean).join(' ')
+  const sourceNormalized = dense(source)
+  const detectedAudience = audience(source)
+  const sourceTypes = concepts(source, GARMENT_TYPES)
+  if (sourceTypes.size > 1) sourceTypes.delete('top')
+  const sourceAudience = detectedAudience ?? ([...sourceTypes].some((type) => ['dress', 'skirt'].includes(type)) ? 'adult-female' : undefined)
+  const sourceContexts = concepts(source, SPECIAL_CONTEXTS)
+  const sourcePlusSize = /(?:大码|加大码|胖\s*mm|胖妹妹|plus\s*size)/iu.test(source)
   return categoryIndex.categories.filter((category) => category.leaf).map((category) => {
     const exact = [category.id, category.name].some((value) => normalized(value) === normalized(facts.category?.value ?? ''))
-    const categoryTokens = tokens(`${category.id} ${category.name}`)
-    let overlap = 0
-    for (const token of categoryTokens) if (sourceTokens.has(token)) overlap += 1
-    const contains = sourceNormalized.includes(normalized(category.name)) ? 2 : 0
-    return { id: category.id, name: category.name, score: exact ? 1_000 : overlap + contains }
+    const categoryText = category.path
+    const categoryTypes = concepts(categoryText, GARMENT_TYPES)
+    if (categoryTypes.size > 1) categoryTypes.delete('top')
+    const categoryContexts = concepts(categoryText, SPECIAL_CONTEXTS)
+    let score = exact ? 10_000 : 0
+    score += Math.round(overlapRatio(source, category.name) * 220)
+    score += Math.round(overlapRatio(source, categoryText) * 100)
+    if (sourceNormalized.includes(dense(category.name)) && dense(category.name).length >= 2) score += 220
+    score += audienceCompatibility(sourceAudience, audience(categoryText))
+    if (sourceTypes.size) score += [...sourceTypes].some((type) => categoryTypes.has(type)) ? 260 : -180
+    for (const context of categoryContexts) score += sourceContexts.has(context) ? 120 : -520
+    for (const context of sourceContexts) if (categoryContexts.has(context)) score += 80
+    const categoryPlusSize = /(?:大码|plus\s*size)/iu.test(categoryText)
+    if (sourcePlusSize && categoryPlusSize) score += 150
+    else if (!sourcePlusSize && categoryPlusSize) score -= 100
+    return { id: category.id, name: category.name, path: category.path, score }
   }).sort((left, right) => right.score - left.score || left.id.localeCompare(right.id)).slice(0, maximum)
 }
 
 export function evidenceBackedCatalogAttributes(facts, attributeIndex, categoryId) {
-  const source = [...facts.attributes, ...facts.skus.flatMap((sku) => sku.attributes)]
+  const source = [
+    ...facts.attributes.map((fact) => ({ ...fact, sourceKind: 'product' })),
+    ...facts.skus.flatMap((sku) => sku.attributes.map((fact) => ({ ...fact, sourceKind: 'sale' }))),
+  ]
   const result = []
   for (const definition of attributeIndex.definitions.filter((entry) => entry.categoryId === categoryId)) {
-    const sourceFact = source.find((fact) => normalized(fact.key) === normalized(definition.key))
-    if (!sourceFact) continue
-    const exactValue = definition.customizable
-      ? sourceFact.value
-      : definition.values.find((value) => normalized(value) === normalized(sourceFact.value))
-    if (exactValue) result.push({ attrId: definition.attrId, key: definition.key, value: exactValue, sourcePointer: sourceFact.pointer })
+    const definitionConcept = canonicalAttributeKey(definition.key)
+    const exactMatches = source.filter((fact) => normalized(fact.key) === normalized(definition.key))
+    const semanticMatches = definitionConcept ? source.filter((fact) =>
+      normalized(fact.key) !== normalized(definition.key)
+      && canonicalAttributeKey(fact.key) === definitionConcept) : []
+    const matches = [...exactMatches, ...semanticMatches]
+    const matched = matches.map((fact) => ({ fact, value: evidenceValue(definition, fact) })).find(({ value }) => value)
+    if (matched) result.push({
+      attrId: definition.attrId, key: definition.key, value: matched.value,
+      sourcePointer: matched.fact.pointer, sourceKind: matched.fact.sourceKind,
+    })
   }
   return result
 }
@@ -370,12 +569,19 @@ export function compactFactsForModel(facts) {
     seenAttributes.add(identity)
     productAttributes.push({ key, value })
   }
+  const skuAxes = new Map()
+  for (const sku of facts.skus) for (const { key, value } of sku.attributes) {
+    const values = skuAxes.get(key) ?? []
+    if (!values.includes(value) && values.length < 80) values.push(value)
+    skuAxes.set(key, values)
+  }
   return {
     productId: facts.productId.value,
     sourcePlatform: facts.sourcePlatform.value,
     title: facts.title.value,
     sourceCategory: facts.category?.value,
     productAttributes,
+    skuAxes: [...skuAxes].slice(0, 20).map(([key, values]) => ({ key, values })),
     skuCount: facts.skus.length,
     sourceMediaCount: facts.imageReferences.length,
   }

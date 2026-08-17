@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const toolScopeSchema = z.enum(["read", "write", "execute", "network", "paid", "credential"]);
+export const toolScopeSchema = z.enum(["read", "write", "execute", "network", "tool-execute", "credential"]);
 export type ToolScope = z.infer<typeof toolScopeSchema>;
 
 export const sandboxCommandSchema = z.enum(["typecheck", "test", "build", "lint", "visual-test"]);

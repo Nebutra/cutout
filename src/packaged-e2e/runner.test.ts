@@ -1309,7 +1309,7 @@ describe('packaged E2E outcome evidence', () => {
     expect(outcome.selectedVisibleSliceCount).toBe(0)
   })
 
-  it('rejects hidden paid-image amplification beyond the benchmark DAG', () => {
+  it('rejects hidden Provider-image amplification beyond the benchmark DAG', () => {
     const workspace = completeOutcomeWorkspace()
     workspace.dataset.packagedE2eImageCallCount = '24'
     expect(() => collect(workspace)).toThrow(JourneyFailure)

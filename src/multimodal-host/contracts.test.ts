@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { z } from 'zod'
 import {
   DASHSCOPE_WAN_VIDEO_SEED_MAXIMUM,
   QWEN_GATE_A_ROUTES,
@@ -60,6 +61,13 @@ function receipt(): MultimodalHostReceipt {
 }
 
 describe('portable multimodal Host contracts', () => {
+  it('exports the trusted receipt contract as strict JSON Schema', () => {
+    expect(z.toJSONSchema(multimodalHostReceiptSchema)).toEqual(expect.objectContaining({
+      type: 'object',
+      additionalProperties: false,
+    }))
+  })
+
   it('routes only exact observed operation/model pairs', () => {
     expect(resolveVerifiedMultimodalRoute({
       providerKind: 'dashscope',
@@ -220,6 +228,41 @@ describe('portable multimodal Host contracts', () => {
     const drifted = structuredClone(parsed)
     drifted.artifact.artifactId = `artifact:sha256:${'e'.repeat(64)}`
     expect(() => multimodalHostReceiptSchema.parse(drifted)).toThrow(/content digest/)
+  })
+
+  it('normalizes absent native Option fields without weakening media evidence', () => {
+    const value = receipt() as Record<string, unknown>
+    value.model = 'qwen3.8-max'
+    value.routeId = 'route:dashscope:qwen3.8-max:structured-text'
+    value.operation = 'structured-text'
+    value.remoteTaskIdHash = null
+    delete value.playbackPromotion
+    value.artifact = {
+      artifactId: `artifact:sha256:${HASH}`,
+      sha256: HASH,
+      mediaType: 'application/json',
+      byteLength: 1_024,
+      decoded: true,
+      width: null,
+      height: null,
+      durationMs: null,
+      frameRate: null,
+      videoCodec: null,
+      audioCodec: null,
+      sampleTablesReadable: null,
+      playbackVerified: null,
+    }
+
+    const parsed = multimodalHostReceiptSchema.parse(value)
+    expect(parsed.remoteTaskIdHash).toBeUndefined()
+    expect(parsed.artifact.width).toBeUndefined()
+    expect(parsed.artifact.playbackVerified).toBeUndefined()
+    expect(Object.hasOwn(parsed, 'remoteTaskIdHash')).toBe(false)
+    expect(Object.hasOwn(parsed.artifact, 'width')).toBe(false)
+
+    const invalidImage = structuredClone(value) as Record<string, unknown>
+    invalidImage.artifact = { ...(value.artifact as object), mediaType: 'image/png' }
+    expect(() => multimodalHostReceiptSchema.parse(invalidImage)).toThrow(/decoded dimensions/)
   })
 
   it('rejects receipt route, timing, credential and video QA drift', () => {

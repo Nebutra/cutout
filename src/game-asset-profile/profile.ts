@@ -31,16 +31,36 @@ import {
 } from './contracts'
 import { evaluateGameAssetFrames } from './evaluation'
 import {
+  GAME_ASSET_BUNDLE_COMPILER,
+  GAME_ASSET_BUNDLE_PROTOCOL,
+  GAME_ASSET_BUNDLE_TIMING_POLICY,
+  compileGameAssetProductionBundle,
+  gameAssetBundleManifestSchema,
+} from './bundle'
+import {
   fingerprintGameAssetRehearsalVerifier,
   gameAssetProductionRehearsalBundleSchema,
   verifyGameAssetProductionRehearsalBundle,
 } from './rehearsal'
+import {
+  gameMapBundleSchema,
+  gameMapObjectLibrarySchema,
+  gameMapPreviewReceiptSchema,
+  gameMapProductionPlanSchema,
+  gameMapRuntimeManifestSchema,
+} from './map'
 
 const GAME_ASSET_RECIPE = { id: 'game-asset.production-recipe', version: 1 } as const
 const GAME_ASSET_PLAN_SCHEMA = { id: 'game-asset.plan', version: 1 } as const
 const GAME_ASSET_FRAME_SCHEMA = { id: 'game-asset.frame', version: 1 } as const
 const GAME_ASSET_EVALUATION_SCHEMA = { id: 'game-asset.evaluation', version: 1 } as const
 const GAME_ASSET_LAYERED_MAP_SCHEMA = { id: 'game-asset.layered-map', version: 1 } as const
+const GAME_ASSET_BUNDLE_SCHEMA = { id: 'game-asset.bundle', version: 1 } as const
+const GAME_MAP_PRODUCTION_PLAN_SCHEMA = { id: 'game-map.production-plan', version: 1 } as const
+const GAME_MAP_OBJECT_LIBRARY_SCHEMA = { id: 'game-map.object-library', version: 1 } as const
+const GAME_MAP_RUNTIME_MANIFEST_SCHEMA = { id: 'game-map.runtime-manifest', version: 1 } as const
+const GAME_MAP_PREVIEW_RECEIPT_SCHEMA = { id: 'game-map.preview-receipt', version: 1 } as const
+const GAME_MAP_BUNDLE_SCHEMA = { id: 'game-map.bundle', version: 1 } as const
 const GAME_ASSET_REPAIR_ACTION_ID = 'action:game-asset-repair' as const
 const GAME_ASSET_CAPABILITY_ID = 'capability:image-generation' as const
 const GAME_ASSET_SCORECARD_RULER = { id: 'ruler:game-asset-quality', version: 1 } as const
@@ -342,6 +362,42 @@ function registerGameAssetSchemas(registry: SchemaRegistry): void {
     schema: layeredGameMapManifestSchema,
     canonicalOwner: 'cutout:game-asset-profile',
   })
+  registerDomainSchema(registry, {
+    reference: GAME_ASSET_BUNDLE_SCHEMA,
+    category: 'outcome',
+    schema: gameAssetBundleManifestSchema,
+    canonicalOwner: 'cutout:game-asset-profile',
+  })
+  registerDomainSchema(registry, {
+    reference: GAME_MAP_PRODUCTION_PLAN_SCHEMA,
+    category: 'outcome',
+    schema: gameMapProductionPlanSchema,
+    canonicalOwner: 'cutout:game-asset-profile',
+  })
+  registerDomainSchema(registry, {
+    reference: GAME_MAP_OBJECT_LIBRARY_SCHEMA,
+    category: 'outcome',
+    schema: gameMapObjectLibrarySchema,
+    canonicalOwner: 'cutout:game-asset-profile',
+  })
+  registerDomainSchema(registry, {
+    reference: GAME_MAP_RUNTIME_MANIFEST_SCHEMA,
+    category: 'outcome',
+    schema: gameMapRuntimeManifestSchema,
+    canonicalOwner: 'cutout:game-asset-profile',
+  })
+  registerDomainSchema(registry, {
+    reference: GAME_MAP_PREVIEW_RECEIPT_SCHEMA,
+    category: 'outcome',
+    schema: gameMapPreviewReceiptSchema,
+    canonicalOwner: 'cutout:game-asset-profile',
+  })
+  registerDomainSchema(registry, {
+    reference: GAME_MAP_BUNDLE_SCHEMA,
+    category: 'outcome',
+    schema: gameMapBundleSchema,
+    canonicalOwner: 'cutout:game-asset-profile',
+  })
 }
 
 const gameAssetCompilerImplementation = { compile: compileGameAssetBrief }
@@ -359,9 +415,13 @@ const gameAssetPresentationImplementation = {
 }
 const gameAssetSemanticActionImplementation = { compile: compileGameAssetRepair }
 const gameAssetDeliveryImplementation = {
-  formatId: 'game-asset.atlas-manifest.v1',
+  formatId: GAME_ASSET_BUNDLE_PROTOCOL,
   mediaType: 'application/json',
-  artifactSchemas: [GAME_ASSET_FRAME_SCHEMA, GAME_ASSET_LAYERED_MAP_SCHEMA],
+  artifactSchemas: [
+    GAME_ASSET_FRAME_SCHEMA,
+    GAME_ASSET_LAYERED_MAP_SCHEMA,
+    GAME_ASSET_BUNDLE_SCHEMA,
+  ],
   requiredTargetAdapterIds: [],
 }
 
@@ -382,8 +442,30 @@ async function fingerprintGameAssetImplementations(): Promise<GameAssetImplement
     fingerprintTrustedImplementation({
       id: 'implementation:game-asset-schemas',
       functions: [registerGameAssetSchemas],
-      schemas: [gameAssetPlanSchema, observedGameAssetFrameSchema, gameAssetEvaluationSchema, layeredGameMapManifestSchema],
-      constants: [GAME_ASSET_PLAN_SCHEMA, GAME_ASSET_FRAME_SCHEMA, GAME_ASSET_EVALUATION_SCHEMA, GAME_ASSET_LAYERED_MAP_SCHEMA],
+      schemas: [
+        gameAssetPlanSchema,
+        observedGameAssetFrameSchema,
+        gameAssetEvaluationSchema,
+        layeredGameMapManifestSchema,
+        gameAssetBundleManifestSchema,
+        gameMapProductionPlanSchema,
+        gameMapObjectLibrarySchema,
+        gameMapRuntimeManifestSchema,
+        gameMapPreviewReceiptSchema,
+        gameMapBundleSchema,
+      ],
+      constants: [
+        GAME_ASSET_PLAN_SCHEMA,
+        GAME_ASSET_FRAME_SCHEMA,
+        GAME_ASSET_EVALUATION_SCHEMA,
+        GAME_ASSET_LAYERED_MAP_SCHEMA,
+        GAME_ASSET_BUNDLE_SCHEMA,
+        GAME_MAP_PRODUCTION_PLAN_SCHEMA,
+        GAME_MAP_OBJECT_LIBRARY_SCHEMA,
+        GAME_MAP_RUNTIME_MANIFEST_SCHEMA,
+        GAME_MAP_PREVIEW_RECEIPT_SCHEMA,
+        GAME_MAP_BUNDLE_SCHEMA,
+      ],
     }),
     fingerprintTrustedImplementation({
       id: 'implementation:game-asset-compiler',
@@ -432,8 +514,18 @@ async function fingerprintGameAssetImplementations(): Promise<GameAssetImplement
     }),
     fingerprintTrustedImplementation({
       id: 'implementation:game-asset-delivery',
-      schemas: [observedGameAssetFrameSchema, layeredGameMapManifestSchema],
-      constants: [gameAssetDeliveryImplementation],
+      functions: [compileGameAssetProductionBundle],
+      schemas: [
+        observedGameAssetFrameSchema,
+        layeredGameMapManifestSchema,
+        gameAssetBundleManifestSchema,
+      ],
+      constants: [
+        gameAssetDeliveryImplementation,
+        GAME_ASSET_BUNDLE_PROTOCOL,
+        GAME_ASSET_BUNDLE_COMPILER,
+        GAME_ASSET_BUNDLE_TIMING_POLICY,
+      ],
     }),
     fingerprintTrustedImplementation({
       id: 'implementation:game-asset-scorecard',

@@ -16,12 +16,12 @@ export type AgentTaskStage =
   | 'review'
   | 'deliver'
 
-export type PaidAction = 'none' | 'image-generation' | 'image-edit'
+export type ProviderAction = 'none' | 'image-generation' | 'image-edit'
 
 export interface AgentTaskContext {
   readonly stage: AgentTaskStage
   readonly multimodal: boolean
-  readonly paidAction: PaidAction
+  readonly providerAction: ProviderAction
   readonly workload?: 'general'|'webdev'|'image-to-webdev'
   readonly effortSignals?: {
     readonly complexity?: number
@@ -190,12 +190,12 @@ export function routeExecutionPolicy(
   }
 }
 
-function capabilitiesFor(task:AgentTaskContext):{required:ModelCapability[];preferred:ModelCapability[]}{if(task.paidAction==='image-generation')return{required:['image-generation'],preferred:[]};if(task.paidAction==='image-edit')return{required:['image-edit'],preferred:[]};if(task.workload==='image-to-webdev')return{required:['text','tools','vision'],preferred:[]};if(task.workload==='webdev')return{required:['text','tools'],preferred:['vision']};if(task.multimodal)return{required:['text','vision'],preferred:[]};return{required:['text'],preferred:task.stage==='plan'||task.stage==='review'?['reasoning']:[]}}
+function capabilitiesFor(task:AgentTaskContext):{required:ModelCapability[];preferred:ModelCapability[]}{if(task.providerAction==='image-generation')return{required:['image-generation'],preferred:[]};if(task.providerAction==='image-edit')return{required:['image-edit'],preferred:[]};if(task.workload==='image-to-webdev')return{required:['text','tools','vision'],preferred:[]};if(task.workload==='webdev')return{required:['text','tools'],preferred:['vision']};if(task.multimodal)return{required:['text','vision'],preferred:[]};return{required:['text'],preferred:task.stage==='plan'||task.stage==='review'?['reasoning']:[]}}
 
 function requiredSlotFor(task: AgentTaskContext): SlotId {
   if (
-    task.paidAction === 'image-generation' ||
-    task.paidAction === 'image-edit'
+    task.providerAction === 'image-generation' ||
+    task.providerAction === 'image-edit'
   ) {
     return 'image'
   }

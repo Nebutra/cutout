@@ -1,8 +1,8 @@
 //! Fixed-origin source-image ingestion for Commerce production evidence.
 //!
-//! This is not a general URL fetcher. It accepts only the reviewed competition
-//! OSS origin/path, pins validated public DNS answers, disables redirects,
-//! decodes bounded image bytes, and signs their exact fact/URL binding.
+//! This is not a general URL fetcher. It accepts only versioned reviewed
+//! Commerce source policies, pins validated public DNS answers, disables
+//! redirects, decodes bounded image bytes, and signs their exact fact/URL binding.
 
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -23,11 +23,31 @@ use super::commerce_held_out::{
 };
 use super::multimodal_receipt::{sha256, sign_host_payload, verify_host_payload};
 
-const REVIEWED_SOURCE_HOST: &str = "aib-innovation-oss.oss-accelerate.aliyuncs.com";
-const REVIEWED_SOURCE_ORIGIN: &str = "https://aib-innovation-oss.oss-accelerate.aliyuncs.com";
-const REVIEWED_SOURCE_PATH_PREFIX: &str = "/AI_Business/";
 const MAX_SOURCE_IMAGE_BYTES: usize = 10 * 1024 * 1024;
 const SOURCE_TIMEOUT_SECS: u64 = 120;
+
+#[derive(Clone, Copy)]
+struct ReviewedSourcePolicy {
+    policy_id: &'static str,
+    host: &'static str,
+    origin: &'static str,
+    path_prefix: &'static str,
+}
+
+const REVIEWED_SOURCE_POLICIES: [ReviewedSourcePolicy; 2] = [
+    ReviewedSourcePolicy {
+        policy_id: "qianwen-commerce-product-image-source.v1",
+        host: "aib-innovation-oss.oss-accelerate.aliyuncs.com",
+        origin: "https://aib-innovation-oss.oss-accelerate.aliyuncs.com",
+        path_prefix: "/AI_Business/",
+    },
+    ReviewedSourcePolicy {
+        policy_id: "dashscope-generated-product-image-source.v1",
+        host: "dashscope-a717.oss-accelerate.aliyuncs.com",
+        origin: "https://dashscope-a717.oss-accelerate.aliyuncs.com",
+        path_prefix: "/",
+    },
+];
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -139,11 +159,11 @@ impl CommerceSourceIngestReceipt {
         source_pointer: &str,
         source_descriptor: &str,
     ) -> bool {
-        reviewed_source_url(source_descriptor).is_ok_and(|url| {
+        reviewed_source_url(source_descriptor).is_ok_and(|(url, policy)| {
             self.fact_id == fact_id
                 && self.source_file == source_file
                 && self.source_pointer == source_pointer
-                && self.source_origin == REVIEWED_SOURCE_ORIGIN
+                && self.source_origin == policy.origin
                 && self.source_path == url.path()
                 && self.source_url_sha256 == sha256(source_descriptor.as_bytes())
         })
@@ -217,20 +237,27 @@ fn valid_context(context: &CommerceSourceIngestContext) -> bool {
         && !context.source_pointer.chars().any(char::is_control)
 }
 
-fn reviewed_source_url(value: &str) -> Result<reqwest::Url, ProxyError> {
+fn reviewed_source_url(
+    value: &str,
+) -> Result<(reqwest::Url, &'static ReviewedSourcePolicy), ProxyError> {
     let parsed = reqwest::Url::parse(value).map_err(|_| ProxyError::BadUrl)?;
     if parsed.scheme() != "https"
-        || parsed.host_str() != Some(REVIEWED_SOURCE_HOST)
         || parsed.port().is_some()
         || !parsed.username().is_empty()
         || parsed.password().is_some()
         || parsed.fragment().is_some()
-        || !parsed.path().starts_with(REVIEWED_SOURCE_PATH_PREFIX)
-        || parsed.path().len() <= REVIEWED_SOURCE_PATH_PREFIX.len()
     {
         return Err(ProxyError::DisallowedHost);
     }
-    Ok(parsed)
+    let policy = REVIEWED_SOURCE_POLICIES
+        .iter()
+        .find(|policy| {
+            parsed.host_str() == Some(policy.host)
+                && parsed.path().starts_with(policy.path_prefix)
+                && parsed.path().len() > policy.path_prefix.len()
+        })
+        .ok_or(ProxyError::DisallowedHost)?;
+    Ok((parsed, policy))
 }
 
 fn artifact(bytes: &[u8]) -> Result<CommerceSourceIngestArtifact, ProxyError> {
@@ -273,6 +300,7 @@ fn issue_receipt(
     context: CommerceSourceIngestContext,
     source_url: &str,
     parsed: &reqwest::Url,
+    policy: &ReviewedSourcePolicy,
     artifact: CommerceSourceIngestArtifact,
     started_at: u64,
     completed_at: u64,
@@ -294,13 +322,13 @@ fn issue_receipt(
         fact_id: context.fact_id,
         source_file: context.source_file,
         source_pointer: context.source_pointer,
-        source_origin: REVIEWED_SOURCE_ORIGIN.into(),
+        source_origin: policy.origin.into(),
         source_path: parsed.path().into(),
         source_url_sha256: sha256(source_url.as_bytes()),
         fetch_policy: CommerceSourceFetchPolicy {
-            policy_id: "qianwen-commerce-product-image-source.v1".into(),
-            origin: REVIEWED_SOURCE_ORIGIN.into(),
-            path_prefix: REVIEWED_SOURCE_PATH_PREFIX.into(),
+            policy_id: policy.policy_id.into(),
+            origin: policy.origin.into(),
+            path_prefix: policy.path_prefix.into(),
             redirects: "disabled".into(),
             dns_binding: "public-resolved-and-pinned".into(),
             maximum_bytes: MAX_SOURCE_IMAGE_BYTES,
@@ -340,12 +368,16 @@ pub(crate) fn verify_receipt(
     bytes: &[u8],
 ) -> Result<CommerceSourceIngestReceipt, ProxyError> {
     let expected_artifact = artifact(bytes)?;
+    let source_policy = REVIEWED_SOURCE_POLICIES.iter().find(|policy| {
+        receipt.source_origin == policy.origin
+            && receipt.source_path.starts_with(policy.path_prefix)
+            && receipt.source_path.len() > policy.path_prefix.len()
+            && receipt.fetch_policy.policy_id == policy.policy_id
+            && receipt.fetch_policy.origin == policy.origin
+            && receipt.fetch_policy.path_prefix == policy.path_prefix
+    });
     if receipt.protocol != "cutout.commerce-source-ingest-receipt.v1"
-        || receipt.source_origin != REVIEWED_SOURCE_ORIGIN
-        || !receipt.source_path.starts_with(REVIEWED_SOURCE_PATH_PREFIX)
-        || receipt.fetch_policy.policy_id != "qianwen-commerce-product-image-source.v1"
-        || receipt.fetch_policy.origin != REVIEWED_SOURCE_ORIGIN
-        || receipt.fetch_policy.path_prefix != REVIEWED_SOURCE_PATH_PREFIX
+        || source_policy.is_none()
         || receipt.fetch_policy.redirects != "disabled"
         || receipt.fetch_policy.dns_binding != "public-resolved-and-pinned"
         || receipt.fetch_policy.maximum_bytes != MAX_SOURCE_IMAGE_BYTES
@@ -401,7 +433,7 @@ pub async fn ai_ingest_competition_source_image(
             None
         };
         let started_at = unix_millis()?;
-        let parsed = reviewed_source_url(&source_url)?;
+        let (parsed, source_policy) = reviewed_source_url(&source_url)?;
         let context = CommerceSourceIngestContext {
             request_id: operation_request_id,
             run_id: run_id.clone(),
@@ -451,6 +483,7 @@ pub async fn ai_ingest_competition_source_image(
             context,
             &source_url,
             &parsed,
+            source_policy,
             artifact.clone(),
             started_at,
             unix_millis()?,
@@ -493,11 +526,17 @@ mod tests {
         assert!(reviewed_source_url(
             "https://aib-innovation-oss.oss-accelerate.aliyuncs.com/AI_Business/a/product.jpg?Expires=1&Signature=x"
         ).is_ok());
+        assert!(reviewed_source_url(
+            "https://dashscope-a717.oss-accelerate.aliyuncs.com/1d/1f/20260814/product.png"
+        )
+        .is_ok());
         for value in [
             "http://aib-innovation-oss.oss-accelerate.aliyuncs.com/AI_Business/a.jpg",
             "https://evil.aliyuncs.com/AI_Business/a.jpg",
             "https://aib-innovation-oss.oss-accelerate.aliyuncs.com/other/a.jpg",
             "https://aib-innovation-oss.oss-accelerate.aliyuncs.com/AI_Business/",
+            "https://dashscope-a717.oss-accelerate.aliyuncs.com/",
+            "https://dashscope-attacker.oss-accelerate.aliyuncs.com/1d/product.png",
         ] {
             assert!(reviewed_source_url(value).is_err(), "{value}");
         }
@@ -517,7 +556,7 @@ mod tests {
             output
         };
         let source_url = "https://aib-innovation-oss.oss-accelerate.aliyuncs.com/AI_Business/a/product.png?Expires=1&Signature=x";
-        let parsed = reviewed_source_url(source_url).unwrap();
+        let (parsed, policy) = reviewed_source_url(source_url).unwrap();
         let receipt = issue_receipt(
             CommerceSourceIngestContext {
                 request_id: "request:test".into(),
@@ -529,6 +568,7 @@ mod tests {
             },
             source_url,
             &parsed,
+            policy,
             artifact(&bytes).unwrap(),
             1,
             2,

@@ -85,6 +85,32 @@ showing that the vulnerable package no longer resolves.
 - Shared source-of-truth projections for readiness, recovery and UI display.
 - Sanitized errors and content-addressed/provenance-bound artifact receipts.
 
+### Convention: Decode binary views across renderer realms
+
+Browser, worker, VM and WebView boundaries may create a valid typed-array view
+whose constructor belongs to another realm. A realm-local `instanceof
+Uint8Array` check can therefore misclassify real bytes as a Blob and fail only
+at the native persistence handoff.
+
+Wrong:
+
+```ts
+if (content instanceof Uint8Array) return content
+return new Uint8Array(await content.arrayBuffer())
+```
+
+Correct:
+
+```ts
+if (ArrayBuffer.isView(content)) {
+  return new Uint8Array(content.buffer, content.byteOffset, content.byteLength)
+}
+return new Uint8Array(await content.arrayBuffer())
+```
+
+Binary repository tests must include one typed array created in another realm and
+assert the exact bytes passed to the native bridge.
+
 ---
 
 ## Testing Requirements

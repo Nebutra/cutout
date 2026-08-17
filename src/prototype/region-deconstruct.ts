@@ -255,7 +255,7 @@ export async function nameRegionSlices(
   return renames
 }
 
-/** The exact Provider/model transport selected for one paid board attempt. */
+/** The exact Provider/model transport selected for one board attempt. */
 export interface RegionImageRoute {
   readonly assignment: ModelAssignment
   readonly operation: 'image-edit' | 'image-generation'
@@ -332,7 +332,7 @@ export interface RegionBreakdownParams {
   /** Exact model evidence intersected with an implemented edit adapter. */
   readonly editSupported?: boolean
   /**
-   * Re-resolve the exact route immediately before every paid attempt. This is
+   * Re-resolve the exact route immediately before every Provider attempt. This is
    * intentionally attempt-scoped so transient and QA retries can leave a
    * pressured route without replaying the logical board node.
    */
@@ -359,7 +359,7 @@ export interface RegionBreakdownParams {
   readonly onRegionError?: (regionId: string, message: string) => void
   /** Retry only these failed regions. Omit for a complete page breakdown. */
   readonly targetRegionIds?: readonly string[]
-  /** Explicit paid QA retries per region board (only with `deps.reviewBoard`). Default 0. */
+  /** Explicit Provider QA retries per region board (only with `deps.reviewBoard`). Default 0. */
   readonly qaMaxRetries?: number
   /** Bounded retries for classified transient Provider transport failures. Default 1. */
   readonly transientRetries?: number
@@ -377,7 +377,7 @@ export interface RegionBreakdownParams {
   readonly onTextFreeSourceError?: (message: string) => void
   /** Streamed once per QA attempt: regionId, attempt number, and its verdict. */
   readonly onRegionQa?: (regionId: string, attempt: number, verdict: QaVerdict) => void
-  /** Records one paid generation attempt for this exact logical board node. */
+  /** Records one Provider generation attempt for this exact logical board node. */
   readonly onRegionGenerationAttempt?: (regionId: string) => void
 }
 

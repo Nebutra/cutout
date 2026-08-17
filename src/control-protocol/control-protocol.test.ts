@@ -33,7 +33,7 @@ describe('cutout.control.v1 request schema', () => {
     }
   })
 
-  it('accepts a bounded audit intent with a larger paid-tool execution prompt', () => {
+  it('accepts a bounded audit intent with a larger Provider execution prompt', () => {
     const prompt = 'render context '.repeat(2_000)
     const parsed = controlRequestSchema.parse(request({
       operation: {
@@ -169,10 +169,10 @@ describe('control request execution guard', () => {
   it('allows an approval-free dry-run of an external export while retaining the approval gate for apply', () => {
     const external = request({ operation: { type: 'export.design-kit', format: 'directory' } })
     const preview = applyControlRequest(createControlLedger(4), { ...external, mode: 'dry-run' }, {
-      policy: { allowPaid: false, allowExternal: false, requireApprovalForExternal: true },
+      policy: { allowProviderExecution: false, allowExternal: false, requireApprovalForExternal: true },
     })
     const apply = applyControlRequest(createControlLedger(4), external, {
-      policy: { allowPaid: false, allowExternal: true, requireApprovalForExternal: true },
+      policy: { allowProviderExecution: false, allowExternal: true, requireApprovalForExternal: true },
     })
 
     expect(preview.decision).toBe('dry-run')
@@ -204,34 +204,33 @@ describe('control request execution guard', () => {
       const guarded = applyControlRequest(
         createControlLedger(4),
         controlRequestSchema.parse(request({ operation: { type, task } })),
-        { policy: { allowPaid: false, allowExternal: true, requireApprovalForExternal: true } },
+        { policy: { allowProviderExecution: false, allowExternal: true, requireApprovalForExternal: true } },
       )
       expect(guarded.decision).toBe('denied')
       expect(guarded.response.error?.code).toBe('approval-required')
     },
   )
 
-  it('requires explicit approval for guarded paid or external effects', () => {
-    const paid = guardControlAction({}, {
-      effects: { paid: true, external: false },
-      policy: { allowPaid: true, allowExternal: true, requireApprovalForPaid: true },
+  it('uses standing Provider authorization while preserving approval for external effects', () => {
+    const providerExecution = guardControlAction({}, {
+      effects: { providerExecution: true, external: false },
+      policy: { allowProviderExecution: true, allowExternal: true },
     })
     const external = guardControlAction(
       {},
       {
-        effects: { paid: false, external: true },
-        policy: { allowPaid: true, allowExternal: true, requireApprovalForExternal: true },
+        effects: { providerExecution: false, external: true },
+        policy: { allowProviderExecution: true, allowExternal: true, requireApprovalForExternal: true },
       },
     )
 
-    expect(paid.allowed).toBe(false)
-    expect(paid.reason).toBe('approval-required')
+    expect(providerExecution.allowed).toBe(true)
     expect(external.allowed).toBe(false)
     expect(external.reason).toBe('approval-required')
 
     expect(guardControlAction({ approval: { id: 'approval-1', grantedAt: 1 } }, {
-      effects: { paid: true, external: false },
-      policy: { allowPaid: true, allowExternal: true, requireApprovalForPaid: true },
+      effects: { providerExecution: false, external: true },
+      policy: { allowProviderExecution: true, allowExternal: true, requireApprovalForExternal: true },
     }).allowed).toBe(true)
   })
 })

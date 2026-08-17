@@ -18,7 +18,13 @@
   "commit": null,
   "pr_url": null,
   "subtasks": [],
-  "children": [],
+  "children": [
+    "08-14-multi-action-sprite-family",
+    "08-14-layered-game-map-production",
+    "08-14-managed-game-engine-adapters",
+    "08-14-temporal-game-asset-ingestion",
+    "08-14-agent-sprite-forge-coverage-ledger"
+  ],
   "parent": "08-13-full-scenario-design-os",
   "relatedFiles": [],
   "notes": "",

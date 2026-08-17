@@ -1,0 +1,4 @@
+{"file":".trellis/spec/frontend/game-asset-profile.md","reason":"Owns typed layered-map authority, non-authoritative flattened previews, structured collision/zones, retained evidence and delivery boundaries."}
+{"file":".trellis/spec/frontend/design-profile-platform.md","reason":"Defines strict Profile-owned schemas, canonical hashes, deterministic compiler replay and capability-claim limits."}
+{"file":".trellis/spec/frontend/design-os-kernel.md","reason":"Defines frozen graph authority, dependency identities, targeted repair and replay invariants reused by the Game Profile."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Requires one canonical projection for fingerprints and complete manifest validation across planning, persistence and delivery."}

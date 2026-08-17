@@ -133,8 +133,8 @@ async function listEndpointModels(cfg: ProviderConfig): Promise<string[]>
 The remote check is deliberately limited to authenticated `GET /models`. It
 verifies host policy, protocol-specific authentication, base URL normalization,
 and supported catalog parsing, but it does not claim that generation succeeded.
-There is no standardized no-cost `OPTIONS`/`HEAD` generation probe shared by all
-four protocol families, and Settings must never trigger a billable model call.
+There is no standardized read-only `OPTIONS`/`HEAD` generation probe shared by all
+four protocol families, and Settings must never trigger a generation request.
 Generation viability is enforced locally by the closed kind/protocol matrix,
 exhaustive adapter selection, protocol-aware paths/auth, and request-shape tests.
 

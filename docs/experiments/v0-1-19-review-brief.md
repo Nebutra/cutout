@@ -23,8 +23,8 @@ reviewable commits.
    negative regression test keeping it removed.
 2. **Planning progress disclosure.** One opaque `step:prepare` split into four
    named phases inside a compact `<details>`.
-3. **Money removed from the paid-tool authority model.** Authorization now depends
-   only on capability, host policy and explicit approval. A cost *estimate* can no
+3. **Provider execution authority simplified.** Authorization now depends
+   only on capability, host policy and explicit approval. An estimate can no
    longer approve or refuse work — which is what
    `docs/HEADLESS_AGENT_CONTROL.md:172-186` required all along.
 4. **Governance repair.** The backlog went from 34 "active" tasks to 4 genuinely

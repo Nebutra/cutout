@@ -1,0 +1,111 @@
+{
+  "version": "game-map.semantic-acceptance.v1",
+  "receiptId": "receipt:game-map-semantic-acceptance:f43782801cfb522a4776c1aa19f82f86149a8cac1a79d26a00155f84f19517f3",
+  "receiptHash": "1beeac3fe112f2de987750bf0164410d1de203a95b1478253bf8449460c2fe10",
+  "mapId": "map:real-qwen:tile",
+  "mode": "tile",
+  "plan": {
+    "id": "plan:real-qwen:tile",
+    "contentHash": "9756bf842353d26cd323381c3876d75fbc9ebb470e53fe7693cd37f72d3bf3df"
+  },
+  "runtimeManifest": {
+    "id": "runtime-manifest:real-qwen:tile",
+    "revision": "revision:sha256:971baa0e0f3e7f16d0da4f21ebd7ef13702e1a864b042341953dc6d7df416085",
+    "contentHash": "97cb72e1f9ca63cc02468be69d857919bb4b9d866f80e6bbdb7208315f860745"
+  },
+  "objectLibrary": {
+    "id": "object-library:real-qwen:tile",
+    "revision": "revision:sha256:53b0fc880143edc7cfa831479fff60ccb81c6fd992cd4ddc7de4826b10e8fe59",
+    "contentHash": "9bff5b2a8e1ce73f3e7e9f87230615db5df2e4dfe1fa9e0c2f18c5539edc98df"
+  },
+  "previewReceiptId": "game-map-preview-receipt:sha256:1dc263afbe0508772ff1915a98339a3d2375a28fbadbddb60be10878c2f8170d",
+  "previewReceiptHash": "179f9fe69b5b06a567a64c1b8e0e1b3cff4584cc22a937bbf75b981f59c8d5ef",
+  "previewArtifactId": "artifact:sha256:ae3feb3675265b570e7c0e2f8bc26b8dbf26490d341b72f4119d60ce48de5233",
+  "debugOverlayArtifactId": "artifact:sha256:f56bd98241890560423665466a8c7b57796ea74a5c3d4e1f6de568d3ab7fa86b",
+  "acceptedArtifacts": [
+    {
+      "bindingKey": "object:object:real-qwen:tile:landmark@object:real-qwen:tile:landmark:revision:1",
+      "admissionReceiptId": "receipt:game-map-artifact-admission:b3f26312e480c8b95ba1a4629fb3b6f3e9dc5efb1da9ded61e9538aad5ee2809",
+      "admissionReceiptHash": "9f7089aec68c801882b6546626988532fdf1f8fd6cdb06cb91cc6f2d3e8c9273",
+      "sourceReceiptId": "receipt:multimodal:1955890b1e80444babaf84313f6563fc",
+      "sourceReceiptHash": "24ed176b45a69c7af97ddf77f06f86fdea7fba2723fad40ca09436e7d2e86493",
+      "sourceArtifactId": "artifact:sha256:f450273d91c9ff33c4b25934c951199321435bac4ee89aa3540d3fe9429f7771",
+      "sourceArtifactSha256": "f450273d91c9ff33c4b25934c951199321435bac4ee89aa3540d3fe9429f7771",
+      "outputArtifactId": "artifact:sha256:393d31f13e529d8defbb5d3d1ebcafe11eb59a15a82d242e64c886525b6de0dc",
+      "outputArtifactSha256": "393d31f13e529d8defbb5d3d1ebcafe11eb59a15a82d242e64c886525b6de0dc"
+    },
+    {
+      "bindingKey": "runtime:terrain-atlas",
+      "admissionReceiptId": "receipt:game-map-artifact-admission:4e166d892143206924fa32770ab6b43b0b7918333efa0565146df34d22d8651f",
+      "admissionReceiptHash": "e34e1139cf2e44954faa3d17ccbf4aa958b50e80ce6421876c4111344e6eef1d",
+      "sourceReceiptId": "receipt:multimodal:7d151d371dbf41f88ecc4d92e6beb15f",
+      "sourceReceiptHash": "2c8a3422f26c52a94f947affa324bb1001da6c41b7e410c31e0e96911aeba71e",
+      "sourceArtifactId": "artifact:sha256:7902c05e21d97a74319c4c8a9ca3e4ebe56de8dc37c1e7633ea79b589b201462",
+      "sourceArtifactSha256": "7902c05e21d97a74319c4c8a9ca3e4ebe56de8dc37c1e7633ea79b589b201462",
+      "outputArtifactId": "artifact:sha256:650d1eb661e7faaedd3e6091041af61c482194f9e992281635deb47858bee9e3",
+      "outputArtifactSha256": "650d1eb661e7faaedd3e6091041af61c482194f9e992281635deb47858bee9e3"
+    }
+  ],
+  "decisions": [
+    {
+      "subjectId": "artifact:sha256:650d1eb661e7faaedd3e6091041af61c482194f9e992281635deb47858bee9e3",
+      "criterion": "visual-role-fidelity",
+      "status": "accepted",
+      "reviewerKind": "local-agent-visual-review",
+      "reviewerId": "reviewer:codex:real-game-map-gate-4",
+      "evidenceArtifactIds": [
+        "artifact:sha256:650d1eb661e7faaedd3e6091041af61c482194f9e992281635deb47858bee9e3"
+      ],
+      "notes": "The retained runtime visual matches its inferred scene or tile role."
+    },
+    {
+      "subjectId": "artifact:sha256:393d31f13e529d8defbb5d3d1ebcafe11eb59a15a82d242e64c886525b6de0dc",
+      "criterion": "object-cutout-quality",
+      "status": "accepted",
+      "reviewerKind": "local-agent-visual-review",
+      "reviewerId": "reviewer:codex:real-game-map-gate-4",
+      "evidenceArtifactIds": [
+        "artifact:sha256:393d31f13e529d8defbb5d3d1ebcafe11eb59a15a82d242e64c886525b6de0dc"
+      ],
+      "notes": "The retained reusable object has a complete silhouette and production-usable transparent edge."
+    },
+    {
+      "subjectId": "artifact:sha256:ae3feb3675265b570e7c0e2f8bc26b8dbf26490d341b72f4119d60ce48de5233",
+      "criterion": "runtime-composition",
+      "status": "accepted",
+      "reviewerKind": "local-agent-visual-review",
+      "reviewerId": "reviewer:codex:real-game-map-gate-4",
+      "evidenceArtifactIds": [
+        "artifact:sha256:ae3feb3675265b570e7c0e2f8bc26b8dbf26490d341b72f4119d60ce48de5233"
+      ],
+      "notes": "The retained deterministic runtime composition is visually coherent."
+    },
+    {
+      "subjectId": "artifact:sha256:f56bd98241890560423665466a8c7b57796ea74a5c3d4e1f6de568d3ab7fa86b",
+      "criterion": "authored-geometry",
+      "status": "accepted",
+      "reviewerKind": "local-agent-visual-review",
+      "reviewerId": "reviewer:codex:real-game-map-gate-4",
+      "evidenceArtifactIds": [
+        "artifact:sha256:f56bd98241890560423665466a8c7b57796ea74a5c3d4e1f6de568d3ab7fa86b"
+      ],
+      "notes": "The retained debug overlay matches the reviewed authored collision, zone, spawn, exit, and camera data."
+    },
+    {
+      "subjectId": "artifact:sha256:650d1eb661e7faaedd3e6091041af61c482194f9e992281635deb47858bee9e3",
+      "criterion": "terrain-grid-coherence",
+      "status": "accepted",
+      "reviewerKind": "local-agent-visual-review",
+      "reviewerId": "reviewer:codex:real-game-map-gate-4",
+      "evidenceArtifactIds": [
+        "artifact:sha256:650d1eb661e7faaedd3e6091041af61c482194f9e992281635deb47858bee9e3"
+      ],
+      "notes": "The retained terrain remains coherent through exact 32-pixel grid replay."
+    }
+  ],
+  "verifierImplementationHash": "d99c5c5e80480fcccac3268202abaa6e4b8688a672d4711556f84702eb42e69d",
+  "reviewerKind": "local-agent-visual-review",
+  "reviewerId": "reviewer:codex:real-game-map-gate-4",
+  "acceptedAt": 1786936438299,
+  "signature": "959f8bb5e708d5b51cb5db728e407ae131bbebb23a97eed89211c0a69da9c3de"
+}

@@ -12,6 +12,12 @@ The product should adopt Agent Sprite Forge's strongest domain practices while
 retaining Cutout's stronger authority, provenance, candidate-selection, approval,
 repair, and content-addressed artifact model.
 
+Replacement is measured by user outcomes, not by copying Agent Sprite Forge's
+Python flags or exposing its three Skill names as scenario buttons. A user who
+asks for the same sprite, map, video-derived animation, or engine handoff must be
+routed from intent to an equal or stronger inspectable deliverable without
+installing Agent Sprite Forge separately.
+
 This is also the third-scenario proof for the full-scenario Design OS. It must
 enter through the Design Profile Platform and demonstrate that a genuinely new
 spatial/temporal/runtime-delivery domain needs no Kernel or global-navigation
@@ -23,6 +29,12 @@ branch.
   `64fd0b57d3f2ae117ef0a95e4c2decc25b4c9dd2` was inspected on 2026-08-13.
   It covers sprite sheets, layered maps, deterministic local processing, limited
   engine handoff, and a Grok-only video-to-sprite path.
+- The same commit remains `main` on 2026-08-14. Its reusable product surface is
+  three Skills (`generate2dsprite`, `generate2dmap`, `video2dsprite`), one sprite
+  processor, two map extractors and one layered-preview compositor. The Godot,
+  Unity and playable-game showcases additionally rely on project-specific Codex
+  coding; the repository does not contain a general Unity/Godot gameplay exporter
+  that can be copied as a production contract.
 - Cutout already owns generated-image routing, multi-candidate exploration,
   production run state, deterministic cutout evidence, managed artifacts,
   OutcomeGraph/ArtifactGraph provenance, targeted repair, and approval policy.
@@ -36,7 +48,8 @@ branch.
   binds the exact request closure; single-use apply directly owns real BYOK
   Provider execution without a per-call payment confirmation; returned receipts
   and original bytes are retained, passed
-  through a versioned deterministic white-border Cutout processor, and
+  through a versioned deterministic chroma-trimap plus multi-level foreground
+  reconstruction processor for controlled generation boards, and
   reverified byte-for-byte before processed-frame pixel evidence is accepted.
 - Post-generation semantic acceptance is separately signed only after the
   retained output set is displayed for review, native code re-verifies the exact
@@ -46,8 +59,9 @@ branch.
 - The System inspector now has a real Game assets workbench. It builds a retained
   action plan from the user's reference image, previews the exact native paid
   request, displays processed output bytes and evaluator findings, requires an
-  explicit per-role semantic review, and persists the signed bundle. Reopening a
-  stored run re-verifies its receipts and bytes instead of trusting saved status.
+  explicit per-role Keep/Regenerate review, previews a strict subset repair before
+  paid apply, and persists the newly signed complete bundle. Reopening a stored
+  run re-verifies its receipts and bytes instead of trusting saved status.
 
 ## Requirements
 
@@ -93,6 +107,9 @@ branch.
   blockers under the existing production policy.
 - Allow targeted regeneration or reprocessing of one failing action or FX family
   while preserving accepted siblings and their hashes.
+- Native repair must re-verify the complete parent authorization and retained
+  bytes before preview, invoke the Provider only for selected failed roles, and
+  sign a new complete authorization that binds parent and preserved-role lineage.
 
 ### R4. Layered-map semantics
 
@@ -176,7 +193,41 @@ branch.
   approve, score, or promote a run.
 - Exactly one attached image may become the retained master reference. Multiple
   images require explicit selection; the router must not guess identity authority.
-- `Create -> Game assets` remains a visible fallback, not the primary workflow.
+- Create exposes no Game Asset scenario picker. The requested outcome selects the
+  Profile automatically and the routed workbench exposes reviewable controls.
+
+### R9. Complete Agent Sprite Forge outcome coverage
+
+- Maintain a versioned coverage ledger for every declared upstream outcome:
+  sprite single/action/directional/family/FX output, scale-profile reuse, prop and
+  terrain pack extraction, six map modes, layered preview, structured collision/
+  zones, runtime-neutral delivery, managed engine handoff, and video-derived
+  animation.
+- A coverage entry is complete only when intent routing, executable production,
+  deterministic or attributed QA, targeted repair where applicable, retained
+  evidence, preview and delivery all close. Documentation or schema presence does
+  not count as coverage.
+- Sprite-family production must orchestrate multiple action/direction groups from
+  one identity lock, establish a master scale/anchor profile from an accepted
+  grounded action, keep body/FX dependencies separate, and assemble final atlases
+  only from accepted action clips.
+- Map production must infer one of `tile`, `scene`, `side-scroll`, `grid`,
+  `room-chunk`, or `baked-scene` from the requested playable outcome. Every mode
+  declares its visual layers, runtime object model, collision model, zones/exits,
+  camera contract and delivery artifacts instead of treating a flattened image
+  as a playable map.
+- Engine adapters consume only an accepted runtime-neutral Game bundle. They may
+  emit managed Godot/Unity-shaped packages and validation receipts, but cannot
+  silently invent gameplay rules or mutate arbitrary existing projects.
+- Video-to-sprite remains a separately gated ingestion route. It must retain the
+  authorized video receipt and bytes, deterministically decode/sample frames, and
+  pass the same sprite QA. The absence of an authorized video Host keeps this
+  coverage entry visibly unavailable rather than falling back to fabricated
+  frames.
+- Project-specific gameplay assembly belongs to the existing Coding Profile. The
+  Game Asset Profile may hand it an accepted bundle and a typed integration brief;
+  it must not absorb arbitrary game logic, deployment, or engine-project mutation
+  into its asset authority.
 
 ## Acceptance Criteria
 
@@ -188,8 +239,9 @@ branch.
 - [ ] A deterministic processor turns retained real Host output bytes into
       ordered transparent frames plus sheet/preview artifacts and emits
       reproducible QA measurements for empty frames, edge touch, anchor drift,
-      and scale drift. Fixed bytes may additionally test determinism but cannot
-      satisfy the real-Host criterion.
+      scale drift, residual board spill and foreground-color reconstruction.
+      Fixed bytes may additionally test determinism but cannot satisfy the
+      real-Host criterion.
 - [ ] A retained artifact whose decoded dimensions or frame timing differs from the request
       records the observed values, blocks incompatible slicing/delivery, and does
       not let requested values masquerade as receipt or QA truth.
@@ -222,6 +274,20 @@ branch.
       rehearsal or promotion acceptance.
 - [ ] Public Agent capability validation passes only after any genuinely shipped
       operations, formats, CLI/MCP tools, manifest, and docs are synchronized.
+- [ ] A coverage ledger maps every declared Agent Sprite Forge output to an
+      executable Cutout route and independently shows `unsupported`, `contract`,
+      `real-host`, or `accepted-delivery`; no aggregate "replacement complete"
+      state is possible while any required outcome is below accepted delivery.
+- [ ] One natural-language character request produces at least idle, run, attack
+      body and attack FX as separately reviewable action groups, reuses one
+      accepted grounded scale profile, repairs one failed group without changing
+      accepted sibling hashes, and exports a multi-animation neutral bundle.
+- [ ] Representative contract and real-delivery cases cover all six map modes;
+      at minimum `scene` and `tile` modes complete retained real production before
+      the map family can be represented as production-ready.
+- [ ] Godot and Unity adapters deterministically compile the same accepted neutral
+      bundle into managed packages, validate every referenced artifact/hash, and
+      leave the accepted neutral bundle unchanged if adapter validation fails.
 - [x] A natural-language Game Asset brief from Home or the project composer opens
       the Game workbench with extracted action/direction/frame controls, bypasses
       the generic Agent run, and binds only one unambiguous image attachment.
@@ -240,3 +306,11 @@ branch.
   remains separately attributed evidence.
 - Pixel-perfect parity with Agent Sprite Forge's Python CLI or its magenta-only
   cleanup implementation.
+
+## Product Boundary Decision
+
+- "Completely replace Agent Sprite Forge" means complete coverage of its declared
+  Sprite, Map and Video-to-Sprite outcomes plus managed Godot/Unity handoff.
+  Playable-game assembly, arbitrary gameplay code, existing-project mutation and
+  deployment remain delegated to Cutout's Coding Profile under its independent
+  planning, approval, filesystem and validation authority.

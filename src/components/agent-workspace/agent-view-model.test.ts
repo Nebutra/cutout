@@ -64,9 +64,9 @@ describe('buildAgentViewModel', () => {
   })
   it('reconciles a matching receipt so the stale approval is no longer actionable', () => {
     const runEvents = replayRunEvents([
-      { eventId: 'start-paid', runId: 'paid', at: 1, type: 'run-started', mode: 'create' },
-      { eventId: 'approval-paid', runId: 'paid', at: 2, type: 'tool-approval-requested', toolCallId: 'image-1', requestId: 'request-1', tool: 'image.generate', label: 'Generate hero', model: { providerId: 'openai', model: 'gpt-image-1' }, approvalPolicy: 'explicit', reason: 'Explicit approval is required.', pendingApproval: true },
-      { eventId: 'receipt-paid', runId: 'paid', at: 3, type: 'tool-receipt-recorded', toolCallId: 'image-1', receipt: { receiptId: 'receipt-1', requestId: 'request-1', capability: 'generate-image', providerId: 'openai', model: 'gpt-image-1', status: 'succeeded', charged: { currency: 'USD', amount: 0.07, credits: 7 }, outputArtifactIds: ['hero.png'], startedAt: 2, completedAt: 3 } },
+      { eventId: 'start-provider', runId: 'provider', at: 1, type: 'run-started', mode: 'create' },
+      { eventId: 'approval-provider', runId: 'provider', at: 2, type: 'tool-approval-requested', toolCallId: 'image-1', requestId: 'request-1', tool: 'image.generate', label: 'Generate hero', model: { providerId: 'openai', model: 'gpt-image-1' }, approvalPolicy: 'explicit', reason: 'Explicit approval is required.', pendingApproval: true },
+      { eventId: 'receipt-provider', runId: 'provider', at: 3, type: 'tool-receipt-recorded', toolCallId: 'image-1', receipt: { receiptId: 'receipt-1', requestId: 'request-1', capability: 'generate-image', providerId: 'openai', model: 'gpt-image-1', status: 'succeeded', outputArtifactIds: ['hero.png'], startedAt: 2, completedAt: 3 } },
     ])
     const model = buildAgentViewModel({ brief: 'Hero', workflowPhase: 'planning', stages: [], outcome: null, working: true, elapsedSeconds: 1, runError: null, runEvents })
     expect(model.feed).toEqual([expect.objectContaining({ type: 'tool', status: 'complete', providerModel: 'openai/gpt-image-1', receiptId: 'receipt-1', outputRefs: ['hero.png'] })])

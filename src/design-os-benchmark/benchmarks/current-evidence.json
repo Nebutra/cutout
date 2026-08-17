@@ -1,0 +1,8 @@
+{
+  "schema": "design-os.benchmark-evidence-pointer.v1",
+  "jobId": "commerceBurgundy006A20260816",
+  "admittedEvidenceSha256": "e4b7dec623c908cd4c26f9d5e8de29a71bbec1502c95bfab10d207bd76e774d9",
+  "bundleHash": "7ccb6d52ea960077a30759b5c4edf78573975ccf60c0384137ebfaf75cfe359a",
+  "attestationId": "attestation:commerce-held-out:194238e7-de44-4e73-b6e1-6af53354f2c1",
+  "hostBuildVersion": "0.1.21"
+}

@@ -160,12 +160,12 @@ describe('AgentWorkspaceDock', () => {
     expect(html).toMatch(/data-slot="agent-conversation" class="[^"]*min-h-0 flex-1 overflow-y-auto/)
     expect(html).not.toContain('data-slot="agent-details"')
   })
-  it('keeps approval focused on the requested action, not provider billing', () => {
+  it('keeps approval focused on the requested external action', () => {
     const onApproveTool = vi.fn()
     const html = renderToStaticMarkup(createElement(AgentWorkspaceDock, {
       viewModel: {
         ...draftModel,
-        summary: { status: 'running', title: 'Waiting for approval', detail: 'One paid tool is paused.', intent: 'Generate hero', elapsedLabel: '0:02' },
+        summary: { status: 'running', title: 'Waiting for approval', detail: 'One external tool is paused.', intent: 'Generate hero', elapsedLabel: '0:02' },
         feed: [{ id: 'approval', type: 'tool', status: 'waiting', title: 'Generate hero', detail: 'Tool: image.generate', provenance: 'runtime', toolCallId: 'tool-1', requestId: 'request-1', providerModel: 'openai/gpt-image-1', approval: { status: 'required', reason: 'Explicit approval is required.' }, actions: ['approve', 'deny'] }],
       },
       composer: { value: '', disabled: true, onChange: vi.fn(), onSubmit: vi.fn() },
@@ -177,11 +177,6 @@ describe('AgentWorkspaceDock', () => {
     expect(html).toContain('Deny')
     expect(html).toContain('data-slot="agent-decision-bubble"')
     expect(html).not.toContain('Tool: image.generate')
-    expect(html).not.toContain('data-slot="agent-cost-summary"')
-    expect(html).not.toContain('Charged')
-    expect(html).not.toContain('Budget')
-    expect(html).not.toContain('USD 0.08')
-    expect(html).not.toContain('Provider estimate')
   })
   it('keeps a real pending approval actionable during local preflight', () => {
     const html = renderToStaticMarkup(createElement(AgentWorkspaceDock, {
@@ -548,15 +543,13 @@ describe('AgentWorkspaceDock', () => {
     expect(html).not.toContain('aria-label="Open Design system"')
   })
 
-  it('keeps cost disclosure out of idle workspace chrome', () => {
+  it('keeps execution approval controls out of idle workspace chrome', () => {
     const hidden = renderToStaticMarkup(createElement(AgentWorkspaceDock, {
       viewModel: stoppedModel,
       composer: { value: '', onChange: vi.fn(), onSubmit: vi.fn() },
     }))
-    expect(hidden).not.toContain('自动执行付费模型，费用以提供商为准')
-    expect(hidden).not.toContain('USD')
-    expect(hidden).not.toContain('Charged')
-    expect(hidden).not.toContain('Budget')
+    expect(hidden).not.toContain('Approve')
+    expect(hidden).not.toContain('Deny')
   })
 
   it('drops stale approval gates after a run stops', () => {
@@ -576,7 +569,6 @@ describe('AgentWorkspaceDock', () => {
     expect(html).not.toContain('Decision needed')
     expect(html).not.toContain('Approve')
     expect(html).not.toContain('Deny')
-    expect(html).not.toContain('USD 0.08')
   })
 
   it('renders a compact, accessible Agent context bar', () => {

@@ -13090,39 +13090,34 @@ var imageAdapterStrategySchema = _enum([
 	"grok-imagine-image-quality": ["image-generation", "image-edit"]
 })];
 //#endregion
-//#region src/control-protocol/paid-tool-contract.ts
+//#region src/control-protocol/provider-tool-contract.ts
 var CREDENTIAL_VALUE = /(?:\b(?:sk|rk|pk)-[A-Za-z0-9_-]{8,}\b|\bBearer\s+[A-Za-z0-9._~+/-]+\b)/i;
 var safeText$1 = string().refine((value) => !CREDENTIAL_VALUE.test(value), "Credential-shaped values are not accepted.");
-var paidToolIntentMaxLength = 2e4;
-var paidToolPromptMaxLength = 2e5;
-var paidToolCapabilitySchema = _enum([
+var providerToolIntentMaxLength = 2e4;
+var providerToolPromptMaxLength = 2e5;
+var providerToolCapabilitySchema = _enum([
 	"generate-image",
 	"edit-image",
 	"cutout",
 	"semantic-cutout"
 ]);
-var moneyAmountSchema = object({
-	currency: string().regex(/^[A-Z]{3}$/),
-	amount: number().nonnegative().finite(),
-	credits: number().nonnegative().finite().optional()
-}).strict();
-var paidToolRequestSchema = object({
-	capability: paidToolCapabilitySchema,
+var providerToolRequestSchema = object({
+	capability: providerToolCapabilitySchema,
 	providerId: safeText$1.min(1).max(160).optional(),
 	model: safeText$1.min(1).max(300).optional(),
-	intent: safeText$1.min(1).max(paidToolIntentMaxLength),
-	prompt: safeText$1.min(1).max(paidToolPromptMaxLength),
+	intent: safeText$1.min(1).max(providerToolIntentMaxLength),
+	prompt: safeText$1.min(1).max(providerToolPromptMaxLength),
 	inputArtifactIds: array(safeText$1.min(1).max(300)).max(32).default([]),
 	approvalPolicy: _enum(["explicit", "auto"]).default("auto")
 }).strict();
 object({
-	capability: paidToolCapabilitySchema,
+	capability: providerToolCapabilitySchema,
 	providerId: safeText$1.min(1).max(160),
 	model: safeText$1.min(1).max(300),
 	available: boolean(),
 	transportStrategy: imageAdapterStrategySchema.optional()
 }).strict();
-function planPaidTool(request, capability, policy, hasExplicitApproval) {
+function planProviderTool(request, capability, policy, hasExplicitApproval) {
 	const base = {
 		capability: request.capability,
 		providerId: capability?.providerId ?? request.providerId,
@@ -13135,11 +13130,11 @@ function planPaidTool(request, capability, policy, hasExplicitApproval) {
 		executable: false,
 		reason: "No host executor is available for this capability."
 	};
-	if (!policy.allowPaid) return {
+	if (!policy.allowProviderExecution) return {
 		...base,
 		status: "authorization-required",
 		executable: false,
-		reason: "Paid actions are disabled by host policy."
+		reason: "Provider execution is disabled by host policy."
 	};
 	if (request.approvalPolicy === "explicit" && !hasExplicitApproval) return {
 		...base,
@@ -13153,10 +13148,10 @@ function planPaidTool(request, capability, policy, hasExplicitApproval) {
 		executable: true
 	};
 }
-var paidToolReceiptSchema = object({
+var providerToolReceiptSchema = object({
 	receiptId: safeText$1.min(1).max(160),
 	requestId: safeText$1.min(1).max(160),
-	capability: paidToolCapabilitySchema,
+	capability: providerToolCapabilitySchema,
 	providerId: safeText$1.min(1).max(160),
 	model: safeText$1.min(1).max(300),
 	status: _enum([
@@ -13164,7 +13159,6 @@ var paidToolReceiptSchema = object({
 		"failed",
 		"cancelled"
 	]),
-	charged: moneyAmountSchema.optional(),
 	outputArtifactIds: array(safeText$1.min(1).max(300)).max(128),
 	startedAt: number().int().nonnegative(),
 	completedAt: number().int().nonnegative()
@@ -13294,7 +13288,7 @@ var agentRunEventSchema = discriminatedUnion("type", [
 	runEventBaseSchema.extend({
 		type: literal("tool-receipt-recorded"),
 		toolCallId: eventText,
-		receipt: paidToolReceiptSchema
+		receipt: providerToolReceiptSchema
 	}).strict(),
 	runEventBaseSchema.extend({
 		type: literal("tool-succeeded"),
@@ -13303,7 +13297,7 @@ var agentRunEventSchema = discriminatedUnion("type", [
 		label: eventText,
 		stepId: eventText.optional(),
 		outputRefs: array(eventText),
-		receipt: paidToolReceiptSchema.optional()
+		receipt: providerToolReceiptSchema.optional()
 	}).strict(),
 	runEventBaseSchema.extend({
 		type: _enum(["tool-failed", "tool-cancelled"]),
@@ -13312,7 +13306,7 @@ var agentRunEventSchema = discriminatedUnion("type", [
 		label: eventText,
 		stepId: eventText.optional(),
 		detail: eventText,
-		receipt: paidToolReceiptSchema.optional()
+		receipt: providerToolReceiptSchema.optional()
 	}).strict(),
 	runEventBaseSchema.extend({
 		type: literal("material-recorded"),
@@ -14773,9 +14767,9 @@ var exportStarterOperationSchema = object({
 		"tanstack-start"
 	])
 }).strict();
-var paidToolInvokeOperationSchema = object({
+var providerToolInvokeOperationSchema = object({
 	type: literal("tool.invoke"),
-	tool: paidToolRequestSchema
+	tool: providerToolRequestSchema
 }).strict();
 var codingOperation = (kind) => object({
 	type: literal(`coding.${kind}`),
@@ -14804,7 +14798,7 @@ var controlOperationSchema = discriminatedUnion("type", [
 	codingOperation("execute"),
 	codingOperation("review"),
 	codingOperation("repair"),
-	paidToolInvokeOperationSchema
+	providerToolInvokeOperationSchema
 ]);
 var controlRequestSchema = object({
 	protocol: literal(CONTROL_PROTOCOL_VERSION),
@@ -14843,20 +14837,20 @@ var controlResponseSchema = object({
 	error: controlResponseErrorSchema.optional()
 }).strict();
 /**
-* Guard a host-declared side effect. The agent cannot make an action paid or
-* external merely by adding fields to JSON: the host owns this declaration.
+* Guard a host-declared side effect. The agent cannot declare Provider execution
+* or an external mutation merely by adding fields to JSON; the host owns both.
 */
 function guardControlAction(authorization, options) {
 	const { effects, policy } = options;
-	if (effects.paid && !policy.allowPaid) return {
+	if (effects.providerExecution && !policy.allowProviderExecution) return {
 		allowed: false,
-		reason: "paid-actions-disabled"
+		reason: "provider-execution-disabled"
 	};
 	if (effects.external && !policy.allowExternal) return {
 		allowed: false,
 		reason: "external-actions-disabled"
 	};
-	if (effects.paid && policy.requireApprovalForPaid || effects.external && policy.requireApprovalForExternal) {
+	if (effects.external && policy.requireApprovalForExternal) {
 		if (!authorization.approval) return {
 			allowed: false,
 			reason: "approval-required"
@@ -14940,19 +14934,19 @@ function response$1(request, revision, status, error) {
 }
 function defaultEffectsFor(operation) {
 	return {
-		paid: operation.type === "tool.invoke",
+		providerExecution: operation.type === "tool.invoke",
 		external: operation.type === "source.ingest" || operation.type === "export.design-kit" || operation.type === "export.brand-kit" || operation.type === "export.starter" || operation.type === "coding.execute" || operation.type === "coding.review" || operation.type === "coding.repair"
 	};
 }
 function mergeEffects(base, override) {
 	return {
-		paid: base.paid || Boolean(override?.paid),
+		providerExecution: base.providerExecution || Boolean(override?.providerExecution),
 		external: base.external || Boolean(override?.external)
 	};
 }
 function defaultControlPolicy() {
 	return {
-		allowPaid: false,
+		allowProviderExecution: false,
 		allowExternal: false
 	};
 }
@@ -18594,7 +18588,7 @@ function createHeadlessRuntime(store, coding = {}) {
 		const ledger = ledgerFromState(state);
 		const preparation = applyControlRequest(ledger, request, {
 			policy: {
-				allowPaid: request.operation.type === "tool.invoke",
+				allowProviderExecution: request.operation.type === "tool.invoke",
 				allowExternal: state.policy.allowApply,
 				requireApprovalForExternal: state.policy.requireApprovalForExternal
 			},
@@ -18671,7 +18665,7 @@ async function dispatch(store, state, request, coding, authorization) {
 			return fail(message);
 		}
 		case "tool.invoke": {
-			const plan = planPaidTool(request.operation.tool, void 0, { allowPaid: true }, Boolean(authorization.approval));
+			const plan = planProviderTool(request.operation.tool, void 0, { allowProviderExecution: true }, Boolean(authorization.approval));
 			if (request.mode === "dry-run") return ok({
 				operation: "tool.invoke",
 				plan
@@ -18679,7 +18673,7 @@ async function dispatch(store, state, request, coding, authorization) {
 			return {
 				ok: false,
 				code: "capability-required",
-				message: plan.reason ?? "No paid tool executor is available."
+				message: plan.reason ?? "No Provider tool executor is available."
 			};
 		}
 	}
@@ -21394,7 +21388,7 @@ function adapterError(code, message) {
 	};
 }
 function unsupported(operation) {
-	return adapterError("unsupported-operation", `${operation} is not available in the headless v1 runtime. It has not performed any file, network, provider, or paid action.`);
+	return adapterError("unsupported-operation", `${operation} is not available in the headless v1 runtime. It has not performed any file, network, or Provider action.`);
 }
 async function withProjectControlLock(projectRoot, action) {
 	const lock = resolve(projectRoot, ".cutout", ".external-control.lock");
@@ -21562,7 +21556,7 @@ var MCP_TOOLS = [
 	},
 	{
 		name: "cutout_run_start",
-		description: "Start and durably persist a provider-free Cutout run lifecycle. This records intent and observable events but does not execute a model or paid tool.",
+		description: "Start and durably persist a provider-free Cutout run lifecycle. This records intent and observable events but does not execute a model or Provider tool.",
 		inputSchema: {
 			type: "object",
 			additionalProperties: false,

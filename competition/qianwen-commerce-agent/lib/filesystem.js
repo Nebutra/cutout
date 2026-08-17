@@ -56,13 +56,26 @@ export function parsePromptPaths(prompt) {
     'invalid-prompt', 'The prompt is missing or exceeds the byte limit.')
   invariant(!prompt.includes('\0'), 'invalid-prompt', 'The prompt contains an invalid character.')
 
-  const marker = (kind) => kind === 'input'
-    ? '(?:input(?:\\s+(?:directory|folder|path))?|source(?:\\s+(?:directory|folder|path))?|输入文件夹路径|输入目录路径|输入(?:文件夹|目录|路径)?)'
-    : '(?:output(?:\\s+(?:directory|folder|path))?|destination(?:\\s+(?:directory|folder|path))?|输出文件夹路径|输出目录路径|输出(?:文件夹|目录|路径)?|保存(?:到|至))'
+  const pathValue = '(?:`([^`\\r\\n]+)`|"([^"\\r\\n]+)"|“([^”\\r\\n]+)”|\'([^\'\\r\\n]+)\'|‘([^’\\r\\n]+)’|([^\\s,，;；。]+))'
+  const link = '(?:(?:is\\b|at\\b|=|:|：|为|是|到|至)\\s*)'
+  const markers = (kind) => kind === 'input' ? {
+    explicit: '(?:input\\s+(?:directory|folder|path)|source\\s+(?:directory|folder|path)|输入(?:文件夹路径|目录路径|文件夹|目录|路径))',
+    generic: '(?:\\b(?:input|source)\\b|输入)',
+  } : {
+    explicit: '(?:output\\s+(?:directory|folder|path)|destination\\s+(?:directory|folder|path)|输出(?:文件夹路径|目录路径|文件夹|目录|路径))',
+    generic: '(?:\\b(?:output|destination)\\b|输出)',
+  }
   const extract = (kind) => {
-    const expression = new RegExp(`${marker(kind)}\\s*(?:(?:is|at|=|:|：|为|是|到|至)\\s*){0,2}(?:["“”']([^"“”'\\r\\n]+)["“”']|([^\\s,，;；。]+))`, 'iu')
-    const match = expression.exec(prompt)
-    const raw = (match?.[1] ?? match?.[2] ?? '').trim().replace(/[。；;,，]+$/u, '')
+    const marker = markers(kind)
+    const expressions = [
+      new RegExp(`^\\s*(?:[-*]\\s*)?${marker.explicit}\\s*(?:${link}){0,2}${pathValue}`, 'imu'),
+      new RegExp(`${marker.explicit}\\s*(?:${link}){0,2}${pathValue}`, 'iu'),
+      new RegExp(`${marker.generic}\\s*(?:${link}){1,2}${pathValue}`, 'iu'),
+      ...(kind === 'output' ? [new RegExp(`保存(?:到|至)\\s*${pathValue}`, 'iu')] : []),
+    ]
+    const match = expressions.map((expression) => expression.exec(prompt)).find(Boolean)
+    const raw = (match?.slice(1).find((value) => value !== undefined) ?? '')
+      .trim().replace(/[。；;,，]+$/u, '')
     invariant(raw.length > 0 && Buffer.byteLength(raw) <= LIMITS.maximumPathBytes,
       'invalid-prompt', `The ${kind} directory was not found in the prompt.`)
     invariant(isAbsolute(raw), 'invalid-prompt', `The ${kind} directory must be an absolute path.`)
@@ -116,13 +129,15 @@ function overlaps(left, right) {
 export async function authorizeRoots({ inputRoot, outputRoot, logRoot }) {
   const input = await assertDirectoryRoot(inputRoot, 'Input')
   const output = await assertDirectoryRoot(outputRoot, 'Output', true)
-  const logs = await assertDirectoryRoot(logRoot, 'Log', true)
+  const logs = logRoot ? await assertDirectoryRoot(logRoot, 'Log', true) : undefined
   invariant(!overlaps(input.canonical, output.canonical) && !overlaps(output.canonical, input.canonical),
     'invalid-path', 'Input and output directories may not overlap.')
-  invariant(!overlaps(input.canonical, logs.canonical) && !overlaps(logs.canonical, input.canonical),
-    'invalid-path', 'Input and log directories may not overlap.')
-  invariant(!overlaps(output.canonical, logs.canonical) && !overlaps(logs.canonical, output.canonical),
-    'invalid-path', 'Output and log directories may not overlap.')
+  if (logs) {
+    invariant(!overlaps(input.canonical, logs.canonical) && !overlaps(logs.canonical, input.canonical),
+      'invalid-path', 'Input and log directories may not overlap.')
+    invariant(!overlaps(output.canonical, logs.canonical) && !overlaps(logs.canonical, output.canonical),
+      'invalid-path', 'Output and log directories may not overlap.')
+  }
   return { input, output, logs }
 }
 
@@ -217,6 +232,13 @@ export async function assertOutputAvailable(outputRoot) {
 }
 
 export function createLogger(logRoot, apiKey) {
+  if (!logRoot) {
+    return Object.freeze({
+      file: undefined,
+      write() { return Promise.resolve() },
+      flush() { return Promise.resolve() },
+    })
+  }
   const file = join(logRoot.canonical, 'agent.log')
   let tail = Promise.resolve()
   const redact = (value) => String(value)

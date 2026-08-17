@@ -392,7 +392,7 @@ describe('repo-native headless runtime', () => {
     expect(result).toMatchObject({ status: 'invalid', error: { code: 'invalid-request' } })
   })
 
-  it('plans a paid tool honestly and requires a real executor before apply', async () => {
+  it('plans a Provider tool honestly and requires a real executor before apply', async () => {
     const initial = projectState()
     initial.policy = {
       ...initial.policy,
@@ -411,8 +411,8 @@ describe('repo-native headless runtime', () => {
       },
     }
 
-    const preview = await runtime.execute(request(operation, { requestId: 'paid-preview', mode: 'dry-run' }))
-    const apply = await runtime.execute(request(operation, { requestId: 'paid-apply' }))
+    const preview = await runtime.execute(request(operation, { requestId: 'provider-preview', mode: 'dry-run' }))
+    const apply = await runtime.execute(request(operation, { requestId: 'provider-apply' }))
 
     expect(preview).toMatchObject({ status: 'ok', dryRun: true, result: {
       operation: 'tool.invoke', plan: { status: 'capability-required', executable: false },

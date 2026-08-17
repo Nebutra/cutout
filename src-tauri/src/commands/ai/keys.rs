@@ -4,12 +4,31 @@
 //! query presence, while provider transport is the only reader.
 
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Mutex, OnceLock};
 
 use keyring::{Entry, Error as KeyringError};
 use serde::Serialize;
 
 const SERVICE: &str = "com.nebutra.cutout";
+const COMMERCE_OPERATOR_SERVICE: &str = "com.nebutra.cutout.commerce-operator";
+
+fn commerce_operator_vault_enabled() -> &'static AtomicBool {
+    static ENABLED: AtomicBool = AtomicBool::new(false);
+    &ENABLED
+}
+
+pub(crate) fn enable_commerce_operator_vault() {
+    commerce_operator_vault_enabled().store(true, Ordering::SeqCst);
+}
+
+pub(crate) fn active_keychain_service() -> &'static str {
+    if commerce_operator_vault_enabled().load(Ordering::SeqCst) {
+        COMMERCE_OPERATOR_SERVICE
+    } else {
+        SERVICE
+    }
+}
 
 fn account(provider_id: &str) -> String {
     format!("provider:{provider_id}")
@@ -55,7 +74,7 @@ fn entry_for(service: &str, provider_id: &str) -> Result<Entry, KeyError> {
 }
 
 fn entry(provider_id: &str) -> Result<Entry, KeyError> {
-    entry_for(SERVICE, provider_id)
+    entry_for(active_keychain_service(), provider_id)
 }
 
 /// The macOS legacy Keychain ACL API is the only system API that can grant a
@@ -79,7 +98,7 @@ mod macos_vault {
     };
     use security_framework_sys::keychain_item::SecKeychainItemDelete;
 
-    use super::{account, entry, KeyError, SERVICE};
+    use super::{account, entry_for, KeyError};
 
     const ACL_LABEL: &str = "Cutout Provider credential";
 
@@ -96,11 +115,11 @@ mod macos_vault {
         fn SecKeychainItemSetAccess(item: SecKeychainItemRef, access: SecAccessRef) -> i32;
     }
 
-    fn item_for(provider_id: &str) -> Result<Option<SecKeychainItem>, KeyError> {
+    fn item_for(service: &str, provider_id: &str) -> Result<Option<SecKeychainItem>, KeyError> {
         let mut query = ItemSearchOptions::new();
         query
             .class(ItemClass::generic_password())
-            .service(SERVICE)
+            .service(service)
             .account(&account(provider_id))
             .load_refs(true);
         match query.search() {
@@ -154,8 +173,8 @@ mod macos_vault {
         }
     }
 
-    pub(super) fn store(provider_id: &str, secret: &str) -> Result<(), KeyError> {
-        match item_for(provider_id)? {
+    pub(super) fn store(service: &str, provider_id: &str, secret: &str) -> Result<(), KeyError> {
+        match item_for(service, provider_id)? {
             Some(mut item) => {
                 // Migrate access before changing the existing secret. If the
                 // legacy ACL refuses this operation, the old credential stays
@@ -169,10 +188,10 @@ mod macos_vault {
                 // partition metadata first, then replace only this item's ACL
                 // with the current Cutout identity. Legacy-only creation here
                 // can break securityd access for a later signed app launch.
-                entry(provider_id)?
+                entry_for(service, provider_id)?
                     .set_password(secret)
                     .map_err(KeyError::from)?;
-                let item = item_for(provider_id)?.ok_or(KeyError::Keychain)?;
+                let item = item_for(service, provider_id)?.ok_or(KeyError::Keychain)?;
                 if let Err(error) = set_item_access(&item) {
                     unsafe { SecKeychainItemDelete(item.as_concrete_TypeRef()) };
                     return Err(error);
@@ -182,9 +201,9 @@ mod macos_vault {
         }
     }
 
-    pub(super) fn read(provider_id: &str) -> Result<Option<String>, KeyError> {
+    pub(super) fn read(service: &str, provider_id: &str) -> Result<Option<String>, KeyError> {
         let account = account(provider_id);
-        match find_generic_password(None, SERVICE, &account) {
+        match find_generic_password(None, service, &account) {
             Ok((secret, item)) => {
                 let secret =
                     String::from_utf8(secret.to_owned()).map_err(|_| KeyError::Keychain)?;
@@ -199,8 +218,8 @@ mod macos_vault {
         }
     }
 
-    pub(super) fn delete(provider_id: &str) -> Result<(), KeyError> {
-        let Some(item) = item_for(provider_id)? else {
+    pub(super) fn delete(service: &str, provider_id: &str) -> Result<(), KeyError> {
+        let Some(item) = item_for(service, provider_id)? else {
             return Ok(());
         };
         if unsafe { SecKeychainItemDelete(item.as_concrete_TypeRef()) } == errSecSuccess {
@@ -234,15 +253,21 @@ fn secret_cache() -> &'static Mutex<HashMap<String, String>> {
     CACHE.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
+fn cache_key(service: &str, provider_id: &str) -> String {
+    format!("{service}\0{provider_id}")
+}
+
 fn cached_or_fetch(provider_id: &str) -> Result<Option<String>, KeyError> {
+    let service = active_keychain_service();
+    let cache_key = cache_key(service, provider_id);
     let mut cache = secret_cache()
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
-    if let Some(secret) = cache.get(provider_id) {
+    if let Some(secret) = cache.get(&cache_key) {
         return Ok(Some(secret.clone()));
     }
     #[cfg(target_os = "macos")]
-    let secret = macos_vault::read(provider_id)?;
+    let secret = macos_vault::read(service, provider_id)?;
     #[cfg(not(target_os = "macos"))]
     let secret = match entry(provider_id)?.get_password() {
         Ok(secret) => Some(secret),
@@ -250,7 +275,7 @@ fn cached_or_fetch(provider_id: &str) -> Result<Option<String>, KeyError> {
         Err(error) => return Err(KeyError::from(error)),
     };
     if let Some(secret) = &secret {
-        cache.insert(provider_id.to_owned(), secret.clone());
+        cache.insert(cache_key, secret.clone());
     }
     Ok(secret)
 }
@@ -259,27 +284,36 @@ pub(crate) fn read_secret(provider_id: &str) -> Result<String, KeyError> {
     cached_or_fetch(provider_id)?.ok_or(KeyError::NotFound)
 }
 
-fn set_key_inner(provider_id: &str, secret: &str) -> Result<(), KeyError> {
+fn set_key_for_service(service: &str, provider_id: &str, secret: &str) -> Result<(), KeyError> {
     if secret.is_empty() {
         return Err(KeyError::EmptySecret);
     }
     #[cfg(target_os = "macos")]
-    macos_vault::store(provider_id, secret)?;
+    macos_vault::store(service, provider_id, secret)?;
     #[cfg(not(target_os = "macos"))]
-    entry(provider_id)?
+    entry_for(service, provider_id)?
         .set_password(secret)
         .map_err(KeyError::from)?;
     secret_cache()
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner())
-        .insert(provider_id.to_owned(), secret.to_owned());
+        .insert(cache_key(service, provider_id), secret.to_owned());
     Ok(())
 }
 
+fn set_key_inner(provider_id: &str, secret: &str) -> Result<(), KeyError> {
+    set_key_for_service(active_keychain_service(), provider_id, secret)
+}
+
+pub(crate) fn store_commerce_operator_key(provider_id: &str, secret: &str) -> Result<(), KeyError> {
+    set_key_for_service(COMMERCE_OPERATOR_SERVICE, provider_id, secret)
+}
+
 fn key_status_inner(provider_id: &str) -> Result<bool, KeyError> {
+    let service = active_keychain_service();
     #[cfg(target_os = "macos")]
     {
-        return keychain_item_exists(SERVICE, provider_id);
+        return keychain_item_exists(service, provider_id);
     }
     #[cfg(not(target_os = "macos"))]
     {
@@ -304,12 +338,13 @@ pub(crate) fn delete_imported_key(provider_id: &str) -> Result<(), KeyError> {
 }
 
 fn delete_key_inner(provider_id: &str) -> Result<(), KeyError> {
+    let service = active_keychain_service();
     secret_cache()
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner())
-        .remove(provider_id);
+        .remove(&cache_key(service, provider_id));
     #[cfg(target_os = "macos")]
-    return macos_vault::delete(provider_id);
+    return macos_vault::delete(service, provider_id);
     #[cfg(not(target_os = "macos"))]
     match entry(provider_id)?.delete_credential() {
         Ok(()) | Err(KeyringError::NoEntry) => Ok(()),

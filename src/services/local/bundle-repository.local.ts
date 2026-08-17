@@ -22,7 +22,9 @@ export interface BundleRepositoryLimits {
 
 async function contentBytes(content: BundleFileContent): Promise<Uint8Array> {
   if (typeof content === 'string') return new TextEncoder().encode(content)
-  if (content instanceof Uint8Array) return content
+  if (ArrayBuffer.isView(content)) {
+    return new Uint8Array(content.buffer, content.byteOffset, content.byteLength)
+  }
   return new Uint8Array(await content.arrayBuffer())
 }
 

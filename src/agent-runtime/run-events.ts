@@ -3,7 +3,7 @@ import type {
   MissingRequirement,
 } from './outcome-runtime'
 import { z } from 'zod'
-import { paidToolReceiptSchema, type PaidToolReceipt } from '@/control-protocol/paid-tool-contract'
+import { providerToolReceiptSchema, type ProviderToolReceipt } from '@/control-protocol/provider-tool-contract'
 import { prototypeHumanLoopChoiceSchema, type HumanLoopChoice } from '@/prototype/prototype-plan'
 
 const runEventBaseSchema = z.object({
@@ -57,9 +57,9 @@ export const agentRunEventSchema = z.discriminatedUnion('type', [
   }).strict(),
   runEventBaseSchema.extend({ type: z.enum(['tool-approved', 'tool-denied']), toolCallId: eventText, requestId: eventText, reason: eventText }).strict(),
   runEventBaseSchema.extend({ type: z.literal('tool-retry-linked'), toolCallId: eventText, previousRequestId: eventText, requestId: eventText }).strict(),
-  runEventBaseSchema.extend({ type: z.literal('tool-receipt-recorded'), toolCallId: eventText, receipt: paidToolReceiptSchema }).strict(),
-  runEventBaseSchema.extend({ type: z.literal('tool-succeeded'), toolCallId: eventText, tool: eventText, label: eventText, stepId: eventText.optional(), outputRefs: z.array(eventText), receipt: paidToolReceiptSchema.optional() }).strict(),
-  runEventBaseSchema.extend({ type: z.enum(['tool-failed', 'tool-cancelled']), toolCallId: eventText, tool: eventText, label: eventText, stepId: eventText.optional(), detail: eventText, receipt: paidToolReceiptSchema.optional() }).strict(),
+  runEventBaseSchema.extend({ type: z.literal('tool-receipt-recorded'), toolCallId: eventText, receipt: providerToolReceiptSchema }).strict(),
+  runEventBaseSchema.extend({ type: z.literal('tool-succeeded'), toolCallId: eventText, tool: eventText, label: eventText, stepId: eventText.optional(), outputRefs: z.array(eventText), receipt: providerToolReceiptSchema.optional() }).strict(),
+  runEventBaseSchema.extend({ type: z.enum(['tool-failed', 'tool-cancelled']), toolCallId: eventText, tool: eventText, label: eventText, stepId: eventText.optional(), detail: eventText, receipt: providerToolReceiptSchema.optional() }).strict(),
   runEventBaseSchema.extend({ type: z.literal('material-recorded'), material: materialEvidenceSchema }).strict(),
   runEventBaseSchema.extend({
     type: z.literal('prototype-page-review-started'),
@@ -187,7 +187,7 @@ export type AgentRunEvent =
   | (RunEventBase & {
       readonly type: 'tool-receipt-recorded'
       readonly toolCallId: string
-      readonly receipt: PaidToolReceipt
+      readonly receipt: ProviderToolReceipt
     })
   | (RunEventBase & {
       readonly type: 'tool-succeeded'
@@ -196,7 +196,7 @@ export type AgentRunEvent =
       readonly label: string
       readonly stepId?: string
       readonly outputRefs: readonly string[]
-      readonly receipt?: PaidToolReceipt
+      readonly receipt?: ProviderToolReceipt
     })
   | (RunEventBase & {
       readonly type: 'tool-failed' | 'tool-cancelled'
@@ -205,7 +205,7 @@ export type AgentRunEvent =
       readonly label: string
       readonly stepId?: string
       readonly detail: string
-      readonly receipt?: PaidToolReceipt
+      readonly receipt?: ProviderToolReceipt
     })
   | (RunEventBase & {
       readonly type: 'material-recorded'
@@ -294,7 +294,7 @@ export interface AgentToolProjection {
   readonly approvalPolicy?: 'explicit' | 'auto'
   readonly approvalReason?: string
   readonly approvalStatus?: 'required' | 'approved' | 'denied'
-  readonly receipt?: PaidToolReceipt
+  readonly receipt?: ProviderToolReceipt
 }
 
 export interface AgentRunProjection {
@@ -558,7 +558,7 @@ export function createRunEvent(
   } as AgentRunEvent
 }
 
-/** A retry is a new billable request, never a replay of an idempotency key. */
+/** A retry is a new Provider request, never a replay of an idempotency key. */
 export function createToolRetryEvent(
   runId: string,
   toolCallId: string,

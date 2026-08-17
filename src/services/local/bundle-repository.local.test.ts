@@ -1,3 +1,4 @@
+import { runInNewContext } from 'node:vm'
 import { describe, expect, it, vi } from 'vitest'
 import type { NativeBridge, SaveBundleInput, SaveBundleResult } from '@/platform/native'
 import { createLocalBundleRepository } from './bundle-repository.local'
@@ -69,6 +70,25 @@ describe('bundle-repository.local', () => {
 
     expect(result).toEqual({ ok: true, data: canceled })
     expect(calls[0]?.files[0]?.bytes).toEqual(new Uint8Array([9, 8]))
+  })
+
+  it('preserves typed-array bytes created in another renderer realm', async () => {
+    const crossRealmBytes = runInNewContext('new Uint8Array([6, 7])') as Uint8Array
+    expect(crossRealmBytes instanceof Uint8Array).toBe(false)
+    const { bridge, calls } = bridgeWith({
+      ...receipt,
+      fileCount: 1,
+      totalBytes: 2,
+      files: [{ path: 'assets/cross-realm.bin', size: 2, sha256: 'c'.repeat(64) }],
+    })
+
+    const result = await createLocalBundleRepository(bridge).save({
+      name: 'cross-realm',
+      files: [{ path: 'assets/cross-realm.bin', content: crossRealmBytes }],
+    })
+
+    expect(result.ok).toBe(true)
+    expect(calls[0]?.files[0]?.bytes).toEqual(new Uint8Array([6, 7]))
   })
 
   it('rejects empty, excessive, unsafe, duplicate, and oversized bundles before native I/O', async () => {

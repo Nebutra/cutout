@@ -2,7 +2,7 @@
 
 Canonical status and launch claims are governed by the [Cutout roadmap](./ROADMAP.md). This file contains speech-specific implementation notes only.
 
-The current desktop contract is local-first and truthful: it reports microphone capture and global shortcuts as unavailable until an authorized native backend is packaged. OpenAI-compatible ASR/TTS is a protocol adapter with an injected transport; tests use a local mock and never call a paid API.
+The current desktop contract is local-first and truthful: it reports microphone capture and global shortcuts as unavailable until an authorized native backend is packaged. OpenAI-compatible ASR/TTS is a protocol adapter with an injected transport; tests use a local fixture and never call a remote API.
 
 Before enabling macOS recording:
 

@@ -1,0 +1,80 @@
+{
+  "runtime": {
+    "protocol": "cutout.multimodal-host-receipt.v1",
+    "receiptId": "receipt:multimodal:7d151d371dbf41f88ecc4d92e6beb15f",
+    "receiptHash": "2c8a3422f26c52a94f947affa324bb1001da6c41b7e410c31e0e96911aeba71e",
+    "requestId": "request:real-game-map:run:real-qwen-game-map:tile:game-map-terrain-atlas",
+    "runId": "run:real-qwen-game-map:tile",
+    "providerId": "dashscope-qwen-image3",
+    "providerKind": "dashscope",
+    "model": "qwen-image-3.0-pro",
+    "routeId": "route:dashscope:qwen-image-3.0-pro:image-generation",
+    "operation": "image-generation",
+    "semanticRole": "game-map-terrain-atlas",
+    "nodeId": "node:real-game-map:tile:terrain-atlas",
+    "capabilityId": "capability:image-generation",
+    "acceptedReferenceArtifactIds": [],
+    "lockIds": [
+      "lock:real-game-map:run:real-qwen-game-map:tile:art-direction"
+    ],
+    "status": "succeeded",
+    "artifact": {
+      "artifactId": "artifact:sha256:7902c05e21d97a74319c4c8a9ca3e4ebe56de8dc37c1e7633ea79b589b201462",
+      "sha256": "7902c05e21d97a74319c4c8a9ca3e4ebe56de8dc37c1e7633ea79b589b201462",
+      "mediaType": "image/png",
+      "byteLength": 558706,
+      "decoded": true,
+      "width": 512,
+      "height": 512,
+      "durationMs": null,
+      "frameRate": null,
+      "videoCodec": null,
+      "audioCodec": null,
+      "sampleTablesReadable": null,
+      "playbackVerified": null
+    },
+    "startedAt": 1786936330147,
+    "completedAt": 1786936384944,
+    "remoteTaskIdHash": null,
+    "signature": "6d88af028b4dd6518b86bbbcfac18ba7a9b53d367b2899e1ba2c27c1b9576d71"
+  },
+  "object": {
+    "protocol": "cutout.multimodal-host-receipt.v1",
+    "receiptId": "receipt:multimodal:1955890b1e80444babaf84313f6563fc",
+    "receiptHash": "24ed176b45a69c7af97ddf77f06f86fdea7fba2723fad40ca09436e7d2e86493",
+    "requestId": "request:real-game-map:run:real-qwen-game-map:tile:game-map-object",
+    "runId": "run:real-qwen-game-map:tile",
+    "providerId": "dashscope-qwen-image3",
+    "providerKind": "dashscope",
+    "model": "qwen-image-3.0-pro",
+    "routeId": "route:dashscope:qwen-image-3.0-pro:image-generation",
+    "operation": "image-generation",
+    "semanticRole": "game-map-object",
+    "nodeId": "node:real-game-map:tile:object-library",
+    "capabilityId": "capability:image-generation",
+    "acceptedReferenceArtifactIds": [],
+    "lockIds": [
+      "lock:real-game-map:run:real-qwen-game-map:tile:art-direction"
+    ],
+    "status": "succeeded",
+    "artifact": {
+      "artifactId": "artifact:sha256:f450273d91c9ff33c4b25934c951199321435bac4ee89aa3540d3fe9429f7771",
+      "sha256": "f450273d91c9ff33c4b25934c951199321435bac4ee89aa3540d3fe9429f7771",
+      "mediaType": "image/png",
+      "byteLength": 261736,
+      "decoded": true,
+      "width": 512,
+      "height": 512,
+      "durationMs": null,
+      "frameRate": null,
+      "videoCodec": null,
+      "audioCodec": null,
+      "sampleTablesReadable": null,
+      "playbackVerified": null
+    },
+    "startedAt": 1786936384968,
+    "completedAt": 1786936438299,
+    "remoteTaskIdHash": null,
+    "signature": "8cdc3c83cf17d72510a977b7c3a5e986430960230b210725031f826b260e8ea5"
+  }
+}

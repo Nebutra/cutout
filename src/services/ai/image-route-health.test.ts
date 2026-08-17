@@ -127,7 +127,7 @@ describe('image route health', () => {
     expect(health.admissionLimit(generationRoute, 3)).toBe(1)
   })
 
-  it('lets an open circuit drain queued claims without admitting paid work', async () => {
+  it('lets an open circuit drain queued claims without admitting Provider work', async () => {
     const health = createImageRouteHealthRegistry({ timeoutThreshold: 1 })
     await expect(health.run(generationRoute, async () => {
       throw new Error('deadline exceeded')

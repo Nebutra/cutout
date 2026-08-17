@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { brandKitInputSchema } from '@/brand-kit'
 import { codingTaskSchema } from '@/coding-runtime/contracts'
-import { paidToolRequestSchema } from './paid-tool-contract'
+import { providerToolRequestSchema } from './provider-tool-contract'
 
 /**
  * The intentionally small, transport-neutral control surface for coding agents.
@@ -183,9 +183,9 @@ const exportStarterOperationSchema = z.object({
   framework: z.enum(['next-app-router', 'vite-react', 'nuxt', 'tanstack-start']),
 }).strict()
 
-const paidToolInvokeOperationSchema = z.object({
+const providerToolInvokeOperationSchema = z.object({
   type: z.literal('tool.invoke'),
-  tool: paidToolRequestSchema,
+  tool: providerToolRequestSchema,
 }).strict()
 
 const codingOperation = <T extends 'execute' | 'review' | 'repair'>(kind: T) => z.object({
@@ -211,7 +211,7 @@ export const controlOperationSchema = z.discriminatedUnion('type', [
   codingOperation('execute'),
   codingOperation('review'),
   codingOperation('repair'),
-  paidToolInvokeOperationSchema,
+  providerToolInvokeOperationSchema,
 ])
 
 export const controlRequestSchema = z.object({
@@ -292,14 +292,13 @@ export function createControlLedger(revision = 0): ControlLedger {
 }
 
 export interface ControlEffects {
-  readonly paid: boolean
+  readonly providerExecution: boolean
   readonly external: boolean
 }
 
 export interface ControlPolicy {
-  readonly allowPaid: boolean
+  readonly allowProviderExecution: boolean
   readonly allowExternal: boolean
-  readonly requireApprovalForPaid?: boolean
   readonly requireApprovalForExternal?: boolean
 }
 
@@ -310,28 +309,25 @@ export interface ControlActionGuardOptions {
 
 export interface ControlActionGuardResult {
   readonly allowed: boolean
-  readonly reason?: 'paid-actions-disabled' | 'external-actions-disabled' | 'approval-required'
+  readonly reason?: 'provider-execution-disabled' | 'external-actions-disabled' | 'approval-required'
 }
 
 /**
- * Guard a host-declared side effect. The agent cannot make an action paid or
- * external merely by adding fields to JSON: the host owns this declaration.
+ * Guard a host-declared side effect. The agent cannot declare Provider execution
+ * or an external mutation merely by adding fields to JSON; the host owns both.
  */
 export function guardControlAction(
   authorization: TrustedControlAuthorization,
   options: ControlActionGuardOptions,
 ): ControlActionGuardResult {
   const { effects, policy } = options
-  if (effects.paid && !policy.allowPaid) {
-    return { allowed: false, reason: 'paid-actions-disabled' }
+  if (effects.providerExecution && !policy.allowProviderExecution) {
+    return { allowed: false, reason: 'provider-execution-disabled' }
   }
   if (effects.external && !policy.allowExternal) {
     return { allowed: false, reason: 'external-actions-disabled' }
   }
-  if (
-    (effects.paid && policy.requireApprovalForPaid)
-    || (effects.external && policy.requireApprovalForExternal)
-  ) {
+  if (effects.external && policy.requireApprovalForExternal) {
     if (!authorization.approval) return { allowed: false, reason: 'approval-required' }
   }
   return { allowed: true }
@@ -465,7 +461,7 @@ function defaultEffectsFor(operation: ControlOperation): ControlEffects {
   // Export is intentionally considered an external write, even if a given host
   // later implements it as a local download. Hosts can require an approval.
   return {
-    paid: operation.type === 'tool.invoke',
+    providerExecution: operation.type === 'tool.invoke',
     external: operation.type === 'source.ingest'
       || operation.type === 'export.design-kit'
       || operation.type === 'export.brand-kit'
@@ -478,14 +474,14 @@ function defaultEffectsFor(operation: ControlOperation): ControlEffects {
 
 function mergeEffects(base: ControlEffects, override: ControlEffects | undefined): ControlEffects {
   return {
-    paid: base.paid || Boolean(override?.paid),
+    providerExecution: base.providerExecution || Boolean(override?.providerExecution),
     external: base.external || Boolean(override?.external),
   }
 }
 
 function defaultControlPolicy(): ControlPolicy {
   return {
-    allowPaid: false,
+    allowProviderExecution: false,
     allowExternal: false,
   }
 }

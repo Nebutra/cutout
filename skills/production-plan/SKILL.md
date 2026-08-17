@@ -8,7 +8,7 @@ description: Plan and validate an outcome-oriented Cutout production DAG from ac
 ## Outcome
 
 Produce one reviewable production plan for the user's requested materials.
-Keep the user focused on results, choices, cost, risk and blocked capabilities.
+Keep the user focused on results, choices, risk and blocked capabilities.
 Delegate routine sequencing and implementation detail to the Agent runtime.
 
 ## Operating Contract
@@ -55,19 +55,19 @@ Allow independent nodes to run in parallel when policy permits.
 Mark read-only validation as `none`.
 Mark Cutout-owned state changes as `project-state`.
 Mark controlled exports as `managed-export`.
-Mark paid or injected provider work as `provider-required`.
+Mark remote or injected Provider work as `provider-required`.
 Never reinterpret a node as arbitrary shell or unrestricted filesystem access.
 
 ### 6. Preview decisions
 
-Summarize deliverables, dependencies, cost ceilings and required approvals.
+Summarize deliverables, dependencies, execution limits and required approvals.
 Surface only decisions that affect outcome, budget, rights, safety or scope.
 Keep raw DAG payloads, adapter facts and provider errors in advanced evidence.
 
 ### 7. Validate readiness
 
 Validate the plan against the current Design IR revision and policy.
-Require explicit inputs for paid actions and external writes.
+Require explicit inputs for Provider actions and external writes.
 Return `capability-required` when an executor or authorized host is absent.
 Invalidate the plan after relevant revision, scope or budget changes.
 
@@ -87,7 +87,7 @@ Never report a planned integration node as connected or executed.
 
 ## Approval Rules
 
-Preview every mutation, export, coding task, paid action and external write.
+Preview every mutation, export, coding task, Provider action and external write.
 Use only an opaque approval bound to the exact reviewed plan.
 Do not reuse approval after dependency, destination or revision changes.
 Do not infer approval from chat wording or UI selection.

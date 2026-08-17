@@ -44,6 +44,8 @@ const LEGACY_MAX_REQUEST_IMAGES: usize = 32;
 const MAX_ATTEMPTS: usize = 3;
 const MAX_POLLS: usize = 80;
 const WORKFLOW_TIMEOUT_SECS: u64 = 600;
+const IMAGE_REQUEST_TIMEOUT_SECS: u64 = 540;
+const RESULT_RESOLUTION_KIND: &str = "openai-compatible";
 
 #[derive(Debug, Clone, Copy, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "kebab-case")]
@@ -394,6 +396,10 @@ fn is_retryable_status(status: StatusCode) -> bool {
         || status.is_server_error()
 }
 
+fn is_retry_safe_method(method: &Method) -> bool {
+    method == Method::GET || method == Method::HEAD
+}
+
 fn retry_delay(attempt: usize, retry_after: Option<Duration>) -> Duration {
     retry_after
         .unwrap_or_else(|| Duration::from_millis(250 * (1_u64 << attempt.min(4))))
@@ -451,6 +457,7 @@ async fn request_json(
     headers: &HeaderMap,
     body: Option<&Value>,
 ) -> Result<Vec<u8>, ProxyError> {
+    let retry_safe = is_retry_safe_method(&method);
     for attempt in 0..MAX_ATTEMPTS {
         let mut request = client.request(method.clone(), url).headers(headers.clone());
         if let Some(body) = body {
@@ -462,16 +469,23 @@ async fn request_json(
                 if response.status.is_success() {
                     return Ok(response.body);
                 }
-                if is_retryable_status(response.status) && attempt + 1 < MAX_ATTEMPTS {
+                if retry_safe && is_retryable_status(response.status) && attempt + 1 < MAX_ATTEMPTS
+                {
                     tokio::time::sleep(retry_delay(attempt, response.retry_after)).await;
                     continue;
                 }
                 return Err(provider_http_error(response.status, &response.body));
             }
-            Err(error) if attempt + 1 < MAX_ATTEMPTS && !error.is_builder() => {
+            Err(error) if retry_safe && attempt + 1 < MAX_ATTEMPTS && !error.is_builder() => {
                 tokio::time::sleep(retry_delay(attempt, None)).await;
             }
             Err(error) => {
+                if !retry_safe && error.is_timeout() {
+                    return Err(ProxyError::Request(
+                        "DashScope image write timed out; automatic retry is disabled because the Provider does not expose an idempotency key"
+                            .into(),
+                    ));
+                }
                 return Err(ProxyError::Request(request_error_message(&error)));
             }
         }
@@ -482,14 +496,12 @@ async fn request_json(
 }
 
 fn provider_http_error(status: StatusCode, body: &[u8]) -> ProxyError {
-    let code = serde_json::from_slice::<Value>(body)
-        .ok()
-        .and_then(|value| {
-            value
-                .get("code")
-                .and_then(Value::as_str)
-                .map(str::to_string)
-        })
+    let value = serde_json::from_slice::<Value>(body).ok();
+    let code = value
+        .as_ref()
+        .and_then(|value| value.get("code"))
+        .and_then(Value::as_str)
+        .map(str::to_string)
         .filter(|value| {
             !value.is_empty()
                 && value.len() <= 80
@@ -497,12 +509,35 @@ fn provider_http_error(status: StatusCode, body: &[u8]) -> ProxyError {
                     .bytes()
                     .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.'))
         });
+    let provider_message = value
+        .as_ref()
+        .and_then(|value| value.get("message"))
+        .and_then(Value::as_str)
+        .map(|message| message.split_whitespace().collect::<Vec<_>>().join(" "))
+        .filter(|message| {
+            let lower = message.to_ascii_lowercase();
+            !message.is_empty()
+                && message.chars().count() <= 320
+                && !message.chars().any(char::is_control)
+                && ![
+                    "bearer ", "api key", "apikey", "api_key", "token", "secret", "http://",
+                    "https://", "oss-",
+                ]
+                .iter()
+                .any(|marker| lower.contains(marker))
+        });
+    let detail = provider_message
+        .map(|message| format!(": {message}"))
+        .unwrap_or_default();
     ProxyError::Request(match code {
         Some(code) => format!(
-            "DashScope image request failed: HTTP {} ({code})",
+            "DashScope image request failed: HTTP {} ({code}){detail}",
+            status.as_u16(),
+        ),
+        None => format!(
+            "DashScope image request failed: HTTP {}{detail}",
             status.as_u16()
         ),
-        None => format!("DashScope image request failed: HTTP {}", status.as_u16()),
     })
 }
 
@@ -620,7 +655,17 @@ fn enforce_result_url(url: &str) -> Result<(), ProxyError> {
     {
         return Err(ProxyError::DisallowedHost);
     }
-    enforce_host("dashscope", url)
+    Ok(())
+}
+
+async fn resolve_result_target(url: &str) -> Result<super::ai_proxy::ResolvedTarget, ProxyError> {
+    enforce_result_url(url).map_err(|error| result_origin_error("URL policy", url, error))?;
+    // The result-origin allowlist above is the authority for Provider-produced
+    // OSS URLs. Reuse the generic remote resolver only for public-address
+    // validation and DNS pinning; the `dashscope` kind owns API-origin policy.
+    enforce_resolved_host(RESULT_RESOLUTION_KIND, url)
+        .await
+        .map_err(|error| result_origin_error("DNS policy", url, error))
 }
 
 fn result_origin_error(stage: &str, url: &str, error: ProxyError) -> ProxyError {
@@ -634,11 +679,8 @@ fn result_origin_error(stage: &str, url: &str, error: ProxyError) -> ProxyError 
 }
 
 async fn download_image(url: &str) -> Result<(DashScopeImageAsset, Vec<u8>, u32, u32), ProxyError> {
-    enforce_result_url(url).map_err(|error| result_origin_error("URL policy", url, error))?;
-    let target = enforce_resolved_host("dashscope", url)
-        .await
-        .map_err(|error| result_origin_error("DNS policy", url, error))?;
-    let client = build_client_for_target(Some(120), &target)?;
+    let target = resolve_result_target(url).await?;
+    let client = build_client_for_target(Some(IMAGE_REQUEST_TIMEOUT_SECS), &target)?;
     for attempt in 0..MAX_ATTEMPTS {
         match client.get(url).send().await {
             Ok(response) => {
@@ -807,7 +849,7 @@ pub(crate) async fn execute_bound(
     let started_at = unix_millis()?;
     enforce_host("dashscope", DASHSCOPE_IMAGE_ENDPOINT)?;
     let target = enforce_resolved_host("dashscope", DASHSCOPE_IMAGE_ENDPOINT).await?;
-    let client = build_client_for_target(Some(120), &target)?;
+    let client = build_client_for_target(Some(IMAGE_REQUEST_TIMEOUT_SECS), &target)?;
     let headers = auth_headers(&secret, contract.mode)?;
     let request = build_request_body(
         operation,
@@ -1190,38 +1232,30 @@ mod tests {
 
     #[test]
     fn result_download_origin_is_closed() {
-        assert!(enforce_result_url(
-            "https://dashscope-result-wlcb.oss-cn-wulanchabu.aliyuncs.com/a.png?Expires=1"
-        )
-        .is_ok());
-        assert!(enforce_result_url(
-            "https://dashscope-a717.oss-accelerate.aliyuncs.com/a.png?Expires=1&Signature=x"
-        )
-        .is_ok());
-        assert!(enforce_result_url("https://evil.aliyuncs.com/a.png").is_err());
-        assert!(enforce_result_url(
-            "http://dashscope-result-sh.oss-cn-shanghai.aliyuncs.com/a.png"
-        )
-        .is_err());
-        assert!(enforce_result_url(
-            "https://dashscope-result-sh.oss-cn-shanghai.aliyuncs.com.evil.test/a.png"
-        )
-        .is_err());
-        assert!(enforce_result_url(
-            "https://dashscope-result-sh.extra.oss-cn-shanghai.aliyuncs.com/a.png"
-        )
-        .is_err());
-        assert!(enforce_result_url(
-            "https://dashscope-a717.oss-accelerate.aliyuncs.com.evil.test/a.png"
-        )
-        .is_err());
-        assert!(enforce_result_url(
-            "https://dashscope-a717.extra.oss-accelerate.aliyuncs.com/a.png"
-        )
-        .is_err());
-        assert!(
-            enforce_result_url("https://dashscope-result-.oss-cn-.aliyuncs.com/a.png").is_err()
-        );
+        for url in [
+            "https://dashscope-result-wlcb.oss-cn-wulanchabu.aliyuncs.com/a.png?Expires=1",
+            "https://dashscope-a717.oss-accelerate.aliyuncs.com/a.png?Expires=1&Signature=x",
+        ] {
+            assert!(enforce_result_url(url).is_ok(), "expected {url} to pass");
+            assert!(
+                enforce_host(RESULT_RESOLUTION_KIND, url).is_ok(),
+                "expected {url} to reach public DNS resolution"
+            );
+        }
+
+        for url in [
+            "https://evil.aliyuncs.com/a.png",
+            "https://other-bucket.oss-accelerate.aliyuncs.com/a.png",
+            "http://dashscope-result-sh.oss-cn-shanghai.aliyuncs.com/a.png",
+            "https://dashscope-result-sh.oss-cn-shanghai.aliyuncs.com.evil.test/a.png",
+            "https://dashscope-result-sh.extra.oss-cn-shanghai.aliyuncs.com/a.png",
+            "https://dashscope-a717.oss-accelerate.aliyuncs.com.evil.test/a.png",
+            "https://dashscope-a717.extra.oss-accelerate.aliyuncs.com/a.png",
+            "https://dashscope-result-.oss-cn-.aliyuncs.com/a.png",
+            "https://127.0.0.1/a.png",
+        ] {
+            assert!(enforce_result_url(url).is_err(), "expected {url} to fail");
+        }
     }
 
     #[test]
@@ -1231,6 +1265,10 @@ mod tests {
         assert!(is_retryable_status(StatusCode::BAD_GATEWAY));
         assert!(!is_retryable_status(StatusCode::BAD_REQUEST));
         assert!(!is_retryable_status(StatusCode::UNAUTHORIZED));
+        assert!(is_retry_safe_method(&Method::GET));
+        assert!(is_retry_safe_method(&Method::HEAD));
+        assert!(!is_retry_safe_method(&Method::POST));
+        assert!(!is_retry_safe_method(&Method::DELETE));
     }
 
     #[test]
@@ -1253,7 +1291,19 @@ mod tests {
     }
 
     #[test]
-    fn provider_failures_do_not_expose_response_messages_or_secrets() {
+    fn provider_failures_retain_only_safe_bounded_diagnostics() {
+        let safe = provider_http_error(
+            StatusCode::BAD_REQUEST,
+            br#"{"code":"InvalidParameter","message":"The size field is unsupported for this request."}"#,
+        );
+        let ProxyError::Request(safe_message) = safe else {
+            panic!("expected sanitized request failure");
+        };
+        assert_eq!(
+            safe_message,
+            "DashScope image request failed: HTTP 400 (InvalidParameter): The size field is unsupported for this request."
+        );
+
         let error = provider_http_error(
             StatusCode::BAD_REQUEST,
             br#"{"code":"InvalidParameter","message":"Bearer private-secret"}"#,
@@ -1266,5 +1316,17 @@ mod tests {
             "DashScope image request failed: HTTP 400 (InvalidParameter)"
         );
         assert!(!message.contains("private-secret"));
+
+        let url = provider_http_error(
+            StatusCode::BAD_REQUEST,
+            br#"{"code":"InvalidParameter","message":"inspect https://oss-example.invalid/signed?token=secret"}"#,
+        );
+        let ProxyError::Request(url_message) = url else {
+            panic!("expected sanitized request failure");
+        };
+        assert_eq!(
+            url_message,
+            "DashScope image request failed: HTTP 400 (InvalidParameter)"
+        );
     }
 }

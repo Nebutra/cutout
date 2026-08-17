@@ -2002,7 +2002,7 @@ fn run_turn(
             let thread_id =
                 start_or_resume_thread(&writer, &receiver, &overflow, &cwd, binding.as_ref())?;
             // Discovery, authentication and thread resume can all take time.
-            // Re-check cancellation at the last non-billable boundary.
+            // Re-check cancellation at the last boundary before turn execution.
             ensure_request_active(&state, &input.request_id)?;
             let turn = rpc_request(
                 &writer,
@@ -2674,7 +2674,7 @@ env_key = "PRIVATE_KEY""#,
     }
 
     #[test]
-    fn cancellation_before_turn_start_closes_the_billable_boundary() {
+    fn cancellation_before_turn_start_closes_the_execution_boundary() {
         let state = RuntimeStateInner::default();
         let input = CodexTurnStartInput {
             request_id: uuid::Uuid::new_v4().to_string(),

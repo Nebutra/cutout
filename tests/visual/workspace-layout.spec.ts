@@ -58,7 +58,7 @@ test("workspace modes use stable non-overlapping geometry", async ({
     if (viewport.width < 768) await page.setViewportSize({ width: 1024, height: viewport.height });
     await openDeliverWorkspace(page);
     if (viewport.width < 768) await page.setViewportSize(viewport);
-    const deliver = page.getByRole("region", { name: "Deliver" });
+    const deliver = page.getByRole("region", { name: "Project workbench" });
     await expect(deliver).toBeVisible();
     const deliverBox = await deliver.boundingBox();
     expect(deliverBox!.width).toBeGreaterThan(viewport.width * 0.8);

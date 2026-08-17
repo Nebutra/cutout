@@ -110,7 +110,7 @@ from `provider.kind` because the descriptor was not passed to one call site.
 verification receipt, and exact capability descriptor together through every
 preflight and execution boundary.
 
-For paid or externally effective operations:
+For Provider or externally effective operations:
 
 - make authoritative evidence a required function parameter;
 - do not use kind/name heuristics as an omitted-argument fallback;
@@ -141,7 +141,7 @@ After implementation:
       casting payload fields locally
 - [ ] Checked that derived state points back to the source event identifier
       (`seq`, `id`, `version`) instead of inventing a second cursor
-- [ ] Checked that paid-operation route locks require the same immutable
+- [ ] Checked that Provider-operation route locks require the same immutable
       Provider/binding/evidence snapshot and have no kind-derived fallback
 - [ ] Checked that a failed upstream Provider turn cannot fall through and be
       misreported as a later stage failure
@@ -340,7 +340,7 @@ client store into React and then exercised by an integration benchmark.
 - [ ] Is success defined by the complete declared plan/manifest rather than
       `results.length > 0`, first callback, filename, or a single ready artifact?
 - [ ] Do tests assert explicit user scope such as requested page count before
-      starting paid downstream work?
+      starting downstream Provider work?
 - [ ] On concurrent failure, does the orchestrator stop claiming new work and
       settle already in-flight callbacks before returning an error?
 - [ ] For Retry/Resume, does the product acknowledge ownership synchronously
@@ -386,7 +386,7 @@ plan or DAG after expensive independent work has already completed.
 - [ ] Is every repair budget explicit and finite, with the complete final
       validator still fail-closed after staged checks?
 - [ ] Are transport, auth, policy, cancellation, timeout, and malformed-schema
-      failures excluded from semantic repair so a second paid request cannot
+      failures excluded from semantic repair so a second Provider request cannot
       disguise the real failure class?
 - [ ] Does terminal UI state suppress all ephemeral pending projections even if
       a progress producer forgot to clear its label?
@@ -432,7 +432,7 @@ and requires native plus external recomputation from retained object bytes.
 ## Cancellation Ownership Checklist
 
 Use this checklist when browser or renderer code starts a native or remote side
-effect, especially a paid Provider request.
+effect, especially a remote Provider request.
 
 - [ ] Does one opaque request id bind the UI owner, IPC command, native future,
       receipt, and sanitized E2E checkpoint?
@@ -440,7 +440,7 @@ effect, especially a paid Provider request.
       outer promise and discard late output?
 - [ ] Are renderer, desktop policy, IPC, HTTP client, and approval-lease
       deadlines ordered and documented instead of independently chosen?
-- [ ] Can a cancelled or timed-out request continue billing, hold a socket, or
+- [ ] Can a cancelled or timed-out request continue executing, hold a socket, or
       publish a late artifact after the owner run has settled?
 - [ ] Is discovery/catalog evidence named separately from the first successful
       execution of an advertised capability?
@@ -448,8 +448,8 @@ effect, especially a paid Provider request.
       or timeout failure, does concurrency stop claiming unstarted sibling work?
 
 **Deadline ordering rule**: an outer owner must not expire before an inner
-transport unless the outer cancellation is proven to stop both execution and
-billing. Keep each boundary's deadline in one reviewed contract and add a
+transport unless the outer cancellation is proven to stop execution. Keep each
+boundary's deadline in one reviewed contract and add a
 cross-source regression when languages cannot share the same constant.
 
 **Single-tenant runtime rule**: acquire a scarce process/session before starting
@@ -462,11 +462,11 @@ workspace. Persisted conversation reuse requires exact revision and context
 digest equality; a fresh run should use a fresh opaque conversation identity.
 
 **Real-world example**: Cutout's native image bridge allowed 300 seconds, while
-the desktop paid-tool owner aborted after 180 seconds. A real image edit hit the
+the desktop Provider-tool owner aborted after 180 seconds. A real image edit hit the
 outer deadline after four completed pages; sibling fan-out then received HTTP
 502. The fix was to let native transport settle first, place the desktop owner
 after it, place the packaged watchdog after both, and close queued image work on
-route-wide failures without cancelling already in-flight paid calls.
+route-wide failures without cancelling already in-flight Provider calls.
 
 ## Error Ownership Across Wrapper Layers
 
@@ -596,14 +596,14 @@ consume recovery for every later stage.
 - [ ] Does a run-boundary Retry reuse the original conversation source event so
       a fresh execution attempt cannot render a duplicate user submission?
 - [ ] Does a transient node retry keep one stable logical identity, use a fresh
-      paid attempt identity, and re-enter the shared fairness queue only after
+      Provider attempt identity, and re-enter the shared fairness queue only after
       the limiter has observed and classified the failure?
 - [ ] Does one user Retry claim all currently failed independent frontiers, or
       does a parallel DAG degrade into one click and one settlement cycle per
       sibling?
 - [ ] Enforce both a per-frontier ceiling and a total journey ceiling so
-      topology-aware recovery cannot become an unbounded paid loop.
-- [ ] Count every repeated paid attempt in both planned and actual execution
+      topology-aware recovery cannot become an unbounded Provider loop.
+- [ ] Count every repeated Provider attempt in both planned and actual execution
       evidence.
 - [ ] Re-resolve mutable health/routing decisions inside each attempt; do not
       capture an exact Provider/model before entering the retry owner.
@@ -625,7 +625,7 @@ had no local transient retry and the UI resumed only the first failed suite per
 click. Recovery took more than 34 minutes and still ended `provider-transport`.
 The prevention contract is one bounded fresh-identity retry at the logical page
 node plus one user Retry that schedules all failed suite frontiers together;
-ready siblings and paid calls already in flight remain untouched.
+ready siblings and Provider calls already in flight remain untouched.
 
 **Real-world example**: Packaged run 053 produced high-fidelity pages but spent
 the hour redrawing rejected pages. Page-local repair omitted the rejected bytes,
@@ -687,7 +687,7 @@ a plain browser/test host:
 - [ ] Is native-host detection centralized and based on the callable bridge,
       rather than the mere presence of a global object?
 - [ ] Does the desktop path reread its native persisted authority at the start
-      of an execution attempt, so stale query state cannot own paid work?
+      of an execution attempt, so stale query state cannot own Provider work?
 - [ ] Does the browser path consume an already validated read-only projection
       instead of importing or invoking an unavailable native store?
 - [ ] Does absence of the native host project a truthful capability/configuration

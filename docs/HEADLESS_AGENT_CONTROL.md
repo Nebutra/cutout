@@ -20,7 +20,7 @@ The GUI, CLI, and MCP use the same provider-neutral lifecycle contract:
 append-only observable events in `.cutout/run-events.json`, can be replayed
 after restart, use optimistic control revisions and request-id idempotency, and
 support cursor-based event reads. Starting a run records intent but does not
-silently invoke a model, paid tool, network capability, or hidden GUI queue.
+silently invoke a model, Provider tool, network capability, or hidden GUI queue.
 
 The desktop app additionally contains an internal durable local Agent Host.
 It persists scheduler checkpoints, node attempts, leases, heartbeat, retry
@@ -168,13 +168,13 @@ Results are JSON-RPC/MCP `structuredContent` and are redacted by the runtime
 before returning. Material results include metadata and SHA-256 addresses, not
 binary artifact bytes.
 
-## Paid/provider tool contract
+## Provider tool contract
 
 `cutout.control.v1` reserves `tool.invoke` for outcome-driven tools such as
 `generate-image`, `edit-image`, and `cutout`. A request declares the intended
 result and input artifact IDs. The desktop product always uses host-policy
-`auto`: enabling a BYOK Provider is standing authorization, so preview is an
-observation surface rather than a per-call payment gate. The legacy `explicit`
+`auto`: enabling a BYOK Provider is sufficient execution authority, so preview is an
+observation surface rather than an execution gate. The legacy `explicit`
 value remains decoder-compatible for non-desktop hosts. A request never carries an API key,
 authorization header, provider configuration, arbitrary file bytes, or an
 executor-supplied receipt.
@@ -184,15 +184,23 @@ desktop execution only when Provider actions are enabled and the exact route is
 available; missing capability or disabled policy fails immediately rather than
 waiting for an approval that cannot fix it. A completed executor returns an auditable receipt
 containing capability, provider/model IDs, output artifact IDs, timestamps, and
-terminal status. Actual charged amount is optional and may appear only when the
-Provider returned verifiable billing evidence; Cutout never substitutes a price
-prediction. Receipt schemas reject credential-shaped values.
+terminal status. Cutout does not meter, estimate, or record Provider billing.
+Receipt schemas reject credential-shaped values.
 
 The current headless host intentionally has no provider executor. Its dry-run
 therefore returns a truthful `capability-required` plan, and apply returns a
 `capability-required` error without advancing the revision or recording a fake
 success. The packaged desktop host does execute assigned image Providers through
-the native credential/origin boundary, request-bound capability lease, paid-tool
+the native credential/origin boundary, request-bound capability lease, Provider
 receipt, and content-addressed artifact store. The lease limits and records
-execution; it does not represent a per-call payment confirmation. That executor is not exported by the default
+execution. That executor is not exported by the default
 headless CLI/MCP process.
+
+Cutout 0.1.21 also ships a separate closed Commerce production binary for the
+held-out benchmark protocol. It accepts only evaluator-signed Commerce packages,
+opaque Host-owned jobs and six fixed lifecycle commands; its native sidecar uses
+the same Keychain, fixed-origin network, receipt, replay-ledger and admission
+code as the desktop Host without constructing a window. This binary is not part
+of `cutout.control.v1`, is absent from CLI/MCP discovery, and cannot be used as a
+generic Provider, file, shell or project controller. See
+[`COMMERCE_OPERATOR.md`](./COMMERCE_OPERATOR.md).

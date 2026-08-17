@@ -1,4 +1,7 @@
 import {
+  forwardRef,
+  lazy,
+  Suspense,
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -6,6 +9,7 @@ import {
   useRef,
   useState,
   type CSSProperties,
+  type ComponentPropsWithoutRef,
   type ComponentType,
   type ReactNode,
 } from "react";
@@ -18,7 +22,6 @@ import {
   Copy,
   Download,
   Files as FilesIcon,
-  Gamepad2,
   ImageIcon,
   Layers3,
   Loader2,
@@ -30,7 +33,6 @@ import {
   Grid3x3,
   GitBranch,
   History,
-  Map as MapIcon,
   PanelLeft,
   PanelLeftClose,
   PanelLeftOpen,
@@ -41,6 +43,7 @@ import {
   Sparkles,
   Tag,
   Trash2,
+  Wrench,
   WandSparkles,
   X,
 } from "lucide-react";
@@ -287,8 +290,10 @@ import { workspaceSidebarRestore } from "./sidebar-restore";
 import {
   createGameAssetLaunchRequest,
   routeWorkspaceSubmission,
+  type CanvasProfileLaunch,
   type WorkspaceWorkbenchLaunchOptions,
 } from "@/workspace/scenario-launch";
+import type { CommerceProjectLifecycleRecord } from "@/commerce-profile/project-lifecycle";
 import {
   withCanvasAnnotations,
   type CanvasAnnotation,
@@ -305,6 +310,14 @@ import type {
 } from "@/workspace/workspace-snapshot";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { SourceCanvas } from "@/components/source/SourceCanvas";
@@ -353,6 +366,12 @@ import {
   sanitizeQaFailures,
 } from "@/prototype/generation-qa";
 import { cn } from "@/lib/utils";
+
+const CanvasProfileStage = lazy(() =>
+  import("./CanvasProfileStage").then((module) => ({
+    default: module.CanvasProfileStage,
+  })),
+);
 
 // Vision QA stays on the critical path. Generic asset retries remain explicit;
 // prototype pages own one bounded node-local repair before surfacing rejection.
@@ -541,7 +560,7 @@ type PackagedE2ePipelineStage =
   | "research-brief"
   | "planner"
   | "planner-complete";
-type WorkspacePanel = "agent" | "files" | "git" | "design" | "deliver";
+type WorkspacePanel = "agent" | "files" | "git" | "design";
 
 interface AssetStage {
   readonly id: Exclude<AssetStageId, "idle">;
@@ -601,12 +620,16 @@ async function runScheduled<T>(
 }
 export function IntentWorkspace({
   onOpenDesignOs = () => {},
+  initialProfileLaunch,
+  onProfileLaunchConsumed,
   projectId,
 }: {
   readonly onOpenDesignOs?: (
     tab?: "overview" | "delivery" | "game-assets" | "specimen",
     options?: WorkspaceWorkbenchLaunchOptions,
   ) => void;
+  readonly initialProfileLaunch?: CanvasProfileLaunch;
+  readonly onProfileLaunchConsumed?: () => void;
   readonly projectId?: string | null;
 }) {
   const { t } = useLingui();
@@ -621,6 +644,9 @@ export function IntentWorkspace({
     (s) => s.workspaceSnapshot?.designDocument ?? null,
   );
   const setWorkspaceSnapshot = useStore((s) => s.setWorkspaceSnapshot);
+  const commerceProjectLifecycle = useStore(
+    (s) => s.workspaceSnapshot?.commerceProjectLifecycle ?? null,
+  );
   const [agentBusy, setAgentBusy] = useState(false);
   const agentRunCoordinatorRef = useRef(new AgentRunCoordinator());
   const activeRunRef = useRef<AgentRunLease | null>(null);
@@ -882,7 +908,8 @@ export function IntentWorkspace({
   }, [approvedDeliverables]);
   const [activeWorkspacePanel, setActiveWorkspacePanel] =
     useState<WorkspacePanel | null>("agent");
-  const deliveryReturnPanelRef = useRef<WorkspacePanel | null>("agent");
+  const [canvasProfileLaunch, setCanvasProfileLaunch] =
+    useState<CanvasProfileLaunch | null>(null);
   const [gitReview, setGitReview] = useState<GitWorkspaceReview>();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const designSystemSelectionRequired = Boolean(
@@ -899,13 +926,6 @@ export function IntentWorkspace({
   const [canvasBackground, setCanvasBackground] = useState<string | null>(
     readCanvasBackground,
   );
-  const [minimapVisible, setMinimapVisible] = useState(() => {
-    try {
-      return localStorage.getItem("cutout.canvas-minimap") === "1";
-    } catch {
-      return false;
-    }
-  });
   const [gridVisible, setGridVisible] = useState(() => {
     try {
       return localStorage.getItem("cutout.canvas-grid") !== "0";
@@ -931,6 +951,29 @@ export function IntentWorkspace({
     }, 50);
   }, []);
   const library = useLibraryUI();
+
+  useEffect(() => {
+    if (!initialProfileLaunch) return;
+    setCanvasProfileLaunch(initialProfileLaunch);
+    setActiveWorkspacePanel("agent");
+    onProfileLaunchConsumed?.();
+  }, [initialProfileLaunch, onProfileLaunchConsumed]);
+
+  const updateCommerceProjectLifecycle = useCallback(
+    (record: CommerceProjectLifecycleRecord | undefined) => {
+      const state = getStoreState();
+      const snapshot = state.workspaceSnapshot;
+      if (!snapshot) {
+        toast.error("The current Project state is unavailable.");
+        return;
+      }
+      state.setWorkspaceSnapshot({
+        ...snapshot,
+        commerceProjectLifecycle: record ?? null,
+      });
+    },
+    [],
+  );
   const [focusedArtifactId, setFocusedArtifactId] = useState<string | null>(
     null,
   );
@@ -1286,7 +1329,7 @@ export function IntentWorkspace({
     );
   }, [materialRefs]);
   // Once an Agent run starts, naming must use the same locked chat route even
-  // if Settings refresh while paid work is still completing.
+  // if Settings refresh while Provider work is still completing.
   const hasChatModel = Boolean(
     lockedRouteRef.current?.chat ?? assignments.data?.chat,
   );
@@ -1474,7 +1517,7 @@ export function IntentWorkspace({
       const resumableDesignSystem = failedDesignCandidate
         ? prototypeDesignSystemCandidates?.artifacts[failedDesignCandidate.id]
         : prototypeDesignSystem;
-      // A Design System candidate set belongs to one failed paid-work attempt.
+      // A Design System candidate set belongs to one failed Provider attempt.
       // Keep the authoritative Planner result, but remove its terminal visual
       // projection as soon as Retry takes ownership. Reusing those failed
       // candidates makes the UI look stuck and lets stale tool state leak into
@@ -1593,6 +1636,7 @@ export function IntentWorkspace({
       outcome,
       agentRunEvents: agentRunEvents.events.length > 0 ? agentRunEvents : undefined,
       designDocument,
+      commerceProjectLifecycle,
       approvedDeliverables,
       canvasAnnotations,
       capabilityReceipts: initialWorkspace?.capabilityReceipts,
@@ -1609,6 +1653,7 @@ export function IntentWorkspace({
     initialWorkspace?.capabilityReceipts,
     composerModelPolicy,
     composerThinkingPolicy,
+    commerceProjectLifecycle,
     creativeBoard,
     designDocument,
     humanLoopChoiceId,
@@ -1756,7 +1801,7 @@ export function IntentWorkspace({
     setLiveAgentOutput("");
     setLiveAgentLabel(null);
     if (pending.length === 0) return;
-    // A correction can arrive after the final paid call has begun. Never
+    // A correction can arrive after the final Provider call has begun. Never
     // replay that call: retain the correction as the next editable draft and
     // make the deferred boundary explicit instead of silently dropping it.
     setComposerDraft((current) =>
@@ -1922,7 +1967,7 @@ export function IntentWorkspace({
       retryPlanningRuntime?: RetryPlanningRuntime;
       /** Reuse the original submitted turn while a new run owns this attempt. */
       retrySourceEventId?: string;
-      /** Start a fresh paid Design System candidate set from an accepted Planner result. */
+      /** Start a fresh Design System candidate set from an accepted Planner result. */
       restartDesignSystemCandidates?: boolean;
     } = {},
   ): Promise<void> {
@@ -3459,7 +3504,7 @@ export function IntentWorkspace({
     );
 
     // Regenerate is a message operation, never an implicit request to enter
-    // the paid asset pipeline when classification returns text or another tool.
+    // the Provider asset pipeline when classification returns text or another tool.
     if (
       options.regenerateTargetEventId &&
       (!conversationalCall || conversationalCall.error)
@@ -3704,7 +3749,7 @@ export function IntentWorkspace({
     const request = getStoreState().consumeAgentRun();
     if (request?.intent === "create-assets") void createAssets();
     // The store request is a one-shot mount handoff. Re-running this effect for
-    // changing workspace state would risk duplicate paid generation.
+    // changing workspace state would risk duplicate Provider generation.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [assignments.isPending, pendingAgentRunId]);
 
@@ -4194,7 +4239,7 @@ export function IntentWorkspace({
       readonly resumePrototypeSuiteCandidates?: PrototypeSuiteCandidateSet;
       /** Failed suite frontiers acknowledged by the current Retry action. */
       readonly retrySuiteCandidateIds?: readonly string[];
-      /** Shared paid-image and single-writer production lanes for sibling suites. */
+      /** Shared Provider-image and single-writer production lanes for sibling suites. */
       readonly productionScheduler?: PrototypeProductionScheduler;
       /** Distinguishes idempotency keys across sibling suite alternatives. */
       readonly suiteRunId?: string;
@@ -5452,7 +5497,7 @@ export function IntentWorkspace({
           })
         : null;
     // A provider may resolve an aborted edit as an error result instead of
-    // throwing AbortError. Never enter the paid fallback after cancellation.
+    // throwing AbortError. Never enter the Provider fallback after cancellation.
     agentRunCoordinatorRef.current.checkpoint(lease);
     const result =
       edited ??
@@ -5522,7 +5567,7 @@ export function IntentWorkspace({
     );
     // Candidate directions are distinct creative work, but they often share one
     // exact image route. Send them through the production scheduler so a cold
-    // or pressured Provider is canaried by one request before more paid work is
+    // or pressured Provider is canaried by one request before more work is
     // admitted. The Agent still owns the candidate count and plan concurrency.
     const referencesPresent = attachments.length > 0 || Boolean(materialReference);
     const scheduledRoute = referencesPresent
@@ -6062,7 +6107,7 @@ export function IntentWorkspace({
     const runId = `workspace:${lease.id}`;
     let successfulImageRoute: ModelAssignment | undefined;
 
-    // One paid invocation owns one page attempt. The previous visual DAG always
+    // One Provider invocation owns one page attempt. The previous visual DAG always
     // generated an unconditioned variant and refined it in a second image call,
     // while the outer QA loop could repeat both. A reference edit is faster and
     // actually consumes the selected Design System and anchor page.
@@ -6311,31 +6356,6 @@ export function IntentWorkspace({
       >
         <Grid3x3 className="size-4" />
       </button>
-      <button
-        type="button"
-        aria-label="Toggle minimap"
-        title="Minimap"
-        aria-pressed={minimapVisible}
-        className={cn(
-          "flex size-8 items-center justify-center rounded-full border bg-background/95 shadow-[0_2px_10px_rgb(0_0_0/0.10)] backdrop-blur transition-all hover:scale-105",
-          minimapVisible
-            ? "border-foreground/30 text-foreground"
-            : "border-border/70 text-muted-foreground hover:border-foreground/25 hover:text-foreground",
-        )}
-        onClick={() => {
-          setMinimapVisible((visible) => {
-            const next = !visible;
-            try {
-              localStorage.setItem("cutout.canvas-minimap", next ? "1" : "0");
-            } catch {
-              // best-effort persistence only
-            }
-            return next;
-          });
-        }}
-      >
-        <MapIcon className="size-4" />
-      </button>
     </>
   );
 
@@ -6581,26 +6601,83 @@ export function IntentWorkspace({
         <WorkspaceRail
           agentActive={activeWorkspacePanel === "agent"}
           onToggleAgent={() => toggleWorkspacePanel("agent")}
-          filesActive={activeWorkspacePanel === "files"}
-          onToggleFiles={() => toggleWorkspacePanel("files")}
-          gitActive={activeWorkspacePanel === "git"}
-          onToggleGit={() => toggleWorkspacePanel("git")}
+          projectToolsActive={
+            activeWorkspacePanel === "files"
+            || activeWorkspacePanel === "git"
+            || activeWorkspacePanel === "design"
+          }
+          onOpenFiles={() => toggleWorkspacePanel("files")}
+          onOpenGit={() => toggleWorkspacePanel("git")}
           onOpenAssets={() => {
             setActiveWorkspacePanel(null);
             library.open();
           }}
           onOpenDesign={() => toggleWorkspacePanel("design")}
-          inspectorActive={activeWorkspacePanel === "design"}
           drawerControlsDisabled={designSystemSelectionRequired}
-          deliverActive={activeWorkspacePanel === "deliver"}
-          onOpenDeliver={() => {
-            setActiveWorkspacePanel((current) => {
-              if (current === "deliver") return null;
-              deliveryReturnPanelRef.current = current;
-              return "deliver";
-            });
-          }}
+          onInspectProject={() => onOpenDesignOs("overview")}
+          onOpenDeliveryDetails={() => onOpenDesignOs("delivery")}
           onCollapseSidebar={() => setSidebarCollapsed(true)}
+        />
+      </div>
+
+      <div
+        data-mobile-workspace-controls
+        className={cn(
+          "absolute right-3 z-40 flex items-center gap-2 transition-[bottom] lg:hidden",
+          activeWorkspacePanel
+            ? "bottom-[calc(min(70dvh,42rem)-2.5rem)]"
+            : "bottom-3",
+        )}
+      >
+        <button
+          type="button"
+          aria-label="Agent"
+          title="Agent"
+          aria-pressed={activeWorkspacePanel === "agent"}
+          className={cn(
+            "flex size-8 items-center justify-center rounded-full border bg-background/95 shadow-[0_2px_10px_rgb(0_0_0/0.10)] backdrop-blur transition-all hover:scale-105",
+            activeWorkspacePanel === "agent"
+              ? "border-foreground/30 text-foreground"
+              : "border-border/70 text-muted-foreground hover:border-foreground/25 hover:text-foreground",
+          )}
+          onClick={() => toggleWorkspacePanel("agent")}
+        >
+          <Sparkles className="size-4" />
+        </button>
+        <ProjectToolsMenu
+          side="top"
+          trigger={(
+            <button
+              type="button"
+              aria-label="Project"
+              title="Project tools"
+              aria-pressed={
+                activeWorkspacePanel === "files"
+                || activeWorkspacePanel === "git"
+                || activeWorkspacePanel === "design"
+              }
+              className={cn(
+                "flex size-8 items-center justify-center rounded-full border bg-background/95 shadow-[0_2px_10px_rgb(0_0_0/0.10)] backdrop-blur transition-all hover:scale-105",
+                activeWorkspacePanel === "files"
+                || activeWorkspacePanel === "git"
+                || activeWorkspacePanel === "design"
+                  ? "border-foreground/30 text-foreground"
+                  : "border-border/70 text-muted-foreground hover:border-foreground/25 hover:text-foreground",
+              )}
+            >
+              <Wrench className="size-4" />
+            </button>
+          )}
+          drawerControlsDisabled={designSystemSelectionRequired}
+          onOpenFiles={() => toggleWorkspacePanel("files")}
+          onOpenGit={() => toggleWorkspacePanel("git")}
+          onOpenAssets={() => {
+            setActiveWorkspacePanel(null);
+            library.open();
+          }}
+          onOpenDesign={() => toggleWorkspacePanel("design")}
+          onInspectProject={() => onOpenDesignOs("overview")}
+          onOpenDeliveryDetails={() => onOpenDesignOs("delivery")}
         />
       </div>
 
@@ -6622,37 +6699,19 @@ export function IntentWorkspace({
           sidebarCollapsed ? "lg:left-0" : "lg:left-14",
         )}
       >
-        {activeWorkspacePanel === "deliver" ? (
-          <DeliveryWorkspaceDock
-            approvedDeliverables={approvedDeliverables}
-            hasDesignSystem={Boolean(prototypeDesignSystem)}
-            prototypePageCount={prototypePages.length}
-            onOpenWorkspace={() => {
-              setActiveWorkspacePanel(deliveryReturnPanelRef.current);
-              onOpenDesignOs("delivery");
-            }}
-            onClose={() => setActiveWorkspacePanel(null)}
-          />
-        ) : activeWorkspacePanel === "design" ? (
+        {activeWorkspacePanel === "design" ? (
           <DesignMarkdownInspector
             docked
             prototypePlan={prototypePlan}
             prototypeDesignSystem={prototypeDesignSystem}
             importedDesignMarkdown={importedDesignMarkdown}
             onChange={updateDesignMarkdownContent}
-            onOpenSystem={() => {
-              setActiveWorkspacePanel(null);
-              onOpenDesignOs("overview");
-            }}
-            onOpenGameAssets={() => {
-              setActiveWorkspacePanel(null);
-              onOpenDesignOs("game-assets");
+            onOpenProductUiux={() => {
+              setActiveWorkspacePanel("agent");
+              setFocusedArtifactId("design-system");
+              setFocusRequestId((id) => id + 1);
             }}
             onClose={() => setActiveWorkspacePanel(null)}
-            onOpenSpecimen={() => {
-              setActiveWorkspacePanel(null);
-              onOpenDesignOs("specimen");
-            }}
           />
         ) : activeWorkspacePanel === "git" ? (
           <GitWorkspaceDock
@@ -6665,7 +6724,7 @@ export function IntentWorkspace({
               type="button"
               aria-label="Hide Files"
               title="Hide Files"
-              className="absolute right-2 top-2 z-10 flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              className="absolute right-2 top-2 z-10 hidden size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground lg:flex"
               onClick={() => setActiveWorkspacePanel(null)}
             >
               <PanelLeftClose className="size-4" />
@@ -6693,7 +6752,7 @@ export function IntentWorkspace({
               type="button"
               aria-label="Hide Agent"
               title="Hide Agent"
-              className="absolute right-2 top-2 z-10 flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              className="absolute right-2 top-2 z-10 hidden size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground lg:flex"
               onClick={() => setActiveWorkspacePanel(null)}
             >
               <PanelLeftClose className="size-4" />
@@ -6811,8 +6870,9 @@ export function IntentWorkspace({
                     consumed.submitted,
                   );
                   if (submissionRoute.kind === "game-assets") {
-                    onOpenDesignOs("game-assets", {
-                      gameAssetLaunch: createGameAssetLaunchRequest(
+                    setCanvasProfileLaunch({
+                      kind: "game-assets",
+                      launch: createGameAssetLaunchRequest(
                         submissionRoute.intent,
                         attachments.map((attachment) => ({
                           name: attachment.name,
@@ -6820,6 +6880,13 @@ export function IntentWorkspace({
                           bytes: attachment.bytes,
                         })),
                       ),
+                    });
+                    return;
+                  }
+                  if (submissionRoute.kind === "commerce") {
+                    setCanvasProfileLaunch({
+                      kind: "commerce",
+                      sourceText: submissionRoute.intent.sourceText,
                     });
                     return;
                   }
@@ -6962,7 +7029,6 @@ export function IntentWorkspace({
               }}
               onOpenArtifact={(kind) => {
                 if (kind === "design-system" || kind === "design-markdown") {
-                  setActiveWorkspacePanel("design");
                   setFocusedArtifactId("design-system");
                   setFocusRequestId((id) => id + 1);
                   return;
@@ -7023,7 +7089,6 @@ export function IntentWorkspace({
             <section className="flex h-full min-h-0 flex-col bg-background" aria-label="Git branch comparison"><header className="flex h-12 shrink-0 items-center gap-3 border-b border-border px-4"><GitBranch className="size-4 text-muted-foreground" /><div className="min-w-0 flex-1"><div className="truncate text-sm font-medium">{gitReview.comparison.base} ↔ {gitReview.comparison.compare}</div><div className="text-[11px] text-muted-foreground">{gitReview.comparison.baseOnly} base-only · {gitReview.comparison.compareOnly} compare-only commits</div></div><Button type="button" variant="ghost" size="icon" className="size-7" aria-label="Close branch comparison" onClick={() => setGitReview(undefined)}><X className="size-3.5" /></Button></header><div className="min-h-0 flex-1 overflow-auto p-5"><h3 className="mb-2 text-xs font-medium uppercase text-muted-foreground">Changed files · {gitReview.comparison.files.length}</h3>{gitReview.comparison.files.map((file) => <div key={`${file.status}:${file.path}`} className="flex max-w-3xl items-center gap-3 border-b border-border/60 px-2 py-2 text-sm"><span className="w-8 shrink-0 font-mono text-xs text-muted-foreground">{file.status}</span><span className="min-w-0 flex-1 truncate">{file.path}</span></div>)}</div></section>
           ) : <OutputSurface
             canvasBackground={canvasBackground}
-            showMinimap={minimapVisible}
             showGrid={gridVisible}
             canvasToolbar={canvasToolbar}
             canvasActions={{
@@ -7185,6 +7250,34 @@ export function IntentWorkspace({
                 : []
             }
           />}
+          {canvasProfileLaunch ? (
+            <div
+              className={cn(
+                "absolute bottom-0 left-0 right-0 top-0 z-10 min-h-0 bg-background",
+                activeWorkspacePanel
+                  && "bottom-[min(70dvh,42rem)] lg:bottom-0 lg:left-[24rem] 2xl:left-[27rem]",
+              )}
+            >
+              <Suspense
+                fallback={
+                  <div
+                    role="status"
+                    className="grid h-full min-h-52 place-items-center text-xs text-muted-foreground"
+                  >
+                    Loading production workspace
+                  </div>
+                }
+              >
+                <CanvasProfileStage
+                  launch={canvasProfileLaunch}
+                  currentRevisionId={designDocument?.revision.id ?? null}
+                  commerceLifecycle={commerceProjectLifecycle}
+                  onCommerceLifecycleChange={updateCommerceProjectLifecycle}
+                  onClose={() => setCanvasProfileLaunch(null)}
+                />
+              </Suspense>
+            </div>
+          ) : null}
         </section>
       </main>
 
@@ -7287,120 +7380,22 @@ function WorkspaceDockHeader({
   );
 }
 
-function DeliveryWorkspaceDock({
-  approvedDeliverables,
-  hasDesignSystem,
-  prototypePageCount,
-  onOpenWorkspace,
-  onClose,
-}: {
-  readonly approvedDeliverables: readonly ApprovedDeliverableReceipt[];
-  readonly hasDesignSystem: boolean;
-  readonly prototypePageCount: number;
-  readonly onOpenWorkspace: () => void;
-  readonly onClose: () => void;
-}) {
-  return (
-    <aside
-      aria-label="Deliver"
-      className="flex h-full min-h-0 w-full shrink-0 flex-col bg-background"
-    >
-      <WorkspaceDockHeader
-        title="Deliver"
-        context="Canvas"
-        closeLabel="Close Deliver"
-        onClose={onClose}
-      />
-      <div className="min-h-0 flex-1 overflow-y-auto">
-        <section className="border-b border-border p-4">
-          <h3 className="text-sm font-semibold">Current output</h3>
-          <ul className="mt-3 divide-y divide-border rounded-md border border-border">
-            <DeliveryReadinessRow
-              label="Approved results"
-              value={
-                approvedDeliverables.length > 0
-                  ? String(approvedDeliverables.length)
-                  : "None"
-              }
-              ready={approvedDeliverables.length > 0}
-            />
-            <DeliveryReadinessRow
-              label="Design system"
-              value={hasDesignSystem ? "Ready" : "Not ready"}
-              ready={hasDesignSystem}
-            />
-            <DeliveryReadinessRow
-              label="Prototype pages"
-              value={prototypePageCount > 0 ? String(prototypePageCount) : "None"}
-              ready={prototypePageCount > 0}
-            />
-          </ul>
-        </section>
-      </div>
-      <div className="shrink-0 border-t border-border p-4">
-        <Button type="button" className="w-full" onClick={onOpenWorkspace}>
-          <PackageOpen className="size-4" />
-          Open delivery workspace
-        </Button>
-      </div>
-    </aside>
-  );
-}
-
-function DeliveryReadinessRow({
-  label,
-  value,
-  ready,
-}: {
-  readonly label: string;
-  readonly value: string;
-  readonly ready: boolean;
-}) {
-  return (
-    <li className="flex min-h-11 items-center gap-3 px-3 py-2">
-      <span
-        aria-hidden="true"
-        className={cn(
-          "flex size-5 shrink-0 items-center justify-center rounded-full border",
-          ready
-            ? "border-emerald-600/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
-            : "border-border bg-muted/40 text-muted-foreground",
-        )}
-      >
-        {ready ? (
-          <Check className="size-3" />
-        ) : (
-          <span className="size-1.5 rounded-full bg-current" />
-        )}
-      </span>
-      <span className="min-w-0 flex-1 text-xs text-muted-foreground">
-        {label}
-      </span>
-      <span className="shrink-0 text-xs font-medium">{value}</span>
-    </li>
-  );
-}
-
 function DesignMarkdownInspector({
   docked = false,
   prototypePlan,
   prototypeDesignSystem,
   importedDesignMarkdown,
   onChange,
-  onOpenSystem,
-  onOpenGameAssets,
+  onOpenProductUiux,
   onClose,
-  onOpenSpecimen,
 }: {
   readonly docked?: boolean;
   readonly prototypePlan: PrototypePlan | null;
   readonly prototypeDesignSystem: PrototypeDesignSystemArtifact | null;
   readonly importedDesignMarkdown: DesignMarkdownAsset;
   readonly onChange: (content: string) => void;
-  readonly onOpenSystem: () => void;
-  readonly onOpenGameAssets: () => void;
+  readonly onOpenProductUiux: () => void;
   readonly onClose: () => void;
-  readonly onOpenSpecimen?: () => void;
 }) {
   const [mode, setMode] = useState<"controls" | "source">("controls");
   const [sourceFormat, setSourceFormat] = useState<
@@ -7458,32 +7453,13 @@ function DesignMarkdownInspector({
       )}
     >
       <WorkspaceDockHeader
-        title="Create"
+        title="Design system"
         context="Project"
-        closeLabel="Close Create"
+        closeLabel="Close Design system"
         onClose={onClose}
       />
 
       <div className="min-h-0 flex-1 overflow-y-auto">
-        <section className="border-b border-border p-4">
-          <p className="text-xs font-medium text-muted-foreground">Production</p>
-          <button
-            type="button"
-            onClick={onOpenGameAssets}
-            className="mt-2 flex min-h-14 w-full items-center gap-3 rounded-md border border-border px-3 text-left outline-none transition-colors hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-muted">
-              <Gamepad2 aria-hidden="true" className="size-4" />
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block text-sm font-medium">Game assets</span>
-              <span className="mt-0.5 block text-xs text-muted-foreground">
-                Generate and review sprite frames with Qwen
-              </span>
-            </span>
-            <ChevronRight aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />
-          </button>
-        </section>
         <section className="border-b border-border p-4">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
@@ -7496,18 +7472,8 @@ function DesignMarkdownInspector({
               {source}
             </span>
           </div>
-          {onOpenSpecimen ? (
-            <button
-              type="button"
-              onClick={onOpenSpecimen}
-              className="mt-2 flex items-center gap-1 text-xs font-medium text-foreground/80 hover:text-foreground hover:underline"
-            >
-              <Palette className="size-3.5" />
-              View specimen
-            </button>
-          ) : null}
-          <Button type="button" variant="outline" size="sm" className="mt-3 w-full" onClick={onOpenSystem}>
-            <Boxes className="size-3.5" /> Open system inspector
+          <Button type="button" variant="outline" size="sm" className="mt-3 w-full" onClick={onOpenProductUiux}>
+            <Boxes className="size-3.5" /> Open Product UI/UX
           </Button>
           {activeFormat !== "astryx" ? (
             <Button
@@ -8768,7 +8734,6 @@ function repairForMaterialImpact(
 
 function OutputSurface({
   canvasBackground,
-  showMinimap,
   showGrid,
   canvasToolbar,
   canvasActions,
@@ -8813,7 +8778,6 @@ function OutputSurface({
   creativeBranches,
 }: {
   readonly canvasBackground: string | null;
-  readonly showMinimap: boolean;
   readonly showGrid: boolean;
   readonly canvasToolbar: ReactNode;
   readonly canvasActions: NonNullable<OutputCanvasProps["actions"]>;
@@ -9064,7 +9028,6 @@ function OutputSurface({
     return (
       <div className="relative h-full min-h-0">
         <OutputCanvas
-          showMinimap={showMinimap}
           showGrid={showGrid}
           background={canvasBackground}
           toolbar={canvasToolbar}
@@ -9267,7 +9230,6 @@ function OutputSurface({
     return (
       <div className="relative h-full min-h-0">
         <OutputCanvas
-          showMinimap={showMinimap}
           showGrid={showGrid}
           background={canvasBackground}
           toolbar={canvasToolbar}
@@ -9286,7 +9248,6 @@ function OutputSurface({
   return (
     <div className="relative h-full min-h-0">
       <OutputCanvas
-        showMinimap={showMinimap}
         showGrid={showGrid}
         background={canvasBackground}
         toolbar={canvasToolbar}
@@ -10825,30 +10786,26 @@ function ExpandSidebarButton({
 function WorkspaceRail({
   agentActive,
   onToggleAgent,
-  filesActive,
-  onToggleFiles,
-  gitActive,
-  onToggleGit,
+  projectToolsActive,
+  onOpenFiles,
+  onOpenGit,
   onOpenAssets,
   onOpenDesign,
-  inspectorActive,
   drawerControlsDisabled,
-  deliverActive,
-  onOpenDeliver,
+  onInspectProject,
+  onOpenDeliveryDetails,
   onCollapseSidebar,
 }: {
   readonly agentActive: boolean;
   readonly onToggleAgent: () => void;
-  readonly filesActive: boolean;
-  readonly onToggleFiles: () => void;
-  readonly gitActive: boolean;
-  readonly onToggleGit: () => void;
+  readonly projectToolsActive: boolean;
+  readonly onOpenFiles: () => void;
+  readonly onOpenGit: () => void;
   readonly onOpenAssets: () => void;
   readonly onOpenDesign: () => void;
-  readonly inspectorActive: boolean;
   readonly drawerControlsDisabled: boolean;
-  readonly deliverActive: boolean;
-  readonly onOpenDeliver: () => void;
+  readonly onInspectProject: () => void;
+  readonly onOpenDeliveryDetails: () => void;
   readonly onCollapseSidebar: () => void;
 }) {
   return (
@@ -10872,71 +10829,106 @@ function WorkspaceRail({
         disabled={drawerControlsDisabled}
         onClick={onToggleAgent}
       />
-      <RailItem
-        icon={<FilesIcon className="size-4" />}
-        label="Files"
-        active={filesActive}
-        disabled={drawerControlsDisabled}
-        onClick={onToggleFiles}
-      />
-      <RailItem
-        icon={<GitBranch className="size-4" />}
-        label="Git"
-        active={gitActive}
-        disabled={drawerControlsDisabled}
-        onClick={onToggleGit}
-      />
-      <RailItem
-        icon={<ImageIcon className="size-4" />}
-        label="Assets"
-        onClick={onOpenAssets}
-      />
-      <RailItem
-        icon={<PanelLeft className="size-4" />}
-        label="Create"
-        active={inspectorActive}
-        disabled={drawerControlsDisabled}
-        onClick={onOpenDesign}
-      />
-      <RailItem
-        icon={<PackageCheck className="size-4" />}
-        label="Deliver"
-        active={deliverActive}
-        onClick={onOpenDeliver}
+      <ProjectToolsMenu
+        trigger={(
+          <RailItem
+            icon={<Wrench className="size-4" />}
+            label="Project"
+            active={projectToolsActive}
+          />
+        )}
+        drawerControlsDisabled={drawerControlsDisabled}
+        onOpenFiles={onOpenFiles}
+        onOpenGit={onOpenGit}
+        onOpenAssets={onOpenAssets}
+        onOpenDesign={onOpenDesign}
+        onInspectProject={onInspectProject}
+        onOpenDeliveryDetails={onOpenDeliveryDetails}
       />
     </nav>
   );
 }
 
-function RailItem({
-  icon,
-  label,
-  active = false,
-  disabled = false,
-  onClick,
+function ProjectToolsMenu({
+  trigger,
+  side = "right",
+  drawerControlsDisabled,
+  onOpenFiles,
+  onOpenGit,
+  onOpenAssets,
+  onOpenDesign,
+  onInspectProject,
+  onOpenDeliveryDetails,
 }: {
+  readonly trigger: ReactNode;
+  readonly side?: "right" | "top";
+  readonly drawerControlsDisabled: boolean;
+  readonly onOpenFiles: () => void;
+  readonly onOpenGit: () => void;
+  readonly onOpenAssets: () => void;
+  readonly onOpenDesign: () => void;
+  readonly onInspectProject: () => void;
+  readonly onOpenDeliveryDetails: () => void;
+}) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>{trigger}</DropdownMenuTrigger>
+      <DropdownMenuContent side={side} align="start" className="w-56">
+        <DropdownMenuLabel>Project tools</DropdownMenuLabel>
+        <DropdownMenuItem disabled={drawerControlsDisabled} onSelect={onOpenFiles}>
+          <FilesIcon /> Files
+        </DropdownMenuItem>
+        <DropdownMenuItem disabled={drawerControlsDisabled} onSelect={onOpenGit}>
+          <GitBranch /> Git
+        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={onOpenAssets}>
+          <ImageIcon /> Library
+        </DropdownMenuItem>
+        <DropdownMenuItem disabled={drawerControlsDisabled} onSelect={onOpenDesign}>
+          <PanelLeft /> DESIGN.md
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onSelect={onInspectProject}>
+          <Boxes /> Inspect project
+        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={onOpenDeliveryDetails}>
+          <PackageCheck /> Delivery details
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+interface RailItemProps extends Omit<ComponentPropsWithoutRef<'button'>, 'children'> {
   readonly icon: ReactNode;
   readonly label: string;
   readonly active?: boolean;
-  readonly disabled?: boolean;
-  readonly onClick: () => void;
-}) {
+}
+
+const RailItem = forwardRef<HTMLButtonElement, RailItemProps>(function RailItem({
+  icon,
+  label,
+  active = false,
+  className,
+  ...buttonProps
+}, ref) {
   return (
     <button
+      {...buttonProps}
+      ref={ref}
       type="button"
       aria-label={label}
       aria-pressed={active}
-      disabled={disabled}
       className={cn(
         "flex size-12 shrink-0 flex-col items-center justify-center gap-1 rounded-md px-1 text-[10px] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-40",
         active
           ? "bg-muted text-foreground"
           : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
+        className,
       )}
-      onClick={onClick}
     >
       {icon}
       <span className="leading-none">{label}</span>
     </button>
   );
-}
+});

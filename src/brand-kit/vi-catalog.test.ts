@@ -36,7 +36,7 @@ describe('Brand VI catalog v1', () => {
     )).toBe(true)
   })
 
-  it('uses selective profiles and never defaults to generating the full paid catalog', () => {
+  it('uses selective profiles and never defaults to generating the full Provider catalog', () => {
     const minimum = createBrandViGenerationPlan({ profile: 'minimum' })
     const core = createBrandViGenerationPlan({ profile: 'core' })
     const full = createBrandViGenerationPlan({ profile: 'full' })
@@ -45,7 +45,7 @@ describe('Brand VI catalog v1', () => {
     expect(core.requestedItemIds.length).toBeLessThan(full.requestedItemIds.length)
     expect(minimum.nodes.some((node) => node.costClass === 'high')).toBe(false)
     expect(full.requestedItemIds).toHaveLength(BRAND_VI_CATALOG.items.length)
-    expect(full.estimatedPaidActions).toBeGreaterThan(0)
+    expect(full.estimatedProviderActions).toBeGreaterThan(0)
     expect(full.requiresApproval).toBe(true)
     expect(full.requiresApproval).toBe(full.nodes.some((node) => node.approval.required))
   })

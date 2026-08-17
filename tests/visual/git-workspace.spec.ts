@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { openProjectTool } from './workspace-helpers'
 
 const oid = 'a'.repeat(40)
 
@@ -46,9 +47,8 @@ test.beforeEach(async ({ page }) => {
   expect(pageErrors).toEqual([])
   await page.getByRole('textbox', { name: 'Describe what you want to design...' }).fill('Git workspace fixture')
   await page.getByRole('button', { name: 'Create from brief' }).click()
-  const workspaceRail = page.getByRole('navigation', { name: 'Workspace panels' })
-  await expect(workspaceRail).toBeVisible()
-  await workspaceRail.getByRole('button', { name: 'Git', exact: true }).click()
+  await expect(page.getByRole('navigation', { name: 'Workspace panels' })).toBeVisible()
+  await openProjectTool(page, 'Git')
   await expect(page.getByRole('button', { name: 'Choose repository' })).toBeVisible()
   await page.getByRole('button', { name: 'Choose repository' }).click()
   await expect(page.getByRole('region', { name: 'Git', exact: true })).toBeVisible()

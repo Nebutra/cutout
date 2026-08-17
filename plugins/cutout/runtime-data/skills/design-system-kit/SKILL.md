@@ -18,7 +18,7 @@ MCP tools: `cutout_plan_design_kit_export`, `cutout_export_design_kit`.
 Default to preview or read. Never invent approval, provider execution, or delivery.
 
 Read [references/contract.md](references/contract.md) before invoking an operation or claiming an artifact.
-Read [../shared/references/safety.md](../shared/references/safety.md) before mutation, export, paid work, or repository inspection.
+Read [../shared/references/safety.md](../shared/references/safety.md) before mutation, export, Provider execution, or repository inspection.
 
 ## Workflow
 
@@ -65,7 +65,7 @@ Return revisions, hashes, receipts, and evidence where available.
 
 ## Approval Rules
 
-Preview ingestion, patches, paid actions, and exports before apply.
+Preview ingestion, patches, Provider execution, and exports before apply.
 Use only a host-issued, short-lived, single-use approval lease bound to the prepared operation, preview digest, and expected revision.
 Invalidate approval when inputs, revision, scope, budget, or output changes.
 
@@ -85,7 +85,7 @@ Keep unsupported deliverables blocked instead of manufacturing placeholders.
 
 Ask only strategic questions that materially change the outcome.
 Delegate routine implementation choices to the Agent and harness.
-Expose process only for a decision, cost, risk, failure, or result.
+Expose process only for a decision, risk, failure, or result.
 Summarize completed and missing user-visible materials.
 
 ## Failure Handling

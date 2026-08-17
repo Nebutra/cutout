@@ -21,7 +21,9 @@ benchmark evidence.
   one exact input-manifest hash. Challenge protocol v2 also signs the exact
   Cutout Host build version. The evaluator refuses to issue it unless
   `package.json` and `src-tauri/Cargo.toml` agree; the current authority is
-  `0.1.20`.
+  `0.1.21`. The first closed non-GUI operator release invalidates every
+  evaluator challenge issued for `0.1.20`; prepare and sign a fresh package
+  only after the release operator passes its trust-root build gate.
 
 ## Prepare The Trust Root
 
@@ -75,10 +77,12 @@ pnpm commerce:evaluator -- challenge \
 
 The output binds the exact derived input manifest, evaluator key id, fresh
 challenge nonce, one allowed Run id, bounded issue/expiry window and
-`hostBuildVersion`. Import it
-from **System inspector > Commerce**, select the eligible first-party DashScope
-Provider and start the Run. Retrying the same package recovers settled native
-responses; it does not authorize another result.
+`hostBuildVersion`. For the non-GUI path, submit it through the closed
+`cutout-commerce-operator` `preflight` and `run` commands with an opaque job id
+and eligible first-party DashScope Provider id. Retrying the same package with
+`recover` re-verifies settled native responses; it does not authorize another
+result. The desktop Commerce panel remains an equivalent interactive caller,
+not a separate receipt authority.
 
 ## Review And Complete
 
@@ -125,7 +129,10 @@ pnpm commerce:evaluator -- complete \
   --output evaluator-completion.json
 ```
 
-Import the completion in the Commerce panel and choose **Verify and admit**.
+Submit the completion to the same operator job with `admit`; the operator reloads
+the exclusively published `pending.json`, so the caller cannot replace the Run
+bundle during admission. The desktop panel's **Verify and admit** action is the
+equivalent interactive path.
 Rust re-verifies the challenge, commitment, replay ledger, complete bundle and
 completion signature before the UI can expose a `14/14` admitted evidence file.
 Both commitment creation and final admission compare the signed

@@ -1,33 +1,42 @@
 import { expect, test } from "@playwright/test";
+import { openDeliverWorkspace, openProjectTool } from "./workspace-helpers";
 
-test("Deliver uses the workspace drawer before the full delivery surface", async ({ page }, testInfo) => {
+test("Deliver opens the single Project workbench without an intermediate drawer", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("textbox", { name: "Describe what you want to design..." }).fill("Inline delivery regression");
   await page.getByRole("button", { name: "Create from brief" }).click();
-  if (testInfo.project.name === "mobile-chrome") await page.setViewportSize({ width: 1024, height: 915 });
-  const deliverButton = page.getByRole("button", { name: "Deliver", exact: true });
-  await deliverButton.click();
-  const deliverDrawer = page.getByRole("complementary", { name: "Deliver" });
-  await expect(deliverDrawer).toBeVisible();
-  await expect(deliverButton).toHaveAttribute("aria-pressed", "true");
-  await expect(deliverDrawer.getByText("Current output", { exact: true })).toBeVisible();
-  const deliverDrawerBox = await deliverDrawer.boundingBox();
-  expect(deliverDrawerBox).not.toBeNull();
-  await deliverDrawer.getByRole("button", { name: "Open delivery workspace" }).click();
-  if (testInfo.project.name === "mobile-chrome") await page.setViewportSize({ width: 412, height: 915 });
+  await openDeliverWorkspace(page);
 
-  const deliver = page.locator('[data-slot="design-os-workbench"][aria-label="Deliver"]');
+  const deliver = page.locator('[data-slot="design-os-workbench"][aria-label="Project workbench"]');
   await expect(deliver).toBeVisible();
+  await expect(page.getByRole("complementary", { name: "Deliver" })).toHaveCount(0);
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await expect(deliver.getByText("Canvas inspector", { exact: true })).toHaveCount(0);
   await expect(deliver.getByText("Axe host required", { exact: true })).toHaveCount(0);
-  const tabs = deliver.getByRole("tablist", { name: "Deliver sections" });
+  const lifecycle = deliver.getByRole("tablist", { name: "Project lifecycle" });
+  await expect(lifecycle.getByRole("tab").allTextContents()).resolves.toEqual([
+    "Brief", "Sources", "Create", "Review", "Deliver", "Inspect",
+  ]);
+  const lifecycleGeometry = await lifecycle.evaluate((list) => {
+    const viewport = list.parentElement!.getBoundingClientRect();
+    const active = list.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]')!
+      .getBoundingClientRect();
+    return {
+      activeLeft: active.left,
+      activeRight: active.right,
+      viewportLeft: viewport.left,
+      viewportRight: viewport.right,
+    };
+  });
+  expect(lifecycleGeometry.activeLeft).toBeGreaterThanOrEqual(lifecycleGeometry.viewportLeft);
+  expect(lifecycleGeometry.activeRight).toBeLessThanOrEqual(lifecycleGeometry.viewportRight);
+  const tabs = deliver.getByRole("tablist", { name: "Delivery views" });
   await expect(tabs).toHaveCount(1);
   await expect(tabs.getByRole("tab").allTextContents()).resolves.toEqual([
-    "Delivery center", "Kits", "Components", "Starter",
+    "Overview", "Kits", "Components", "Starter",
   ]);
 
-  await tabs.getByRole("tab", { name: "Delivery center" }).click();
+  await tabs.getByRole("tab", { name: "Overview" }).click();
   await expect(deliver.locator('[data-slot="delivery-center"]')).toBeVisible();
   const deliveryAdvanced = deliver.getByText("Advanced delivery details", { exact: true });
   await deliveryAdvanced.click();
@@ -74,27 +83,22 @@ test("Deliver uses the workspace drawer before the full delivery surface", async
   await expect(
     page.getByRole("complementary", { name: "Agent workspace" }),
   ).toBeVisible();
-  if (testInfo.project.name === "mobile-chrome") await page.setViewportSize({ width: 1024, height: 915 });
-  const designButton = page.getByRole("button", { name: "Design", exact: true });
-  await designButton.click();
+  await openProjectTool(page, "DESIGN.md");
   const canvasInspector = page.getByRole("complementary", { name: "Design system" });
   await expect(canvasInspector).toBeVisible();
   const designDrawerBox = await canvasInspector.boundingBox();
   expect(designDrawerBox).not.toBeNull();
-  expect(designDrawerBox!.width).toBe(deliverDrawerBox!.width);
-  await expect(designButton).toHaveAttribute("aria-pressed", "true");
-  await designButton.click();
+  const projectButton = page.getByRole("button", { name: "Project", exact: true });
+  await expect(projectButton).toHaveAttribute("aria-pressed", "true");
+  await openProjectTool(page, "DESIGN.md");
   await expect(canvasInspector).toHaveCount(0);
-  await expect(designButton).toHaveAttribute("aria-pressed", "false");
-  await designButton.click();
+  await expect(projectButton).toHaveAttribute("aria-pressed", "false");
+  await openProjectTool(page, "DESIGN.md");
   await expect(canvasInspector).toBeVisible();
   expect(await canvasInspector.innerText()).not.toMatch(/revision|provenance|host|json/i);
   await expect(canvasInspector.getByText("Advanced design system")).toHaveCount(0);
-  await canvasInspector.getByRole("button", { name: "Open system inspector" }).click();
-  const inspector = page.getByRole("dialog", { name: "System inspector" });
-  await expect(inspector).toBeVisible();
-  await expect(inspector.getByRole("tablist", { name: "Deliver sections" })).toHaveCount(0);
-  await expect(inspector.getByRole("tab", { name: /Delivery center|Kits|Components|Starter/ })).toHaveCount(0);
-  await expect(inspector.getByText("System inspector", { exact: true }).first()).toBeVisible();
-  await inspector.getByRole("button", { name: "Close" }).click();
+  await canvasInspector.getByRole("button", { name: "Open Product UI/UX" }).click();
+  await expect(canvasInspector).toHaveCount(0);
+  await expect(page.getByRole("dialog", { name: "Project workbench" })).toHaveCount(0);
+  await expect(page.getByRole("complementary", { name: "Agent workspace" })).toBeVisible();
 });

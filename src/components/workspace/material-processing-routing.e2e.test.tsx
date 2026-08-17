@@ -231,7 +231,7 @@ describe('loaded material Agent routing', () => {
     const send = host.querySelector<HTMLButtonElement>('[aria-label="Send"]')!
     await act(async () => { send.click() })
 
-    // Local slicing is non-billable and runs under the user's standing local
+    // Local slicing uses no remote Provider and runs under the user's standing local
     // authorization; the route must complete without an approval dialog.
     expect([...host.querySelectorAll<HTMLButtonElement>('button')]
       .some((button) => button.textContent?.trim() === 'Approve')).toBe(false)

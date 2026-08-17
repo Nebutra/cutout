@@ -160,6 +160,48 @@ graph/Plan/lock/DAG closure, semantic QA, playable video and internal evaluation
 Only after native admission and full verification may the dedicated Design OS
 path pass the audit metric; the normal decoder rejects that state.
 
+## Closed Non-GUI Operator
+
+The renderer is not an execution authority. The production runner receives one
+`CommerceProductionHost` that owns Provider enumeration/preflight, held-out
+commitment, selected-source ingestion, structured text, image, vision QA, video,
+receipt verification, playback promotion and final admission. The existing
+desktop adapter maps that contract to Tauri invoke. A second adapter maps it to
+the closed Commerce operator protocol. Runner orchestration and bundle assembly
+remain single-source TypeScript; trust, secrets, network traffic, receipts and
+replay settlement remain single-source Rust.
+
+`cutout-commerce-operator` is a product binary, not an extension of
+`cutout.control.v1`. It creates no Tauri window or WebView and accepts a bounded
+JSON envelope on standard input whose discriminant is one of `preflight`, `run`,
+`recover`, `admit`, `status` or `cancel`. Inputs contain an opaque job id and
+strict evaluator/pending/completion data only. The binary resolves its own
+private application-data root, rejects symlinks and non-regular/oversized input,
+serializes job transitions, and atomically publishes fixed result filenames.
+There is no caller-selected root, destination, Provider URL, raw native command,
+credential or arbitrary payload forwarding.
+
+The operator process and its TypeScript runner communicate through a fixed,
+versioned native request union. Each request is decoded twice: strict schema at
+the TypeScript owner and serde validation at the Rust owner. Cancellation uses
+one opaque job-scoped token while deterministic operation request ids continue
+to identify replay slots. A crash or IPC loss can resume the exact job from the
+native replay ledger; changed request/package bytes fail closed.
+
+The first authoritative operator release advances the product and Host build to
+`0.1.21`. That invalidates the existing `0.1.20` challenge for this purpose.
+After the evaluator trust root is injected into the release build, the evaluator
+must create a fresh challenge bound to `0.1.21`; only its admitted bundle may
+regenerate the durable benchmark snapshots.
+
+The pre-commit source boundary uses a versioned fixed policy set instead of one
+competition-sample bucket. Each policy binds one exact HTTPS origin and non-root
+path prefix. The initial closure admits the official AIB `/AI_Business/` source
+and the exact reviewed DashScope generated-asset origin, while preserving DNS
+pinning, disabled redirects, byte limits and rejection of similar or arbitrary
+hosts. This lets an evaluator create a genuinely fresh product after code freeze
+without turning Commerce ingestion into a generic URL fetcher.
+
 ## Compatibility And Rollback
 
 Benchmark comparisons require equal id and version. Adding another Profile or

@@ -5,7 +5,7 @@
  * secrets go straight to the OS keychain via `set_key` and are never held in JS.
  * `test()` verifies credentials and endpoint catalog access through the Rust
  * proxy. It deliberately does not issue a generation request because the four
- * supported protocol families have no common, standardized no-cost probe.
+ * supported protocol families have no common, standardized read-only generation probe.
  */
 import { invoke } from '@tauri-apps/api/core'
 import { err, isOk, ok } from '@/services/types'
@@ -158,7 +158,7 @@ export function createLocalProviderService(): ProviderService {
       // GET `{baseUrl}/models` verifies host policy, protocol-specific auth,
       // endpoint normalization, and catalog parsing without incurring a model
       // call. It does not claim that a selected model can generate; there is no
-      // cross-family standardized no-cost OPTIONS/HEAD generation probe.
+      // cross-family standardized read-only OPTIONS/HEAD generation probe.
       const configuredBaseUrl = cfg.baseUrl ?? (await import('./provider-registry'))
         .createBuiltinProviderRegistry().definition(cfg.kind)?.defaultBaseUrl
       if (configuredBaseUrl) {

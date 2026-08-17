@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import type { AgentRunEvent } from './run-events'
-import type { PaidToolReceipt } from '@/control-protocol/paid-tool-contract'
+import type { ProviderToolReceipt } from '@/control-protocol/provider-tool-contract'
 
 export const durableToolStatusSchema = z.enum(['planned', 'in-flight', 'reconciling', 'succeeded', 'failed', 'cancelled'])
 const safeText = z.string().max(1000).refine((value) => !/(?:\bBearer\s+|\b(?:sk|rk|pk)-[A-Za-z0-9_-]{8,}\b)/i.test(value))
@@ -15,7 +15,7 @@ export interface ToolDurabilityStore {
   get(requestId: string): Promise<DurableToolRequest | null>
   plan(input: { requestId: string; runId: string; toolCallId: string; capability: string; at: number }): Promise<{ duplicate: boolean; request: DurableToolRequest }>
   begin(requestId: string, attemptId: string, at: number): Promise<DurableToolRequest>
-  settle(requestId: string, attemptId: string, outcome: { status: 'succeeded' | 'failed' | 'cancelled'; receipt?: PaidToolReceipt; error?: string; at: number }, events: readonly AgentRunEvent[]): Promise<DurableToolRequest>
+  settle(requestId: string, attemptId: string, outcome: { status: 'succeeded' | 'failed' | 'cancelled'; receipt?: ProviderToolReceipt; error?: string; at: number }, events: readonly AgentRunEvent[]): Promise<DurableToolRequest>
   drainEvents(deliver: (events: readonly AgentRunEvent[]) => void): Promise<number>
 }
 

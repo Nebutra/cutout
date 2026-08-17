@@ -8,14 +8,13 @@
 
 ## Requirements
 
-- Injected paid-tool provider
+- Injected Provider executor
 - Approved budget and policy
 - Rights for references
 
 ## Produced Evidence
 
 - Generation DAG
-- Cost estimate
 - Visual variants
 - Tool receipts
 

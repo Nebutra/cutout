@@ -1562,3 +1562,37 @@ Added the removable evidence-first Commerce Profile, deterministic normalization
 ### Next Steps
 
 - None - task complete
+
+
+## Session 47: Layered game map production
+
+**Date**: 2026-08-17
+**Task**: Layered game map production
+**Branch**: `main`
+
+### Summary
+
+Shipped intent-routed multi-action Game Asset and layered map production, retained real Qwen scene/tile acceptance evidence, native replay, and atomic accepted bundle exports without frontend E2E or mock production claims.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `e7fe37f` | (see git log) |
+| `d2afee2` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

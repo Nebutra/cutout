@@ -119,13 +119,13 @@ export class ImageRouteHealthRegistry {
 
   /**
    * A catalog-verified route is still cold until one real execution settles.
-   * Keep cold or recently pressured routes to one paid request while allowing
+   * Keep cold or recently pressured routes to one Provider request while allowing
    * an independently healthy exact route to use the caller's full ceiling.
    */
   admissionLimit(route: ImageRouteHealthKey, maximumConcurrency: number): number {
     const maximum = positiveInteger(maximumConcurrency, 1)
     const state = this.#states.get(routeKey(route))
-    // An open circuit rejects synchronously before starting paid work, so let
+    // An open circuit rejects synchronously before starting Provider work, so let
     // the scheduler drain queued claims instead of leaving them parked behind
     // an already-known failure. Half-open remains a single recovery probe.
     if (state?.circuit === 'open') return maximum
@@ -201,7 +201,7 @@ export class ImageRouteHealthRegistry {
       }
     } else if (attempt.state.circuit !== 'closed' && outcome !== 'success') {
       // A late failure from work admitted before the circuit opened is not
-      // recovery evidence. Only a successful paid result or probe may close it.
+      // recovery evidence. Only a successful Provider result or probe may close it.
       return
     }
 

@@ -89,7 +89,7 @@ describe("OpenAI-compatible speech adapter", () => {
       },
     });
   });
-  it("enforces cancellation, timeout, provider errors and response limits without paid calls", async () => {
+  it("enforces cancellation, timeout, Provider errors and response limits without remote calls", async () => {
     const cancelled = new AbortController();
     cancelled.abort();
     const hanging = new OpenAICompatibleSpeechAdapter({

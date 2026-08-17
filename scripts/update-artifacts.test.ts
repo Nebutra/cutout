@@ -165,7 +165,7 @@ describe('signed update artifact policy', () => {
     const metadata = JSON.parse(await readFile(join(directory, 'release-metadata.json'), 'utf8'))
     expect(Object.keys(manifest.platforms)).toEqual(['darwin-aarch64', 'darwin-x86_64', 'windows-x86_64', 'linux-x86_64'])
     expect(manifest.platforms['windows-x86_64'].url).toBe('https://releases.example.test/windows-x86_64-Cutout-setup.exe')
-    expect(manifest.notes).toMatch(/^Readable preparation and honest paid-action decisions/m)
+    expect(manifest.notes).toMatch(/^Readable preparation and direct Provider execution/m)
     expect(metadata).not.toHaveProperty('artifact')
     expect(metadata.platforms).toHaveLength(4)
     expect(metadata.sbom.sha256).toBe(sha256(await readFile(join(directory, 'sbom.spdx.json'))))

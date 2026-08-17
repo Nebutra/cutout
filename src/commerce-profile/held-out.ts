@@ -1,7 +1,7 @@
-import { invoke } from '@tauri-apps/api/core'
 import { z } from 'zod'
 import { canonicalJson, fingerprint } from '@/design-ir/fingerprint'
 import { PRODUCT_VERSION } from '@/product-version'
+import type { MultimodalHostReceipt } from '@/multimodal-host/contracts'
 import { productFactsSchema, type ProductFacts } from './contracts'
 import { COMMERCE_PROFILE_ID, COMMERCE_PROFILE_VERSION } from './profile'
 import {
@@ -10,6 +10,7 @@ import {
   type CommerceProductionRehearsalBundle,
   type VerifiedCommerceProductionRehearsal,
 } from './rehearsal'
+import type { CommerceSourceIngestArtifact } from './source-ingest'
 
 export const COMMERCE_HELD_OUT_INPUT_MANIFEST_SCHEMA = 'commerce.held-out-input-manifest.v1' as const
 export const COMMERCE_HELD_OUT_EVALUATOR_INPUT_SCHEMA = 'commerce.held-out-evaluator-input.v1' as const
@@ -263,18 +264,6 @@ export async function decodeCommerceHeldOutEvaluatorPackage(
   return expected
 }
 
-export async function createCommerceHeldOutCommitment(input: {
-  readonly evaluatorChallenge: unknown
-  readonly inputManifest: unknown
-}): Promise<CommerceHeldOutCommitment> {
-  const inputManifest = commerceHeldOutInputManifestSchema.parse(input.inputManifest)
-  const evaluatorChallenge = commerceHeldOutChallengeSelectionSchema.parse(input.evaluatorChallenge)
-  return commerceHeldOutCommitmentSchema.parse(await invoke(
-    'create_commerce_held_out_commitment',
-    { evaluatorChallenge, inputManifest },
-  ))
-}
-
 export function encodeCommerceHeldOutChallengePayload(input: unknown): string {
   return canonicalJson(commerceHeldOutChallengeSelectionPayloadSchema.parse(input))
 }
@@ -328,6 +317,18 @@ export async function verifyCommerceHeldOutProductionRehearsal(input: {
   readonly rehearsalBundle: unknown
   readonly commitment: unknown
   readonly evaluatorAttestation: unknown
+  readonly host: {
+    verify(input: {
+      readonly receipt: MultimodalHostReceipt
+      readonly bytes: Uint8Array
+    }): Promise<unknown>
+    verifySource(input: CommerceSourceIngestArtifact): Promise<unknown>
+    admit(input: {
+      readonly commitment: CommerceHeldOutCommitment
+      readonly evaluatorAttestation: CommerceHeldOutEvaluatorAttestation
+      readonly rehearsalBundle: CommerceProductionRehearsalBundle
+    }): Promise<CommerceHeldOutAdmission>
+  }
 }): Promise<{
   readonly rehearsal: VerifiedCommerceProductionRehearsal
   readonly admission: CommerceHeldOutAdmission
@@ -351,11 +352,13 @@ export async function verifyCommerceHeldOutProductionRehearsal(input: {
   // receipt/byte identity, graph/Plan closure, semantic QA and playback.
   const rehearsal = await verifyCommerceProductionRehearsalBundle(bundle, {
     heldOutCommitmentHash: commitment.commitmentHash,
+    host: input.host,
   })
-  const admission = commerceHeldOutAdmissionSchema.parse(await invoke(
-    'verify_commerce_held_out_attestation',
-    { commitment, evaluatorAttestation, rehearsalBundle: bundle },
-  ))
+  const admission = commerceHeldOutAdmissionSchema.parse(await input.host.admit({
+    commitment,
+    evaluatorAttestation,
+    rehearsalBundle: bundle,
+  }))
   assertExactAdmission({ commitment, attestation: evaluatorAttestation, admission, rehearsal })
   return { rehearsal, admission }
 }

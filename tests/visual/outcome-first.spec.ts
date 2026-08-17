@@ -12,6 +12,7 @@ import {
   createEmptyWorkspaceSnapshot,
   type WorkspaceSnapshot,
 } from '../../src/workspace/workspace-snapshot'
+import { openProjectTool } from './workspace-helpers'
 
 const VAGUE_GOAL = 'Create a distinctive launch identity for our new product.'
 const INTERNAL_TERMS = [
@@ -413,9 +414,10 @@ test('Design System candidates pause downstream work and remain comparable', asy
   await expect(page.getByRole('complementary', { name: 'Agent workspace' })).toHaveCount(0)
   if (testInfo.project.name === 'desktop-chrome') {
     await expect(page.getByRole('button', { name: 'Agent', exact: true })).toBeDisabled()
-    await expect(page.getByRole('button', { name: 'Files', exact: true })).toBeDisabled()
-    await expect(page.getByRole('button', { name: 'Git', exact: true })).toBeDisabled()
-    await expect(page.getByRole('button', { name: 'Design', exact: true })).toBeDisabled()
+    await page.getByRole('button', { name: 'Project', exact: true }).click()
+    await expect(page.getByRole('menuitem', { name: 'Files', exact: true })).toBeDisabled()
+    await expect(page.getByRole('menuitem', { name: 'Git', exact: true })).toBeDisabled()
+    await page.keyboard.press('Escape')
   }
   await expect(page.getByText('Generating prototype pages')).toHaveCount(0)
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true)
@@ -466,19 +468,18 @@ test('conversational Agent replies stay in the panel and never cover the canvas'
   }).toBe(true)
 })
 
-test('design details open in the left workspace drawer and do not leak internals by default', async ({ page }, testInfo) => {
+test('design details open from Project tools and do not leak internals by default', async ({ page }, testInfo) => {
   await createProjectWithWorkspace(page, completedWorkspace(), 'Inspect the result details')
   const workspace = page.getByRole('main')
 
   await expectNoInternalVocabulary(workspace)
   await expect(page.getByRole('complementary', { name: 'Design system' })).toHaveCount(0)
   if (testInfo.project.name === 'mobile-chrome') {
-    await expect(page.getByRole('button', { name: 'Design', exact: true })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: 'Project', exact: true })).toBeVisible()
     return
   }
 
-  const design = page.getByRole('button', { name: 'Design', exact: true })
-  await expect(design).toBeVisible(); await design.click()
+  await openProjectTool(page, 'DESIGN.md')
   await expect(page.getByRole('complementary', { name: 'Design system' })).toBeVisible()
 })
 
@@ -493,10 +494,13 @@ test('completed result keeps the canvas free of review controls, while ordinary 
 
 test('selecting a deliverable previews it and targets an Agent change request', async ({ page }) => {
   await createProjectWithWorkspace(page, completedWorkspace(), 'Deliverable lineage fixture')
-  const closeInspector = page.getByRole('button', { name: 'Close design inspector' })
+  const closeInspector = page.getByRole('button', { name: 'Close Create' })
   if (await closeInspector.isVisible()) await closeInspector.click()
-  const hideAgent = page.getByRole('button', { name: 'Hide Agent' })
-  if (await hideAgent.isVisible()) await hideAgent.click()
+  const agent = page.getByRole('complementary', { name: 'Agent workspace' })
+  if (await agent.isVisible()) {
+    await page.getByRole('button', { name: 'Agent', exact: true }).click()
+    await expect(agent).toBeHidden()
+  }
   const card = page.getByText('Launch home', { exact: true }).last()
   await expect(card).toBeVisible()
   await card.click()
@@ -515,8 +519,11 @@ test('selecting a deliverable previews it and targets an Agent change request', 
 test('Canvas keeps a responsive safe area while workspace panels change', async ({ page }, testInfo) => {
   await createProjectWithWorkspace(page, completedWorkspace(), 'Canvas safe area fixture')
 
-  const hideAgent = page.getByRole('button', { name: 'Hide Agent' })
-  if (await hideAgent.isVisible()) await hideAgent.click()
+  const agent = page.getByRole('complementary', { name: 'Agent workspace' })
+  if (await agent.isVisible()) {
+    await page.getByRole('button', { name: 'Agent', exact: true }).click()
+    await expect(agent).toBeHidden()
+  }
 
   const canvas = page.locator('.react-flow').first()
   await expect(canvas).toBeVisible()
@@ -557,8 +564,6 @@ test('Canvas keeps a responsive safe area while workspace panels change', async 
     }
   })
 
-  await page.getByRole('button', { name: 'Toggle minimap' }).click()
-  await expect(page.locator('.react-flow__minimap')).toBeVisible()
   await fit.click()
   await page.waitForTimeout(250)
   const baseline = await geometry()
@@ -576,17 +581,17 @@ test('Canvas keeps a responsive safe area while workspace panels change', async 
     expect(agent.overlap).toBe(false)
     await page.getByRole('button', { name: 'Agent', exact: true }).click()
 
-    await page.getByRole('button', { name: 'Files', exact: true }).click()
+    await openProjectTool(page, 'Files')
     await expect(page.locator('[data-workspace-panel="files-drawer"]')).toBeVisible()
     const files = await geometry()
     expect(files.controlsInside).toBe(true)
     expect(files.overlap).toBe(false)
-    await page.getByRole('button', { name: 'Files', exact: true }).click()
+    await openProjectTool(page, 'Files')
 
-    await page.getByRole('button', { name: 'Design', exact: true }).click()
+    await openProjectTool(page, 'DESIGN.md')
     const inspectorPanel = page.getByRole('complementary', { name: 'Design system' })
     await expect(inspectorPanel).toBeVisible()
-    await inspectorPanel.getByRole('button', { name: 'Close design inspector' }).click()
+    await inspectorPanel.getByRole('button', { name: 'Close Design system' }).click()
     await expect(inspectorPanel).toHaveCount(0)
     const afterInspector = await geometry()
     expect(afterInspector.controlsInside).toBe(true)
@@ -646,7 +651,7 @@ test('primary controls do not overlap and remain keyboard reachable', async ({ p
 
   const composer = page.getByPlaceholder(/Describe a result/i)
   const send = page.getByRole('button', { name: /send/i })
-  const details = page.getByRole('button', { name: 'Design', exact: true })
+  const details = page.getByRole('button', { name: 'Project', exact: true })
   await expect(composer).toBeVisible()
   await expect(send).toBeVisible()
   if (testInfo.project.name !== 'mobile-chrome') await expect(details).toBeVisible()

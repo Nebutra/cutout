@@ -13,7 +13,7 @@ const json = async (path) => JSON.parse(await readFile(path, 'utf8'))
 const sha256 = (bytes) => createHash('sha256').update(bytes).digest('hex')
 const EXPECTED_FILES = Object.freeze([
   'README.md', 'agent.js', 'agent.json', 'lib/contracts.js', 'lib/data.js', 'lib/filesystem.js',
-  'lib/media.js', 'lib/orchestrator.js', 'lib/provider.js', 'package.json', 'provenance.json',
+  'lib/localization.js', 'lib/media.js', 'lib/orchestrator.js', 'lib/provider.js', 'package.json', 'provenance.json',
   'scripts/validate-package.js', 'scripts/validate-rehearsal.js', 'tests/agent.test.js',
   'tests/helpers.js', 'tests/provider.test.js', 'tests/rehearsal-validator.test.js',
 ].sort())
@@ -45,8 +45,24 @@ assert(provenance.hostProjection?.kernelContract === 'design-os.protocol.v1'
 'package Host projection contract is invalid')
 assert(provenance.hostProjection?.mediaIdentity?.authority === 'first explicit product image'
   && JSON.stringify(provenance.hostProjection?.mediaIdentity?.binding) === JSON.stringify(['role', 'source JSON Pointer', 'ordered URL'])
-  && provenance.hostProjection?.mediaIdentity?.inheritance === 'main image -> reviewed details -> image-conditioned video',
+  && provenance.hostProjection?.mediaIdentity?.inheritance === 'main image -> reviewed details -> image-conditioned video'
+  && provenance.hostProjection?.mediaIdentity?.roleSupport === 'deterministic semantic role-to-source plan over ordered product and description images',
 'package media-identity projection provenance is invalid')
+assert(JSON.stringify(provenance.hostProjection?.strategyDelivery?.actualRunClosure)
+    === JSON.stringify(['market', 'localization', 'role purpose', 'source support', 'semantic QA', 'repair'])
+  && provenance.hostProjection?.strategyDelivery?.videoStoryboard === '0.0-5.0 seconds',
+'package strategy-delivery projection provenance is invalid')
+assert(provenance.hostProjection?.catalogSelection?.runtimeSampleAnswers === false
+  && JSON.stringify(provenance.hostProjection?.catalogSelection?.candidateEvidence)
+    === JSON.stringify(['complete lineage', 'garment type', 'audience', 'usage context', 'plus-size signal']),
+'package catalog-selection projection provenance is invalid')
+assert(provenance.hostProjection?.localization?.sourceBinding === 'original value plus source JSON Pointer'
+  && JSON.stringify(provenance.hostProjection?.localization?.markets) === JSON.stringify(['en-US', 'ko-KR', 'pt-BR'])
+  && provenance.hostProjection?.localization?.numericConversions === 'deterministic Host projection'
+  && provenance.hostProjection?.localization?.modelTranslationClosure === 'exact ordered fact-id request and response in the structured plan'
+  && provenance.hostProjection?.localization?.bodyScriptPolicy === 'target-market script outside fixed inline evidence and source-reference sections'
+  && provenance.hostProjection?.localization?.benchmarkScope === 'translation request closure only, not language quality or SOTA',
+'package localization projection provenance is invalid')
 const declaredProjectionSources = (provenance.generatedFrom ?? []).map((source) => source.path).sort()
 assert(declaredProjectionSources.length === EXPECTED_PROJECTION_SOURCES.length
   && declaredProjectionSources.every((path, index) => path === EXPECTED_PROJECTION_SOURCES[index]),
@@ -56,11 +72,15 @@ for (const name of ['agent.js', 'agent.json', 'package.json']) {
   assert(info?.isFile(), `required package root file missing: ${name}`)
 }
 
+const repositoryMarker = await stat(join(repositoryRoot, '.git')).catch(() => undefined)
 for (const source of provenance.generatedFrom ?? []) {
   const path = resolve(repositoryRoot, source.path)
   assert(relative(repositoryRoot, path) && !relative(repositoryRoot, path).startsWith('..'), `provenance path escapes repository: ${source.path}`)
-  const bytes = await readFile(path).catch(() => undefined)
-  assert(bytes && sha256(bytes) === source.sha256, `source projection hash is stale: ${source.path}`)
+  assert(/^[a-f0-9]{64}$/u.test(source.sha256), `source projection hash is malformed: ${source.path}`)
+  if (repositoryMarker) {
+    const bytes = await readFile(path).catch(() => undefined)
+    assert(bytes && sha256(bytes) === source.sha256, `source projection hash is stale: ${source.path}`)
+  }
 }
 
 const files = []
@@ -88,6 +108,8 @@ for (const file of files) {
 assert(totalBytes < 100 * 1024 * 1024, 'package exceeds 100 MB')
 assert(!source.includes("'qwen-image-3.0'") && !source.includes('"qwen-image-3.0"') && !source.includes('wan2.6-t2v') && !source.includes('qwen3.5-omni'), 'forbidden model id found')
 assert(!/(?:responses\.create|files\.create|['"]\/(?:responses|files|uploads?)(?:['"/]))/i.test(source), 'forbidden Responses/upload API surface found')
+assert(!/(?:PUBLIC_GOLD|acceptedIds|benchmarkPublicSample|qianwen-public-benchmark|product_\d{8,}\.json)/u.test(source),
+  'public benchmark gold or evaluator coupling found in runtime source')
 assert(!/(?:node:child_process|from\s+['"]child_process['"]|require\(['"]child_process['"]\))/.test(source), 'process execution is forbidden')
 assert(!/https?:\/\/(?!dashscope\.aliyuncs\.com)/.test(source.replace(/https:\/\/dashscope-result-/g, 'https://dashscope.aliyuncs.com/')), 'unexpected literal network origin found')
 for (const required of ['qwen3.8-max', 'qwen3-vl-plus', 'qwen-image-3.0-pro', 'wan2.7-i2v-2026-04-25']) assert(source.includes(required), `required model missing: ${required}`)

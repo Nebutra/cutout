@@ -343,14 +343,16 @@ describe('Game Asset Profile', () => {
     expect(schemas.parse({ id: 'game-asset.plan', version: 1 }, plan())).toEqual(plan())
     expect(schemas.parse({ id: 'game-asset.frame', version: 1 }, frame(0))).toEqual(frame(0))
     expect(schemas.registrations().map(({ reference }) => reference.id)).toEqual([
-      'game-asset.evaluation', 'game-asset.frame', 'game-asset.layered-map', 'game-asset.plan',
+      'game-asset.bundle', 'game-asset.evaluation', 'game-asset.frame', 'game-asset.layered-map', 'game-asset.plan',
+      'game-map.bundle', 'game-map.object-library', 'game-map.preview-receipt', 'game-map.production-plan',
+      'game-map.runtime-manifest',
     ])
     expect(registries.renderers.project(profile.manifest.renderers[0]!, plan())).toEqual(expect.objectContaining({
       title: 'asset:hero',
       actionIds: ['action:game-asset-repair'],
     }))
     expect(registries.delivery.require(profile.manifest.deliveries[0]!).implementation.formatId)
-      .toBe('game-asset.atlas-manifest.v1')
+      .toBe('game-asset.bundle.v1')
     expect(command).toEqual(expect.objectContaining({
       id: 'command:game-asset-repair',
       kind: 'request-repair',

@@ -51,17 +51,17 @@ describe('AgentRunCoordinator', () => {
     expect(isAgentRunCancelled(new Error('other'))).toBe(false)
   })
 
-  it('prevents paid work after a cancellation checkpoint', () => {
+  it('prevents Provider work after a cancellation checkpoint', () => {
     const coordinator = new AgentRunCoordinator()
     const lease = coordinator.begin()
-    const paidCall = vi.fn()
+    const providerCall = vi.fn()
     coordinator.cancel(lease)
 
     expect(() => {
       coordinator.checkpoint(lease)
-      paidCall()
+      providerCall()
     }).toThrow(AgentRunCancelledError)
-    expect(paidCall).not.toHaveBeenCalled()
+    expect(providerCall).not.toHaveBeenCalled()
   })
 
   it('queues steers for the exact active lease and drains them FIFO', () => {

@@ -17,8 +17,8 @@ test("Delivery stays outcome-first and keeps preview approval real", async ({
     await page.setViewportSize({ width: 412, height: 915 });
   }
 
-  const workbench = page.getByRole("region", { name: "Deliver" });
-  await workbench.getByRole("tab", { name: "Delivery center" }).click();
+  const workbench = page.getByRole("region", { name: "Project workbench" });
+  await workbench.getByRole("tab", { name: "Overview" }).click();
   const delivery = workbench.locator('[data-slot="delivery-center"]');
   await expect(delivery).toBeVisible();
   await expect(delivery.getByText("Choose a result", { exact: true })).toBeVisible();

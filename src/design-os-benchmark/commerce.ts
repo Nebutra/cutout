@@ -37,10 +37,13 @@ function admitProductionRehearsalAudit(input: {
   }
   const metrics = input.report.metrics.map((candidate) => candidate.id === REHEARSAL_METRIC_ID
     ? {
-        ...candidate,
+        id: candidate.id,
+        profileId: candidate.profileId,
+        stage: candidate.stage,
+        label: candidate.label,
+        critical: candidate.critical,
         status: 'passed' as const,
         source: { ...candidate.source, admission: input.admission },
-        diagnostic: undefined,
       }
     : candidate)
   return designOsBenchmarkReportSchema.parse({
@@ -168,6 +171,7 @@ export async function createDesignOsBenchmarkFromCommerceHeldOutRehearsal(input:
   readonly rehearsalBundle: unknown
   readonly commitment: unknown
   readonly evaluatorAttestation: unknown
+  readonly host: Parameters<typeof createCommerceProfileBenchmarkReportFromHeldOutRehearsal>[0]['host']
   readonly identity: { readonly id: string; readonly revision: string }
 }): Promise<DesignOsBenchmarkReport> {
   const { report, admission } = await createCommerceProfileBenchmarkReportFromHeldOutRehearsal({
@@ -175,6 +179,7 @@ export async function createDesignOsBenchmarkFromCommerceHeldOutRehearsal(input:
     rehearsalBundle: input.rehearsalBundle,
     commitment: input.commitment,
     evaluatorAttestation: input.evaluatorAttestation,
+    host: input.host,
   })
   const projected = await createDesignOsBenchmarkFromDecodedCommerce({
     commerce: report,
@@ -192,6 +197,7 @@ export async function decodeDesignOsBenchmarkFromCommerceHeldOutRehearsal(input:
   readonly rehearsalBundle: unknown
   readonly commitment: unknown
   readonly evaluatorAttestation: unknown
+  readonly host: Parameters<typeof createCommerceProfileBenchmarkReportFromHeldOutRehearsal>[0]['host']
   readonly identity: { readonly id: string; readonly revision: string }
 }): Promise<DesignOsBenchmarkReport> {
   const expected = await createDesignOsBenchmarkFromCommerceHeldOutRehearsal(input)

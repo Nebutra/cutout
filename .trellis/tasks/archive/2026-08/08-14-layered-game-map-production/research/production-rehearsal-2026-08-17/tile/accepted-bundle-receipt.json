@@ -1,0 +1,57 @@
+{
+  "mode": "tile",
+  "previewId": "game-map-managed-bundle-preview:sha256:0fb23211eac245614e8f04d4642c93cd11f064cf81631d1372fc144707b9ca4c",
+  "previewHash": "0fb23211eac245614e8f04d4642c93cd11f064cf81631d1372fc144707b9ca4c",
+  "bundleHash": "399e2ae267ea027607cc77ecdc9ee1d85c70c6b72e389532587a1692545fc003",
+  "deliveryStatus": "accepted",
+  "status": "accepted-exported",
+  "receipt": {
+    "canceled": false,
+    "outputDir": "accepted-exports",
+    "bundleDir": "accepted-exports/game-map-399e2ae267ea",
+    "fileCount": 8,
+    "totalBytes": 2100486,
+    "files": [
+      {
+        "path": "assets/runtime/terrain-atlas.png",
+        "size": 674059,
+        "sha256": "650d1eb661e7faaedd3e6091041af61c482194f9e992281635deb47858bee9e3"
+      },
+      {
+        "path": "assets/objects/0000-393d31f13e529d8defbb5d3d1ebcafe11eb59a15a82d242e64c886525b6de0dc.png",
+        "size": 34036,
+        "sha256": "393d31f13e529d8defbb5d3d1ebcafe11eb59a15a82d242e64c886525b6de0dc"
+      },
+      {
+        "path": "manifests/map.json",
+        "size": 15881,
+        "sha256": "97cb72e1f9ca63cc02468be69d857919bb4b9d866f80e6bbdb7208315f860745"
+      },
+      {
+        "path": "manifests/objects.json",
+        "size": 1248,
+        "sha256": "9bff5b2a8e1ce73f3e7e9f87230615db5df2e4dfe1fa9e0c2f18c5539edc98df"
+      },
+      {
+        "path": "previews/map.png",
+        "size": 681855,
+        "sha256": "ae3feb3675265b570e7c0e2f8bc26b8dbf26490d341b72f4119d60ce48de5233"
+      },
+      {
+        "path": "previews/debug.png",
+        "size": 682193,
+        "sha256": "f56bd98241890560423665466a8c7b57796ea74a5c3d4e1f6de568d3ab7fa86b"
+      },
+      {
+        "path": "evidence/semantic-acceptance.json",
+        "size": 5490,
+        "sha256": "0336390f455d4f262f087adc44c3333bdcc86d4158ce85c443042dc1cbe31ab9"
+      },
+      {
+        "path": "manifests/bundle.json",
+        "size": 5724,
+        "sha256": "399e2ae267ea027607cc77ecdc9ee1d85c70c6b72e389532587a1692545fc003"
+      }
+    ]
+  }
+}

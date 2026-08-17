@@ -44,13 +44,12 @@ receipts. `.cutout` state and provenance remain authoritative.
   approval token as authority. The native host presents an OS-level warning
   confirmation after preview and emits the receipt approval id only after the
   user approves it.
-- Desktop BYOK paid-tool requests execute directly after capability and Provider
+- Desktop BYOK Provider-tool requests execute directly after capability and Provider
   policy checks. Provider configuration is standing authorization; preview and
   run events are observation, cancellation and evidence surfaces, never per-call
-  payment gates. Missing capability or disabled policy fails immediately.
-  Optional `receipt.charged` evidence is recorded only when backed by verifiable
-  Provider billing evidence.
-- Desktop-local `cutout` and `semantic-cutout` require only the `paid` scope;
+  execution gates. Missing capability or disabled policy fails immediately.
+  Requests and receipts do not carry Provider prices, charges or billing evidence.
+- Desktop-local `cutout` and `semantic-cutout` require only the `tool-execute` scope;
   they never require or imply a provider credential. Semantic availability is
   checked immediately before artifact writes and approval so unsupported hosts
   return `capability-required` without presenting an unusable approval request.
@@ -114,7 +113,7 @@ receipts. `.cutout` state and provenance remain authoritative.
   exactly equals the artifacts in its target receipts.
 - A transient run-level retry starts a new `createAssets("create",
   { briefOverride })` invocation with the original submitted brief. It does not
-  resume an in-flight stream, reuse a paid-tool request id, or bypass the
+  resume an in-flight stream, reuse a Provider-tool request id, or bypass the
   existing tool receipt/retry machinery.
 - The Agent view and retry controller consume one canonical current error:
   persisted `runError` first, otherwise the normalized generation error. When
@@ -125,7 +124,7 @@ receipts. `.cutout` state and provenance remain authoritative.
   error item, even when newer informational messages follow it. Repair-plan
   `Continue` takes precedence over transient `Retry`, and both are hidden while
   another run is active.
-- Message-level Regenerate is distinct from run-level and paid-tool Retry. Only
+- Message-level Regenerate is distinct from run-level and Provider-tool Retry. Only
   the selected response at the active conversation head is eligible. It reuses
   the effective source user turn, ignores selected-material repair context,
   emits no duplicate `intent-recorded` event, appends an immutable sibling
@@ -169,7 +168,7 @@ receipts. `.cutout` state and provenance remain authoritative.
 - Message regeneration is fail-closed against asset generation. Tool-gate
   failure becomes a new classified run error; no-call and non-conversational
   tool results remain on the conversational revision path and never fall
-  through to the paid prototype pipeline.
+  through to the Provider-backed prototype pipeline.
 
 ### 4. Validation & Error Matrix
 
@@ -226,7 +225,7 @@ receipts. `.cutout` state and provenance remain authoritative.
 - Good message regeneration: the selected Agent reply shows a circular-arrow
   icon, reuses the source user turn, appends a sibling response, selects it,
   and exposes stable previous/next navigation without a second user bubble or
-  paid asset execution.
+  Provider asset execution.
 - Good preparation projection: repeated regeneration appends distinct durable
   preparation lifecycles, while chat shows one current activity during request
   checking and no preparation activity after completion or branch switching.
@@ -235,7 +234,7 @@ receipts. `.cutout` state and provenance remain authoritative.
 - Bad: reconstruct `{ id, grantedAt }` from a CLI flag, execute after a failed
   claim, follow a workspace symlink, attach page-wide axe output to every
   scenario, report delivery success without exact artifact hashes, or route a
-  run-level retry through a prior paid-tool request id.
+  run-level retry through a prior Provider-tool request id.
 - Bad: implement message Regenerate by calling the normal create path with a
   new intent event or by letting a no-call classifier result fall into asset
   generation.
@@ -285,7 +284,7 @@ receipts. `.cutout` state and provenance remain authoritative.
   deterministic ordered union, identical current-transcript deduplication, branch
   selection restoration, divergent-ID rejection, CAS conflict, credential
   rejection, local-state preservation, and sanitized in-product failure copy.
-- Uploaded material: semantic capability preflight before approval, paid-only
+- Uploaded material: semantic capability preflight before approval, tool-execute-only
   local scope, cancellation propagation, expected source identity binding, and
   no prototype/image-generation fallthrough on capability failure.
 - Run `pnpm agent:validate` after every CLI, MCP, protocol, capability, Skill,

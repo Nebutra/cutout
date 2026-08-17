@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import commerceCurrent from '@/commerce-profile/benchmarks/current.json'
-import designOsCurrent from './benchmarks/current.json'
+import commerceCurrent from '@/commerce-profile/benchmarks/contract-baseline.json'
+import designOsCurrent from './benchmarks/contract-baseline.json'
 import {
   compareDesignOsBenchmarkReports,
   decodeDesignOsBenchmarkReport,
@@ -50,7 +50,7 @@ describe('Design OS evidence benchmark', () => {
     })
   })
 
-  it('keeps the durable current snapshot equal to the regenerated Profile projection', async () => {
+  it('keeps the durable contract baseline equal to the regenerated Profile projection', async () => {
     const regenerated = await currentReport()
     expect(decodeDesignOsBenchmarkReport(designOsCurrent)).toEqual(regenerated)
   })
@@ -119,7 +119,7 @@ describe('Design OS evidence benchmark', () => {
       challengeId: 'challenge:caller',
       challengeHash: 'd'.repeat(64),
       evaluatorKeyId: 'evaluator:caller',
-      hostBuildVersion: '0.1.20',
+      hostBuildVersion: '0.1.21',
       commitmentId: 'commitment:caller',
       commitmentHash: 'a'.repeat(64),
       attestationId: 'attestation:caller',

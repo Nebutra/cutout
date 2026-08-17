@@ -219,11 +219,11 @@ describe('prototype production work scheduler', () => {
     }
 
     const continuation = createPrototypeProductionScheduler(1, { imageRouteHealth: health })
-    let paidCallStarted = false
+    let providerCallStarted = false
     await expect(continuation.imageLane('suite-a', route)(async () => {
-      paidCallStarted = true
+      providerCallStarted = true
     })).rejects.toBeInstanceOf(ImageRouteCircuitOpenError)
-    expect(paidCallStarted).toBe(false)
+    expect(providerCallStarted).toBe(false)
   })
 
   it('canaries a cold exact route before expanding its image concurrency', async () => {
@@ -339,7 +339,7 @@ describe('prototype production work scheduler', () => {
     await pending
   })
 
-  it('settles paid work already in flight when sibling timeouts open the route circuit', async () => {
+  it('settles Provider work already in flight when sibling timeouts open the route circuit', async () => {
     const health = createImageRouteHealthRegistry({ timeoutThreshold: 2 })
     const route = {
       providerId: 'provider-1',
@@ -351,7 +351,7 @@ describe('prototype production work scheduler', () => {
     const lane = scheduler.imageLane('suite-a', route)
     let releaseCompleted!: () => void
     const held = new Promise<string>((resolve) => {
-      releaseCompleted = () => resolve('paid-node-ready')
+      releaseCompleted = () => resolve('provider-node-ready')
     })
     const completed = lane(() => held)
     const firstTimeout = lane(async () => { throw new Error('request timed out') })
@@ -365,7 +365,7 @@ describe('prototype production work scheduler', () => {
     await expect(secondTimeout).rejects.toThrow('deadline exceeded')
     await expect(queued).rejects.toBeInstanceOf(ImageRouteCircuitOpenError)
     releaseCompleted()
-    await expect(completed).resolves.toBe('paid-node-ready')
+    await expect(completed).resolves.toBe('provider-node-ready')
     expect(queuedStarted).toBe(false)
   })
 

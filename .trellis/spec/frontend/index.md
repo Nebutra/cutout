@@ -24,9 +24,9 @@ more restrictive.
 | [Type Safety](./type-safety.md) | Type patterns, validation | Filled |
 | [Cutout Pipeline](./cutout-pipeline.md) | `src/algorithm/` edge-matting contract & invariants | Filled |
 | [BYOK User Copy](./byok-user-copy.md) | No billing-estimate copy; approval-notification & transport-error contracts | Filled |
-| [BYOK Provider Protocols](./byok-provider-protocols.md) | Provider kind/protocol matrix, strict persistence, Rust auth, and non-billable connection checks | Filled |
+| [BYOK Provider Protocols](./byok-provider-protocols.md) | Provider kind/protocol matrix, strict persistence, Rust auth, and read-only connection checks | Filled |
 | [AI Rich-Text Artifacts](./ai-rich-text-artifacts.md) | Structured execution data with safe AI-authored Markdown review artifacts | Filled |
-| [Paid-Tool Prompt Contract](./paid-tool-prompt-contract.md) | Separate bounded audit intent from complete provider execution prompts | Filled |
+| [Provider-Tool Prompt Contract](./provider-tool-prompt-contract.md) | Separate bounded audit intent from complete Provider execution prompts | Filled |
 | [Codex Plugin Infrastructure](./codex-plugin.md) | Self-contained plugin runtime, project binding, packaging and drift validation | Filled |
 | [Prototype Route-Suite Generation](./prototype-generation.md) | Agent-authored route graphs, complete page generation, and cross-page visual consistency | Filled |
 | [Desktop Release Pipeline](./release-pipeline.md) | Atomic cross-platform native builds, updater evidence, and GitHub Release publication | Filled |
@@ -34,6 +34,7 @@ more restrictive.
 | [Design OS Kernel](./design-os-kernel.md) | Canonical OutcomeGraph contracts, frozen authority, bounded scheduling, conformance, and replay | Filled |
 | [Design OS Evidence Benchmark](./design-os-benchmark.md) | Versioned maturity stages, Profile projections, evidence-derived progress and release regressions | Filled |
 | [Design Profile Platform](./design-profile-platform.md) | Declarative manifests, trusted registries, Universal Brief composition, lifecycle closure, and promotion gates | Filled |
+| [Canvas + Agent Design OS](./design-os-workbench.md) | Agent-owned outcomes, Canvas production/review, secondary Project tools, and optional Workbench compatibility | Filled |
 | [Commerce Production Profile](./commerce-production-profile.md) | Fact lineage, offline policy, cross-media evaluation, targeted repair, and evidence-tier benchmarks | Filled |
 | [Game Asset Profile](./game-asset-profile.md) | Typed sprite-family roles, identity/scale/anchor locks, targeted repair, layered maps, and delivery | Filled |
 | [Integration Brand Icons](./integration-brand-icons.md) | Local brand asset provenance, theme contrast, accessibility, and visual verification | Filled |

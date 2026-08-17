@@ -12,7 +12,7 @@ import {
   type VisualReviewer,
   type VisualToolInvoker,
 } from ".";
-import { paidToolReceiptSchema } from "@/control-protocol/paid-tool-contract";
+import { providerToolReceiptSchema } from "@/control-protocol/provider-tool-contract";
 
 const RUN = process.env.CUTOUT_RUN_BRAND_BENCHMARK === "1";
 const OUTPUT = "/private/tmp/cutout-brand-benchmark";
@@ -365,15 +365,14 @@ function providerTool(input: {
       );
       const providerId = localNoop ? "cutout-local" : "mox-openai-compatible";
       const model = localNoop ? "identity-noop-v1" : "gpt-image-2";
-      const receipt = paidToolReceiptSchema.parse({
+      const receipt = providerToolReceiptSchema.parse({
         receiptId: `receipt:${sha256.slice(0, 20)}:${invocation.nodeId.slice(-12)}`,
         requestId: invocation.requestId,
         capability: reference ? "edit-image" : invocation.capability,
         providerId,
         model,
         status: "succeeded",
-        charged: { currency: "USD", amount: 0 },
-        outputArtifactIds: [artifactId],
+                outputArtifactIds: [artifactId],
         startedAt,
         completedAt,
       });
@@ -676,15 +675,14 @@ async function loadFoundationAttempts(
         attempt: 1,
         provenanceId: `provenance:${sha256.slice(0, 24)}`,
       },
-      receipt: paidToolReceiptSchema.parse({
+      receipt: providerToolReceiptSchema.parse({
         receiptId: `receipt:${sha256.slice(0, 24)}`,
         requestId,
         capability: "generate-image",
         providerId: "mox-openai-compatible",
         model: "gpt-image-2",
         status: "succeeded",
-        charged: { currency: "USD", amount: 0 },
-        outputArtifactIds: [artifactId],
+                outputArtifactIds: [artifactId],
         startedAt: 0,
         completedAt: 0,
       }),

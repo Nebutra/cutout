@@ -1,9 +1,9 @@
 import type { DesktopToolExecutionResult } from "@/services/desktop-tool-executor";
 import type { DesktopToolLoop } from "@/agent-runtime/desktop-tool-loop";
 import {
-  paidToolRequestSchema,
-  type PaidToolRequest,
-} from "@/control-protocol/paid-tool-contract";
+  providerToolRequestSchema,
+  type ProviderToolRequest,
+} from "@/control-protocol/provider-tool-contract";
 import type {
   VisualToolInvoker,
   VisualToolInvocation,
@@ -20,7 +20,7 @@ export interface VisualArtifactMetadata {
 
 /**
  * Bridges the visual DAG to the existing approval/cancel/idempotency tool
- * loop. The loop remains the only paid-action authority; this adapter never
+ * loop. The loop remains the only Provider-execution authority; this adapter never
  * invokes a provider or reads a credential itself.
  */
 export function createDesktopVisualToolInvoker(input: {
@@ -29,14 +29,14 @@ export function createDesktopVisualToolInvoker(input: {
   readonly resolveArtifact: (
     artifactId: string,
   ) => Promise<VisualArtifactMetadata>;
-  readonly authorize?: (input: { readonly runId: string; readonly requestId: string; readonly request: PaidToolRequest }) => Promise<{ readonly capabilityLeaseId: string; readonly requestDigest: string }>;
+  readonly authorize?: (input: { readonly runId: string; readonly requestId: string; readonly request: ProviderToolRequest }) => Promise<{ readonly capabilityLeaseId: string; readonly requestDigest: string }>;
 }): VisualToolInvoker {
   return {
     async invoke(invocation: VisualToolInvocation): Promise<VisualToolResult> {
       const toolCallId = `visual-tool:${invocation.taskId}:${invocation.nodeId}`;
       if (invocation.signal?.aborted)
         throw new DOMException("Visual generation cancelled.", "AbortError");
-      const request = paidToolRequestSchema.parse({
+      const request = providerToolRequestSchema.parse({
         capability: invocation.capability,
         model: invocation.allowCompatibleFallback ? undefined : invocation.preferredModel,
         intent: `${invocation.capability === "generate-image" ? "Generate" : "Edit"} visual for ${invocation.taskId} (${invocation.nodeId})`,

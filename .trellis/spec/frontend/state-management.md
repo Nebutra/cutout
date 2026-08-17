@@ -504,7 +504,7 @@ submitted conversation turn.
   the response source. It must not append a duplicate `intent-recorded` event.
 - Route health may change the Provider/model selected for the new attempt. Once
   selected, that attempt's snapshot is frozen through preflight, tool-gate,
-  planning and paid execution.
+  planning and Provider execution.
 - Clearing the visible failure must not discard the retry source identity before
   the new attempt receives it.
 - Regenerate remains a response-branch operation and is distinct from Retry.

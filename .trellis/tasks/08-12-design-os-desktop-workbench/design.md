@@ -1,32 +1,118 @@
 # General Design OS desktop workbench - technical design
 
-## Projection Model
+## Architecture
 
-Decompose `IntentWorkspace` into a domain-neutral controller plus registries for
-artifact renderers, inspectors and semantic actions. The controller consumes
-Kernel/Project projections only; no renderer owns state. Brief/Sources/Board/
-Review/Deliver remain stable while selected Outcomes and artifact types determine
-contextual panels.
+The workbench is a projection shell over existing Project, Kernel, Profile and
+delivery records. It does not become a new source of truth.
 
-Designer and Builder are contextual lenses, not global personas. Both resolve
-the same commands and records; Designer emphasizes composition, visual compare,
-annotations and readiness, while Builder exposes semantic diff, checks, target
-bindings and receipts. Advanced controls expand progressively without duplicating
-state or hiding required gates.
+```text
+Project / Design IR / OutcomeGraph / receipts
+  -> Workbench projection model
+  -> lifecycle destination { section, profile?, view?, detail? }
+  -> shared shell
+       Brief | Sources | Create | Review | Deliver | Inspect
+  -> contextual view or existing domain production component
+  -> existing semantic command / preview / approved apply
+```
 
-Timeline and Board share selection, locks, ChangeSet and Agent context. Stable
-responsive dimensions prevent dynamic artifacts or localized labels from
-shifting controls. Media previews are real artifact bytes with explicit loading,
-unavailable, invalid and stale states.
+## Navigation Contract
 
-Projection selectors consume indexed affected revisions. Board, Timeline,
-history and queue collections virtualize beyond the visible window, and preview
-media is decoded lazily from CAS. Reference-hardware baselines track load,
-selection, command preview and scroll memory without making UI state authoritative.
+Add a pure `workbench-navigation` module that owns:
 
-## Migration And Rollback
+```ts
+type DesignOsWorkbenchSection =
+  | 'brief' | 'sources' | 'create' | 'review' | 'deliver' | 'inspect'
 
-Introduce the controller and registries behind the existing prototype adapter,
-then move one surface at a time. Keep the current workspace selectable until
-prototype parity and mixed-Outcome visual journeys pass. Desktop capability UI
-is derived from truthful Host resolution, not Profile wishes.
+type DesignOsProfileId =
+  | 'product-uiux' | 'brand' | 'commerce' | 'game-asset' | 'motion'
+
+interface DesignOsWorkbenchDestination {
+  section: DesignOsWorkbenchSection
+  profileId?: DesignOsProfileId
+  detail?: string
+}
+```
+
+The module also owns the compatibility map from existing tab ids. The map is
+deterministic and exhaustively tested. Domain components and `AppShell` must not
+recreate it with local conditionals.
+
+Profiles are not mutually exclusive Project modes. `profileId` selects the
+currently projected production lane only; it neither installs/uninstalls a
+Profile nor changes Project authority.
+
+## Shell And Views
+
+- The primary lifecycle is a stable tab set on every surface.
+- Create uses a narrow profile rail on desktop and a horizontally scrollable
+  selector on compact layouts. Its content region lazy-mounts a Profile on first
+  visit, then keeps that lane mounted and hidden so lifecycle navigation cannot
+  cancel in-flight domain work or discard retained Project state.
+- Product UI/UX owns contextual System and Figma projections in stage one. Flow,
+  Canvas and Prototype continue to live in the existing main workspace until
+  their shared projection adapters are introduced.
+- Brand projects current kit readiness and actions without claiming a separate
+  Brand generator.
+- Commerce and Game Asset mount their existing production panels without
+  modifying their internal state or evidence contracts.
+- Commerce completion is projected into one schema-validated
+  `CommerceProjectLifecycleRecord` in `WorkspaceSnapshot`. It binds the current
+  Design IR revision, exact retained result, explicit Review acceptance, and a
+  truthful browser download request. Stale or unaccepted records cannot Deliver.
+- Motion is an unavailable capability row until the temporal Host is real.
+- Review derives a stable summary from the current model. Governance repair
+  calls the existing callback; unavailable evidence remains unavailable.
+- Deliver reuses Delivery Center, Kit, Component and Starter components with one
+  secondary view selector. It keeps preview and apply callbacks unchanged.
+- Inspect contains system evidence, workflow packs and evaluator-only advanced
+  surfaces. It is progressively disclosed and does not own normal production.
+
+## State And Compatibility
+
+`DesignOsWorkbench` stores one destination, not unrelated primary and domain tab
+states. A legacy `defaultTab` is decoded once. Selecting a lifecycle section
+retains the most recent contextual profile/detail for that section.
+
+The existing `WorkspaceNavigation` protocol remains valid during stage one.
+`AppShell.openDesignOs(tab, options)` keeps accepting legacy destinations;
+`gameAssetLaunch` is forwarded unchanged when the compatibility destination is
+the Game Asset lane. Deliver remains the single inline main Workbench surface;
+the workspace does not own a second Deliver drawer. The narrow Design System
+drawer links into that same Workbench instead of presenting another lifecycle.
+
+## Authority Boundaries
+
+- The shell renders model projections and invokes existing callbacks only.
+- Profile selection cannot execute Provider work, approve, score or deliver.
+- Commerce Project and Commerce Benchmark remain separate inside the Commerce
+  component. Benchmark results do not affect Project lifecycle readiness.
+- Review does not infer acceptance from generated bytes or test fixtures.
+- `DesignOsSourceItem` is provenance metadata, not retained browser `File`
+  bytes. Commerce keeps its bounded run-input picker until a future source
+  adapter can carry the exact required catalog and image bytes.
+- No credential, arbitrary path or new network origin enters the workbench model.
+
+## Migration
+
+1. Introduce the pure destination/profile registry and tests.
+2. Replace domain top-level tabs with lifecycle navigation and compatibility
+   routing while preserving all existing subcomponents.
+3. Add real Brief/Create/Review projections from current model fields.
+4. Update AppShell titles and visual journeys.
+5. Later tasks add Flow, Timeline, Matrix and cross-Profile delivery adapters as
+   their domain contracts become executable.
+
+Rollback is local: the compatibility map and existing subcomponents remain
+intact, so the old tab shell can be restored without changing Project data or
+domain receipts.
+
+## Performance And Accessibility
+
+- Lazy domain imports remain intact.
+- Unvisited production lanes remain unloaded; visited lanes remain mounted but
+  hidden so navigation does not interrupt domain runtimes.
+- Primary and contextual selectors expose tab semantics and visible focus.
+- Stable min/max tracks and overflow ownership prevent long localized labels or
+  media from resizing navigation.
+- Reduced motion requires no alternate state because this stage adds no motion
+  choreography.

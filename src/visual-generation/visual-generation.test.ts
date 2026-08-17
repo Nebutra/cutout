@@ -10,7 +10,7 @@ import {
   type VisualGenerationTask,
   type VisualToolInvocation,
 } from ".";
-import type { PaidToolReceipt } from "@/control-protocol/paid-tool-contract";
+import type { ProviderToolReceipt } from "@/control-protocol/provider-tool-contract";
 
 const hash = "a".repeat(64);
 function task(
@@ -67,7 +67,7 @@ function task(
     ...overrides,
   });
 }
-function receipt(input: VisualToolInvocation, output: string): PaidToolReceipt {
+function receipt(input: VisualToolInvocation, output: string): ProviderToolReceipt {
   return {
     receiptId: `receipt:${input.requestId}`,
     requestId: input.requestId,
@@ -75,8 +75,7 @@ function receipt(input: VisualToolInvocation, output: string): PaidToolReceipt {
     providerId: "openai",
     model: input.preferredModel,
     status: "succeeded",
-    charged: { currency: "USD", amount: 0.02 },
-    outputArtifactIds: [output],
+        outputArtifactIds: [output],
     startedAt: 1,
     completedAt: 2,
   };
@@ -184,7 +183,7 @@ describe("visual generation contracts and planning", () => {
       }).refinement.mode,
     ).toBe("local-mask");
   });
-  it("rejects malformed executable topology before invoking paid tools", async () => {
+  it("rejects malformed executable topology before invoking Provider tools", async () => {
     const valid = planVisualGeneration(
       task({ variants: { count: 1, parallelism: 1 } }),
     );
@@ -388,7 +387,7 @@ describe("visual generation executor", () => {
     expect(invocations.at(-1)?.inputArtifactIds).toHaveLength(1);
     expect(result.promotion?.status).toBe("approved-master");
   });
-  it("persists successful paid attempts from a partially failed fan-out and reuses them on resume", async () => {
+  it("persists successful Provider attempts from a partially failed fan-out and reuses them on resume", async () => {
     const store = createMemoryVisualExecutionStore();
     const plan = planVisualGeneration(
       task({

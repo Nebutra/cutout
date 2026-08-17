@@ -9,6 +9,12 @@ import {
   workspaceSnapshotFingerprint,
   type WorkspaceSnapshot,
 } from './workspace-snapshot'
+import {
+  acceptCommerceProjectLifecycleRecord,
+  createCommerceProjectLifecycleRecord,
+  requestCommerceProjectDownload,
+} from '@/commerce-profile/project-lifecycle'
+import { createCommerceProjectContractResult } from '@/commerce-profile/project-production.test-fixture'
 
 describe('workspace snapshot helpers', () => {
   it('defaults new workspaces to the complete planned route suite', () => {
@@ -207,6 +213,43 @@ describe('workspace snapshot helpers', () => {
     expect(isWorkspaceSnapshotEmpty(coded)).toBe(false)
     expect(workspaceSnapshotFingerprint(coded)).not.toBe(
       workspaceSnapshotFingerprint(base),
+    )
+  })
+
+  it('treats Commerce production, acceptance, and download requests as durable changes', async () => {
+    const result = await createCommerceProjectContractResult()
+    const produced = createCommerceProjectLifecycleRecord({
+      designRevisionId: 'revision:commerce:1',
+      result,
+    })
+    const accepted = acceptCommerceProjectLifecycleRecord(
+      produced,
+      '2026-08-17T00:00:00.000Z',
+    )
+    const requested = requestCommerceProjectDownload(
+      accepted,
+      '2026-08-17T00:01:00.000Z',
+    )
+    const base = createEmptyWorkspaceSnapshot()
+    const productionSnapshot = {
+      ...base,
+      commerceProjectLifecycle: produced,
+    } satisfies WorkspaceSnapshot
+    const acceptedSnapshot = {
+      ...base,
+      commerceProjectLifecycle: accepted,
+    } satisfies WorkspaceSnapshot
+    const requestedSnapshot = {
+      ...base,
+      commerceProjectLifecycle: requested,
+    } satisfies WorkspaceSnapshot
+
+    expect(isWorkspaceSnapshotEmpty(productionSnapshot)).toBe(false)
+    expect(workspaceSnapshotFingerprint(productionSnapshot)).not.toBe(
+      workspaceSnapshotFingerprint(acceptedSnapshot),
+    )
+    expect(workspaceSnapshotFingerprint(acceptedSnapshot)).not.toBe(
+      workspaceSnapshotFingerprint(requestedSnapshot),
     )
   })
 })

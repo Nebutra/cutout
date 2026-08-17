@@ -62,6 +62,28 @@
 - [x] Upgrade the evaluator challenge, commitment, completion and admission to
       explicit v2 protocols; bind one package/Cargo Host build version through
       both signatures and native admission, and reject legacy or drifted values.
+- [x] Introduce one `CommerceProductionHost` contract and inject it through the
+      complete runner/session path; move every remaining direct Tauri invoke
+      behind the desktop adapter without changing receipt semantics.
+- [x] Add the closed versioned operator request/result schemas, fixed command
+      dispatcher, private app-data job store, atomic publication, cancellation
+      and exact recovery tests. Keep it outside public CLI/MCP discovery.
+- [x] Add the native `cutout-commerce-operator` binary and shared Rust command
+      core so desktop and operator paths reuse Keychain credentials, fixed-origin
+      network clients, receipt verification, replay SQLite and admission.
+- [x] Synchronize product/Cargo/Tauri/capability versions at `0.1.21`, build the
+      release operator with the evaluator public key, and run focused schema,
+      native, runner, contract, agent and release gates.
+- [x] Have the evaluator prepare and sign a fresh `0.1.21` challenge, execute or
+      replay-recover the real Provider Run through the operator, inspect all materialized
+      bytes, record the explicit eleven-deliverable review, sign completion and
+      invoke native admission.
+- [x] Regenerate durable Commerce and Design OS snapshots from the admitted
+      evidence only; verify truthful `14/14`, production readiness and replayed
+      re-verification before closing B20-B23.
+- [x] Replace the live paid-action protocol with Provider execution contracts,
+      remove charge/credit receipt fields and paid scopes/gates, synchronize the
+      manifest/schema/Skills/plugin/runtime/docs surface, and verify B24.
 
 ## Validation
 

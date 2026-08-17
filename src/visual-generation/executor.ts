@@ -1,8 +1,8 @@
 import { createRunEvent, type AgentRunEvent } from "@/agent-runtime/run-events";
 import type {
-  PaidToolCapability,
-  PaidToolReceipt,
-} from "@/control-protocol/paid-tool-contract";
+  ProviderToolCapability,
+  ProviderToolReceipt,
+} from "@/control-protocol/provider-tool-contract";
 import {
   promotionReceiptSchema,
   reviewGateSchema,
@@ -19,7 +19,7 @@ export interface VisualToolInvocation {
   readonly nodeId: string;
   readonly requestId: string;
   readonly capability: Extract<
-    PaidToolCapability,
+    ProviderToolCapability,
     "generate-image" | "edit-image"
   >;
   readonly preferredModel: string;
@@ -33,7 +33,7 @@ export interface VisualToolInvocation {
 }
 export interface VisualToolResult {
   readonly candidate: VariantCandidate;
-  readonly receipt: PaidToolReceipt;
+  readonly receipt: ProviderToolReceipt;
 }
 export interface VisualToolInvoker {
   invoke(input: VisualToolInvocation): Promise<VisualToolResult>;
@@ -65,7 +65,7 @@ export interface VisualExecutionResult {
   readonly candidates: readonly VariantCandidate[];
   readonly gates: readonly ReviewGate[];
   readonly promotion?: PromotionReceipt;
-  readonly receipts: readonly PaidToolReceipt[];
+  readonly receipts: readonly ProviderToolReceipt[];
   readonly idempotent: boolean;
 }
 
@@ -94,7 +94,7 @@ export async function executeVisualGeneration(
     (node) => node.operation === "generate",
   );
   const generated: VariantCandidate[] = [];
-  const receipts: PaidToolReceipt[] = [];
+  const receipts: ProviderToolReceipt[] = [];
   try {
     for (
       let offset = 0;

@@ -19,6 +19,7 @@ use super::ai_proxy::ProxyError;
 use super::commerce_source_ingest::{
     verify_receipt as verify_source_receipt, CommerceSourceIngestReceipt,
 };
+use super::keys::active_keychain_service;
 use super::multimodal_receipt::{
     sha256, sign_host_payload, verify_host_payload, verify_receipt as verify_multimodal_receipt,
     MultimodalHostReceipt,
@@ -50,7 +51,6 @@ const COMMERCE_SEMANTIC_ROLES: [&str; DELIVERABLE_COUNT] = [
     "strategy-document",
 ];
 const MAX_CHALLENGE_WINDOW_MS: u64 = 24 * 60 * 60 * 1_000;
-const KEYCHAIN_SERVICE: &str = "com.nebutra.cutout";
 const CHALLENGE_REGISTRATION_PROTOCOL: &str = "cutout.commerce-held-out-challenge-registration.v1";
 const EXECUTION_LEDGER_PROTOCOL: &str = "cutout.commerce-held-out-execution-ledger.v1";
 const REPLAY_RESPONSE_PROTOCOL: &str = "cutout.commerce-held-out-replay-response.v1";
@@ -323,8 +323,12 @@ fn replay_database_path(app: &AppHandle) -> Result<PathBuf, ProxyError> {
     let root = app
         .path()
         .app_data_dir()
-        .map_err(|_| ProxyError::Request("held-out Commerce replay store is unavailable".into()))?
-        .join("commerce-held-out");
+        .map_err(|_| ProxyError::Request("held-out Commerce replay store is unavailable".into()))?;
+    replay_database_path_for_app_data(&root)
+}
+
+pub(crate) fn replay_database_path_for_app_data(app_data: &Path) -> Result<PathBuf, ProxyError> {
+    let root = app_data.join("commerce-held-out");
     std::fs::create_dir_all(&root)
         .map_err(|_| ProxyError::Request("held-out Commerce replay store is unavailable".into()))?;
     if std::fs::symlink_metadata(&root)
@@ -389,8 +393,15 @@ fn with_replay_lock<T>(
     app: &AppHandle,
     operation: impl FnOnce() -> Result<T, ProxyError>,
 ) -> Result<T, ProxyError> {
+    with_replay_lock_path(&replay_database_path(app)?, operation)
+}
+
+fn with_replay_lock_path<T>(
+    database_path: &Path,
+    operation: impl FnOnce() -> Result<T, ProxyError>,
+) -> Result<T, ProxyError> {
     let _guard = replay_lock().lock().map_err(|_| ProxyError::Keychain)?;
-    let mut connection = open_replay_database(&replay_database_path(app)?)?;
+    let mut connection = open_replay_database(database_path)?;
     let transaction = connection
         .transaction_with_behavior(TransactionBehavior::Immediate)
         .map_err(|_| ProxyError::Request("held-out Commerce replay store is busy".into()))?;
@@ -402,7 +413,7 @@ fn with_replay_lock<T>(
 }
 
 fn replay_entry(account: &str) -> Result<Entry, ProxyError> {
-    Entry::new(KEYCHAIN_SERVICE, account).map_err(|_| ProxyError::Keychain)
+    Entry::new(active_keychain_service(), account).map_err(|_| ProxyError::Keychain)
 }
 
 fn read_replay_entry(account: &str) -> Result<Option<String>, ProxyError> {
@@ -475,7 +486,7 @@ fn register_receipt_slot(
     ledger: &mut ExecutionLedger,
     slot_id: &str,
     receipt_hash: &str,
-) -> Result<(), ProxyError> {
+) -> Result<bool, ProxyError> {
     if slot_id.is_empty()
         || slot_id.len() > 512
         || slot_id.chars().any(char::is_control)
@@ -496,7 +507,7 @@ fn register_receipt_slot(
         .find(|entry| entry.slot_id == slot_id)
     {
         return if existing.receipt_hash == receipt_hash {
-            Ok(())
+            Ok(false)
         } else {
             Err(ProxyError::Request(format!(
                 "held-out Commerce receipt slot was already settled: {slot_id}"
@@ -512,7 +523,40 @@ fn register_receipt_slot(
         slot_id: slot_id.into(),
         receipt_hash: receipt_hash.into(),
     });
-    Ok(())
+    Ok(true)
+}
+
+pub(crate) fn assert_registered_held_out_execution(
+    app: &AppHandle,
+    commitment_hash: &str,
+    run_id: &str,
+) -> Result<(), ProxyError> {
+    if !valid_hash(commitment_hash) || !valid_identifier(run_id) {
+        return Err(ProxyError::Request(
+            "held-out Commerce execution identity is invalid".into(),
+        ));
+    }
+    with_replay_lock(app, || {
+        let account = ledger_account(commitment_hash);
+        let value = read_replay_entry(&account)?.ok_or_else(|| {
+            ProxyError::Request("held-out Commerce commitment is not registered".into())
+        })?;
+        let ledger: ExecutionLedger = decode_registration(&value, "execution ledger")?;
+        if ledger.protocol != EXECUTION_LEDGER_PROTOCOL
+            || ledger.commitment_hash != commitment_hash
+            || ledger.run_id != run_id
+        {
+            return Err(ProxyError::Request(
+                "held-out Commerce execution does not bind the registered run".into(),
+            ));
+        }
+        if ledger.admitted_bundle_hash.is_some() || ledger.attestation_id.is_some() {
+            return Err(ProxyError::Request(
+                "held-out Commerce commitment is already sealed".into(),
+            ));
+        }
+        Ok(())
+    })
 }
 
 pub(crate) fn register_held_out_receipt(
@@ -536,8 +580,10 @@ pub(crate) fn register_held_out_receipt(
                 "held-out Commerce receipt does not bind the registered run".into(),
             ));
         }
-        register_receipt_slot(&mut ledger, slot_id, receipt_hash)?;
-        write_replay_entry(&account, &encode_registration(&ledger)?)
+        if register_receipt_slot(&mut ledger, slot_id, receipt_hash)? {
+            write_replay_entry(&account, &encode_registration(&ledger)?)?;
+        }
+        Ok(())
     })
 }
 
@@ -1248,6 +1294,46 @@ fn commitment_from_registration(
     })
 }
 
+fn registration_from_retained_commitment(
+    retained: CommerceHeldOutCommitment,
+    evaluator_challenge: CommerceHeldOutChallengeSelection,
+    input_manifest: CommerceHeldOutInputManifest,
+    evaluator_key_id: String,
+    challenge_hash: String,
+    input_manifest_hash: String,
+    now: u64,
+) -> Result<(ChallengeRegistration, CommerceHeldOutCommitment), ProxyError> {
+    if retained.issued_at < evaluator_challenge.payload.issued_at
+        || retained.issued_at > evaluator_challenge.payload.expires_at
+        || retained.issued_at > now
+    {
+        return Err(ProxyError::Request(
+            "held-out Commerce retained commitment chronology is invalid".into(),
+        ));
+    }
+    let registration = ChallengeRegistration {
+        protocol: CHALLENGE_REGISTRATION_PROTOCOL.into(),
+        challenge_hash,
+        commitment_id: retained.commitment_id.clone(),
+        commitment_hash: retained.commitment_hash.clone(),
+        input_manifest_hash,
+        run_id: evaluator_challenge.payload.allowed_run_id.clone(),
+        issued_at: retained.issued_at,
+    };
+    let recovered = commitment_from_registration(
+        &registration,
+        evaluator_challenge,
+        input_manifest,
+        evaluator_key_id,
+    )?;
+    if canonical_json_bytes(&recovered)? != canonical_json_bytes(&retained)? {
+        return Err(ProxyError::Request(
+            "held-out Commerce retained commitment is invalid".into(),
+        ));
+    }
+    Ok((registration, recovered))
+}
+
 impl ChallengeRegistration {
     fn evaluator_identity_drifted(
         &self,
@@ -1265,10 +1351,10 @@ impl ChallengeRegistration {
 }
 
 fn verify_registered_commitment(
-    app: &AppHandle,
+    database_path: &Path,
     commitment: &CommerceHeldOutCommitment,
 ) -> Result<(), ProxyError> {
-    with_replay_lock(app, || {
+    with_replay_lock_path(database_path, || {
         let value = read_replay_entry(&challenge_account(&commitment.challenge_hash))?.ok_or_else(
             || ProxyError::Request("held-out Commerce commitment is not registered".into()),
         )?;
@@ -1291,13 +1377,13 @@ fn verify_registered_commitment(
 }
 
 fn seal_execution_ledger(
-    app: &AppHandle,
+    database_path: &Path,
     commitment: &CommerceHeldOutCommitment,
     expected_slots: &[ReceiptSlotRegistration],
     bundle_hash: &str,
     attestation_id: &str,
 ) -> Result<(), ProxyError> {
-    with_replay_lock(app, || {
+    with_replay_lock_path(database_path, || {
         let account = ledger_account(&commitment.commitment_hash);
         let value = read_replay_entry(&account)?.ok_or_else(|| {
             ProxyError::Request("held-out Commerce execution ledger is missing".into())
@@ -1344,11 +1430,36 @@ pub async fn create_commerce_held_out_commitment(
     evaluator_challenge: CommerceHeldOutChallengeSelection,
     input_manifest: CommerceHeldOutInputManifest,
 ) -> Result<CommerceHeldOutCommitment, ProxyError> {
+    let database_path = replay_database_path(&app)?;
+    create_commerce_held_out_commitment_inner(&database_path, evaluator_challenge, input_manifest)
+        .await
+}
+
+pub(crate) async fn create_commerce_held_out_commitment_inner(
+    database_path: &Path,
+    evaluator_challenge: CommerceHeldOutChallengeSelection,
+    input_manifest: CommerceHeldOutInputManifest,
+) -> Result<CommerceHeldOutCommitment, ProxyError> {
+    create_commerce_held_out_commitment_with_recovery(
+        database_path,
+        evaluator_challenge,
+        input_manifest,
+        None,
+    )
+    .await
+}
+
+pub(crate) async fn create_commerce_held_out_commitment_with_recovery(
+    database_path: &Path,
+    evaluator_challenge: CommerceHeldOutChallengeSelection,
+    input_manifest: CommerceHeldOutInputManifest,
+    retained_commitment: Option<CommerceHeldOutCommitment>,
+) -> Result<CommerceHeldOutCommitment, ProxyError> {
     validate_input_manifest(&input_manifest)?;
     let input_manifest_hash = sha256(&canonical_json_bytes(&input_manifest)?);
     let (public_key, evaluator_key_id) =
         decode_trusted_evaluator_key(TRUSTED_EVALUATOR_PUBLIC_KEY)?;
-    with_replay_lock(&app, || {
+    with_replay_lock_path(database_path, || {
         let issued_at = unix_millis()?;
         let challenge_hash = verify_challenge(
             &evaluator_challenge,
@@ -1369,6 +1480,20 @@ pub async fn create_commerce_held_out_commitment(
             )?;
             ensure_execution_ledger(&registration)?;
             return Ok(commitment);
+        }
+        if let Some(retained) = retained_commitment {
+            let (registration, recovered) = registration_from_retained_commitment(
+                retained,
+                evaluator_challenge,
+                input_manifest,
+                evaluator_key_id,
+                challenge_hash,
+                input_manifest_hash,
+                issued_at,
+            )?;
+            write_replay_entry(&account, &encode_registration(&registration)?)?;
+            ensure_execution_ledger(&registration)?;
+            return Ok(recovered);
         }
         let host_build_version = evaluator_challenge.payload.host_build_version.clone();
         let payload = CommerceHeldOutCommitmentPayload {
@@ -1422,6 +1547,22 @@ pub async fn verify_commerce_held_out_attestation(
     evaluator_attestation: CommerceHeldOutEvaluatorAttestation,
     rehearsal_bundle: Value,
 ) -> Result<CommerceHeldOutAdmission, ProxyError> {
+    let database_path = replay_database_path(&app)?;
+    verify_commerce_held_out_attestation_inner(
+        &database_path,
+        commitment,
+        evaluator_attestation,
+        rehearsal_bundle,
+    )
+    .await
+}
+
+pub(crate) async fn verify_commerce_held_out_attestation_inner(
+    database_path: &Path,
+    commitment: CommerceHeldOutCommitment,
+    evaluator_attestation: CommerceHeldOutEvaluatorAttestation,
+    rehearsal_bundle: Value,
+) -> Result<CommerceHeldOutAdmission, ProxyError> {
     validate_input_manifest(&commitment.input_manifest)?;
     let expected_manifest_hash = sha256(&canonical_json_bytes(&commitment.input_manifest)?);
     if commitment.input_manifest_hash != expected_manifest_hash {
@@ -1434,7 +1575,7 @@ pub async fn verify_commerce_held_out_attestation(
         &commitment.commitment_hash,
         &commitment.signature,
     )?;
-    verify_registered_commitment(&app, &commitment)?;
+    verify_registered_commitment(database_path, &commitment)?;
     let (public_key, evaluator_key_id) =
         decode_trusted_evaluator_key(TRUSTED_EVALUATOR_PUBLIC_KEY)?;
     let now = unix_millis()?;
@@ -1487,7 +1628,7 @@ pub async fn verify_commerce_held_out_attestation(
         &canonical_json_bytes(&evaluator_attestation.payload)?,
     )?;
     seal_execution_ledger(
-        &app,
+        database_path,
         &commitment,
         &receipt_slots,
         &bundle_hash,
@@ -1559,7 +1700,7 @@ mod tests {
     #[test]
     fn challenge_window_and_exact_identity_fail_closed() {
         let mut value = challenge();
-        assert_eq!(HOST_BUILD_VERSION, "0.1.20");
+        assert_eq!(HOST_BUILD_VERSION, "0.1.21");
         assert!(validate_challenge_binding(&value, &"a".repeat(64), "evaluator:test", 20).is_ok());
         assert!(
             validate_challenge_binding(&value, &"a".repeat(64), "evaluator:test", 101).is_err()
@@ -1671,9 +1812,92 @@ mod tests {
     fn challenge_payload_uses_the_cross_runtime_canonical_json_contract() {
         let encoded = String::from_utf8(canonical_json_bytes(&challenge()).unwrap()).unwrap();
         assert_eq!(encoded, format!(
-            "{{\"allowedRunId\":\"run:test\",\"benchmark\":{{\"id\":\"benchmark:commerce-profile:p1-p7\",\"version\":2}},\"challengeId\":\"challenge:test\",\"challengeNonce\":\"{}\",\"evaluatorKeyId\":\"evaluator:test\",\"expiresAt\":100,\"hostBuildVersion\":\"0.1.20\",\"inputManifestHash\":\"{}\",\"issuedAt\":10,\"profile\":{{\"id\":\"profile:commerce-materials\",\"version\":\"1.1.0\"}},\"protocol\":\"cutout.commerce-held-out-challenge-selection.v2\"}}",
+            "{{\"allowedRunId\":\"run:test\",\"benchmark\":{{\"id\":\"benchmark:commerce-profile:p1-p7\",\"version\":2}},\"challengeId\":\"challenge:test\",\"challengeNonce\":\"{}\",\"evaluatorKeyId\":\"evaluator:test\",\"expiresAt\":100,\"hostBuildVersion\":\"0.1.21\",\"inputManifestHash\":\"{}\",\"issuedAt\":10,\"profile\":{{\"id\":\"profile:commerce-materials\",\"version\":\"1.1.0\"}},\"protocol\":\"cutout.commerce-held-out-challenge-selection.v2\"}}",
             "n".repeat(32), "a".repeat(64)
         ));
+    }
+
+    #[test]
+    fn retained_commitment_recovery_requires_the_exact_host_signed_commitment() {
+        super::super::multimodal_receipt::install_ephemeral_test_signing_key();
+        let mut evaluator_challenge = CommerceHeldOutChallengeSelection {
+            payload: challenge(),
+            signature: "evaluator-signature".into(),
+        };
+        let input_manifest = CommerceHeldOutInputManifest {
+            schema: INPUT_MANIFEST_SCHEMA.into(),
+            rehearsal_identity: CommerceHeldOutIdentity {
+                id: "rehearsal:test".into(),
+                revision: "revision:test".into(),
+            },
+            facts_hash: "b".repeat(64),
+            category_catalog_hash: "c".repeat(64),
+            attribute_catalog_hash: "d".repeat(64),
+            selected_sources: vec![],
+        };
+        let input_manifest_hash = sha256(&canonical_json_bytes(&input_manifest).unwrap());
+        evaluator_challenge.payload.input_manifest_hash = input_manifest_hash.clone();
+        let challenge_hash = sha256(&canonical_json_bytes(&evaluator_challenge.payload).unwrap());
+        let registration = ChallengeRegistration {
+            protocol: CHALLENGE_REGISTRATION_PROTOCOL.into(),
+            challenge_hash: challenge_hash.clone(),
+            commitment_id: "commitment:test".into(),
+            commitment_hash: String::new(),
+            input_manifest_hash: input_manifest_hash.clone(),
+            run_id: "run:test".into(),
+            issued_at: 20,
+        };
+        let payload = CommerceHeldOutCommitmentPayload {
+            protocol: COMMITMENT_PROTOCOL.into(),
+            commitment_id: registration.commitment_id.clone(),
+            challenge_selection: evaluator_challenge.clone(),
+            challenge_hash: registration.challenge_hash.clone(),
+            evaluator_key_id: "evaluator:test".into(),
+            host_build_version: HOST_BUILD_VERSION.into(),
+            input_manifest: input_manifest.clone(),
+            input_manifest_hash: registration.input_manifest_hash.clone(),
+            run_id: registration.run_id.clone(),
+            issued_at: registration.issued_at,
+        };
+        let (commitment_hash, signature) = sign_host_payload(&payload).unwrap();
+        let retained = CommerceHeldOutCommitment {
+            protocol: payload.protocol,
+            commitment_id: payload.commitment_id,
+            commitment_hash,
+            challenge_selection: payload.challenge_selection,
+            challenge_hash: payload.challenge_hash,
+            evaluator_key_id: payload.evaluator_key_id,
+            host_build_version: payload.host_build_version,
+            input_manifest: payload.input_manifest,
+            input_manifest_hash: payload.input_manifest_hash,
+            run_id: payload.run_id,
+            issued_at: payload.issued_at,
+            signature,
+        };
+        let recovered = registration_from_retained_commitment(
+            retained.clone(),
+            evaluator_challenge.clone(),
+            input_manifest.clone(),
+            "evaluator:test".into(),
+            challenge_hash.clone(),
+            input_manifest_hash.clone(),
+            40,
+        )
+        .unwrap();
+        assert_eq!(recovered.0.commitment_hash, retained.commitment_hash);
+
+        let mut drifted = retained;
+        drifted.run_id = "run:other".into();
+        assert!(registration_from_retained_commitment(
+            drifted,
+            evaluator_challenge,
+            input_manifest,
+            "evaluator:test".into(),
+            challenge_hash,
+            input_manifest_hash,
+            40,
+        )
+        .is_err());
     }
 
     #[test]
@@ -1693,13 +1917,15 @@ mod tests {
             "multimodal:plan-node:main-image",
             &"d".repeat(64),
         )
-        .is_ok());
-        assert!(register_receipt_slot(
+        .unwrap());
+        let registered = ledger.clone();
+        assert!(!register_receipt_slot(
             &mut ledger,
             "multimodal:plan-node:main-image",
             &"d".repeat(64),
         )
-        .is_ok());
+        .unwrap());
+        assert_eq!(ledger.receipt_slots, registered.receipt_slots);
         assert!(register_receipt_slot(
             &mut ledger,
             "multimodal:plan-node:main-image",

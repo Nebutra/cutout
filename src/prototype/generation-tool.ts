@@ -9,8 +9,8 @@
  * effects, does no generation, and never touches the lease/checkpoint
  * machinery. It returns a decision that `createAssets()` folds into the SAME,
  * unmodified `researchedBrief`/`planPrototypeSuite`/`generatePrototypeSuite`
- * call. Because it can never fire concurrently with a paid generation (it runs
- * in the pre-generation tool gate), there is no paid-generation race.
+ * call. Because it can never fire concurrently with a Provider generation (it runs
+ * in the pre-generation tool gate), there is no Provider-generation race.
  */
 import { z } from 'zod'
 import type { AgentToolDefinition } from '@/agent-runtime/tool-loop'

@@ -8,14 +8,13 @@
 
 ## Requirements
 
-- Injected paid-tool provider
+- Injected Provider executor
 - Approved budget and policy
 - Rights for references
 
 ## Produced Evidence
 
 - Generation DAG
-- Cost estimate
 - Visual variants
 - Tool receipts
 
@@ -31,4 +30,3 @@
 - Preview before approved apply.
 - Keep credentials host-owned and out of artifacts.
 - Do not claim results without authoritative evidence.
-

@@ -1953,7 +1953,7 @@ async fn check_draft<R: Runtime>(
     draft: &ProviderDraftSession,
 ) -> Result<(Vec<String>, Option<String>), DiscoveryError> {
     // This intentionally remains an authenticated catalog request. The four
-    // supported generation protocols do not share a standardized no-cost
+    // supported generation protocols do not share a standardized read-only
     // OPTIONS/HEAD probe, and Check connection must never trigger generation.
     // Runtime viability is enforced locally by the closed kind/protocol matrix,
     // protocol-specific auth, URL normalization, and exhaustive SDK adapters.

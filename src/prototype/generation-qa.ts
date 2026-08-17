@@ -3,7 +3,7 @@
  *
  * Checklist builders are deterministic functions of the plan, the review is
  * one injected structured-output vision call, and `generateWithQa` retains the
- * verdict as observational evidence. Paid retries default to zero; a caller
+ * verdict as observational evidence. Provider retries default to zero; a caller
  * must explicitly authorize a bounded later attempt.
  */
 import { z } from 'zod'
@@ -191,7 +191,7 @@ export interface GenerateWithQaParams {
   readonly generate: (prompt: string, signal?: AbortSignal) => Promise<Uint8Array>
   /** Review attempt: image in, verdict out. */
   readonly review: (bytes: Uint8Array, signal?: AbortSignal) => Promise<QaVerdict>
-  /** Explicit extra paid attempts after the first attempt. Default 0, clamp >= 0. */
+  /** Explicit extra Provider attempts after the first attempt. Default 0, clamp >= 0. */
   readonly maxRetries?: number
   /** Observability: called once per attempt with its verdict. */
   readonly onVerdict?: (attempt: number, verdict: QaVerdict) => void

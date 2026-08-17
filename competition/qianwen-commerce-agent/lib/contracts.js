@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 
-export const VERSION = '1.0.2'
+export const VERSION = '1.0.5'
 export const MODELS = Object.freeze({
   text: 'qwen3.8-max',
   qa: 'qwen3-vl-plus',
@@ -55,29 +55,53 @@ export const IMAGE_BASENAMES = Object.freeze([
 export const VIDEO_BASENAME = 'product_video'
 
 export const IMAGE_ROLES = Object.freeze([
-  Object.freeze({ id: 'main', basename: 'main_image', label: 'Main catalog image', size: '1024*1024' }),
-  Object.freeze({ id: 'detail-1', basename: 'detail_image_1', label: 'Front and silhouette detail', size: '1024*1024' }),
-  Object.freeze({ id: 'detail-2', basename: 'detail_image_2', label: 'Material and texture detail', size: '1024*1024' }),
-  Object.freeze({ id: 'detail-3', basename: 'detail_image_3', label: 'Construction and finish detail', size: '1024*1024' }),
-  Object.freeze({ id: 'detail-4', basename: 'detail_image_4', label: 'Fit and proportion detail', size: '1024*1024' }),
-  Object.freeze({ id: 'detail-5', basename: 'detail_image_5', label: 'Supplementary product presentation', size: '1024*1024' }),
+  Object.freeze({
+    id: 'main', basename: 'main_image', label: 'Pure-white marketplace hero', size: '1024*1024',
+    purpose: 'Establish an inspectable whole-product identity and a compliant marketplace first impression.',
+  }),
+  Object.freeze({
+    id: 'detail-1', basename: 'detail_image_1', label: 'Source-supported alternate angle or reverse construction', size: '1024*1024',
+    purpose: 'Resolve product shape or reverse construction that the hero cannot show.',
+  }),
+  Object.freeze({
+    id: 'detail-2', basename: 'detail_image_2', label: 'Material and texture macro', size: '1024*1024',
+    purpose: 'Make source-visible material character and surface texture inspectable.',
+  }),
+  Object.freeze({
+    id: 'detail-3', basename: 'detail_image_3', label: 'Hardware, seam, and finish close-up', size: '1024*1024',
+    purpose: 'Expose source-visible construction, hardware, seams, edges, and finish quality.',
+  }),
+  Object.freeze({
+    id: 'detail-4', basename: 'detail_image_4', label: 'Silhouette, length, and proportion view', size: '1024*1024',
+    purpose: 'Clarify the whole-product silhouette, relative length, and proportions.',
+  }),
+  Object.freeze({
+    id: 'detail-5', basename: 'detail_image_5', label: 'Source-supported styling and merchandising context', size: '1024*1024',
+    purpose: 'Close the set with source-supported usage or merchandising context without inventing accessories or claims.',
+  }),
+])
+
+export const VIDEO_STORYBOARD = Object.freeze([
+  Object.freeze({ range: '0.0-1.2s', purpose: 'Identity', direction: 'Hold the complete product clearly and preserve the accepted hero framing.' }),
+  Object.freeze({ range: '1.2-3.4s', purpose: 'Evidence', direction: 'Use one controlled shallow move to reveal only source-visible material or construction.' }),
+  Object.freeze({ range: '3.4-5.0s', purpose: 'Commerce close', direction: 'Return to a stable whole-product catalog hold with no captions or scene cut.' }),
 ])
 
 export const MEDIA_INVENTORY_ROLES = Object.freeze({
   en: Object.freeze({
     prefix: 'Planned and QA-validated role',
     imageRoles: Object.freeze(IMAGE_ROLES.map((role) => role.label)),
-    videoRole: 'Stable five-second product presentation',
+    videoRole: 'Five-second product story with whole-product and construction holds',
   }),
   ko: Object.freeze({
     prefix: '계획 및 QA 검증 역할',
-    imageRoles: Object.freeze(['메인 카탈로그 이미지', '정면 및 실루엣 디테일', '소재 및 질감 디테일', '구조 및 마감 디테일', '핏 및 비율 디테일', '보조 상품 프레젠테이션']),
-    videoRole: '안정적인 5초 상품 프레젠테이션',
+    imageRoles: Object.freeze(['순백 배경 마켓플레이스 메인 이미지', '원본 근거 기반의 다른 각도 또는 뒷면 구조', '소재 및 질감 매크로', '하드웨어, 봉제선 및 마감 클로즈업', '실루엣, 길이 및 비율 뷰', '원본 근거 기반 스타일링 및 판매 맥락']),
+    videoRole: '전체 상품과 구조를 보여 주는 5초 상품 스토리',
   }),
   pt: Object.freeze({
     prefix: 'Funcao planejada e validada por QA',
-    imageRoles: Object.freeze(['Imagem principal de catalogo', 'Detalhe frontal e da silhueta', 'Detalhe do material e da textura', 'Detalhe da construcao e do acabamento', 'Detalhe do caimento e da proporcao', 'Apresentacao complementar do produto']),
-    videoRole: 'Apresentacao estavel do produto por cinco segundos',
+    imageRoles: Object.freeze(['Imagem principal em fundo branco puro', 'Angulo alternativo ou construcao traseira com base na fonte', 'Macro de material e textura', 'Close de aviamentos, costuras e acabamento', 'Vista de silhueta, comprimento e proporcao', 'Contexto de styling e venda com base na fonte']),
+    videoRole: 'Historia de produto de cinco segundos com vistas geral e construtiva',
   }),
 })
 

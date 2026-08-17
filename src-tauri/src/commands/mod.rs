@@ -3,6 +3,7 @@
 pub mod agent_host;
 pub mod ai;
 pub mod coding_workspace;
+pub(crate) mod foreground_estimation;
 pub mod foreground_segmentation;
 pub mod git;
 pub mod monotonic_deadline;

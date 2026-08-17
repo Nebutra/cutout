@@ -23,6 +23,7 @@ describe.runIf(Boolean(referencePath && outputPath))('direct real Game Asset GUI
       bytes,
     }])
     if (!launch.reference) throw new Error('Expected the one retained image reference')
+    if (launch.intent.scope === 'map') throw new Error('Expected a sprite action route')
 
     const input = await authorGameAssetActionRun({
       assetName: 'Courier',

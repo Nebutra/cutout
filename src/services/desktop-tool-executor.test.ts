@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from 'vitest'
-import { paidToolRequestSchema, type PaidToolExecutorCapability } from '@/control-protocol/paid-tool-contract'
+import { providerToolRequestSchema, type ProviderToolExecutorCapability } from '@/control-protocol/provider-tool-contract'
 import { createDesktopToolExecutor, type DesktopToolArtifactStore } from './desktop-tool-executor'
 import type { ServiceRegistry } from './types'
 import { PermissionBroker } from '@/tool-sandbox/broker'
 
-const imageCapability: PaidToolExecutorCapability = {
+const imageCapability: ProviderToolExecutorCapability = {
   capability: 'generate-image', providerId: 'provider-1', model: 'image-1', available: true,
   transportStrategy: 'openai-images-generations',
 }
@@ -13,7 +13,7 @@ function request(
   capability: 'generate-image' | 'edit-image' | 'cutout' | 'semantic-cutout' = 'generate-image',
   prompt = 'Execute the approved tool request.',
 ) {
-  return paidToolRequestSchema.parse({
+  return providerToolRequestSchema.parse({
     capability,
     ...(capability === 'cutout'
       ? { providerId: 'local', model: 'cutout-v1' }
@@ -28,7 +28,7 @@ function request(
 }
 
 function harness(overrides: {
-  capability?: PaidToolExecutorCapability
+  capability?: ProviderToolExecutorCapability
   revision?: () => number
   aborted?: AbortSignal
   hasKey?: boolean
@@ -84,12 +84,12 @@ function execution(tool = request(), overrides: { approvalGranted?: boolean; exp
   return {
     requestId: 'request-1', runId: 'run-1', toolCallId: 'tool-1', label: 'Hero visual',
     expectedRevision: overrides.expectedRevision ?? 4, request: tool,
-    approvalGranted: overrides.approvalGranted ?? false, policy: { allowPaid: true }, signal: overrides.signal,
+    approvalGranted: overrides.approvalGranted ?? false, policy: { allowProviderExecution: true }, signal: overrides.signal,
     capabilityLeaseId: overrides.capabilityLeaseId, requestDigest: overrides.requestDigest,
   }
 }
 
-describe('desktop paid tool executor', () => {
+describe('desktop Provider tool executor', () => {
   it('requires and consumes a request-bound capability lease before provider access', async () => {
     const digest = 'b'.repeat(64)
     const broker = new PermissionBroker({
@@ -97,7 +97,7 @@ describe('desktop paid tool executor', () => {
       id: () => 'desktop-receipt',
       capabilities: { canonicalWorkspaceRoot: true, symlinkBoundary: true, commandAllowlist: true, environmentAllowlist: true, wallClockTimeout: true, byteLimit: true, processTreeCancellation: 'supported', cpuLimit: 'capability-required', networkIsolation: 'capability-required' },
     })
-    broker.issue({ version: 'cutout.capability-lease.v1', leaseId: 'lease:desktop', approvalId: 'approval:desktop', subject: 'run-1', requestDigest: digest, scopes: ['paid', 'credential'], workspaceRoot: '/workspace', allowedPaths: [], allowedCommands: [], allowedHosts: [], limits: { maxDurationMs: 1_000, maxBytes: 1_000, maxProcesses: 1 }, issuedAt: 10, expiresAt: 20 })
+    broker.issue({ version: 'cutout.capability-lease.v1', leaseId: 'lease:desktop', approvalId: 'approval:desktop', subject: 'run-1', requestDigest: digest, scopes: ['tool-execute', 'credential'], workspaceRoot: '/workspace', allowedPaths: [], allowedCommands: [], allowedHosts: [], limits: { maxDurationMs: 1_000, maxBytes: 1_000, maxProcesses: 1 }, issuedAt: 10, expiresAt: 20 })
 
     const secured = harness({ permissionBroker: broker })
     const missing = await secured.executor.execute(execution())
@@ -124,7 +124,7 @@ describe('desktop paid tool executor', () => {
     expect(artifacts.write).toHaveBeenCalledTimes(1)
     expect(result.events.map((event) => event.type)).toEqual(['tool-started', 'tool-succeeded', 'material-recorded'])
     expect(result.receipt).toMatchObject({ status: 'succeeded', outputArtifactIds: ['artifact:generate-image:1'] })
-    expect(result.receipt).not.toHaveProperty('charged')
+    expect(result.receipt).toMatchObject({ status: 'succeeded', providerId: 'provider-1' })
     expect(JSON.stringify(result)).not.toContain('secret')
   })
 
@@ -215,7 +215,7 @@ describe('desktop paid tool executor', () => {
       images: [new Uint8Array([7]), new Uint8Array([8])],
     }))
 
-    const cutoutCapability: PaidToolExecutorCapability = { capability: 'cutout', providerId: 'local', model: 'cutout-v1', available: true, }
+    const cutoutCapability: ProviderToolExecutorCapability = { capability: 'cutout', providerId: 'local', model: 'cutout-v1', available: true, }
     const cutout = harness({ capability: cutoutCapability, hasKey: false })
     const cutoutResult = await cutout.executor.execute(execution(request('cutout')))
     expect(cutoutResult.ok).toBe(true)
@@ -281,7 +281,7 @@ describe('desktop paid tool executor', () => {
   it('publishes a cutout exactly once through the result sink after an atomic artifact batch', async () => {
     const sink = vi.fn()
     const writeBatch = vi.fn(async () => ['artifact:cutout:1'])
-    const capability: PaidToolExecutorCapability = { capability: 'cutout', providerId: 'local', model: 'cutout-v1', available: true, }
+    const capability: ProviderToolExecutorCapability = { capability: 'cutout', providerId: 'local', model: 'cutout-v1', available: true, }
     const cutout = harness({ capability, sink, writeBatch })
 
     const result = await cutout.executor.execute(execution(request('cutout')))
@@ -301,7 +301,7 @@ describe('desktop paid tool executor', () => {
     const writeBatch = vi.fn()
       .mockResolvedValueOnce(['artifact:mask'])
       .mockResolvedValueOnce(['artifact:slice'])
-    const capability: PaidToolExecutorCapability = {
+    const capability: ProviderToolExecutorCapability = {
       capability: 'semantic-cutout',
       providerId: 'local',
       model: 'apple-vision-foreground-v1',
@@ -330,7 +330,7 @@ describe('desktop paid tool executor', () => {
 
   it('does not publish cutout state when artifact commit fails', async () => {
     const sink = vi.fn()
-    const capability: PaidToolExecutorCapability = { capability: 'cutout', providerId: 'local', model: 'cutout-v1', available: true, }
+    const capability: ProviderToolExecutorCapability = { capability: 'cutout', providerId: 'local', model: 'cutout-v1', available: true, }
     const cutout = harness({ capability, sink, writeBatch: vi.fn(async () => { throw new Error('atomic write failed') }) })
 
     const result = await cutout.executor.execute(execution(request('cutout')))
@@ -340,7 +340,7 @@ describe('desktop paid tool executor', () => {
   })
 
   it('does not publish a cutout after cancellation or a revision change during artifact preparation', async () => {
-    const capability: PaidToolExecutorCapability = { capability: 'cutout', providerId: 'local', model: 'cutout-v1', available: true, }
+    const capability: ProviderToolExecutorCapability = { capability: 'cutout', providerId: 'local', model: 'cutout-v1', available: true, }
     const cancelledSink = vi.fn()
     const controller = new AbortController()
     const cancelled = harness({ capability, sink: cancelledSink, writeBatch: vi.fn(async () => { controller.abort(); return ['artifact:cutout:1'] }) })

@@ -101,7 +101,7 @@ describe('stopped-run retry', () => {
     expect(onRetry).toHaveBeenCalledTimes(1)
   })
 
-  it('keeps run Retry separate from a paid-tool Retry action', async () => {
+  it('keeps run Retry separate from a Provider-tool Retry action', async () => {
     const onRetry = vi.fn()
     const onRetryTool = vi.fn()
     container = document.createElement('div')
@@ -109,7 +109,7 @@ describe('stopped-run retry', () => {
     await act(async () => createRoot(container!).render(createElement(AgentRunFeed, {
       items: [
         { id: 'error', type: 'error', status: 'stopped', title: 'Run stopped', detail: 'Service temporarily unavailable', provenance: 'runtime' },
-        { id: 'tool', type: 'tool', status: 'stopped', title: 'Generate hero', detail: 'Paid image request failed', provenance: 'runtime', toolCallId: 'tool-1', requestId: 'request-1', actions: ['retry'] },
+        { id: 'tool', type: 'tool', status: 'stopped', title: 'Generate hero', detail: 'Provider image request failed', provenance: 'runtime', toolCallId: 'tool-1', requestId: 'request-1', actions: ['retry'] },
       ],
       heading: 'Conversation',
       emptyLabel: 'No activity',

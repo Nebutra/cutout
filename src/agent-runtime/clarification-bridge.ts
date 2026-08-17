@@ -2,7 +2,7 @@
  * The in-call suspend/resume mechanism for human-in-the-loop clarification —
  * a tool's `execute()` awaits a Promise that only a UI interaction can
  * resolve, mirroring the already-proven pattern in `desktop-tool-loop.ts`
- * (paid-tool approval: `calls: Map<id, PendingCall>`, `resolve` stashed from
+ * (Provider-tool approval: `calls: Map<id, PendingCall>`, `resolve` stashed from
  * a Promise executor, resolved by a UI button calling `approve()`/`deny()`).
  * This is a narrower version of that same idea for a simpler case (asking a
  * question, no approval/receipt/retry machinery).
