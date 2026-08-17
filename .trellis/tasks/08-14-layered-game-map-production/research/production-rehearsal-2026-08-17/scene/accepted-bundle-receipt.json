@@ -1,0 +1,57 @@
+{
+  "mode": "scene",
+  "previewId": "game-map-managed-bundle-preview:sha256:d62fb1e74848b22552ccd573a4296e1f9da18607cc25c4ca0f27a865eacdafcc",
+  "previewHash": "d62fb1e74848b22552ccd573a4296e1f9da18607cc25c4ca0f27a865eacdafcc",
+  "bundleHash": "e1cdbb1ee285e63b916da72980b82d3a39e0d94101d515b44ce8d2d1b89eae71",
+  "deliveryStatus": "accepted",
+  "status": "accepted-exported",
+  "receipt": {
+    "canceled": false,
+    "outputDir": "accepted-exports",
+    "bundleDir": "accepted-exports/game-map-e1cdbb1ee285",
+    "fileCount": 8,
+    "totalBytes": 1854683,
+    "files": [
+      {
+        "path": "assets/runtime/base.png",
+        "size": 588437,
+        "sha256": "894b3b8a645b795609445c74d804a4f32ab07193a88551d2dbc243185cbb7096"
+      },
+      {
+        "path": "assets/objects/0000-8e722585d94ddcdc20f8a373f536d5d43e8ce78c2ab933d7b6cbf21e66ef9356.png",
+        "size": 49230,
+        "sha256": "8e722585d94ddcdc20f8a373f536d5d43e8ce78c2ab933d7b6cbf21e66ef9356"
+      },
+      {
+        "path": "manifests/map.json",
+        "size": 2558,
+        "sha256": "3d0bb5293030113a74d8ad088269f46c082df65f7cd85e7d70daa85351238cb6"
+      },
+      {
+        "path": "manifests/objects.json",
+        "size": 1251,
+        "sha256": "736b3450c6c2e8c3a72776ec7e30a6229eb107f59d288547bc26f9cf489cad49"
+      },
+      {
+        "path": "previews/map.png",
+        "size": 599872,
+        "sha256": "c7e74b4efaf3fc1834a4d9f1752b1764c5cdb6bc1e2f077eea37cf7cce495b1d"
+      },
+      {
+        "path": "previews/debug.png",
+        "size": 602567,
+        "sha256": "2f30d6e90d7365e7aac8011fbca7dad84c4b6919f54983a8274abe38489a1eda"
+      },
+      {
+        "path": "evidence/semantic-acceptance.json",
+        "size": 5049,
+        "sha256": "5a8bcf9777eb904d7558c545fd1eb8d1cb3962d46842bccb740d0c53c585aa6b"
+      },
+      {
+        "path": "manifests/bundle.json",
+        "size": 5719,
+        "sha256": "e1cdbb1ee285e63b916da72980b82d3a39e0d94101d515b44ce8d2d1b89eae71"
+      }
+    ]
+  }
+}

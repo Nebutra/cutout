@@ -1,0 +1,80 @@
+{
+  "runtime": {
+    "protocol": "cutout.multimodal-host-receipt.v1",
+    "receiptId": "receipt:multimodal:20ffaca1f3b94affa78840a97a302767",
+    "receiptHash": "f48f8155e6137441ec19d7432017c87915f5650a6b464fe19f94b87a81fa8980",
+    "requestId": "request:real-game-map:run:real-qwen-game-map:scene:game-map-base",
+    "runId": "run:real-qwen-game-map:scene",
+    "providerId": "dashscope-qwen-image3",
+    "providerKind": "dashscope",
+    "model": "qwen-image-3.0-pro",
+    "routeId": "route:dashscope:qwen-image-3.0-pro:image-generation",
+    "operation": "image-generation",
+    "semanticRole": "game-map-base",
+    "nodeId": "node:real-game-map:scene:base",
+    "capabilityId": "capability:image-generation",
+    "acceptedReferenceArtifactIds": [],
+    "lockIds": [
+      "lock:real-game-map:run:real-qwen-game-map:scene:art-direction"
+    ],
+    "status": "succeeded",
+    "artifact": {
+      "artifactId": "artifact:sha256:8c20cf1b34cb94ecb260dec3ddeed3a63d7fe3662622aa030dcef4569202b620",
+      "sha256": "8c20cf1b34cb94ecb260dec3ddeed3a63d7fe3662622aa030dcef4569202b620",
+      "mediaType": "image/png",
+      "byteLength": 496076,
+      "decoded": true,
+      "width": 512,
+      "height": 512,
+      "durationMs": null,
+      "frameRate": null,
+      "videoCodec": null,
+      "audioCodec": null,
+      "sampleTablesReadable": null,
+      "playbackVerified": null
+    },
+    "startedAt": 1786936164251,
+    "completedAt": 1786936204631,
+    "remoteTaskIdHash": null,
+    "signature": "3f81b7f19d5ebc65a6048938758a0bbcf43e76e5e1229dae2513df371fdad56a"
+  },
+  "object": {
+    "protocol": "cutout.multimodal-host-receipt.v1",
+    "receiptId": "receipt:multimodal:25470c0aebda436da209efffdc606903",
+    "receiptHash": "f431dec7692744fcbc3d08138980c6bc2ed09dcbbc71322000b3c10396332f5a",
+    "requestId": "request:real-game-map:run:real-qwen-game-map:scene:game-map-object",
+    "runId": "run:real-qwen-game-map:scene",
+    "providerId": "dashscope-qwen-image3",
+    "providerKind": "dashscope",
+    "model": "qwen-image-3.0-pro",
+    "routeId": "route:dashscope:qwen-image-3.0-pro:image-generation",
+    "operation": "image-generation",
+    "semanticRole": "game-map-object",
+    "nodeId": "node:real-game-map:scene:object-library",
+    "capabilityId": "capability:image-generation",
+    "acceptedReferenceArtifactIds": [],
+    "lockIds": [
+      "lock:real-game-map:run:real-qwen-game-map:scene:art-direction"
+    ],
+    "status": "succeeded",
+    "artifact": {
+      "artifactId": "artifact:sha256:2d5d1eb3c9d88b9312d41b65ec90f9fa88eec97a4fa1d4f8d99928f34c9e35f1",
+      "sha256": "2d5d1eb3c9d88b9312d41b65ec90f9fa88eec97a4fa1d4f8d99928f34c9e35f1",
+      "mediaType": "image/png",
+      "byteLength": 352944,
+      "decoded": true,
+      "width": 512,
+      "height": 512,
+      "durationMs": null,
+      "frameRate": null,
+      "videoCodec": null,
+      "audioCodec": null,
+      "sampleTablesReadable": null,
+      "playbackVerified": null
+    },
+    "startedAt": 1786936264346,
+    "completedAt": 1786936326701,
+    "remoteTaskIdHash": null,
+    "signature": "5b222a4ef40832a8573df40afaf0830c1a993b1c42108e44a71ff2967141d559"
+  }
+}
