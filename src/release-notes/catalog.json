@@ -2,7 +2,7 @@
   "protocol": "cutout.release-notes.catalog.v1",
   "entries": [
     {
-      "version": "0.1.23",
+      "version": "0.1.24",
       "releasedOn": "2026-08-17",
       "locales": {
         "en": {

@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.1.23 - 2026-08-17
+## 0.1.24 - 2026-08-17
 
 - Publish the Canvas-first Agent workflow with bounded Commerce production and
   coherent Game Asset family and map delivery from the reviewed main branch.
@@ -11,6 +11,9 @@
   projections before asserting their evidence.
 - Prepare the packaged-app smoke evidence directory before native startup so
   Apple Silicon release builds verify the real signed application reliably.
+- Retry a macOS bundle build once, and only once, when Apple's timestamp service
+  returns its known transient missing-timestamp failure; all other signing
+  failures remain hard release blockers.
 
 ## 0.1.21 - 2026-08-17
 

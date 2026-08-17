@@ -1,4 +1,7 @@
-import { readFile } from 'node:fs/promises'
+import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { spawnSync } from 'node:child_process'
 import { describe, expect, it } from 'vitest'
 import YAML from 'yaml'
 
@@ -30,11 +33,12 @@ describe('cross-platform release workflow', () => {
     const source = await readFile('.github/workflows/release-update.yml', 'utf8')
     const workflow = YAML.parse(source)
     const buildActions = workflow.jobs.build.steps.filter((step: { uses?: string }) => step.uses?.startsWith('tauri-apps/tauri-action@'))
+    const macBuild = workflow.jobs.build.steps.find((step: { name?: string }) => step.name === 'Build signed and notarized macOS bundles')
     const artifactUpload = workflow.jobs.build.steps.find((step: { name?: string }) => step.name === 'Upload platform release artifacts')
     const configInjection = workflow.jobs.build.steps.find((step: { name?: string }) => step.name === 'Inject updater public key into release-only Tauri config')
     const publishScript = workflow.jobs.publish.steps.at(-1).run
 
-    expect(buildActions).toHaveLength(2)
+    expect(buildActions).toHaveLength(1)
     for (const buildAction of buildActions) {
       expect(buildAction.uses).toBe('tauri-apps/tauri-action@1deb371b0cd8bd54025b384f1cd735e725c4060f')
       expect(buildAction.with).toMatchObject({
@@ -46,6 +50,8 @@ describe('cross-platform release workflow', () => {
       expect(buildAction.with).not.toHaveProperty('releaseId')
       expect(buildAction.with.args).toContain('--config src-tauri/tauri.release.conf.json')
     }
+    expect(macBuild.run).toBe('bash scripts/build-macos-release.sh "${{ matrix.target }}" "${{ matrix.bundles }}"')
+    expect(macBuild).not.toHaveProperty('continue-on-error')
     expect(artifactUpload.with).toMatchObject({
       name: '${{ matrix.artifact }}',
       path: 'src-tauri/target/${{ matrix.target }}/release/bundle',
@@ -225,7 +231,6 @@ describe('cross-platform release workflow', () => {
     }
     expect(Object.keys(preparation.env)).toEqual(appleNames)
     expect(Object.keys(macBuild.env)).toEqual([
-      'GITHUB_TOKEN',
       'TAURI_SIGNING_PRIVATE_KEY',
       'TAURI_SIGNING_PRIVATE_KEY_PASSWORD',
       'APPLE_CERTIFICATE',
@@ -292,8 +297,8 @@ describe('cross-platform release workflow', () => {
     expect(cleanupIndex).toBeGreaterThan(verificationIndex)
     expect(uploadIndex).toBeGreaterThan(verificationIndex)
     expect(uploadIndex).toBeGreaterThan(cleanupIndex)
-    expect(macBuild.with.args).not.toContain('--skip-stapling')
-    expect(macBuild.with.args).not.toContain('--no-sign')
+    expect(macBuild.run).not.toContain('--skip-stapling')
+    expect(macBuild.run).not.toContain('--no-sign')
     expect(dmgNotarization.run).toContain('Expected exactly one macOS DMG')
     expect(dmgNotarization.run).toContain('xcrun notarytool submit "${dmgs[0]}"')
     expect(dmgNotarization.run).toContain('--key "$APPLE_API_KEY_PATH"')
@@ -308,6 +313,86 @@ describe('cross-platform release workflow', () => {
     expect(verification.run).toContain('spctl --assess --type execute')
     expect(verification.run).toContain('spctl --assess --type open')
     expect(verification.run.match(/xcrun stapler validate/g)).toHaveLength(2)
+  })
+
+  it('retries only the known transient Apple timestamp failure and still hard-fails exhaustion', async () => {
+    const source = await readFile('scripts/build-macos-release.sh', 'utf8')
+
+    expect(source).toContain('aarch64-apple-darwin|x86_64-apple-darwin')
+    expect(source).toContain('A timestamp was expected but was not found.')
+    expect(source.match(/run_build/g)).toHaveLength(3)
+    expect(source).toContain('if ! grep -Fq -- "$timestamp_error" "$attempt_log"')
+    expect(source).toContain('rm -rf -- "$bundle_root/macos" "$bundle_root/dmg"')
+    expect(source).toContain('sleep "$retry_delay_seconds"')
+    expect(source).toContain('exit "$status"')
+    expect(source).not.toContain('--skip-stapling')
+    expect(source).not.toContain('--no-sign')
+  })
+
+  it.skipIf(process.platform === 'win32')('executes at most one retry and never retries unrelated failures', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'cutout-macos-release-test-'))
+    const bin = join(root, 'bin')
+    const fakePnpm = join(bin, 'pnpm')
+    const attempts = join(root, 'attempts')
+    const script = join(process.cwd(), 'scripts/build-macos-release.sh')
+
+    try {
+      await mkdir(bin)
+      await writeFile(fakePnpm, `#!/usr/bin/env bash
+set -euo pipefail
+count=0
+if [[ -f "$CUTOUT_TEST_ATTEMPTS" ]]; then count="$(< "$CUTOUT_TEST_ATTEMPTS")"; fi
+count=$((count + 1))
+printf '%s' "$count" > "$CUTOUT_TEST_ATTEMPTS"
+case "$CUTOUT_TEST_MODE" in
+  transient-once)
+    if [[ "$count" -eq 1 ]]; then echo 'A timestamp was expected but was not found.' >&2; exit 1; fi
+    ;;
+  transient-always)
+    echo 'A timestamp was expected but was not found.' >&2
+    exit 9
+    ;;
+  unrelated)
+    echo 'compiler failure' >&2
+    exit 7
+    ;;
+esac
+`, { mode: 0o755 })
+      await chmod(fakePnpm, 0o755)
+
+      const run = async (mode: string) => {
+        await rm(attempts, { force: true })
+        const result = spawnSync('bash', [script, 'x86_64-apple-darwin', 'app,dmg'], {
+          cwd: root,
+          encoding: 'utf8',
+          env: {
+            ...process.env,
+            PATH: `${bin}:${process.env.PATH ?? ''}`,
+            RUNNER_TEMP: root,
+            CUTOUT_TEST_ATTEMPTS: attempts,
+            CUTOUT_TEST_MODE: mode,
+            CUTOUT_MACOS_TIMESTAMP_RETRY_DELAY_SECONDS: '0',
+          },
+        })
+        return { result, attempts: Number(await readFile(attempts, 'utf8')) }
+      }
+
+      const recovered = await run('transient-once')
+      expect(recovered.result.status).toBe(0)
+      expect(recovered.attempts).toBe(2)
+      expect(`${recovered.result.stdout}${recovered.result.stderr}`).toContain('retrying the macOS bundle build once')
+
+      const exhausted = await run('transient-always')
+      expect(exhausted.result.status).toBe(9)
+      expect(exhausted.attempts).toBe(2)
+
+      const unrelated = await run('unrelated')
+      expect(unrelated.result.status).toBe(7)
+      expect(unrelated.attempts).toBe(1)
+      expect(`${unrelated.result.stdout}${unrelated.result.stderr}`).not.toContain('retrying the macOS bundle build once')
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
   })
 
   it('cryptographically verifies one updater artifact per matrix entry before upload', async () => {
