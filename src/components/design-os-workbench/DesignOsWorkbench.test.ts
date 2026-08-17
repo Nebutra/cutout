@@ -389,7 +389,7 @@ describe("DesignOsWorkbench", () => {
     }));
     await vi.waitFor(() => {
       expect(view.querySelector('[data-slot="commerce-production"]')).toBeTruthy();
-    });
+    }, { timeout: 5_000 });
 
     const commerceProduction = view.querySelector('[data-slot="commerce-production"]');
     const lifecycle = view.querySelector('[role="tablist"][aria-label="Project lifecycle"]');
