@@ -89,7 +89,11 @@ describe('packaged E2E macOS window lifecycle', () => {
     )
     expect(smokeScript).toContain('previous_result_root="$result_root.previous"')
     expect(smokeScript).toContain('mv -- "$result_root" "$previous_result_root"')
-    expect(smokeScript).toContain('chmod 700 "$result_root"')
+    expect(smokeScript).toContain(
+      'fi\nmkdir -p -- "$result_root"\nchmod 700 "$result_root"\nif [[ "${CUTOUT_PACKAGED_E2E:-0}" == "1" ]]; then',
+    )
+    expect(smokeScript.indexOf('mkdir -p -- "$result_root"'))
+      .toBeLessThan(smokeScript.indexOf(': >"$log_file"'))
     expect(smokeScript).toContain(
       'state_archive="/private/tmp/cutout-packaged-e2e-state-archive-$(date +%Y%m%d-%H%M%S)"',
     )

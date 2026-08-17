@@ -86,8 +86,10 @@ if [[ "${CUTOUT_PACKAGED_E2E:-0}" == "1" ]]; then
   if [[ -d "$result_root" ]]; then
     mv -- "$result_root" "$previous_result_root"
   fi
-  mkdir -p -- "$result_root"
-  chmod 700 "$result_root"
+fi
+mkdir -p -- "$result_root"
+chmod 700 "$result_root"
+if [[ "${CUTOUT_PACKAGED_E2E:-0}" == "1" ]]; then
   : >"$driver_log"
   # The remote driver owns no inherited terminal pipe after this point. App and
   # WebKit descendants can therefore never keep an SSH/expect session open
