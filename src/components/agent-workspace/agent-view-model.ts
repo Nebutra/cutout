@@ -14,7 +14,6 @@ import {
   resolveAgentResponseSource,
 } from '@/agent-runtime/run-events'
 import { CHAT_SURFACE_TOOLS, toolEventLabel } from '@/agent-runtime/tool-loop'
-import type { MoneyAmount } from '@/control-protocol'
 import { projectExecutionTimeline, type ExecutionTimeline } from './execution-timeline'
 
 export type AgentStageStatus = 'pending' | 'running' | 'done'
@@ -107,7 +106,6 @@ export type AgentFeedItem =
       readonly toolName?: string
       readonly requestId?: string
       readonly providerModel?: string
-      readonly charged?: MoneyAmount
       readonly approval?: {
         readonly status: 'required' | 'approved' | 'denied' | 'automatic'
         readonly reason: string
@@ -684,7 +682,6 @@ function feedItemFromRunEvent(event: AgentRunEvent): readonly AgentFeedItem[] {
         toolCallId: event.toolCallId,
         requestId: event.receipt.requestId,
         providerModel: `${event.receipt.providerId}/${event.receipt.model}`,
-        charged: event.receipt.charged,
         receiptId: event.receipt.receiptId,
         outputRefs: event.receipt.outputArtifactIds,
         actions: event.receipt.status === 'failed' ? ['retry'] : undefined,

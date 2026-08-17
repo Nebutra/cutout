@@ -223,7 +223,7 @@ the Zustand store carries `assetProduction: AssetProductionSnapshot`.
 |---|---|
 | Source/plan/run mismatch, stale callback, invalid hash, missing output, invalid bounds, ambiguous/missing board slot | Integrity failure; never waive or export |
 | Applicable policy classifies an issue as blocking quality | `needs-review`; preserve evidence; explicit revision-bound approval required |
-| Prototype visual QA rejects/is unavailable or deterministic output edges violate the planned transparent/full-bleed contract | Preserve `needs-review`; block consumption and do not start paid work automatically |
+| Prototype visual QA rejects/is unavailable or deterministic output edges violate the planned transparent/full-bleed contract | Preserve `needs-review`; block consumption and do not start Provider work automatically |
 | Final crop boxes omit foreground at or above the pipeline noise floor | Preserve the candidate and coverage evidence as `needs-review`; explicit Retry targets that region |
 | Persisted coverage counts do not reconcile or its ratio disagrees | Reject the evidence at the schema boundary; never infer corrected measurements |
 | Board background diagnostics are non-compliant but assigned output passes semantic QA and deterministic Alpha-edge checks | Preserve a warning on the `ready` task |
@@ -317,7 +317,7 @@ commitProduction(production)
 Apply this contract whenever prototype planning, image generation, QA, or
 region extraction changes. Schema-valid output alone is insufficient: the
 journey must preserve explicit user scope and complete within a bounded amount
-of paid work.
+of Provider work.
 
 ### 2. Signatures
 
@@ -380,7 +380,7 @@ Real gateway benchmarks are opt-in with
   standalone material, and keeps ordinary layout regions `ignore-code-ui`.
   Seeds without group ids are incomplete current records and are rejected.
   Closure never pads a route to a requested or benchmark count.
-- Compile the logical prototype graph into an explicit paid-request budget.
+- Compile the logical prototype graph into an explicit Provider-request budget.
   Heterogeneous fixtures include pages with zero, one, and several useful
   materials and compute their expectation as Design Systems + actual pages +
   actual board regions + actual direct assets. Mandatory hidden refine,
@@ -390,7 +390,7 @@ Real gateway benchmarks are opt-in with
   Agent-authored business topology and useful material plan. The general baseline is
   `Design System calls + actual pages + actual board-cutout regions + explicit
   direct-generate assets`, compiled from the resolved plans.
-- One logical page node uses one initial paid image invocation. A classified
+- One logical page node uses one initial Provider image invocation. A classified
   transient transport failure (`408`, `429`, `5xx`, timeout, network reset)
   may re-enter the shared suite lane once with a fresh `attempt-N` tool-call
   identity and the same stable logical-node identity. The limiter observes the
@@ -402,7 +402,7 @@ Real gateway benchmarks are opt-in with
   executor preserves every bounded ordered reference or fails closed when one
   is unavailable.
 - QA is evidence by default. It records a verdict and review issues with zero
-  automatic paid re-rolls; regeneration requires a later explicit user/Agent
+  automatic Provider re-rolls; regeneration requires a later explicit user/Agent
   decision and a new bounded attempt identity.
 - Compact board groups use the page, Design System, and at most one stable
   anchor as visual context. They do not generate a text-free page prepass, and
@@ -430,7 +430,7 @@ Real gateway benchmarks are opt-in with
   A strict packaged 3/3 proof remains incomplete until every failed frontier is
   retried successfully, while independent siblings continue toward useful,
   candidate-local outcomes.
-- Cold or recently pressured exact routes admit one paid image call. Every
+- Cold or recently pressured exact routes admit one Provider image call. Every
   transient page/direct/board attempt re-resolves quality-ranked task-fit
   candidates through shared route health; the successful route, not a captured
   pre-retry assignment, decides QA Provider ownership. Same-Provider Vision QA
@@ -439,7 +439,7 @@ Real gateway benchmarks are opt-in with
   throttle, recover, or open image-route circuits.
 - Production visual QA is a blocking quality gate after the first attempt.
   Rejection or unavailability preserves `needs-review` evidence and never starts
-  an automatic paid re-roll. Explicit Retry resumes only rejected pages or
+  an automatic Provider re-roll. Explicit Retry resumes only rejected pages or
   resource regions and carries already passing nodes.
 - Page progress counts only valid QA-passing review receipts. Image bytes that
   returned but remain unreviewed or rejected stay inspectable evidence and do
@@ -520,7 +520,7 @@ Real gateway benchmarks are opt-in with
 | One concurrent task hits authentication/configuration failure | Stop new claims, settle in-flight work, then surface the first error |
 | One page call hits transient Provider pressure | Lower future concurrency, requeue that logical page once at its suite-lane tail with a fresh attempt id, and preserve all independent work |
 | A transient retry has another healthy task-fit exact route | Re-resolve after the failure and use the healthier route; do not capture the first route outside the retry loop |
-| Prototype QA reviewer unavailable after deterministic validity succeeds | Preserve candidate as `needs-review`; no paid re-roll loop |
+| Prototype QA reviewer unavailable after deterministic validity succeeds | Preserve candidate as `needs-review`; no Provider re-roll loop |
 | Packaged 3/3 suite benchmark has one or more failed suites | Retain every frontier while independent siblings continue; one Retry resumes all failed suites under the shared ceiling |
 | Packaged suite has rejected or unavailable visual QA | Reject terminal release proof; retain the product review evidence |
 | Frontend emits a closed diagnostic such as `prototype-viewport` | Rust accepts the matching serde variant and writes a failed terminal result with that diagnostic |
@@ -534,7 +534,7 @@ Real gateway benchmarks are opt-in with
   restaurant journey and explains the additional order-status destination;
   generation then waits for all three planned routes.
 - Base: a provider outage fails during planning or marks generated candidates
-  for review without expanding paid retries.
+  for review without expanding Provider retries.
 - Base: a generated page has the wrong intrinsic orientation; the frontend
   emits `prototype-viewport`, Rust persists the failed result, and the smoke
   owner finalizes evidence with a non-zero exit.
@@ -565,7 +565,7 @@ Real gateway benchmarks are opt-in with
   and do not silently drop later references.
 - Production wiring coverage proving multiple board groups on one page and
   boards across pages run concurrently, keep bounded reference context, and do
-  not enable a text-free paid prepass.
+  not enable a text-free Provider prepass.
 - Packaged benchmark coverage proving a failed suite preserves independent
   siblings and exposes Retry only for real failed frontiers.
 - Rendered multi-suite coverage proving a first transient page failure retries
@@ -647,18 +647,21 @@ guest without activating or focusing Cutout.
 - Retain an `NSProcessInfo` user-initiated activity for the complete packaged
   journey. Renderer timers and stream-finalization callbacks must continue
   after a long native Provider await and after the native socket closes.
-- The lifecycle branch exists only in the dedicated packaged-E2E build/mode.
-  Normal production startup, activation, focus, and window behavior remain
-  unchanged.
+- The background lifecycle branch exists only in the dedicated packaged-E2E
+  build/mode. Normal desktop startup retains the production activation and
+  focus policy, but its main window starts hidden: the renderer synchronously
+  commits the first React tree and then invokes only `show` through the narrow
+  `core:window:allow-show` capability. Browser startup remains concurrent.
 - A Provider-free window probe exercises the same packaged bundle, activation
   policy, visible WebView, native tick and native screenshot path for a bounded
   observation interval. It must pass the same consecutive-frontmost monitor
-  before a paid full journey is started.
-- The packaged-only React bootstrap commits its first tree synchronously before
-  inspecting the stable `#root` viewport and does not wait on a browser timer
-  or depend on React child order. Background WKWebView timer throttling must not
-  be able to deadlock the liveness probe. The native snapshot's nonblank,
-  color, and contrast checks prove rendered content; ordinary production
+  before a Provider-backed full journey is started.
+- The Tauri React bootstrap commits its first tree synchronously before either
+  inspecting the packaged-E2E `#root` viewport or showing the production
+  window. It does not wait on a browser timer or depend on React child order.
+  Background WKWebView timer throttling must not be able to deadlock the
+  liveness probe or normal desktop startup. The native snapshot's nonblank,
+  color, and contrast checks prove packaged-E2E rendered content; browser-only
   startup keeps the normal concurrent render.
 - `webview-renderable` means the lifecycle prerequisites were applied; it does
   not by itself prove liveness. Closed VM evidence must include macOS process

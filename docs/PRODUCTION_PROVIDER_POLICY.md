@@ -1,17 +1,17 @@
 # Production Provider Policy
 
-Every paid or remote provider execution is guarded before invocation by a versioned policy:
+Every remote Provider execution is guarded before invocation by a versioned policy:
 
 - request/minute and concurrency quotas;
 - hard timeout and cancellation signal;
 - explicit allowed deployment region;
 - required content-safety decision and blocked categories;
-- enabled BYOK Provider policy with no per-call payment confirmation;
+- enabled BYOK Provider policy;
 - telemetry disabled unless the user opts in, never including content or credentials.
 
 ## Host security boundary
 
-- Desktop BYOK actions receive a short-lived `cutout.capability-lease.v1` bound to the exact run subject, request digest, execution authorization id and scopes. This is an execution constraint and audit record, not a payment prompt. Expired, revoked or replayed authority fails closed and produces no provider call.
+- Desktop BYOK actions receive a short-lived `cutout.capability-lease.v1` bound to the exact run subject, request digest, execution authorization id and scopes. This is an execution constraint and audit record. Expired, revoked or replayed authority fails closed and produces no Provider call.
 - Provider secrets remain in the native local credential store. Before reading one, Rust reloads the persisted provider id and binds the secret to that record's enabled kind, effective protocol, exact origin and configured/default base-path prefix. The WebView never receives the credential; Rust assembles the provider-specific authentication header immediately before transport.
 - Remote provider URLs are HTTPS and provider/vendor allowlisted. Literal and DNS-resolved loopback, private, link-local, multicast, IPv6 ULA and reserved destinations are rejected. The validated DNS socket addresses are pinned into the HTTP client so connect cannot re-resolve to a different address. Redirect following is disabled, preventing credential forwarding to a second origin.
 - Explicit Ollama, vLLM and LM Studio profiles are the exception: they permit HTTP(S) only to loopback and do not broaden access to the LAN.

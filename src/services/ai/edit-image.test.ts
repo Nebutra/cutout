@@ -339,7 +339,7 @@ describe('GenerationService.editImage', () => {
     expect(invokeMock).toHaveBeenCalledOnce()
   })
 
-  it('does not start a paid native edit when already aborted', async () => {
+  it('does not start a Provider native edit when already aborted', async () => {
     const controller = new AbortController()
     controller.abort()
     const gen = createLocalGenerationService(providersWith([cfg()]))

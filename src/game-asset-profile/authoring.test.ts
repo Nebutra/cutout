@@ -35,7 +35,10 @@ describe('Game Asset action authoring contract (contract-only)', () => {
           `${right.reference.id}@${right.reference.revision}`,
         ))
         .map(({ reference }) => `${reference.id}@${reference.revision}`))
-    expect(input.roles.every(({ prompt }) => prompt.includes('pure white background'))).toBe(true)
+    expect(input.roles.every(({ prompt }) => prompt.includes('pure magenta (#FF00FF) chroma-key background'))).toBe(true)
+    expect(input.roles.every(({ prompt }) => prompt.includes('exactly ONE character in exactly ONE pose'))).toBe(true)
+    expect(input.roles.every(({ prompt }) => prompt.includes('not a sprite sheet, sequence, contact sheet, comparison, or before/after image'))).toBe(true)
+    expect(input.roles.every(({ prompt }) => prompt.includes('No text, border, grid, labels, ground plane, cast shadow'))).toBe(true)
     expect(input).not.toHaveProperty('productionReady')
     expect(input).not.toHaveProperty('semanticAcceptance')
   })

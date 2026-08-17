@@ -21,7 +21,8 @@
   "children": [
     "08-12-commerce-material-agent",
     "08-13-design-profile-platform",
-    "08-13-sprite-production-workflow"
+    "08-13-sprite-production-workflow",
+    "08-17-canvas-agent-primary"
   ],
   "parent": null,
   "relatedFiles": [],

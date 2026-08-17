@@ -15,7 +15,7 @@ test("Kits stay outcome-first and preserve gated callbacks", async ({
   if (testInfo.project.name === "mobile-chrome") {
     await page.setViewportSize({ width: 412, height: 915 });
   }
-  const workbench = page.getByRole("region", { name: "Deliver" });
+  const workbench = page.getByRole("region", { name: "Project workbench" });
   await workbench.getByRole("tab", { name: "Kits" }).click();
   const kits = workbench.getByRole("region", { name: "Kit workspace" });
   await expect(kits).toBeVisible();

@@ -50,7 +50,7 @@ export function createLocalRegistry(
 /**
  * Keep the AI SDK and every provider adapter out of the application entry.
  * Generation methods are already asynchronous, so resolving the implementation
- * on the first paid/model-backed action preserves the public contract while
+ * on the first Provider/model-backed action preserves the public contract while
  * avoiding a large startup download for Home and offline editing.
  */
 function createDeferredGenerationService(

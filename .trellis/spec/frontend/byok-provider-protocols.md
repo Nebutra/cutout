@@ -1,7 +1,7 @@
 # BYOK Provider Protocol Contract
 
 > Executable contract for provider wire protocols, custom endpoints, Rust-owned
-> credentials, and non-billable connection checks.
+> credentials, and read-only connection checks.
 
 ## Scenario: Add Or Change A Provider Wire Protocol
 
@@ -144,7 +144,7 @@ accept OpenAI/Anthropic `data[].id` and Google `models[].name`, removing a
 leading `models/` prefix and deduplicating IDs.
 
 Connection checks prove credential and catalog access only. They must never
-issue a generation POST because there is no standardized cross-family no-cost
+issue a generation POST because there is no standardized cross-family read-only
 generation probe.
 
 An authenticated catalog image id is a candidate route, not proof that image
@@ -153,13 +153,13 @@ from the first completed image execution and never calls the former success.
 
 Composer image routing must consume the exact observed/verified model descriptor
 from the same immutable run snapshot as the Provider and task binding. Provider
-kind may supply text-adapter behavior, but it never grants a paid image
-capability. The paid image route-lock API requires this catalog explicitly so a
+kind may supply text-adapter behavior, but it never grants a Provider image
+capability. The Provider image route-lock API requires this catalog explicitly so a
 call site cannot silently fall back to a kind-derived capability table.
 
 A failed conversational tool-gate Provider call is terminal for that turn. It
 must preserve the original classified failure and must not fall through into
-planning or paid image production, where a later preflight could overwrite the
+planning or Provider image production, where a later preflight could overwrite the
 owning diagnostic.
 
 Every renderer-owned generation `AbortSignal` propagates through the desktop
@@ -170,7 +170,7 @@ Native buffered generation and image-edit requests own a 300-second transport
 failsafe. The desktop owner for remote image tools settles 15 seconds later so
 the native request can return its own terminal result before an outer abort;
 ending the outer owner first can discard a valid slow result and cause a second
-paid call on Retry. Deterministic local cutout tools retain their 180-second
+Provider call on Retry. Deterministic local cutout tools retain their 180-second
 owner. The packaged candidate watchdog settles another 15 seconds after the
 desktop image owner. Catalog/health probes retain their shorter bound.
 
@@ -622,7 +622,7 @@ import_provider_draft(app: AppHandle, input: ImportDraftInput) -> Result<Provide
   GPT Image 1/1.5. Complete UI/UX Design System, page and resource production
   applies a second closed product-fit gate and currently admits only exact
   `gpt-image-2`, `qwen-image-3.0`, and `qwen-image-3.0-pro` ids. Health fallback
-  may choose only within that task-fit set; absence fails before paid prototype
+  may choose only within that task-fit set; absence fails before Provider prototype
   work instead of silently degrading visual fidelity.
 - Planning chat and semantic Vision QA are separate task bindings. The resolved
   workspace route carries an exact verified `vision` assignment, and page,
@@ -647,7 +647,7 @@ import_provider_draft(app: AppHandle, input: ImportDraftInput) -> Result<Provide
   `/models` row remains capability-unknown until separate observed/verified
   evidence exists.
 - `image-generation` and `image-edit` are independent task routes. Automatic
-  setup, desktop paid-tool capability projection, and prototype execution must
+  setup, desktop Provider-tool capability projection, and prototype execution must
   honor separate bindings when different exact models own those capabilities.
   The derived primary image projection is only a convenience view; it must not cause an
   available edit route to be ignored or a generation-only route to be advertised
@@ -889,7 +889,7 @@ or sandbox parameter.
 ### 3. Contracts
 
 - Native code owns executable discovery, platform identity validation, fixed
-  non-billable probe commands, environment filtering, bounded output, timeout,
+  read-only probe commands, environment filtering, bounded output, timeout,
   and process-group termination. Raw command output is discarded natively.
 - Cutout code never opens, copies, serializes, logs, imports, or reinterprets
   Codex OAuth/session payloads as direct Provider keys. The isolated runtime

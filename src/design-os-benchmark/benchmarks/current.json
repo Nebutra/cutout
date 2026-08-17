@@ -5,25 +5,25 @@
     "version": 2
   },
   "identity": {
-    "id": "benchmark-run:design-os:current",
-    "revision": "benchmark-run:design-os:current:revision:1"
+    "id": "benchmark-run:design-os:run:commerce-held-out:64dbdb68-f0a5-4b1c-844e-6a10e278d11c",
+    "revision": "benchmark-run:design-os:run:commerce-held-out:64dbdb68-f0a5-4b1c-844e-6a10e278d11c:bundle:7ccb6d52ea960077a30759b5c4edf78573975ccf60c0384137ebfaf75cfe359a"
   },
   "profiles": [
     {
       "id": "commerce",
       "label": "Commerce",
       "sourceReport": {
-        "id": "source-report:commerce:benchmark-run:current",
+        "id": "source-report:commerce:rehearsal:commerce-held-out:0.1.21:fresh-burgundy-sherpa-jacket:006",
         "schema": "commerce.profile-benchmark.v1",
         "benchmark": {
           "id": "benchmark:commerce-profile:p1-p7",
           "version": 2
         },
         "identity": {
-          "id": "benchmark-run:current",
-          "revision": "benchmark-run:current:revision:1"
+          "id": "rehearsal:commerce-held-out:0.1.21:fresh-burgundy-sherpa-jacket:006",
+          "revision": "release-freeze:0.1.21:source-policy-set-v1:leaf-30435:20260816T1014Z"
         },
-        "contentHash": "d98bfdd7f189c628f2b8ad33e5d8a540c08b168e273a718f9468d72ca12f6e3c"
+        "contentHash": "34f85fae1c00e96d35a8c8ca2ece34cf8dba9975d4b44eba90f044a769098538"
       }
     }
   ],
@@ -37,7 +37,7 @@
       "status": "passed",
       "source": {
         "kind": "profile-report-metric",
-        "sourceReportId": "source-report:commerce:benchmark-run:current",
+        "sourceReportId": "source-report:commerce:rehearsal:commerce-held-out:0.1.21:fresh-burgundy-sherpa-jacket:006",
         "sourceMetricId": "p1.product-facts-normalization"
       }
     },
@@ -50,7 +50,7 @@
       "status": "passed",
       "source": {
         "kind": "profile-report-metric",
-        "sourceReportId": "source-report:commerce:benchmark-run:current",
+        "sourceReportId": "source-report:commerce:rehearsal:commerce-held-out:0.1.21:fresh-burgundy-sherpa-jacket:006",
         "sourceMetricId": "p2.fact-citation-closure"
       }
     },
@@ -63,7 +63,7 @@
       "status": "passed",
       "source": {
         "kind": "profile-report-metric",
-        "sourceReportId": "source-report:commerce:benchmark-run:current",
+        "sourceReportId": "source-report:commerce:rehearsal:commerce-held-out:0.1.21:fresh-burgundy-sherpa-jacket:006",
         "sourceMetricId": "p3.catalog-closure"
       }
     },
@@ -76,7 +76,7 @@
       "status": "passed",
       "source": {
         "kind": "profile-report-metric",
-        "sourceReportId": "source-report:commerce:benchmark-run:current",
+        "sourceReportId": "source-report:commerce:rehearsal:commerce-held-out:0.1.21:fresh-burgundy-sherpa-jacket:006",
         "sourceMetricId": "p4.offline-policy-gates"
       }
     },
@@ -89,7 +89,7 @@
       "status": "passed",
       "source": {
         "kind": "profile-report-metric",
-        "sourceReportId": "source-report:commerce:benchmark-run:current",
+        "sourceReportId": "source-report:commerce:rehearsal:commerce-held-out:0.1.21:fresh-burgundy-sherpa-jacket:006",
         "sourceMetricId": "p5.kernel-profile-composition"
       }
     },
@@ -99,15 +99,11 @@
       "stage": "real-host",
       "label": "Real localized text execution",
       "critical": true,
-      "status": "blocked",
+      "status": "passed",
       "source": {
         "kind": "profile-report-metric",
-        "sourceReportId": "source-report:commerce:benchmark-run:current",
+        "sourceReportId": "source-report:commerce:rehearsal:commerce-held-out:0.1.21:fresh-burgundy-sherpa-jacket:006",
         "sourceMetricId": "p6.real-text-execution"
-      },
-      "diagnostic": {
-        "code": "real-host-evidence-unavailable",
-        "message": "Real Host execution evidence has not been supplied."
       }
     },
     {
@@ -116,15 +112,11 @@
       "stage": "real-host",
       "label": "Real localized text deliverables",
       "critical": true,
-      "status": "blocked",
+      "status": "passed",
       "source": {
         "kind": "profile-report-metric",
-        "sourceReportId": "source-report:commerce:benchmark-run:current",
+        "sourceReportId": "source-report:commerce:rehearsal:commerce-held-out:0.1.21:fresh-burgundy-sherpa-jacket:006",
         "sourceMetricId": "p6.real-text-bytes"
-      },
-      "diagnostic": {
-        "code": "real-host-evidence-unavailable",
-        "message": "Real Host execution evidence has not been supplied."
       }
     },
     {
@@ -133,15 +125,11 @@
       "stage": "real-host",
       "label": "Real commerce image execution",
       "critical": true,
-      "status": "blocked",
+      "status": "passed",
       "source": {
         "kind": "profile-report-metric",
-        "sourceReportId": "source-report:commerce:benchmark-run:current",
+        "sourceReportId": "source-report:commerce:rehearsal:commerce-held-out:0.1.21:fresh-burgundy-sherpa-jacket:006",
         "sourceMetricId": "p6.real-image-execution"
-      },
-      "diagnostic": {
-        "code": "real-host-evidence-unavailable",
-        "message": "Real Host execution evidence has not been supplied."
       }
     },
     {
@@ -150,15 +138,11 @@
       "stage": "real-host",
       "label": "Real commerce image deliverables",
       "critical": true,
-      "status": "blocked",
+      "status": "passed",
       "source": {
         "kind": "profile-report-metric",
-        "sourceReportId": "source-report:commerce:benchmark-run:current",
+        "sourceReportId": "source-report:commerce:rehearsal:commerce-held-out:0.1.21:fresh-burgundy-sherpa-jacket:006",
         "sourceMetricId": "p6.real-image-bytes"
-      },
-      "diagnostic": {
-        "code": "real-host-evidence-unavailable",
-        "message": "Real Host execution evidence has not been supplied."
       }
     },
     {
@@ -167,15 +151,11 @@
       "stage": "real-host",
       "label": "Real product video execution",
       "critical": true,
-      "status": "blocked",
+      "status": "passed",
       "source": {
         "kind": "profile-report-metric",
-        "sourceReportId": "source-report:commerce:benchmark-run:current",
+        "sourceReportId": "source-report:commerce:rehearsal:commerce-held-out:0.1.21:fresh-burgundy-sherpa-jacket:006",
         "sourceMetricId": "p6.real-video-execution"
-      },
-      "diagnostic": {
-        "code": "real-host-evidence-unavailable",
-        "message": "Real Host execution evidence has not been supplied."
       }
     },
     {
@@ -184,15 +164,11 @@
       "stage": "real-host",
       "label": "Real playable product video",
       "critical": true,
-      "status": "blocked",
+      "status": "passed",
       "source": {
         "kind": "profile-report-metric",
-        "sourceReportId": "source-report:commerce:benchmark-run:current",
+        "sourceReportId": "source-report:commerce:rehearsal:commerce-held-out:0.1.21:fresh-burgundy-sherpa-jacket:006",
         "sourceMetricId": "p6.real-video-bytes"
-      },
-      "diagnostic": {
-        "code": "real-host-evidence-unavailable",
-        "message": "Real Host execution evidence has not been supplied."
       }
     },
     {
@@ -201,15 +177,11 @@
       "stage": "real-host",
       "label": "Real strategy execution",
       "critical": true,
-      "status": "blocked",
+      "status": "passed",
       "source": {
         "kind": "profile-report-metric",
-        "sourceReportId": "source-report:commerce:benchmark-run:current",
+        "sourceReportId": "source-report:commerce:rehearsal:commerce-held-out:0.1.21:fresh-burgundy-sherpa-jacket:006",
         "sourceMetricId": "p7.real-strategy-execution"
-      },
-      "diagnostic": {
-        "code": "real-host-evidence-unavailable",
-        "message": "Real Host execution evidence has not been supplied."
       }
     },
     {
@@ -218,15 +190,11 @@
       "stage": "real-host",
       "label": "Real evidence-derived strategy",
       "critical": true,
-      "status": "blocked",
+      "status": "passed",
       "source": {
         "kind": "profile-report-metric",
-        "sourceReportId": "source-report:commerce:benchmark-run:current",
+        "sourceReportId": "source-report:commerce:rehearsal:commerce-held-out:0.1.21:fresh-burgundy-sherpa-jacket:006",
         "sourceMetricId": "p7.real-strategy-bytes"
-      },
-      "diagnostic": {
-        "code": "real-host-evidence-unavailable",
-        "message": "Real Host execution evidence has not been supplied."
       }
     },
     {
@@ -235,30 +203,42 @@
       "stage": "production-rehearsal",
       "label": "Complete unseen-input production rehearsal",
       "critical": true,
-      "status": "blocked",
+      "status": "passed",
       "source": {
         "kind": "profile-capability-audit",
-        "sourceReportId": "source-report:commerce:benchmark-run:current",
-        "findingCode": "complete-production-rehearsal-unavailable"
-      },
-      "diagnostic": {
-        "code": "complete-production-rehearsal-unavailable",
-        "message": "No complete unseen-input Commerce production rehearsal bundle is available."
+        "sourceReportId": "source-report:commerce:rehearsal:commerce-held-out:0.1.21:fresh-burgundy-sherpa-jacket:006",
+        "findingCode": "complete-production-rehearsal-unavailable",
+        "admission": {
+          "protocol": "cutout.commerce-held-out-admission.v2",
+          "challengeId": "challenge:commerce-held-out:f924381c-7e89-42e1-be22-1cc30a83e3ba",
+          "challengeHash": "c74f8aa84b97a766b078adc2a3613756dec982847d02375642bb7ab96b570f85",
+          "evaluatorKeyId": "evaluator:minisign:sha256:61eee4bafacf487b2175d550690f506d8a283189a2fa7e2404a59b748e907d47",
+          "hostBuildVersion": "0.1.21",
+          "commitmentId": "commitment:commerce-held-out:905cbec9187b413b98a6c6e59e671d02",
+          "commitmentHash": "185415650f8712ece4f1e4e8114c32894061b2606ab580d7bee99700df10ec82",
+          "attestationId": "attestation:commerce-held-out:194238e7-de44-4e73-b6e1-6af53354f2c1",
+          "inputManifestHash": "86557d42b2c7cf40db8a9cd48baab4d8ef4734ccb7d227db805138dcda6b63e5",
+          "runId": "run:commerce-held-out:64dbdb68-f0a5-4b1c-844e-6a10e278d11c",
+          "bundleHash": "7ccb6d52ea960077a30759b5c4edf78573975ccf60c0384137ebfaf75cfe359a",
+          "commitmentIssuedAt": 1786846827318,
+          "evaluatorCompletedAt": 1786848359012,
+          "deliverableCount": 11
+        }
       }
     }
   ],
   "summary": {
     "overall": {
       "total": 14,
-      "passed": 5,
+      "passed": 14,
       "failed": 0,
-      "blocked": 9,
-      "ready": false
+      "blocked": 0,
+      "ready": true
     },
     "coverage": {
-      "passed": 5,
+      "passed": 14,
       "total": 14,
-      "basisPoints": 3571
+      "basisPoints": 10000
     },
     "stages": [
       {
@@ -272,64 +252,23 @@
       {
         "stage": "real-host",
         "total": 8,
-        "passed": 0,
+        "passed": 8,
         "failed": 0,
-        "blocked": 8,
-        "ready": false
+        "blocked": 0,
+        "ready": true
       },
       {
         "stage": "production-rehearsal",
         "total": 1,
-        "passed": 0,
+        "passed": 1,
         "failed": 0,
-        "blocked": 1,
-        "ready": false
+        "blocked": 0,
+        "ready": true
       }
     ],
-    "maturity": "contract",
-    "nextStage": "real-host",
-    "criticalFrontier": [
-      {
-        "metricId": "commerce.real-host.text-execution",
-        "stage": "real-host",
-        "status": "blocked"
-      },
-      {
-        "metricId": "commerce.real-host.text-deliverable",
-        "stage": "real-host",
-        "status": "blocked"
-      },
-      {
-        "metricId": "commerce.real-host.image-execution",
-        "stage": "real-host",
-        "status": "blocked"
-      },
-      {
-        "metricId": "commerce.real-host.image-deliverable",
-        "stage": "real-host",
-        "status": "blocked"
-      },
-      {
-        "metricId": "commerce.real-host.video-execution",
-        "stage": "real-host",
-        "status": "blocked"
-      },
-      {
-        "metricId": "commerce.real-host.video-deliverable",
-        "stage": "real-host",
-        "status": "blocked"
-      },
-      {
-        "metricId": "commerce.real-host.strategy-execution",
-        "stage": "real-host",
-        "status": "blocked"
-      },
-      {
-        "metricId": "commerce.real-host.strategy-deliverable",
-        "stage": "real-host",
-        "status": "blocked"
-      }
-    ],
-    "productionReady": false
+    "maturity": "production-rehearsal",
+    "nextStage": null,
+    "criticalFrontier": [],
+    "productionReady": true
   }
 }

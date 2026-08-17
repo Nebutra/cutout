@@ -8,7 +8,7 @@
 
 ## Approval
 
-- Preview ingestion, export, coding, and paid actions.
+- Preview ingestion, export, coding, and Provider execution.
 - Require a host-issued, short-lived, single-use approval lease bound to the exact operation, preview digest, and expected revision for apply.
 - Invalidate approval when revision, scope, budget, or output changes.
 

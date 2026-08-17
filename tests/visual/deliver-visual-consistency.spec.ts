@@ -10,8 +10,8 @@ test("Deliver tabs share the product visual language without becoming forms", as
   await openDeliverWorkspace(page);
   if (testInfo.project.name === "mobile-chrome") await page.setViewportSize({ width: 412, height: 915 });
 
-  const deliver = page.locator('[data-slot="design-os-workbench"][aria-label="Deliver"]');
-  const tabs = deliver.getByRole("tablist", { name: "Deliver sections" });
+  const deliver = page.locator('[data-slot="design-os-workbench"][aria-label="Project workbench"]');
+  const tabs = deliver.getByRole("tablist", { name: "Delivery views" });
   const back = deliver.getByRole("button", { name: /Back to (Canvas|Agent)/ });
   const topControls = [back, ...await tabs.getByRole("tab").all()];
   await expect.poll(async () => {
@@ -21,7 +21,7 @@ test("Deliver tabs share the product visual language without becoming forms", as
   }).toBe(true);
 
   const surfaces: Array<{ tab: string; region: Locator; cta: RegExp }> = [
-    { tab: "Delivery center", region: deliver.locator('[data-slot="delivery-center"]'), cta: /Preview delivery|Ask Agent to prepare deliverables|Add destination/ },
+    { tab: "Overview", region: deliver.locator('[data-slot="delivery-center"]'), cta: /Preview delivery|Ask Agent to prepare deliverables|Add destination/ },
     { tab: "Kits", region: deliver.getByRole("region", { name: "Kit workspace" }), cta: /Review required preparation|Prepare required materials|Preview and export/ },
     { tab: "Components", region: deliver.getByRole("region", { name: "Components workspace" }), cta: /Prepare prototype|Declare components|Resolve governance issues|Approve and continue|Preview and export/ },
     { tab: "Starter", region: deliver.getByRole("region", { name: "Starter workspace" }), cta: /Prepare|Approve and continue|Export starter/ },
@@ -39,7 +39,7 @@ test("Deliver tabs share the product visual language without becoming forms", as
     }), await description.elementHandle()));
     const cta = surface.region.getByRole("button", { name: surface.cta }).first();
     await expect(cta).toBeVisible();
-    const advanced = surface.tab === "Delivery center"
+    const advanced = surface.tab === "Overview"
       ? surface.region.getByText("Advanced delivery details", { exact: true })
       : surface.region.getByRole("button", { name: "Advanced" });
     await expect(advanced).toBeVisible();

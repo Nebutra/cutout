@@ -35,16 +35,16 @@ describe('routeExecutionPolicy', () => {
   ]
 
   it('requires vision for multimodal and image-to-webdev tasks but only prefers it for plain webdev',()=>{
-    const multimodal=routeExecutionPolicy({model:{mode:'auto'},thinking:'auto',task:{stage:'understand',multimodal:true,paidAction:'none'},assignments,providers,modelCatalog})
+    const multimodal=routeExecutionPolicy({model:{mode:'auto'},thinking:'auto',task:{stage:'understand',multimodal:true,providerAction:'none'},assignments,providers,modelCatalog})
     expect(multimodal.assignment?.model).toBe('vision-dev');expect(multimodal.routeReceipt?.requiredCapabilities).toContain('vision')
-    const imageToWebdev=routeExecutionPolicy({model:{mode:'auto'},thinking:'auto',task:{stage:'execute',multimodal:true,paidAction:'none',workload:'image-to-webdev'},assignments,providers,modelCatalog})
+    const imageToWebdev=routeExecutionPolicy({model:{mode:'auto'},thinking:'auto',task:{stage:'execute',multimodal:true,providerAction:'none',workload:'image-to-webdev'},assignments,providers,modelCatalog})
     expect(imageToWebdev.routeReceipt?.requiredCapabilities).toEqual(['text','tools','vision'])
-    const webdev=routeExecutionPolicy({model:{mode:'auto'},thinking:'auto',task:{stage:'execute',multimodal:false,paidAction:'none',workload:'webdev'},assignments,providers,modelCatalog,routePreferences:{priority:'quality'}})
+    const webdev=routeExecutionPolicy({model:{mode:'auto'},thinking:'auto',task:{stage:'execute',multimodal:false,providerAction:'none',workload:'webdev'},assignments,providers,modelCatalog,routePreferences:{priority:'quality'}})
     expect(webdev.assignment?.model).toBe('vision-dev');expect(webdev.routeReceipt?.preferredCapabilities).toEqual(['vision'])
   })
 
   it('blocks with an auditable receipt when no model satisfies a required capability',()=>{
-    const result=routeExecutionPolicy({model:{mode:'auto'},thinking:'auto',task:{stage:'understand',multimodal:true,paidAction:'none'},assignments,providers,modelCatalog:modelCatalog.filter(model=>!model.capabilities.some(capability=>capability==='vision'))})
+    const result=routeExecutionPolicy({model:{mode:'auto'},thinking:'auto',task:{stage:'understand',multimodal:true,providerAction:'none'},assignments,providers,modelCatalog:modelCatalog.filter(model=>!model.capabilities.some(capability=>capability==='vision'))})
     expect(result.status).toBe('blocked');expect(result.routeReceipt).toMatchObject({requiredCapabilities:['text','vision']});expect(result.routeReceipt?.selected).toBeUndefined();expect(result.routeReceipt?.candidates.every(candidate=>!candidate.eligible)).toBe(true)
   })
   it('keeps ordinary planning at medium automatic thinking', () => {
@@ -52,7 +52,7 @@ describe('routeExecutionPolicy', () => {
       routeExecutionPolicy({
         model: { mode: 'auto' },
         thinking: 'auto',
-        task: { stage: 'plan', multimodal: false, paidAction: 'none' },
+        task: { stage: 'plan', multimodal: false, providerAction: 'none' },
         assignments,
         providers,
       }),
@@ -69,7 +69,7 @@ describe('routeExecutionPolicy', () => {
       routeExecutionPolicy({
         model: { mode: 'auto' },
         thinking: 'auto',
-        task: { stage: 'plan', multimodal: false, paidAction: 'none' },
+        task: { stage: 'plan', multimodal: false, providerAction: 'none' },
         assignments,
         providers,
       }).rationaleCodes,
@@ -77,14 +77,14 @@ describe('routeExecutionPolicy', () => {
   })
 
   it('raises effort only from explicit complexity, ambiguity, DAG, risk and retry signals', () => {
-    const result = routeExecutionPolicy({ model: { mode: 'auto' }, thinking: 'auto', task: { stage: 'plan', multimodal: false, paidAction: 'none', effortSignals: { complexity: .9, ambiguity: .8, dagDepth: 9, risk: 'high', retryCount: 1, budgetPressure: .1 } }, assignments, providers })
+    const result = routeExecutionPolicy({ model: { mode: 'auto' }, thinking: 'auto', task: { stage: 'plan', multimodal: false, providerAction: 'none', effortSignals: { complexity: .9, ambiguity: .8, dagDepth: 9, risk: 'high', retryCount: 1, budgetPressure: .1 } }, assignments, providers })
     expect(result.reasoningEffort).toBe('high')
     expect(result.effortReceipt).toMatchObject({ protocol: 'cutout.effort-decision.v1', selected: 'high', manualOverride: false })
     expect(result.effortReceipt?.score).toBeGreaterThanOrEqual(.68)
   })
 
   it('keeps a manual effort override separate from model binding', () => {
-    const result = routeExecutionPolicy({ model: { mode: 'fixed', slot: 'chat', assignment: assignments.chat! }, thinking: 'low', task: { stage: 'review', multimodal: false, paidAction: 'none', effortSignals: { complexity: 1, ambiguity: 1, dagDepth: 20, risk: 'high', retryCount: 3 } }, assignments, providers })
+    const result = routeExecutionPolicy({ model: { mode: 'fixed', slot: 'chat', assignment: assignments.chat! }, thinking: 'low', task: { stage: 'review', multimodal: false, providerAction: 'none', effortSignals: { complexity: 1, ambiguity: 1, dagDepth: 20, risk: 'high', retryCount: 3 } }, assignments, providers })
     expect(result.assignment).toEqual(assignments.chat)
     expect(result.reasoningEffort).toBe('low')
     expect(result.effortReceipt).toMatchObject({ selected: 'low', manualOverride: true })
@@ -92,10 +92,10 @@ describe('routeExecutionPolicy', () => {
 
   it('uses verified compatible reasoning protocol evidence and rejects undeclared compatible thinking', () => {
     const mox = { id: 'mox', kind: 'openai-compatible', label: 'MOX', wireProtocol: 'chat-completions' as const, defaultModel: 'gpt-5.5', enabled: true }
-    const verified = routeExecutionPolicy({ model: { mode: 'auto' }, thinking: 'auto', task: { stage: 'plan', multimodal: false, paidAction: 'none' }, assignments: { chat: { providerId: 'mox', model: 'gpt-5.5' } }, providers: [mox], modelCatalog: [{ providerId: 'mox', model: 'gpt-5.5', slot: 'chat', capabilities: ['text', 'reasoning'], reasoningProtocol: 'openai', quality: .9, cost: .5, speed: .7, region: 'global', available: true }] })
+    const verified = routeExecutionPolicy({ model: { mode: 'auto' }, thinking: 'auto', task: { stage: 'plan', multimodal: false, providerAction: 'none' }, assignments: { chat: { providerId: 'mox', model: 'gpt-5.5' } }, providers: [mox], modelCatalog: [{ providerId: 'mox', model: 'gpt-5.5', slot: 'chat', capabilities: ['text', 'reasoning'], reasoningProtocol: 'openai', quality: .9, cost: .5, speed: .7, region: 'global', available: true }] })
     expect(verified).toMatchObject({ status: 'ready', reasoningEffort: 'medium', assignment: { providerId: 'mox', model: 'gpt-5.5', reasoningProtocol: 'openai' } })
     expect(verified.routeReceipt?.effort).toMatchObject({ selected: 'medium', manualOverride: false })
-    const undeclared = routeExecutionPolicy({ model: { mode: 'fixed', slot: 'chat', assignment: { providerId: 'mox', model: 'gpt-5.5' } }, thinking: 'auto', task: { stage: 'plan', multimodal: false, paidAction: 'none' }, assignments: {}, providers: [mox] })
+    const undeclared = routeExecutionPolicy({ model: { mode: 'fixed', slot: 'chat', assignment: { providerId: 'mox', model: 'gpt-5.5' } }, thinking: 'auto', task: { stage: 'plan', multimodal: false, providerAction: 'none' }, assignments: {}, providers: [mox] })
     expect(undeclared).toMatchObject({ status: 'degraded', thinkingSupport: 'unsupported', reasoningEffort: undefined })
   })
 
@@ -104,19 +104,19 @@ describe('routeExecutionPolicy', () => {
       routeExecutionPolicy({
         model: { mode: 'auto' },
         thinking: 'auto',
-        task: { stage: 'understand', multimodal: true, paidAction: 'none' },
+        task: { stage: 'understand', multimodal: true, providerAction: 'none' },
         assignments,
         providers,
       }),
     ).toMatchObject({ slot: 'chat', reasoningEffort: 'medium' })
   })
 
-  it('routes image generation and image editing paid actions to the image slot', () => {
-    for (const paidAction of ['image-generation', 'image-edit'] as const) {
+  it('routes image generation and image editing Provider actions to the image slot', () => {
+    for (const providerAction of ['image-generation', 'image-edit'] as const) {
       const result = routeExecutionPolicy({
         model: { mode: 'auto' },
         thinking: 'high',
-        task: { stage: 'execute', multimodal: paidAction === 'image-edit', paidAction },
+        task: { stage: 'execute', multimodal: providerAction === 'image-edit', providerAction },
         assignments,
         providers,
       })
@@ -135,7 +135,7 @@ describe('routeExecutionPolicy', () => {
     const result = routeExecutionPolicy({
       model: { mode: 'fixed', slot: 'chat', assignment: assignments.chat! },
       thinking: 'low',
-      task: { stage: 'name', multimodal: true, paidAction: 'none' },
+      task: { stage: 'name', multimodal: true, providerAction: 'none' },
       assignments,
       providers,
     })
@@ -155,7 +155,7 @@ describe('routeExecutionPolicy', () => {
       task: {
         stage: 'execute',
         multimodal: false,
-        paidAction: 'image-generation',
+        providerAction: 'image-generation',
       },
       assignments,
       providers,
@@ -177,7 +177,7 @@ describe('routeExecutionPolicy', () => {
     const result = routeExecutionPolicy({
       model: { mode: 'fixed', slot: 'chat', assignment: gatewayAssignment },
       thinking: 'high',
-      task: { stage: 'plan', multimodal: false, paidAction: 'none' },
+      task: { stage: 'plan', multimodal: false, providerAction: 'none' },
       assignments,
       providers: [
         ...providers,
@@ -203,7 +203,7 @@ describe('routeExecutionPolicy', () => {
     const result = routeExecutionPolicy({
       model: { mode: 'auto' },
       thinking: 'provider-default',
-      task: { stage: 'plan', multimodal: false, paidAction: 'none' },
+      task: { stage: 'plan', multimodal: false, providerAction: 'none' },
       assignments,
       providers,
     })
@@ -227,7 +227,7 @@ describe('routeExecutionPolicy', () => {
       task: {
         stage: 'execute',
         multimodal: false,
-        paidAction: 'image-generation',
+        providerAction: 'image-generation',
       },
       assignments: { chat: assignments.chat },
       providers,
@@ -246,7 +246,7 @@ describe('routeExecutionPolicy', () => {
     const result = routeExecutionPolicy({
       model: { mode: 'auto' },
       thinking: 'medium',
-      task: { stage: 'plan', multimodal: false, paidAction: 'none' },
+      task: { stage: 'plan', multimodal: false, providerAction: 'none' },
       assignments,
       providers: providers.map((provider) =>
         provider.id === 'anthropic' ? { ...provider, enabled: false } : provider,
@@ -261,7 +261,7 @@ describe('routeExecutionPolicy', () => {
     const result = routeExecutionPolicy({
       model: { mode: 'auto' },
       thinking: 'auto',
-      task: { stage: 'plan', multimodal: false, paidAction: 'none' },
+      task: { stage: 'plan', multimodal: false, providerAction: 'none' },
       assignments,
       providers,
       modelCatalog: modelCatalog.map((descriptor) => ({ ...descriptor, available: false })),

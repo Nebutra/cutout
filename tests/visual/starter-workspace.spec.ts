@@ -15,7 +15,7 @@ test("Starter stays outcome-first and progressively discloses technical evidence
   if (testInfo.project.name === "mobile-chrome") {
     await page.setViewportSize({ width: 412, height: 915 });
   }
-  const workbench = page.getByRole("region", { name: "Deliver" });
+  const workbench = page.getByRole("region", { name: "Project workbench" });
   await workbench.getByRole("tab", { name: "Starter" }).click();
   const starter = workbench.getByRole("region", { name: "Starter workspace" });
   await expect(starter).toBeVisible();

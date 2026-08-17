@@ -64,7 +64,7 @@ Return revisions, hashes, receipts, and checks where available.
 
 ## Approval Rules
 
-Preview mutations, exports, coding, and paid work before apply.
+Preview mutations, exports, coding, and Provider execution before apply.
 Use a host-issued, short-lived, single-use approval lease bound to the prepared operation, preview digest, and expected revision.
 Invalidate approval after any revision, scope, budget, or output change.
 
@@ -84,7 +84,7 @@ Keep unsupported work blocked rather than creating placeholders.
 
 Ask only strategic questions that change the outcome.
 Delegate routine choices to the Agent and harness.
-Expose process only for decisions, cost, risk, failure, or results.
+Expose process only for decisions, risk, failure, or results.
 Summarize completed and missing materials.
 
 ## Failure Handling

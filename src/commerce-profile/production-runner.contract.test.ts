@@ -17,6 +17,7 @@ import {
   assertCommerceProductionSourceSelection,
   assertCommerceRunnerQaReadyArtifact,
   assertCommerceRunnerReceiptClosure,
+  commerceSemanticQaRoleConstraints,
   COMMERCE_PRODUCTION_RUNNER_MODELS,
   createCommerceHeldOutCompletionRequest,
   createCommerceRunnerMediaReferenceClosure,
@@ -33,6 +34,7 @@ import type { CommerceProductionRehearsalBundle } from './rehearsal'
 // submitted to native verification or admitted as Commerce benchmark evidence.
 
 const reviewedSource = 'https://aib-innovation-oss.oss-accelerate.aliyuncs.com/AI_Business/product/front.png?Expires=1&Signature=x'
+const reviewedDashScopeSource = 'https://dashscope-a717.oss-accelerate.aliyuncs.com/1d/1f/20260814/product.png'
 const facts = normalizeProductRecord({
   file: 'product.json',
   contents: JSON.stringify(fixtureProductRecord),
@@ -215,6 +217,11 @@ describe('Commerce production runner pure preflight contracts (not benchmark evi
       sourcePointer: '/images/0',
       sourceDescriptor: reviewedSource,
     })).not.toThrow()
+    expect(() => assertCommerceProductionSourceDescriptor({
+      sourceFile: 'product.json',
+      sourcePointer: '/images/0',
+      sourceDescriptor: reviewedDashScopeSource,
+    })).not.toThrow()
     for (const sourceDescriptor of [
       reviewedSource.replace('https:', 'http:'),
       reviewedSource.replace('aib-innovation-oss.oss-accelerate.aliyuncs.com', 'evil.example'),
@@ -222,6 +229,8 @@ describe('Commerce production runner pure preflight contracts (not benchmark evi
       reviewedSource.replace('.com/', '.com:8443/'),
       `${reviewedSource}#fragment`,
       'https://aib-innovation-oss.oss-accelerate.aliyuncs.com/AI_Business/',
+      'https://dashscope-a717.oss-accelerate.aliyuncs.com/',
+      reviewedDashScopeSource.replace('dashscope-a717', 'dashscope-attacker'),
       reviewedSource.replace('https://', 'HTTPS://'),
     ]) {
       expect(() => assertCommerceProductionSourceDescriptor({
@@ -368,7 +377,7 @@ describe('Commerce production runner pure preflight contracts (not benchmark evi
     )
   })
 
-  it('fails media before paid QA when dimensions or promoted playback are absent', () => {
+  it('fails media before external QA when dimensions or promoted playback are absent', () => {
     const image = artifactEvidence('main-image', 1)
     expect(() => assertCommerceRunnerQaReadyArtifact(image, 'main-image')).not.toThrow()
     expect(() => assertCommerceRunnerQaReadyArtifact({ ...image, width: undefined }, 'main-image'))
@@ -381,6 +390,20 @@ describe('Commerce production runner pure preflight contracts (not benchmark evi
       artifactEvidence('product-video', 2, true),
       'product-video',
     )).not.toThrow()
+  })
+
+  it('judges detail identity from visible cues without treating crop omission as drift', () => {
+    const detail = commerceSemanticQaRoleConstraints('detail-image:5').join(' ')
+    expect(detail).toContain('at least two visible identity cues')
+    expect(detail).toContain('Off-frame whole-product features are not contradictions')
+    expect(detail).toContain('useful close crop')
+
+    const main = commerceSemanticQaRoleConstraints('main-image').join(' ')
+    expect(main).toContain('full product')
+    expect(main).not.toContain('Off-frame')
+
+    const video = commerceSemanticQaRoleConstraints('product-video').join(' ')
+    expect(video).toContain('without morphing or scene-cut drift')
   })
 
   it('closes exactly eleven Provider, seven QA, and one playback-promotion receipt slots', () => {

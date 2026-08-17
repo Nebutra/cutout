@@ -91,6 +91,7 @@ export interface MultimodalDesktopHost extends MultimodalHostVerifier {
 }
 
 export interface MultimodalNativeTransport {
+  encodeBytes?(bytes: Uint8Array): readonly number[] | string
   invokeCancellable(
     command: 'ai_dashscope_structured_text' | 'ai_dashscope_vision_json' | 'ai_dashscope_image' | 'ai_dashscope_video',
     args: Record<string, unknown>,
@@ -98,6 +99,13 @@ export interface MultimodalNativeTransport {
   ): Promise<unknown>
   verify(receipt: MultimodalHostReceipt, artifactBytes: Uint8Array): Promise<unknown>
   promoteVideoPlayback(receipt: MultimodalHostReceipt, artifactBytes: Uint8Array): Promise<unknown>
+}
+
+function encodeTransportBytes(
+  transport: MultimodalNativeTransport,
+  bytes: Uint8Array,
+): readonly number[] | string {
+  return transport.encodeBytes?.(bytes) ?? Array.from(bytes)
 }
 
 const tauriTransport: MultimodalNativeTransport = {
@@ -215,7 +223,7 @@ export function createMultimodalDesktopHost(
           system: input.system,
           prompt: input.prompt,
           outputSchema: input.outputSchema,
-          referenceImage: Array.from(input.referenceBytes),
+          referenceImage: encodeTransportBytes(transport, input.referenceBytes),
           hostContext: context,
         },
         input.signal,
@@ -240,7 +248,7 @@ export function createMultimodalDesktopHost(
           model: input.model,
           operation: input.operation === 'image-generation' ? 'generation' : 'edit',
           prompt: input.prompt,
-          images: references.map((bytes) => Array.from(bytes)),
+          images: references.map((bytes) => encodeTransportBytes(transport, bytes)),
           size: input.size ?? null,
           hostContext: context,
         },
@@ -279,7 +287,9 @@ export function createMultimodalDesktopHost(
           ratio: input.ratio,
           durationSeconds: input.durationSeconds,
           seed: input.seed ?? null,
-          referenceImage: input.referenceBytes ? Array.from(input.referenceBytes) : null,
+          referenceImage: input.referenceBytes
+            ? encodeTransportBytes(transport, input.referenceBytes)
+            : null,
           hostContext: context,
         },
         input.signal,

@@ -8,7 +8,7 @@ const workspaceSource = readFileSync(
 )
 
 describe('prototype production throughput wiring', () => {
-  it('keeps page QA gated with one bounded node-local repair and unique paid attempts', () => {
+  it('keeps page QA gated with one bounded node-local repair and unique Provider attempts', () => {
     const start = workspaceSource.indexOf('async function generatePrototypePage(')
     const end = workspaceSource.indexOf('async function invokeDesktopImageTool(', start)
     const pageGeneration = workspaceSource.slice(start, end)

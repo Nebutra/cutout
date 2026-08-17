@@ -5,8 +5,8 @@
     "version": 2
   },
   "identity": {
-    "id": "benchmark-run:current",
-    "revision": "benchmark-run:current:revision:1"
+    "id": "rehearsal:commerce-held-out:0.1.21:fresh-burgundy-sherpa-jacket:006",
+    "revision": "release-freeze:0.1.21:source-policy-set-v1:leaf-30435:20260816T1014Z"
   },
   "metrics": [
     {
@@ -179,481 +179,1371 @@
       "acceptanceCriterion": "P6",
       "tier": "real-host",
       "label": "Real Host localized text execution",
-      "status": "blocked",
+      "status": "passed",
       "assertions": [
         {
           "id": "authorized-command-settled",
-          "verdict": "blocked",
-          "diagnostic": {
-            "code": "real-host-evidence-unavailable",
-            "message": "Real Host execution evidence has not been supplied.",
-            "evidenceReferenceIds": [
-              "evidence:p6.real-text-execution"
-            ]
-          }
+          "verdict": "passed"
         },
         {
           "id": "accepted-receipt-bound",
-          "verdict": "blocked",
-          "diagnostic": {
-            "code": "real-host-evidence-unavailable",
-            "message": "Real Host execution evidence has not been supplied.",
-            "evidenceReferenceIds": [
-              "evidence:p6.real-text-execution"
-            ]
-          }
+          "verdict": "passed"
         }
       ],
       "evidenceReferences": [
         {
-          "id": "evidence:p6.real-text-execution",
-          "revision": "evidence:p6.real-text-execution:revision:1",
-          "contentHash": "6f53d2b7e254518b2742e3e32c1573f3882af394c1037034749e0add421ea758",
-          "kind": "host-capability-audit",
+          "id": "evidence:p6.real-text-execution:receipt:multimodal:1b615f8076eb4a3fbf6e92d2a8f879db",
+          "revision": "receipt:multimodal:1b615f8076eb4a3fbf6e92d2a8f879db:revision:1",
+          "contentHash": "0e01cc7e6cae6257e2d2a00e86d5405d04a0f44b507287b7cfe77072e03ea2ba",
+          "kind": "real-host-receipt",
           "binding": {
             "metricId": "p6.real-text-execution",
-            "findingCode": "real-host-evidence-unavailable"
+            "receiptId": "receipt:multimodal:1b615f8076eb4a3fbf6e92d2a8f879db",
+            "runId": "run:commerce-held-out:64dbdb68-f0a5-4b1c-844e-6a10e278d11c",
+            "capabilityId": "capability:commerce-localized-copy",
+            "artifactIds": [
+              "artifact:sha256:5fa6b5723f684aa96488adc6f96752034459d2fd8aa00d1d0e7bc64badf1a193"
+            ],
+            "acceptedReferenceArtifactIds": [],
+            "dagReferences": []
+          }
+        },
+        {
+          "id": "evidence:p6.real-text-execution:receipt:multimodal:7dec3a3f00254488be78dac5fa6b50d2",
+          "revision": "receipt:multimodal:7dec3a3f00254488be78dac5fa6b50d2:revision:1",
+          "contentHash": "e3948eb9e4610bac2c2b10a8a8c822c1b2171f7bed6779777ae55b21b61366c3",
+          "kind": "real-host-receipt",
+          "binding": {
+            "metricId": "p6.real-text-execution",
+            "receiptId": "receipt:multimodal:7dec3a3f00254488be78dac5fa6b50d2",
+            "runId": "run:commerce-held-out:64dbdb68-f0a5-4b1c-844e-6a10e278d11c",
+            "capabilityId": "capability:commerce-localized-copy",
+            "artifactIds": [
+              "artifact:sha256:373e1f5a9bebfac4e0661ddca9791534084e323f1380455c10bc5810eba8cac5"
+            ],
+            "acceptedReferenceArtifactIds": [],
+            "dagReferences": []
+          }
+        },
+        {
+          "id": "evidence:p6.real-text-execution:receipt:multimodal:616412c2d98a4bf6b91d347274c12551",
+          "revision": "receipt:multimodal:616412c2d98a4bf6b91d347274c12551:revision:1",
+          "contentHash": "1063e044a79e78c15a5c9849f9d489dd27d820d487092f70ae9c5d623b7de6d3",
+          "kind": "real-host-receipt",
+          "binding": {
+            "metricId": "p6.real-text-execution",
+            "receiptId": "receipt:multimodal:616412c2d98a4bf6b91d347274c12551",
+            "runId": "run:commerce-held-out:64dbdb68-f0a5-4b1c-844e-6a10e278d11c",
+            "capabilityId": "capability:commerce-localized-copy",
+            "artifactIds": [
+              "artifact:sha256:cee6471a88d32bdc481b6a87dc87e9027a030a40a8de5059979bbbf9620289d5"
+            ],
+            "acceptedReferenceArtifactIds": [],
+            "dagReferences": []
           }
         }
       ],
-      "diagnostics": [
-        {
-          "code": "real-host-evidence-unavailable",
-          "message": "Real Host execution evidence has not been supplied.",
-          "evidenceReferenceIds": [
-            "evidence:p6.real-text-execution"
-          ]
-        },
-        {
-          "code": "real-host-evidence-unavailable",
-          "message": "Real Host execution evidence has not been supplied.",
-          "evidenceReferenceIds": [
-            "evidence:p6.real-text-execution"
-          ]
-        }
-      ]
+      "diagnostics": []
     },
     {
       "id": "p6.real-text-bytes",
       "acceptanceCriterion": "P6",
       "tier": "real-host",
       "label": "Real Host localized text bytes and gates",
-      "status": "blocked",
+      "status": "passed",
       "assertions": [
         {
           "id": "artifact-bytes-present-and-decoded",
-          "verdict": "blocked",
-          "diagnostic": {
-            "code": "real-host-evidence-unavailable",
-            "message": "Real Host execution evidence has not been supplied.",
-            "evidenceReferenceIds": [
-              "evidence:p6.real-text-bytes"
-            ]
-          }
+          "verdict": "passed"
         },
         {
           "id": "locale-policy-and-citation-gates-pass",
-          "verdict": "blocked",
-          "diagnostic": {
-            "code": "real-host-evidence-unavailable",
-            "message": "Real Host execution evidence has not been supplied.",
-            "evidenceReferenceIds": [
-              "evidence:p6.real-text-bytes"
-            ]
-          }
+          "verdict": "passed"
         }
       ],
       "evidenceReferences": [
         {
-          "id": "evidence:p6.real-text-bytes",
-          "revision": "evidence:p6.real-text-bytes:revision:1",
-          "contentHash": "6f53d2b7e254518b2742e3e32c1573f3882af394c1037034749e0add421ea758",
-          "kind": "host-capability-audit",
+          "id": "evidence:p6.real-text-bytes:receipt:multimodal:1b615f8076eb4a3fbf6e92d2a8f879db",
+          "revision": "receipt:multimodal:1b615f8076eb4a3fbf6e92d2a8f879db:revision:1",
+          "contentHash": "0e01cc7e6cae6257e2d2a00e86d5405d04a0f44b507287b7cfe77072e03ea2ba",
+          "kind": "real-host-receipt",
           "binding": {
             "metricId": "p6.real-text-bytes",
-            "findingCode": "real-host-evidence-unavailable"
+            "receiptId": "receipt:multimodal:1b615f8076eb4a3fbf6e92d2a8f879db",
+            "runId": "run:commerce-held-out:64dbdb68-f0a5-4b1c-844e-6a10e278d11c",
+            "capabilityId": "capability:commerce-localized-copy",
+            "artifactIds": [
+              "artifact:sha256:5fa6b5723f684aa96488adc6f96752034459d2fd8aa00d1d0e7bc64badf1a193"
+            ],
+            "acceptedReferenceArtifactIds": [],
+            "dagReferences": []
+          }
+        },
+        {
+          "id": "evidence:p6.real-text-bytes:bytes:artifact:sha256:5fa6b5723f684aa96488adc6f96752034459d2fd8aa00d1d0e7bc64badf1a193",
+          "revision": "artifact:sha256:5fa6b5723f684aa96488adc6f96752034459d2fd8aa00d1d0e7bc64badf1a193:revision:1",
+          "contentHash": "5fa6b5723f684aa96488adc6f96752034459d2fd8aa00d1d0e7bc64badf1a193",
+          "kind": "artifact-bytes",
+          "binding": {
+            "metricId": "p6.real-text-bytes",
+            "receiptId": "receipt:multimodal:1b615f8076eb4a3fbf6e92d2a8f879db",
+            "artifactId": "artifact:sha256:5fa6b5723f684aa96488adc6f96752034459d2fd8aa00d1d0e7bc64badf1a193",
+            "mediaType": "application/json",
+            "byteLength": 2277
+          }
+        },
+        {
+          "id": "evidence:p6.real-text-bytes:bytes:artifact:sha256:9f4692f1a5bac2c7ab28510ca3fbbd516a573109ca9d2b35b46f5023955f9b23",
+          "revision": "artifact:sha256:9f4692f1a5bac2c7ab28510ca3fbbd516a573109ca9d2b35b46f5023955f9b23:revision:1",
+          "contentHash": "9f4692f1a5bac2c7ab28510ca3fbbd516a573109ca9d2b35b46f5023955f9b23",
+          "kind": "artifact-bytes",
+          "binding": {
+            "metricId": "p6.real-text-bytes",
+            "receiptId": "receipt:multimodal:1b615f8076eb4a3fbf6e92d2a8f879db",
+            "artifactId": "artifact:sha256:9f4692f1a5bac2c7ab28510ca3fbbd516a573109ca9d2b35b46f5023955f9b23",
+            "mediaType": "text/markdown",
+            "byteLength": 1560,
+            "derivedFromArtifactId": "artifact:sha256:5fa6b5723f684aa96488adc6f96752034459d2fd8aa00d1d0e7bc64badf1a193"
+          }
+        },
+        {
+          "id": "evidence:p6.real-text-bytes:receipt:multimodal:7dec3a3f00254488be78dac5fa6b50d2",
+          "revision": "receipt:multimodal:7dec3a3f00254488be78dac5fa6b50d2:revision:1",
+          "contentHash": "e3948eb9e4610bac2c2b10a8a8c822c1b2171f7bed6779777ae55b21b61366c3",
+          "kind": "real-host-receipt",
+          "binding": {
+            "metricId": "p6.real-text-bytes",
+            "receiptId": "receipt:multimodal:7dec3a3f00254488be78dac5fa6b50d2",
+            "runId": "run:commerce-held-out:64dbdb68-f0a5-4b1c-844e-6a10e278d11c",
+            "capabilityId": "capability:commerce-localized-copy",
+            "artifactIds": [
+              "artifact:sha256:373e1f5a9bebfac4e0661ddca9791534084e323f1380455c10bc5810eba8cac5"
+            ],
+            "acceptedReferenceArtifactIds": [],
+            "dagReferences": []
+          }
+        },
+        {
+          "id": "evidence:p6.real-text-bytes:bytes:artifact:sha256:373e1f5a9bebfac4e0661ddca9791534084e323f1380455c10bc5810eba8cac5",
+          "revision": "artifact:sha256:373e1f5a9bebfac4e0661ddca9791534084e323f1380455c10bc5810eba8cac5:revision:1",
+          "contentHash": "373e1f5a9bebfac4e0661ddca9791534084e323f1380455c10bc5810eba8cac5",
+          "kind": "artifact-bytes",
+          "binding": {
+            "metricId": "p6.real-text-bytes",
+            "receiptId": "receipt:multimodal:7dec3a3f00254488be78dac5fa6b50d2",
+            "artifactId": "artifact:sha256:373e1f5a9bebfac4e0661ddca9791534084e323f1380455c10bc5810eba8cac5",
+            "mediaType": "application/json",
+            "byteLength": 2348
+          }
+        },
+        {
+          "id": "evidence:p6.real-text-bytes:bytes:artifact:sha256:48409f981b4b203cfa577ac7170cfe8ebf8f11ec5b43f0a3893add18d9c97b37",
+          "revision": "artifact:sha256:48409f981b4b203cfa577ac7170cfe8ebf8f11ec5b43f0a3893add18d9c97b37:revision:1",
+          "contentHash": "48409f981b4b203cfa577ac7170cfe8ebf8f11ec5b43f0a3893add18d9c97b37",
+          "kind": "artifact-bytes",
+          "binding": {
+            "metricId": "p6.real-text-bytes",
+            "receiptId": "receipt:multimodal:7dec3a3f00254488be78dac5fa6b50d2",
+            "artifactId": "artifact:sha256:48409f981b4b203cfa577ac7170cfe8ebf8f11ec5b43f0a3893add18d9c97b37",
+            "mediaType": "text/markdown",
+            "byteLength": 1643,
+            "derivedFromArtifactId": "artifact:sha256:373e1f5a9bebfac4e0661ddca9791534084e323f1380455c10bc5810eba8cac5"
+          }
+        },
+        {
+          "id": "evidence:p6.real-text-bytes:receipt:multimodal:616412c2d98a4bf6b91d347274c12551",
+          "revision": "receipt:multimodal:616412c2d98a4bf6b91d347274c12551:revision:1",
+          "contentHash": "1063e044a79e78c15a5c9849f9d489dd27d820d487092f70ae9c5d623b7de6d3",
+          "kind": "real-host-receipt",
+          "binding": {
+            "metricId": "p6.real-text-bytes",
+            "receiptId": "receipt:multimodal:616412c2d98a4bf6b91d347274c12551",
+            "runId": "run:commerce-held-out:64dbdb68-f0a5-4b1c-844e-6a10e278d11c",
+            "capabilityId": "capability:commerce-localized-copy",
+            "artifactIds": [
+              "artifact:sha256:cee6471a88d32bdc481b6a87dc87e9027a030a40a8de5059979bbbf9620289d5"
+            ],
+            "acceptedReferenceArtifactIds": [],
+            "dagReferences": []
+          }
+        },
+        {
+          "id": "evidence:p6.real-text-bytes:bytes:artifact:sha256:cee6471a88d32bdc481b6a87dc87e9027a030a40a8de5059979bbbf9620289d5",
+          "revision": "artifact:sha256:cee6471a88d32bdc481b6a87dc87e9027a030a40a8de5059979bbbf9620289d5:revision:1",
+          "contentHash": "cee6471a88d32bdc481b6a87dc87e9027a030a40a8de5059979bbbf9620289d5",
+          "kind": "artifact-bytes",
+          "binding": {
+            "metricId": "p6.real-text-bytes",
+            "receiptId": "receipt:multimodal:616412c2d98a4bf6b91d347274c12551",
+            "artifactId": "artifact:sha256:cee6471a88d32bdc481b6a87dc87e9027a030a40a8de5059979bbbf9620289d5",
+            "mediaType": "application/json",
+            "byteLength": 2358
+          }
+        },
+        {
+          "id": "evidence:p6.real-text-bytes:bytes:artifact:sha256:38d0111922cf90f4a4c158ff19e4f8c3a16b18f6aa97e13020ab677d4979ae1e",
+          "revision": "artifact:sha256:38d0111922cf90f4a4c158ff19e4f8c3a16b18f6aa97e13020ab677d4979ae1e:revision:1",
+          "contentHash": "38d0111922cf90f4a4c158ff19e4f8c3a16b18f6aa97e13020ab677d4979ae1e",
+          "kind": "artifact-bytes",
+          "binding": {
+            "metricId": "p6.real-text-bytes",
+            "receiptId": "receipt:multimodal:616412c2d98a4bf6b91d347274c12551",
+            "artifactId": "artifact:sha256:38d0111922cf90f4a4c158ff19e4f8c3a16b18f6aa97e13020ab677d4979ae1e",
+            "mediaType": "text/markdown",
+            "byteLength": 1641,
+            "derivedFromArtifactId": "artifact:sha256:cee6471a88d32bdc481b6a87dc87e9027a030a40a8de5059979bbbf9620289d5"
           }
         }
       ],
-      "diagnostics": [
-        {
-          "code": "real-host-evidence-unavailable",
-          "message": "Real Host execution evidence has not been supplied.",
-          "evidenceReferenceIds": [
-            "evidence:p6.real-text-bytes"
-          ]
-        },
-        {
-          "code": "real-host-evidence-unavailable",
-          "message": "Real Host execution evidence has not been supplied.",
-          "evidenceReferenceIds": [
-            "evidence:p6.real-text-bytes"
-          ]
-        }
-      ]
+      "diagnostics": []
     },
     {
       "id": "p6.real-image-execution",
       "acceptanceCriterion": "P6",
       "tier": "real-host",
       "label": "Real Host commerce image execution",
-      "status": "blocked",
+      "status": "passed",
       "assertions": [
         {
           "id": "authorized-command-settled",
-          "verdict": "blocked",
-          "diagnostic": {
-            "code": "real-host-evidence-unavailable",
-            "message": "Real Host execution evidence has not been supplied.",
-            "evidenceReferenceIds": [
-              "evidence:p6.real-image-execution"
-            ]
-          }
+          "verdict": "passed"
         },
         {
           "id": "accepted-receipt-bound",
-          "verdict": "blocked",
-          "diagnostic": {
-            "code": "real-host-evidence-unavailable",
-            "message": "Real Host execution evidence has not been supplied.",
-            "evidenceReferenceIds": [
-              "evidence:p6.real-image-execution"
-            ]
-          }
+          "verdict": "passed"
         }
       ],
       "evidenceReferences": [
         {
-          "id": "evidence:p6.real-image-execution",
-          "revision": "evidence:p6.real-image-execution:revision:1",
-          "contentHash": "6f53d2b7e254518b2742e3e32c1573f3882af394c1037034749e0add421ea758",
-          "kind": "host-capability-audit",
+          "id": "evidence:p6.real-image-execution:receipt:multimodal:7a2440bb8b194d78b4472b30dacc7b18",
+          "revision": "receipt:multimodal:7a2440bb8b194d78b4472b30dacc7b18:revision:1",
+          "contentHash": "6b7ecf7cb6144f03c55090707b0598b19f63365f42f2e4acfb2135499161a27e",
+          "kind": "real-host-receipt",
           "binding": {
             "metricId": "p6.real-image-execution",
-            "findingCode": "real-host-evidence-unavailable"
+            "receiptId": "receipt:multimodal:7a2440bb8b194d78b4472b30dacc7b18",
+            "runId": "run:commerce-held-out:64dbdb68-f0a5-4b1c-844e-6a10e278d11c",
+            "capabilityId": "capability:commerce-image",
+            "artifactIds": [
+              "artifact:sha256:41790ec8760fba3a39ea768219cd71502e2b92dba73ffe7de9e064f904948cd4"
+            ],
+            "acceptedReferenceArtifactIds": [
+              "artifact:sha256:1bf6821d0b7ad9fc637646883b3b6bd8d79e00f2b0894f734096ce39a9f13122"
+            ],
+            "dagReferences": []
+          }
+        },
+        {
+          "id": "evidence:p6.real-image-execution:receipt:multimodal:7e5a822489d744418e476e5372b536f2",
+          "revision": "receipt:multimodal:7e5a822489d744418e476e5372b536f2:revision:1",
+          "contentHash": "be719b85240a47fa4d7a2647c65d0598be84e3baf87a5784b0a99c70797c14ae",
+          "kind": "real-host-receipt",
+          "binding": {
+            "metricId": "p6.real-image-execution",
+            "receiptId": "receipt:multimodal:7e5a822489d744418e476e5372b536f2",
+            "runId": "run:commerce-held-out:64dbdb68-f0a5-4b1c-844e-6a10e278d11c",
+            "capabilityId": "capability:commerce-semantic-media-qa",
+            "artifactIds": [
+              "artifact:sha256:187e1941643a092f7ff805759c283d868b0b33c1c133c5c26c0f7ec413126a09"
+            ],
+            "acceptedReferenceArtifactIds": [
+              "artifact:sha256:41790ec8760fba3a39ea768219cd71502e2b92dba73ffe7de9e064f904948cd4"
+            ]
+          }
+        },
+        {
+          "id": "evidence:p6.real-image-execution:receipt:multimodal:6169d80aeab046d1a0669083d32eefe2",
+          "revision": "receipt:multimodal:6169d80aeab046d1a0669083d32eefe2:revision:1",
+          "contentHash": "0247af8883693d55dc7b1ad244c392bf9ceb4bea7f77b65d5016fea6167a1599",
+          "kind": "real-host-receipt",
+          "binding": {
+            "metricId": "p6.real-image-execution",
+            "receiptId": "receipt:multimodal:6169d80aeab046d1a0669083d32eefe2",
+            "runId": "run:commerce-held-out:64dbdb68-f0a5-4b1c-844e-6a10e278d11c",
+            "capabilityId": "capability:commerce-image",
+            "artifactIds": [
+              "artifact:sha256:d9631ca8f4948b981e3e67960b06c8f95b80756b452e99b1f848a74587a178f9"
+            ],
+            "acceptedReferenceArtifactIds": [
+              "artifact:sha256:1bf6821d0b7ad9fc637646883b3b6bd8d79e00f2b0894f734096ce39a9f13122",
+              "artifact:sha256:41790ec8760fba3a39ea768219cd71502e2b92dba73ffe7de9e064f904948cd4"
+            ],
+            "dagReferences": [
+              {
+                "sourcePlanNodeId": "outcome:commerce:main-image:step:1",
+                "sourceSemanticRole": "main-image",
+                "artifactId": "artifact:sha256:41790ec8760fba3a39ea768219cd71502e2b92dba73ffe7de9e064f904948cd4",
+                "contentHash": "41790ec8760fba3a39ea768219cd71502e2b92dba73ffe7de9e064f904948cd4",
+                "identityLockIds": [
+                  "lock:commerce-product-identity",
+                  "lock:commerce-creative-direction"
+                ],
+                "referenceRole": "visual-continuity",
+                "allowedChanges": [
+                  "camera-angle",
+                  "crop",
+                  "lighting",
+                  "background"
+                ],
+                "bindingHash": "d8309fa8b6398530039f8e9061fb9cb7fbc1ccf488377f24066aa026c659cd33"
+              }
+            ]
+          }
+        },
+        {
+          "id": "evidence:p6.real-image-execution:receipt:multimodal:9ef61ae463234c5bb201a80b715b069c",
+          "revision": "receipt:multimodal:9ef61ae463234c5bb201a80b715b069c:revision:1",
+          "contentHash": "9ec5399f239db786f0988c38f44e8aaf8e12722a600c389513f5b031a17d970f",
+          "kind": "real-host-receipt",
+          "binding": {
+            "metricId": "p6.real-image-execution",
+            "receiptId": "receipt:multimodal:9ef61ae463234c5bb201a80b715b069c",
+            "runId": "run:commerce-held-out:64dbdb68-f0a5-4b1c-844e-6a10e278d11c",
+            "capabilityId": "capability:commerce-semantic-media-qa",
+            "artifactIds": [
+              "artifact:sha256:fd9cf036b0fb60b89f8efed3a904a1a66da38ae720aec40e3598af2dad118932"
+            ],
+            "acceptedReferenceArtifactIds": [
+              "artifact:sha256:d9631ca8f4948b981e3e67960b06c8f95b80756b452e99b1f848a74587a178f9"
+            ]
+          }
+        },
+        {
+          "id": "evidence:p6.real-image-execution:receipt:multimodal:93906e26a8584f1ea4393aa01cbffadb",
+          "revision": "receipt:multimodal:93906e26a8584f1ea4393aa01cbffadb:revision:1",
+          "contentHash": "6579f123f399c6c2342fd91f249d3284cc15586a5e03843f97e5aeab15b16a2b",
+          "kind": "real-host-receipt",
+          "binding": {
+            "metricId": "p6.real-image-execution",
+            "receiptId": "receipt:multimodal:93906e26a8584f1ea4393aa01cbffadb",
+            "runId": "run:commerce-held-out:64dbdb68-f0a5-4b1c-844e-6a10e278d11c",
+            "capabilityId": "capability:commerce-image",
+            "artifactIds": [
+              "artifact:sha256:bb26b4da01d7bbc7102da3862346427381369d677a97bd743d6452c414831ae8"
+            ],
+            "acceptedReferenceArtifactIds": [
+              "artifact:sha256:1bf6821d0b7ad9fc637646883b3b6bd8d79e00f2b0894f734096ce39a9f13122",
+              "artifact:sha256:41790ec8760fba3a39ea768219cd71502e2b92dba73ffe7de9e064f904948cd4"
+            ],
+            "dagReferences": [
+              {
+                "sourcePlanNodeId": "outcome:commerce:main-image:step:1",
+                "sourceSemanticRole": "main-image",
+                "artifactId": "artifact:sha256:41790ec8760fba3a39ea768219cd71502e2b92dba73ffe7de9e064f904948cd4",
+                "contentHash": "41790ec8760fba3a39ea768219cd71502e2b92dba73ffe7de9e064f904948cd4",
+                "identityLockIds": [
+                  "lock:commerce-product-identity",
+                  "lock:commerce-creative-direction"
+                ],
+                "referenceRole": "visual-continuity",
+                "allowedChanges": [
+                  "camera-angle",
+                  "crop",
+                  "lighting",
+                  "background"
+                ],
+                "bindingHash": "d8309fa8b6398530039f8e9061fb9cb7fbc1ccf488377f24066aa026c659cd33"
+              }
+            ]
+          }
+        },
+        {
+          "id": "evidence:p6.real-image-execution:receipt:multimodal:3322f4515ec14852b218a4a83f7fbbeb",
+          "revision": "receipt:multimodal:3322f4515ec14852b218a4a83f7fbbeb:revision:1",
+          "contentHash": "97ecbec69fe9dfb3ccebde9229702a0af4a40420478fbb9722428b0373b03e7e",
+          "kind": "real-host-receipt",
+          "binding": {
+            "metricId": "p6.real-image-execution",
+            "receiptId": "receipt:multimodal:3322f4515ec14852b218a4a83f7fbbeb",
+            "runId": "run:commerce-held-out:64dbdb68-f0a5-4b1c-844e-6a10e278d11c",
+            "capabilityId": "capability:commerce-semantic-media-qa",
+            "artifactIds": [
+              "artifact:sha256:d6908df4053c086ae27de0fb82fdc6cdf6177ef0733b49803d51926c228e342f"
+            ],
+            "acceptedReferenceArtifactIds": [
+              "artifact:sha256:bb26b4da01d7bbc7102da3862346427381369d677a97bd743d6452c414831ae8"
+            ]
+          }
+        },
+        {
+          "id": "evidence:p6.real-image-execution:receipt:multimodal:90b1ef3fe18f4287b3e29c8c46540127",
+          "revision": "receipt:multimodal:90b1ef3fe18f4287b3e29c8c46540127:revision:1",
+          "contentHash": "aa336f8b8ea346da0358a781abfc9191e1922ebe44c2d20882f2763f4a12a9e0",
+          "kind": "real-host-receipt",
+          "binding": {
+            "metricId": "p6.real-image-execution",
+            "receiptId": "receipt:multimodal:90b1ef3fe18f4287b3e29c8c46540127",
+            "runId": "run:commerce-held-out:64dbdb68-f0a5-4b1c-844e-6a10e278d11c",
+            "capabilityId": "capability:commerce-image",
+            "artifactIds": [
+              "artifact:sha256:cd0be322beac7b5603162c279f35fd5f3813c08180715a14b89213f54315c448"
+            ],
+            "acceptedReferenceArtifactIds": [
+              "artifact:sha256:1bf6821d0b7ad9fc637646883b3b6bd8d79e00f2b0894f734096ce39a9f13122",
+              "artifact:sha256:41790ec8760fba3a39ea768219cd71502e2b92dba73ffe7de9e064f904948cd4"
+            ],
+            "dagReferences": [
+              {
+                "sourcePlanNodeId": "outcome:commerce:main-image:step:1",
+                "sourceSemanticRole": "main-image",
+                "artifactId": "artifact:sha256:41790ec8760fba3a39ea768219cd71502e2b92dba73ffe7de9e064f904948cd4",
+                "contentHash": "41790ec8760fba3a39ea768219cd71502e2b92dba73ffe7de9e064f904948cd4",
+                "identityLockIds": [
+                  "lock:commerce-product-identity",
+                  "lock:commerce-creative-direction"
+                ],
+                "referenceRole": "visual-continuity",
+                "allowedChanges": [
+                  "camera-angle",
+                  "crop",
+                  "lighting",
+                  "background"
+                ],
+                "bindingHash": "d8309fa8b6398530039f8e9061fb9cb7fbc1ccf488377f24066aa026c659cd33"
+              }
+            ]
+          }
+        },
+        {
+          "id": "evidence:p6.real-image-execution:receipt:multimodal:073705430fd544998211bb64e4ab1916",
+          "revision": "receipt:multimodal:073705430fd544998211bb64e4ab1916:revision:1",
+          "contentHash": "cc6eff15d2bd867e54efb85c111d6b06631766e4924cc6fae979584a0631d557",
+          "kind": "real-host-receipt",
+          "binding": {
+            "metricId": "p6.real-image-execution",
+            "receiptId": "receipt:multimodal:073705430fd544998211bb64e4ab1916",
+            "runId": "run:commerce-held-out:64dbdb68-f0a5-4b1c-844e-6a10e278d11c",
+            "capabilityId": "capability:commerce-semantic-media-qa",
+            "artifactIds": [
+              "artifact:sha256:7022e4348c11b331ba7344821841b0258caaa9d0f0a490885892097f69f7a546"
+            ],
+            "acceptedReferenceArtifactIds": [
+              "artifact:sha256:cd0be322beac7b5603162c279f35fd5f3813c08180715a14b89213f54315c448"
+            ]
+          }
+        },
+        {
+          "id": "evidence:p6.real-image-execution:receipt:multimodal:0667d683d3704f9fa561575a36dfac7d",
+          "revision": "receipt:multimodal:0667d683d3704f9fa561575a36dfac7d:revision:1",
+          "contentHash": "5d286b7d92d002850519197f4d172adb78570c6945d8f2c6276291ef2445a614",
+          "kind": "real-host-receipt",
+          "binding": {
+            "metricId": "p6.real-image-execution",
+            "receiptId": "receipt:multimodal:0667d683d3704f9fa561575a36dfac7d",
+            "runId": "run:commerce-held-out:64dbdb68-f0a5-4b1c-844e-6a10e278d11c",
+            "capabilityId": "capability:commerce-image",
+            "artifactIds": [
+              "artifact:sha256:9dbad1fdbd62dd3fe73013ac142c18de2d28d8406df77bbb636dbe9308884c19"
+            ],
+            "acceptedReferenceArtifactIds": [
+              "artifact:sha256:1bf6821d0b7ad9fc637646883b3b6bd8d79e00f2b0894f734096ce39a9f13122",
+              "artifact:sha256:41790ec8760fba3a39ea768219cd71502e2b92dba73ffe7de9e064f904948cd4"
+            ],
+            "dagReferences": [
+              {
+                "sourcePlanNodeId": "outcome:commerce:main-image:step:1",
+                "sourceSemanticRole": "main-image",
+                "artifactId": "artifact:sha256:41790ec8760fba3a39ea768219cd71502e2b92dba73ffe7de9e064f904948cd4",
+                "contentHash": "41790ec8760fba3a39ea768219cd71502e2b92dba73ffe7de9e064f904948cd4",
+                "identityLockIds": [
+                  "lock:commerce-product-identity",
+                  "lock:commerce-creative-direction"
+                ],
+                "referenceRole": "visual-continuity",
+                "allowedChanges": [
+                  "camera-angle",
+                  "crop",
+                  "lighting",
+                  "background"
+                ],
+                "bindingHash": "d8309fa8b6398530039f8e9061fb9cb7fbc1ccf488377f24066aa026c659cd33"
+              }
+            ]
+          }
+        },
+        {
+          "id": "evidence:p6.real-image-execution:receipt:multimodal:55622d9242354da8abe6c9a56deba7f9",
+          "revision": "receipt:multimodal:55622d9242354da8abe6c9a56deba7f9:revision:1",
+          "contentHash": "3e92ac19f8a8ff64007e61ddbfef1bbba3b387c70ceb54bab6b3fa835abe2784",
+          "kind": "real-host-receipt",
+          "binding": {
+            "metricId": "p6.real-image-execution",
+            "receiptId": "receipt:multimodal:55622d9242354da8abe6c9a56deba7f9",
+            "runId": "run:commerce-held-out:64dbdb68-f0a5-4b1c-844e-6a10e278d11c",
+            "capabilityId": "capability:commerce-semantic-media-qa",
+            "artifactIds": [
+              "artifact:sha256:346b113f7fee6ebdc0253f39ed42aed5d6fb2966872db81713a5d0b838bd1848"
+            ],
+            "acceptedReferenceArtifactIds": [
+              "artifact:sha256:9dbad1fdbd62dd3fe73013ac142c18de2d28d8406df77bbb636dbe9308884c19"
+            ]
+          }
+        },
+        {
+          "id": "evidence:p6.real-image-execution:receipt:multimodal:08dfd9ab98294571b20856e462781d7d",
+          "revision": "receipt:multimodal:08dfd9ab98294571b20856e462781d7d:revision:1",
+          "contentHash": "c6f9df5cf2a618898a3e2eb6fbe0aa1f1e6daad6aa4dd61c4682ba874bba783b",
+          "kind": "real-host-receipt",
+          "binding": {
+            "metricId": "p6.real-image-execution",
+            "receiptId": "receipt:multimodal:08dfd9ab98294571b20856e462781d7d",
+            "runId": "run:commerce-held-out:64dbdb68-f0a5-4b1c-844e-6a10e278d11c",
+            "capabilityId": "capability:commerce-image",
+            "artifactIds": [
+              "artifact:sha256:c753f002f424f683cada19e0f8a24d569743e3bd314211b46e21a5e3a18c91ee"
+            ],
+            "acceptedReferenceArtifactIds": [
+              "artifact:sha256:1bf6821d0b7ad9fc637646883b3b6bd8d79e00f2b0894f734096ce39a9f13122",
+              "artifact:sha256:41790ec8760fba3a39ea768219cd71502e2b92dba73ffe7de9e064f904948cd4"
+            ],
+            "dagReferences": [
+              {
+                "sourcePlanNodeId": "outcome:commerce:main-image:step:1",
+                "sourceSemanticRole": "main-image",
+                "artifactId": "artifact:sha256:41790ec8760fba3a39ea768219cd71502e2b92dba73ffe7de9e064f904948cd4",
+                "contentHash": "41790ec8760fba3a39ea768219cd71502e2b92dba73ffe7de9e064f904948cd4",
+                "identityLockIds": [
+                  "lock:commerce-product-identity",
+                  "lock:commerce-creative-direction"
+                ],
+                "referenceRole": "visual-continuity",
+                "allowedChanges": [
+                  "camera-angle",
+                  "crop",
+                  "lighting",
+                  "background"
+                ],
+                "bindingHash": "d8309fa8b6398530039f8e9061fb9cb7fbc1ccf488377f24066aa026c659cd33"
+              }
+            ]
+          }
+        },
+        {
+          "id": "evidence:p6.real-image-execution:receipt:multimodal:43f899ec47cb4813bb3fc6efea4d9d96",
+          "revision": "receipt:multimodal:43f899ec47cb4813bb3fc6efea4d9d96:revision:1",
+          "contentHash": "9204d28354a81b1057afdf8f8bb33f8ec687da012fda5143887d7204bcb3a871",
+          "kind": "real-host-receipt",
+          "binding": {
+            "metricId": "p6.real-image-execution",
+            "receiptId": "receipt:multimodal:43f899ec47cb4813bb3fc6efea4d9d96",
+            "runId": "run:commerce-held-out:64dbdb68-f0a5-4b1c-844e-6a10e278d11c",
+            "capabilityId": "capability:commerce-semantic-media-qa",
+            "artifactIds": [
+              "artifact:sha256:430a0b0904e88d5f0c7b6457de6ab9a3e41c01800b87a54ef38994fff0075b6e"
+            ],
+            "acceptedReferenceArtifactIds": [
+              "artifact:sha256:c753f002f424f683cada19e0f8a24d569743e3bd314211b46e21a5e3a18c91ee"
+            ]
           }
         }
       ],
-      "diagnostics": [
-        {
-          "code": "real-host-evidence-unavailable",
-          "message": "Real Host execution evidence has not been supplied.",
-          "evidenceReferenceIds": [
-            "evidence:p6.real-image-execution"
-          ]
-        },
-        {
-          "code": "real-host-evidence-unavailable",
-          "message": "Real Host execution evidence has not been supplied.",
-          "evidenceReferenceIds": [
-            "evidence:p6.real-image-execution"
-          ]
-        }
-      ]
+      "diagnostics": []
     },
     {
       "id": "p6.real-image-bytes",
       "acceptanceCriterion": "P6",
       "tier": "real-host",
       "label": "Real Host image bytes and usability gates",
-      "status": "blocked",
+      "status": "passed",
       "assertions": [
         {
           "id": "artifact-bytes-present-and-decoded",
-          "verdict": "blocked",
-          "diagnostic": {
-            "code": "real-host-evidence-unavailable",
-            "message": "Real Host execution evidence has not been supplied.",
-            "evidenceReferenceIds": [
-              "evidence:p6.real-image-bytes"
-            ]
-          }
+          "verdict": "passed"
         },
         {
           "id": "dimensions-identity-policy-and-usability-pass",
-          "verdict": "blocked",
-          "diagnostic": {
-            "code": "real-host-evidence-unavailable",
-            "message": "Real Host execution evidence has not been supplied.",
-            "evidenceReferenceIds": [
-              "evidence:p6.real-image-bytes"
-            ]
-          }
+          "verdict": "passed"
         }
       ],
       "evidenceReferences": [
         {
-          "id": "evidence:p6.real-image-bytes",
-          "revision": "evidence:p6.real-image-bytes:revision:1",
-          "contentHash": "6f53d2b7e254518b2742e3e32c1573f3882af394c1037034749e0add421ea758",
-          "kind": "host-capability-audit",
+          "id": "evidence:p6.real-image-bytes:receipt:multimodal:7a2440bb8b194d78b4472b30dacc7b18",
+          "revision": "receipt:multimodal:7a2440bb8b194d78b4472b30dacc7b18:revision:1",
+          "contentHash": "6b7ecf7cb6144f03c55090707b0598b19f63365f42f2e4acfb2135499161a27e",
+          "kind": "real-host-receipt",
           "binding": {
             "metricId": "p6.real-image-bytes",
-            "findingCode": "real-host-evidence-unavailable"
+            "receiptId": "receipt:multimodal:7a2440bb8b194d78b4472b30dacc7b18",
+            "runId": "run:commerce-held-out:64dbdb68-f0a5-4b1c-844e-6a10e278d11c",
+            "capabilityId": "capability:commerce-image",
+            "artifactIds": [
+              "artifact:sha256:41790ec8760fba3a39ea768219cd71502e2b92dba73ffe7de9e064f904948cd4"
+            ],
+            "acceptedReferenceArtifactIds": [
+              "artifact:sha256:1bf6821d0b7ad9fc637646883b3b6bd8d79e00f2b0894f734096ce39a9f13122"
+            ],
+            "dagReferences": []
+          }
+        },
+        {
+          "id": "evidence:p6.real-image-bytes:receipt:multimodal:7e5a822489d744418e476e5372b536f2",
+          "revision": "receipt:multimodal:7e5a822489d744418e476e5372b536f2:revision:1",
+          "contentHash": "be719b85240a47fa4d7a2647c65d0598be84e3baf87a5784b0a99c70797c14ae",
+          "kind": "real-host-receipt",
+          "binding": {
+            "metricId": "p6.real-image-bytes",
+            "receiptId": "receipt:multimodal:7e5a822489d744418e476e5372b536f2",
+            "runId": "run:commerce-held-out:64dbdb68-f0a5-4b1c-844e-6a10e278d11c",
+            "capabilityId": "capability:commerce-semantic-media-qa",
+            "artifactIds": [
+              "artifact:sha256:187e1941643a092f7ff805759c283d868b0b33c1c133c5c26c0f7ec413126a09"
+            ],
+            "acceptedReferenceArtifactIds": [
+              "artifact:sha256:41790ec8760fba3a39ea768219cd71502e2b92dba73ffe7de9e064f904948cd4"
+            ]
+          }
+        },
+        {
+          "id": "evidence:p6.real-image-bytes:bytes:artifact:sha256:41790ec8760fba3a39ea768219cd71502e2b92dba73ffe7de9e064f904948cd4",
+          "revision": "artifact:sha256:41790ec8760fba3a39ea768219cd71502e2b92dba73ffe7de9e064f904948cd4:revision:1",
+          "contentHash": "41790ec8760fba3a39ea768219cd71502e2b92dba73ffe7de9e064f904948cd4",
+          "kind": "artifact-bytes",
+          "binding": {
+            "metricId": "p6.real-image-bytes",
+            "receiptId": "receipt:multimodal:7a2440bb8b194d78b4472b30dacc7b18",
+            "artifactId": "artifact:sha256:41790ec8760fba3a39ea768219cd71502e2b92dba73ffe7de9e064f904948cd4",
+            "mediaType": "image/png",
+            "byteLength": 1634592
+          }
+        },
+        {
+          "id": "evidence:p6.real-image-bytes:bytes:artifact:sha256:187e1941643a092f7ff805759c283d868b0b33c1c133c5c26c0f7ec413126a09",
+          "revision": "artifact:sha256:187e1941643a092f7ff805759c283d868b0b33c1c133c5c26c0f7ec413126a09:revision:1",
+          "contentHash": "187e1941643a092f7ff805759c283d868b0b33c1c133c5c26c0f7ec413126a09",
+          "kind": "artifact-bytes",
+          "binding": {
+            "metricId": "p6.real-image-bytes",
+            "receiptId": "receipt:multimodal:7e5a822489d744418e476e5372b536f2",
+            "artifactId": "artifact:sha256:187e1941643a092f7ff805759c283d868b0b33c1c133c5c26c0f7ec413126a09",
+            "mediaType": "application/json",
+            "byteLength": 881
+          }
+        },
+        {
+          "id": "evidence:p6.real-image-bytes:receipt:multimodal:6169d80aeab046d1a0669083d32eefe2",
+          "revision": "receipt:multimodal:6169d80aeab046d1a0669083d32eefe2:revision:1",
+          "contentHash": "0247af8883693d55dc7b1ad244c392bf9ceb4bea7f77b65d5016fea6167a1599",
+          "kind": "real-host-receipt",
+          "binding": {
+            "metricId": "p6.real-image-bytes",
+            "receiptId": "receipt:multimodal:6169d80aeab046d1a0669083d32eefe2",
+            "runId": "run:commerce-held-out:64dbdb68-f0a5-4b1c-844e-6a10e278d11c",
+            "capabilityId": "capability:commerce-image",
+            "artifactIds": [
+              "artifact:sha256:d9631ca8f4948b981e3e67960b06c8f95b80756b452e99b1f848a74587a178f9"
+            ],
+            "acceptedReferenceArtifactIds": [
+              "artifact:sha256:1bf6821d0b7ad9fc637646883b3b6bd8d79e00f2b0894f734096ce39a9f13122",
+              "artifact:sha256:41790ec8760fba3a39ea768219cd71502e2b92dba73ffe7de9e064f904948cd4"
+            ],
+            "dagReferences": [
+              {
+                "sourcePlanNodeId": "outcome:commerce:main-image:step:1",
+                "sourceSemanticRole": "main-image",
+                "artifactId": "artifact:sha256:41790ec8760fba3a39ea768219cd71502e2b92dba73ffe7de9e064f904948cd4",
+                "contentHash": "41790ec8760fba3a39ea768219cd71502e2b92dba73ffe7de9e064f904948cd4",
+                "identityLockIds": [
+                  "lock:commerce-product-identity",
+                  "lock:commerce-creative-direction"
+                ],
+                "referenceRole": "visual-continuity",
+                "allowedChanges": [
+                  "camera-angle",
+                  "crop",
+                  "lighting",
+                  "background"
+                ],
+                "bindingHash": "d8309fa8b6398530039f8e9061fb9cb7fbc1ccf488377f24066aa026c659cd33"
+              }
+            ]
+          }
+        },
+        {
+          "id": "evidence:p6.real-image-bytes:receipt:multimodal:9ef61ae463234c5bb201a80b715b069c",
+          "revision": "receipt:multimodal:9ef61ae463234c5bb201a80b715b069c:revision:1",
+          "contentHash": "9ec5399f239db786f0988c38f44e8aaf8e12722a600c389513f5b031a17d970f",
+          "kind": "real-host-receipt",
+          "binding": {
+            "metricId": "p6.real-image-bytes",
+            "receiptId": "receipt:multimodal:9ef61ae463234c5bb201a80b715b069c",
+            "runId": "run:commerce-held-out:64dbdb68-f0a5-4b1c-844e-6a10e278d11c",
+            "capabilityId": "capability:commerce-semantic-media-qa",
+            "artifactIds": [
+              "artifact:sha256:fd9cf036b0fb60b89f8efed3a904a1a66da38ae720aec40e3598af2dad118932"
+            ],
+            "acceptedReferenceArtifactIds": [
+              "artifact:sha256:d9631ca8f4948b981e3e67960b06c8f95b80756b452e99b1f848a74587a178f9"
+            ]
+          }
+        },
+        {
+          "id": "evidence:p6.real-image-bytes:bytes:artifact:sha256:d9631ca8f4948b981e3e67960b06c8f95b80756b452e99b1f848a74587a178f9",
+          "revision": "artifact:sha256:d9631ca8f4948b981e3e67960b06c8f95b80756b452e99b1f848a74587a178f9:revision:1",
+          "contentHash": "d9631ca8f4948b981e3e67960b06c8f95b80756b452e99b1f848a74587a178f9",
+          "kind": "artifact-bytes",
+          "binding": {
+            "metricId": "p6.real-image-bytes",
+            "receiptId": "receipt:multimodal:6169d80aeab046d1a0669083d32eefe2",
+            "artifactId": "artifact:sha256:d9631ca8f4948b981e3e67960b06c8f95b80756b452e99b1f848a74587a178f9",
+            "mediaType": "image/png",
+            "byteLength": 1603884
+          }
+        },
+        {
+          "id": "evidence:p6.real-image-bytes:bytes:artifact:sha256:fd9cf036b0fb60b89f8efed3a904a1a66da38ae720aec40e3598af2dad118932",
+          "revision": "artifact:sha256:fd9cf036b0fb60b89f8efed3a904a1a66da38ae720aec40e3598af2dad118932:revision:1",
+          "contentHash": "fd9cf036b0fb60b89f8efed3a904a1a66da38ae720aec40e3598af2dad118932",
+          "kind": "artifact-bytes",
+          "binding": {
+            "metricId": "p6.real-image-bytes",
+            "receiptId": "receipt:multimodal:9ef61ae463234c5bb201a80b715b069c",
+            "artifactId": "artifact:sha256:fd9cf036b0fb60b89f8efed3a904a1a66da38ae720aec40e3598af2dad118932",
+            "mediaType": "application/json",
+            "byteLength": 780
+          }
+        },
+        {
+          "id": "evidence:p6.real-image-bytes:receipt:multimodal:93906e26a8584f1ea4393aa01cbffadb",
+          "revision": "receipt:multimodal:93906e26a8584f1ea4393aa01cbffadb:revision:1",
+          "contentHash": "6579f123f399c6c2342fd91f249d3284cc15586a5e03843f97e5aeab15b16a2b",
+          "kind": "real-host-receipt",
+          "binding": {
+            "metricId": "p6.real-image-bytes",
+            "receiptId": "receipt:multimodal:93906e26a8584f1ea4393aa01cbffadb",
+            "runId": "run:commerce-held-out:64dbdb68-f0a5-4b1c-844e-6a10e278d11c",
+            "capabilityId": "capability:commerce-image",
+            "artifactIds": [
+              "artifact:sha256:bb26b4da01d7bbc7102da3862346427381369d677a97bd743d6452c414831ae8"
+            ],
+            "acceptedReferenceArtifactIds": [
+              "artifact:sha256:1bf6821d0b7ad9fc637646883b3b6bd8d79e00f2b0894f734096ce39a9f13122",
+              "artifact:sha256:41790ec8760fba3a39ea768219cd71502e2b92dba73ffe7de9e064f904948cd4"
+            ],
+            "dagReferences": [
+              {
+                "sourcePlanNodeId": "outcome:commerce:main-image:step:1",
+                "sourceSemanticRole": "main-image",
+                "artifactId": "artifact:sha256:41790ec8760fba3a39ea768219cd71502e2b92dba73ffe7de9e064f904948cd4",
+                "contentHash": "41790ec8760fba3a39ea768219cd71502e2b92dba73ffe7de9e064f904948cd4",
+                "identityLockIds": [
+                  "lock:commerce-product-identity",
+                  "lock:commerce-creative-direction"
+                ],
+                "referenceRole": "visual-continuity",
+                "allowedChanges": [
+                  "camera-angle",
+                  "crop",
+                  "lighting",
+                  "background"
+                ],
+                "bindingHash": "d8309fa8b6398530039f8e9061fb9cb7fbc1ccf488377f24066aa026c659cd33"
+              }
+            ]
+          }
+        },
+        {
+          "id": "evidence:p6.real-image-bytes:receipt:multimodal:3322f4515ec14852b218a4a83f7fbbeb",
+          "revision": "receipt:multimodal:3322f4515ec14852b218a4a83f7fbbeb:revision:1",
+          "contentHash": "97ecbec69fe9dfb3ccebde9229702a0af4a40420478fbb9722428b0373b03e7e",
+          "kind": "real-host-receipt",
+          "binding": {
+            "metricId": "p6.real-image-bytes",
+            "receiptId": "receipt:multimodal:3322f4515ec14852b218a4a83f7fbbeb",
+            "runId": "run:commerce-held-out:64dbdb68-f0a5-4b1c-844e-6a10e278d11c",
+            "capabilityId": "capability:commerce-semantic-media-qa",
+            "artifactIds": [
+              "artifact:sha256:d6908df4053c086ae27de0fb82fdc6cdf6177ef0733b49803d51926c228e342f"
+            ],
+            "acceptedReferenceArtifactIds": [
+              "artifact:sha256:bb26b4da01d7bbc7102da3862346427381369d677a97bd743d6452c414831ae8"
+            ]
+          }
+        },
+        {
+          "id": "evidence:p6.real-image-bytes:bytes:artifact:sha256:bb26b4da01d7bbc7102da3862346427381369d677a97bd743d6452c414831ae8",
+          "revision": "artifact:sha256:bb26b4da01d7bbc7102da3862346427381369d677a97bd743d6452c414831ae8:revision:1",
+          "contentHash": "bb26b4da01d7bbc7102da3862346427381369d677a97bd743d6452c414831ae8",
+          "kind": "artifact-bytes",
+          "binding": {
+            "metricId": "p6.real-image-bytes",
+            "receiptId": "receipt:multimodal:93906e26a8584f1ea4393aa01cbffadb",
+            "artifactId": "artifact:sha256:bb26b4da01d7bbc7102da3862346427381369d677a97bd743d6452c414831ae8",
+            "mediaType": "image/png",
+            "byteLength": 1524330
+          }
+        },
+        {
+          "id": "evidence:p6.real-image-bytes:bytes:artifact:sha256:d6908df4053c086ae27de0fb82fdc6cdf6177ef0733b49803d51926c228e342f",
+          "revision": "artifact:sha256:d6908df4053c086ae27de0fb82fdc6cdf6177ef0733b49803d51926c228e342f:revision:1",
+          "contentHash": "d6908df4053c086ae27de0fb82fdc6cdf6177ef0733b49803d51926c228e342f",
+          "kind": "artifact-bytes",
+          "binding": {
+            "metricId": "p6.real-image-bytes",
+            "receiptId": "receipt:multimodal:3322f4515ec14852b218a4a83f7fbbeb",
+            "artifactId": "artifact:sha256:d6908df4053c086ae27de0fb82fdc6cdf6177ef0733b49803d51926c228e342f",
+            "mediaType": "application/json",
+            "byteLength": 789
+          }
+        },
+        {
+          "id": "evidence:p6.real-image-bytes:receipt:multimodal:90b1ef3fe18f4287b3e29c8c46540127",
+          "revision": "receipt:multimodal:90b1ef3fe18f4287b3e29c8c46540127:revision:1",
+          "contentHash": "aa336f8b8ea346da0358a781abfc9191e1922ebe44c2d20882f2763f4a12a9e0",
+          "kind": "real-host-receipt",
+          "binding": {
+            "metricId": "p6.real-image-bytes",
+            "receiptId": "receipt:multimodal:90b1ef3fe18f4287b3e29c8c46540127",
+            "runId": "run:commerce-held-out:64dbdb68-f0a5-4b1c-844e-6a10e278d11c",
+            "capabilityId": "capability:commerce-image",
+            "artifactIds": [
+              "artifact:sha256:cd0be322beac7b5603162c279f35fd5f3813c08180715a14b89213f54315c448"
+            ],
+            "acceptedReferenceArtifactIds": [
+              "artifact:sha256:1bf6821d0b7ad9fc637646883b3b6bd8d79e00f2b0894f734096ce39a9f13122",
+              "artifact:sha256:41790ec8760fba3a39ea768219cd71502e2b92dba73ffe7de9e064f904948cd4"
+            ],
+            "dagReferences": [
+              {
+                "sourcePlanNodeId": "outcome:commerce:main-image:step:1",
+                "sourceSemanticRole": "main-image",
+                "artifactId": "artifact:sha256:41790ec8760fba3a39ea768219cd71502e2b92dba73ffe7de9e064f904948cd4",
+                "contentHash": "41790ec8760fba3a39ea768219cd71502e2b92dba73ffe7de9e064f904948cd4",
+                "identityLockIds": [
+                  "lock:commerce-product-identity",
+                  "lock:commerce-creative-direction"
+                ],
+                "referenceRole": "visual-continuity",
+                "allowedChanges": [
+                  "camera-angle",
+                  "crop",
+                  "lighting",
+                  "background"
+                ],
+                "bindingHash": "d8309fa8b6398530039f8e9061fb9cb7fbc1ccf488377f24066aa026c659cd33"
+              }
+            ]
+          }
+        },
+        {
+          "id": "evidence:p6.real-image-bytes:receipt:multimodal:073705430fd544998211bb64e4ab1916",
+          "revision": "receipt:multimodal:073705430fd544998211bb64e4ab1916:revision:1",
+          "contentHash": "cc6eff15d2bd867e54efb85c111d6b06631766e4924cc6fae979584a0631d557",
+          "kind": "real-host-receipt",
+          "binding": {
+            "metricId": "p6.real-image-bytes",
+            "receiptId": "receipt:multimodal:073705430fd544998211bb64e4ab1916",
+            "runId": "run:commerce-held-out:64dbdb68-f0a5-4b1c-844e-6a10e278d11c",
+            "capabilityId": "capability:commerce-semantic-media-qa",
+            "artifactIds": [
+              "artifact:sha256:7022e4348c11b331ba7344821841b0258caaa9d0f0a490885892097f69f7a546"
+            ],
+            "acceptedReferenceArtifactIds": [
+              "artifact:sha256:cd0be322beac7b5603162c279f35fd5f3813c08180715a14b89213f54315c448"
+            ]
+          }
+        },
+        {
+          "id": "evidence:p6.real-image-bytes:bytes:artifact:sha256:cd0be322beac7b5603162c279f35fd5f3813c08180715a14b89213f54315c448",
+          "revision": "artifact:sha256:cd0be322beac7b5603162c279f35fd5f3813c08180715a14b89213f54315c448:revision:1",
+          "contentHash": "cd0be322beac7b5603162c279f35fd5f3813c08180715a14b89213f54315c448",
+          "kind": "artifact-bytes",
+          "binding": {
+            "metricId": "p6.real-image-bytes",
+            "receiptId": "receipt:multimodal:90b1ef3fe18f4287b3e29c8c46540127",
+            "artifactId": "artifact:sha256:cd0be322beac7b5603162c279f35fd5f3813c08180715a14b89213f54315c448",
+            "mediaType": "image/png",
+            "byteLength": 1422741
+          }
+        },
+        {
+          "id": "evidence:p6.real-image-bytes:bytes:artifact:sha256:7022e4348c11b331ba7344821841b0258caaa9d0f0a490885892097f69f7a546",
+          "revision": "artifact:sha256:7022e4348c11b331ba7344821841b0258caaa9d0f0a490885892097f69f7a546:revision:1",
+          "contentHash": "7022e4348c11b331ba7344821841b0258caaa9d0f0a490885892097f69f7a546",
+          "kind": "artifact-bytes",
+          "binding": {
+            "metricId": "p6.real-image-bytes",
+            "receiptId": "receipt:multimodal:073705430fd544998211bb64e4ab1916",
+            "artifactId": "artifact:sha256:7022e4348c11b331ba7344821841b0258caaa9d0f0a490885892097f69f7a546",
+            "mediaType": "application/json",
+            "byteLength": 801
+          }
+        },
+        {
+          "id": "evidence:p6.real-image-bytes:receipt:multimodal:0667d683d3704f9fa561575a36dfac7d",
+          "revision": "receipt:multimodal:0667d683d3704f9fa561575a36dfac7d:revision:1",
+          "contentHash": "5d286b7d92d002850519197f4d172adb78570c6945d8f2c6276291ef2445a614",
+          "kind": "real-host-receipt",
+          "binding": {
+            "metricId": "p6.real-image-bytes",
+            "receiptId": "receipt:multimodal:0667d683d3704f9fa561575a36dfac7d",
+            "runId": "run:commerce-held-out:64dbdb68-f0a5-4b1c-844e-6a10e278d11c",
+            "capabilityId": "capability:commerce-image",
+            "artifactIds": [
+              "artifact:sha256:9dbad1fdbd62dd3fe73013ac142c18de2d28d8406df77bbb636dbe9308884c19"
+            ],
+            "acceptedReferenceArtifactIds": [
+              "artifact:sha256:1bf6821d0b7ad9fc637646883b3b6bd8d79e00f2b0894f734096ce39a9f13122",
+              "artifact:sha256:41790ec8760fba3a39ea768219cd71502e2b92dba73ffe7de9e064f904948cd4"
+            ],
+            "dagReferences": [
+              {
+                "sourcePlanNodeId": "outcome:commerce:main-image:step:1",
+                "sourceSemanticRole": "main-image",
+                "artifactId": "artifact:sha256:41790ec8760fba3a39ea768219cd71502e2b92dba73ffe7de9e064f904948cd4",
+                "contentHash": "41790ec8760fba3a39ea768219cd71502e2b92dba73ffe7de9e064f904948cd4",
+                "identityLockIds": [
+                  "lock:commerce-product-identity",
+                  "lock:commerce-creative-direction"
+                ],
+                "referenceRole": "visual-continuity",
+                "allowedChanges": [
+                  "camera-angle",
+                  "crop",
+                  "lighting",
+                  "background"
+                ],
+                "bindingHash": "d8309fa8b6398530039f8e9061fb9cb7fbc1ccf488377f24066aa026c659cd33"
+              }
+            ]
+          }
+        },
+        {
+          "id": "evidence:p6.real-image-bytes:receipt:multimodal:55622d9242354da8abe6c9a56deba7f9",
+          "revision": "receipt:multimodal:55622d9242354da8abe6c9a56deba7f9:revision:1",
+          "contentHash": "3e92ac19f8a8ff64007e61ddbfef1bbba3b387c70ceb54bab6b3fa835abe2784",
+          "kind": "real-host-receipt",
+          "binding": {
+            "metricId": "p6.real-image-bytes",
+            "receiptId": "receipt:multimodal:55622d9242354da8abe6c9a56deba7f9",
+            "runId": "run:commerce-held-out:64dbdb68-f0a5-4b1c-844e-6a10e278d11c",
+            "capabilityId": "capability:commerce-semantic-media-qa",
+            "artifactIds": [
+              "artifact:sha256:346b113f7fee6ebdc0253f39ed42aed5d6fb2966872db81713a5d0b838bd1848"
+            ],
+            "acceptedReferenceArtifactIds": [
+              "artifact:sha256:9dbad1fdbd62dd3fe73013ac142c18de2d28d8406df77bbb636dbe9308884c19"
+            ]
+          }
+        },
+        {
+          "id": "evidence:p6.real-image-bytes:bytes:artifact:sha256:9dbad1fdbd62dd3fe73013ac142c18de2d28d8406df77bbb636dbe9308884c19",
+          "revision": "artifact:sha256:9dbad1fdbd62dd3fe73013ac142c18de2d28d8406df77bbb636dbe9308884c19:revision:1",
+          "contentHash": "9dbad1fdbd62dd3fe73013ac142c18de2d28d8406df77bbb636dbe9308884c19",
+          "kind": "artifact-bytes",
+          "binding": {
+            "metricId": "p6.real-image-bytes",
+            "receiptId": "receipt:multimodal:0667d683d3704f9fa561575a36dfac7d",
+            "artifactId": "artifact:sha256:9dbad1fdbd62dd3fe73013ac142c18de2d28d8406df77bbb636dbe9308884c19",
+            "mediaType": "image/png",
+            "byteLength": 1321286
+          }
+        },
+        {
+          "id": "evidence:p6.real-image-bytes:bytes:artifact:sha256:346b113f7fee6ebdc0253f39ed42aed5d6fb2966872db81713a5d0b838bd1848",
+          "revision": "artifact:sha256:346b113f7fee6ebdc0253f39ed42aed5d6fb2966872db81713a5d0b838bd1848:revision:1",
+          "contentHash": "346b113f7fee6ebdc0253f39ed42aed5d6fb2966872db81713a5d0b838bd1848",
+          "kind": "artifact-bytes",
+          "binding": {
+            "metricId": "p6.real-image-bytes",
+            "receiptId": "receipt:multimodal:55622d9242354da8abe6c9a56deba7f9",
+            "artifactId": "artifact:sha256:346b113f7fee6ebdc0253f39ed42aed5d6fb2966872db81713a5d0b838bd1848",
+            "mediaType": "application/json",
+            "byteLength": 816
+          }
+        },
+        {
+          "id": "evidence:p6.real-image-bytes:receipt:multimodal:08dfd9ab98294571b20856e462781d7d",
+          "revision": "receipt:multimodal:08dfd9ab98294571b20856e462781d7d:revision:1",
+          "contentHash": "c6f9df5cf2a618898a3e2eb6fbe0aa1f1e6daad6aa4dd61c4682ba874bba783b",
+          "kind": "real-host-receipt",
+          "binding": {
+            "metricId": "p6.real-image-bytes",
+            "receiptId": "receipt:multimodal:08dfd9ab98294571b20856e462781d7d",
+            "runId": "run:commerce-held-out:64dbdb68-f0a5-4b1c-844e-6a10e278d11c",
+            "capabilityId": "capability:commerce-image",
+            "artifactIds": [
+              "artifact:sha256:c753f002f424f683cada19e0f8a24d569743e3bd314211b46e21a5e3a18c91ee"
+            ],
+            "acceptedReferenceArtifactIds": [
+              "artifact:sha256:1bf6821d0b7ad9fc637646883b3b6bd8d79e00f2b0894f734096ce39a9f13122",
+              "artifact:sha256:41790ec8760fba3a39ea768219cd71502e2b92dba73ffe7de9e064f904948cd4"
+            ],
+            "dagReferences": [
+              {
+                "sourcePlanNodeId": "outcome:commerce:main-image:step:1",
+                "sourceSemanticRole": "main-image",
+                "artifactId": "artifact:sha256:41790ec8760fba3a39ea768219cd71502e2b92dba73ffe7de9e064f904948cd4",
+                "contentHash": "41790ec8760fba3a39ea768219cd71502e2b92dba73ffe7de9e064f904948cd4",
+                "identityLockIds": [
+                  "lock:commerce-product-identity",
+                  "lock:commerce-creative-direction"
+                ],
+                "referenceRole": "visual-continuity",
+                "allowedChanges": [
+                  "camera-angle",
+                  "crop",
+                  "lighting",
+                  "background"
+                ],
+                "bindingHash": "d8309fa8b6398530039f8e9061fb9cb7fbc1ccf488377f24066aa026c659cd33"
+              }
+            ]
+          }
+        },
+        {
+          "id": "evidence:p6.real-image-bytes:receipt:multimodal:43f899ec47cb4813bb3fc6efea4d9d96",
+          "revision": "receipt:multimodal:43f899ec47cb4813bb3fc6efea4d9d96:revision:1",
+          "contentHash": "9204d28354a81b1057afdf8f8bb33f8ec687da012fda5143887d7204bcb3a871",
+          "kind": "real-host-receipt",
+          "binding": {
+            "metricId": "p6.real-image-bytes",
+            "receiptId": "receipt:multimodal:43f899ec47cb4813bb3fc6efea4d9d96",
+            "runId": "run:commerce-held-out:64dbdb68-f0a5-4b1c-844e-6a10e278d11c",
+            "capabilityId": "capability:commerce-semantic-media-qa",
+            "artifactIds": [
+              "artifact:sha256:430a0b0904e88d5f0c7b6457de6ab9a3e41c01800b87a54ef38994fff0075b6e"
+            ],
+            "acceptedReferenceArtifactIds": [
+              "artifact:sha256:c753f002f424f683cada19e0f8a24d569743e3bd314211b46e21a5e3a18c91ee"
+            ]
+          }
+        },
+        {
+          "id": "evidence:p6.real-image-bytes:bytes:artifact:sha256:c753f002f424f683cada19e0f8a24d569743e3bd314211b46e21a5e3a18c91ee",
+          "revision": "artifact:sha256:c753f002f424f683cada19e0f8a24d569743e3bd314211b46e21a5e3a18c91ee:revision:1",
+          "contentHash": "c753f002f424f683cada19e0f8a24d569743e3bd314211b46e21a5e3a18c91ee",
+          "kind": "artifact-bytes",
+          "binding": {
+            "metricId": "p6.real-image-bytes",
+            "receiptId": "receipt:multimodal:08dfd9ab98294571b20856e462781d7d",
+            "artifactId": "artifact:sha256:c753f002f424f683cada19e0f8a24d569743e3bd314211b46e21a5e3a18c91ee",
+            "mediaType": "image/png",
+            "byteLength": 1517134
+          }
+        },
+        {
+          "id": "evidence:p6.real-image-bytes:bytes:artifact:sha256:430a0b0904e88d5f0c7b6457de6ab9a3e41c01800b87a54ef38994fff0075b6e",
+          "revision": "artifact:sha256:430a0b0904e88d5f0c7b6457de6ab9a3e41c01800b87a54ef38994fff0075b6e:revision:1",
+          "contentHash": "430a0b0904e88d5f0c7b6457de6ab9a3e41c01800b87a54ef38994fff0075b6e",
+          "kind": "artifact-bytes",
+          "binding": {
+            "metricId": "p6.real-image-bytes",
+            "receiptId": "receipt:multimodal:43f899ec47cb4813bb3fc6efea4d9d96",
+            "artifactId": "artifact:sha256:430a0b0904e88d5f0c7b6457de6ab9a3e41c01800b87a54ef38994fff0075b6e",
+            "mediaType": "application/json",
+            "byteLength": 806
           }
         }
       ],
-      "diagnostics": [
-        {
-          "code": "real-host-evidence-unavailable",
-          "message": "Real Host execution evidence has not been supplied.",
-          "evidenceReferenceIds": [
-            "evidence:p6.real-image-bytes"
-          ]
-        },
-        {
-          "code": "real-host-evidence-unavailable",
-          "message": "Real Host execution evidence has not been supplied.",
-          "evidenceReferenceIds": [
-            "evidence:p6.real-image-bytes"
-          ]
-        }
-      ]
+      "diagnostics": []
     },
     {
       "id": "p6.real-video-execution",
       "acceptanceCriterion": "P6",
       "tier": "real-host",
       "label": "Real Host product video execution",
-      "status": "blocked",
+      "status": "passed",
       "assertions": [
         {
           "id": "authorized-command-settled",
-          "verdict": "blocked",
-          "diagnostic": {
-            "code": "real-host-evidence-unavailable",
-            "message": "Real Host execution evidence has not been supplied.",
-            "evidenceReferenceIds": [
-              "evidence:p6.real-video-execution"
-            ]
-          }
+          "verdict": "passed"
         },
         {
           "id": "accepted-receipt-bound",
-          "verdict": "blocked",
-          "diagnostic": {
-            "code": "real-host-evidence-unavailable",
-            "message": "Real Host execution evidence has not been supplied.",
-            "evidenceReferenceIds": [
-              "evidence:p6.real-video-execution"
-            ]
-          }
+          "verdict": "passed"
         }
       ],
       "evidenceReferences": [
         {
-          "id": "evidence:p6.real-video-execution",
-          "revision": "evidence:p6.real-video-execution:revision:1",
-          "contentHash": "6f53d2b7e254518b2742e3e32c1573f3882af394c1037034749e0add421ea758",
-          "kind": "host-capability-audit",
+          "id": "evidence:p6.real-video-execution:receipt:multimodal-playback:14e5826cf3024d1bb4ce9884fe9454b5",
+          "revision": "receipt:multimodal-playback:14e5826cf3024d1bb4ce9884fe9454b5:revision:1",
+          "contentHash": "eec55dfda05f231fc7369a1b868a812ead0ffc60b4198bf7882376aade622074",
+          "kind": "real-host-receipt",
           "binding": {
             "metricId": "p6.real-video-execution",
-            "findingCode": "real-host-evidence-unavailable"
+            "receiptId": "receipt:multimodal-playback:14e5826cf3024d1bb4ce9884fe9454b5",
+            "runId": "run:commerce-held-out:64dbdb68-f0a5-4b1c-844e-6a10e278d11c",
+            "capabilityId": "capability:commerce-video",
+            "artifactIds": [
+              "artifact:sha256:8b548bc4e5442403fedf34cfc8f61f093858540a71132e04fed41d38d7ed419a"
+            ],
+            "acceptedReferenceArtifactIds": [
+              "artifact:sha256:41790ec8760fba3a39ea768219cd71502e2b92dba73ffe7de9e064f904948cd4"
+            ],
+            "dagReferences": [
+              {
+                "sourcePlanNodeId": "outcome:commerce:main-image:step:1",
+                "sourceSemanticRole": "main-image",
+                "artifactId": "artifact:sha256:41790ec8760fba3a39ea768219cd71502e2b92dba73ffe7de9e064f904948cd4",
+                "contentHash": "41790ec8760fba3a39ea768219cd71502e2b92dba73ffe7de9e064f904948cd4",
+                "identityLockIds": [
+                  "lock:commerce-product-identity",
+                  "lock:commerce-creative-direction"
+                ],
+                "referenceRole": "first-frame",
+                "allowedChanges": [
+                  "camera-motion",
+                  "temporal-composition",
+                  "native-audio"
+                ],
+                "bindingHash": "36e0baf6c9f4fafb61deb8ccf034ed4b1c8e84e9c6b3c735cfec1dc9c2f060c1"
+              }
+            ]
+          }
+        },
+        {
+          "id": "evidence:p6.real-video-execution:receipt:multimodal:67ba8afbf9c44484913c3293a3c210ee",
+          "revision": "receipt:multimodal:67ba8afbf9c44484913c3293a3c210ee:revision:1",
+          "contentHash": "3b2d747d30f42efef7fcc9dc73e841cc09c2f69d1930b867e9de5e8894ae7377",
+          "kind": "real-host-receipt",
+          "binding": {
+            "metricId": "p6.real-video-execution",
+            "receiptId": "receipt:multimodal:67ba8afbf9c44484913c3293a3c210ee",
+            "runId": "run:commerce-held-out:64dbdb68-f0a5-4b1c-844e-6a10e278d11c",
+            "capabilityId": "capability:commerce-semantic-media-qa",
+            "artifactIds": [
+              "artifact:sha256:141ebcc6a52aa3f3e1f8bf32a93cc5cb3dc764909945d2e281df850b4fa702ca"
+            ],
+            "acceptedReferenceArtifactIds": [
+              "artifact:sha256:8b548bc4e5442403fedf34cfc8f61f093858540a71132e04fed41d38d7ed419a"
+            ]
           }
         }
       ],
-      "diagnostics": [
-        {
-          "code": "real-host-evidence-unavailable",
-          "message": "Real Host execution evidence has not been supplied.",
-          "evidenceReferenceIds": [
-            "evidence:p6.real-video-execution"
-          ]
-        },
-        {
-          "code": "real-host-evidence-unavailable",
-          "message": "Real Host execution evidence has not been supplied.",
-          "evidenceReferenceIds": [
-            "evidence:p6.real-video-execution"
-          ]
-        }
-      ]
+      "diagnostics": []
     },
     {
       "id": "p6.real-video-bytes",
       "acceptanceCriterion": "P6",
       "tier": "real-host",
       "label": "Real Host video bytes and playability gates",
-      "status": "blocked",
+      "status": "passed",
       "assertions": [
         {
           "id": "artifact-bytes-present-and-decoded",
-          "verdict": "blocked",
-          "diagnostic": {
-            "code": "real-host-evidence-unavailable",
-            "message": "Real Host execution evidence has not been supplied.",
-            "evidenceReferenceIds": [
-              "evidence:p6.real-video-bytes"
-            ]
-          }
+          "verdict": "passed"
         },
         {
           "id": "playability-identity-and-policy-gates-pass",
-          "verdict": "blocked",
-          "diagnostic": {
-            "code": "real-host-evidence-unavailable",
-            "message": "Real Host execution evidence has not been supplied.",
-            "evidenceReferenceIds": [
-              "evidence:p6.real-video-bytes"
-            ]
-          }
+          "verdict": "passed"
         }
       ],
       "evidenceReferences": [
         {
-          "id": "evidence:p6.real-video-bytes",
-          "revision": "evidence:p6.real-video-bytes:revision:1",
-          "contentHash": "6f53d2b7e254518b2742e3e32c1573f3882af394c1037034749e0add421ea758",
-          "kind": "host-capability-audit",
+          "id": "evidence:p6.real-video-bytes:receipt:multimodal-playback:14e5826cf3024d1bb4ce9884fe9454b5",
+          "revision": "receipt:multimodal-playback:14e5826cf3024d1bb4ce9884fe9454b5:revision:1",
+          "contentHash": "eec55dfda05f231fc7369a1b868a812ead0ffc60b4198bf7882376aade622074",
+          "kind": "real-host-receipt",
           "binding": {
             "metricId": "p6.real-video-bytes",
-            "findingCode": "real-host-evidence-unavailable"
+            "receiptId": "receipt:multimodal-playback:14e5826cf3024d1bb4ce9884fe9454b5",
+            "runId": "run:commerce-held-out:64dbdb68-f0a5-4b1c-844e-6a10e278d11c",
+            "capabilityId": "capability:commerce-video",
+            "artifactIds": [
+              "artifact:sha256:8b548bc4e5442403fedf34cfc8f61f093858540a71132e04fed41d38d7ed419a"
+            ],
+            "acceptedReferenceArtifactIds": [
+              "artifact:sha256:41790ec8760fba3a39ea768219cd71502e2b92dba73ffe7de9e064f904948cd4"
+            ],
+            "dagReferences": [
+              {
+                "sourcePlanNodeId": "outcome:commerce:main-image:step:1",
+                "sourceSemanticRole": "main-image",
+                "artifactId": "artifact:sha256:41790ec8760fba3a39ea768219cd71502e2b92dba73ffe7de9e064f904948cd4",
+                "contentHash": "41790ec8760fba3a39ea768219cd71502e2b92dba73ffe7de9e064f904948cd4",
+                "identityLockIds": [
+                  "lock:commerce-product-identity",
+                  "lock:commerce-creative-direction"
+                ],
+                "referenceRole": "first-frame",
+                "allowedChanges": [
+                  "camera-motion",
+                  "temporal-composition",
+                  "native-audio"
+                ],
+                "bindingHash": "36e0baf6c9f4fafb61deb8ccf034ed4b1c8e84e9c6b3c735cfec1dc9c2f060c1"
+              }
+            ]
+          }
+        },
+        {
+          "id": "evidence:p6.real-video-bytes:receipt:multimodal:67ba8afbf9c44484913c3293a3c210ee",
+          "revision": "receipt:multimodal:67ba8afbf9c44484913c3293a3c210ee:revision:1",
+          "contentHash": "3b2d747d30f42efef7fcc9dc73e841cc09c2f69d1930b867e9de5e8894ae7377",
+          "kind": "real-host-receipt",
+          "binding": {
+            "metricId": "p6.real-video-bytes",
+            "receiptId": "receipt:multimodal:67ba8afbf9c44484913c3293a3c210ee",
+            "runId": "run:commerce-held-out:64dbdb68-f0a5-4b1c-844e-6a10e278d11c",
+            "capabilityId": "capability:commerce-semantic-media-qa",
+            "artifactIds": [
+              "artifact:sha256:141ebcc6a52aa3f3e1f8bf32a93cc5cb3dc764909945d2e281df850b4fa702ca"
+            ],
+            "acceptedReferenceArtifactIds": [
+              "artifact:sha256:8b548bc4e5442403fedf34cfc8f61f093858540a71132e04fed41d38d7ed419a"
+            ]
+          }
+        },
+        {
+          "id": "evidence:p6.real-video-bytes:bytes:artifact:sha256:8b548bc4e5442403fedf34cfc8f61f093858540a71132e04fed41d38d7ed419a",
+          "revision": "artifact:sha256:8b548bc4e5442403fedf34cfc8f61f093858540a71132e04fed41d38d7ed419a:revision:1",
+          "contentHash": "8b548bc4e5442403fedf34cfc8f61f093858540a71132e04fed41d38d7ed419a",
+          "kind": "artifact-bytes",
+          "binding": {
+            "metricId": "p6.real-video-bytes",
+            "receiptId": "receipt:multimodal-playback:14e5826cf3024d1bb4ce9884fe9454b5",
+            "artifactId": "artifact:sha256:8b548bc4e5442403fedf34cfc8f61f093858540a71132e04fed41d38d7ed419a",
+            "mediaType": "video/mp4",
+            "byteLength": 9951174
+          }
+        },
+        {
+          "id": "evidence:p6.real-video-bytes:bytes:artifact:sha256:141ebcc6a52aa3f3e1f8bf32a93cc5cb3dc764909945d2e281df850b4fa702ca",
+          "revision": "artifact:sha256:141ebcc6a52aa3f3e1f8bf32a93cc5cb3dc764909945d2e281df850b4fa702ca:revision:1",
+          "contentHash": "141ebcc6a52aa3f3e1f8bf32a93cc5cb3dc764909945d2e281df850b4fa702ca",
+          "kind": "artifact-bytes",
+          "binding": {
+            "metricId": "p6.real-video-bytes",
+            "receiptId": "receipt:multimodal:67ba8afbf9c44484913c3293a3c210ee",
+            "artifactId": "artifact:sha256:141ebcc6a52aa3f3e1f8bf32a93cc5cb3dc764909945d2e281df850b4fa702ca",
+            "mediaType": "application/json",
+            "byteLength": 790
           }
         }
       ],
-      "diagnostics": [
-        {
-          "code": "real-host-evidence-unavailable",
-          "message": "Real Host execution evidence has not been supplied.",
-          "evidenceReferenceIds": [
-            "evidence:p6.real-video-bytes"
-          ]
-        },
-        {
-          "code": "real-host-evidence-unavailable",
-          "message": "Real Host execution evidence has not been supplied.",
-          "evidenceReferenceIds": [
-            "evidence:p6.real-video-bytes"
-          ]
-        }
-      ]
+      "diagnostics": []
     },
     {
       "id": "p7.real-strategy-execution",
       "acceptanceCriterion": "P7",
       "tier": "real-host",
       "label": "Real Host strategy document execution",
-      "status": "blocked",
+      "status": "passed",
       "assertions": [
         {
           "id": "authorized-command-settled",
-          "verdict": "blocked",
-          "diagnostic": {
-            "code": "real-host-evidence-unavailable",
-            "message": "Real Host execution evidence has not been supplied.",
-            "evidenceReferenceIds": [
-              "evidence:p7.real-strategy-execution"
-            ]
-          }
+          "verdict": "passed"
         },
         {
           "id": "accepted-receipt-bound",
-          "verdict": "blocked",
-          "diagnostic": {
-            "code": "real-host-evidence-unavailable",
-            "message": "Real Host execution evidence has not been supplied.",
-            "evidenceReferenceIds": [
-              "evidence:p7.real-strategy-execution"
-            ]
-          }
+          "verdict": "passed"
         }
       ],
       "evidenceReferences": [
         {
-          "id": "evidence:p7.real-strategy-execution",
-          "revision": "evidence:p7.real-strategy-execution:revision:1",
-          "contentHash": "6f53d2b7e254518b2742e3e32c1573f3882af394c1037034749e0add421ea758",
-          "kind": "host-capability-audit",
+          "id": "evidence:p7.real-strategy-execution:receipt:multimodal:692e3c7802fe4b528a2e9ac991bf3a24",
+          "revision": "receipt:multimodal:692e3c7802fe4b528a2e9ac991bf3a24:revision:1",
+          "contentHash": "3a5696d9c61b14ae405507be40302255dce33ab49e8cc52b433b0d74844cc7dd",
+          "kind": "real-host-receipt",
           "binding": {
             "metricId": "p7.real-strategy-execution",
-            "findingCode": "real-host-evidence-unavailable"
+            "receiptId": "receipt:multimodal:692e3c7802fe4b528a2e9ac991bf3a24",
+            "runId": "run:commerce-held-out:64dbdb68-f0a5-4b1c-844e-6a10e278d11c",
+            "capabilityId": "capability:commerce-strategy",
+            "artifactIds": [
+              "artifact:sha256:ef972cac3d7c59d6f1d3267c2009fe00adab53b7429219a673db9942289a3cee"
+            ],
+            "acceptedReferenceArtifactIds": [
+              "artifact:sha256:9f4692f1a5bac2c7ab28510ca3fbbd516a573109ca9d2b35b46f5023955f9b23",
+              "artifact:sha256:48409f981b4b203cfa577ac7170cfe8ebf8f11ec5b43f0a3893add18d9c97b37",
+              "artifact:sha256:38d0111922cf90f4a4c158ff19e4f8c3a16b18f6aa97e13020ab677d4979ae1e",
+              "artifact:sha256:41790ec8760fba3a39ea768219cd71502e2b92dba73ffe7de9e064f904948cd4",
+              "artifact:sha256:d9631ca8f4948b981e3e67960b06c8f95b80756b452e99b1f848a74587a178f9",
+              "artifact:sha256:bb26b4da01d7bbc7102da3862346427381369d677a97bd743d6452c414831ae8",
+              "artifact:sha256:cd0be322beac7b5603162c279f35fd5f3813c08180715a14b89213f54315c448",
+              "artifact:sha256:9dbad1fdbd62dd3fe73013ac142c18de2d28d8406df77bbb636dbe9308884c19",
+              "artifact:sha256:c753f002f424f683cada19e0f8a24d569743e3bd314211b46e21a5e3a18c91ee",
+              "artifact:sha256:8b548bc4e5442403fedf34cfc8f61f093858540a71132e04fed41d38d7ed419a"
+            ],
+            "dagReferences": []
           }
         }
       ],
-      "diagnostics": [
-        {
-          "code": "real-host-evidence-unavailable",
-          "message": "Real Host execution evidence has not been supplied.",
-          "evidenceReferenceIds": [
-            "evidence:p7.real-strategy-execution"
-          ]
-        },
-        {
-          "code": "real-host-evidence-unavailable",
-          "message": "Real Host execution evidence has not been supplied.",
-          "evidenceReferenceIds": [
-            "evidence:p7.real-strategy-execution"
-          ]
-        }
-      ]
+      "diagnostics": []
     },
     {
       "id": "p7.real-strategy-bytes",
       "acceptanceCriterion": "P7",
       "tier": "real-host",
       "label": "Real Host strategy bytes and evidence gates",
-      "status": "blocked",
+      "status": "passed",
       "assertions": [
         {
           "id": "artifact-bytes-present-and-decoded",
-          "verdict": "blocked",
-          "diagnostic": {
-            "code": "real-host-evidence-unavailable",
-            "message": "Real Host execution evidence has not been supplied.",
-            "evidenceReferenceIds": [
-              "evidence:p7.real-strategy-bytes"
-            ]
-          }
+          "verdict": "passed"
         },
         {
           "id": "facts-plan-route-validation-receipt-repair-closure-passes",
-          "verdict": "blocked",
-          "diagnostic": {
-            "code": "real-host-evidence-unavailable",
-            "message": "Real Host execution evidence has not been supplied.",
-            "evidenceReferenceIds": [
-              "evidence:p7.real-strategy-bytes"
-            ]
-          }
+          "verdict": "passed"
         }
       ],
       "evidenceReferences": [
         {
-          "id": "evidence:p7.real-strategy-bytes",
-          "revision": "evidence:p7.real-strategy-bytes:revision:1",
-          "contentHash": "6f53d2b7e254518b2742e3e32c1573f3882af394c1037034749e0add421ea758",
-          "kind": "host-capability-audit",
+          "id": "evidence:p7.real-strategy-bytes:receipt:multimodal:692e3c7802fe4b528a2e9ac991bf3a24",
+          "revision": "receipt:multimodal:692e3c7802fe4b528a2e9ac991bf3a24:revision:1",
+          "contentHash": "3a5696d9c61b14ae405507be40302255dce33ab49e8cc52b433b0d74844cc7dd",
+          "kind": "real-host-receipt",
           "binding": {
             "metricId": "p7.real-strategy-bytes",
-            "findingCode": "real-host-evidence-unavailable"
+            "receiptId": "receipt:multimodal:692e3c7802fe4b528a2e9ac991bf3a24",
+            "runId": "run:commerce-held-out:64dbdb68-f0a5-4b1c-844e-6a10e278d11c",
+            "capabilityId": "capability:commerce-strategy",
+            "artifactIds": [
+              "artifact:sha256:ef972cac3d7c59d6f1d3267c2009fe00adab53b7429219a673db9942289a3cee"
+            ],
+            "acceptedReferenceArtifactIds": [
+              "artifact:sha256:9f4692f1a5bac2c7ab28510ca3fbbd516a573109ca9d2b35b46f5023955f9b23",
+              "artifact:sha256:48409f981b4b203cfa577ac7170cfe8ebf8f11ec5b43f0a3893add18d9c97b37",
+              "artifact:sha256:38d0111922cf90f4a4c158ff19e4f8c3a16b18f6aa97e13020ab677d4979ae1e",
+              "artifact:sha256:41790ec8760fba3a39ea768219cd71502e2b92dba73ffe7de9e064f904948cd4",
+              "artifact:sha256:d9631ca8f4948b981e3e67960b06c8f95b80756b452e99b1f848a74587a178f9",
+              "artifact:sha256:bb26b4da01d7bbc7102da3862346427381369d677a97bd743d6452c414831ae8",
+              "artifact:sha256:cd0be322beac7b5603162c279f35fd5f3813c08180715a14b89213f54315c448",
+              "artifact:sha256:9dbad1fdbd62dd3fe73013ac142c18de2d28d8406df77bbb636dbe9308884c19",
+              "artifact:sha256:c753f002f424f683cada19e0f8a24d569743e3bd314211b46e21a5e3a18c91ee",
+              "artifact:sha256:8b548bc4e5442403fedf34cfc8f61f093858540a71132e04fed41d38d7ed419a"
+            ],
+            "dagReferences": []
+          }
+        },
+        {
+          "id": "evidence:p7.real-strategy-bytes:bytes:artifact:sha256:ef972cac3d7c59d6f1d3267c2009fe00adab53b7429219a673db9942289a3cee",
+          "revision": "artifact:sha256:ef972cac3d7c59d6f1d3267c2009fe00adab53b7429219a673db9942289a3cee:revision:1",
+          "contentHash": "ef972cac3d7c59d6f1d3267c2009fe00adab53b7429219a673db9942289a3cee",
+          "kind": "artifact-bytes",
+          "binding": {
+            "metricId": "p7.real-strategy-bytes",
+            "receiptId": "receipt:multimodal:692e3c7802fe4b528a2e9ac991bf3a24",
+            "artifactId": "artifact:sha256:ef972cac3d7c59d6f1d3267c2009fe00adab53b7429219a673db9942289a3cee",
+            "mediaType": "application/json",
+            "byteLength": 2435
+          }
+        },
+        {
+          "id": "evidence:p7.real-strategy-bytes:bytes:artifact:sha256:2fd665784567ae502cabb889cc06135cbd201973bf3927271c6dde65120dad3a",
+          "revision": "artifact:sha256:2fd665784567ae502cabb889cc06135cbd201973bf3927271c6dde65120dad3a:revision:1",
+          "contentHash": "2fd665784567ae502cabb889cc06135cbd201973bf3927271c6dde65120dad3a",
+          "kind": "artifact-bytes",
+          "binding": {
+            "metricId": "p7.real-strategy-bytes",
+            "receiptId": "receipt:multimodal:692e3c7802fe4b528a2e9ac991bf3a24",
+            "artifactId": "artifact:sha256:2fd665784567ae502cabb889cc06135cbd201973bf3927271c6dde65120dad3a",
+            "mediaType": "text/markdown",
+            "byteLength": 2344,
+            "derivedFromArtifactId": "artifact:sha256:ef972cac3d7c59d6f1d3267c2009fe00adab53b7429219a673db9942289a3cee"
           }
         }
       ],
-      "diagnostics": [
-        {
-          "code": "real-host-evidence-unavailable",
-          "message": "Real Host execution evidence has not been supplied.",
-          "evidenceReferenceIds": [
-            "evidence:p7.real-strategy-bytes"
-          ]
-        },
-        {
-          "code": "real-host-evidence-unavailable",
-          "message": "Real Host execution evidence has not been supplied.",
-          "evidenceReferenceIds": [
-            "evidence:p7.real-strategy-bytes"
-          ]
-        }
-      ]
+      "diagnostics": []
     }
   ],
   "summary": {
     "overall": {
       "total": 13,
-      "passed": 5,
+      "passed": 13,
       "failed": 0,
-      "blocked": 8,
-      "ready": false
+      "blocked": 0,
+      "ready": true
     },
     "tiers": [
       {
@@ -667,54 +1557,13 @@
       {
         "tier": "real-host",
         "total": 8,
-        "passed": 0,
+        "passed": 8,
         "failed": 0,
-        "blocked": 8,
-        "ready": false
+        "blocked": 0,
+        "ready": true
       }
     ],
-    "productionReady": false,
-    "productionFrontier": [
-      {
-        "metricId": "p6.real-text-execution",
-        "tier": "real-host",
-        "status": "blocked"
-      },
-      {
-        "metricId": "p6.real-text-bytes",
-        "tier": "real-host",
-        "status": "blocked"
-      },
-      {
-        "metricId": "p6.real-image-execution",
-        "tier": "real-host",
-        "status": "blocked"
-      },
-      {
-        "metricId": "p6.real-image-bytes",
-        "tier": "real-host",
-        "status": "blocked"
-      },
-      {
-        "metricId": "p6.real-video-execution",
-        "tier": "real-host",
-        "status": "blocked"
-      },
-      {
-        "metricId": "p6.real-video-bytes",
-        "tier": "real-host",
-        "status": "blocked"
-      },
-      {
-        "metricId": "p7.real-strategy-execution",
-        "tier": "real-host",
-        "status": "blocked"
-      },
-      {
-        "metricId": "p7.real-strategy-bytes",
-        "tier": "real-host",
-        "status": "blocked"
-      }
-    ]
+    "productionReady": true,
+    "productionFrontier": []
   }
 }

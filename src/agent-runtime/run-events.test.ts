@@ -141,30 +141,30 @@ describe('agent run events', () => {
     expect(createToolRetryEvent('run', 'tool', 'request-1', { requestId: 'request-2' })).toMatchObject({ previousRequestId: 'request-1', requestId: 'request-2' })
     expect(() => createToolRetryEvent('run', 'tool', 'request-1', { requestId: 'request-1' })).toThrow('new request id')
   })
-  it('replays approval, retry linkage, and charged receipt on the existing tool projection', () => {
+  it('replays approval, retry linkage, and the Provider receipt on the existing tool projection', () => {
     const events = [
-      createRunEvent('run-paid', { type: 'run-started', mode: 'create' }, { eventId: 'start', at: 1 }),
-      createRunEvent('run-paid', {
+      createRunEvent('run-provider', { type: 'run-started', mode: 'create' }, { eventId: 'start', at: 1 }),
+      createRunEvent('run-provider', {
         type: 'tool-approval-requested', toolCallId: 'tool-1', requestId: 'request-1', tool: 'image.generate', label: 'Generate hero',
         model: { providerId: 'openai', model: 'gpt-image-1' }, approvalPolicy: 'explicit', reason: 'Explicit approval is required.', pendingApproval: true,
       }, { eventId: 'approval', at: 2 }),
-      createRunEvent('run-paid', { type: 'tool-approved', toolCallId: 'tool-1', requestId: 'request-1', reason: 'Approved by user.' }, { eventId: 'approved', at: 3 }),
-      createRunEvent('run-paid', { type: 'tool-retry-linked', toolCallId: 'tool-1', previousRequestId: 'request-1', requestId: 'request-2' }, { eventId: 'retry', at: 4 }),
-      createRunEvent('run-paid', {
+      createRunEvent('run-provider', { type: 'tool-approved', toolCallId: 'tool-1', requestId: 'request-1', reason: 'Approved by user.' }, { eventId: 'approved', at: 3 }),
+      createRunEvent('run-provider', { type: 'tool-retry-linked', toolCallId: 'tool-1', previousRequestId: 'request-1', requestId: 'request-2' }, { eventId: 'retry', at: 4 }),
+      createRunEvent('run-provider', {
         type: 'tool-receipt-recorded', toolCallId: 'tool-1', receipt: {
           receiptId: 'receipt-1', requestId: 'request-2', capability: 'generate-image', providerId: 'openai', model: 'gpt-image-1', status: 'succeeded',
-          charged: { currency: 'USD', amount: 0.07, credits: 7 }, outputArtifactIds: ['hero.png'], startedAt: 4, completedAt: 5,
+          outputArtifactIds: ['hero.png'], startedAt: 4, completedAt: 5,
         },
       }, { eventId: 'receipt', at: 5 }),
     ]
     const projection = replayRunEvents(events).activeRun?.tools['tool-1']
     expect(projection).toMatchObject({ requestId: 'request-2', previousRequestId: 'request-1', approvalStatus: 'required' })
-    expect(projection?.receipt).toMatchObject({ receiptId: 'receipt-1', charged: { amount: 0.07 } })
+    expect(projection?.receipt).toMatchObject({ receiptId: 'receipt-1', })
   })
   it('rejects unrecognized prediction fields on approval events', () => {
     const approval = {
       eventId: 'approval',
-      runId: 'run-paid',
+      runId: 'run-provider',
       at: 2,
       type: 'tool-approval-requested',
       toolCallId: 'tool-1',
@@ -179,7 +179,7 @@ describe('agent run events', () => {
     expect(agentRunEventSchema.safeParse(approval).success).toBe(true)
     expect(agentRunEventSchema.safeParse({
       ...approval,
-      predictedCharge: { currency: 'USD', amount: 1 },
+      callerProjection: { ready: true },
     }).success).toBe(false)
   })
   it('replays observable run state without executing side effects', () => {

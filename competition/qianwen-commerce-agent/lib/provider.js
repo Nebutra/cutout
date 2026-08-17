@@ -73,9 +73,9 @@ function parseBaseUrl(value, allowTestOrigin = false) {
   invariant((allowTestOrigin && ['http:', 'https:'].includes(parsed.protocol))
     || (parsed.protocol === 'https:' && parsed.hostname === 'dashscope.aliyuncs.com' && !parsed.port),
   'invalid-provider-origin', 'DashScope base URL is not an allowed fixed origin.')
-  const compatibleSuffix = '/compatible-mode/v1'
+  const supportedBasePaths = new Set(['/api/v1', '/compatible-mode/v1'])
   let pathname = parsed.pathname.replace(/\/+$/, '')
-  if (pathname.endsWith(compatibleSuffix)) pathname = pathname.slice(0, -compatibleSuffix.length)
+  if (supportedBasePaths.has(pathname)) pathname = ''
   invariant(pathname === '', 'invalid-provider-origin', 'DashScope base URL path is not supported.')
   return parsed.origin
 }
@@ -153,8 +153,8 @@ export class DashScopeClient {
     return { authorization: `Bearer ${this.apiKey}`, 'content-type': 'application/json', ...(async ? { 'x-dashscope-async': 'enable' } : {}) }
   }
 
-  async paidPost(nodeId, path, body, async = false, maximumMs = LIMITS.requestMs) {
-    invariant((this.postCounts.get(nodeId) ?? 0) === 0, 'duplicate-paid-post', `Paid request was already submitted for node ${nodeId}.`)
+  async providerPost(nodeId, path, body, async = false, maximumMs = LIMITS.requestMs) {
+    invariant((this.postCounts.get(nodeId) ?? 0) === 0, 'duplicate-provider-execution', `Provider request was already submitted for node ${nodeId}.`)
     this.postCounts.set(nodeId, 1)
     await writeCheckpoint(this.workspace, nodeId, {
       state: 'submit-intent', model: body.model, requestHash: sha256(JSON.stringify(body)),
@@ -207,7 +207,7 @@ export class DashScopeClient {
       response_format: { type: 'json_object' }, stream: false,
       enable_thinking: false, max_tokens: 8_192,
     }
-    const value = await this.paidPost(nodeId, ENDPOINT_PATHS.text, body)
+    const value = await this.providerPost(nodeId, ENDPOINT_PATHS.text, body)
     const content = value?.choices?.[0]?.message?.content
     invariant(typeof content === 'string' && Buffer.byteLength(content) <= LIMITS.maximumJsonResponseBytes,
       'invalid-provider-response', 'Structured text response content is invalid.')
@@ -221,7 +221,7 @@ export class DashScopeClient {
   async mediaQa(nodeId, { prompt, mediaKind, resultUrl: generatedUrl, sourceUrls = [] }) {
     invariant(['image', 'video'].includes(mediaKind), 'invalid-qa-request', 'Media QA kind is invalid.')
     const content = [{ type: 'text', text: prompt }]
-    for (const url of sourceUrls.slice(0, 2)) content.push({ type: 'image_url', image_url: { url } })
+    for (const url of sourceUrls.slice(0, 3)) content.push({ type: 'image_url', image_url: { url } })
     content.push(mediaKind === 'image'
       ? { type: 'image_url', image_url: { url: generatedUrl } }
       : { type: 'video_url', video_url: { url: generatedUrl } })
@@ -234,7 +234,7 @@ export class DashScopeClient {
       response_format: { type: 'json_object' }, stream: false,
       enable_thinking: false, max_tokens: 1_024,
     }
-    const value = await this.paidPost(nodeId, ENDPOINT_PATHS.text, body, false, LIMITS.qaRequestMs)
+    const value = await this.providerPost(nodeId, ENDPOINT_PATHS.text, body, false, LIMITS.qaRequestMs)
     const raw = value?.choices?.[0]?.message?.content
     invariant(typeof raw === 'string' && Buffer.byteLength(raw) <= LIMITS.maximumJsonResponseBytes,
       'invalid-provider-response', 'Media QA response content is invalid.')
@@ -253,7 +253,7 @@ export class DashScopeClient {
       input: { messages: [{ role: 'user', content }] },
       parameters: { n: 1, size, seed: Math.max(0, Math.min(2_147_483_647, Math.trunc(seed))), prompt_extend: true, watermark: false },
     }
-    const value = await this.paidPost(nodeId, ENDPOINT_PATHS.image, body, false, LIMITS.imageRequestMs)
+    const value = await this.providerPost(nodeId, ENDPOINT_PATHS.image, body, false, LIMITS.imageRequestMs)
     return this.resolveTask(nodeId, value, 'image')
   }
 
@@ -263,7 +263,7 @@ export class DashScopeClient {
       input: { prompt, negative_prompt: 'morphing, product identity drift, altered logo, changed color, added parts, text, captions, flicker, scene cuts', media: [{ type: 'first_frame', url: sourceUrl }] },
       parameters: { resolution: '1080P', ratio: '16:9', duration: 5, seed: Math.max(0, Math.min(2_147_483_647, Math.trunc(seed))), prompt_extend: false, watermark: false },
     }
-    const value = await this.paidPost(nodeId, ENDPOINT_PATHS.video, body, true)
+    const value = await this.providerPost(nodeId, ENDPOINT_PATHS.video, body, true)
     return this.resolveTask(nodeId, value, 'video')
   }
 

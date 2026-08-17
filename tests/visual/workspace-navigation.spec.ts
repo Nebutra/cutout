@@ -3,33 +3,29 @@ import { openDeliverWorkspace } from "./workspace-helpers";
 
 async function createProject(
   page: Page,
-  _brief = "Components UX regression",
+  brief = "Components UX regression",
 ) {
-  const viewport = page.viewportSize();
-  if (viewport && viewport.width < 768) {
-    await page.setViewportSize({ width: 1024, height: viewport.height });
-  }
   await page.goto("/");
   await page
     .getByRole("textbox", { name: "Describe what you want to design..." })
-    .fill("Components UX regression");
+    .fill(brief);
   await page.getByRole("button", { name: "Create from brief" }).click();
-  if (viewport && viewport.width < 768) {
-    await page.setViewportSize(viewport);
+  const workspace = page.locator("[data-workspace-root]");
+  if ((page.viewportSize()?.width ?? 1024) < 768) {
+    const activeProject = page.locator(
+      'button[aria-label^="Open "][aria-current="page"]',
+    );
+    await expect(workspace.or(activeProject)).toBeVisible();
+    if (!(await workspace.isVisible())) await activeProject.click();
   }
-  await expect(page.getByRole("banner")).toContainText("Components UX regression");
+  await expect(workspace).toBeVisible();
+  await expect(page.getByRole("banner")).toContainText(brief);
 }
 
 async function expectOnlyPrimaryModes(page: Page) {
   const nav = page.getByRole("navigation", { name: "Workspace panels" });
-  if (await nav.isVisible()) {
-    for (const name of ["Agent", "Design", "Deliver"]) {
-      await expect(nav.getByRole("button", { name, exact: true })).toBeVisible();
-    }
-  } else {
-    await expect(
-      page.getByRole("button", { name: "Hide Agent" }).or(page.getByRole("region", { name: "Deliver" })),
-    ).toBeVisible();
+  for (const name of ["Agent", "Project"]) {
+    await expect(page.getByRole("button", { name, exact: true })).toBeVisible();
   }
   await expect(nav.getByText("Design OS", { exact: true })).toHaveCount(0);
   await expect(
@@ -39,27 +35,32 @@ async function expectOnlyPrimaryModes(page: Page) {
   ).toHaveCount(0);
 }
 
-test("Agent, Design and Deliver retain their consumers in the workspace panel rail", async ({
+test("Agent and Canvas stay primary while Project tools retain secondary consumers", async ({
   page,
 }) => {
   await createProject(page);
   await expectOnlyPrimaryModes(page);
 
   await expect(page.getByLabel("Message the Agent")).toBeVisible();
-  const viewport = page.viewportSize()!;
-  if (viewport.width < 768) await page.setViewportSize({ width: 1024, height: viewport.height });
+  if ((page.viewportSize()?.width ?? 0) < 768) {
+    const agentControl = page.getByRole("button", { name: "Agent", exact: true });
+    await agentControl.click();
+    await expect(page.getByRole("complementary", { name: "Agent workspace" })).toBeHidden();
+    await expect(agentControl).toBeVisible();
+    await agentControl.click();
+    await expect(page.getByRole("complementary", { name: "Agent workspace" })).toBeVisible();
+  }
   await openDeliverWorkspace(page);
-  if (viewport.width < 768) await page.setViewportSize(viewport);
-  const deliver = page.getByRole("region", { name: "Deliver" });
+  const deliver = page.getByRole("region", { name: "Project workbench" });
   await expect(deliver).toBeVisible();
   const deliverTabs = deliver.getByRole("tablist", {
-    name: "Deliver sections",
+    name: "Delivery views",
   });
   await expect(deliverTabs.getByRole("tab").allTextContents()).resolves.toEqual(
-    ["Delivery center", "Kits", "Components", "Starter"],
+    ["Overview", "Kits", "Components", "Starter"],
   );
   await expect(
-    deliver.getByText("Deliver results", { exact: true }),
+    deliver.getByRole("heading", { name: "Approved results", exact: true }),
   ).toBeVisible();
   await deliver.getByRole("tab", { name: "Kits" }).click();
   await expect(

@@ -1,9 +1,9 @@
-import type { PaidToolReceipt } from '@/control-protocol/paid-tool-contract'
+import type { ProviderToolReceipt } from '@/control-protocol/provider-tool-contract'
 
 export interface VideoFrameEvidence { readonly id:string; readonly atMs:number; readonly sha256:string; readonly perceptualHash:string; readonly width:number; readonly height:number }
 export interface VideoShot { readonly id:string; readonly startMs:number; readonly endMs:number; readonly frameIds:readonly string[]; readonly confidence:number }
 export interface VideoTimelineReference { readonly durationMs:number; readonly frames:readonly VideoFrameEvidence[]; readonly shots:readonly VideoShot[]; readonly receiptId:string }
-export interface VideoReferenceExecutor { readonly available:boolean; extract(input:{readonly requestId:string;readonly bytes:Uint8Array;readonly mediaType:string;readonly intervalMs:number}):Promise<{readonly receipt:PaidToolReceipt;readonly durationMs:number;readonly frames:readonly VideoFrameEvidence[]}> }
+export interface VideoReferenceExecutor { readonly available:boolean; extract(input:{readonly requestId:string;readonly bytes:Uint8Array;readonly mediaType:string;readonly intervalMs:number}):Promise<{readonly receipt:ProviderToolReceipt;readonly durationMs:number;readonly frames:readonly VideoFrameEvidence[]}> }
 
 export async function createVideoTimeline(input:{readonly requestId:string;readonly bytes:Uint8Array;readonly mediaType:string;readonly executor:VideoReferenceExecutor;readonly intervalMs?:number;readonly shotThreshold?:number}):Promise<VideoTimelineReference>{
   if(!input.executor.available)throw new Error('Video processing requires an authorized video executor host.')

@@ -17,7 +17,7 @@ test("Components stays outcome-first and preserves the explicit-declaration gate
     await page.setViewportSize({ width: 412, height: 915 });
   }
 
-  const workbench = page.getByRole("region", { name: "Deliver" });
+  const workbench = page.getByRole("region", { name: "Project workbench" });
   await workbench.getByRole("tab", { name: "Components" }).click();
   const components = workbench.getByRole("region", {
     name: "Components workspace",

@@ -58,8 +58,24 @@ join without changing the meaning of existing results.
   source, Provider, route, catalog and graph failures before the single-use
   commitment, executes the exact Commerce DAG with native receipts, and returns
   only a pending independent-evaluator completion request.
+- Provide one closed non-GUI Commerce operator that invokes that same production
+  runner through a typed native Host boundary. It accepts only strict evaluator
+  package, pending and completion documents; exposes no generic Provider invoke,
+  shell, arbitrary path, secret, project root or external-controller capability;
+  and never activates, focuses, clicks, captures or automates a desktop window.
+- The operator transports a fixed command enum over bounded standard input and
+  writes results only to a private Host-owned app-data job directory selected by
+  an opaque job id. Caller-selected export paths and partial result publication
+  are forbidden. Cancellation, exact replay recovery and sanitized failures are
+  part of the same command protocol.
+- Refactor Provider authority, commitment, source ingestion, multimodal
+  execution, receipt verification, playback promotion and native admission
+  behind one injected production Host contract. The desktop adapter and the
+  non-GUI operator adapter must call the same Rust trust/network/Keychain/replay
+  implementation; a Node-only Provider transport or second receipt authority is
+  not acceptable evidence.
 - A successfully settled held-out native call must survive renderer/IPC response
-  loss without a second paid call. Exact retry recovers the original signed
+  loss without a duplicate Provider call. Exact retry recovers the original signed
   response; request drift, stored-response tampering and cross-process slot races
   fail closed.
 - Cancellation must reach source ingestion as well as Provider operations. The
@@ -76,6 +92,15 @@ join without changing the meaning of existing results.
   deliverable, semantic-QA and playback bytes for human inspection, requires
   explicit review of the eleven-deliverable closure before completion, and
   emits only strictly decoded handoff files.
+- Treat the Host build version as evidence identity. The first non-GUI operator
+  build is `0.1.21`; package, Cargo, Tauri configuration, capability manifest and
+  evaluator handoff versions remain synchronized. A fresh evaluator-signed
+  `0.1.21` challenge is required, and the existing `0.1.20` challenge cannot be
+  reused after the operator changes the authoritative binary.
+- Model remote generation as Provider execution, never as a paid product action.
+  Enabling a BYOK Provider is sufficient execution authority; Cutout exposes no
+  payment confirmation, price estimate, charge/credit receipt field, paid scope,
+  paid policy gate or paid-action vocabulary in its live Agent surface.
 
 ## Acceptance Criteria
 
@@ -154,6 +179,29 @@ join without changing the meaning of existing results.
       before commitment and again at final admission; commitment, completion,
       admission and Design OS evidence expose the same version. Legacy v1,
       missing or drifted versions fail closed and change no benchmark score.
+- [x] B20: A production `cutout-commerce-operator` runs without constructing or
+      controlling a WebView/window and exposes only `preflight`, `run`,
+      `recover`, `admit`, `status` and `cancel` for one strict opaque job. Its
+      request/output limits, private app-data ownership, exclusive publication,
+      sanitized errors and command rejection are covered by focused tests.
+- [x] B21: The TypeScript production runner has one injected typed Host for
+      Provider preflight, commitment, source ingestion, every multimodal call,
+      native receipt verification, playback promotion and final admission. Both
+      desktop and operator transports use the same Rust Keychain, network,
+      receipt and replay-ledger implementation; no mock, fixture or alternate
+      transport contributes benchmark evidence.
+- [x] B22: Product, Cargo, Tauri and capability versions are `0.1.21`; a release
+      operator is built with the evaluator public trust root, and an independent
+      evaluator issues a fresh matching challenge before the real Provider Run.
+- [x] B23: One fresh operator Run produces the exact `11 + 7 + 1` closure,
+      survives replay recovery, is byte-inspected and explicitly completed by
+      the evaluator, passes native admission, and only then regenerates the
+      durable Commerce and Design OS snapshots to truthful `14/14` with
+      `productionReady=true`.
+- [x] B24: Live source, Agent manifests, schemas, Skills, current release copy
+      and generated plugin artifacts use Provider execution contracts only.
+      Provider enablement plus capability/route availability starts execution;
+      receipts reject price, charge, credit and billing fields.
 
 ## Out Of Scope
 
@@ -161,6 +209,6 @@ join without changing the meaning of existing results.
   score prediction.
 - Pretending one subjective model score is ground truth. Probabilistic visual
   quality distributions and judge calibration are a follow-up Profile evaluator.
-- Running paid Provider calls in deterministic CI.
+- Running real external Provider calls in deterministic CI.
 - Claiming Commerce production readiness before a fresh evaluator-signed unseen
   challenge, real Provider run, evaluator completion and native admission exist.

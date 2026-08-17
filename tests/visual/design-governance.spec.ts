@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { openProjectTool } from './workspace-helpers'
 
 for (const viewport of [{name:'desktop',width:1280,height:800},{name:'mobile',width:390,height:844}]) {
   test(`governance summary remains readable on ${viewport.name}`, async ({page}) => {
@@ -20,7 +21,7 @@ test('Design inspector exposes governance evidence without claiming an unavailab
   await page.getByRole('textbox',{name:'Describe what you want to design...'}).fill('Governed workspace')
   await page.getByRole('button',{name:'Create from brief'}).click()
   await expect(page.getByRole('complementary',{name:'Agent workspace'})).toBeVisible()
-  await page.getByRole('button',{name:'Design',exact:true}).click()
+  await openProjectTool(page, 'DESIGN.md')
   const inspector=page.getByRole('complementary',{name:'Design system'});await expect(inspector).toBeVisible()
   await expect(inspector).toContainText('DESIGN.md')
   await expect(inspector.getByRole('button',{name:'Inspect accessibility'})).toHaveCount(0)

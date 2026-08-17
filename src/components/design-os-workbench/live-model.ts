@@ -5,6 +5,7 @@ import { authoringForDocument, buildDesignOsReadiness, type AuthoringPreview, ty
 import type { DesignDocument, SourceLicense } from '@/design-ir'
 import type { NativeRepositoryScanResult } from '@/platform/native'
 import type { CompositeDeliveryReceipt, DeliveryPlan } from '@/delivery-center'
+import type { CommerceProjectLifecycleRecord } from '@/commerce-profile/project-lifecycle'
 
 export interface LiveDesignOsArtifacts {
   readonly ingestPreview?: SourceIngestPreview
@@ -14,6 +15,7 @@ export interface LiveDesignOsArtifacts {
   readonly repositoryIngest?: { readonly previewId: string; readonly scan: NativeRepositoryScanResult; readonly role: string; readonly license: string }
   readonly deliveryPlan?: DeliveryPlan | null
   readonly deliveryReceipt?: CompositeDeliveryReceipt | null
+  readonly commerceProjectLifecycle?: CommerceProjectLifecycleRecord | null
 }
 
 export function buildLiveDesignOsWorkbenchModel(
@@ -43,6 +45,7 @@ export function buildLiveDesignOsWorkbenchModel(
   const governance = buildTokenContrastGovernance(document.tokens)
 
   return {
+    projectTitle: document.meta.title,
     summary: designDocumentToDesignOsPanelModel(document, capabilities),
     ...(governance ? { governance } : {}),
     sources: document.sources.map((source) => ({
@@ -81,6 +84,9 @@ export function buildLiveDesignOsWorkbenchModel(
       ...(authoring.starterConfigs?.[0] ? { starter: authoring.starterConfigs[0] } : {}),
     } } : {}),
     ...(authoringPreview ? { authoringPreview: { id: authoringPreview.id, kind: authoringPreview.kind, summary: authoringPreview.summary } } : {}),
+    ...(artifacts.commerceProjectLifecycle
+      ? { commerceProjectLifecycle: artifacts.commerceProjectLifecycle }
+      : {}),
     kits: [
       {
         id: 'kit:design-system',

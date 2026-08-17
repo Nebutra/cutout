@@ -586,7 +586,7 @@ function createVerifiedCommerceReport(
   baselineInput: unknown,
   rehearsal: VerifiedCommerceProductionRehearsal,
 ): CommerceProfileBenchmarkReport {
-  const baseline = decodeCommerceProfileBenchmarkReport(baselineInput)
+  const baseline = decodeCommerceProfileBenchmarkReportInternal(baselineInput, true)
   const metrics = baseline.metrics.map((metric) => {
     if (metric.tier !== 'real-host') return metric
     const definition = metricDefinition(metric.id)
@@ -659,6 +659,7 @@ export async function createCommerceProfileBenchmarkReportFromHeldOutRehearsal(i
   readonly rehearsalBundle: unknown
   readonly commitment: unknown
   readonly evaluatorAttestation: unknown
+  readonly host: Parameters<typeof verifyCommerceHeldOutProductionRehearsal>[0]['host']
 }): Promise<{
   readonly report: CommerceProfileBenchmarkReport
   readonly rehearsal: VerifiedCommerceProductionRehearsal
@@ -678,6 +679,7 @@ export async function decodeCommerceProfileBenchmarkReportFromHeldOutRehearsal(i
   readonly rehearsalBundle: unknown
   readonly commitment: unknown
   readonly evaluatorAttestation: unknown
+  readonly host: Parameters<typeof verifyCommerceHeldOutProductionRehearsal>[0]['host']
 }): Promise<CommerceProfileBenchmarkReport> {
   const expected = await createCommerceProfileBenchmarkReportFromHeldOutRehearsal(input)
   const candidate = commerceProfileBenchmarkReportSchema.parse(input.report)

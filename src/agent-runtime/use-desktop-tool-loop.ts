@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react'
 import { createDesktopToolLoop, type DesktopToolLoop } from './desktop-tool-loop'
 import {
-  composerRouteToPaidToolRequest,
-  desktopPaidToolCapabilities,
-  type PaidToolCapability,
-  type PaidToolExecutorCapability,
-  type PaidToolPolicy,
-  type PaidToolRequest,
-} from '@/control-protocol/paid-tool-contract'
+  composerRouteToProviderToolRequest,
+  desktopProviderToolCapabilities,
+  type ProviderToolCapability,
+  type ProviderToolExecutorCapability,
+  type ProviderToolPolicy,
+  type ProviderToolRequest,
+} from '@/control-protocol/provider-tool-contract'
 import { createDesktopToolExecutor, createToolExecutorRegistry, type CutoutResultSink, type DesktopToolArtifact } from '@/services/desktop-tool-executor'
 import type { ModelAssignment, ModelAssignments } from '@/services/ai/model-assignment-types'
 import type { ProviderConfig } from '@/services/ai/provider-types'
@@ -23,9 +23,9 @@ import { PermissionBroker } from '@/tool-sandbox/broker'
 import { getAuthorizedWorkspace } from '@/platform/authorized-workspace'
 import { createTauriAgentHostService } from '@/agent-host/tauri-service'
 import { runDurableHostEffect } from '@/agent-host/durable-effect'
-import { desktopPaidToolTimeoutMs } from './paid-tool-timeouts'
+import { desktopProviderToolTimeoutMs } from './provider-tool-timeouts'
 
-const DESKTOP_PAID_TOOL_POLICY: PaidToolPolicy = { allowPaid: true }
+const DESKTOP_PROVIDER_TOOL_POLICY: ProviderToolPolicy = { allowProviderExecution: true }
 const FOREGROUND_SEGMENTATION_UNAVAILABLE =
   'capability-required: foreground segmentation is unavailable on this host.'
 
@@ -65,7 +65,7 @@ export interface DesktopToolInvocation {
   readonly runId: string
   readonly toolCallId: string
   readonly label: string
-  readonly capability: PaidToolCapability
+  readonly capability: ProviderToolCapability
   readonly intent: string
   readonly prompt: string
   readonly image: ModelAssignment
@@ -82,21 +82,21 @@ export interface DesktopToolRuntimeSnapshot {
 
 export function desktopToolCapabilitiesForSnapshot(
   snapshot: DesktopToolRuntimeSnapshot,
-): readonly PaidToolExecutorCapability[] {
-  return desktopPaidToolCapabilities(snapshot.providers, snapshot.assignments, {
+): readonly ProviderToolExecutorCapability[] {
+  return desktopProviderToolCapabilities(snapshot.providers, snapshot.assignments, {
     descriptors: snapshot.capabilityBindings?.descriptors,
     bindings: snapshot.capabilityBindings?.bindings,
   })
 }
 
-export function createDesktopPaidToolRequest(input: {
-  readonly capability: PaidToolCapability
+export function createDesktopProviderToolRequest(input: {
+  readonly capability: ProviderToolCapability
   readonly intent: string
   readonly prompt: string
   readonly image: ModelAssignment
   readonly inputArtifactIds?: readonly string[]
-}): PaidToolRequest {
-  return composerRouteToPaidToolRequest({
+}): ProviderToolRequest {
+  return composerRouteToProviderToolRequest({
     capability: input.capability,
     intent: input.intent,
     prompt: input.prompt,
@@ -139,12 +139,12 @@ export function useDesktopToolLoop(input: {
     })
     return () => { current = false }
   }, [input.services.foregroundSegmentation])
-  const authorize = useCallback(async (runId: string, requestId: string, request: PaidToolRequest, authorizationId: string) => {
+  const authorize = useCallback(async (runId: string, requestId: string, request: ProviderToolRequest, authorizationId: string) => {
     const requestDigest = await digestRequest({ runId, requestId, revision: state.current.revision, request })
-    const issuedAt = Date.now(), lease = permissionBroker.issue({ version: 'cutout.capability-lease.v1', leaseId: `lease:${requestId}`, approvalId: authorizationId, subject: runId, requestDigest, scopes: isLocalCutout(request.capability) ? ['paid'] : ['paid', 'credential'], workspaceRoot: 'authorized-workspace', allowedPaths: [], allowedCommands: [], allowedHosts: [], limits: { maxDurationMs: 600_000, maxBytes: 100_000_000, maxProcesses: 1 }, issuedAt, expiresAt: issuedAt + 600_000 })
+    const issuedAt = Date.now(), lease = permissionBroker.issue({ version: 'cutout.capability-lease.v1', leaseId: `lease:${requestId}`, approvalId: authorizationId, subject: runId, requestDigest, scopes: isLocalCutout(request.capability) ? ['tool-execute'] : ['tool-execute', 'credential'], workspaceRoot: 'authorized-workspace', allowedPaths: [], allowedCommands: [], allowedHosts: [], limits: { maxDurationMs: 600_000, maxBytes: 100_000_000, maxProcesses: 1 }, issuedAt, expiresAt: issuedAt + 600_000 })
     return { capabilityLeaseId: lease.leaseId, requestDigest }
   }, [permissionBroker])
-  const capabilities = useCallback((): readonly PaidToolExecutorCapability[] => {
+  const capabilities = useCallback((): readonly ProviderToolExecutorCapability[] => {
     const snapshot = state.current.resolveRuntimeSnapshot?.() ?? {
       providers: state.current.providers,
       assignments: state.current.assignments,
@@ -168,10 +168,10 @@ export function useDesktopToolLoop(input: {
     return createDesktopToolLoop({
       executors: createToolExecutorRegistry([executor]),
       currentRevision: () => state.current.revision,
-      policy: () => DESKTOP_PAID_TOOL_POLICY,
+      policy: () => DESKTOP_PROVIDER_TOOL_POLICY,
       append: (events) => state.current.append(events),
       timeoutMs: (request) =>
-        desktopPaidToolTimeoutMs(request.request.capability),
+        desktopProviderToolTimeoutMs(request.request.capability),
       authorize: (request, authorizationId) => authorize(
         request.runId,
         request.requestId,
@@ -205,7 +205,7 @@ export function useDesktopToolLoop(input: {
     const inputIds = await Promise.all((invocation.inputs ?? []).map((artifact) => artifacts.current!.write({ ...artifact, source: 'edit-image', runId: invocation.runId })))
     invocation.signal?.throwIfAborted()
     const requestId = crypto.randomUUID()
-    const request = createDesktopPaidToolRequest({
+    const request = createDesktopProviderToolRequest({
       capability: invocation.capability,
       intent: invocation.intent,
       prompt: invocation.prompt,
@@ -230,7 +230,7 @@ export function useDesktopToolLoop(input: {
       expectedSourceImageId: invocation.expectedSourceImageId,
     });return loop.settled(invocation.toolCallId, requestId)}
     const workspace=getAuthorizedWorkspace()
-    const result=workspace?await runDurableHostEffect({host:createTauriAgentHostService({workspaceHandle:workspace.handle,instanceId:'desktop.effect'}),runId:invocation.runId,nodeId:invocation.toolCallId,effectKey:`paid:${invocation.toolCallId}`,execute:async()=>{const value=await execute();if(!value.receipt)throw new Error(value.ok?'Paid tool receipt is missing.':value.error);return{value,receiptId:value.receipt.receiptId}}}):await execute()
+    const result=workspace?await runDurableHostEffect({host:createTauriAgentHostService({workspaceHandle:workspace.handle,instanceId:'desktop.effect'}),runId:invocation.runId,nodeId:invocation.toolCallId,effectKey:`provider:${invocation.toolCallId}`,execute:async()=>{const value=await execute();if(!value.receipt)throw new Error(value.ok?'Provider tool receipt is missing.':value.error);return{value,receiptId:value.receipt.receiptId}}}):await execute()
     if (!result.ok) throw new Error(result.error)
     return (await Promise.all(result.receipt.outputArtifactIds.map((id) => artifacts.current!.read(id))))
       .filter((item): item is DesktopToolArtifact => Boolean(item))
@@ -262,6 +262,6 @@ async function digestRequest(value: unknown): Promise<string> {
   return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('')
 }
 
-function isLocalCutout(capability: PaidToolCapability): boolean {
+function isLocalCutout(capability: ProviderToolCapability): boolean {
   return capability === 'cutout' || capability === 'semantic-cutout'
 }

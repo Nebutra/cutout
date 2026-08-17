@@ -25,6 +25,7 @@ createDesignOsBenchmarkFromCommerceHeldOutRehearsal({
 }): Promise<DesignOsBenchmarkReport>
 decodeDesignOsBenchmarkReport(input): DesignOsBenchmarkReport
 compareDesignOsBenchmarkReports(prior, current): DesignOsBenchmarkComparison
+publicBenchmarkPasses(summary): boolean // outer competition evaluator only
 ```
 
 `pnpm benchmark:design-os` strictly decodes the durable snapshot, regenerates it
@@ -61,8 +62,10 @@ supported current-snapshot writer.
 - Commerce v2 contributes five Contract metrics, eight Real-Host metrics and one
   explicit Production-Rehearsal audit gate. Simulated Host execution is excluded
   from definitions, reports, snapshots, coverage, maturity and user-facing output.
-  The current truthful baseline is Contract `5/5`, Real Host `0/8`, Rehearsal
-  `0/1`, maturity `contract`, coverage `5/14` (`35.71%`).
+  The current re-verifiable snapshot is Contract `5/5`, Real Host `8/8`,
+  Rehearsal `1/1`, maturity `production-rehearsal`, coverage `14/14` (`100%`).
+  This is internal product evidence, not an official competition hidden-set
+  score or leaderboard claim.
 - Commerce real-host passage requires the exact eleven-artifact role closure,
   signed receipt/byte/role/node/lock/Plan bindings, internal Commerce evaluation,
   semantic media QA, playable video and a durable re-verifiable bundle. Native
@@ -92,7 +95,7 @@ supported current-snapshot writer.
   benchmark evidence. They change no metric until the independent evaluator
   completion is native-admitted against the exact bundle and replay ledger.
 - Durable replay responses prevent a lost renderer reply from forcing another
-  paid attempt: the signed response is persisted before the Keychain slot, and
+  duplicate Provider attempt: the signed response is persisted before the Keychain slot, and
   exact retry recovers the original bytes. This strengthens run integrity but
   does not itself pass a metric.
 - A callable runner without an operator is not production evidence. The desktop
@@ -101,6 +104,15 @@ supported current-snapshot writer.
   evaluator completion and invoke native admission. External evaluator tooling
   and UI availability remain capability surfaces and change no metric by
   themselves.
+- The outer Qianwen public-sample evaluator has an independent regression gate.
+  PASS requires Top-1, Recall@5 and Recall@30 to equal the complete reviewed
+  product count, MRR to equal `1.0`, every counterfactual retrieval to remain
+  Top-1, deterministic measurement and translation-request closures to be
+  complete, and every visual role to retain its required source assignment.
+  The report declares `offline-public-sample` scope. It measures request and
+  orchestration contracts, not translation semantics, generated-media quality,
+  a hidden set, a leaderboard result or SOTA; it never changes Design OS
+  maturity or `productionReady`.
 
 ### 4. Validation And Error Matrix
 
@@ -115,10 +127,12 @@ supported current-snapshot writer.
 | Profile source cannot strictly decode | do not publish a Design OS report |
 | Commerce has receipts but lacks eleven-role/evaluation/QA closure | keep real-host and rehearsal blocked |
 | Complete signed Commerce bundle lacks independent held-out-input evidence | pass eligible real-host metrics but keep rehearsal blocked |
-| Runner returns a pending completion request or a live route probe succeeds | change no metric; retain the durable `5/14` baseline |
-| Held-out admission omits or drifts the signed Host build version | reject admission and keep the durable `5/14` baseline |
-| Exact paid response is recovered after IPC loss | accept it only inside the same committed Run/slot/request; do not count recovery as a second execution |
+| Runner returns a pending completion request or a live route probe succeeds | change no metric; retain the prior durable snapshot |
+| Held-out admission omits or drifts the signed Host build version | reject admission and keep the prior durable snapshot |
+| Exact Provider response is recovered after IPC loss | accept it only inside the same committed Run/slot/request; do not count recovery as a second execution |
 | Rehearsal audit is marked passed outside native held-out admission | normal decoder rejects the report |
+| Public-sample Top-1, Recall@5, Recall@30 or MRR falls below the complete current baseline | fail the outer public benchmark; never preserve PASS through a weaker threshold |
+| Public evaluator passes while no live/hidden evidence exists | retain its explicit offline scope and change no Design OS metric |
 
 ### 5. Good / Base / Bad Cases
 
@@ -130,11 +144,12 @@ supported current-snapshot writer.
   exposes the eight real-Host blockers and keeps production readiness false.
 - Bad: edit a Design OS snapshot's metric statuses and regenerate its summary,
   count an API success as usable material, let a later stage compensate for a
-  failed Contract metric, or change ruler weights/labels without a version bump.
+  failed Contract metric, change ruler weights/labels without a version bump,
+  or present a perfect public-sample gate as official hidden-set SOTA.
 
 ### 6. Tests Required
 
-- Exact current baseline and human-readable offline command output.
+- Exact current snapshot and human-readable offline command output.
 - Missing, duplicate, reordered, relabeled, rebound-source and forged-summary
   rejection.
 - Contiguous maturity under later-stage passes and earlier-stage failure.
@@ -145,6 +160,9 @@ supported current-snapshot writer.
 - Commerce runner/probe fixtures are explicitly non-benchmark; only a real
   native admission fixture backed by an evaluator-signed unseen run may derive
   newly passed metrics.
+- The outer public baseline gate passes only at complete Top-1/Recall and MRR
+  `1.0`; regress each field independently and assert failure. Its output must
+  state offline/non-live/non-hidden/non-SOTA scope.
 
 ### 7. Wrong vs Correct
 
@@ -172,4 +190,14 @@ return pending.completionRequest
 // The independent evaluator returns its signature out of band. No benchmark
 // write occurs until createDesignOsBenchmarkFromCommerceHeldOutRehearsal
 // performs dedicated native held-out admission.
+```
+
+```js
+// Wrong: preserve a green public badge after category quality regresses.
+const passed = summary.category.top1 >= 6 && summary.category.recallAt5 >= 10
+
+// Correct: lock the complete reviewed baseline and keep its authority separate.
+const passed = publicBenchmarkPasses(summary) // 11/11 and MRR 1.0 today
+publishOfflineEvaluatorResult({ ...summary, passed })
+// No Design OS snapshot or official competition claim is mutated here.
 ```

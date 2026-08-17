@@ -88,7 +88,7 @@ export function lockComposerChatRoute(input: {
   const chatPolicy = routeExecutionPolicy({
     model: input.model,
     thinking: input.thinking,
-    task: { stage: 'plan', multimodal: input.hasReferenceImages, paidAction: 'none' },
+    task: { stage: 'plan', multimodal: input.hasReferenceImages, providerAction: 'none' },
     assignments: input.assignments,
     providers: input.providers,
     modelCatalog,
@@ -119,7 +119,7 @@ export function lockComposerImageRoute(input: {
     task: {
       stage: 'execute',
       multimodal: input.hasReferenceImages,
-      paidAction: input.hasReferenceImages ? 'image-edit' : 'image-generation',
+      providerAction: input.hasReferenceImages ? 'image-edit' : 'image-generation',
     },
     assignments: input.assignments,
     providers: input.providers,
@@ -158,7 +158,7 @@ const routerCapabilities = new Set<ModelDescriptor['capabilities'][number]>([
 ])
 
 /**
- * Project the exact configured assignments into the composer router. Paid
+ * Project the exact configured assignments into the composer router. Provider
  * image capabilities come only from observed/verified model evidence in the
  * authoritative capability snapshot; provider kind never grants them.
  */

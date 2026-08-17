@@ -277,9 +277,6 @@ vi.mock('@/agent-runtime/use-desktop-tool-loop', () => ({
       const id = persistArtifact(bytes, mediaType)
       return { artifactId: id, sha256: id.slice('artifact:sha256:'.length) }
     },
-    visualBudget: () => ({
-      ceiling: { currency: 'USD' as const, amount: 0.08 },
-    }),
   }),
 }))
 
@@ -1321,7 +1318,7 @@ describe('brief → every planned route — rendered IntentWorkspace', () => {
     ])
   }, 60_000)
 
-  it('fails before paid prototype generation when no task-fit image route exists', async () => {
+  it('fails before Provider prototype generation when no task-fit image route exists', async () => {
     codexHarness.enabled = true
     desktopHarness.editRouteEnabled = false
     desktopHarness.taskFitRouteEnabled = false

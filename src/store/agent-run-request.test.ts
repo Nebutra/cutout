@@ -21,14 +21,14 @@ describe('agent run request handoff', () => {
     expect(getStoreState().consumeAgentRun()).toEqual(second)
   })
 
-  it('does not carry a paid action request across project reset', () => {
+  it('does not carry a Provider action request across project reset', () => {
     getStoreState().requestAgentRun('create-assets')
     getStoreState().resetProject()
 
     expect(getStoreState().consumeAgentRun()).toBeNull()
   })
 
-  it('does not carry a paid action request into a restored project', () => {
+  it('does not carry a Provider action request into a restored project', () => {
     getStoreState().requestAgentRun('create-assets')
     getStoreState().restoreProject({ brief: 'Restored project' })
 

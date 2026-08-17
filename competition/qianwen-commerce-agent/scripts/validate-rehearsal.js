@@ -16,18 +16,33 @@ const SIGNED_QUERY = /https?:\/\/[^\s<>)\]`]+[?&](?:x-amz-[a-z0-9-]+|signature|s
 const HIDDEN_RUNTIME_CONTENT = /(?:qianwen\.node-checkpoint|\.qianwen-agent-work|remote[-_ ](?:task|job)[-_ ]?id|\btask[_-]?id\b)/i
 const DESCRIPTION_CONTRACTS = Object.freeze({
   'product_description_en.md': Object.freeze({
-    category: 'Exact leaf category', skus: 'SKU Breakdown', attributes: 'Product Attributes',
+    locale: 'en',
+    category: 'Exact leaf category', overview: 'Product Overview', skus: 'SKU Breakdown', attributes: 'Product Attributes',
     identity: 'Source and Product Identity', media: 'Image and Video Assets', fidelity: 'Source Fidelity',
+    sourceValueLabel: 'source value',
+    noSkus: 'No distinct SKU records were supplied in the source product JSON.',
+    noAttributes: 'No product attributes were supplied.',
+    sourceLabels: Object.freeze({ productId: 'Product ID', platform: 'Source platform', url: 'Product URL', title: 'Source product title', category: 'Source category' }),
     mediaInventory: MEDIA_INVENTORY_ROLES.en,
   }),
   'product_description_ko.md': Object.freeze({
-    category: '정확한 최하위 카테고리', skus: 'SKU 구성', attributes: '상품 속성',
+    locale: 'ko',
+    category: '정확한 최하위 카테고리', overview: '상품 개요', skus: 'SKU 구성', attributes: '상품 속성',
     identity: '출처 및 상품 식별 정보', media: '이미지 및 영상 에셋', fidelity: '출처 일치성',
+    sourceValueLabel: '원문 값',
+    noSkus: '원본 상품 JSON에 개별 SKU 정보가 없습니다.',
+    noAttributes: '제공된 상품 속성이 없습니다.',
+    sourceLabels: Object.freeze({ productId: '상품 ID', platform: '원본 플랫폼', url: '상품 URL', title: '원본 상품명', category: '원본 카테고리' }),
     mediaInventory: MEDIA_INVENTORY_ROLES.ko,
   }),
   'product_description_pt.md': Object.freeze({
-    category: 'Categoria final exata', skus: 'Detalhamento de SKUs', attributes: 'Atributos do produto',
+    locale: 'pt',
+    category: 'Categoria final exata', overview: 'Visao geral do produto', skus: 'Detalhamento de SKUs', attributes: 'Atributos do produto',
     identity: 'Origem e identificacao do produto', media: 'Imagens e video', fidelity: 'Fidelidade a fonte',
+    sourceValueLabel: 'valor original',
+    noSkus: 'Nenhum SKU separado foi informado no JSON de origem.',
+    noAttributes: 'Nenhum atributo de produto foi informado.',
+    sourceLabels: Object.freeze({ productId: 'ID do produto', platform: 'Plataforma de origem', url: 'URL do produto', title: 'Titulo original do produto', category: 'Categoria original' }),
     mediaInventory: MEDIA_INVENTORY_ROLES.pt,
   }),
 })
@@ -153,26 +168,80 @@ function sectionBody(text, heading, nextHeading) {
   return expression.exec(text)?.[1]?.trim() ?? ''
 }
 
+function assertSourceIdentityClosure(text, contract, name) {
+  const body = sectionBody(text, contract.identity, contract.media)
+  const lines = body.split(/\r?\n/u).map((line) => line.trim()).filter(Boolean)
+  const labels = contract.sourceLabels
+  const required = [labels.productId, labels.platform, labels.url, labels.title]
+  for (const label of required) {
+    const value = label === labels.url ? 'https:\\/\\/\\S+' : '\\S.+'
+    const matches = lines.filter((line) => line.startsWith(`- ${label}: `))
+    invariant(matches.length === 1
+      && new RegExp(`^- ${escapeRegExp(label)}: ${value} \\x60[^\\x60\\r\\n]+\\/[^\\x60\\r\\n]+\\x60$`, 'u').test(matches[0]),
+      'invalid-document', `Localized source identity closure is missing: ${name}`)
+  }
+  const categoryLines = lines.filter((line) => line.startsWith(`- ${labels.category}: `))
+  invariant(categoryLines.length <= 1
+    && categoryLines.every((line) => new RegExp(`^- ${escapeRegExp(labels.category)}: \\S.+ \\x60[^\\x60\\r\\n]+\\/[^\\x60\\r\\n]+\\x60$`, 'u').test(line)),
+  'invalid-document', `Localized source category closure is invalid: ${name}`)
+  invariant(lines.length === required.length + categoryLines.length,
+  'invalid-document', `Localized source identity labels are invalid: ${name}`)
+}
+
+function proseWithoutExplicitEvidence(text, contract) {
+  const identity = new RegExp(`(^## ${escapeRegExp(contract.identity)}\\s*$)[\\s\\S]*?(?=^## ${escapeRegExp(contract.media)}\\s*$)`, 'mu')
+  return text.replace(identity, '$1\n').split(/\r?\n/u).map((line) => {
+    if (!/^\s*- /u.test(line) || !/`[^`\r\n]+\/[^`\r\n]+`\s*$/u.test(line)) return line
+    return line
+      .replace(/^(\s*-\s+)\*\*`[^`\r\n]*`\*\*/u, '$1')
+      .replace(new RegExp(`\\(${escapeRegExp(contract.sourceValueLabel)}: \\x60[^\\x60\\r\\n]*\\x60\\)`, 'gu'), '')
+      .replace(/\s+`[^`\r\n]+\/[^`\r\n]+`\s*$/u, '')
+  }).join('\n')
+}
+
+function assertLocaleScriptClosure(text, contract, name) {
+  const prose = proseWithoutExplicitEvidence(text, contract)
+  if (contract.locale === 'ko') {
+    invariant(!/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/u.test(prose),
+      'invalid-document', `Korean localized body contains source-market script leakage: ${name}`)
+    invariant((prose.match(/\p{Script=Hangul}/gu) ?? []).length >= 10,
+      'invalid-document', 'Korean description lacks Hangul content.')
+  } else {
+    invariant(!/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/u.test(prose),
+      'invalid-document', `${contract.locale} localized body contains source-market script leakage: ${name}`)
+  }
+}
+
 function validateDescription(name, text, mediaNames) {
   const contract = DESCRIPTION_CONTRACTS[name]
   invariant(contract && /^# [^\r\n]{2,500}\r?$/mu.test(text), 'invalid-document', `Description title is missing: ${name}`)
-  for (const heading of [contract.skus, contract.attributes, contract.identity, contract.media, contract.fidelity]) {
-    invariant(new RegExp(`^## ${escapeRegExp(heading)}\\s*$`, 'mu').test(text), 'invalid-document', `Description section is missing: ${name}`)
-  }
-  const category = new RegExp(`^\\*\\*${escapeRegExp(contract.category)}:\\*\\*\\s+.+\\s+\\(([^()\\r\\n]{1,240})\\)\\s*$`, 'mu').exec(text)?.[1]
-  invariant(category, 'invalid-document', `Exact leaf category declaration is missing: ${name}`)
+  const expectedHeadings = [contract.overview, contract.skus, contract.attributes, contract.identity, contract.media, contract.fidelity]
+  const actualHeadings = [...text.matchAll(/^## ([^\r\n]+?)\s*$/gmu)].map((match) => match[1])
+  invariant(actualHeadings.length === expectedHeadings.length
+    && actualHeadings.every((heading, index) => heading === expectedHeadings[index]),
+  'invalid-document', `Description section closure or order is invalid: ${name}`)
+  const categoryMatches = [...text.matchAll(new RegExp(`^\\*\\*${escapeRegExp(contract.category)}:\\*\\*\\s+(.{1,500})\\s+\\(([^()\\r\\n]{1,240})\\)\\s*$`, 'gmu'))]
+  invariant(categoryMatches.length === 1, 'invalid-document', `Exact leaf category declaration is missing or duplicated: ${name}`)
+  const categoryMatch = categoryMatches[0]
+  const categoryName = categoryMatch?.[1]
+  const categoryId = categoryMatch?.[2]
+  invariant(categoryName && categoryId && /^[A-Za-z0-9][A-Za-z0-9._:-]{0,239}$/u.test(categoryId),
+    'invalid-document', `Exact leaf category declaration is invalid: ${name}`)
+  if (contract.locale === 'ko') {
+    invariant(/\p{Script=Hangul}/u.test(categoryName)
+      && !/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/u.test(categoryName),
+    'invalid-document', 'Korean category name is not localized.')
+  } else invariant(!/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/u.test(categoryName),
+    'invalid-document', `${contract.locale} category name is not localized.`)
   const skuBody = sectionBody(text, contract.skus, contract.attributes)
   const attributeBody = sectionBody(text, contract.attributes, contract.identity)
-  invariant(skuBody.length > 20 && (/`[^`\r\n]+\/[^`\r\n]+`/u.test(skuBody) || /No distinct|없습니다|Nenhum SKU/u.test(skuBody)),
+  invariant((skuBody.length > 20 && /`[^`\r\n]+\/[^`\r\n]+`/u.test(skuBody))
+    || skuBody.includes(`- ${contract.noSkus}`),
     'invalid-document', `SKU breakdown closure is missing: ${name}`)
-  invariant(attributeBody.length > 20 && /`[^`\r\n]+\/[^`\r\n]+`/u.test(attributeBody),
+  invariant((attributeBody.length > 20 && /`[^`\r\n]+\/[^`\r\n]+`/u.test(attributeBody))
+    || attributeBody.includes(`- ${contract.noAttributes}`),
     'invalid-document', `Attribute source closure is missing: ${name}`)
-  for (const label of ['Product ID', 'Source platform']) {
-    invariant(new RegExp(`^- ${label}: \\S.+ \\x60[^\\x60\\r\\n]+\\/[^\\x60\\r\\n]+\\x60\\s*$`, 'mu').test(text),
-      'invalid-document', `Source identity closure is missing: ${name}`)
-  }
-  invariant(/^- Product URL: https:\/\/\S+ `[^`\r\n]+\/[^`\r\n]+`\s*$/mu.test(text),
-    'invalid-document', `Source URL closure is missing: ${name}`)
+  assertSourceIdentityClosure(text, contract, name)
   const roles = [...contract.mediaInventory.imageRoles, contract.mediaInventory.videoRole]
   const expectedMediaLines = mediaNames.map((mediaName, index) =>
     `- ${mediaName}: ${contract.mediaInventory.prefix}: ${roles[index]}`)
@@ -181,14 +250,14 @@ function validateDescription(name, text, mediaNames) {
   invariant(actualMediaLines.length === expectedMediaLines.length
     && actualMediaLines.every((line, index) => line === expectedMediaLines[index]),
   'invalid-document', `Deterministic media role closure is missing or contains free-form entries: ${name}`)
-  if (name.endsWith('_ko.md')) invariant((text.match(/[\uac00-\ud7af]/gu) ?? []).length >= 10, 'invalid-document', 'Korean description lacks Hangul content.')
+  assertLocaleScriptClosure(text, contract, name)
   if (name.endsWith('_pt.md')) invariant((text.toLocaleLowerCase('pt-BR').match(/\b(?:a|o|de|do|da|para|com|produto|tamanho|cor|material|imagem|detalhes|origem)\b/gu) ?? []).length >= 5,
     'invalid-document', 'Portuguese description lacks locale evidence.')
-  return category
+  return categoryId
 }
 
 function validateStrategy(text, imageArtifacts, videoArtifact) {
-  for (const heading of ['Product and Evidence Lock', 'Localization Strategy', 'Image Strategy', 'Video Strategy', 'Execution and Validation', 'Source References']) {
+  for (const heading of ['Market and Merchandising Direction', 'Localization', 'Image Story', 'Video Story', 'Technical QA Appendix', 'Source References']) {
     invariant(new RegExp(`^## ${escapeRegExp(heading)}\\s*$`, 'mu').test(text), 'invalid-document', 'Strategy document closure is incomplete.')
   }
   for (const artifact of [...imageArtifacts, videoArtifact]) {

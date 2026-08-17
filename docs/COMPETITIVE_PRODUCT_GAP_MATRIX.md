@@ -58,8 +58,8 @@ by reviewed first-party material.
 | Area | Current authoritative evidence | Gap to target | Priority |
 | --- | --- | --- | --- |
 | Outcome-first Agent UX | `ProjectHome`, `IntentWorkspace`, `AgentWorkspaceDock`; outcome runtime and visible deliverables | Home/project lifecycle still exposes project mechanics before a user has a result; Agent direction/variants/selection need one coherent surface | P0 |
-| Multimodal visual generation | `src/visual-generation`, paid desktop tool loop, durable request/attempt ledger, Brand VI DAG | No full creative-board loop for prompt/reference grouping, variant contact sheets, compare, favorite, branch and local edit | P0 |
-| Asset lineage | Design IR sources, content hashes, material revisions, provenance, relations and durable receipts | Lineage is technically strong but not legible in normal UX; users need “derived from”, version ancestry, approval and cost on demand | P0 |
+| Multimodal visual generation | `src/visual-generation`, Provider desktop tool loop, durable request/attempt ledger, Brand VI DAG | No full creative-board loop for prompt/reference grouping, variant contact sheets, compare, favorite, branch and local edit | P0 |
+| Asset lineage | Design IR sources, content hashes, material revisions, provenance, relations and durable receipts | Lineage is technically strong but not legible in normal UX; users need “derived from”, version ancestry and approval on demand | P0 |
 | Structured canvas/editor | Prototype plans and material canvas; Figma snapshot adapter | Generated results are still primarily deliverables, not universally editable structured nodes with stable selection/constraints | P0 |
 | Component system | Explicit component candidates, Design Kit, Astryx binding, starter compiler | No direct canvas-to-explicit-component authoring UX, variant/property editor, story/state matrix or round-trip implementation status | P0 |
 | Motion system | Design IR carries motion tokens and governance samples; Brand VI can request motion/Lottie output | No executable timeline, easing/keyframe editor, Lottie validation/render preview or reduced-motion authoring | P1 |
@@ -126,7 +126,7 @@ One delivery action should resolve the correct outputs from the outcome:
 - Figma/Framer integration plans;
 - GitHub PR/check and Notion documentation receipts.
 
-The user approves effects, destination and cost once. The harness performs
+The user approves effects and destination once. The harness performs
 build, screenshot, accessibility, visual and provenance checks, then repairs
 before presenting the final receipt.
 
@@ -146,7 +146,7 @@ before presenting the final receipt.
 
 - Framer Plugin/Server API adapter with staging preview and approval-gated
   publish.
-- Portable model/workflow packs with provenance, cost, compatibility and
+- Portable model/workflow packs with provenance, compatibility and
   evaluation cards; avoid copying marketplace mechanics without governance.
 - Team libraries, remote asset indexing and organization policy.
 - Advanced motion authoring and reusable motion components.

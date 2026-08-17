@@ -7,7 +7,7 @@ import {
   type ControlResponse,
   type TrustedControlAuthorization,
 } from '@/control-protocol'
-import { planPaidTool } from '@/control-protocol'
+import { planProviderTool } from '@/control-protocol'
 import { compileHeadlessDesignKit } from '@/design-kit'
 import { compileBrandKit } from '@/brand-kit'
 import { compileComponentCandidates, type ComponentManifest } from '@/components-compiler'
@@ -54,10 +54,10 @@ export function createHeadlessRuntime(store: RuntimeStore, coding: { backend?: C
       const ledger = ledgerFromState(state)
       const preparation = applyControlRequest(ledger, request, {
         policy: {
-          // A paid request still passes through the shared capability/authorization
+          // A Provider request still passes through the shared capability/authorization
           // contract. This host has no provider executor, so apply terminates as
           // capability-required rather than pretending work occurred.
-          allowPaid: request.operation.type === 'tool.invoke',
+          allowProviderExecution: request.operation.type === 'tool.invoke',
           allowExternal: state.policy.allowApply,
           requireApprovalForExternal: state.policy.requireApprovalForExternal,
         },
@@ -164,9 +164,9 @@ async function dispatch(store: RuntimeStore, state: HeadlessProjectState, reques
       }
     }
     case 'tool.invoke': {
-      const plan = planPaidTool(request.operation.tool, undefined, { allowPaid: true }, Boolean(authorization.approval))
+      const plan = planProviderTool(request.operation.tool, undefined, { allowProviderExecution: true }, Boolean(authorization.approval))
       if (request.mode === 'dry-run') return ok({ operation: 'tool.invoke', plan })
-      return { ok: false, code: 'capability-required', message: plan.reason ?? 'No paid tool executor is available.' }
+      return { ok: false, code: 'capability-required', message: plan.reason ?? 'No Provider tool executor is available.' }
     }
   }
 }

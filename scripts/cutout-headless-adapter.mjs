@@ -94,7 +94,7 @@ export function adapterError(code, message) {
 export function unsupported(operation) {
   return adapterError(
     'unsupported-operation',
-    `${operation} is not available in the headless v1 runtime. It has not performed any file, network, provider, or paid action.`,
+    `${operation} is not available in the headless v1 runtime. It has not performed any file, network, or Provider action.`,
   )
 }
 

@@ -273,8 +273,8 @@ export async function compileBrandKitOperation(
 }
 
 /**
- * Build a reviewable Brand VI DAG without invoking a provider or spending credits.
- * Paid image generation/edit nodes remain plans until a separate approved tool invocation.
+ * Build a reviewable Brand VI DAG without invoking a Provider.
+ * Provider image generation/edit nodes remain plans until a separate approved tool invocation.
  */
 export function planBrandViOperation(request: BrandViPlanRequest): Result<BrandViGenerationPlan> {
   try {

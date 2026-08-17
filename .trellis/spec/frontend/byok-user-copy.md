@@ -14,15 +14,13 @@ estimates (`estimates X USD`, amounts, currencies presented as charges).
 **Why**: Users bring their own provider keys; showing USD estimates implies the app
 is billing them. Provider billing is the only source of truth.
 
-**Boundary**: Paid-tool requests, plans, visual DAGs, Agent run events, and
+**Boundary**: Provider-tool requests, plans, visual DAGs, Agent run events, and
 delivery previews carry no predicted cost or budget ceiling. Enabling a BYOK
-Provider is standing authorization for Provider calls, so desktop paid requests
-use `approvalPolicy: 'auto'` and never show a per-call billing confirmation.
+Provider is sufficient authority for Provider calls, so desktop Provider requests
+use `approvalPolicy: 'auto'` and never show a per-call confirmation.
 Preview and run events exist for observation, cancellation and evidence, not for
-approval. An optional `receipt.charged` value may be
-recorded only after execution and only when it is backed by verifiable Provider
-billing evidence; Cutout must never infer it from a model, capability, plan, or
-request.
+approval. Requests, plans, receipts and UI projections do not carry Provider
+prices, charges, credits or billing evidence.
 
 ```ts
 // Wrong (predicted billing copy)

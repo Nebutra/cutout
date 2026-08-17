@@ -4,12 +4,12 @@ import {
   type AgentRunEvent,
 } from "./run-events";
 import {
-  planPaidTool,
-  type PaidToolExecutorCapability,
-  type PaidToolPolicy,
-  type PaidToolReceipt,
-  type PaidToolRequest,
-} from "@/control-protocol/paid-tool-contract";
+  planProviderTool,
+  type ProviderToolExecutorCapability,
+  type ProviderToolPolicy,
+  type ProviderToolReceipt,
+  type ProviderToolRequest,
+} from "@/control-protocol/provider-tool-contract";
 import type {
   DesktopToolExecutionResult,
   ToolExecutorRegistry,
@@ -24,7 +24,7 @@ export interface DesktopToolLoopRequest {
   readonly label: string;
   readonly stepId?: string;
   readonly expectedRevision: number;
-  readonly request: PaidToolRequest;
+  readonly request: ProviderToolRequest;
   readonly capabilityLeaseId?: string;
   readonly requestDigest?: string;
   /** Cancels approval or execution when the owning workspace run is superseded. */
@@ -36,7 +36,7 @@ export interface DesktopToolLoopRequest {
 export interface DesktopToolLoopDependencies {
   readonly executors: ToolExecutorRegistry;
   readonly currentRevision: () => number;
-  readonly policy: () => PaidToolPolicy;
+  readonly policy: () => ProviderToolPolicy;
   /** One callback is one durable transaction. */
   readonly append: (events: readonly AgentRunEvent[]) => void;
   readonly now?: () => number;
@@ -67,7 +67,7 @@ export interface DesktopToolLoop {
 
 interface PendingCall {
   input: DesktopToolLoopRequest;
-  capability?: PaidToolExecutorCapability;
+  capability?: ProviderToolExecutorCapability;
   controller?: AbortController;
   state: "approval" | "running" | "settled";
   result: Promise<DesktopToolExecutionResult>;
@@ -105,7 +105,7 @@ export function createDesktopToolLoop(
     approvalGranted: boolean,
   ): Promise<void> {
     if (call.state === "settled") return;
-    const plan = planPaidTool(
+    const plan = planProviderTool(
       call.input.request,
       call.capability,
       dependencies.policy(),
@@ -220,7 +220,7 @@ export function createDesktopToolLoop(
         await dependencies.durability.recover()
         const durable = await dependencies.durability.plan({ requestId: input.requestId, runId: input.runId, toolCallId: input.toolCallId, capability: input.request.capability, at: now() })
         if (durable.duplicate && durable.request.status === 'succeeded') {
-          const receipt = durable.request.attempts.findLast((attempt) => attempt.status === 'succeeded')?.receipt as PaidToolReceipt | undefined
+          const receipt = durable.request.attempts.findLast((attempt) => attempt.status === 'succeeded')?.receipt as ProviderToolReceipt | undefined
           if (receipt) {
             const result = Promise.resolve({ ok: true, receipt, events: [] } as DesktopToolExecutionResult)
             calls.set(input.toolCallId, { input, state: 'settled', result, resolve: () => undefined })
@@ -239,7 +239,7 @@ export function createDesktopToolLoop(
             item.providerId === input.request.providerId) &&
           (!input.request.model || item.model === input.request.model),
       );
-      const plan = planPaidTool(
+      const plan = planProviderTool(
         input.request,
         capability,
         dependencies.policy(),
@@ -247,7 +247,7 @@ export function createDesktopToolLoop(
       );
       const awaitsHumanApproval = input.request.approvalPolicy === "explicit"
         && Boolean(capability?.available)
-        && dependencies.policy().allowPaid;
+        && dependencies.policy().allowProviderExecution;
       let resolve!: (result: DesktopToolExecutionResult) => void;
       const result = new Promise<DesktopToolExecutionResult>((done) => {
         resolve = done;

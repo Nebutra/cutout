@@ -363,7 +363,7 @@ export interface StoreActions {
   commitAssetProduction(expectedRevision: number, snapshot: AssetProductionSnapshot): boolean
   /** Queue a one-shot agent run after navigation mounts the workspace. */
   requestAgentRun(intent: PendingAgentRun['intent']): PendingAgentRun
-  /** Atomically take and clear the pending run, preventing duplicate paid work. */
+  /** Atomically take and clear the pending run, preventing duplicate Provider work. */
   consumeAgentRun(): PendingAgentRun | null
   /** Mark a forward generation as started (clears the prior error). */
   beginGen(phase: Exclude<GenPhase, 'idle'>): void

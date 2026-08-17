@@ -109,7 +109,7 @@ deliverables without granting Cutout arbitrary shell access.
 1. Read `cutout.agent-capabilities.json` and `.cutout/manifest.json`.
 2. Call `context`, `materials` and `validate` without mutation.
 3. Preview source ingestion or an export and retain its structured plan.
-4. Present source, license, provenance, paths, hashes, cost/capability status and
+4. Present source, license, provenance, paths, hashes, capability status and
    expected effects to the user.
 5. Apply only after explicit approval and only if `.cutout` policy enables it.
 6. Read the result back and run `validate` again. An accepted request is not

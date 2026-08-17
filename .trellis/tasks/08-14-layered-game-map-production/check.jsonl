@@ -1,0 +1,4 @@
+{"file":".trellis/spec/frontend/game-asset-profile.md","reason":"Review map authority, legacy compatibility, structured geometry and no-fixture production claims."}
+{"file":".trellis/spec/frontend/type-safety.md","reason":"Review strict Zod boundaries, discriminated unions and absence of raw payload casts."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Review focused invalid-boundary tests, deterministic evidence and truthful capability claims."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Review canonical fingerprint reuse and complete manifest closure across consumers."}

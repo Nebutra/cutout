@@ -1,14 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { verifyNativeMultimodalHostArtifact } from '@/multimodal-host/desktop-host'
-import currentCommerce from './benchmarks/current.json'
+import currentCommerce from './benchmarks/contract-baseline.json'
 import {
   createCommerceProfileBenchmarkReportFromRehearsal,
   decodeCommerceProfileBenchmarkReport,
   decodeCommerceProfileBenchmarkReportFromRehearsal,
 } from './benchmark'
 import { createCommerceRehearsalFixture } from './rehearsal.test-fixture'
-import type { CommerceProductionRehearsalBundle } from './rehearsal'
-import { assertCommerceHeldOutReceiptCommitmentClosure } from './rehearsal'
+import {
+  assertCommerceHeldOutReceiptCommitmentClosure,
+  commerceProductionRehearsalArtifactSchema,
+  type CommerceProductionRehearsalBundle,
+} from './rehearsal'
 import {
   createDesignOsBenchmarkFromCommerceRehearsal,
   decodeDesignOsBenchmarkFromCommerceRehearsal,
@@ -42,6 +45,37 @@ describe('Commerce rehearsal verifier contract (fixture only; not benchmark evid
     })
     vi.mocked(verifyNativeCommerceSourceIngestReceipt).mockImplementation(async ({ receipt }) => receipt)
   }
+
+  it('decodes retained multi-megabyte base64 with bounded linear validation', async () => {
+    const fixture = await createCommerceRehearsalFixture()
+    const retainedBytes = new Uint8Array(5 * 1024 * 1024)
+    const chunk = 'Cutout held-out retained evidence.'
+    for (let index = 0; index < retainedBytes.length; index += 1) {
+      retainedBytes[index] = chunk.charCodeAt(index % chunk.length)
+    }
+    const artifactBytesBase64 = Buffer.from(retainedBytes).toString('base64')
+
+    expect(artifactBytesBase64.length).toBeGreaterThan(6 * 1024 * 1024)
+    expect(() => commerceProductionRehearsalArtifactSchema.parse({
+      ...fixture.bundle.artifacts[0],
+      artifactBytesBase64,
+    })).not.toThrow()
+  })
+
+  it.each([
+    'AAA',
+    'A===',
+    'AA=A',
+    'AAA==',
+    '====',
+    'AA!A',
+  ])('rejects malformed retained base64 syntax: %s', async (artifactBytesBase64) => {
+    const fixture = await createCommerceRehearsalFixture()
+    expect(() => commerceProductionRehearsalArtifactSchema.parse({
+      ...fixture.bundle.artifacts[0],
+      artifactBytesBase64,
+    })).toThrow(/Invalid base64 encoding|too small/)
+  })
 
   it('requires complete receipt, byte, graph, Plan, lock, QA, and evaluation closure before deriving real-Host statuses', async () => {
     const fixture = await createCommerceRehearsalFixture()

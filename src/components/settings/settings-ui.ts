@@ -16,7 +16,7 @@ export interface SettingsUI {
   readonly open: (target?: SettingsTarget) => void
 }
 export type SettingsTargetSection='general'|'ai'|'updates-support'|'speech'|'personalization'|'integrations'|'archived'
-export interface SettingsTarget{readonly section:SettingsTargetSection;readonly anchor?:'model-routing'|'connections'|'paid-actions'|'updates'}
+export interface SettingsTarget{readonly section:SettingsTargetSection;readonly anchor?:'model-routing'|'connections'|'provider-execution'|'updates'}
 
 export function focusSettingsTarget(
   target: SettingsTarget | undefined,

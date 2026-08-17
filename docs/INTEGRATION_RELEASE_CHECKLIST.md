@@ -11,7 +11,7 @@ Status: production acceptance contract. A checked box requires attached receipt 
 - Refresh preserves session identity; revoke invalidates both host credentials and Cutout state.
 - A selected-resource readback succeeds with least-privilege scopes.
 - Publish preview and base revision are shown before approval; readback confirms the remote result.
-- Rate-limit, timeout, region, cost and content-safety failures return structured receipts.
+- Rate-limit, timeout, region, quota and content-safety failures return structured receipts.
 
 ## Foreground plugins: Figma, Obsidian, Framer, Canva Apps
 

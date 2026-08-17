@@ -10,7 +10,7 @@ export interface PrototypeImageRequestBudget {
 
 /**
  * Compiles the resolved Agent-authored business topology into the baseline
- * paid-image DAG. This function owns no product defaults for page or asset
+ * Provider-image DAG. This function owns no product defaults for page or asset
  * counts and never interprets a number from the user's prose.
  */
 export function compilePrototypeImageRequestBudget(input: {

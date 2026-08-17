@@ -23,6 +23,7 @@ import type {
   PrototypePageReviewRecord,
   PrototypeResourceReviewRecord,
 } from '@/prototype/review-evidence'
+import type { CommerceProjectLifecycleRecord } from '@/commerce-profile/project-lifecycle'
 
 export type WorkspaceWorkflowPhase =
   | 'idle'
@@ -141,6 +142,8 @@ export interface WorkspaceSnapshot {
   readonly deliveryReceipt?: CompositeDeliveryReceipt | null
   readonly approvedDeliverables?: readonly ApprovedDeliverableReceipt[]
   readonly brandViRun?: BrandViRun | null
+  /** Revision-bound Commerce production, explicit review, and truthful download handoff. */
+  readonly commerceProjectLifecycle?: CommerceProjectLifecycleRecord | null
   /** User-authored canvas guidance. It is Agent context, never raster output. */
   readonly canvasAnnotations?: readonly CanvasAnnotation[]
   /** Durable evidence for inputs that require a runtime capability not currently available. */
@@ -210,6 +213,7 @@ export function isWorkspaceSnapshotEmpty(
     !snapshot.deliveryReceipt &&
     !(snapshot.approvedDeliverables?.length) &&
     !snapshot.brandViRun &&
+    !snapshot.commerceProjectLifecycle &&
     !(snapshot.canvasAnnotations?.length) &&
     !(snapshot.capabilityReceipts?.length) &&
     !(snapshot.codingReceipts?.length) &&
@@ -322,6 +326,7 @@ export function workspaceSnapshotFingerprint(
     snapshot.deliveryReceipt ? textFingerprint(JSON.stringify(snapshot.deliveryReceipt)) : '',
     snapshot.approvedDeliverables?.length ? textFingerprint(JSON.stringify(snapshot.approvedDeliverables)) : '',
     snapshot.brandViRun ? textFingerprint(JSON.stringify(snapshot.brandViRun)) : '',
+    commerceProjectLifecycleFingerprint(snapshot.commerceProjectLifecycle),
     snapshot.canvasAnnotations?.length
       ? textFingerprint(JSON.stringify(snapshot.canvasAnnotations))
       : '',
@@ -369,10 +374,25 @@ function hasWorkspaceProjectionInput(snapshot: WorkspaceSnapshot): boolean {
       snapshot.deliveryPlan ||
       snapshot.deliveryReceipt ||
       snapshot.brandViRun ||
+      snapshot.commerceProjectLifecycle ||
       (snapshot.canvasAnnotations?.length ?? 0) > 0 ||
       (snapshot.capabilityReceipts?.length ?? 0) > 0 ||
       (snapshot.codingReceipts?.length ?? 0) > 0
   )
+}
+
+function commerceProjectLifecycleFingerprint(
+  record: CommerceProjectLifecycleRecord | null | undefined,
+): string {
+  if (!record) return ''
+  return [
+    record.schema,
+    record.designRevisionId,
+    record.result.run.runId,
+    record.result.deliverables.map((deliverable) => deliverable.sha256).join(','),
+    record.review?.reviewedAt ?? '',
+    record.delivery?.requestedAt ?? '',
+  ].join(':')
 }
 
 function composerModelPolicyFingerprint(

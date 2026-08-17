@@ -1,13 +1,13 @@
 import type { CutoutParams } from '@/algorithm/types'
 import {
-  paidToolReceiptSchema,
-  paidToolExecutionPrompt,
-  planPaidTool,
-  type PaidToolExecutorCapability,
-  type PaidToolPolicy,
-  type PaidToolReceipt,
-  type PaidToolRequest,
-} from '@/control-protocol/paid-tool-contract'
+  providerToolReceiptSchema,
+  providerToolExecutionPrompt,
+  planProviderTool,
+  type ProviderToolExecutorCapability,
+  type ProviderToolPolicy,
+  type ProviderToolReceipt,
+  type ProviderToolRequest,
+} from '@/control-protocol/provider-tool-contract'
 import { createRunEvent, type AgentRunEvent } from '@/agent-runtime/run-events'
 import type { GeneratedAsset } from '@/services/ai/types'
 import type { ImageAdapterStrategy } from '@/services/ai/image-route-assessment'
@@ -59,9 +59,9 @@ export interface DesktopToolExecution {
   readonly label: string
   readonly stepId?: string
   readonly expectedRevision: number
-  readonly request: PaidToolRequest
+  readonly request: ProviderToolRequest
   readonly approvalGranted: boolean
-  readonly policy: PaidToolPolicy
+  readonly policy: ProviderToolPolicy
   readonly signal?: AbortSignal
   readonly cutoutParams?: CutoutParams
   readonly capabilityLeaseId?: string
@@ -72,16 +72,16 @@ export interface DesktopToolExecution {
 }
 
 export type DesktopToolExecutionResult =
-  | { readonly ok: true; readonly receipt: PaidToolReceipt; readonly events: readonly AgentRunEvent[] }
-  | { readonly ok: false; readonly error: string; readonly receipt?: PaidToolReceipt; readonly events: readonly AgentRunEvent[] }
+  | { readonly ok: true; readonly receipt: ProviderToolReceipt; readonly events: readonly AgentRunEvent[] }
+  | { readonly ok: false; readonly error: string; readonly receipt?: ProviderToolReceipt; readonly events: readonly AgentRunEvent[] }
 
 export interface ToolExecutor {
-  capabilities(): Promise<readonly PaidToolExecutorCapability[]>
+  capabilities(): Promise<readonly ProviderToolExecutorCapability[]>
   execute(input: DesktopToolExecution): Promise<DesktopToolExecutionResult>
 }
 
 export interface ToolExecutorRegistry {
-  executor(capability: PaidToolRequest['capability']): Promise<ToolExecutor | undefined>
+  executor(capability: ProviderToolRequest['capability']): Promise<ToolExecutor | undefined>
   execute(input: DesktopToolExecution): Promise<DesktopToolExecutionResult>
 }
 
@@ -91,13 +91,13 @@ export interface DesktopToolExecutorDependencies {
     'providers' | 'generation' | 'cutout' | 'foregroundSegmentation'
   >
   readonly artifacts: DesktopToolArtifactStore
-  readonly capabilities: () => Promise<readonly PaidToolExecutorCapability[]>
+  readonly capabilities: () => Promise<readonly ProviderToolExecutorCapability[]>
   readonly currentRevision: () => number
   readonly now?: () => number
   readonly id?: () => string
   readonly decodeBitmap?: (artifact: DesktopToolArtifact) => Promise<ImageBitmap>
   readonly cutoutResultSink?: CutoutResultSink
-  /** Host-owned authorization boundary. When configured, every paid action
+  /** Host-owned authorization boundary. When configured, every Provider action
    * must present a short-lived lease bound to this exact request digest. */
   readonly permissionBroker?: PermissionBroker
 }
@@ -119,7 +119,7 @@ export function createDesktopToolExecutor(
         const authorization = dependencies.permissionBroker.authorize(input.capabilityLeaseId, {
           subject: input.runId,
           requestDigest: input.requestDigest,
-          requiredScopes: isLocalCutout(input.request.capability) ? ['paid'] : ['paid', 'credential'],
+          requiredScopes: isLocalCutout(input.request.capability) ? ['tool-execute'] : ['tool-execute', 'credential'],
         })
         if (authorization.decision !== 'allowed') {
           return failure(input, authorization.reason ?? 'Capability authorization failed.', startedAt)
@@ -129,7 +129,7 @@ export function createDesktopToolExecutor(
         item.capability === input.request.capability
         && (!input.request.providerId || item.providerId === input.request.providerId)
         && (!input.request.model || item.model === input.request.model))
-      const plan = planPaidTool(input.request, capability, input.policy, input.approvalGranted)
+      const plan = planProviderTool(input.request, capability, input.policy, input.approvalGranted)
       if (!plan.executable || !capability) return failure(input, plan.reason ?? 'Tool execution is not authorized.', startedAt)
       if (dependencies.currentRevision() !== input.expectedRevision) {
         return failure(input, `Expected revision ${input.expectedRevision}, current revision is ${dependencies.currentRevision()}.`, startedAt)
@@ -164,7 +164,7 @@ export function createDesktopToolExecutor(
         const executionOutput = await executeCapability(dependencies, input, capability)
         if (input.signal?.aborted) return cancelled(input, capability, startedAt, now(), id(), preceding)
         if (dependencies.currentRevision() !== input.expectedRevision) {
-          return failure(input, 'The project changed while the paid tool was running; its output was not published.', startedAt, preceding, capability, now(), id())
+          return failure(input, 'The project changed while the Provider tool was running; its output was not published.', startedAt, preceding, capability, now(), id())
         }
         const evidenceRefs = executionOutput.evidenceAssets
           ? await writeAssets(dependencies.artifacts, executionOutput.evidenceAssets, input, 'cutout')
@@ -229,7 +229,7 @@ export function createToolExecutorRegistry(executors: readonly ToolExecutor[]): 
 async function executeCapability(
   dependencies: DesktopToolExecutorDependencies,
   input: DesktopToolExecution,
-  capability: PaidToolExecutorCapability,
+  capability: ProviderToolExecutorCapability,
 ): Promise<{
   readonly assets: readonly GeneratedAsset[]
   readonly cutoutSlices?: readonly CutoutSlice[]
@@ -244,7 +244,7 @@ async function executeCapability(
       'dashscope-native-image-generation',
     ])
     const result = await dependencies.services.generation.generateImages({
-      providerId: capability.providerId, model: capability.model, prompt: paidToolExecutionPrompt(input.request), signal: input.signal,
+      providerId: capability.providerId, model: capability.model, prompt: providerToolExecutionPrompt(input.request), signal: input.signal,
     })
     if (!result.ok) throw new Error(result.error)
     return { assets: result.data }
@@ -255,7 +255,7 @@ async function executeCapability(
       input.request.inputArtifactIds,
     )
     if (sources.length === 0) {
-      throw new Error('The paid tool requires an input image artifact.')
+      throw new Error('The Provider tool requires an input image artifact.')
     }
     const strategy = requireImageStrategy(capability, [
       'openai-images-edits',
@@ -263,7 +263,7 @@ async function executeCapability(
       'google-multimodal-generate',
       'dashscope-native-image-edit',
     ])
-    const prompt = paidToolExecutionPrompt(input.request)
+    const prompt = providerToolExecutionPrompt(input.request)
     const result = strategy === 'google-multimodal-generate'
       ? await dependencies.services.generation.generateImages({
           providerId: capability.providerId,
@@ -283,7 +283,7 @@ async function executeCapability(
     return { assets: result.data }
   }
   const source = await firstArtifact(dependencies.artifacts, input.request.inputArtifactIds)
-  if (!source) throw new Error('The paid tool requires an input image artifact.')
+  if (!source) throw new Error('The Provider tool requires an input image artifact.')
   let cutoutSource = source
   let evidenceAssets: readonly GeneratedAsset[] | undefined
   let providerRoute = 'local/cutout-v1'
@@ -318,7 +318,7 @@ async function executeCapability(
 }
 
 function requireImageStrategy(
-  capability: PaidToolExecutorCapability,
+  capability: ProviderToolExecutorCapability,
   allowed: readonly ImageAdapterStrategy[],
 ): ImageAdapterStrategy {
   const strategy = capability.transportStrategy
@@ -369,17 +369,17 @@ function defaultCutoutParams(): CutoutParams {
   return { threshold: 246, minArea: 900, mergeGap: 18, padding: 10 }
 }
 
-function receiptFor(input: DesktopToolExecution, capability: PaidToolExecutorCapability, status: PaidToolReceipt['status'], outputArtifactIds: readonly string[], startedAt: number, completedAt: number, receiptId: string): PaidToolReceipt {
-  return paidToolReceiptSchema.parse({ receiptId, requestId: input.requestId, capability: input.request.capability, providerId: capability.providerId, model: capability.model, status, outputArtifactIds, startedAt, completedAt })
+function receiptFor(input: DesktopToolExecution, capability: ProviderToolExecutorCapability, status: ProviderToolReceipt['status'], outputArtifactIds: readonly string[], startedAt: number, completedAt: number, receiptId: string): ProviderToolReceipt {
+  return providerToolReceiptSchema.parse({ receiptId, requestId: input.requestId, capability: input.request.capability, providerId: capability.providerId, model: capability.model, status, outputArtifactIds, startedAt, completedAt })
 }
 
-function failure(input: DesktopToolExecution, error: string, startedAt: number, preceding: readonly AgentRunEvent[] = [], capability?: PaidToolExecutorCapability, completedAt = startedAt, receiptId = `receipt:${input.requestId}`): DesktopToolExecutionResult {
+function failure(input: DesktopToolExecution, error: string, startedAt: number, preceding: readonly AgentRunEvent[] = [], capability?: ProviderToolExecutorCapability, completedAt = startedAt, receiptId = `receipt:${input.requestId}`): DesktopToolExecutionResult {
   const receipt = capability ? receiptFor(input, capability, 'failed', [], startedAt, completedAt, receiptId) : undefined
   const event = createRunEvent(input.runId, { type: 'tool-failed', toolCallId: input.toolCallId, tool: input.request.capability, label: input.label, stepId: input.stepId, detail: error, receipt }, { eventId: `event:${input.requestId}:tool-failed`, at: completedAt })
   return { ok: false, error, receipt, events: [...preceding, event] }
 }
 
-function cancelled(input: DesktopToolExecution, capability: PaidToolExecutorCapability, startedAt: number, completedAt: number, receiptId: string, preceding: readonly AgentRunEvent[] = []): DesktopToolExecutionResult {
+function cancelled(input: DesktopToolExecution, capability: ProviderToolExecutorCapability, startedAt: number, completedAt: number, receiptId: string, preceding: readonly AgentRunEvent[] = []): DesktopToolExecutionResult {
   const receipt = receiptFor(input, capability, 'cancelled', [], startedAt, completedAt, receiptId)
   const event = createRunEvent(input.runId, { type: 'tool-cancelled', toolCallId: input.toolCallId, tool: input.request.capability, label: input.label, stepId: input.stepId, detail: 'Tool execution was cancelled.', receipt }, { eventId: `event:${input.requestId}:tool-cancelled`, at: completedAt })
   return { ok: false, error: 'Tool execution was cancelled.', receipt, events: [...preceding, event] }
@@ -387,11 +387,11 @@ function cancelled(input: DesktopToolExecution, capability: PaidToolExecutorCapa
 
 function isAbort(error: unknown): boolean { return error instanceof DOMException && error.name === 'AbortError' }
 function errorText(error: unknown): string { return error instanceof Error ? error.message : String(error) }
-function isLocalCutout(capability: PaidToolRequest['capability']): boolean {
+function isLocalCutout(capability: ProviderToolRequest['capability']): boolean {
   return capability === 'cutout' || capability === 'semantic-cutout'
 }
 function artifactSource(
-  capability: PaidToolRequest['capability'],
+  capability: ProviderToolRequest['capability'],
 ): 'generate-image' | 'edit-image' | 'cutout' {
   switch (capability) {
     case 'cutout':

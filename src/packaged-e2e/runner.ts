@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core'
-import { DESKTOP_IMAGE_TOOL_TIMEOUT_MS } from '@/agent-runtime/paid-tool-timeouts'
+import { DESKTOP_IMAGE_TOOL_TIMEOUT_MS } from '@/agent-runtime/provider-tool-timeouts'
 import {
   createMonotonicDeadline,
   type MonotonicDeadline,

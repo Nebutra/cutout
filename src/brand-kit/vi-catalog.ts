@@ -259,7 +259,7 @@ export interface BrandViPlanRequest { readonly profile: BrandViProfile; readonly
 export interface BrandViPlanNode extends BrandViCatalogItem {
   readonly itemId: string
   readonly status: 'planned'
-  readonly paidAction: boolean
+  readonly providerAction: boolean
   readonly executionRoutes: readonly BrandViExecutionRoute[]
 }
 export interface BrandViGenerationPlan {
@@ -268,7 +268,7 @@ export interface BrandViGenerationPlan {
   readonly profile: BrandViProfile
   readonly requestedItemIds: readonly string[]
   readonly nodes: readonly BrandViPlanNode[]
-  readonly estimatedPaidActions: number
+  readonly estimatedProviderActions: number
   readonly requiresApproval: boolean
 }
 
@@ -297,7 +297,7 @@ export function createBrandViGenerationPlan(request: BrandViPlanRequest): BrandV
       ...item,
       itemId,
       status: 'planned' as const,
-      paidAction: item.generationModes.some((mode) => mode === 'image-generate' || mode === 'image-edit'),
+      providerAction: item.generationModes.some((mode) => mode === 'image-generate' || mode === 'image-edit'),
       executionRoutes: item.generationModes.map(resolveBrandViExecutionRoute),
     }
   })
@@ -307,7 +307,7 @@ export function createBrandViGenerationPlan(request: BrandViPlanRequest): BrandV
     profile: request.profile,
     requestedItemIds: [...requested],
     nodes,
-    estimatedPaidActions: nodes.filter((node) => node.paidAction).length,
+    estimatedProviderActions: nodes.filter((node) => node.providerAction).length,
     requiresApproval: nodes.some((node) => node.approval.required),
   }
 }

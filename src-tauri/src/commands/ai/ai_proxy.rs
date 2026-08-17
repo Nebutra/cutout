@@ -778,7 +778,7 @@ pub(crate) async fn request_with_secret(
 
 /// Same secret-bound request boundary with a caller-selected, bounded timeout.
 /// Used only for automatic credential discovery; normal user-invoked checks and
-/// paid execution retain their established timeout policy.
+/// Provider execution retains its established timeout policy.
 pub(crate) async fn request_with_secret_timeout(
     kind: &str,
     wire_protocol: Option<ProviderWireProtocol>,
@@ -794,8 +794,12 @@ pub(crate) async fn request_with_secret_timeout(
             "request timeout is outside the reviewed bound".into(),
         ));
     }
-    enforce_host(kind, url)?;
-    let target = enforce_resolved_host(kind, url).await?;
+    enforce_host(kind, url).map_err(|error| {
+        ProxyError::Request(format!("Provider endpoint URL policy rejected: {error}"))
+    })?;
+    let target = enforce_resolved_host(kind, url).await.map_err(|error| {
+        ProxyError::Request(format!("Provider endpoint DNS policy rejected: {error}"))
+    })?;
     let provider_kind = parse_provider_kind(kind)?;
     let (method, header_map) =
         build_method_and_headers(provider_kind, wire_protocol, method, headers, secret)?;

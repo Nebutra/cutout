@@ -72,7 +72,7 @@ screenshot gates. Export Lottie JSON only for the supported subset.
 ## Approval Rules
 
 Preview mutations and exports before apply.
-Require approval for paid style-reference generation.
+Require an enabled Provider route for style-reference generation.
 Invalidate approval after source revision or timing changes.
 
 ## Completion Gate

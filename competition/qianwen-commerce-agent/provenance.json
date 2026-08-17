@@ -23,7 +23,7 @@
     },
     {
       "path": "src/commerce-profile/policies.ts",
-      "sha256": "f56bf73a703da30fc73adc38f4cde45e6ff1fd925051aceb1a0789c3611b63b6"
+      "sha256": "0961fec141c9d5407fa9e29054287840866c24e37a92e044c51b5663bf45bf63"
     },
     {
       "path": "src/commerce-profile/recipes.ts",
@@ -31,7 +31,7 @@
     },
     {
       "path": "src/commerce-profile/evaluation.ts",
-      "sha256": "63c694a0fa7683e417ee93a7d7724ae4de5352d879db50341fb19ea914d081e4"
+      "sha256": "a56a0821404a9d87f73bf7b26510985181c78d7d479f7923ac6a4353600b5bd9"
     }
   ],
   "hostProjection": {
@@ -39,10 +39,27 @@
     "productFacts": "product-facts.v1",
     "categoryIndex": "commerce.category-index.v1",
     "attributeIndex": "commerce.attribute-index.v1",
+    "catalogSelection": {
+      "candidateEvidence": ["complete lineage", "garment type", "audience", "usage context", "plus-size signal"],
+      "runtimeSampleAnswers": false
+    },
+    "localization": {
+      "sourceBinding": "original value plus source JSON Pointer",
+      "markets": ["en-US", "ko-KR", "pt-BR"],
+      "numericConversions": "deterministic Host projection",
+      "modelTranslationClosure": "exact ordered fact-id request and response in the structured plan",
+      "bodyScriptPolicy": "target-market script outside fixed inline evidence and source-reference sections",
+      "benchmarkScope": "translation request closure only, not language quality or SOTA"
+    },
     "mediaIdentity": {
       "authority": "first explicit product image",
       "binding": ["role", "source JSON Pointer", "ordered URL"],
-      "inheritance": "main image -> reviewed details -> image-conditioned video"
+      "inheritance": "main image -> reviewed details -> image-conditioned video",
+      "roleSupport": "deterministic semantic role-to-source plan over ordered product and description images"
+    },
+    "strategyDelivery": {
+      "actualRunClosure": ["market", "localization", "role purpose", "source support", "semantic QA", "repair"],
+      "videoStoryboard": "0.0-5.0 seconds"
     }
   }
 }

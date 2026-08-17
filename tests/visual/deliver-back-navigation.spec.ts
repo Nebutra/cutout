@@ -5,7 +5,7 @@ async function enterDeliver(page: Page, testInfo: TestInfo) {
   if (testInfo.project.name === "mobile-chrome") await page.setViewportSize({ width: 1024, height: 915 });
   await openDeliverWorkspace(page);
   if (testInfo.project.name === "mobile-chrome") await page.setViewportSize({ width: 412, height: 915 });
-  const deliver = page.locator('[data-slot="design-os-workbench"][aria-label="Deliver"]');
+  const deliver = page.locator('[data-slot="design-os-workbench"][aria-label="Project workbench"]');
   await expect(deliver).toBeVisible();
   return deliver;
 }
@@ -27,9 +27,13 @@ test("Deliver always returns to the same stateful project workspace", async ({ p
   const workspace = page.locator('[data-slot="project-workspace-surface"]');
   await workspace.evaluate((element) => { (element as HTMLElement).dataset.persistenceProbe = "same-node"; });
 
-  for (const [index, tabName] of ["Delivery center", "Kits", "Components", "Starter"].entries()) {
+  for (const [index, tabName] of ["Overview", "Kits", "Components", "Starter"].entries()) {
     const deliver = await enterDeliver(page, testInfo);
-    const tabs = deliver.getByRole("tablist", { name: "Deliver sections" });
+    const lifecycle = deliver.getByRole("tablist", { name: "Project lifecycle" });
+    await expect(lifecycle.getByRole("tab").allTextContents()).resolves.toEqual([
+      "Brief", "Sources", "Create", "Review", "Deliver", "Inspect",
+    ]);
+    const tabs = deliver.getByRole("tablist", { name: "Delivery views" });
     await expect(tabs).toHaveCount(1);
     await tabs.getByRole("tab", { name: tabName }).click();
     const back = deliver.getByRole("button", { name: /Back to (Canvas|Agent)/ });
@@ -54,7 +58,7 @@ test("Deliver always returns to the same stateful project workspace", async ({ p
     await expect(composer).toHaveValue("");
     await expect(workspace).toHaveAttribute("data-persistence-probe", "same-node");
     await expect(workspace).toHaveAttribute("aria-hidden", "false");
-    await expect(page.getByRole("tablist", { name: "Deliver sections" })).toHaveCount(0);
+    await expect(page.getByRole("tablist", { name: "Delivery views" })).toHaveCount(0);
     await expect(page.getByRole("dialog")).toHaveCount(0);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
   }

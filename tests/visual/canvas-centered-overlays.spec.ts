@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { openProjectTool } from "./workspace-helpers";
 
 async function createStoppedRun(page: Page) {
   await page.goto("/");
@@ -63,18 +64,21 @@ test("Canvas centered states follow the responsive safe content rectangle", asyn
   };
 
   await assertCentered();
-  const hideAgent = page.getByRole("button", { name: "Hide Agent" });
-  if (await hideAgent.isVisible()) await hideAgent.click();
+  const agent = page.getByRole("complementary", { name: "Agent workspace" });
+  if (await agent.isVisible()) {
+    await page.getByRole("button", { name: "Agent", exact: true }).click();
+    await expect(agent).toBeHidden();
+  }
   await assertCentered();
 
   if (testInfo.project.name === "desktop-chrome") {
-    await page.getByRole("button", { name: "Files", exact: true }).click();
+    await openProjectTool(page, "Files");
     await assertCentered();
-    await page.getByRole("button", { name: "Files", exact: true }).click();
-    await page.getByRole("button", { name: "Design", exact: true }).click();
+    await openProjectTool(page, "Files");
+    await openProjectTool(page, "DESIGN.md");
     const inspector = page.getByRole("complementary", { name: "Design system" });
     await expect(inspector).toBeVisible();
-    await inspector.getByRole("button", { name: "Close design inspector" }).click();
+    await inspector.getByRole("button", { name: "Close Design system" }).click();
     await assertCentered();
     await page.getByRole("button", { name: "Collapse sidebar" }).click();
     await assertCentered();

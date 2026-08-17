@@ -45,16 +45,60 @@ import {
   commerceSourceIngestReceiptSchema,
   sha256CommerceSourceUrl,
   verifyNativeCommerceSourceIngestReceipt,
+  type CommerceSourceIngestArtifact,
 } from './source-ingest'
+
+interface CommerceRehearsalVerificationHost {
+  verify(input: {
+    readonly receipt: MultimodalHostReceipt
+    readonly bytes: Uint8Array
+  }): Promise<unknown>
+  verifySource(input: CommerceSourceIngestArtifact): Promise<unknown>
+}
+
+const desktopRehearsalVerificationHost: CommerceRehearsalVerificationHost = {
+  verify: verifyNativeMultimodalHostArtifact,
+  verifySource: verifyNativeCommerceSourceIngestReceipt,
+}
 
 const MAX_RETAINED_BASE64_CHARACTERS = 360 * 1024 * 1024
 const SEMANTIC_QA_CAPABILITY_ID = 'capability:commerce-semantic-media-qa'
 const sha256Schema = z.string().regex(/^[a-f0-9]{64}$/)
+
+function hasCanonicalBase64Syntax(value: string): boolean {
+  if (value.length % 4 !== 0) return false
+
+  let dataLength = value.length
+  let paddingLength = 0
+  if (value.charCodeAt(dataLength - 1) === 61) {
+    paddingLength = 1
+    dataLength -= 1
+    if (value.charCodeAt(dataLength - 1) === 61) {
+      paddingLength = 2
+      dataLength -= 1
+    }
+  }
+
+  for (let index = 0; index < dataLength; index += 1) {
+    const code = value.charCodeAt(index)
+    const isBase64Character = (code >= 65 && code <= 90)
+      || (code >= 97 && code <= 122)
+      || (code >= 48 && code <= 57)
+      || code === 43
+      || code === 47
+    if (!isBase64Character) return false
+  }
+
+  return paddingLength === 0
+    ? dataLength % 4 === 0
+    : dataLength % 4 === 4 - paddingLength
+}
+
 const artifactIdSchema = z.string().regex(/^artifact:sha256:[a-f0-9]{64}$/)
 const base64Schema = z.string()
   .min(4)
   .max(MAX_RETAINED_BASE64_CHARACTERS)
-  .regex(/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/)
+  .refine(hasCanonicalBase64Syntax, 'Invalid base64 encoding.')
 
 const retainedSemanticQaSchema = z.object({
   receipt: multimodalHostReceiptSchema,
@@ -443,7 +487,7 @@ export async function createCommerceRehearsalRunBindings(
   ]
 }
 
-function sourceMediaType(bytes: Uint8Array): CommerceRehearsalSourceMaterial['mediaType'] | undefined {
+export function commerceSourceMediaType(bytes: Uint8Array): CommerceRehearsalSourceMaterial['mediaType'] | undefined {
   if (bytes.length >= 8 && bytes[0] === 0x89 && bytes[1] === 0x50
     && bytes[2] === 0x4e && bytes[3] === 0x47) return 'image/png'
   if (bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return 'image/jpeg'
@@ -454,6 +498,7 @@ function sourceMediaType(bytes: Uint8Array): CommerceRehearsalSourceMaterial['me
 
 async function verifySourceMaterials(
   bundle: CommerceProductionRehearsalBundle,
+  host: CommerceRehearsalVerificationHost,
 ): Promise<VerifiedCommerceProductionRehearsal['sourceMaterials']> {
   assertUnique(bundle.sourceMaterials.map((material) => material.artifactId), 'Commerce source material artifact ids')
   assertUnique(bundle.sourceMaterials.map((material) => material.factId), 'Commerce source material fact ids')
@@ -477,7 +522,7 @@ async function verifySourceMaterials(
     const digest = await sha256Bytes(bytes)
     const dimensions = readRasterDimensions(bytes)
     if (digest !== material.sha256 || bytes.byteLength !== material.byteLength
-      || sourceMediaType(bytes) !== material.mediaType || !dimensions
+      || commerceSourceMediaType(bytes) !== material.mediaType || !dimensions
       || dimensions.width !== material.width || dimensions.height !== material.height) {
       throw new Error(`Commerce source material ${material.artifactId} does not match its retained decoded bytes.`)
     }
@@ -502,7 +547,7 @@ async function verifySourceMaterials(
       throw new Error(`Commerce source material ${material.artifactId} does not match its source-ingest receipt URL, fact, or bytes.`)
     }
     const verifiedReceipt = commerceSourceIngestReceiptSchema.parse(
-      await verifyNativeCommerceSourceIngestReceipt({ receipt, bytes }),
+      await host.verifySource({ receipt, bytes }),
     )
     if (canonicalJson(verifiedReceipt) !== canonicalJson(receipt)) {
       throw new Error(`Commerce source material ${material.artifactId} source-ingest receipt was not authenticated unchanged.`)
@@ -518,6 +563,7 @@ async function verifyRetainedArtifact(input: {
   readonly playbackSourceReceipt?: MultimodalHostReceipt
   readonly bytes: Uint8Array
   readonly label: string
+  readonly host: CommerceRehearsalVerificationHost
 }): Promise<VerifiedCommerceRehearsalBytes> {
   const digest = await sha256Bytes(input.bytes)
   if (digest !== input.receipt.artifact.sha256
@@ -525,7 +571,7 @@ async function verifyRetainedArtifact(input: {
     || input.receipt.artifact.artifactId !== `artifact:sha256:${digest}`) {
     throw new Error(`${input.label} does not match its retained artifact bytes.`)
   }
-  const verified = verifiedMultimodalHostArtifactSchema.parse(await verifyNativeMultimodalHostArtifact({
+  const verified = verifiedMultimodalHostArtifactSchema.parse(await input.host.verify({
     receipt: input.receipt,
     bytes: input.bytes,
   }))
@@ -661,7 +707,10 @@ function assertUnique(values: readonly string[], label: string): void {
 
 export async function verifyCommerceProductionRehearsalBundle(
   input: unknown,
-  options: { readonly heldOutCommitmentHash?: string } = {},
+  options: {
+    readonly heldOutCommitmentHash?: string
+    readonly host?: CommerceRehearsalVerificationHost
+  } = {},
 ): Promise<VerifiedCommerceProductionRehearsal> {
   const bundle = commerceProductionRehearsalBundleSchema.parse(input)
   if (options.heldOutCommitmentHash) {
@@ -672,7 +721,8 @@ export async function verifyCommerceProductionRehearsalBundle(
     COMMERCE_SEMANTIC_ROLES,
     'Rehearsal semantic roles',
   )
-  const sourceMaterials = await verifySourceMaterials(bundle)
+  const host = options.host ?? desktopRehearsalVerificationHost
+  const sourceMaterials = await verifySourceMaterials(bundle, host)
   await assertFrozenCommerceDocuments(bundle)
   const runBindings = await createCommerceRehearsalRunBindings(bundle)
   const categoryIndex = buildCategoryIndex(bundle.categoryCatalog)
@@ -696,6 +746,7 @@ export async function verifyCommerceProductionRehearsalBundle(
       playbackSourceReceipt: retained.playbackSourceReceipt,
       bytes: sourceBytes,
       label: `Commerce artifact ${retained.semanticRole}`,
+      host,
     })
     let publication: CommerceMaterialPublication
     const retainedBytes: VerifiedCommerceRehearsalBytes[] = [sourceEvidence]
@@ -719,6 +770,7 @@ export async function verifyCommerceProductionRehearsalBundle(
         receipt: retained.semanticQa.receipt,
         bytes: qaBytes,
         label: `Commerce semantic QA ${retained.semanticRole}`,
+        host,
       })
       if (retained.semanticQa.receipt.artifact.mediaType !== 'application/json') {
         throw new Error(`Commerce semantic QA ${retained.semanticRole} must retain signed JSON bytes.`)

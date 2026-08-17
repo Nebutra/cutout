@@ -9,7 +9,7 @@ import type {
   ToolExecutor,
   ToolExecutorRegistry,
 } from "@/services/desktop-tool-executor";
-import { DESKTOP_IMAGE_TOOL_TIMEOUT_MS } from './paid-tool-timeouts'
+import { DESKTOP_IMAGE_TOOL_TIMEOUT_MS } from './provider-tool-timeouts'
 import { tauriBridge } from '@/platform/native'
 
 afterEach(() => {
@@ -75,8 +75,7 @@ function harness(
           providerId: "p",
           model: "m",
           status: "succeeded" as const,
-          charged: { currency: "USD", amount: 0.08 },
-          outputArtifactIds: ["artifact"],
+                    outputArtifactIds: ["artifact"],
           startedAt: 2,
           completedAt: 3,
         },
@@ -97,7 +96,7 @@ function harness(
   const loop = createDesktopToolLoop({
     executors: registry,
     currentRevision: () => revision,
-    policy: () => ({ allowPaid: true }),
+    policy: () => ({ allowProviderExecution: true }),
     append: (events) => batches.push([...events]),
     now: () => 1,
     id: () => `retry-${++nextId}`,
@@ -198,8 +197,7 @@ describe("desktop tool loop", () => {
         providerId: "p",
         model: "m",
         status: "succeeded",
-        charged: { currency: "USD", amount: 0.08 },
-        outputArtifactIds: ["artifact"],
+                outputArtifactIds: ["artifact"],
         startedAt: 2,
         completedAt: 3,
       },
@@ -265,7 +263,7 @@ describe("desktop tool loop", () => {
     expect(h.execute).toHaveBeenCalledOnce();
   });
 
-  it('does not execute or charge again after a durable successful request', async () => {
+  it('does not execute the Provider again after a durable successful request', async () => {
     const durability = createMemoryToolDurabilityStore()
     const first = harness(undefined, { durability })
     await first.loop.request(input())
@@ -273,7 +271,7 @@ describe("desktop tool loop", () => {
     const restarted = harness(undefined, { durability })
     await restarted.loop.request(input())
     expect(restarted.execute).not.toHaveBeenCalled()
-    expect(await restarted.loop.settled('tool', 'request')).toMatchObject({ ok: true, receipt: { receiptId: 'receipt', charged: { amount: 0.08 } } })
+    expect(await restarted.loop.settled('tool', 'request')).toMatchObject({ ok: true, receipt: { receiptId: 'receipt', } })
   })
 
   it("cancels a running executor cooperatively", async () => {
@@ -359,21 +357,20 @@ describe("desktop tool loop", () => {
     expect(JSON.stringify(h.batches)).not.toMatch(/apiKey|Bearer|sk-/i);
   });
 
-  it("discards stale provider results after execution and records the paid receipt", async () => {
+  it("discards stale provider results after execution and records the Provider receipt", async () => {
     const h = harness();
     h.execute.mockImplementation(async (execution) => {
       h.setRevision(4);
       return {
         ok: true,
         receipt: {
-          receiptId: "paid",
+          receiptId: "provider",
           requestId: execution.requestId,
           capability: "generate-image",
           providerId: "p",
           model: "m",
           status: "succeeded",
-          charged: { currency: "USD", amount: 0.08 },
-          outputArtifactIds: ["stale-artifact"],
+                    outputArtifactIds: ["stale-artifact"],
           startedAt: 1,
           completedAt: 2,
         },
@@ -400,8 +397,7 @@ describe("desktop tool loop", () => {
         providerId: "p",
         model: "m",
         status: "succeeded",
-        charged: { currency: "USD", amount: 0.08 },
-        outputArtifactIds: [],
+                outputArtifactIds: [],
         startedAt: 1,
         completedAt: 2,
       },
@@ -421,7 +417,7 @@ describe("desktop tool loop", () => {
     });
   });
 
-  it("resolves the deadline from the current paid capability", async () => {
+  it("resolves the deadline from the current Provider capability", async () => {
     const timeoutMs = vi.fn(() => 1);
     const timed = harness(undefined, { timeoutMs });
     timed.execute.mockImplementation(async () => new Promise(() => undefined));

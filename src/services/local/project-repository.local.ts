@@ -62,6 +62,7 @@ const WORKSPACE_KEYS = new Set([
   'deliveryReceipt',
   'approvedDeliverables',
   'brandViRun',
+  'commerceProjectLifecycle',
   'canvasAnnotations',
   'capabilityReceipts',
   'codingReceipts',
@@ -536,8 +537,9 @@ async function normalizeProjectRecord(
   idb: IDBFactory | undefined = globalThis.indexedDB,
 ): Promise<NormalizedProjectRecord> {
   const materialized = await materializeProjectSliceBlobs(input, idb)
-  const workspace = isCurrentWorkspaceSnapshot(materialized.workspace)
-    ? normalizeWorkspaceContentBytes(materialized.workspace)
+  const parsedWorkspace = await parseCurrentWorkspaceSnapshot(materialized.workspace)
+  const workspace = parsedWorkspace
+    ? normalizeWorkspaceContentBytes(parsedWorkspace)
     : null
   const parsedProduction = assetProductionSnapshotSchema.safeParse(materialized.assetProduction)
   let record: LocalProjectRecord = {
@@ -673,7 +675,24 @@ function productionArtifactIdForSlice(
   return undefined
 }
 
-function isCurrentWorkspaceSnapshot(input: unknown): input is WorkspaceSnapshot {
+async function parseCurrentWorkspaceSnapshot(
+  input: unknown,
+): Promise<WorkspaceSnapshot | null> {
+  if (!isCurrentWorkspaceSnapshotBase(input)) return null
+  if (input.commerceProjectLifecycle != null) {
+    const { commerceProjectLifecycleRecordSchema } = await import(
+      '@/commerce-profile/project-lifecycle'
+    )
+    if (!commerceProjectLifecycleRecordSchema.safeParse(
+      input.commerceProjectLifecycle,
+    ).success) return null
+  }
+  return input
+}
+
+function isCurrentWorkspaceSnapshotBase(
+  input: unknown,
+): input is WorkspaceSnapshot {
   if (!input || typeof input !== 'object' || Array.isArray(input)) return false
   const workspace = input as Record<string, unknown>
   return workspace.version === 'workspace.v1'

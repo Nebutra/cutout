@@ -240,10 +240,10 @@ describe('Commerce Profile benchmark (P8)', () => {
     expect(() => compareCommerceProfileBenchmarkReports(incompatibleClosure, prior)).toThrow(/exact ordered Commerce benchmark closure/)
   })
 
-  it('decodes the committed current capability snapshot', () => {
+  it('decodes the committed contract baseline fixture', () => {
     const snapshot = JSON.parse(readFileSync(resolve(
       process.cwd(),
-      'src/commerce-profile/benchmarks/current.json',
+      'src/commerce-profile/benchmarks/contract-baseline.json',
     ), 'utf8'))
     const report = decodeCommerceProfileBenchmarkReport(snapshot)
     const expected = createCommerceProfileBenchmarkReport(currentEvidenceSet())

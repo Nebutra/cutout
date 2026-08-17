@@ -1,0 +1,5 @@
+{"file":".trellis/spec/frontend/design-os-workbench.md","reason":"Verify Workbench remains an optional projection and all existing review/delivery authority survives."}
+{"file":".trellis/spec/frontend/agent-control-safety.md","reason":"Verify no UI routing action invents approval, execution authority or unsupported Agent capability."}
+{"file":".trellis/spec/frontend/commerce-production-profile.md","reason":"Verify Commerce completion, acceptance, stale blocking, retained bytes and download receipts remain exact."}
+{"file":".trellis/spec/frontend/game-asset-profile.md","reason":"Verify Game launch input and bounded production contracts are unchanged by the Canvas host."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Apply focused and full-scope repository quality gates without counting mocks as maturity evidence."}

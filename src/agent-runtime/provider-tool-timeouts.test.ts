@@ -5,19 +5,19 @@ import {
   DESKTOP_IMAGE_TOOL_TIMEOUT_MS,
   DESKTOP_LOCAL_TOOL_TIMEOUT_MS,
   NATIVE_IMAGE_TRANSPORT_TIMEOUT_MS,
-  desktopPaidToolTimeoutMs,
-} from './paid-tool-timeouts'
+  desktopProviderToolTimeoutMs,
+} from './provider-tool-timeouts'
 
-describe('paid tool timeout ownership', () => {
+describe('Provider tool timeout ownership', () => {
   it('lets the native image transport settle before the desktop owner', () => {
     expect(NATIVE_IMAGE_TRANSPORT_TIMEOUT_MS).toBe(300_000)
     expect(DESKTOP_IMAGE_TOOL_TIMEOUT_MS).toBeGreaterThan(
       NATIVE_IMAGE_TRANSPORT_TIMEOUT_MS,
     )
-    expect(desktopPaidToolTimeoutMs('generate-image')).toBe(
+    expect(desktopProviderToolTimeoutMs('generate-image')).toBe(
       DESKTOP_IMAGE_TOOL_TIMEOUT_MS,
     )
-    expect(desktopPaidToolTimeoutMs('edit-image')).toBe(
+    expect(desktopProviderToolTimeoutMs('edit-image')).toBe(
       DESKTOP_IMAGE_TOOL_TIMEOUT_MS,
     )
   })
@@ -33,10 +33,10 @@ describe('paid tool timeout ownership', () => {
   })
 
   it('keeps deterministic local tools on the shorter owner deadline', () => {
-    expect(desktopPaidToolTimeoutMs('cutout')).toBe(
+    expect(desktopProviderToolTimeoutMs('cutout')).toBe(
       DESKTOP_LOCAL_TOOL_TIMEOUT_MS,
     )
-    expect(desktopPaidToolTimeoutMs('semantic-cutout')).toBe(
+    expect(desktopProviderToolTimeoutMs('semantic-cutout')).toBe(
       DESKTOP_LOCAL_TOOL_TIMEOUT_MS,
     )
   })

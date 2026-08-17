@@ -17,7 +17,31 @@ async function clientWorkspace(fixture, planHash) {
   return createWorkspace({ resolved: fixture.output, canonical: fixture.output, device: info.dev, inode: info.ino }, planHash, 'test-key')
 }
 
-test('invalid result origin fails after one paid POST and cannot duplicate spend', async () => {
+test('official root, native API, and compatible-mode base URLs normalize to the fixed DashScope origin', async () => {
+  for (const [index, baseUrl] of [
+    'https://dashscope.aliyuncs.com',
+    'https://dashscope.aliyuncs.com/api/v1',
+    'https://dashscope.aliyuncs.com/api/v1/',
+    'https://dashscope.aliyuncs.com/compatible-mode/v1',
+  ].entries()) {
+    const fixture = await fixtureDirectories(); cleanup.push(fixture.root)
+    const planHash = String(index + 3).repeat(64)
+    const workspace = await clientWorkspace(fixture, planHash)
+    const client = new DashScopeClient({
+      apiKey: 'test-key', baseUrl, deadline: Date.now() + 120_000,
+      workspace, planHash, logger, fetchImpl: async () => new Response(),
+    })
+    assert.equal(client.origin, 'https://dashscope.aliyuncs.com')
+  }
+  const fixture = await fixtureDirectories(); cleanup.push(fixture.root)
+  const workspace = await clientWorkspace(fixture, '8'.repeat(64))
+  assert.throws(() => new DashScopeClient({
+    apiKey: 'test-key', baseUrl: 'https://dashscope.aliyuncs.com/api/v1/other', deadline: Date.now() + 120_000,
+    workspace, planHash: '8'.repeat(64), logger, fetchImpl: async () => new Response(),
+  }), /base URL path is not supported/)
+})
+
+test('invalid result origin fails after one Provider POST and cannot duplicate Provider execution', async () => {
   const fixture = await fixtureDirectories(); cleanup.push(fixture.root)
   const workspace = await clientWorkspace(fixture, '1'.repeat(64))
   let posts = 0

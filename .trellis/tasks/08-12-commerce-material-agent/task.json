@@ -25,7 +25,8 @@
     "08-12-temporal-multimodal-host",
     "08-12-qianwen-competition-host",
     "08-12-design-os-desktop-workbench",
-    "08-13-design-os-evidence-benchmark"
+    "08-13-design-os-evidence-benchmark",
+    "08-16-general-commerce-production"
   ],
   "parent": "08-13-full-scenario-design-os",
   "relatedFiles": [],

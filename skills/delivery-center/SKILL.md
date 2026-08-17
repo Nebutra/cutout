@@ -33,7 +33,7 @@ Select explicit destinations for every target.
 
 Preview managed exports, project file effects and external writes.
 
-Preview provider cost in USD where applicable.
+Preview Provider availability and execution limits where applicable.
 
 Preview exact known files and warnings.
 
@@ -57,7 +57,7 @@ Do not claim the downstream target succeeded.
 
 ## Approval
 
-Present the combined effects, destinations and estimated cost.
+Present the combined effects, destinations and execution limits.
 
 Obtain one opaque approval for the exact plan.
 

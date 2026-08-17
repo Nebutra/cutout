@@ -52,7 +52,7 @@ export const MCP_TOOLS = [
   },
   {
     name: 'cutout_run_start',
-    description: 'Start and durably persist a provider-free Cutout run lifecycle. This records intent and observable events but does not execute a model or paid tool.',
+    description: 'Start and durably persist a provider-free Cutout run lifecycle. This records intent and observable events but does not execute a model or Provider tool.',
     inputSchema: { type: 'object', additionalProperties: false, required: ['runId', 'mode', 'intent'], properties: { runId: { type: 'string', minLength: 1, maxLength: 160 }, mode: { type: 'string', enum: ['create', 'repair'] }, intent: { type: 'string', minLength: 1, maxLength: 20000 } } },
   },
   {

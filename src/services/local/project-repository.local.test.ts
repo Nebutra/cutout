@@ -24,6 +24,11 @@ import { createRunEvent, projectAgentResponseBranches, replayRunEvents } from '@
 import { createPrototypeAssetManifest } from '@/prototype/asset-manifest'
 import { currentPrototypeExploration, currentPrototypeReviewDocument } from '@/prototype/prototype-plan.test-fixture'
 import type { WorkspaceSnapshot } from '@/workspace/workspace-snapshot'
+import {
+  acceptCommerceProjectLifecycleRecord,
+  createCommerceProjectLifecycleRecord,
+} from '@/commerce-profile/project-lifecycle'
+import { createCommerceProjectContractResult } from '@/commerce-profile/project-production.test-fixture'
 
 const pngBlob = (byte = 1) =>
   new Blob([new Uint8Array([byte])], { type: 'image/png' })
@@ -551,6 +556,64 @@ describe('project-repository.local', () => {
       workspace: {
         ...planningSnapshot(),
         retiredSurface: true,
+      } as unknown as WorkspaceSnapshot,
+    }
+    await putRawRecord(idb, record)
+
+    const loaded = await repo.load(record.id)
+
+    expect(loaded.ok).toBe(true)
+    if (!loaded.ok) return
+    expect(loaded.data.workspace).toBeNull()
+  })
+
+  it('round-trips a schema-valid Commerce lifecycle through project persistence', async () => {
+    const idb = new IDBFactory()
+    const repo = createLocalProjectRepository({ idb })
+    const result = await createCommerceProjectContractResult()
+    const lifecycle = acceptCommerceProjectLifecycleRecord(
+      createCommerceProjectLifecycleRecord({
+        designRevisionId: 'revision:commerce:persisted',
+        result,
+      }),
+      '2026-08-17T00:00:00.000Z',
+    )
+    const record = {
+      ...createEmptyProjectRecord(313),
+      workspace: {
+        ...planningSnapshot(),
+        commerceProjectLifecycle: lifecycle,
+      },
+    }
+
+    expect((await repo.save(record)).ok).toBe(true)
+    const loaded = await repo.load(record.id)
+
+    expect(loaded.ok).toBe(true)
+    if (!loaded.ok) return
+    expect(loaded.data.workspace?.commerceProjectLifecycle).toEqual(lifecycle)
+  })
+
+  it('drops a persisted Commerce lifecycle that fails its receipt-bound schema', async () => {
+    const idb = new IDBFactory()
+    const repo = createLocalProjectRepository({ idb })
+    const result = await createCommerceProjectContractResult()
+    const lifecycle = createCommerceProjectLifecycleRecord({
+      designRevisionId: 'revision:commerce:invalid',
+      result,
+    })
+    const record = {
+      ...createEmptyProjectRecord(314),
+      workspace: {
+        ...planningSnapshot(),
+        commerceProjectLifecycle: {
+          ...lifecycle,
+          delivery: {
+            status: 'download-requested',
+            requestedAt: '2026-08-17T00:01:00.000Z',
+            artifactHashes: result.deliverables.map((deliverable) => deliverable.sha256),
+          },
+        },
       } as unknown as WorkspaceSnapshot,
     }
     await putRawRecord(idb, record)

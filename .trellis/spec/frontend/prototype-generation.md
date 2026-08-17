@@ -184,7 +184,7 @@ function planDistinctSuiteTopologies<Request, Plan>(input: {
   code may compile those approved edges into exact interactions, but it must not
   invent an ordered page ring, infer missing destinations, or let independently
   expanded pages redefine the global graph. Deterministic Planner graph failures
-  do not justify replaying the complete paid planning chain; repair the smallest
+  do not justify replaying the complete Provider planning chain; repair the smallest
   owning boundary or fail with a bounded Retry affordance.
 - Alternative-suite distinctness is structural evidence, not route-order
   theater. One canonical `prototype-route-graph.v1` projection includes each
@@ -255,7 +255,7 @@ function planDistinctSuiteTopologies<Request, Plan>(input: {
   review settlement consumes capacity only and never opens, closes, throttles,
   or recovers image-route health. Recovered pages are never reviewed
   again merely because a continuation reuses them. Every page-local attempt
-  re-resolves the currently healthy exact task-fit route before paid execution.
+  re-resolves the currently healthy exact task-fit route before Provider execution.
   A semantic repair edits the exact rejected page: reference order is rejected
   page bytes, Design System bytes, then optional selected-material bytes. It
   omits predecessor/anchor references so Qwen Image 3 never receives more than
@@ -323,15 +323,15 @@ function planDistinctSuiteTopologies<Request, Plan>(input: {
   never creates or removes capability evidence. It retains only a bounded recent
   outcome/latency window, clamps latency at the existing desktop image deadline,
   and stores no raw error, credential, endpoint, prompt, or path. Repeated exact-
-  route timeouts open that operation's circuit: paid work already in flight may
+  route timeouts open that operation's circuit: Provider work already in flight may
   settle, but queued work and a fresh Retry scheduler consult the same health
   projection before another Provider request. A bounded cooldown admits one
   recovery probe. One page node may retry a classified transient transport
   failure once after re-entering its suite lane, using the same logical node id
-  and a fresh paid attempt id; an already-open route circuit may reject that
+  and a fresh Provider attempt id; an already-open route circuit may reject that
   claim without spend. Retry creates a fresh scheduler, preserves completed
-  frontiers, and never reuses a failed paid request identity.
-- A cold or recently pressured exact image route admits one paid request until
+  frontiers, and never reuses a failed Provider request identity.
+- A cold or recently pressured exact image route admits one Provider request until
   a successful execution sample exists. An open circuit may drain queued claims
   immediately because those claims fail before spend; a half-open route still
   admits exactly one recovery probe. Page, direct-asset, and board retry attempts
@@ -358,7 +358,7 @@ function planDistinctSuiteTopologies<Request, Plan>(input: {
 - Page, direct-asset, board, and optional text-free image nodes use the same
   bounded transient-generation retry contract. It retries only classified
   rate-limit, timeout, network, and 5xx transport failures, propagates
-  cancellation, and uses a fresh paid attempt id while retaining the stable
+  cancellation, and uses a fresh Provider attempt id while retaining the stable
   logical node id. Authentication, configuration, policy, malformed output,
   deterministic QA, and semantic QA failures are terminal for that attempt and
   never consume a transport retry.
@@ -397,7 +397,7 @@ function planDistinctSuiteTopologies<Request, Plan>(input: {
   remains distinguishable from timeout, and neither condition starts another
   hidden Planner or image call. Desktop Planner and Vision QA deadlines use the
   bounded native monotonic owner because hidden/background WKWebView timers may
-  be throttled or stopped. The desktop paid-tool owner uses the same primitive
+  be throttled or stopped. The desktop Provider-tool owner uses the same primitive
   at its existing 315-second image budget, after the unchanged 300-second native
   image transport failsafe. Browser and unit-test hosts retain a cancelable
   renderer fallback only when no Tauri runtime exists. A desktop command or
@@ -416,7 +416,7 @@ function planDistinctSuiteTopologies<Request, Plan>(input: {
   projection; expiry invokes the product Run cancel control, which aborts the
   owning lease and native Proxy request. It must settle every sibling out of
   `provider-executing` before evidence records failure, and it must not start a
-  paid retry after the expiry signal.
+  Provider retry after the expiry signal.
 - A single-turn planning runtime acquires one renderer-wide session before the
   complete Plan deadline starts. Its independent page expansion uses runtime
   parallelism one, so no page-stage deadline elapses while that page is queued
@@ -434,7 +434,7 @@ function planDistinctSuiteTopologies<Request, Plan>(input: {
 - A suite Retry frontier retains two different authorities. Passing pages are
   reusable delivery nodes and are skipped; each incomplete page retains its
   latest rejected artifact plus hash-bound review receipt as repair input. The
-  continuation feeds those failures into its first paid attempt and edits the
+  continuation feeds those failures into its first Provider attempt and edits the
   rejected bytes. Initializing or settling a continuation must not overwrite
   the frontier with passing pages only, even when the next Provider request
   fails before returning new bytes.
@@ -563,7 +563,7 @@ function planDistinctSuiteTopologies<Request, Plan>(input: {
 - Visual QA rejection/unavailability and deterministic output-edge contract
   failures are blocking after the single baseline generation call. Preserve the
   candidate and evidence as `needs-review`; do not publish a ready resource pack
-  and do not start an automatic paid re-roll. Board-background diagnostics may
+  and do not start an automatic Provider re-roll. Board-background diagnostics may
   remain observational after deterministic Alpha edges and semantic QA pass.
   Missing, ambiguous, cross-slot, undecodable, or unavailable required outputs
   remain integrity failures and fail the pack closed.
@@ -629,7 +629,7 @@ function planDistinctSuiteTopologies<Request, Plan>(input: {
 | A Planner run fails while a live progress label remains | clear ephemeral output at run settlement and suppress every pending feed projection when the terminal error exists |
 | Any Planner deadline expires in packaged E2E | retain the closed `planner-timeout` diagnostic and the latest bounded Planner/pipeline checkpoints across renderer, native progress, and external evidence validation |
 | A Vision QA review exceeds 180 seconds | abort its exact review signal, retain an unavailable verdict, and spend no replacement image call |
-| A desktop paid-tool deadline expires while renderer timers are stopped | settle from the native 315-second owner and propagate abort to the executor |
+| A desktop Provider-tool deadline expires while renderer timers are stopped | settle from the native 315-second owner and propagate abort to the executor |
 | A Design System candidate remains in one owner stage past its packaged E2E deadline | settle from the native stage handle, cancel the owning Agent run, abort registered native requests, and require every candidate to leave `provider-executing` |
 | A native desktop deadline command is missing, denied, or rejected | fail closed immediately; never fall back to a throttled renderer timer |
 | Native Planner work has settled but the hidden WebView has not drained its invoke completion | use the fixed packaged-only background pulse; if checkpoints still stall with no live child, fail the release run rather than waiting for the outer budget |
@@ -744,7 +744,7 @@ function planDistinctSuiteTopologies<Request, Plan>(input: {
 - Scheduler regression: sibling suite lanes rotate under contention; transient
   pressure lowers the future ceiling without discarding queued sibling work;
   authentication/configuration failure still closes queued claims; repeated
-  exact-route operation timeouts open a bounded shared circuit, preserve paid
+  exact-route operation timeouts open a bounded shared circuit, preserve Provider
   work already in flight, and block a fresh continuation before another call.
 - Route-selection regression: generic GPT Image 1/1.5 edit support remains
   intact while prototype fitness rejects it; quality ordering prefers
@@ -784,7 +784,7 @@ function planDistinctSuiteTopologies<Request, Plan>(input: {
   repeated attempts rather than full-suite replay.
 - Rejected-page continuation regression: reject one page through both local
   attempts, then pass after one explicit Retry; assert the second and third
-  paid requests use the immediately preceding rejected bytes as reference zero,
+  Provider requests use the immediately preceding rejected bytes as reference zero,
   preserve accepted sibling call ids, carry sanitized failures into the first
   continuation prompt, stay within three references, and persist three started,
   two rejected, and one passed review events.

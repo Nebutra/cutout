@@ -26,7 +26,7 @@ export interface MaterialImpactPlan {
   readonly scope: 'project' | 'design' | 'page' | 'slice'
   readonly redo: readonly string[]
   readonly preserve: readonly string[]
-  readonly paidActionRequired: boolean
+  readonly providerActionRequired: boolean
   readonly degradation: string | null
   readonly blockedReason: string | null
 }
@@ -46,7 +46,7 @@ export function buildMaterialImpactPlan(
         'all-slices',
       ],
       preserve: [],
-      paidActionRequired: true,
+      providerActionRequired: true,
       degradation: null,
       blockedReason: null,
     }
@@ -62,7 +62,7 @@ export function buildMaterialImpactPlan(
         ...inventory.pageIds.map((id) => `page:${id}`),
         ...inventory.sliceIds.map((id) => `slice:${id}`),
       ],
-      paidActionRequired: true,
+      providerActionRequired: true,
       degradation: null,
       blockedReason: null,
     }
@@ -83,7 +83,7 @@ export function buildMaterialImpactPlan(
         ...inventory.pageIds.map((id) => `page:${id}`),
         ...inventory.sliceIds.filter((id) => id !== target.id).map((id) => `slice:${id}`),
       ],
-      paidActionRequired: true,
+      providerActionRequired: true,
       degradation: null,
       blockedReason: null,
     }
@@ -97,7 +97,7 @@ export function buildMaterialImpactPlan(
       scope: 'slice',
       redo: [],
       preserve: [],
-      paidActionRequired: false,
+      providerActionRequired: false,
       degradation: null,
       blockedReason: 'This slice cannot be edited independently and its source page is unavailable.',
     }
@@ -130,7 +130,7 @@ function pageImpact(
       ...(inventory.designSystemId ? [`design:${inventory.designSystemId}`] : []),
       ...inventory.pageIds.filter((id) => id !== target.id).map((id) => `page:${id}`),
     ],
-    paidActionRequired: true,
+    providerActionRequired: true,
     degradation: null,
     blockedReason: null,
   }
@@ -147,13 +147,13 @@ export function reconcileMaterialSelection(
   return current?.version === selected.version ? current : null
 }
 
-/** Must run immediately before route locking or any paid provider call. */
+/** Must run immediately before route locking or any Provider call. */
 export function assertImpactPlanCurrent(
   plan: MaterialImpactPlan,
   currentTarget: MaterialRef | null,
 ): void {
   if (plan.blockedReason) throw new Error(plan.blockedReason)
-  if (!plan.paidActionRequired) throw new Error('The requested change has no executable paid action.')
+  if (!plan.providerActionRequired) throw new Error('The requested change has no executable Provider action.')
   if (!plan.target) return
   if (
     !currentTarget ||
@@ -161,6 +161,6 @@ export function assertImpactPlanCurrent(
     currentTarget.kind !== plan.target.kind ||
     currentTarget.version !== plan.target.version
   ) {
-    throw new Error('The selected material changed. Review the updated impact before running paid actions.')
+    throw new Error('The selected material changed. Review the updated impact before running Provider actions.')
   }
 }

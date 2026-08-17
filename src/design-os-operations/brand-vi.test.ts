@@ -2,12 +2,12 @@ import { describe, expect, it } from 'vitest'
 import { planBrandViOperation } from './operations'
 
 describe('Brand VI planning operation', () => {
-  it('returns a reviewable custom DAG without executing paid actions', () => {
+  it('returns a reviewable custom DAG without executing Provider actions', () => {
     const result = planBrandViOperation({ profile: 'custom', itemIds: ['b13.mascot.3d-render'] })
     expect(result.ok).toBe(true)
     if (!result.ok) return
     expect(result.data.nodes.at(-1)?.itemId).toBe('b13.mascot.3d-render')
-    expect(result.data.estimatedPaidActions).toBeGreaterThan(0)
+    expect(result.data.estimatedProviderActions).toBeGreaterThan(0)
     expect(result.data.requiresApproval).toBe(true)
     expect(result.data.nodes.every((node) => node.status === 'planned')).toBe(true)
   })

@@ -173,6 +173,23 @@ export const multimodalHostContextSchema = z.object({
 }).strict()
 export type MultimodalHostContext = z.infer<typeof multimodalHostContextSchema>
 
+function nativeOptional<Value>(schema: z.ZodType<Value, Value>) {
+  return z.codec(
+    schema.nullish(),
+    schema.optional(),
+    {
+      decode: (value) => value ?? undefined,
+      encode: (value) => value,
+    },
+  )
+}
+
+function omitUndefined<T extends Record<string, unknown>>(value: T): T {
+  return Object.fromEntries(
+    Object.entries(value).filter(([, entry]) => entry !== undefined),
+  ) as T
+}
+
 export const multimodalArtifactEvidenceSchema = z.object({
   artifactId: z.string().regex(/^artifact:sha256:[a-f0-9]{64}$/),
   sha256: sha256Schema,
@@ -185,15 +202,15 @@ export const multimodalArtifactEvidenceSchema = z.object({
   ]),
   byteLength: z.number().int().positive(),
   decoded: z.literal(true),
-  width: z.number().int().positive().optional(),
-  height: z.number().int().positive().optional(),
-  durationMs: z.number().int().positive().optional(),
-  frameRate: z.number().positive().finite().optional(),
-  videoCodec: z.enum(['h264', 'h265', 'vp9']).optional(),
-  audioCodec: z.literal('aac').optional(),
-  sampleTablesReadable: z.boolean().optional(),
-  playbackVerified: z.boolean().optional(),
-}).strict().superRefine((artifact, context) => {
+  width: nativeOptional(z.number().int().positive()),
+  height: nativeOptional(z.number().int().positive()),
+  durationMs: nativeOptional(z.number().int().positive()),
+  frameRate: nativeOptional(z.number().positive().finite()),
+  videoCodec: nativeOptional(z.enum(['h264', 'h265', 'vp9'])),
+  audioCodec: nativeOptional(z.literal('aac')),
+  sampleTablesReadable: nativeOptional(z.boolean()),
+  playbackVerified: nativeOptional(z.boolean()),
+}).strict().overwrite(omitUndefined).superRefine((artifact, context) => {
   if (artifact.artifactId !== `artifact:sha256:${artifact.sha256}`) {
     context.addIssue({ code: 'custom', message: 'Artifact identity must equal its content digest.' })
   }
@@ -236,9 +253,9 @@ export const multimodalHostReceiptSchema = z.object({
   model: safeTextSchema.max(300),
   routeId: recordIdSchema,
   operation: multimodalOperationSchema,
-  semanticRole: recordIdSchema.optional(),
-  nodeId: recordIdSchema.optional(),
-  capabilityId: recordIdSchema.optional(),
+  semanticRole: nativeOptional(recordIdSchema),
+  nodeId: nativeOptional(recordIdSchema),
+  capabilityId: nativeOptional(recordIdSchema),
   acceptedReferenceArtifactIds: z.array(
     z.string().regex(/^artifact:sha256:[a-f0-9]{64}$/),
   ).max(64),
@@ -247,10 +264,10 @@ export const multimodalHostReceiptSchema = z.object({
   artifact: multimodalArtifactEvidenceSchema,
   startedAt: z.number().int().nonnegative(),
   completedAt: z.number().int().nonnegative(),
-  remoteTaskIdHash: sha256Schema.optional(),
+  remoteTaskIdHash: nativeOptional(sha256Schema),
   playbackPromotion: playbackPromotionEvidenceSchema.optional(),
   signature: sha256Schema,
-}).strict().superRefine((receipt, context) => {
+}).strict().overwrite(omitUndefined).superRefine((receipt, context) => {
   if (receipt.completedAt < receipt.startedAt) {
     context.addIssue({ code: 'custom', message: 'Receipt completion cannot precede its start.' })
   }

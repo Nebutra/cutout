@@ -13,30 +13,54 @@ after(async () => { await Promise.all(cleanup.map((path) => rm(path, { recursive
 
 const imageNames = ['main_image.png', 'detail_image_1.png', 'detail_image_2.png', 'detail_image_3.png', 'detail_image_4.png', 'detail_image_5.png']
 const videoName = 'product_video.mp4'
-const sourceLines = `- Product ID: OFFICIAL-100 \`offer.json/ret/result/result/offerId\`
+const sourceLines = Object.freeze({
+  en: `- Product ID: OFFICIAL-100 \`offer.json/ret/result/result/offerId\`
 - Source platform: 1688 \`offer.json/ret/result/result/sourceType\`
-- Product URL: https://detail.example.test/offer/OFFICIAL-100 \`offer.json/ret/result/result/productUrl\``
+- Product URL: https://detail.example.test/offer/OFFICIAL-100 \`offer.json/ret/result/result/productUrl\`
+- Source product title: 红色棉质女装上衣 \`offer.json/ret/result/result/subject\`
+- Source category: 9301181 \`offer.json/ret/result/result/categoryId\``,
+  ko: `- 상품 ID: OFFICIAL-100 \`offer.json/ret/result/result/offerId\`
+- 원본 플랫폼: 1688 \`offer.json/ret/result/result/sourceType\`
+- 상품 URL: https://detail.example.test/offer/OFFICIAL-100 \`offer.json/ret/result/result/productUrl\`
+- 원본 상품명: 红色棉质女装上衣 \`offer.json/ret/result/result/subject\`
+- 원본 카테고리: 9301181 \`offer.json/ret/result/result/categoryId\``,
+  pt: `- ID do produto: OFFICIAL-100 \`offer.json/ret/result/result/offerId\`
+- Plataforma de origem: 1688 \`offer.json/ret/result/result/sourceType\`
+- URL do produto: https://detail.example.test/offer/OFFICIAL-100 \`offer.json/ret/result/result/productUrl\`
+- Titulo original do produto: 红色棉质女装上衣 \`offer.json/ret/result/result/subject\`
+- Categoria original: 9301181 \`offer.json/ret/result/result/categoryId\``,
+})
+const localeContent = Object.freeze({
+  en: Object.freeze({ categoryName: 'Womens tops', overviewHeading: 'Product Overview', overview: 'A red everyday top with source-backed details.', sku: '- **`RED-M`** - Color: red (source value: `红色`); Size: M (source value: `M`) `offer.json/ret/result/result/productSkuInfos/0/skuId`', attribute: '- Craft: handwoven (source value: `手工编织`) `offer.json/ret/result/result/productAttribute/2/attrValue`', fidelity: 'Claims are limited to the supplied record and retain source annotations.' }),
+  ko: Object.freeze({ categoryName: '여성 상의', overviewHeading: '상품 개요', overview: '원본 근거를 유지한 레드 데일리 상의입니다.', sku: '- **`RED-M`** - 색상: 레드 (원문 값: `红色`); 사이즈: M (원문 값: `M`) `offer.json/ret/result/result/productSkuInfos/0/skuId`', attribute: '- 제작 방식: 수작업 직조 (원문 값: `手工编织`) `offer.json/ret/result/result/productAttribute/2/attrValue`', fidelity: '모든 설명은 제공된 원본과 확인된 값으로 제한되며 출처 주석을 유지합니다.' }),
+  pt: Object.freeze({ categoryName: 'Blusas femininas', overviewHeading: 'Visao geral do produto', overview: 'Uma blusa vermelha para o dia a dia com detalhes confirmados na origem.', sku: '- **`RED-M`** - Cor: vermelho (valor original: `红色`); Tamanho: M (valor original: `M`) `offer.json/ret/result/result/productSkuInfos/0/skuId`', attribute: '- Tecnica: trama manual (valor original: `手工编织`) `offer.json/ret/result/result/productAttribute/2/attrValue`', fidelity: 'As alegacoes ficam limitadas ao cadastro fornecido e mantem referencias de origem.' }),
+})
 
 function description({ locale, title, category, skus, attributes, identity, media, fidelity }) {
   const contract = MEDIA_INVENTORY_ROLES[locale]
+  const content = localeContent[locale]
   const localizedRoles = [...contract.imageRoles, contract.videoRole]
   const mediaLines = [...imageNames, videoName]
     .map((name, index) => `- ${name}: ${contract.prefix}: ${localizedRoles[index]}`).join('\n')
   return `# ${title}
 
-**${category}:** Womens tops (29073)
+**${category}:** ${content.categoryName} (29073)
+
+## ${content.overviewHeading}
+
+${content.overview}
 
 ## ${skus}
 
-- **RED-M** - Color: red; Size: M \`offer.json/ret/result/result/productSkuInfos/0/skuId\`
+${content.sku}
 
 ## ${attributes}
 
-- Material: cotton \`offer.json/ret/result/result/productAttribute/0/attrValue\`
+${content.attribute}
 
 ## ${identity}
 
-${sourceLines}
+${sourceLines[locale]}
 
 ## ${media}
 
@@ -44,7 +68,7 @@ ${mediaLines}
 
 ## ${fidelity}
 
-Claims are limited to the supplied record and retain source annotations.
+${content.fidelity}
 `
 }
 
@@ -81,29 +105,29 @@ async function validOutput() {
     `- ${artifact.name}: ${artifact.width} x ${artifact.height}px; SHA-256 \`${artifact.sha256}\``).join('\n')
   await writeFile(join(root, 'strategy_document.md'), `# Cross-Border Material Strategy
 
-## Product and Evidence Lock
+## Market and Merchandising Direction
 
 The exact catalog leaf and source facts are locked before generation.
 
-## Localization Strategy
+## Localization
 
 English, Korean, and Brazilian Portuguese copy retain source annotations.
 
-## Image Strategy
+## Image Story
 
 ${mediaEvidence}
 
-## Video Strategy
+## Video Story
 
 ${video.durationMs}ms ${video.codec} stable product presentation.
 
-## Execution and Validation
+## Technical QA Appendix
 
 Decoded pixels, physical constraints, hashes, and MP4 sample tables were validated.
 
 ## Source References
 
-${sourceLines}
+${sourceLines.en}
 `)
   return root
 }
@@ -122,6 +146,31 @@ test('emits deterministic path-free evidence for exact decoded output closure', 
   const serialized = JSON.stringify(report)
   assert.doesNotMatch(serialized, /https?:\/\/|OFFICIAL-100|remote|task[_-]?id|checkpoint|signature|secret|api[_-]?key/i)
   assert.doesNotMatch(serialized, new RegExp(root.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')))
+})
+
+test('accepts the exact locale-native empty SKU and attribute closures', async () => {
+  const root = await validOutput()
+  const replacements = {
+    'product_description_en.md': [
+      ['- **`RED-M`** - Color: red (source value: `红色`); Size: M (source value: `M`) `offer.json/ret/result/result/productSkuInfos/0/skuId`', '- No distinct SKU records were supplied in the source product JSON.'],
+      ['- Craft: handwoven (source value: `手工编织`) `offer.json/ret/result/result/productAttribute/2/attrValue`', '- No product attributes were supplied.'],
+    ],
+    'product_description_ko.md': [
+      ['- **`RED-M`** - 색상: 레드 (원문 값: `红色`); 사이즈: M (원문 값: `M`) `offer.json/ret/result/result/productSkuInfos/0/skuId`', '- 원본 상품 JSON에 개별 SKU 정보가 없습니다.'],
+      ['- 제작 방식: 수작업 직조 (원문 값: `手工编织`) `offer.json/ret/result/result/productAttribute/2/attrValue`', '- 제공된 상품 속성이 없습니다.'],
+    ],
+    'product_description_pt.md': [
+      ['- **`RED-M`** - Cor: vermelho (valor original: `红色`); Tamanho: M (valor original: `M`) `offer.json/ret/result/result/productSkuInfos/0/skuId`', '- Nenhum SKU separado foi informado no JSON de origem.'],
+      ['- Tecnica: trama manual (valor original: `手工编织`) `offer.json/ret/result/result/productAttribute/2/attrValue`', '- Nenhum atributo de produto foi informado.'],
+    ],
+  }
+  for (const [name, pairs] of Object.entries(replacements)) {
+    const path = join(root, name)
+    let text = await readFile(path, 'utf8')
+    for (const [before, after] of pairs) text = text.replace(before, after)
+    await writeFile(path, text)
+  }
+  assert.equal((await validateRehearsal(root)).status, 'passed')
 })
 
 test('fails closed on partial, unexpected, and symlinked output entries', async () => {
@@ -164,7 +213,7 @@ test('rejects model-authored media descriptions that are not bound to the QA-val
   const path = join(root, 'product_description_en.md')
   const text = await readFile(path, 'utf8')
   await writeFile(path, text.replace(
-    '- product_video.mp4: Planned and QA-validated role: Stable five-second product presentation',
+    '- product_video.mp4: Planned and QA-validated role: Five-second product story with whole-product and construction holds',
     '- product_video.mp4: Lifestyle context with a model in a city scene',
   ))
   await assert.rejects(validateRehearsal(root), /Deterministic media role closure/)
@@ -177,6 +226,66 @@ test('rejects model-authored media descriptions that are not bound to the QA-val
     '\n- Lifestyle scene: model-authored but not tied to a physical role\n\n## Source Fidelity',
   ))
   await assert.rejects(validateRehearsal(extra), /free-form entries/)
+})
+
+test('enforces localized category, source labels, category identity, and body script closure', async () => {
+  const englishLeak = await validOutput()
+  const englishPath = join(englishLeak, 'product_description_en.md')
+  await writeFile(englishPath, (await readFile(englishPath, 'utf8')).replace('Craft: handwoven', 'Craft: 手工'))
+  await assert.rejects(validateRehearsal(englishLeak), /body contains source-market script leakage/)
+
+  const backtickLeak = await validOutput()
+  const backtickPath = join(backtickLeak, 'product_description_en.md')
+  await writeFile(backtickPath, (await readFile(backtickPath, 'utf8')).replace(
+    'A red everyday top with source-backed details.',
+    'A red everyday top with `隐藏泄漏` source-backed details.',
+  ))
+  await assert.rejects(validateRehearsal(backtickLeak), /body contains source-market script leakage/)
+
+  const pointerBulletLeak = await validOutput()
+  const pointerBulletPath = join(pointerBulletLeak, 'product_description_en.md')
+  await writeFile(pointerBulletPath, (await readFile(pointerBulletPath, 'utf8')).replace(
+    'A red everyday top with source-backed details.',
+    'A red everyday top with source-backed details.\n- note `手工` `offer.json/path`',
+  ))
+  await assert.rejects(validateRehearsal(pointerBulletLeak), /body contains source-market script leakage/)
+
+  const koreanLeak = await validOutput()
+  const koreanPath = join(koreanLeak, 'product_description_ko.md')
+  await writeFile(koreanPath, (await readFile(koreanPath, 'utf8')).replace('제작 방식: 수작업 직조', '工艺: 수작업 직조'))
+  await assert.rejects(validateRehearsal(koreanLeak), /Korean localized body contains source-market script leakage/)
+
+  const wrongPortugueseLabel = await validOutput()
+  const portuguesePath = join(wrongPortugueseLabel, 'product_description_pt.md')
+  await writeFile(portuguesePath, (await readFile(portuguesePath, 'utf8')).replace('- ID do produto:', '- Product ID:'))
+  await assert.rejects(validateRehearsal(wrongPortugueseLabel), /Localized source identity closure/)
+
+  const categoryDrift = await validOutput()
+  const categoryPath = join(categoryDrift, 'product_description_pt.md')
+  await writeFile(categoryPath, (await readFile(categoryPath, 'utf8')).replace('(29073)', '(29074)'))
+  await assert.rejects(validateRehearsal(categoryDrift), /disagree on exact leaf category identity/)
+
+  const unsafeCategory = await validOutput()
+  const unsafeCategoryPath = join(unsafeCategory, 'product_description_en.md')
+  await writeFile(unsafeCategoryPath, (await readFile(unsafeCategoryPath, 'utf8')).replace('(29073)', '(29073 injected)'))
+  await assert.rejects(validateRehearsal(unsafeCategory), /category declaration is invalid/)
+
+  const duplicateIdentity = await validOutput()
+  const duplicateIdentityPath = join(duplicateIdentity, 'product_description_en.md')
+  const duplicateIdentityText = await readFile(duplicateIdentityPath, 'utf8')
+  await writeFile(duplicateIdentityPath, duplicateIdentityText.replace(
+    '- Source platform: 1688',
+    '- Product ID: OFFICIAL-100 `offer.json/productId`\n- Source platform: 1688',
+  ))
+  await assert.rejects(validateRehearsal(duplicateIdentity), /source identity closure is missing|source identity labels are invalid/)
+
+  const duplicateHeading = await validOutput()
+  const duplicateHeadingPath = join(duplicateHeading, 'product_description_en.md')
+  await writeFile(duplicateHeadingPath, (await readFile(duplicateHeadingPath, 'utf8')).replace(
+    'A red everyday top with source-backed details.',
+    'A red everyday top with source-backed details.\n\n## Source and Product Identity\n\nInjected section',
+  ))
+  await assert.rejects(validateRehearsal(duplicateHeading), /section closure or order is invalid/)
 })
 
 test('rejects non-canonical roots and writes a new sanitized report outside output closure', async () => {

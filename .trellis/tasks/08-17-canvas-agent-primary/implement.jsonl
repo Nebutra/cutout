@@ -1,0 +1,5 @@
+{"file":".trellis/spec/frontend/design-os-workbench.md","reason":"Preserve current Project lifecycle, Commerce evidence and Workbench compatibility while inverting presentation ownership."}
+{"file":".trellis/spec/frontend/agent-control-safety.md","reason":"Preserve Agent preview, approval, capability and receipt boundaries while moving scenario launch into Agent and Canvas."}
+{"file":".trellis/spec/frontend/commerce-production-profile.md","reason":"Reuse the real Commerce Project lifecycle and exact retained-artifact review without weakening benchmark or production claims."}
+{"file":".trellis/spec/frontend/game-asset-profile.md","reason":"Preserve exact Game launch, production, review and bundle behavior while changing only its presentation host."}
+{"file":".trellis/spec/frontend/design-profile-platform.md","reason":"Keep Profiles as typed Agent capabilities rather than new Kernel modes or scenario-specific authority."}

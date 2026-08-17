@@ -55,7 +55,7 @@ function withAdditionalBoardGroup(
   }
 }
 
-describe('prototype paid-image budget', () => {
+describe('prototype Provider-image budget', () => {
   it('derives calls from heterogeneous Agent-authored page material scopes', () => {
     const budget = compilePrototypeImageRequestBudget({
       designSystemCalls: 2,

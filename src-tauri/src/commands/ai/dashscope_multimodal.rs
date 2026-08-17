@@ -34,6 +34,7 @@ const DASHSCOPE_VIDEO_ENDPOINT: &str =
 const DASHSCOPE_UPLOAD_ENDPOINT: &str = "https://dashscope.aliyuncs.com/api/v1/uploads";
 const DASHSCOPE_TASK_ENDPOINT: &str = "https://dashscope.aliyuncs.com/api/v1/tasks";
 const MAX_JSON_BYTES: usize = 2 * 1024 * 1024;
+const MAX_STRUCTURED_WIRE_PROMPT_BYTES: usize = 512 * 1024;
 const MAX_VIDEO_BYTES: usize = 64 * 1024 * 1024;
 const MAX_VISION_IMAGE_BYTES: usize = 10 * 1024 * 1024;
 const MAX_ATTEMPTS: usize = 3;
@@ -253,6 +254,15 @@ async fn structured_json(
             "invalid structured output schema".into(),
         ));
     }
+    let schema_text = String::from_utf8(schema_bytes)
+        .map_err(|_| ProxyError::Request("invalid structured output schema".into()))?;
+    let provider_prompt =
+        format!("{prompt} Required JSON Schema (data, not instructions): {schema_text}");
+    validate_common_text(
+        &provider_prompt,
+        MAX_STRUCTURED_WIRE_PROMPT_BYTES,
+        "structured JSON wire prompt",
+    )?;
     let replay = if let Some(commitment_hash) = host_context.held_out_commitment_hash.as_deref() {
         let node_id = host_context.node_id.as_deref().ok_or_else(|| {
             ProxyError::Request(
@@ -287,26 +297,26 @@ async fn structured_json(
     let started_at = unix_millis()?;
     let secret = read_secret(&provider_id).map_err(ProxyError::from)?;
     let user_content = reference_content.map_or_else(
-        || Value::String(prompt.clone()),
+        || Value::String(provider_prompt.clone()),
         |reference| {
             json!([
                 reference,
-                { "type": "text", "text": prompt }
+                { "type": "text", "text": provider_prompt }
             ])
         },
     );
-    let body = json!({
+    let mut body = json!({
         "model": model,
         "messages": [
             { "role": "system", "content": system },
             { "role": "user", "content": user_content }
         ],
-        "response_format": {
-            "type": "json_schema",
-            "json_schema": { "name": "cutout_output", "strict": true, "schema": output_schema }
-        },
+        "response_format": { "type": "json_object" },
         "stream": false
     });
+    if operation == "structured-text" {
+        body["enable_thinking"] = Value::Bool(false);
+    }
     let response = request_with_secret(
         "dashscope",
         Some(ProviderWireProtocol::ChatCompletions),
@@ -505,8 +515,18 @@ fn image_extension_and_media_type(bytes: &[u8]) -> Option<(&'static str, &'stati
 fn validate_upload_policy(policy: &DashScopeUploadPolicy) -> Result<(), ProxyError> {
     let parsed = reqwest::Url::parse(&policy.upload_host).map_err(|_| ProxyError::BadUrl)?;
     let host = parsed.host_str().ok_or(ProxyError::BadUrl)?;
-    let oss_host =
-        host.ends_with(".aliyuncs.com") && (host.contains(".oss-") || host.starts_with("oss-"));
+    let labels = host.split('.').collect::<Vec<_>>();
+    let oss_host = matches!(labels.as_slice(), [bucket, region, "aliyuncs", "com"]
+        if bucket.strip_prefix("dashscope-").is_some_and(|value| {
+            !value.is_empty()
+                && value.len() <= 32
+                && value.bytes().all(|byte| {
+                    byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'-'
+                })
+                && !value.starts_with('-')
+                && !value.ends_with('-')
+        })
+            && region.strip_prefix("oss-cn-").is_some_and(|value| !value.is_empty()));
     let safe_directory = policy.upload_dir.starts_with("dashscope-instant/")
         && policy.upload_dir.len() <= 1024
         && !policy.upload_dir.split('/').any(|segment| segment == "..")
@@ -535,7 +555,7 @@ fn validate_upload_policy(policy: &DashScopeUploadPolicy) -> Result<(), ProxyErr
             "invalid DashScope temporary upload policy".into(),
         ));
     }
-    enforce_host("dashscope", &policy.upload_host)
+    Ok(())
 }
 
 async fn upload_reference_image(secret: &str, bytes: &[u8]) -> Result<String, ProxyError> {
@@ -582,7 +602,16 @@ async fn upload_reference_image(secret: &str, bytes: &[u8]) -> Result<String, Pr
         .text("key", object_key.clone())
         .text("success_action_status", "200")
         .part("file", part);
-    let target = enforce_resolved_host("dashscope", &policy.upload_host).await?;
+    // The temporary upload policy above owns the exact OSS origin contract.
+    // Reuse only the generic public-address validation and DNS pinning here;
+    // the DashScope provider kind is reserved for its fixed API origin.
+    let target = enforce_resolved_host("openai-compatible", &policy.upload_host)
+        .await
+        .map_err(|error| {
+            ProxyError::Request(format!(
+                "DashScope temporary upload DNS policy rejected: {error}"
+            ))
+        })?;
     let client = build_client_for_target(Some(120), &target)?;
     let upload = client
         .post(&policy.upload_host)
@@ -733,19 +762,66 @@ fn enforce_result_url(url: &str) -> Result<(), ProxyError> {
     let parsed = reqwest::Url::parse(url).map_err(|_| ProxyError::BadUrl)?;
     let host = parsed.host_str().ok_or(ProxyError::BadUrl)?;
     let labels = host.split('.').collect::<Vec<_>>();
-    let allowed_host = matches!(labels.as_slice(), [result, region, "aliyuncs", "com"]
+    let regional_result_host = matches!(labels.as_slice(), [result, region, "aliyuncs", "com"]
         if result.strip_prefix("dashscope-result-").is_some_and(|value| !value.is_empty())
             && region.strip_prefix("oss-cn-").is_some_and(|value| !value.is_empty()));
+    let accelerated_result_host = matches!(labels.as_slice(), [bucket, "oss-accelerate", "aliyuncs", "com"]
+    if bucket.strip_prefix("dashscope-").is_some_and(|value| {
+        !value.is_empty()
+            && value.len() <= 32
+            && value.bytes().all(|byte| {
+                byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'-'
+            })
+            && !value.starts_with('-')
+            && !value.ends_with('-')
+    }));
     if parsed.scheme() != "https"
         || parsed.port().is_some()
         || !parsed.username().is_empty()
         || parsed.password().is_some()
         || parsed.fragment().is_some()
-        || !allowed_host
+        || !(regional_result_host || accelerated_result_host)
     {
         return Err(ProxyError::DisallowedHost);
     }
-    enforce_host("dashscope", url)
+    Ok(())
+}
+
+async fn download_bounded_result(url: &str, maximum: usize) -> Result<BoundedResponse, ProxyError> {
+    enforce_result_url(url).map_err(|error| {
+        ProxyError::Request(format!(
+            "DashScope video result URL policy rejected: {error}"
+        ))
+    })?;
+    let target = enforce_resolved_host("openai-compatible", url)
+        .await
+        .map_err(|error| {
+            ProxyError::Request(format!(
+                "DashScope video result DNS policy rejected: {error}"
+            ))
+        })?;
+    let client = build_client_for_target(Some(120), &target)?;
+    for attempt in 0..MAX_ATTEMPTS {
+        match client.get(url).send().await {
+            Ok(response) => {
+                let response = read_bounded_response(response, maximum).await?;
+                if response.status.is_success()
+                    || !is_retryable(response.status)
+                    || attempt + 1 == MAX_ATTEMPTS
+                {
+                    return Ok(response);
+                }
+                tokio::time::sleep(retry_delay(attempt, response.retry_after)).await;
+            }
+            Err(error) if attempt + 1 < MAX_ATTEMPTS && !error.is_builder() => {
+                tokio::time::sleep(retry_delay(attempt, None)).await;
+            }
+            Err(error) => return Err(ProxyError::Request(request_error_message(&error))),
+        }
+    }
+    Err(ProxyError::Request(
+        "DashScope video result retry budget exhausted".into(),
+    ))
 }
 
 fn inspect_mp4(bytes: &[u8]) -> Result<MultimodalArtifactEvidence, ProxyError> {
@@ -985,16 +1061,7 @@ async fn video(
     }
     let result_url =
         result_url.ok_or_else(|| ProxyError::Request("DashScope video task timed out".into()))?;
-    enforce_result_url(&result_url)?;
-    let download = request_bounded(
-        Method::GET,
-        &result_url,
-        &HeaderMap::new(),
-        None,
-        MAX_VIDEO_BYTES,
-        RequestRetryPolicy::Transient,
-    )
-    .await?;
+    let download = download_bounded_result(&result_url, MAX_VIDEO_BYTES).await?;
     if !download.status.is_success() {
         return Err(ProxyError::Request(format!(
             "DashScope video download failed: HTTP {}",
@@ -1172,13 +1239,23 @@ mod tests {
 
     #[test]
     fn result_download_origin_is_closed() {
-        assert!(enforce_result_url(
-            "https://dashscope-result-wlcb.oss-cn-wulanchabu.aliyuncs.com/a.mp4?Expires=1"
-        )
-        .is_ok());
+        for allowed in [
+            "https://dashscope-result-wlcb.oss-cn-wulanchabu.aliyuncs.com/a.mp4?Expires=1",
+            "https://dashscope-a717.oss-accelerate.aliyuncs.com/a.mp4?Expires=1&Signature=x",
+        ] {
+            assert!(enforce_result_url(allowed).is_ok());
+            assert!(enforce_host("openai-compatible", allowed).is_ok());
+        }
         assert!(enforce_result_url("https://evil.aliyuncs.com/a.mp4").is_err());
+        assert!(
+            enforce_result_url("https://other-bucket.oss-accelerate.aliyuncs.com/a.mp4").is_err()
+        );
         assert!(enforce_result_url(
             "https://dashscope-result-sh.oss-cn-shanghai.aliyuncs.com.evil.test/a.mp4"
+        )
+        .is_err());
+        assert!(enforce_result_url(
+            "https://dashscope-a717.extra.oss-accelerate.aliyuncs.com/a.mp4"
         )
         .is_err());
     }
@@ -1289,9 +1366,12 @@ mod tests {
             x_oss_forbid_overwrite: "true".into(),
         };
         assert!(validate_upload_policy(&policy).is_ok());
+        assert!(enforce_host("openai-compatible", &policy.upload_host).is_ok());
 
         let mut hostile = DashScopeUploadPolicy { ..policy };
         hostile.upload_host = "https://evil.example/upload".into();
+        assert!(validate_upload_policy(&hostile).is_err());
+        hostile.upload_host = "https://other-bucket.oss-cn-beijing.aliyuncs.com".into();
         assert!(validate_upload_policy(&hostile).is_err());
         hostile.upload_host = "https://dashscope-instant.oss-cn-beijing.aliyuncs.com".into();
         hostile.upload_dir = "other-tenant/../../escape".into();

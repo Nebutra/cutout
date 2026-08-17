@@ -255,10 +255,23 @@ fn convert_bgra_rows(
         let input = &source[row * bytes_per_row..row * bytes_per_row + packed];
         let output = &mut rgba[row * packed..(row + 1) * packed];
         for (bgra, rgba) in input.chunks_exact(4).zip(output.chunks_exact_mut(4)) {
-            rgba.copy_from_slice(&[bgra[2], bgra[1], bgra[0], bgra[3]]);
+            let alpha = bgra[3];
+            rgba.copy_from_slice(&[
+                unpremultiply_channel(bgra[2], alpha),
+                unpremultiply_channel(bgra[1], alpha),
+                unpremultiply_channel(bgra[0], alpha),
+                alpha,
+            ]);
         }
     }
     Ok(rgba)
+}
+
+fn unpremultiply_channel(channel: u8, alpha: u8) -> u8 {
+    if alpha == 0 {
+        return 0;
+    }
+    ((u32::from(channel) * 255 + u32::from(alpha) / 2) / u32::from(alpha)).min(255) as u8
 }
 
 #[cfg(test)]
@@ -276,12 +289,20 @@ mod tests {
     #[test]
     fn converts_row_padded_bgra_without_copying_padding() {
         let source = [
-            1, 2, 3, 4, 5, 6, 7, 8, 99, 99, 99, 99, 9, 10, 11, 12, 13, 14, 15, 16, 88, 88, 88, 88,
+            1, 2, 3, 255, 5, 6, 7, 255, 99, 99, 99, 99, 9, 10, 11, 255, 13, 14, 15, 255, 88, 88,
+            88, 88,
         ];
         assert_eq!(
             convert_bgra_rows(&source, 2, 2, 12).unwrap(),
-            [3, 2, 1, 4, 7, 6, 5, 8, 11, 10, 9, 12, 15, 14, 13, 16]
+            [3, 2, 1, 255, 7, 6, 5, 255, 11, 10, 9, 255, 15, 14, 13, 255]
         );
+    }
+
+    #[test]
+    fn unpremultiplies_translucent_vision_pixels() {
+        assert_eq!(unpremultiply_channel(64, 128), 128);
+        assert_eq!(unpremultiply_channel(0, 0), 0);
+        assert_eq!(unpremultiply_channel(255, 128), 255);
     }
 
     #[test]
@@ -303,6 +324,34 @@ mod tests {
         assert!(result.height > 0);
         assert!(result.instance_count > 0);
         assert!(result.png_bytes.starts_with(&[137, 80, 78, 71]));
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    #[ignore = "requires retained real image bytes and the macOS Apple Vision runtime"]
+    fn apple_vision_segments_retained_real_game_sources() {
+        let source_dir = std::env::var("CUTOUT_REAL_GAME_SOURCE_DIR")
+            .expect("CUTOUT_REAL_GAME_SOURCE_DIR must name retained real source bytes");
+        let output_dir = std::env::var("CUTOUT_REAL_GAME_OUTPUT_DIR")
+            .expect("CUTOUT_REAL_GAME_OUTPUT_DIR must name the evidence output directory");
+        std::fs::create_dir_all(&output_dir).expect("could not create evidence output directory");
+
+        for frame in 1..=4 {
+            let source = std::fs::read(format!("{source_dir}/frame-{frame:02}-source.png"))
+                .expect("could not read retained real source bytes");
+            let started = std::time::Instant::now();
+            let result = segment_platform(&source).expect("Apple Vision segmentation failed");
+            let output = format!("{output_dir}/frame-{frame:02}-apple-vision-cutout.png");
+            std::fs::write(&output, &result.png_bytes)
+                .expect("could not retain Apple Vision output bytes");
+            eprintln!(
+                "frame={frame:02} elapsed_ms={} instances={} size={}x{}",
+                started.elapsed().as_millis(),
+                result.instance_count,
+                result.width,
+                result.height
+            );
+        }
     }
 
     #[cfg(not(target_os = "macos"))]

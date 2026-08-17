@@ -138,6 +138,28 @@ describe('Tauri capability least privilege contract', () => {
     expect(permissions).not.toContain('ai_dashscope_request')
   })
 
+  it('registers bounded deterministic Game Map processors outside the Provider boundary', async () => {
+    const [modules, handlers, permissions, desktopCapability] = await Promise.all([
+      readRepositoryFile('src-tauri/src/commands/ai/mod.rs'),
+      readRepositoryFile('src-tauri/src/lib.rs'),
+      readRepositoryFile('src-tauri/permissions/application.toml'),
+      readCapability('updater'),
+    ])
+
+    expect(modules).toContain('pub mod game_map_processing;')
+    for (const command of [
+      'extract_game_map_prop_pack',
+      'extract_game_map_terrain_atlas',
+      'validate_game_map_runtime',
+      'compose_game_map_preview',
+    ]) {
+      expect(handlers).toContain(`commands::ai::game_map_processing::${command}`)
+      expect(permissions).toContain(`"${command}"`)
+    }
+    expect(permissions).toContain('identifier = "game-map-processing"')
+    expect(desktopCapability.permissions).toContain('game-map-processing')
+  })
+
   it('registers only the bounded multimodal Host commands inside the provider boundary', async () => {
     const [modules, handlers, permissions, desktopCapability] = await Promise.all([
       readRepositoryFile('src-tauri/src/commands/ai/mod.rs'),
@@ -160,6 +182,12 @@ describe('Tauri capability least privilege contract', () => {
     expect(handlers).toContain('commands::ai::game_asset_generation::preview_game_asset_generation')
     expect(handlers).toContain('commands::ai::game_asset_generation::apply_game_asset_generation')
     expect(handlers).toContain('commands::ai::game_asset_generation::verify_game_asset_generation_authorization')
+    expect(handlers).toContain('commands::ai::game_asset_generation::preview_game_asset_action_sheet_generation')
+    expect(handlers).toContain('commands::ai::game_asset_generation::preview_game_asset_action_sheet_repair')
+    expect(handlers).toContain('commands::ai::game_asset_generation::apply_game_asset_action_sheet_generation')
+    expect(handlers).toContain('commands::ai::game_asset_generation::apply_game_asset_action_sheet_repair')
+    expect(handlers).toContain('commands::ai::game_asset_generation::verify_game_asset_action_sheet_authorization')
+    expect(handlers).toContain('commands::ai::game_asset_generation::verify_game_asset_action_sheet_repair_authorization')
     expect(handlers).toContain('commands::ai::game_asset_generation::preview_game_asset_semantic_acceptance')
     expect(handlers).toContain('commands::ai::game_asset_generation::apply_game_asset_semantic_acceptance')
     expect(handlers).toContain('commands::ai::game_asset_generation::verify_game_asset_semantic_acceptance')
@@ -175,6 +203,12 @@ describe('Tauri capability least privilege contract', () => {
     expect(permissions).toContain('"preview_game_asset_generation"')
     expect(permissions).toContain('"apply_game_asset_generation"')
     expect(permissions).toContain('"verify_game_asset_generation_authorization"')
+    expect(permissions).toContain('"preview_game_asset_action_sheet_generation"')
+    expect(permissions).toContain('"preview_game_asset_action_sheet_repair"')
+    expect(permissions).toContain('"apply_game_asset_action_sheet_generation"')
+    expect(permissions).toContain('"apply_game_asset_action_sheet_repair"')
+    expect(permissions).toContain('"verify_game_asset_action_sheet_authorization"')
+    expect(permissions).toContain('"verify_game_asset_action_sheet_repair_authorization"')
     expect(permissions).toContain('"preview_game_asset_semantic_acceptance"')
     expect(permissions).toContain('"apply_game_asset_semantic_acceptance"')
     expect(permissions).toContain('"verify_game_asset_semantic_acceptance"')

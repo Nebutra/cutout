@@ -13,7 +13,7 @@ describe("settings section grouping", () => {
     const sidebar = source("SettingsSidebar.tsx");
     const dialog = source("SettingsDialog.tsx");
 
-    expect(general).not.toMatch(/Paid actions|Local recovery/);
+    expect(general).not.toMatch(/Provider execution|Local recovery/);
     expect(ai).toContain("ModelAssignments");
     expect(general).not.toContain("settings.developer_mode");
     expect(support).toContain("UpdatesSection");

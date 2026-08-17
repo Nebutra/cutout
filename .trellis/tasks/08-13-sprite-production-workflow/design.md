@@ -24,11 +24,157 @@ single-use consumption, direct BYOK Provider invocation and signed authorization
 receipt. It returns the exact native multimodal receipts and bytes; it does not
 accept a renderer-authored `approved` flag or opaque approval string.
 
+## Replacement Boundary
+
+Agent Sprite Forge is treated as an outcome corpus, not as an architecture to
+embed. Its three Skills decompose into four independent Design OS planes:
+
+1. **Sprite family production**: identity/master, action and direction groups,
+   detached FX, frame processing, scale/anchor profile, animation clips and atlas.
+2. **Map production**: map-mode planning, visual layers, reusable objects,
+   placements, collision/zones/exits, composed preview and map bundle.
+3. **Adapter delivery**: runtime-neutral bundle to managed Godot/Unity-shaped
+   output with reference validation and no mutation of accepted source artifacts.
+4. **Temporal ingestion**: authorized video bytes to deterministic decoded and
+   sampled frames, then the same sprite-family QA and delivery path.
+
+Project-specific gameplay, engine scripts, deployment and playable-prototype
+assembly remain owned by the Coding Profile. The Game Asset Profile produces a
+typed integration brief and accepted artifacts for that Profile. This matches the
+actual upstream implementation: reusable asset Skills and processors are separate
+from the project-specific coding used by its showcases.
+
+Complete replacement is a conjunction, never a marketing boolean:
+
+```text
+replacementComplete = every required upstream outcome has
+  intent route
+  + executable producer
+  + retained source/result evidence
+  + QA authority
+  + repair/revision semantics
+  + preview consumer
+  + accepted delivery receipt
+```
+
+Each coverage entry advances monotonically through `unsupported -> contract ->
+real-host -> accepted-delivery`. Fixture or schema tests may advance only to
+`contract`. A real generation without semantic acceptance may advance to
+`real-host`, but cannot satisfy replacement completion.
+
+## Profile Decomposition
+
+The current single-action `game-asset.plan.v1` remains the atomic real-Host unit.
+Do not widen it into a polymorphic mega-plan. Add aggregate contracts above it:
+
+- `game-asset.family-plan.v1` owns identity, requested action/direction groups,
+  body/FX relationships, master action selection and desired bundle layouts.
+- `game-asset.action-clip.v1` binds one accepted atomic plan, its ordered frames,
+  observed timing, anchor policy and scale-profile revision.
+- `game-asset.scale-profile.v1` is derived from one accepted grounded master clip
+  and freezes delivery canvas, standing-equivalent scale, anchor, trim/component
+  policy and compatibility class.
+- `game-asset.family-bundle.v1` binds accepted clips, detached FX and one or more
+  deterministic atlases. It never embeds an unaccepted atomic rehearsal.
+- `game-map.production-plan.v1` selects one map mode and declares required visual,
+  object, geometry, camera and delivery nodes.
+- `game-map.runtime-manifest.v1` replaces the current shallow layer list as the
+  authoritative placement/collision/zone representation while retaining the
+  existing schema for compatibility.
+- `game-engine.adapter-plan.v1` binds one neutral bundle hash, adapter/version,
+  managed target shape and validation policy.
+- `game-temporal-ingest.v1` binds an authorized video artifact, deterministic
+  decoder/sampler identity and derived-frame identities.
+- `game-asset.coverage-ledger.v1` records per-outcome evidence state and the exact
+  receipts/artifacts that justify it.
+
+These are Profile-owned domain contracts. Kernel contracts stay unchanged.
+
+## Intent And Workbench Projection
+
+The user describes an outcome once. Local intent classification selects the Game
+Profile and compiles a reviewable plan; it does not ask the user to pick Sprite,
+Map, Godot or Unity from a scenario card.
+
+```text
+"做一个四方向武士，带攻击特效，导出 Godot"
+        |
+        +-> family-plan
+        |     +-> idle/down,left,right,up
+        |     +-> walk/down,left,right,up
+        |     +-> attack body
+        |     +-> detached attack FX
+        |
+        +-> neutral family bundle
+        +-> Godot adapter plan
+```
+
+The workbench is a projection of graph state, not a static form. It shows the
+current master reference, independently reviewable action/map nodes, measured
+blockers, stale dependencies, preview consumers and delivery targets. Advanced
+controls remain editable, but inferred sheet/grid/processor flags are not required
+up front. Changing a field recompiles a plan revision; it never mutates accepted
+evidence in place.
+
+## Delivery Layers
+
+Delivery is deliberately split into three layers:
+
+1. **Neutral runtime bundle**: transparent frames/atlases, animation/map manifests,
+   placements, collision/zones, hashes and provenance. This is the authoritative
+   portable result.
+2. **Managed engine package**: deterministic Godot/Unity-shaped files generated
+   solely from a neutral bundle. Adapter failure creates a failed delivery receipt
+   and cannot stale or modify the accepted neutral bundle.
+3. **Project integration**: a Coding Profile changes an existing project under its
+   own preview, approval, filesystem and test authority. The engine adapter never
+   inherits arbitrary-path access merely because the user requested Godot/Unity.
+
+The first Godot adapter should target data-only animation resources and a minimal
+preview scene under a managed export. The first Unity adapter should target atlas
+metadata plus import/animation descriptors under a managed export. Neither claims
+to generate gameplay controllers, combat systems or complete scenes.
+
+## Workstream Order
+
+The remaining replacement work is split by independently verifiable authority:
+
+1. Sprite-family orchestration and multi-animation bundle over the proven atomic
+   Qwen/cutout/repair/atlas path.
+2. Scene-mode and tile-mode maps with real retained visual assets, structured
+   geometry and deterministic preview composition.
+3. Remaining map modes as contracts first, then representative real deliveries.
+4. Godot and Unity managed adapters over accepted neutral bundles.
+5. Temporal ingestion only after an authorized video Host exists.
+6. Coverage-ledger promotion after every required path has accepted delivery;
+   never promote from documentation, fixtures or an upstream feature checklist.
+
+The Trellis task dependency graph is:
+
+```text
+08-13 atomic Game foundation
+  +-> 08-14 multi-action sprite family ----+
+  |                                         +-> managed engine adapters
+  +-> 08-14 layered map production --------+
+  |
+  +-> temporal multimodal Host -> temporal Game ingestion -> sprite family
+
+all owning verifier outputs -> Agent Sprite Forge coverage ledger
+```
+
+The coverage ledger may be implemented early as an honest diagnostic, but its
+replacement result cannot complete before every owning child closes. Engine
+adapters never block neutral Sprite/Map delivery; Temporal ingestion never blocks
+non-video Game production.
+
 Real Qwen image roles receive a 600-second native execution budget each and an
 aggregate budget covering the admitted role closure. HTTPS downloads remain
 closed to the exact DashScope regional-result and `dashscope-*` accelerated OSS
 bucket shapes under `aliyuncs.com`; partial attempts retain completed outputs and
-stage-specific diagnostics without retaining signed URLs.
+stage-specific diagnostics without retaining signed URLs. The synchronous Image
+3 POST has a single 540-second transport attempt. Without a Provider idempotency
+key, write timeout/status failure is never retried automatically; only safe
+GET/HEAD reads and output downloads retain bounded retry.
 
 ```text
 Brief + references + target policy
@@ -73,6 +219,25 @@ native confirmation -> single-use semantic acceptance receipt
 strict retained bundle verification (blocked until both evidence planes close)
 ```
 
+Targeted repair re-enters the same native boundary without regenerating accepted
+siblings:
+
+```text
+parent authorization + complete retained outputs + replacement role prompts
+        |
+        v
+native parent reverification -> strict-subset repair preview
+        |
+        v
+Qwen only for replacement roles -> merge exact preserved outputs
+        |
+        v
+signed v3 authorization(parent + replacement + preserved origin lineage)
+        |
+        v
+complete retained-bundle reverification
+```
+
 ## Contracts
 
 Introduce versioned schemas under a dedicated `src/game-asset-profile/` boundary:
@@ -86,14 +251,19 @@ Introduce versioned schemas under a dedicated `src/game-asset-profile/` boundary
   sort/occlusion policy, collision, zones, scene hooks, and preview recipe.
 - `game-asset.raster-evidence.v1`: per-frame boxes/coverage/edge state, action
   anchor/scale measurements, residual background diagnostics, and provenance.
-- `game-asset.bundle.v1`: accepted artifact references, animation/map manifests,
-  hashes, compatibility metadata, preview reference, and export receipt binding.
+- `game-asset.bundle.v1`: fixed relative logical names, generation/preview/run
+  provenance, ordered animation cells, observed anchors, frozen timing policy,
+  exact artifact/atlas/manifest hashes and optional semantic acceptance. Missing
+  acceptance produces `candidate`; it cannot be represented as accepted delivery.
 - `cutout.game-asset-generation-preview.v2`: native-owned digest of the exact
   bounded BYOK request closure with `executionMode: 'byok-direct'`; it is
   observation information, not authority or a payment gate.
 - `cutout.game-asset-generation-authorization.v2`: native-signed, single-use
   execution evidence binding the preview digest, execution identity/start time,
   exact role requests and every returned multimodal receipt/artifact identity.
+- `cutout.game-asset-generation-repair-preview.v2` and authorization v4 bind the
+  complete parent/evidence/preserved/replacement closure. Historical repair
+  preview v1 and authorization v3 remain replay-only.
 - `cutout.game-asset-semantic-acceptance-preview.v1`: content-addressed review
   closure over the verified generation receipt, exact outputs and per-role
   semantic decisions; it carries no approval authority.
@@ -171,26 +341,31 @@ emit exact artifact hashes plus measurements; review policy decides whether thos
 measurements block publication.
 
 The current native single-frame processor is
-`cutout-white-border-flood-matte-normalize-anchor-rust-image-0.23-v2`. It retains
-the exact Provider source bytes and native receipt, floods only white/transparent
-pixels connected to the canvas border, applies the frozen one-pixel white matte
-rule, extracts the measured alpha bounds, and crops the retained subject. It then
-uses proportional Lanczos3 scaling to contain the plan's alpha envelope and
-places the result at the declared anchor on the fixed delivery canvas. It never
-stretches width and height independently or changes cell dimensions between
-animation frames.
+`cutout-adaptive-border-chroma-trimap-pymatting-ml-foreground-normalize-anchor-rust-image-0.23-v5`.
+It retains the exact Provider source bytes and native receipt, measures a uniform
+high-chroma board from decoded border pixels, requires the complete perimeter to
+remain board-colored, and derives a bounded BT.601 threshold from the observed
+border range. A threshold approaching neutral chroma fails closed rather than
+erasing edge-touching content. The processor derives its trimap and uses a Rust
+adaptation of PyMatting's MIT-licensed Fast Multi-Level Foreground Estimation to
+reconstruct colors contaminated by that board. It then extracts measured alpha
+bounds, crops the retained subject, uses proportional Lanczos3 scaling to contain
+the plan's alpha envelope, and places the result at the declared anchor on the
+fixed delivery canvas. Already-transparent sources preserve alpha.
 
-Signed v2 processing evidence binds source dimensions/bounds, frame size, alpha
-envelope, expected anchor, anchor and scale policy, resized subject size,
-placement, output bounds, source/output identities and byte length. Verification
-repeats the complete transform from retained source bytes and requires
-byte-for-byte PNG equality before trusting pixel measurements. The matte-only
-`cutout-white-border-flood-matte-rust-image-0.23-v1` path remains dispatchable
-only for already signed retained runs so the algorithm upgrade does not destroy
-their replay evidence. Non-white or non-removable backgrounds remain opaque and
-fail normal edge/alpha evaluation; they are never silently relabeled as
-successful cutouts. Grid splitting and atlas composition remain later typed
-processors.
+Signed v5 processing evidence binds measured board color, the derived squared
+chroma threshold in the closed `64..=4096` range, route, source dimensions/bounds, frame size, alpha envelope,
+expected anchor, anchor and scale policy, resized subject size, placement, output
+bounds, source/output identities and byte length. Verification repeats the
+complete transform from retained source bytes and requires byte-for-byte PNG
+equality before trusting pixel measurements. Historical v4 fixed-chroma, v3
+adaptive-key, v2 white-border normalization and v1 matte-only paths remain
+separately dispatchable only for exact retained-evidence replay. Their
+implementation identities cannot authorize v5 bytes. Grid splitting remains a
+later typed processor. Atlas composition is a native deterministic processor:
+it first re-verifies every processed frame, copies plan-ordered RGBA pixels into
+bounded cells, emits a canonical `game-asset.bundle.v1` manifest, and
+content-addresses both PNG and manifest bytes.
 
 Pixel geometry is computed locally from decoded returned bytes. Alpha bounds are
 the smallest non-transparent rectangle above the frozen alpha threshold; edge

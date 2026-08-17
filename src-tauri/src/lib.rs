@@ -1,4 +1,10 @@
 mod commands;
+pub mod commerce_operator;
+pub mod commerce_operator_native;
+
+pub(crate) fn application_context() -> tauri::Context<tauri::Wry> {
+    tauri::generate_context!()
+}
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -13,6 +19,7 @@ pub fn run() {
         .manage(commands::agent_host::AgentHostDesktopState::default())
         .manage(commands::ai::ai_proxy::AiProxyCancellationState::default())
         .manage(commands::ai::game_asset_generation::GameAssetGenerationState::default())
+        .manage(commands::ai::game_asset_family::GameAssetFamilyState::default())
         .manage(commands::ai::codex_system::CodexSystemRuntimeState::default())
         .manage(commands::monotonic_deadline::MonotonicDeadlineState::default());
     #[cfg(desktop)]
@@ -91,11 +98,41 @@ pub fn run() {
             commands::ai::dashscope_multimodal::ai_dashscope_vision_json,
             commands::ai::dashscope_multimodal::ai_dashscope_video,
             commands::ai::game_asset_generation::preview_game_asset_generation,
+            commands::ai::game_asset_generation::preview_game_asset_generation_repair,
             commands::ai::game_asset_generation::apply_game_asset_generation,
             commands::ai::game_asset_generation::verify_game_asset_generation_authorization,
+            commands::ai::game_asset_generation::preview_game_asset_action_sheet_generation,
+            commands::ai::game_asset_generation::preview_game_asset_action_sheet_repair,
+            commands::ai::game_asset_generation::preview_game_asset_action_sheet_partial_repair,
+            commands::ai::game_asset_generation::preview_game_asset_action_sheet_partial_reprocess,
+            commands::ai::game_asset_generation::apply_game_asset_action_sheet_generation,
+            commands::ai::game_asset_generation::apply_game_asset_action_sheet_repair,
+            commands::ai::game_asset_generation::apply_game_asset_action_sheet_partial_repair,
+            commands::ai::game_asset_generation::apply_game_asset_action_sheet_partial_reprocess,
+            commands::ai::game_asset_generation::verify_game_asset_action_sheet_authorization,
+            commands::ai::game_asset_generation::verify_game_asset_action_sheet_partial_authorization,
+            commands::ai::game_asset_generation::verify_game_asset_action_sheet_repair_authorization,
+            commands::ai::game_asset_generation::verify_game_asset_action_sheet_partial_repair_authorization,
+            commands::ai::game_asset_generation::verify_game_asset_action_sheet_partial_reprocess_authorization,
             commands::ai::game_asset_generation::preview_game_asset_semantic_acceptance,
             commands::ai::game_asset_generation::apply_game_asset_semantic_acceptance,
             commands::ai::game_asset_generation::verify_game_asset_semantic_acceptance,
+            commands::ai::game_asset_generation::compile_game_asset_production_bundle,
+            commands::ai::game_asset_family::preview_game_asset_grounded_normalization,
+            commands::ai::game_asset_family::apply_game_asset_grounded_normalization,
+            commands::ai::game_asset_family::verify_game_asset_grounded_normalization_authorization,
+            commands::ai::game_asset_family::preview_game_asset_family_acceptance,
+            commands::ai::game_asset_family::apply_game_asset_family_acceptance,
+            commands::ai::game_asset_family::verify_game_asset_family_acceptance,
+            commands::ai::game_asset_family::compile_game_asset_family_bundle,
+            commands::ai::game_map_processing::extract_game_map_prop_pack,
+            commands::ai::game_map_processing::extract_game_map_terrain_atlas,
+            commands::ai::game_map_processing::admit_game_map_live_artifact,
+            commands::ai::game_map_processing::verify_game_map_live_artifact,
+            commands::ai::game_map_processing::validate_game_map_runtime,
+            commands::ai::game_map_processing::compose_game_map_preview,
+            commands::ai::game_map_processing::accept_game_map_semantic_review,
+            commands::ai::game_map_processing::verify_game_map_semantic_acceptance,
             commands::ai::multimodal_receipt::verify_multimodal_host_artifact,
             commands::ai::multimodal_receipt::promote_multimodal_video_playback,
             // PNG → SVG vectorization
@@ -218,6 +255,6 @@ pub fn run() {
             }
             Ok(())
         })
-        .run(tauri::generate_context!())
+        .run(application_context())
         .expect("error while running tauri application");
 }

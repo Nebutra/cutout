@@ -2,7 +2,13 @@
 import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { renderToStaticMarkup } from "react-dom/server";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import {
+  acceptCommerceProjectLifecycleRecord,
+  createCommerceProjectLifecycleRecord,
+} from "@/commerce-profile/project-lifecycle";
+import { createCommerceProjectContractResult } from "@/commerce-profile/project-production.test-fixture";
+import type { CommerceProjectProductionResult } from "@/commerce-profile/project-production";
 import {
   DesignOsWorkbench,
   type DesignOsWorkbenchModel,
@@ -111,6 +117,11 @@ const model: DesignOsWorkbenchModel = {
 
 let root: Root | undefined;
 let container: HTMLDivElement | undefined;
+let commerceResult: CommerceProjectProductionResult;
+
+beforeAll(async () => {
+  commerceResult = await createCommerceProjectContractResult();
+});
 
 afterEach(() => {
   if (root) act(() => root?.unmount());
@@ -127,31 +138,41 @@ function mount(element: ReturnType<typeof createElement>) {
   return container;
 }
 
+function activateTab(tab: HTMLElement) {
+  act(() => {
+    tab.dispatchEvent(
+      new MouseEvent("mousedown", { bubbles: true, button: 0 }),
+    );
+    tab.click();
+  });
+}
+
 describe("DesignOsWorkbench", () => {
-  it("SSR renders the System inspector with project tools and progressive evidence", () => {
+  it("SSR renders one six-stage Project lifecycle without global domain tabs", () => {
     const html = renderToStaticMarkup(
       createElement(DesignOsWorkbench, { model }),
     );
 
-    expect(html).toContain('aria-label="System inspector"');
-    expect(html).toContain('aria-label="System inspector sections"');
+    expect(html).toContain('aria-label="Project workbench"');
+    expect(html).toContain('aria-label="Project lifecycle"');
     expect(html).not.toContain(">Design OS<");
-    expect(html).toContain("Overview");
-    expect(html).toContain("Sources");
-    expect(html).toContain("Game assets");
-    expect(html).toContain("Figma");
+    for (const label of ["Brief", "Sources", "Create", "Review", "Deliver", "Inspect"]) {
+      expect(html).toContain(`>${label}</button>`);
+    }
+    expect(html).not.toContain(">Commerce</button>");
+    expect(html).not.toContain(">Game Asset</button>");
     expect(html).not.toContain(">Kits</button>");
     expect(html).not.toContain(">Components</button>");
     expect(html).not.toContain(">Starter</button>");
-    expect(html).toContain("Project system");
-    expect(html).toContain("Advanced system evidence");
+    expect(html).toContain("Project brief");
+    expect(html).not.toContain("Advanced system evidence");
     expect(html.indexOf("Revision 12")).toBeGreaterThan(
-      html.indexOf("Advanced system evidence"),
+      html.indexOf("Project workbench"),
     );
     expect(html).not.toContain("Only verified outputs");
   });
 
-  it("shows only delivery surfaces in Deliver mode", () => {
+  it("uses the shared lifecycle shell and contextual delivery views in Deliver mode", () => {
     const html = renderToStaticMarkup(
       createElement(DesignOsWorkbench, {
         model: { ...model, delivery: { targets: [] } },
@@ -159,17 +180,18 @@ describe("DesignOsWorkbench", () => {
         defaultTab: "delivery",
       }),
     );
-    expect(html).toContain(">Delivery center</button>");
+    for (const label of ["Brief", "Sources", "Create", "Review", "Deliver", "Inspect"]) {
+      expect(html).toContain(`>${label}</button>`);
+    }
+    expect(html).toContain('aria-label="Delivery views"');
+    expect(html).toContain(">Overview</button>");
     expect(html).toContain(">Kits</button>");
     expect(html).toContain(">Components</button>");
     expect(html).toContain(">Starter</button>");
-    expect(html).not.toContain(">Overview</button>");
-    expect(html).not.toContain(">Sources</button>");
-    expect(html).not.toContain(">Figma</button>");
     expect(html).not.toContain("System inspector");
     expect(html).not.toContain("Axe host required");
-    expect(html.match(/>Delivery center<\/button>/g)).toHaveLength(1);
-    expect(html).toContain('aria-label="Deliver"');
+    expect(html.match(/>Overview<\/button>/g)).toHaveLength(1);
+    expect(html).toContain('aria-label="Project workbench"');
   });
 
   it("returns from Deliver through the workspace callback with responsive copy", () => {
@@ -184,13 +206,252 @@ describe("DesignOsWorkbench", () => {
     }));
     const button = view.querySelector<HTMLButtonElement>('button[aria-label="Back to Agent"]');
     expect(button?.className).toContain("min-h-11");
-    expect(button?.textContent).toContain("Back to Agent");
+    expect(button?.className).toContain("min-w-11");
+    expect(button?.title).toBe("Back to Agent");
     expect(button?.textContent).toContain("Back");
     act(() => button?.click());
     expect(onBack).toHaveBeenCalledOnce();
   });
 
-  it("reviews authorized Figma snapshot facts and requires explicit approval", () => {
+  it("defaults Create to Product UI/UX and switches Profiles without changing the lifecycle", () => {
+    const onOpenCanvas = vi.fn();
+    const view = mount(createElement(DesignOsWorkbench, {
+      model,
+      callbacks: { onOpenProductCanvas: onOpenCanvas },
+    }));
+    const lifecycle = view.querySelector('[role="tablist"][aria-label="Project lifecycle"]');
+    const create = Array.from(lifecycle?.querySelectorAll('[role="tab"]') ?? []).find(
+      (tab) => tab.textContent?.includes("Create"),
+    ) as HTMLElement;
+    activateTab(create);
+
+    expect(onOpenCanvas).toHaveBeenCalledOnce();
+    expect(view.textContent).not.toContain("Open canvas");
+    expect(view.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toContain("Brief");
+
+    act(() =>
+      root?.render(createElement(DesignOsWorkbench, {
+        model,
+        defaultTab: "specimen",
+        callbacks: { onOpenProductCanvas: onOpenCanvas },
+      })),
+    );
+    const productViews = view.querySelector('[role="tablist"][aria-label="Product UI/UX views"]');
+    const canvas = Array.from(productViews?.querySelectorAll('[role="tab"]') ?? []).find(
+      (tab) => tab.textContent?.includes("Canvas"),
+    ) as HTMLElement;
+    activateTab(canvas);
+    expect(onOpenCanvas).toHaveBeenCalledTimes(2);
+
+    const profiles = view.querySelector('[role="tablist"][aria-label="Production profiles"]');
+    const motion = Array.from(profiles?.querySelectorAll('[role="tab"]') ?? []).find(
+      (tab) => tab.textContent?.includes("Motion"),
+    ) as HTMLElement;
+    activateTab(motion);
+    expect(view.textContent).toContain("Temporal Host required");
+    expect(view.textContent).toContain(
+      "Motion production remains unavailable until an authorized temporal Host is connected.",
+    );
+    expect(view.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toContain("Create");
+  });
+
+  it("changes Designer and Builder presentation without changing destination or command authority", () => {
+    const onGenerate = vi.fn();
+    const view = mount(
+      createElement(DesignOsWorkbench, {
+        model,
+        defaultTab: "specimen",
+        callbacks: { onGenerateSpecimen: onGenerate },
+      }),
+    );
+    const selectedLifecycle = () =>
+      view.querySelector(
+        '[role="tablist"][aria-label="Project lifecycle"] [role="tab"][aria-selected="true"]',
+      );
+    const selectedProfile = () =>
+      view.querySelector(
+        '[role="tablist"][aria-label="Production profiles"] [role="tab"][aria-selected="true"]',
+      );
+
+    expect(view.querySelector('[aria-label="Builder context"]')).toBeNull();
+    act(() => view.querySelector<HTMLButtonElement>('button[aria-label="Builder"]')?.click());
+    expect(view.textContent).toContain("Builder context");
+    expect(view.textContent).toContain("revision:12");
+    expect(view.textContent).toContain("git:abc123");
+    expect(selectedLifecycle()?.textContent).toContain("Create");
+    expect(selectedProfile()?.textContent).toContain("Product UI/UX");
+
+    const generate = Array.from(view.querySelectorAll("button")).find((button) =>
+      button.textContent?.includes("Generate specimen"),
+    );
+    act(() => generate?.click());
+    expect(onGenerate).toHaveBeenCalledOnce();
+
+    act(() => view.querySelector<HTMLButtonElement>('button[aria-label="Designer"]')?.click());
+    expect(view.querySelector('[aria-label="Builder context"]')).toBeNull();
+    expect(selectedLifecycle()?.textContent).toContain("Create");
+    expect(selectedProfile()?.textContent).toContain("Product UI/UX");
+  });
+
+  it("moves a ready Brand kit into Deliver instead of exporting from Create", () => {
+    const onExport = vi.fn();
+    const brandReady: DesignOsWorkbenchModel = {
+      ...model,
+      kits: model.kits.map((item) =>
+        item.id === "kit:brand"
+          ? { ...item, readiness: "ready" as const, blockers: undefined }
+          : item,
+      ),
+    };
+    const view = mount(
+      createElement(DesignOsWorkbench, {
+        model: brandReady,
+        defaultTab: "specimen",
+        callbacks: { onExportKit: onExport },
+      }),
+    );
+    const profiles = view.querySelector(
+      '[role="tablist"][aria-label="Production profiles"]',
+    );
+    const brand = Array.from(profiles?.querySelectorAll('[role="tab"]') ?? []).find(
+      (tab) => tab.textContent?.includes("Brand"),
+    ) as HTMLElement;
+    activateTab(brand);
+
+    expect(view.textContent).toContain("Prepare the Brand kit");
+    const openDelivery = Array.from(view.querySelectorAll("button")).find(
+      (button) => button.textContent?.includes("Open delivery"),
+    );
+    act(() => openDelivery?.click());
+
+    expect(onExport).not.toHaveBeenCalled();
+    expect(
+      view.querySelector(
+        '[role="tablist"][aria-label="Project lifecycle"] [role="tab"][aria-selected="true"]',
+      )?.textContent,
+    ).toContain("Deliver");
+    expect(view.textContent).toContain("Kit delivery");
+    expect(view.querySelector('[role="tablist"][aria-label="Delivery views"]')).toBeTruthy();
+  });
+
+  it("projects only current readiness, blockers, governance, and receipts into Review", () => {
+    const view = mount(
+      createElement(DesignOsWorkbench, { model, defaultTab: "overview" }),
+    );
+    const lifecycle = view.querySelector('[role="tablist"][aria-label="Project lifecycle"]');
+    const review = Array.from(lifecycle?.querySelectorAll('[role="tab"]') ?? []).find(
+      (tab) => tab.textContent?.includes("Review"),
+    ) as HTMLElement;
+    activateTab(review);
+
+    expect(view.textContent).toContain("Current revision evidence");
+    expect(view.textContent).toContain("Brand VI Kit: Logo family is missing.");
+    expect(view.textContent).toContain("Verified deliveries");
+    expect(view.textContent).toContain("Last verified export");
+    expect(view.textContent).not.toContain("No review evidence yet");
+  });
+
+  it("states explicitly when Review has no governance or receipt evidence", () => {
+    const noEvidence: DesignOsWorkbenchModel = {
+      ...model,
+      kits: model.kits.map(({ receipt: _receipt, ...item }) => item),
+      components: model.components.map(({ receipt: _receipt, ...item }) => item),
+      starters: model.starters.map(({ receipt: _receipt, ...item }) => item),
+      governance: undefined,
+      figmaPreview: undefined,
+    };
+    const view = mount(
+      createElement(DesignOsWorkbench, { model: noEvidence }),
+    );
+    const lifecycle = view.querySelector('[role="tablist"][aria-label="Project lifecycle"]');
+    const review = Array.from(lifecycle?.querySelectorAll('[role="tab"]') ?? []).find(
+      (tab) => tab.textContent?.includes("Review"),
+    ) as HTMLElement;
+    activateTab(review);
+
+    expect(view.textContent).toContain("No review evidence yet");
+    expect(view.textContent).toContain(
+      "Review evidence appears after governance or a verified delivery receipt exists for this revision.",
+    );
+    expect(view.textContent).not.toContain("Verified deliveries");
+  });
+
+  it("keeps Commerce production mounted from Create into Review and gates Deliver on acceptance", async () => {
+    const onLifecycleChange = vi.fn();
+    const record = createCommerceProjectLifecycleRecord({
+      designRevisionId: model.summary.revisionId,
+      result: commerceResult,
+    });
+    const view = mount(createElement(DesignOsWorkbench, {
+      model: { ...model, commerceProjectLifecycle: record },
+      defaultTab: "commerce",
+      callbacks: { onCommerceLifecycleChange: onLifecycleChange },
+    }));
+    await vi.waitFor(() => {
+      expect(view.querySelector('[data-slot="commerce-production"]')).toBeTruthy();
+    });
+
+    const commerceProduction = view.querySelector('[data-slot="commerce-production"]');
+    const lifecycle = view.querySelector('[role="tablist"][aria-label="Project lifecycle"]');
+    const review = Array.from(lifecycle?.querySelectorAll('[role="tab"]') ?? []).find(
+      (tab) => tab.textContent?.includes("Review"),
+    ) as HTMLElement;
+    activateTab(review);
+
+    expect(commerceProduction?.isConnected).toBe(true);
+    expect(view.textContent).toContain("Commerce material set");
+    expect(view.textContent).toContain("Review required");
+    expect(view.querySelector('[aria-label="Commerce retained artifact previews"]')?.children).toHaveLength(11);
+    expect(view.textContent).toContain("Receipt and QA closure");
+    expect(view.textContent).toContain("QA passed");
+    expect(view.textContent).toContain("Provider receipt:project-lifecycle:");
+    expect(view.textContent).not.toContain("Review materials");
+    expect(view.textContent).not.toContain("Download files");
+    const accept = Array.from(view.querySelectorAll("button")).find((button) =>
+      button.textContent?.includes("Accept for delivery"),
+    );
+    act(() => accept?.click());
+    expect(onLifecycleChange).toHaveBeenCalledOnce();
+    expect(onLifecycleChange.mock.calls[0]?.[0]?.review?.status).toBe("accepted");
+
+    const accepted = acceptCommerceProjectLifecycleRecord(record);
+    act(() => root?.render(createElement(DesignOsWorkbench, {
+      model: { ...model, commerceProjectLifecycle: accepted },
+      defaultTab: "delivery",
+      callbacks: { onCommerceLifecycleChange: onLifecycleChange },
+    })));
+    expect(view.textContent).toContain("Commerce bundle");
+    expect(view.textContent).toContain("Download files");
+    expect(view.textContent).not.toContain("Download bundle");
+  });
+
+  it("blocks review acceptance and delivery when Commerce belongs to a stale revision", () => {
+    const stale = createCommerceProjectLifecycleRecord({
+      designRevisionId: "revision:older",
+      result: commerceResult,
+    });
+    const view = mount(createElement(DesignOsWorkbench, {
+      model: { ...model, commerceProjectLifecycle: stale },
+      defaultTab: "overview",
+    }));
+    const lifecycle = view.querySelector('[role="tablist"][aria-label="Project lifecycle"]');
+    const review = Array.from(lifecycle?.querySelectorAll('[role="tab"]') ?? []).find(
+      (tab) => tab.textContent?.includes("Review"),
+    ) as HTMLElement;
+    activateTab(review);
+    expect(view.textContent).toContain("Stale revision");
+    expect(view.textContent).not.toContain("Accept for delivery");
+
+    const deliver = Array.from(lifecycle?.querySelectorAll('[role="tab"]') ?? []).find(
+      (tab) => tab.textContent?.includes("Deliver"),
+    ) as HTMLElement;
+    activateTab(deliver);
+    expect(view.textContent).toContain("Regenerate");
+    expect(view.textContent).not.toContain("Download files");
+  });
+
+  it("keeps Figma import, approval, and export in Sources, Review, and Deliver", () => {
+    const prepare = vi.fn();
     const approve = vi.fn();
     const exportVariables = vi.fn();
     const view = mount(
@@ -198,22 +459,45 @@ describe("DesignOsWorkbench", () => {
         model,
         defaultTab: "figma",
         callbacks: {
+          onPrepareFigmaSnapshot: prepare,
           onApproveFigmaSnapshot: approve,
           onExportFigmaVariables: exportVariables,
         },
       }),
     );
     expect(view.textContent).toContain(
-      "Live sync requires a separately authorized host connector and is currently unavailable.",
+      "Inspect a caller-authorized offline snapshot. Import stays in Sources and approval stays in Review.",
     );
+    expect(view.textContent).toContain("Figma snapshot");
+    expect(view.textContent).not.toContain("Figma handoff");
     expect(view.textContent).toContain("Product UI");
     expect(view.textContent).toContain("Code Connect");
     expect(view.textContent).toContain("One node ref is informational only.");
+    expect(view.querySelector('[aria-label="Choose Figma snapshot JSON"]')).toBeNull();
+    expect(view.textContent).not.toContain("Approve and apply IR patch");
+    expect(view.textContent).not.toContain("Export Figma Variables payload");
+
+    const lifecycle = view.querySelector('[role="tablist"][aria-label="Project lifecycle"]');
+    const sources = Array.from(lifecycle?.querySelectorAll('[role="tab"]') ?? []).find(
+      (tab) => tab.textContent?.includes("Sources"),
+    ) as HTMLElement;
+    activateTab(sources);
+    expect(view.querySelector('[aria-label="Choose Figma snapshot JSON"]')).toBeTruthy();
+
+    const review = Array.from(lifecycle?.querySelectorAll('[role="tab"]') ?? []).find(
+      (tab) => tab.textContent?.includes("Review"),
+    ) as HTMLElement;
+    activateTab(review);
     const apply = Array.from(view.querySelectorAll("button")).find((button) =>
       button.textContent?.includes("Approve and apply"),
     );
     act(() => apply?.click());
     expect(approve).toHaveBeenCalledWith("figma:1");
+
+    const deliver = Array.from(lifecycle?.querySelectorAll('[role="tab"]') ?? []).find(
+      (tab) => tab.textContent?.includes("Deliver"),
+    ) as HTMLElement;
+    activateTab(deliver);
     const exportButton = Array.from(view.querySelectorAll("button")).find(
       (button) => button.textContent?.includes("Export Figma Variables"),
     );
@@ -304,7 +588,7 @@ describe("DesignOsWorkbench", () => {
     expect(onGenerate).toHaveBeenCalledOnce();
   });
 
-  it("hosts the compiled design-system.html in an iframe and offers demo.html for download and sync", () => {
+  it("inspects the specimen in Create, syncs it in Sources, and downloads it in Deliver", () => {
     const onSync = vi.fn();
     const specimenModel: DesignOsWorkbenchModel = {
       ...model,
@@ -331,15 +615,27 @@ describe("DesignOsWorkbench", () => {
     expect(iframe.getAttribute("sandbox")).toBe("allow-scripts");
     expect(iframe.getAttribute("srcdoc")).toContain("specimen");
     expect(view.textContent).toContain("Regenerate");
-    expect(view.textContent).toContain("Download demo.html");
     expect(view.textContent).toContain("demo.html: composed for this product");
     expect(view.textContent).not.toContain("Tokens changed since this specimen was generated");
+    expect(view.textContent).not.toContain("Download demo.html");
+    expect(view.querySelector('[aria-label="Sync from edited demo.html"]')).toBeNull();
 
+    const lifecycle = view.querySelector('[role="tablist"][aria-label="Project lifecycle"]');
+    const sources = Array.from(lifecycle?.querySelectorAll('[role="tab"]') ?? []).find(
+      (tab) => tab.textContent?.includes("Sources"),
+    ) as HTMLElement;
+    activateTab(sources);
     const input = view.querySelector('[aria-label="Sync from edited demo.html"]') as HTMLInputElement;
     const file = new File(["<html></html>"], "demo.html", { type: "text/html" });
     Object.defineProperty(input, "files", { value: [file] });
     act(() => input.dispatchEvent(new Event("change", { bubbles: true })));
     expect(onSync).toHaveBeenCalledWith(file);
+
+    const deliver = Array.from(lifecycle?.querySelectorAll('[role="tab"]') ?? []).find(
+      (tab) => tab.textContent?.includes("Deliver"),
+    ) as HTMLElement;
+    activateTab(deliver);
+    expect(view.textContent).toContain("Download demo.html");
   });
 
   it("marks the demo as a generic template when composition fell back to the deterministic renderer", () => {
@@ -409,6 +705,11 @@ describe("DesignOsWorkbench", () => {
         callbacks: { onSaveSpecimenToLibrary: onSave },
       }),
     );
+    const lifecycle = view.querySelector('[role="tablist"][aria-label="Project lifecycle"]');
+    const deliver = Array.from(lifecycle?.querySelectorAll('[role="tab"]') ?? []).find(
+      (tab) => tab.textContent?.includes("Deliver"),
+    ) as HTMLElement;
+    activateTab(deliver);
     const save = Array.from(view.querySelectorAll("button")).find((button) =>
       button.textContent?.includes("Save to Library"),
     ) as HTMLButtonElement;
@@ -451,6 +752,50 @@ describe("DesignOsWorkbench", () => {
     expect(view.textContent).not.toContain("Save to Library");
   });
 
+  it("reviews a synced token diff only in Review", () => {
+    const apply = vi.fn();
+    const discard = vi.fn();
+    const diffModel: DesignOsWorkbenchModel = {
+      ...model,
+      figmaPreview: undefined,
+      tokenSyncPreview: {
+        changes: [{
+          tokenId: "token:color:accent",
+          name: "Accent",
+          previousValue: "#111111",
+          nextValue: "#22cc88",
+        }],
+      },
+    };
+    const view = mount(createElement(DesignOsWorkbench, {
+      model: diffModel,
+      defaultTab: "specimen",
+      callbacks: {
+        onApplyTokenSync: apply,
+        onDiscardTokenSync: discard,
+      },
+    }));
+    expect(view.querySelector('[data-slot="token-sync-preview"]')).toBeNull();
+
+    const lifecycle = view.querySelector('[role="tablist"][aria-label="Project lifecycle"]');
+    const review = Array.from(lifecycle?.querySelectorAll('[role="tab"]') ?? []).find(
+      (tab) => tab.textContent?.includes("Review"),
+    ) as HTMLElement;
+    activateTab(review);
+    expect(view.querySelector('[data-slot="token-sync-preview"]')).toBeTruthy();
+    expect(view.textContent).toContain("Accent");
+    const applyButton = Array.from(view.querySelectorAll("button")).find((button) =>
+      button.textContent?.includes("Apply token changes"),
+    );
+    const discardButton = Array.from(view.querySelectorAll("button")).find((button) =>
+      button.textContent?.includes("Discard"),
+    );
+    act(() => applyButton?.click());
+    act(() => discardButton?.click());
+    expect(apply).toHaveBeenCalledOnce();
+    expect(discard).toHaveBeenCalledOnce();
+  });
+
   it("keeps kit evidence progressive and exports only the selected ready target", () => {
     const onExport = vi.fn();
     const view = mount(
@@ -465,7 +810,9 @@ describe("DesignOsWorkbench", () => {
     expect(view.textContent).toContain("Provide an approved logo family.");
     expect(view.textContent).not.toContain("Logo family is missing.");
     expect(view.textContent).not.toContain("sha256:actual");
-    const design = view.querySelector('[role="radio"]') as HTMLButtonElement;
+    const design = view.querySelector(
+      '[role="radiogroup"][aria-label="Kit target"] [role="radio"]',
+    ) as HTMLButtonElement;
     act(() => design.click());
     const exportButton = Array.from(view.querySelectorAll("button")).find((button) => button.textContent?.includes("Preview and export"));
     act(() => exportButton?.click());

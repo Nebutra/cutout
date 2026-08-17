@@ -26,9 +26,19 @@ import {
   gameAssetGenerationAuthorizationSchema,
   gameAssetPixelEvidenceSchema,
   gameAssetRasterProcessingEvidenceSchema,
+  ADAPTIVE_BOARD_GAME_ASSET_RASTER_PROCESSOR,
+  CHROMA_ML_GAME_ASSET_RASTER_PROCESSOR,
+  GAME_ASSET_GENERATION_REPAIR_AUTHORIZATION_PROTOCOL,
+  GAME_ASSET_GENERATION_REPAIR_PREVIEW_PROTOCOL,
+  LEGACY_GAME_ASSET_GENERATION_REPAIR_AUTHORIZATION_PROTOCOL,
+  LEGACY_GAME_ASSET_GENERATION_REPAIR_PREVIEW_PROTOCOL,
   GAME_ASSET_RASTER_PROCESSOR,
+  V5_GAME_ASSET_RASTER_PROCESSOR,
+  V6_GAME_ASSET_RASTER_PROCESSOR,
+  V7_GAME_ASSET_RASTER_PROCESSOR,
   GAME_ASSET_RASTER_SCALE_POLICY,
   LEGACY_GAME_ASSET_RASTER_PROCESSOR,
+  WHITE_BOARD_GAME_ASSET_RASTER_PROCESSOR,
   gameAssetSemanticAcceptanceSchema,
   retainedGameAssetRoleOutputSchema,
   verifyNativeGameAssetGenerationAuthorization,
@@ -276,7 +286,16 @@ async function assertGenerationAuthorizationClosure(
     || authorization.gamePlanId !== bundle.plan.id
     || authorization.gamePlanHash !== planHash
     || authorization.outputSize !== outputSize
-    || ![GAME_ASSET_RASTER_PROCESSOR, LEGACY_GAME_ASSET_RASTER_PROCESSOR]
+    || ![
+      GAME_ASSET_RASTER_PROCESSOR,
+      V7_GAME_ASSET_RASTER_PROCESSOR,
+      V5_GAME_ASSET_RASTER_PROCESSOR,
+      V6_GAME_ASSET_RASTER_PROCESSOR,
+      CHROMA_ML_GAME_ASSET_RASTER_PROCESSOR,
+      ADAPTIVE_BOARD_GAME_ASSET_RASTER_PROCESSOR,
+      WHITE_BOARD_GAME_ASSET_RASTER_PROCESSOR,
+      LEGACY_GAME_ASSET_RASTER_PROCESSOR,
+    ]
       .includes(authorization.processorImplementation)) {
     throw new Error('Game Asset generation authorization does not bind the exact rehearsal identity, run, Plan, or output size.')
   }
@@ -297,9 +316,14 @@ async function assertGenerationAuthorizationClosure(
       throw new Error(`Authorized Game Asset request does not bind the exact role and prompt: ${role.id}`)
     }
     const output = authorization.outputs[index]!
-    if (authorization.processorImplementation === GAME_ASSET_RASTER_PROCESSOR) {
+    if (authorization.processorImplementation === GAME_ASSET_RASTER_PROCESSOR
+      || authorization.processorImplementation === V6_GAME_ASSET_RASTER_PROCESSOR
+      || authorization.processorImplementation === V5_GAME_ASSET_RASTER_PROCESSOR
+      || authorization.processorImplementation === CHROMA_ML_GAME_ASSET_RASTER_PROCESSOR
+      || authorization.processorImplementation === ADAPTIVE_BOARD_GAME_ASSET_RASTER_PROCESSOR
+      || authorization.processorImplementation === WHITE_BOARD_GAME_ASSET_RASTER_PROCESSOR) {
       const processing = output.processingEvidence
-      if (processing.implementation !== GAME_ASSET_RASTER_PROCESSOR
+      if (processing.implementation !== authorization.processorImplementation
         || canonicalJson(processing.frameSize) !== canonicalJson({
           width: bundle.plan.delivery.frameWidth,
           height: bundle.plan.delivery.frameHeight,
@@ -318,21 +342,70 @@ async function assertGenerationAuthorizationClosure(
     exactArray(request.lockIds, await signedGenerationLocks(bundle.plan, role), `Authorized Game Asset role ${role.id} locks`)
   }
   const roleRequests = authorization.roleRequests.map(({ anchorPolicy: _anchorPolicy, ...request }) => request)
-  const requestDigest = await fingerprint({
-    identity: bundle.identity,
-    runId: bundle.runId,
-    providerId: authorization.providerId,
-    model: authorization.model,
-    plan: bundle.plan,
-    retainedEvidence: bundle.retainedEvidence.map((evidence) => ({
-      reference: evidence.reference,
-      mediaType: evidence.mediaType,
-      byteLength: bytesFromBase64(evidence.artifactBytesBase64).byteLength,
-    })),
-    roles: roleRequests,
-    outputSize,
-    processorImplementation: authorization.processorImplementation,
-  })
+  const retainedEvidence = [...bundle.retainedEvidence]
+    .sort((left, right) => compareGameAssetEvidenceIdentity(
+      `${left.reference.id}@${left.reference.revision}`,
+      `${right.reference.id}@${right.reference.revision}`,
+    ))
+  const legacyRepair = authorization.protocol === LEGACY_GAME_ASSET_GENERATION_REPAIR_AUTHORIZATION_PROTOCOL
+  const currentRepair = authorization.protocol === GAME_ASSET_GENERATION_REPAIR_AUTHORIZATION_PROTOCOL
+  const exactReferences = exactGameAssetReferences(bundle.plan)
+  const providerReferenceEvidence = bundle.plan.referenceArtifacts.map((reference) => (
+    retainedEvidence.find((evidence) => evidence.reference.id === reference.id
+      && evidence.reference.revision === reference.revision)!
+  ))
+  const requestDigest = legacyRepair
+    ? await fingerprint({
+        protocol: LEGACY_GAME_ASSET_GENERATION_REPAIR_PREVIEW_PROTOCOL,
+        parentAuthorizationReceiptId: authorization.repairLineage?.parentReceiptId,
+        parentAuthorizationReceiptHash: authorization.repairLineage?.parentReceiptHash,
+        runId: bundle.runId,
+        providerId: authorization.providerId,
+        model: authorization.model,
+        plan: bundle.plan,
+        retainedEvidence: exactReferences.slice(0, providerReferenceEvidence.length).map((reference, index) => ({
+          reference,
+          byteLength: bytesFromBase64(providerReferenceEvidence[index]!.artifactBytesBase64).byteLength,
+        })),
+        roles: roleRequests,
+        replacementRoleIds: authorization.repairLineage?.replacedRoleIds,
+        outputSize,
+        processorImplementation: authorization.processorImplementation,
+      })
+    : currentRepair
+      ? await fingerprint({
+          protocol: GAME_ASSET_GENERATION_REPAIR_PREVIEW_PROTOCOL,
+          parentAuthorizationReceiptId: authorization.repairLineage?.parentReceiptId,
+          parentAuthorizationReceiptHash: authorization.repairLineage?.parentReceiptHash,
+          runId: bundle.runId,
+          providerId: authorization.providerId,
+          model: authorization.model,
+          plan: bundle.plan,
+          retainedEvidence: retainedEvidence.map((evidence) => ({
+            reference: evidence.reference,
+            mediaType: evidence.mediaType,
+            byteLength: bytesFromBase64(evidence.artifactBytesBase64).byteLength,
+          })),
+          roles: roleRequests,
+          replacementRoleIds: authorization.repairLineage?.replacedRoleIds,
+          outputSize,
+          processorImplementation: authorization.processorImplementation,
+        })
+    : await fingerprint({
+        identity: bundle.identity,
+        runId: bundle.runId,
+        providerId: authorization.providerId,
+        model: authorization.model,
+        plan: bundle.plan,
+        retainedEvidence: retainedEvidence.map((evidence) => ({
+          reference: evidence.reference,
+          mediaType: evidence.mediaType,
+          byteLength: bytesFromBase64(evidence.artifactBytesBase64).byteLength,
+        })),
+        roles: roleRequests,
+        outputSize,
+        processorImplementation: authorization.processorImplementation,
+      })
   if (authorization.requestDigest !== requestDigest
     || authorization.planId !== `game-asset-preview:sha256:${requestDigest}`) {
     throw new Error('Game Asset generation authorization request digest cannot be reconstructed from retained evidence.')
@@ -462,9 +535,23 @@ export async function verifyGameAssetProductionRehearsalBundle(
       throw new Error(`Game Asset processed frame is not a decoded retained PNG: ${role.id}`)
     }
     const generationLocks = await signedGenerationLocks(bundle.plan, role)
+    const repairLineage = authorization.repairLineage
+    const preserved = repairLineage?.preservedRoles.find(({ roleId }) => roleId === role.id)
+    const replaced = repairLineage?.replacedRoleIds.includes(role.id) ?? false
+    if (authorization.protocol === GAME_ASSET_GENERATION_REPAIR_AUTHORIZATION_PROTOCOL
+      || authorization.protocol === LEGACY_GAME_ASSET_GENERATION_REPAIR_AUTHORIZATION_PROTOCOL) {
+      const request = authorization.roleRequests[index]!
+      if (replaced === Boolean(preserved)
+        || (preserved && (preserved.requestId !== request.requestId
+          || preserved.receiptId !== retained.receipt.receiptId
+          || preserved.sourceArtifactId !== retained.receipt.artifact.artifactId
+          || preserved.artifactId !== authorizedOutput.artifactId))) {
+        throw new Error(`Game Asset repair lineage does not bind the exact preserved role: ${role.id}`)
+      }
+    }
     assertReceiptContext({
       receipt: retained.receipt,
-      runId: bundle.runId,
+      runId: preserved?.originRunId ?? bundle.runId,
       semanticRole: role.id,
       nodeId: generationNodeId(role.id),
       capabilityId: GAME_ASSET_GENERATION_CAPABILITY_ID,
@@ -570,7 +657,17 @@ export async function fingerprintGameAssetRehearsalVerifier(): Promise<string> {
     constants: [
       MAX_RETAINED_BASE64_CHARACTERS,
       GAME_ASSET_GENERATION_CAPABILITY_ID,
+      GAME_ASSET_GENERATION_REPAIR_PREVIEW_PROTOCOL,
+      GAME_ASSET_GENERATION_REPAIR_AUTHORIZATION_PROTOCOL,
+      LEGACY_GAME_ASSET_GENERATION_REPAIR_PREVIEW_PROTOCOL,
+      LEGACY_GAME_ASSET_GENERATION_REPAIR_AUTHORIZATION_PROTOCOL,
       GAME_ASSET_RASTER_PROCESSOR,
+      V7_GAME_ASSET_RASTER_PROCESSOR,
+      V5_GAME_ASSET_RASTER_PROCESSOR,
+      V6_GAME_ASSET_RASTER_PROCESSOR,
+      CHROMA_ML_GAME_ASSET_RASTER_PROCESSOR,
+      ADAPTIVE_BOARD_GAME_ASSET_RASTER_PROCESSOR,
+      WHITE_BOARD_GAME_ASSET_RASTER_PROCESSOR,
       LEGACY_GAME_ASSET_RASTER_PROCESSOR,
       GAME_ASSET_RASTER_SCALE_POLICY,
     ],

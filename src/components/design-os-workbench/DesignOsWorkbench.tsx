@@ -1,11 +1,29 @@
-import { lazy, Suspense, useEffect, useRef, useState, type ReactNode } from "react";
+import {
+  lazy,
+  Suspense,
+  useEffect,
+  useReducer,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import type { AuthoringKind } from "@/design-os-operations";
+import type { GameAssetLaunchRequest } from "@/game-asset-profile";
+import {
+  acceptCommerceProjectLifecycleRecord,
+  createCommerceProjectLifecycleRecord,
+  requestCommerceProjectDownload,
+  type CommerceProjectLifecycleRecord,
+} from "@/commerce-profile/project-lifecycle";
+import { downloadCommerceProjectFiles } from "@/commerce-profile/project-download";
+import type { WorkspaceWorkbenchTab } from "@/workspace/navigation";
 import {
   Boxes,
   ArrowLeft,
   Check,
   CheckCircle2,
   CircleAlert,
+  Code2,
   Component,
   ExternalLink,
   FileArchive,
@@ -45,6 +63,7 @@ import {
   DeliveryCenterPanel,
   type DeliveryCenterViewModel,
 } from "./DeliveryCenterPanel";
+import { CommerceLifecycleEvidence } from "./CommerceProjectLifecycleReview";
 import {
   WorkflowPackCatalogPanel,
   type WorkflowPackCatalogItem,
@@ -57,6 +76,19 @@ import {
 } from "./starter-readiness";
 import { projectComponentReadiness } from "./component-readiness";
 import { deliveryWorkspaceClasses } from "@/workspace/delivery-workspace-ui";
+import {
+  DESIGN_OS_PROFILE_DESCRIPTORS,
+  createDesignOsWorkbenchNavigationState,
+  defaultDestinationForSection,
+  destinationForProfile,
+  reduceDesignOsWorkbenchNavigation,
+  type DesignOsCreateDetail,
+  type DesignOsDeliverDetail,
+  type DesignOsInspectDetail,
+  type DesignOsProfileId,
+  type DesignOsWorkbenchDestination,
+  type DesignOsWorkbenchSection,
+} from "./workbench-navigation";
 
 const GameAssetProductionPanel = lazy(() =>
   import("./GameAssetProductionPanel").then((module) => ({
@@ -71,18 +103,8 @@ const CommerceProductionPanel = lazy(() =>
 );
 
 export type DesignOsReadiness = "ready" | "blocked" | "pending" | "unavailable";
-export type DesignOsWorkbenchTab =
-  | "overview"
-  | "delivery"
-  | "workflows"
-  | "sources"
-  | "commerce"
-  | "game-assets"
-  | "specimen"
-  | "figma"
-  | "kits"
-  | "components"
-  | "starter";
+export type DesignOsWorkbenchTab = WorkspaceWorkbenchTab;
+type DesignOsWorkbenchLens = "designer" | "builder";
 
 export interface FigmaWorkbenchPreview {
   readonly id: string;
@@ -147,6 +169,8 @@ export interface DesignOsDeliverableItem {
 }
 
 export interface DesignOsWorkbenchModel {
+  readonly projectTitle?: string;
+  readonly brief?: string;
   readonly summary: DesignOsPanelModel;
   readonly sources: readonly DesignOsSourceItem[];
   readonly ingestPreview?: DesignOsIngestPreview;
@@ -172,6 +196,7 @@ export interface DesignOsWorkbenchModel {
     readonly scenarios?: readonly GovernanceScenario[];
   };
   readonly workflowPacks?: readonly WorkflowPackCatalogItem[];
+  readonly commerceProjectLifecycle?: CommerceProjectLifecycleRecord;
   /**
    * Present once a design kit has been compiled for the current revision.
    * `files` mirrors DesignKit['files'] — the same tokens.json/DESIGN.md/
@@ -243,6 +268,10 @@ export interface DesignOsWorkbenchCallbacks {
   readonly onInstallWorkflowPack?: (id: string, version: string) => void;
   readonly onUpgradeWorkflowPack?: (id: string) => void;
   readonly onEvaluateWorkflowPack?: (id: string) => void;
+  readonly onOpenProductCanvas?: () => void;
+  readonly onCommerceLifecycleChange?: (
+    record: CommerceProjectLifecycleRecord | undefined,
+  ) => void;
 }
 
 export interface DesignOsWorkbenchProps {
@@ -251,6 +280,7 @@ export interface DesignOsWorkbenchProps {
   readonly defaultTab?: DesignOsWorkbenchTab;
   readonly className?: string;
   readonly surfaceMode?: "inspector" | "deliver";
+  readonly gameAssetLaunch?: GameAssetLaunchRequest;
   readonly onBackToWorkspace?: () => void;
   readonly backLabel?: string;
   readonly backMobileLabel?: string;
@@ -279,109 +309,874 @@ export function DesignOsWorkbench({
   defaultTab = "overview",
   className,
   surfaceMode = "inspector",
+  gameAssetLaunch,
   onBackToWorkspace,
   backLabel = "Back to workspace",
   backMobileLabel = "Back",
 }: DesignOsWorkbenchProps) {
-  const [tab, setTab] = useState<DesignOsWorkbenchTab>(defaultTab);
+  const [navigation, dispatchNavigation] = useReducer(
+    reduceDesignOsWorkbenchNavigation,
+    defaultTab,
+    createDesignOsWorkbenchNavigationState,
+  );
+  const [lens, setLens] = useState<DesignOsWorkbenchLens>("designer");
+  useEffect(() => {
+    dispatchNavigation({ type: "sync-legacy-tab", tab: defaultTab });
+  }, [defaultTab]);
+  const section = navigation.current.section;
+  const rememberedCreate = navigation.remembered.create;
+  const createDestination =
+    navigation.current.section === "create"
+      ? navigation.current
+      : rememberedCreate?.section === "create"
+        ? rememberedCreate
+        : destinationForProfile("product-uiux");
+  const lifecycleScrollRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const scrollActiveTabIntoView = () => {
+      const activeTab = lifecycleScrollRef.current?.querySelector<HTMLElement>(
+        '[role="tab"][aria-selected="true"]',
+      );
+      activeTab?.scrollIntoView?.({ block: "nearest", inline: "start" });
+    };
+    scrollActiveTabIntoView();
+    window.addEventListener("resize", scrollActiveTabIntoView);
+    return () => window.removeEventListener("resize", scrollActiveTabIntoView);
+  }, [section]);
+  const navigate = (destination: DesignOsWorkbenchDestination) =>
+    destination.section === "create"
+      && destination.profileId === "product-uiux"
+      && destination.detail === "canvas"
+      && callbacks?.onOpenProductCanvas
+      ? callbacks.onOpenProductCanvas()
+      : dispatchNavigation({ type: "navigate", destination });
+  const selectSection = (nextSection: DesignOsWorkbenchSection) => {
+    const destination = navigation.remembered[nextSection]
+      ?? defaultDestinationForSection(nextSection);
+    if (
+      destination.section === "create"
+      && destination.profileId === "product-uiux"
+      && destination.detail === "canvas"
+      && callbacks?.onOpenProductCanvas
+    ) {
+      callbacks.onOpenProductCanvas();
+      return;
+    }
+    dispatchNavigation({ type: "select-section", section: nextSection });
+  };
   return (
     <section
-      aria-label={surfaceMode === "deliver" ? "Deliver" : "System inspector"}
+      aria-label="Project workbench"
       data-slot="design-os-workbench"
       className={cn(
         "flex min-h-0 min-w-0 flex-col overflow-hidden bg-background text-foreground",
         className,
       )}
     >
-      {surfaceMode === "inspector" ? <header className="shrink-0 border-b border-border px-3 py-3 sm:px-4">
-        <div className="flex min-w-0 items-start gap-2.5">
+      <header
+        className={cn(
+          "shrink-0 border-b border-border py-3 pl-3 sm:pl-4",
+          surfaceMode === "inspector" ? "pr-12" : "pr-3 sm:pr-4",
+        )}
+      >
+        <div className="flex min-w-0 items-center gap-2.5">
+          {surfaceMode === "deliver" && onBackToWorkspace ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              className="min-h-11 min-w-11 shrink-0"
+              onClick={onBackToWorkspace}
+              aria-label={backLabel}
+              title={backLabel}
+            >
+              <ArrowLeft className="size-4" />
+              <span className="sr-only">{backMobileLabel}</span>
+            </Button>
+          ) : null}
           <div className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-md bg-muted">
             <Boxes aria-hidden="true" className="size-4" />
           </div>
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <h2 data-governance-probe="title" className="text-sm font-semibold">
-              System inspector
+              Project workbench
             </h2>
             <p className="truncate text-xs text-muted-foreground">
-              Project sources and design system
+              {model.projectTitle ?? model.summary.documentId}
             </p>
           </div>
+          <WorkbenchLensControl
+            lens={lens}
+            onChange={setLens}
+            className="flex"
+          />
+          <Badge variant="outline" className="shrink-0">
+            Revision {model.summary.revisionNumber}
+          </Badge>
         </div>
-      </header> : null}
+      </header>
 
       <Tabs
-        value={tab}
-        onValueChange={(value) => setTab(value as DesignOsWorkbenchTab)}
+        value={section}
+        onValueChange={(value) =>
+          selectSection(value as DesignOsWorkbenchSection)
+        }
         className="min-h-0 min-w-0 flex-1 gap-0"
       >
-        <div className={cn(deliveryWorkspaceClasses.modeHeader,"flex min-w-0 flex-col items-stretch sm:flex-row sm:items-center")}>
-          {surfaceMode === "deliver" && onBackToWorkspace ? (
-            <Button type="button" variant="ghost" size="sm" className="min-h-11 self-start px-2 sm:mr-3 sm:self-auto" onClick={onBackToWorkspace} aria-label={backLabel}>
-              <ArrowLeft className="size-4" />
-              <span className="sm:hidden">{backMobileLabel}</span>
-              <span className="hidden sm:inline">{backLabel}</span>
-            </Button>
-          ) : null}
-          <div className="min-w-0 flex-1 overflow-x-auto">
-          <TabsList
-            aria-label={surfaceMode === "deliver" ? "Deliver sections" : "System inspector sections"}
-            variant="line"
-            className={deliveryWorkspaceClasses.subnav}
-          >
-            {surfaceMode === "inspector" ? (
-              <>
-                <WorkbenchTab value="overview" icon={<Boxes />}>
-                  Overview
-                </WorkbenchTab>
-                {model.workflowPacks ? (
-                  <WorkbenchTab value="workflows" icon={<Workflow />}>
-                    Workflows
-                  </WorkbenchTab>
-                ) : null}
-                <WorkbenchTab value="sources" icon={<FolderInput />}>
-                  Sources
-                </WorkbenchTab>
-                <WorkbenchTab value="commerce" icon={<ReceiptText />}>
-                  Commerce
-                </WorkbenchTab>
-                <WorkbenchTab value="game-assets" icon={<Gamepad2 />}>
-                  Game assets
-                </WorkbenchTab>
-                <WorkbenchTab value="specimen" icon={<Palette />}>
-                  Specimen
-                </WorkbenchTab>
-                <WorkbenchTab value="figma" icon={<PenTool />}>
-                  Figma
-                </WorkbenchTab>
-              </>
-            ) : (
-              <>
-                {model.delivery ? (
-                  <WorkbenchTab value="delivery" icon={<PackageCheck />}>
-                    Delivery center
-                  </WorkbenchTab>
-                ) : null}
-                <WorkbenchTab value="kits" icon={<Layers3 />}>
-                  Kits
-                </WorkbenchTab>
-                <WorkbenchTab value="components" icon={<Component />}>
-                  Components
-                </WorkbenchTab>
-                <WorkbenchTab value="starter" icon={<FileArchive />}>
-                  Starter
-                </WorkbenchTab>
-              </>
-            )}
-          </TabsList>
+        <div className={cn(deliveryWorkspaceClasses.modeHeader, "min-w-0")}>
+          <div ref={lifecycleScrollRef} className="min-w-0 flex-1 overflow-x-auto">
+            <TabsList
+              aria-label="Project lifecycle"
+              variant="line"
+              className={cn(
+                deliveryWorkspaceClasses.subnav,
+                "pr-8 sm:pr-0",
+              )}
+            >
+              <WorkbenchTab value="brief" icon={<Boxes />}>
+                Brief
+              </WorkbenchTab>
+              <WorkbenchTab value="sources" icon={<FolderInput />}>
+                Sources
+              </WorkbenchTab>
+              <WorkbenchTab value="create" icon={<Sparkles />}>
+                Create
+              </WorkbenchTab>
+              <WorkbenchTab value="review" icon={<CheckCircle2 />}>
+                Review
+              </WorkbenchTab>
+              <WorkbenchTab value="deliver" icon={<PackageCheck />}>
+                Deliver
+              </WorkbenchTab>
+              <WorkbenchTab value="inspect" icon={<FileSearch />}>
+                Inspect
+              </WorkbenchTab>
+            </TabsList>
           </div>
         </div>
 
-        <div className={cn("min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain",surfaceMode === "deliver" ? deliveryWorkspaceClasses.content : "p-3 sm:p-4")}>
-          <TabsContent value="overview" className="m-0">
+        <div
+          className={cn(
+            "min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain",
+            section === "deliver"
+              ? deliveryWorkspaceClasses.content
+              : "p-3 sm:p-4",
+          )}
+        >
+          {lens === "builder" ? (
+            <BuilderContext destination={navigation.current} model={model} />
+          ) : null}
+          <TabsContent value="brief" className="m-0">
             <Overview model={model} />
           </TabsContent>
-          {model.delivery ? (
-            <TabsContent value="delivery" className="m-0">
+          <TabsContent value="sources" className="m-0">
+            <Sources model={model} callbacks={callbacks} />
+          </TabsContent>
+          <TabsContent
+            value="create"
+            forceMount
+            className="m-0 data-[state=inactive]:hidden"
+          >
+            <CreateWorkspace
+              destination={createDestination}
+              model={model}
+              callbacks={callbacks}
+              gameAssetLaunch={gameAssetLaunch}
+              onNavigate={navigate}
+            />
+          </TabsContent>
+          <TabsContent value="review" className="m-0">
+            <ReviewWorkspace
+              model={model}
+              callbacks={callbacks}
+              onNavigate={navigate}
+            />
+          </TabsContent>
+          <TabsContent value="deliver" className="m-0">
+            <DeliverWorkspace
+              detail={
+                navigation.current.section === "deliver"
+                  ? navigation.current.detail
+                  : "delivery"
+              }
+              model={model}
+              callbacks={callbacks}
+              onNavigateDestination={navigate}
+              onNavigate={(detail) =>
+                navigate({ section: "deliver", detail })
+              }
+            />
+          </TabsContent>
+          <TabsContent value="inspect" className="m-0">
+            <InspectWorkspace
+              detail={
+                navigation.current.section === "inspect"
+                  ? navigation.current.detail
+                  : "system"
+              }
+              model={model}
+              callbacks={callbacks}
+              onNavigate={(detail) =>
+                navigate({ section: "inspect", detail })
+              }
+            />
+          </TabsContent>
+        </div>
+      </Tabs>
+    </section>
+  );
+}
+
+function WorkbenchLensControl({
+  lens,
+  onChange,
+  className,
+}: {
+  readonly lens: DesignOsWorkbenchLens;
+  readonly onChange: (lens: DesignOsWorkbenchLens) => void;
+  readonly className?: string;
+}) {
+  return (
+    <div
+      role="radiogroup"
+      aria-label="Workbench lens"
+      className={cn(
+        "h-8 shrink-0 items-center rounded-md bg-muted p-0.5",
+        className,
+      )}
+    >
+      {(
+        [
+          ["designer", "Designer", <PenTool key="designer" />],
+          ["builder", "Builder", <Code2 key="builder" />],
+        ] as const
+      ).map(([value, label, icon]) => (
+        <button
+          key={value}
+          type="button"
+          role="radio"
+          aria-checked={lens === value}
+          aria-label={label}
+          title={`${label} lens`}
+          onClick={() => onChange(value)}
+          className={cn(
+            "flex h-7 min-w-8 items-center justify-center gap-1.5 rounded px-0 text-xs font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring sm:min-w-24 sm:px-2",
+            lens === value
+              ? "bg-background text-foreground shadow-sm"
+              : "text-muted-foreground hover:text-foreground",
+          )}
+        >
+          <span className="[&>svg]:size-3.5" aria-hidden="true">
+            {icon}
+          </span>
+          <span className="hidden sm:inline">{label}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function BuilderContext({
+  destination,
+  model,
+}: {
+  readonly destination: DesignOsWorkbenchDestination;
+  readonly model: DesignOsWorkbenchModel;
+}) {
+  const deliverables = [...model.kits, ...model.components, ...model.starters];
+  const receipts = deliverables.flatMap((item) =>
+    item.receipt
+      ? [
+          {
+            deliverableId: item.id,
+            receiptId: item.receipt.id,
+            digest: item.receipt.digest,
+          },
+        ]
+      : [],
+  );
+  const projection =
+    destination.section === "create"
+      ? `${destination.section}/${destination.profileId}/${destination.detail}`
+      : "detail" in destination
+        ? `${destination.section}/${destination.detail}`
+        : destination.section;
+  return (
+    <section
+      aria-label="Builder context"
+      className="mb-4 min-w-0 border-b border-border pb-4"
+    >
+      <div className="flex min-w-0 items-center gap-2">
+        <Code2 className="size-4 shrink-0 text-muted-foreground" />
+        <h3 className="text-xs font-semibold">Builder context</h3>
+        <span className="ml-auto truncate font-mono text-[10px] text-muted-foreground">
+          {projection}
+        </span>
+      </div>
+      <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-xs sm:grid-cols-4">
+        <BuilderBinding label="Document" value={model.summary.documentId} />
+        <BuilderBinding label="Revision" value={model.summary.revisionId} />
+        <BuilderBinding label="Sources" value={String(model.sources.length)} />
+        <BuilderBinding label="Receipts" value={String(receipts.length)} />
+      </dl>
+      <details className="mt-3 text-xs">
+        <summary className="min-h-8 cursor-pointer py-2 font-medium text-muted-foreground">
+          Bindings and provenance
+        </summary>
+        <pre className="max-w-full overflow-x-auto whitespace-pre-wrap break-words border-t border-border pt-3 font-mono text-[10px]">
+          {JSON.stringify(
+            {
+              destination,
+              sources: model.sources.map(({ id, provenance, license }) => ({
+                id,
+                provenance,
+                license,
+              })),
+              deliverables: deliverables.map(({ id, readiness }) => ({
+                id,
+                readiness,
+              })),
+              receipts,
+            },
+            null,
+            2,
+          )}
+        </pre>
+      </details>
+    </section>
+  );
+}
+
+function BuilderBinding({
+  label,
+  value,
+}: {
+  readonly label: string;
+  readonly value: string;
+}) {
+  return (
+    <div className="min-w-0">
+      <dt className="text-[10px] text-muted-foreground">{label}</dt>
+      <dd className="mt-0.5 truncate font-mono text-[11px]" title={value}>
+        {value}
+      </dd>
+    </div>
+  );
+}
+
+function ProfileIcon({ profileId }: { readonly profileId: DesignOsProfileId }) {
+  switch (profileId) {
+    case "product-uiux":
+      return <PenTool />;
+    case "brand":
+      return <Palette />;
+    case "commerce":
+      return <ReceiptText />;
+    case "game-asset":
+      return <Gamepad2 />;
+    case "motion":
+      return <Workflow />;
+  }
+}
+
+function CreateWorkspace({
+  destination,
+  model,
+  callbacks,
+  gameAssetLaunch,
+  onNavigate,
+}: {
+  readonly destination: Extract<
+    DesignOsWorkbenchDestination,
+    { section: "create" }
+  >;
+  readonly model: DesignOsWorkbenchModel;
+  readonly callbacks?: DesignOsWorkbenchCallbacks;
+  readonly gameAssetLaunch?: GameAssetLaunchRequest;
+  readonly onNavigate: (destination: DesignOsWorkbenchDestination) => void;
+}) {
+  const profileScrollRef = useRef<HTMLDivElement>(null);
+  const [mountedProfiles, setMountedProfiles] = useState<
+    readonly DesignOsProfileId[]
+  >([destination.profileId]);
+  useEffect(() => {
+    const activeTab = profileScrollRef.current?.querySelector<HTMLElement>(
+      '[role="tab"][aria-selected="true"]',
+    );
+    activeTab?.scrollIntoView?.({ block: "nearest", inline: "start" });
+  }, [destination.profileId]);
+  useEffect(() => {
+    setMountedProfiles((current) =>
+      current.includes(destination.profileId)
+        ? current
+        : [...current, destination.profileId],
+    );
+  }, [destination.profileId]);
+  const isMounted = (profileId: DesignOsProfileId) =>
+    profileId === destination.profileId || mountedProfiles.includes(profileId);
+  return (
+    <div className="grid min-h-0 min-w-0 gap-4 lg:grid-cols-[12rem_minmax(0,1fr)]">
+      <div
+        ref={profileScrollRef}
+        role="tablist"
+        aria-label="Production profiles"
+        className="flex min-w-0 gap-1 overflow-x-auto border-b border-border pb-2 lg:flex-col lg:overflow-visible lg:border-r lg:border-b-0 lg:pr-3 lg:pb-0"
+      >
+        {DESIGN_OS_PROFILE_DESCRIPTORS.map((profile) => {
+          const selected = destination.profileId === profile.id;
+          return (
+            <button
+              key={profile.id}
+              type="button"
+              role="tab"
+              aria-selected={selected}
+              onClick={() => onNavigate(destinationForProfile(profile.id))}
+              className={cn(
+                "flex h-10 shrink-0 items-center gap-2 rounded-md px-2.5 text-left text-xs font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring lg:w-full",
+                selected
+                  ? "bg-muted text-foreground"
+                  : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
+              )}
+            >
+              <span className="[&>svg]:size-4" aria-hidden="true">
+                <ProfileIcon profileId={profile.id} />
+              </span>
+              <span className="whitespace-nowrap">{profile.label}</span>
+              {profile.availability === "capability-required" ? (
+                <span className="ml-auto size-1.5 rounded-full bg-muted-foreground/50" />
+              ) : null}
+            </button>
+          );
+        })}
+      </div>
+
+      <div
+        role="tabpanel"
+        aria-label={`${DESIGN_OS_PROFILE_DESCRIPTORS.find((profile) => profile.id === destination.profileId)?.label ?? destination.profileId} production`}
+        className="min-w-0"
+      >
+        {isMounted("product-uiux") ? (
+          <div hidden={destination.profileId !== "product-uiux"}>
+            <ProductUiuxWorkspace
+              detail={destination.detail}
+              model={model}
+              callbacks={callbacks}
+              onNavigate={(detail) =>
+                onNavigate({
+                  section: "create",
+                  profileId: "product-uiux",
+                  detail,
+                })
+              }
+            />
+          </div>
+        ) : null}
+        {isMounted("brand") ? (
+          <div hidden={destination.profileId !== "brand"} className="min-w-0 space-y-3">
+            <SectionHeading title="Brand" description="Brand system and kit" />
+            <KitWorkspace
+              model={model}
+              callbacks={callbacks}
+              initialTarget="brand"
+              purpose="create"
+              onOpenDelivery={() =>
+                onNavigate({ section: "deliver", detail: "kits" })
+              }
+            />
+          </div>
+        ) : null}
+        {isMounted("commerce") ? (
+          <div hidden={destination.profileId !== "commerce"}>
+            <Suspense fallback={<ProductionLoading label="Loading Commerce production" />}>
+              <CommerceProductionPanel
+                modeScope="project"
+                retainedResult={model.commerceProjectLifecycle?.result}
+                retainedResultStale={
+                  model.commerceProjectLifecycle !== undefined
+                  && model.commerceProjectLifecycle.designRevisionId !== model.summary.revisionId
+                }
+                onCompleted={(result) =>
+                  callbacks?.onCommerceLifecycleChange?.(
+                    createCommerceProjectLifecycleRecord({
+                      designRevisionId: model.summary.revisionId,
+                      result,
+                    }),
+                  )
+                }
+                onReset={() => callbacks?.onCommerceLifecycleChange?.(undefined)}
+                onRequestReview={() => onNavigate({ section: "review" })}
+              />
+            </Suspense>
+          </div>
+        ) : null}
+        {isMounted("game-asset") ? (
+          <div hidden={destination.profileId !== "game-asset"}>
+            <Suspense fallback={<ProductionLoading label="Loading Game Asset production" />}>
+              <GameAssetProductionPanel launch={gameAssetLaunch} />
+            </Suspense>
+          </div>
+        ) : null}
+        {isMounted("motion") ? (
+          <div hidden={destination.profileId !== "motion"} className="min-w-0 space-y-3">
+            <SectionHeading title="Motion" description="Temporal production" />
+            <EmptyState
+              icon={<Workflow />}
+              title="Temporal Host required"
+              detail="Motion production remains unavailable until an authorized temporal Host is connected."
+            />
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function ProductUiuxWorkspace({
+  detail,
+  model,
+  callbacks,
+  onNavigate,
+}: {
+  readonly detail: DesignOsCreateDetail;
+  readonly model: DesignOsWorkbenchModel;
+  readonly callbacks?: DesignOsWorkbenchCallbacks;
+  readonly onNavigate: (detail: "canvas" | "specimen" | "figma") => void;
+}) {
+  const view = detail === "figma" || detail === "specimen" ? detail : "canvas";
+  return (
+    <div className="min-w-0 space-y-3">
+      <div className="flex min-w-0 flex-col gap-2 border-b border-border pb-3 sm:flex-row sm:items-center">
+        <div className="min-w-0 flex-1">
+          <h3 className="text-sm font-semibold">Product UI/UX</h3>
+          <p className="text-xs text-muted-foreground">Product canvas and systems</p>
+        </div>
+        <div
+          role="tablist"
+          aria-label="Product UI/UX views"
+          className="flex h-9 items-center gap-1 rounded-md bg-muted p-1"
+        >
+          <ContextTab
+            selected={view === "canvas"}
+            onClick={() => onNavigate("canvas")}
+          >
+            Canvas
+          </ContextTab>
+          <ContextTab
+            selected={view === "specimen"}
+            onClick={() => onNavigate("specimen")}
+          >
+            System
+          </ContextTab>
+          <ContextTab
+            selected={view === "figma"}
+            onClick={() => onNavigate("figma")}
+          >
+            Figma snapshot
+          </ContextTab>
+        </div>
+      </div>
+      {view === "canvas" ? (
+        <EmptyState
+          icon={<PenTool />}
+          title="Product canvas unavailable"
+          detail="This host did not provide the existing Product canvas route."
+        />
+      ) : view === "figma" ? (
+        <FigmaSnapshot model={model} />
+      ) : (
+        <Specimen model={model} callbacks={callbacks} />
+      )}
+    </div>
+  );
+}
+
+function ReviewWorkspace({
+  model,
+  callbacks,
+  onNavigate,
+}: {
+  readonly model: DesignOsWorkbenchModel;
+  readonly callbacks?: DesignOsWorkbenchCallbacks;
+  readonly onNavigate: (destination: DesignOsWorkbenchDestination) => void;
+}) {
+  const items = [...model.kits, ...model.components, ...model.starters];
+  const ready = items.filter((item) => item.readiness === "ready");
+  const blocked = items.filter((item) => item.readiness === "blocked");
+  const receipts = items.flatMap((item) =>
+    item.receipt ? [{ item, receipt: item.receipt }] : [],
+  );
+  const blockers = [
+    ...new Set(
+      blocked.flatMap((item) =>
+        (item.blockers ?? []).map((blocker) => `${item.label}: ${blocker}`),
+      ),
+    ),
+  ];
+  const findings = model.governance?.receipt.findings ?? [];
+  const failedFindings = findings.filter((finding) => finding.status === "failed");
+  const commerce = model.commerceProjectLifecycle;
+  const commerceCurrent = commerce?.designRevisionId === model.summary.revisionId;
+  const commerceReceiptCount = commerce?.result.deliverables.reduce(
+    (count, deliverable) =>
+      count + 1 + (deliverable.playbackSourceReceipt ? 1 : 0) + (deliverable.qa ? 1 : 0),
+    0,
+  ) ?? 0;
+  const hasEvidence = Boolean(
+    model.governance
+      || receipts.length
+      || commerce
+      || model.figmaPreview
+      || model.tokenSyncPreview?.changes.length,
+  );
+
+  return (
+    <section aria-label="Project review" className="min-w-0 space-y-4">
+      <SectionHeading title="Review" description="Current revision evidence" />
+      <dl className="grid grid-cols-2 gap-px overflow-hidden border-y border-border bg-border sm:grid-cols-4">
+        <ReviewMetric label="Ready" value={ready.length} />
+        <ReviewMetric label="Blocked" value={blocked.length} />
+        <ReviewMetric label="Findings" value={failedFindings.length} />
+        <ReviewMetric label="Receipts" value={receipts.length + commerceReceiptCount} />
+      </dl>
+
+      {commerce ? (
+        <section aria-label="Commerce review" className="min-w-0 border-y border-border py-3">
+          <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center">
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <h4 className="text-xs font-semibold">Commerce material set</h4>
+                <Badge
+                  variant={
+                    commerceCurrent && commerce.review ? "secondary" : "outline"
+                  }
+                >
+                  {!commerceCurrent
+                    ? "Stale revision"
+                    : commerce.review
+                      ? "Accepted"
+                      : "Review required"}
+                </Badge>
+              </div>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {commerce.result.deliverables.length} retained artifacts · {commerceReceiptCount} Provider and QA receipts
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {!commerceCurrent ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => onNavigate(destinationForProfile("commerce"))}
+                >
+                  <RefreshCw /> Regenerate
+                </Button>
+              ) : !commerce.review ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  disabled={!callbacks?.onCommerceLifecycleChange}
+                  onClick={() =>
+                    callbacks?.onCommerceLifecycleChange?.(
+                      acceptCommerceProjectLifecycleRecord(commerce),
+                    )
+                  }
+                >
+                  <Check /> Accept for delivery
+                </Button>
+              ) : null}
+            </div>
+          </div>
+          <CommerceReviewArtifacts record={commerce} />
+        </section>
+      ) : null}
+
+      <ProductUiuxReviewChanges model={model} callbacks={callbacks} />
+
+      {blockers.length ? (
+        <section className="min-w-0 border-b border-border pb-4">
+          <h4 className="text-xs font-semibold">Blocking work</h4>
+          <ul className="mt-2 divide-y divide-border text-xs">
+            {blockers.map((blocker) => (
+              <li key={blocker} className="flex items-start gap-2 py-2">
+                <CircleAlert className="mt-0.5 size-3.5 shrink-0 text-destructive" />
+                <span className="min-w-0 break-words">{blocker}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
+      {model.governance ? (
+        <GovernanceSummary
+          receipt={model.governance.receipt}
+          scenarios={model.governance.scenarios}
+          onRequestRepair={callbacks?.onRequestGovernanceRepair}
+        />
+      ) : null}
+
+      {receipts.length ? (
+        <section className="min-w-0">
+          <h4 className="text-xs font-semibold">Verified deliveries</h4>
+          <ul className="mt-2 divide-y divide-border border-y border-border text-xs">
+            {receipts.map(({ item, receipt }) => (
+              <li key={`${item.id}:${receipt.id}`} className="flex min-w-0 items-start gap-3 py-2.5">
+                <CheckCircle2 className="mt-0.5 size-3.5 shrink-0 text-emerald-600" />
+                <div className="min-w-0 flex-1">
+                  <p className="font-medium">{item.label}</p>
+                  <p className="mt-0.5 truncate text-muted-foreground">{receipt.title}</p>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
+      {!hasEvidence ? (
+        <EmptyState
+          icon={<CheckCircle2 />}
+          title="No review evidence yet"
+          detail="Review evidence appears after governance or a verified delivery receipt exists for this revision."
+        />
+      ) : null}
+    </section>
+  );
+}
+
+function ReviewMetric({ label, value }: { readonly label: string; readonly value: number }) {
+  return (
+    <div className="min-h-16 bg-background px-3 py-2.5">
+      <dt className="text-[11px] text-muted-foreground">{label}</dt>
+      <dd className="mt-1 text-base font-semibold">{value}</dd>
+    </div>
+  );
+}
+
+function CommerceReviewArtifacts({
+  record,
+}: {
+  readonly record: CommerceProjectLifecycleRecord;
+}) {
+  return (
+    <div className="mt-3 min-w-0 border-t border-border pt-3">
+      <CommerceLifecycleEvidence record={record} />
+    </div>
+  );
+}
+
+function ProductUiuxReviewChanges({
+  model,
+  callbacks,
+}: {
+  readonly model: DesignOsWorkbenchModel;
+  readonly callbacks?: DesignOsWorkbenchCallbacks;
+}) {
+  const tokenChanges = model.tokenSyncPreview?.changes ?? [];
+  if (!tokenChanges.length && !model.figmaPreview) return null;
+  return (
+    <section aria-label="Product UI/UX changes" className="min-w-0 space-y-3 border-b border-border pb-4">
+      <div>
+        <h4 className="text-xs font-semibold">Product UI/UX changes</h4>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Apply or discard prepared source changes against the current revision.
+        </p>
+      </div>
+      {tokenChanges.length ? (
+        <div className="min-w-0 border-y border-border py-3" data-slot="token-sync-preview">
+          <div className="flex items-center gap-1.5 text-xs font-medium">
+            <CircleAlert className="size-3.5 text-amber-600 dark:text-amber-400" />
+            {tokenChanges.length} token value change
+            {tokenChanges.length === 1 ? "" : "s"}
+          </div>
+          <ul aria-label="Token value changes" className="mt-2 divide-y divide-border">
+            {tokenChanges.map((change) => (
+              <li key={change.tokenId} className="flex min-w-0 items-center gap-2 py-1.5 text-xs">
+                <span className="min-w-0 flex-1 truncate font-medium">{change.name}</span>
+                <SwatchOrValue value={change.previousValue} />
+                <span className="text-muted-foreground" aria-hidden="true">to</span>
+                <SwatchOrValue value={change.nextValue} />
+              </li>
+            ))}
+          </ul>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {callbacks?.onApplyTokenSync ? (
+              <Button size="sm" onClick={callbacks.onApplyTokenSync}>
+                <Check /> Apply token changes
+              </Button>
+            ) : null}
+            {callbacks?.onDiscardTokenSync ? (
+              <Button size="sm" variant="ghost" onClick={callbacks.onDiscardTokenSync}>
+                <X /> Discard
+              </Button>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
+      {model.figmaPreview ? (
+        <div className="min-w-0 space-y-3">
+          <FigmaSnapshotFacts preview={model.figmaPreview} />
+          {callbacks?.onApproveFigmaSnapshot ? (
+            <Button
+              size="sm"
+              onClick={() =>
+                callbacks.onApproveFigmaSnapshot?.(model.figmaPreview!.id)
+              }
+            >
+              <ShieldCheck /> Approve and apply IR patch
+            </Button>
+          ) : (
+            <p className="text-xs text-muted-foreground">
+              Figma approval is not available in this host.
+            </p>
+          )}
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+function DeliverWorkspace({
+  detail,
+  model,
+  callbacks,
+  onNavigate,
+  onNavigateDestination,
+}: {
+  readonly detail: DesignOsDeliverDetail;
+  readonly model: DesignOsWorkbenchModel;
+  readonly callbacks?: DesignOsWorkbenchCallbacks;
+  readonly onNavigate: (detail: DesignOsDeliverDetail) => void;
+  readonly onNavigateDestination: (
+    destination: DesignOsWorkbenchDestination,
+  ) => void;
+}) {
+  return (
+    <Tabs value={detail} onValueChange={(value) => onNavigate(value as DesignOsDeliverDetail)} className="min-w-0 gap-0">
+      <div className="min-w-0 overflow-x-auto border-b border-border">
+        <TabsList aria-label="Delivery views" variant="line" className={deliveryWorkspaceClasses.subnav}>
+          <WorkbenchTab value="delivery" icon={<PackageCheck />}>Overview</WorkbenchTab>
+          <WorkbenchTab value="kits" icon={<Layers3 />}>Kits</WorkbenchTab>
+          <WorkbenchTab value="components" icon={<Component />}>Components</WorkbenchTab>
+          <WorkbenchTab value="starter" icon={<FileArchive />}>Starter</WorkbenchTab>
+        </TabsList>
+      </div>
+      <div className="min-w-0 pt-4">
+        <TabsContent value="delivery" className="m-0">
+          <div className="min-w-0 space-y-5">
+            <ProductUiuxDelivery
+              model={model}
+              callbacks={callbacks}
+              onNavigate={onNavigateDestination}
+            />
+            {model.commerceProjectLifecycle ? (
+              <CommerceDelivery
+                record={model.commerceProjectLifecycle}
+                currentRevisionId={model.summary.revisionId}
+                callbacks={callbacks}
+                onNavigate={onNavigateDestination}
+              />
+            ) : null}
+            {model.delivery ? (
               <DeliveryCenterPanel
                 model={{
                   ...model.delivery,
@@ -393,57 +1188,275 @@ export function DesignOsWorkbench({
                 onAddDestination={callbacks?.onAddDeliveryDestination}
                 onRequestGovernanceRepair={callbacks?.onRequestGovernanceRepair}
               />
-            </TabsContent>
-          ) : null}
-          {model.workflowPacks ? (
-            <TabsContent value="workflows" className="m-0">
-              <WorkflowPackCatalogPanel
-                items={model.workflowPacks}
-                onInstall={callbacks?.onInstallWorkflowPack}
-                onUpgrade={callbacks?.onUpgradeWorkflowPack}
-                onEvaluate={callbacks?.onEvaluateWorkflowPack}
+            ) : (
+              <EmptyState
+                icon={<PackageCheck />}
+                title="No delivery plan yet"
+                detail="Delivery targets appear when the current revision has an executable target projection."
               />
-            </TabsContent>
-          ) : null}
-          <TabsContent value="sources" className="m-0">
-            <Sources model={model} callbacks={callbacks} />
-          </TabsContent>
-          <TabsContent value="commerce" className="m-0">
-            <Suspense fallback={(
-              <div className="flex min-h-64 items-center justify-center text-muted-foreground">
-                <RefreshCw className="size-4 animate-spin" aria-label="Loading Commerce production" />
-              </div>
-            )}>
-              <CommerceProductionPanel />
-            </Suspense>
-          </TabsContent>
-          <TabsContent value="game-assets" className="m-0">
-            <Suspense fallback={(
-              <div className="flex min-h-64 items-center justify-center text-muted-foreground">
-                <RefreshCw className="size-4 animate-spin" aria-label="Loading Game assets" />
-              </div>
-            )}>
-              <GameAssetProductionPanel />
-            </Suspense>
-          </TabsContent>
-          <TabsContent value="specimen" className="m-0">
-            <Specimen model={model} callbacks={callbacks} />
-          </TabsContent>
-          <TabsContent value="figma" className="m-0">
-            <FigmaSnapshot model={model} callbacks={callbacks} />
-          </TabsContent>
-          <TabsContent value="kits" className="m-0">
-            <KitWorkspace model={model} callbacks={callbacks} />
-          </TabsContent>
-          <TabsContent value="components" className="m-0">
-            <ComponentWorkspace model={model} callbacks={callbacks} />
-          </TabsContent>
-          <TabsContent value="starter" className="m-0">
-            <StarterWorkspace model={model} callbacks={callbacks} />
-          </TabsContent>
+            )}
+          </div>
+        </TabsContent>
+        <TabsContent value="kits" className="m-0">
+          <KitWorkspace model={model} callbacks={callbacks} />
+        </TabsContent>
+        <TabsContent value="components" className="m-0">
+          <ComponentWorkspace model={model} callbacks={callbacks} />
+        </TabsContent>
+        <TabsContent value="starter" className="m-0">
+          <StarterWorkspace model={model} callbacks={callbacks} />
+        </TabsContent>
+      </div>
+    </Tabs>
+  );
+}
+
+function ProductUiuxDelivery({
+  model,
+  callbacks,
+  onNavigate,
+}: {
+  readonly model: DesignOsWorkbenchModel;
+  readonly callbacks?: DesignOsWorkbenchCallbacks;
+  readonly onNavigate: (destination: DesignOsWorkbenchDestination) => void;
+}) {
+  const files = model.specimen?.files ?? [];
+  const specimenHtml = files.find((file) => file.path === "design-system.html");
+  const demoHtml = files.find((file) => file.path === "demo.html");
+  const hasSystemOutput = Boolean(specimenHtml || demoHtml);
+  if (!hasSystemOutput && !model.figmaExportReady) return null;
+  const download = (file: { readonly path: string; readonly content: string }) => {
+    const blob = new Blob([file.content], { type: "text/html;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = file.path;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+  return (
+    <section aria-label="Product UI/UX delivery" className="min-w-0 border-y border-border py-4">
+      <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start">
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <h3 className="text-sm font-semibold">Product UI/UX outputs</h3>
+            {model.specimen?.stale ? <Badge variant="outline">Stale specimen</Badge> : null}
+          </div>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Download or publish current-revision system files and Figma Variables payloads.
+          </p>
         </div>
-      </Tabs>
+        {model.specimen?.stale ? (
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={() =>
+              onNavigate({
+                section: "create",
+                profileId: "product-uiux",
+                detail: "specimen",
+              })
+            }
+          >
+            <RefreshCw /> Regenerate
+          </Button>
+        ) : null}
+      </div>
+      <div className="mt-3 flex flex-wrap gap-2">
+        {!model.specimen?.stale && specimenHtml ? (
+          <Button size="sm" variant="outline" onClick={() => download(specimenHtml)}>
+            <Download /> Download design-system.html
+          </Button>
+        ) : null}
+        {!model.specimen?.stale && demoHtml ? (
+          <Button size="sm" variant="outline" onClick={() => download(demoHtml)}>
+            <Download /> Download demo.html
+          </Button>
+        ) : null}
+        {!model.specimen?.stale && hasSystemOutput && callbacks?.onSaveSpecimenToLibrary ? (
+          <Button
+            size="sm"
+            variant={model.specimen?.savedToLibrary ? "secondary" : "outline"}
+            disabled={model.specimen?.savedToLibrary}
+            onClick={callbacks.onSaveSpecimenToLibrary}
+          >
+            <LibraryBig /> {model.specimen?.savedToLibrary ? "Saved to Library" : "Save to Library"}
+          </Button>
+        ) : null}
+        {model.figmaExportReady && callbacks?.onExportFigmaVariables ? (
+          <Button size="sm" variant="outline" onClick={callbacks.onExportFigmaVariables}>
+            <PackageCheck /> Export Figma Variables payload
+          </Button>
+        ) : null}
+      </div>
     </section>
+  );
+}
+
+function CommerceDelivery({
+  record,
+  currentRevisionId,
+  callbacks,
+  onNavigate,
+}: {
+  readonly record: CommerceProjectLifecycleRecord;
+  readonly currentRevisionId: string;
+  readonly callbacks?: DesignOsWorkbenchCallbacks;
+  readonly onNavigate: (destination: DesignOsWorkbenchDestination) => void;
+}) {
+  const current = record.designRevisionId === currentRevisionId;
+  const deliverable = current && Boolean(record.review);
+  const requestDownload = () => {
+    if (!deliverable) return;
+    downloadCommerceProjectFiles(record.result);
+    callbacks?.onCommerceLifecycleChange?.(
+      requestCommerceProjectDownload(record),
+    );
+  };
+  return (
+    <section aria-label="Commerce delivery" className="min-w-0 border-y border-border py-4">
+      <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center">
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <h3 className="text-sm font-semibold">Commerce bundle</h3>
+            <Badge variant={deliverable ? "secondary" : "outline"}>
+              {!current
+                ? "Stale revision"
+                : record.review
+                  ? record.delivery
+                    ? "Download requested"
+                    : "Ready"
+                  : "Review required"}
+            </Badge>
+          </div>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {record.result.deliverables.length} artifacts · exact manifest and retained bytes
+          </p>
+        </div>
+        {!current ? (
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={() => onNavigate(destinationForProfile("commerce"))}
+          >
+            <RefreshCw /> Regenerate
+          </Button>
+        ) : !record.review ? (
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={() => onNavigate({ section: "review" })}
+          >
+            <ShieldCheck /> Open review
+          </Button>
+        ) : (
+          <Button
+            type="button"
+            size="sm"
+            disabled={!callbacks?.onCommerceLifecycleChange}
+            onClick={requestDownload}
+          >
+            <Download /> {record.delivery ? "Download files again" : "Download files"}
+          </Button>
+        )}
+      </div>
+      {record.delivery ? (
+        <p className="mt-2 text-[11px] text-muted-foreground">
+          Browser download requested {record.delivery.requestedAt}. This is not a verified filesystem receipt.
+        </p>
+      ) : null}
+    </section>
+  );
+}
+
+function InspectWorkspace({
+  detail,
+  model,
+  callbacks,
+  onNavigate,
+}: {
+  readonly detail: DesignOsInspectDetail;
+  readonly model: DesignOsWorkbenchModel;
+  readonly callbacks?: DesignOsWorkbenchCallbacks;
+  readonly onNavigate: (detail: DesignOsInspectDetail) => void;
+}) {
+  return (
+    <Tabs value={detail} onValueChange={(value) => onNavigate(value as DesignOsInspectDetail)} className="min-w-0 gap-0">
+      <div className="min-w-0 overflow-x-auto border-b border-border">
+        <TabsList aria-label="Inspection views" variant="line" className={deliveryWorkspaceClasses.subnav}>
+          <WorkbenchTab value="system" icon={<Boxes />}>System</WorkbenchTab>
+          <WorkbenchTab value="workflows" icon={<Workflow />}>Workflows</WorkbenchTab>
+          <WorkbenchTab value="commerce-benchmark" icon={<ShieldCheck />}>Labs</WorkbenchTab>
+        </TabsList>
+      </div>
+      <div className="min-w-0 pt-4">
+        <TabsContent value="system" className="m-0">
+          <section aria-label="System evidence" className="min-w-0 space-y-3">
+            <SectionHeading title="System evidence" description="Design IR and capability projection" />
+            <DesignOsPanel model={model.summary} className="min-w-0" />
+          </section>
+        </TabsContent>
+        <TabsContent value="workflows" className="m-0">
+          {model.workflowPacks ? (
+            <WorkflowPackCatalogPanel
+              items={model.workflowPacks}
+              onInstall={callbacks?.onInstallWorkflowPack}
+              onUpgrade={callbacks?.onUpgradeWorkflowPack}
+              onEvaluate={callbacks?.onEvaluateWorkflowPack}
+            />
+          ) : (
+            <EmptyState
+              icon={<Workflow />}
+              title="No workflow catalog"
+              detail="This host has no installed workflow catalog projection."
+            />
+          )}
+        </TabsContent>
+        <TabsContent value="commerce-benchmark" className="m-0">
+          <Suspense fallback={<ProductionLoading label="Loading Commerce benchmark" />}>
+            <CommerceProductionPanel modeScope="benchmark" />
+          </Suspense>
+        </TabsContent>
+      </div>
+    </Tabs>
+  );
+}
+
+function ProductionLoading({ label }: { readonly label: string }) {
+  return (
+    <div className="flex min-h-64 items-center justify-center text-muted-foreground">
+      <RefreshCw className="size-4 animate-spin" aria-label={label} />
+    </div>
+  );
+}
+
+function ContextTab({
+  selected,
+  onClick,
+  children,
+}: {
+  readonly selected: boolean;
+  readonly onClick: () => void;
+  readonly children: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      role="tab"
+      aria-selected={selected}
+      onClick={onClick}
+      className={cn(
+        "h-7 rounded px-2.5 text-xs font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring",
+        selected
+          ? "bg-background text-foreground shadow-sm"
+          : "text-muted-foreground hover:text-foreground",
+      )}
+    >
+      {children}
+    </button>
   );
 }
 
@@ -467,11 +1480,17 @@ function kitBlocker(value: string) {
 function KitWorkspace({
   model,
   callbacks,
+  initialTarget = "both",
+  purpose = "deliver",
+  onOpenDelivery,
 }: {
   readonly model: DesignOsWorkbenchModel;
   readonly callbacks?: DesignOsWorkbenchCallbacks;
+  readonly initialTarget?: KitTarget;
+  readonly purpose?: "create" | "deliver";
+  readonly onOpenDelivery?: () => void;
 }) {
-  const [target, setTarget] = useState<KitTarget>("both"),
+  const [target, setTarget] = useState<KitTarget>(initialTarget),
     [advanced, setAdvanced] = useState(false),
     [brandText, setBrandText] = useState(() =>
       JSON.stringify(template("brand"), null, 2),
@@ -526,7 +1545,8 @@ function KitWorkspace({
       return;
     }
     if (ready) {
-      selected.forEach((item) => callbacks?.onExportKit?.(item.id));
+      if (purpose === "create") onOpenDelivery?.();
+      else selected.forEach((item) => callbacks?.onExportKit?.(item.id));
       return;
     }
     if (blockers.some((value) => /component/i.test(value))) {
@@ -547,24 +1567,31 @@ function KitWorkspace({
     : preview
       ? Boolean(callbacks?.onApproveAuthoring)
       : ready
-        ? Boolean(callbacks?.onExportKit)
+        ? purpose === "create"
+          ? Boolean(onOpenDelivery)
+          : Boolean(callbacks?.onExportKit)
         : target !== "design" && Boolean(callbacks?.onPrepareAuthoring);
   const actionLabel = governanceHard.length
     ? "Repair governance blockers"
     : preview
       ? "Approve and continue"
       : ready
-        ? "Preview and export"
+        ? purpose === "create"
+          ? "Open delivery"
+          : "Preview and export"
         : target === "design"
           ? "Review required preparation"
           : "Prepare required materials";
   return (
     <section aria-label="Kit workspace" className={deliveryWorkspaceClasses.primaryColumn}>
       <div>
-        <h3 className={deliveryWorkspaceClasses.heading}>Kit delivery</h3>
+        <h3 className={deliveryWorkspaceClasses.heading}>
+          {purpose === "create" ? "Brand system" : "Kit delivery"}
+        </h3>
         <p className={deliveryWorkspaceClasses.description}>
-          Choose the reusable kit result. Cutout will preserve approvals, source
-          rights, and governance evidence.
+          {purpose === "create"
+            ? "Prepare the Brand kit against current approvals, source rights, and governance evidence."
+            : "Choose the reusable kit result. Cutout will preserve approvals, source rights, and governance evidence."}
         </p>
       </div>
       <div
@@ -1064,129 +2091,72 @@ function template(kind: AuthoringKind): unknown {
 
 function FigmaSnapshot({
   model,
-  callbacks,
 }: {
   readonly model: DesignOsWorkbenchModel;
-  readonly callbacks?: DesignOsWorkbenchCallbacks;
 }) {
-  const [fileError, setFileError] = useState<string>();
-  const load = async (file: File | undefined) => {
-    if (!file) return;
-    try {
-      const value: unknown = JSON.parse(await file.text());
-      setFileError(undefined);
-      callbacks?.onPrepareFigmaSnapshot?.(value);
-    } catch {
-      setFileError("The selected file is not valid JSON.");
-    }
-  };
   return (
     <div className="min-w-0 space-y-3">
       <SectionHeading
         title="Figma Snapshot"
-        description="Review a caller-authorized snapshot offline. Cutout never signs in, calls Figma, guesses layout, or converts screenshots to code."
+        description="Inspect a caller-authorized offline snapshot. Import stays in Sources and approval stays in Review."
       />
-      <Card size="sm" className="min-w-0 rounded-lg">
-        <CardHeader>
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <CardTitle>Authorized JSON snapshot</CardTitle>
-              <CardDescription className="mt-1">
-                Live sync requires a separately authorized host connector and is
-                currently unavailable.
-              </CardDescription>
-            </div>
-            <Badge variant="outline">Offline only</Badge>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <label className="inline-flex cursor-pointer items-center gap-2 rounded-md border border-input px-3 py-1.5 text-xs font-medium hover:bg-accent">
-            <FolderInput className="size-4" /> Choose snapshot JSON
-            <input
-              aria-label="Choose Figma snapshot JSON"
-              type="file"
-              accept="application/json,.json"
-              className="sr-only"
-              onChange={(event) => void load(event.target.files?.[0])}
-            />
-          </label>
-          {fileError ? (
-            <p role="alert" className="text-xs text-destructive">
-              {fileError}
-            </p>
-          ) : null}
-        </CardContent>
-      </Card>
       {model.figmaPreview ? (
-        <Card
-          data-slot="figma-snapshot-preview"
-          size="sm"
-          className="min-w-0 rounded-lg"
-        >
-          <CardHeader>
-            <CardTitle>{model.figmaPreview.fileName}</CardTitle>
-            <CardDescription>{model.figmaPreview.summary}</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-              <Metric
-                label="Collections"
-                value={model.figmaPreview.collections}
-                icon={<Layers3 className="size-4" />}
-              />
-              <Metric
-                label="Token modes"
-                value={model.figmaPreview.tokens}
-                icon={<Sparkles className="size-4" />}
-              />
-              <Metric
-                label="Components"
-                value={model.figmaPreview.components}
-                icon={<Component className="size-4" />}
-              />
-              <Metric
-                label="Code Connect"
-                value={model.figmaPreview.codeConnect}
-                icon={<Boxes className="size-4" />}
-              />
-            </div>
-            {model.figmaPreview.warnings.length ? (
-              <ul
-                aria-label="Figma snapshot warnings"
-                className="space-y-1 text-xs text-amber-700 dark:text-amber-300"
-              >
-                {model.figmaPreview.warnings.map((warning) => (
-                  <li key={warning}>• {warning}</li>
-                ))}
-              </ul>
-            ) : (
-              <p className="text-xs text-muted-foreground">
-                No adapter conflicts or incomplete binding warnings detected.
-              </p>
-            )}
-            {callbacks?.onApproveFigmaSnapshot ? (
-              <Button
-                size="sm"
-                onClick={() =>
-                  callbacks.onApproveFigmaSnapshot?.(model.figmaPreview!.id)
-                }
-              >
-                <ShieldCheck /> Approve and apply IR patch
-              </Button>
-            ) : null}
-          </CardContent>
-        </Card>
-      ) : null}
-      {model.figmaExportReady && callbacks?.onExportFigmaVariables ? (
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={callbacks.onExportFigmaVariables}
-        >
-          <PackageCheck /> Export Figma Variables payload
-        </Button>
-      ) : null}
+        <>
+          <FigmaSnapshotFacts preview={model.figmaPreview} />
+          <p className="text-xs text-muted-foreground">
+            Review and apply this prepared change from the Project Review stage.
+          </p>
+        </>
+      ) : (
+        <EmptyState
+          icon={<FolderInput />}
+          title="No Figma snapshot prepared"
+          detail="Import a caller-authorized JSON snapshot from Sources. Live sync is unavailable."
+        />
+      )}
     </div>
+  );
+}
+
+function FigmaSnapshotFacts({ preview }: { readonly preview: FigmaWorkbenchPreview }) {
+  return (
+    <Card
+      data-slot="figma-snapshot-preview"
+      size="sm"
+      className="min-w-0 rounded-lg"
+    >
+      <CardHeader>
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <CardTitle>{preview.fileName}</CardTitle>
+            <CardDescription>{preview.summary}</CardDescription>
+          </div>
+          <Badge variant="outline">Offline only</Badge>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <Metric label="Collections" value={preview.collections} icon={<Layers3 className="size-4" />} />
+          <Metric label="Token modes" value={preview.tokens} icon={<Sparkles className="size-4" />} />
+          <Metric label="Components" value={preview.components} icon={<Component className="size-4" />} />
+          <Metric label="Code Connect" value={preview.codeConnect} icon={<Boxes className="size-4" />} />
+        </div>
+        {preview.warnings.length ? (
+          <ul
+            aria-label="Figma snapshot warnings"
+            className="space-y-1 text-xs text-amber-700 dark:text-amber-300"
+          >
+            {preview.warnings.map((warning) => (
+              <li key={warning}>• {warning}</li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-xs text-muted-foreground">
+            No adapter conflicts or incomplete binding warnings detected.
+          </p>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
@@ -1195,7 +2165,7 @@ function WorkbenchTab({
   icon,
   children,
 }: {
-  value: DesignOsWorkbenchTab;
+  value: string;
   icon: ReactNode;
   children: ReactNode;
 }) {
@@ -1218,29 +2188,60 @@ function Overview({ model }: { readonly model: DesignOsWorkbenchModel }) {
   ].filter((item) => item.readiness === "blocked").length;
 
   return (
-    <div className="min-w-0 space-y-4">
-      <div className="rounded-md border border-border p-4">
-        <h3 className="text-sm font-medium">Project system</h3>
-        <p className="mt-1 max-w-prose text-xs leading-5 text-muted-foreground">
-          Manage reusable sources, specimens, workflows, and authorized Figma snapshots from the sections above.
+    <section aria-label="Project brief" className="min-w-0 space-y-4">
+      <div className="border-b border-border pb-4">
+        <p className="text-[11px] font-medium uppercase text-muted-foreground">
+          Product brief
         </p>
-        <dl className="mt-4 grid grid-cols-3 gap-2 text-center">
-          <div className="rounded-md bg-muted/40 px-2 py-3"><dt className="text-[11px] text-muted-foreground">Sources</dt><dd className="mt-1 text-base font-semibold">{model.summary.counts.sources}</dd></div>
-          <div className="rounded-md bg-muted/40 px-2 py-3"><dt className="text-[11px] text-muted-foreground">Tokens</dt><dd className="mt-1 text-base font-semibold">{model.summary.counts.tokens}</dd></div>
-          <div className="rounded-md bg-muted/40 px-2 py-3"><dt className="text-[11px] text-muted-foreground">Components</dt><dd className="mt-1 text-base font-semibold">{model.summary.counts.components}</dd></div>
-        </dl>
+        <h3 className="mt-1 text-lg font-semibold">
+          {model.projectTitle ?? model.summary.documentId}
+        </h3>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Revision {model.summary.revisionNumber} · {model.summary.revisionId}
+        </p>
+        {model.brief?.trim() ? (
+          <p className="mt-3 max-w-3xl whitespace-pre-wrap text-sm leading-6">
+            {model.brief.trim()}
+          </p>
+        ) : (
+          <p className="mt-3 text-xs text-muted-foreground">
+            No project brief is bound to this revision.
+          </p>
+        )}
       </div>
-      <details className="rounded-md border border-border text-xs">
-        <summary className="min-h-11 cursor-pointer px-4 py-3 font-medium text-muted-foreground">Advanced system evidence</summary>
-        <div className="space-y-3 border-t border-border p-3">
-          <DesignOsPanel model={model.summary} className="min-w-0" />
-          <div className="grid grid-cols-2 gap-2">
-            <Metric label="Delivery ready" value={ready} icon={<CheckCircle2 className="size-4 text-emerald-600" />} />
-            <Metric label="Blocked" value={blocked} icon={<CircleAlert className="size-4 text-destructive" />} />
+      <dl className="grid grid-cols-2 gap-px overflow-hidden border-y border-border bg-border sm:grid-cols-5">
+        <ReviewMetric label="Sources" value={model.summary.counts.sources} />
+        <ReviewMetric label="Materials" value={model.summary.counts.materials} />
+        <ReviewMetric label="Tokens" value={model.summary.counts.tokens} />
+        <ReviewMetric label="Ready" value={ready} />
+        <ReviewMetric label="Blocked" value={blocked} />
+      </dl>
+      <div className="grid gap-2 sm:grid-cols-2">
+        {model.summary.capabilities.map((capability) => (
+          <div
+            key={capability.id}
+            className="flex min-w-0 items-start gap-2 border-b border-border py-2.5 text-xs"
+          >
+            <span
+              className={cn(
+                "mt-1 size-2 shrink-0 rounded-full",
+                capability.status === "available"
+                  ? "bg-emerald-500"
+                  : "bg-muted-foreground/40",
+              )}
+            />
+            <div className="min-w-0">
+              <p className="font-medium">{capability.label}</p>
+              {capability.detail ? (
+                <p className="mt-0.5 break-words text-muted-foreground">
+                  {capability.detail}
+                </p>
+              ) : null}
+            </div>
           </div>
-        </div>
-      </details>
-    </div>
+        ))}
+      </div>
+    </section>
   );
 }
 
@@ -1258,20 +2259,9 @@ function Specimen({
   readonly model: DesignOsWorkbenchModel;
   readonly callbacks?: DesignOsWorkbenchCallbacks;
 }) {
-  const syncInputRef = useRef<HTMLInputElement>(null);
   const files = model.specimen?.files ?? [];
   const specimenHtml = files.find((file) => file.path === "design-system.html")?.content;
   const demoHtml = files.find((file) => file.path === "demo.html")?.content;
-
-  const download = (path: string, content: string) => {
-    const blob = new Blob([content], { type: "text/html;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = path;
-    link.click();
-    URL.revokeObjectURL(url);
-  };
 
   return (
     <div className="flex min-w-0 flex-col gap-3">
@@ -1297,14 +2287,6 @@ function Specimen({
       {specimenHtml ? (
         <>
           <div className="flex flex-wrap items-center gap-2">
-            <Button size="sm" variant="outline" onClick={() => download("design-system.html", specimenHtml)}>
-              <Download /> Download design-system.html
-            </Button>
-            {demoHtml ? (
-              <Button size="sm" variant="outline" onClick={() => download("demo.html", demoHtml)}>
-                <Download /> Download demo.html
-              </Button>
-            ) : null}
             {demoHtml ? (
               <Badge variant={model.specimen?.composedByAgent ? "secondary" : "outline"}>
                 {model.specimen?.composedByAgent
@@ -1312,80 +2294,11 @@ function Specimen({
                   : "demo.html: generic template"}
               </Badge>
             ) : null}
-            {callbacks?.onSyncDemoHtml ? (
-              <>
-                <Button size="sm" variant="ghost" onClick={() => syncInputRef.current?.click()}>
-                  <Upload /> Sync from edited demo.html
-                </Button>
-                <input
-                  ref={syncInputRef}
-                  type="file"
-                  accept=".html,text/html"
-                  className="sr-only"
-                  aria-label="Sync from edited demo.html"
-                  onChange={(event) => {
-                    const file = event.target.files?.[0];
-                    if (file) callbacks.onSyncDemoHtml?.(file);
-                    event.target.value = "";
-                  }}
-                />
-              </>
-            ) : null}
           </div>
-          {callbacks?.onSaveSpecimenToLibrary ? (
-            <div className="flex flex-wrap items-center gap-2">
-              <Button
-                size="sm"
-                variant={model.specimen?.savedToLibrary ? "secondary" : "outline"}
-                disabled={model.specimen?.savedToLibrary}
-                onClick={callbacks.onSaveSpecimenToLibrary}
-              >
-                <LibraryBig /> {model.specimen?.savedToLibrary ? "Saved to Library" : "Save to Library"}
-              </Button>
-              <p className="text-xs text-muted-foreground">
-                Keeps this specimen past this session — reopen it from Library even after the tokens change again.
-              </p>
-            </div>
-          ) : null}
           <p className="text-xs text-muted-foreground">
-            Hand-edit the downloaded demo.html, or ask the Agent to adjust it, then sync it back —
-            changes go through the same review you already use for Sources, nothing is applied silently.
+            Import edited source files from Sources, review prepared changes in Review,
+            and download or publish accepted outputs from Deliver.
           </p>
-
-          {model.tokenSyncPreview && model.tokenSyncPreview.changes.length > 0 ? (
-            <div className="rounded-lg border border-border bg-muted/20 p-3" data-slot="token-sync-preview">
-              <div className="flex items-center gap-1.5 text-sm font-medium">
-                <CircleAlert className="size-3.5 text-amber-600 dark:text-amber-400" />
-                {model.tokenSyncPreview.changes.length} token value change
-                {model.tokenSyncPreview.changes.length === 1 ? "" : "s"} detected in the synced demo.html
-              </div>
-              <ul aria-label="Token value changes" className="mt-2 divide-y divide-border">
-                {model.tokenSyncPreview.changes.map((change) => (
-                  <li
-                    key={change.tokenId}
-                    className="flex min-w-0 items-center gap-2 py-1.5 text-xs"
-                  >
-                    <span className="min-w-0 flex-1 truncate font-medium">{change.name}</span>
-                    <SwatchOrValue value={change.previousValue} />
-                    <span className="text-muted-foreground" aria-hidden="true">→</span>
-                    <SwatchOrValue value={change.nextValue} />
-                  </li>
-                ))}
-              </ul>
-              <div className="mt-2 flex gap-2">
-                {callbacks?.onApplyTokenSync ? (
-                  <Button size="sm" onClick={callbacks.onApplyTokenSync}>
-                    <Check /> Apply changes
-                  </Button>
-                ) : null}
-                {callbacks?.onDiscardTokenSync ? (
-                  <Button size="sm" variant="ghost" onClick={callbacks.onDiscardTokenSync}>
-                    <X /> Discard
-                  </Button>
-                ) : null}
-              </div>
-            </div>
-          ) : null}
 
           <iframe
             title="Design system specimen"
@@ -1443,6 +2356,8 @@ function Sources({
         />
       ) : null}
 
+      <ProductUiuxSourceActions callbacks={callbacks} />
+
       {importedSources.length > 0 ? (
         <ul
           aria-label="Design sources"
@@ -1491,6 +2406,94 @@ function Sources({
         />
       )}
     </div>
+  );
+}
+
+function ProductUiuxSourceActions({
+  callbacks,
+}: {
+  readonly callbacks?: DesignOsWorkbenchCallbacks;
+}) {
+  const [figmaError, setFigmaError] = useState<string>();
+  if (!callbacks?.onSyncDemoHtml && !callbacks?.onPrepareFigmaSnapshot) {
+    return null;
+  }
+  const prepareFigma = async (file: File | undefined) => {
+    if (!file) return;
+    try {
+      const value: unknown = JSON.parse(await file.text());
+      setFigmaError(undefined);
+      callbacks.onPrepareFigmaSnapshot?.(value);
+    } catch {
+      setFigmaError("The selected file is not valid JSON.");
+    }
+  };
+  return (
+    <section aria-label="Product UI/UX source actions" className="min-w-0 border-y border-border py-3">
+      <div className="mb-3">
+        <h4 className="text-xs font-semibold">Product UI/UX sources</h4>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Import caller-authorized files here before reviewing any resulting change.
+        </p>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2">
+        {callbacks.onSyncDemoHtml ? (
+          <div className="min-w-0 border-b border-border pb-3 sm:border-b-0 sm:border-r sm:pr-3 sm:pb-0">
+            <p className="text-xs font-medium">Edited demo.html</p>
+            <p className="mt-1 text-[11px] leading-4 text-muted-foreground">
+              Ingest the edited demo as a provenanced source and prepare a token diff.
+            </p>
+            <Button asChild size="sm" variant="outline" className="mt-3">
+              <label>
+                <Upload /> Choose demo.html
+                <input
+                  type="file"
+                  accept=".html,text/html"
+                  className="sr-only"
+                  aria-label="Sync from edited demo.html"
+                  onChange={(event) => {
+                    const file = event.currentTarget.files?.[0];
+                    if (file) callbacks.onSyncDemoHtml?.(file);
+                    event.currentTarget.value = "";
+                  }}
+                />
+              </label>
+            </Button>
+          </div>
+        ) : null}
+        {callbacks.onPrepareFigmaSnapshot ? (
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="text-xs font-medium">Figma snapshot</p>
+              <Badge variant="outline">Offline only</Badge>
+            </div>
+            <p className="mt-1 text-[11px] leading-4 text-muted-foreground">
+              Import a caller-authorized JSON snapshot. Live Figma sync is unavailable.
+            </p>
+            <Button asChild size="sm" variant="outline" className="mt-3">
+              <label>
+                <FolderInput /> Choose snapshot JSON
+                <input
+                  aria-label="Choose Figma snapshot JSON"
+                  type="file"
+                  accept="application/json,.json"
+                  className="sr-only"
+                  onChange={(event) => {
+                    void prepareFigma(event.currentTarget.files?.[0]);
+                    event.currentTarget.value = "";
+                  }}
+                />
+              </label>
+            </Button>
+            {figmaError ? (
+              <p role="alert" className="mt-2 text-xs text-destructive">
+                {figmaError}
+              </p>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
+    </section>
   );
 }
 

@@ -49,11 +49,14 @@ type CancellableProxyCommand =
   | 'ai_dashscope_vision_json'
   | 'ai_dashscope_video'
   | 'apply_game_asset_generation'
+  | 'apply_game_asset_action_sheet_generation'
+  | 'apply_game_asset_action_sheet_repair'
+  | 'apply_game_asset_action_sheet_partial_repair'
 
 /**
  * Tauri's invoke promise has no AbortSignal channel. Bind every cancellable AI
  * command to an opaque native request id, return promptly on owner abort, and
- * tell Rust to drop the underlying reqwest future so a timed-out paid request
+ * tell Rust to drop the underlying reqwest future so a timed-out Provider request
  * does not continue in the background.
  */
 export async function invokeCancellableProxy<T>(

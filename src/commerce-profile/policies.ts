@@ -268,7 +268,7 @@ function finding(
 
 const EVIDENCE_RULES = [
   { field: 'composition', pattern: /\b(?:composition|material|fabric|cotton|polyester|silk|wool)\b|소재|재질|원단|composição|material/i },
-  { field: 'dimensions', pattern: /\b(?:dimension|length|width|height|size|measure|inch|inches|cm|mm)\b|치수|길이|너비|크기|dimens(?:ão|ões)|comprimento|largura|tamanho/i },
+  { field: 'dimensions', pattern: /\b(?:dimension|dimensions|measure|measurement|measurements|inch|inches|cm|mm)\b|치수|dimens(?:ão|ões)/i },
   { field: 'certification', pattern: /\b(?:certified|certification|approved|compliant)\b|인증|승인|certificad[oa]|aprova[çc][aã]o/i },
   { field: 'performance', pattern: /\b(?:waterproof|durable|performance|protects|resistant)\b|방수|내구|성능|보호|impermeável|durável|resistente|desempenho/i },
 ] as const
@@ -400,7 +400,15 @@ function factConsistencyFindings(input: {
     const converted = measurementToBase(value, match[2]!)
     if (!converted) continue
     const compatible = measurementFacts.filter((fact) => fact.dimension === converted.dimension)
-    if (compatible.length > 0 && !compatible.some((fact) => {
+    if (compatible.length === 0) {
+      result.push(finding(
+        input.outcomeNodeId,
+        'measurement-fact-unresolved',
+        `Localized measurement has no normalized ${converted.dimension} evidence.`,
+        [],
+        input.artifactId,
+      ))
+    } else if (!compatible.some((fact) => {
       const tolerance = Math.max(0.51, Math.abs(fact.value) * 0.02)
       return Math.abs(fact.value - converted.value) <= tolerance
     })) {

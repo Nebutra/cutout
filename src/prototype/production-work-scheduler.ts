@@ -21,7 +21,7 @@ export interface PrototypeProductionScheduler {
 
 /**
  * A queued image item becomes observable only once it owns an execution slot.
- * Callers use that boundary for paid-work lifecycle state, not enqueue time.
+ * Callers use that boundary for Provider-work lifecycle state, not enqueue time.
  */
 export type ImageWorkLimiter = <T>(
   run: () => Promise<T>,
@@ -29,7 +29,7 @@ export type ImageWorkLimiter = <T>(
 ) => Promise<T>
 
 export interface PrototypeProductionSchedulerOptions {
-  /** Terminal route failures close queued work without cancelling paid calls already in flight. */
+  /** Terminal route failures close queued work without cancelling Provider calls already in flight. */
   readonly stopQueuedImageWorkAfter?: (error: unknown) => boolean
   /** Transient route pressure lowers future concurrency while preserving independent queued work. */
   readonly reduceImageConcurrencyAfter?: (error: unknown) => boolean

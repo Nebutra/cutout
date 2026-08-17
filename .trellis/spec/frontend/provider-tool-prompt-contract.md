@@ -1,4 +1,4 @@
-# Paid-Tool Intent And Prompt Contract
+# Provider-Tool Intent And Prompt Contract
 
 ## 1. Scope / Trigger
 
@@ -9,7 +9,7 @@ needs a much larger generated prompt.
 ## 2. Signatures
 
 ```ts
-interface PaidToolRequest {
+interface ProviderToolRequest {
   capability: 'generate-image' | 'edit-image' | 'cutout'
   intent: string
   prompt: string
@@ -17,12 +17,8 @@ interface PaidToolRequest {
   approvalPolicy: 'explicit' | 'auto'
 }
 
-interface PaidToolReceipt {
-  charged?: MoneyAmount
-}
-
-function paidToolExecutionPrompt(
-  request: Pick<PaidToolRequest, 'intent' | 'prompt'>,
+function providerToolExecutionPrompt(
+  request: Pick<ProviderToolRequest, 'intent' | 'prompt'>,
 ): string
 ```
 
@@ -32,17 +28,17 @@ function paidToolExecutionPrompt(
   the human-readable observation and audit summary.
 - `prompt` is required, credential-safe, and at most 200,000 characters. It is
   the complete provider execution payload.
-- Provider adapters use `paidToolExecutionPrompt(request)`, which returns the
+- Provider adapters use `providerToolExecutionPrompt(request)`, which returns the
   complete `request.prompt` and rejects an absent value.
 - Request digests and capability leases bind the entire request, including
   `prompt`.
-- The shared `paidToolRequestSchema` owns parsing for desktop and control
+- The shared `providerToolRequestSchema` owns parsing for desktop and control
   protocol paths. Consumers must not create a duplicate schema.
-- Paid-tool requests, plans, visual DAGs, run events, and delivery previews must
+- Provider-tool requests, plans, visual DAGs, run events, and delivery previews must
   not carry a predicted cost or budget ceiling.
 - Desktop product requests always use `approvalPolicy: 'auto'`. Configuring and
   enabling a BYOK Provider is the user's standing authorization for Provider
-  execution; no per-call paid confirmation may be inserted by a caller bridge.
+  execution; no per-call confirmation may be inserted by a caller bridge.
 - Preview remains an observable, content-addressed request closure. It may expose
   route, prompt summary, roles, inputs, limits, status and receipts, but it must
   not become an approval gate.
@@ -51,9 +47,8 @@ function paidToolExecutionPrompt(
   pending approval that a user could never resolve.
 - `approvalPolicy: 'explicit'` is accepted only for protocol compatibility with
   non-desktop hosts. Product-owned desktop bridges must not emit it.
-- `receipt.charged` is optional post-execution evidence. It may be present only
-  when the executor can bind it to verifiable Provider billing evidence; it
-  must never be copied or derived from a request, plan, model, or capability.
+- Receipts contain execution identity, terminal status, timestamps and artifact
+  bindings. They do not contain prices, charges, credits or billing evidence.
 
 ## 4. Validation & Error Matrix
 
@@ -66,8 +61,7 @@ function paidToolExecutionPrompt(
 | `prompt` is valid | Execute with `prompt`; retain `intent` for audit |
 | Desktop bridge emits `approvalPolicy: 'explicit'` | Reject as product contract drift |
 | Provider capability is absent or Provider execution is disabled | Fail immediately; do not wait for approval |
-| Request or plan includes predicted cost or a budget ceiling | Reject as contract drift |
-| `receipt.charged` lacks verifiable Provider billing evidence | Omit `charged`; never infer a value |
+| Request, plan or receipt includes predicted cost, charges, credits or a budget ceiling | Reject as contract drift |
 
 ## 5. Good / Base / Bad Cases
 
@@ -76,11 +70,8 @@ function paidToolExecutionPrompt(
   the provider receives the prompt immediately.
 - Base: a current composer request carries both a bounded `intent` and complete
   provider `prompt`.
-- Good: a Provider returns verifiable billing evidence after execution and the
-  receipt records the actual `charged` amount.
 - Bad: a caller places the full generated prompt in `intent`, causing local
   validation to stop a valid generation before provider access.
-- Bad: derive `receipt.charged` from model metadata or a preflight estimate.
 - Bad: turn a valid BYOK request preview into a per-call confirmation dialog.
 
 ## 6. Tests Required
@@ -95,8 +86,7 @@ function paidToolExecutionPrompt(
   are absent and every product-owned desktop request is `auto`.
 - Desktop loop: assert a missing capability settles as `capability-required`
   without a pending approval or an approval notification.
-- Receipts: assert `charged` is absent without verifiable Provider billing
-  evidence and preserves the actual amount when such evidence exists.
+- Receipts: assert cost, charge, credit and billing fields are rejected.
 - Run `pnpm agent:validate` after changing this contract.
 
 ## 7. Wrong vs Correct

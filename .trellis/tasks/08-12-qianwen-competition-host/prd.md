@@ -28,6 +28,10 @@ benchmark constraints without forking product semantics or weakening safety.
 - Build the evaluator/package harness before optimization and retain public plus
   held-out fixtures. Classify every benchmark improvement as Kernel, Profile or
   Host before promotion; block sample-specific values and score gaming.
+- Keep public-sample gold labels and dataset fingerprints in a repository-only
+  evaluator that is excluded from the submitted package. Require category
+  retrieval to retain its result when source-category, attributes and SKU axes
+  are removed, so the score cannot depend on copied labels or product ids.
 - Do not expose benchmark video/headless support through CLI/MCP/manifest unless
   the same public surface is separately implemented and validated.
 
@@ -48,6 +52,17 @@ benchmark constraints without forking product semantics or weakening safety.
 - [x] B7: A real pre-submission DashScope rehearsal on unseen data produces a
       sanitized evidence bundle; `pnpm agent:validate`, project checks and the
       package validator pass without changing unsupported public claims.
+- [x] B8: The reviewed eleven-product public sample reports category Top-1,
+      Recall@5 and Recall@30 at `11/11`, including `11/11` Top-1 both without
+      the source category and from title-only facts. All `176/176` explicitly
+      supported measurement facts localize deterministically, while public gold
+      stays outside the runtime package.
+- [ ] B9: Package version `1.0.3` completes a fresh package-native real
+      DashScope Run and validates the resulting eleven files. This remains
+      separate from official hidden-set or leaderboard evidence.
+- [x] B10: A fresh `1.0.3` submission ZIP contains the exact reviewed 18-file
+      closure and passes version, package validation and all package tests from
+      a standalone read-only extraction without repository source access.
 
 ## Out Of Scope
 

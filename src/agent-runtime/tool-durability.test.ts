@@ -6,23 +6,26 @@ import { describe, expect, it } from 'vitest'
 import { createMemoryToolDurabilityStore } from './tool-durability'
 import { createNodeToolDurabilityStore } from './tool-durability.node'
 import type { AgentRunEvent } from './run-events'
-import type { PaidToolReceipt } from '@/control-protocol/paid-tool-contract'
+import type { ProviderToolReceipt } from '@/control-protocol/provider-tool-contract'
 
 const event = { eventId: 'event:req:success', runId: 'run', at: 3, type: 'tool-succeeded', toolCallId: 'call', tool: 'generate-image', label: 'Hero', outputRefs: ['artifact:hero'] } as AgentRunEvent
-const receipt: PaidToolReceipt = { receiptId: 'receipt', requestId: 'req', capability: 'generate-image', providerId: 'provider', model: 'model', status: 'succeeded', charged: { currency: 'USD', amount: 1 }, outputArtifactIds: ['artifact:hero'], startedAt: 2, completedAt: 3 }
+const receipt: ProviderToolReceipt = { receiptId: 'receipt', requestId: 'req', capability: 'generate-image', providerId: 'provider', model: 'model', status: 'succeeded', outputArtifactIds: ['artifact:hero'], startedAt: 2, completedAt: 3 }
 
 describe.each([
   ['memory', async () => createMemoryToolDurabilityStore()],
   ['node', async () => { const root = await mkdtemp(join(tmpdir(), 'cutout-tool-ledger-')); return Object.assign(createNodeToolDurabilityStore(root), { cleanup: () => rm(root, { recursive: true, force: true }), root }) }],
 ])('tool durability store: %s', (_, factory) => {
-  it('deduplicates success with charged evidence and replays the event outbox', async () => {
+  it('deduplicates a successful receipt and replays the event outbox', async () => {
     const store = await factory()
     try {
       expect((await store.plan({ requestId: 'req', runId: 'run', toolCallId: 'call', capability: 'generate-image', at: 1 })).duplicate).toBe(false)
       await store.begin('req', 'attempt:1', 2)
       await store.settle('req', 'attempt:1', { status: 'succeeded', receipt, at: 3 }, [event])
       expect((await store.plan({ requestId: 'req', runId: 'run', toolCallId: 'call', capability: 'generate-image', at: 4 })).duplicate).toBe(true)
-      expect(await store.get('req')).toMatchObject({ status: 'succeeded', attempts: [{ status: 'succeeded', receipt: { charged: { amount: 1 } } }] })
+      expect(await store.get('req')).toMatchObject({
+        status: 'succeeded',
+        attempts: [{ status: 'succeeded', receipt: { receiptId: 'receipt' } }],
+      })
       await expect(store.drainEvents(() => { throw new Error('event sink unavailable') })).rejects.toThrow('event sink unavailable')
       const delivered: AgentRunEvent[] = []
       expect(await store.drainEvents((events) => delivered.push(...events))).toBe(1)

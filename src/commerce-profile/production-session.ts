@@ -13,7 +13,10 @@ import {
   runCommerceHeldOutProduction,
   type CommerceHeldOutPendingAdmission,
 } from './production-runner'
-import type { MultimodalDesktopHost } from '@/multimodal-host'
+import {
+  createCommerceProductionDesktopHost,
+  type CommerceProductionHost,
+} from './production-host'
 import { z } from 'zod'
 
 export const COMMERCE_HELD_OUT_ADMITTED_EVIDENCE_SCHEMA = 'commerce.held-out-admitted-evidence.v1' as const
@@ -35,7 +38,7 @@ export async function runCommerceHeldOutEvaluatorPackage(input: {
   readonly evaluatorPackage: unknown
   readonly providerId: string
   readonly signal?: AbortSignal
-  readonly host?: MultimodalDesktopHost
+  readonly host?: CommerceProductionHost
 }): Promise<CommerceHeldOutPendingAdmission> {
   const evaluatorPackage = await decodeCommerceHeldOutEvaluatorPackage(input.evaluatorPackage)
   const runInput = evaluatorPackage.input
@@ -54,6 +57,7 @@ export async function runCommerceHeldOutEvaluatorPackage(input: {
 export async function admitCommerceHeldOutPending(input: {
   readonly pending: unknown
   readonly evaluatorAttestation: unknown
+  readonly host?: CommerceProductionHost
 }): Promise<CommerceHeldOutAdmittedEvidence> {
   const pending = await decodeCommerceHeldOutPendingAdmission(input.pending)
   const evaluatorAttestation = commerceHeldOutEvaluatorAttestationSchema.parse(input.evaluatorAttestation)
@@ -66,6 +70,7 @@ export async function admitCommerceHeldOutPending(input: {
     rehearsalBundle: pending.bundle,
     commitment: pending.commitment,
     evaluatorAttestation,
+    host: input.host ?? createCommerceProductionDesktopHost(),
     identity,
   })
   if (!benchmarkReport.summary.productionReady
@@ -83,11 +88,13 @@ export async function admitCommerceHeldOutPending(input: {
 
 export async function decodeCommerceHeldOutAdmittedEvidence(
   input: unknown,
+  host: CommerceProductionHost = createCommerceProductionDesktopHost(),
 ): Promise<CommerceHeldOutAdmittedEvidence> {
   const candidate = commerceHeldOutAdmittedEvidenceSchema.parse(input)
   const expected = await admitCommerceHeldOutPending({
     pending: candidate.pending,
     evaluatorAttestation: candidate.evaluatorAttestation,
+    host,
   })
   if (canonicalJson(candidate) !== canonicalJson(expected)) {
     throw new Error('Admitted Commerce evidence does not match native re-verification.')

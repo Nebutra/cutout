@@ -280,6 +280,60 @@ describe('Commerce catalog closure and offline policies (P2-P4)', () => {
     ]))
   })
 
+  it('separates qualitative length attributes from numeric measurement evidence', () => {
+    const supportingFact = {
+      ...facts.facts[0]!,
+      id: 'fact:product.attribute.closure',
+      field: 'product.attribute.closure',
+      value: { type: 'text' as const, value: 'Matte black full-length zipper' },
+      confidence: 'explicit' as const,
+    }
+    const explicitFacts = { ...facts, facts: [...facts.facts, supportingFact] }
+    const english = fixtureLocalizedDescription(explicitFacts, 'en-US')
+    const description = {
+      ...english,
+      attributes: [
+        ...english.attributes,
+        {
+          text: 'Closure: Matte black full-length zipper',
+          citations: [{ factId: supportingFact.id }],
+        },
+      ],
+    }
+
+    expect(validateLocalizedDescription({
+      outcomeNodeId: 'outcome:en-US',
+      description,
+      facts: explicitFacts,
+      policy: ALIEXPRESS_POLICY_PACKS['en-US'],
+      categoryIndex: categories,
+      attributeIndex: attributes,
+      artifactId: `artifact:sha256:${'a'.repeat(64)}`,
+      mediaType: 'text/markdown',
+      byteLength: 1_024,
+    }).map((finding) => finding.code)).not.toContain('claim-dimensions-unsupported')
+  })
+
+  it('rejects numeric measurements when no normalized measurement fact exists', () => {
+    const english = fixtureLocalizedDescription(facts, 'en-US')
+    const factsWithoutMeasurements = {
+      ...facts,
+      facts: facts.facts.filter((fact) => fact.value.type !== 'measurement'),
+    }
+    const invalid = {
+      ...english,
+      summary: [{ ...english.summary[0]!, text: 'Length: 60 cm.' }],
+    }
+    expect(validateLocalizedDescription({
+      outcomeNodeId: 'outcome:en-US',
+      description: invalid,
+      facts: factsWithoutMeasurements,
+      policy: ALIEXPRESS_POLICY_PACKS['en-US'],
+      categoryIndex: categories,
+      attributeIndex: attributes,
+    }).map((finding) => finding.code)).toContain('measurement-fact-unresolved')
+  })
+
   it('rejects a catalog-valid attribute that has no normalized product evidence', () => {
     const extendedAttributes = buildAttributeIndex(JSON.stringify({
       tops: [

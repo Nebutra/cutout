@@ -29,7 +29,7 @@ describe('material impact planning', () => {
       scope: 'page',
       redo: ['page:checkout', 'all-slices'],
       preserve: ['design:design-system', 'page:home'],
-      paidActionRequired: true,
+      providerActionRequired: true,
       degradation: null,
       blockedReason: null,
     })
@@ -77,7 +77,7 @@ describe('material impact planning', () => {
     }
 
     const plan = buildMaterialImpactPlan(slice, inventory)
-    expect(plan.paidActionRequired).toBe(false)
+    expect(plan.providerActionRequired).toBe(false)
     expect(plan.blockedReason).toContain('source page')
   })
 
@@ -87,7 +87,7 @@ describe('material impact planning', () => {
     expect(reconcileMaterialSelection(page, [{ ...page, version: 'page-v2' }])).toBeNull()
   })
 
-  it('rejects stale or blocked plans before a paid action can start', () => {
+  it('rejects stale or blocked plans before a Provider action can start', () => {
     const plan = buildMaterialImpactPlan(page, inventory)
     expect(() => assertImpactPlanCurrent(plan, page)).not.toThrow()
     expect(() => assertImpactPlanCurrent(plan, { ...page, version: 'page-v2' }))

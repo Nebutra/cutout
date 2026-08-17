@@ -781,7 +781,7 @@ describe('GenerationService.generateImages', () => {
     expect(invokeMock).not.toHaveBeenCalled()
   })
 
-  it('does not invoke the paid image endpoint when already aborted', async () => {
+  it('does not invoke the Provider image endpoint when already aborted', async () => {
     const controller = new AbortController()
     controller.abort()
     const generation = createLocalGenerationService(providersWith([cfg()]), prompts)

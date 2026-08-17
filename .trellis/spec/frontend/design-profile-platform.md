@@ -59,6 +59,13 @@ evidenceBenchmarkAdapters.verifyAndProject(reference, retainedEvidence): Promise
 - A trusted implementation digest binds executable function source, runtime
   schemas and behavior-defining constants. Hashing an id/version label, copying a
   manifest digest, or registering an empty compiler is not implementation proof.
+- Every Zod schema supplied to `fingerprintTrustedImplementation` must export a
+  strict JSON Schema through `z.toJSONSchema`. `preprocess` and output `transform`
+  nodes are not fingerprintable contracts. When a native `Option<T>` may arrive
+  as `null` but the domain output must omit that field, use a Zod `codec` with a
+  `nullish` input schema and an `optional` output schema, then test both native
+  normalization and JSON Schema export. Never select `unrepresentable: 'any'` or
+  remove the schema from the digest to make installation pass.
 - A compiler selection must exist in the supplied installed closure. Each
   compiler receives the same deeply frozen Universal Brief and is invoked twice;
   mutation or canonically different replay results fail closed. Ranking and
@@ -139,6 +146,7 @@ evidenceBenchmarkAdapters.verifyAndProject(reference, retainedEvidence): Promise
 | Verified envelope packet/target/hash differs at ChangeSet handoff | Reject as stale or unreviewed; never apply |
 | Adapter output changes Profile or ruler identity | Reject the projection |
 | Implementation hash covers only labels/version text | Reject admission review; bind functions, schemas and constants |
+| A fingerprinted runtime schema contains an unrepresentable preprocess/transform | Reject implementation fingerprinting; replace it with an introspectable schema/codec and retain strict export |
 | Maturity source is fixture, stubbed verifier, id-only report or precomputed pass | Reject the invocation or omit the adapter; keep the stage blocked |
 | Maturity adapter implements synchronous `project(report)` instead of asynchronous retained-evidence verification | Reject registration |
 | A real bundle lacks independently verifiable unseen-input/acceptance evidence | Pass only reverified Real-Host metrics; keep Production Rehearsal and readiness blocked |
@@ -175,6 +183,7 @@ evidenceBenchmarkAdapters.verifyAndProject(reference, retainedEvidence): Promise
   uniqueness, canonical envelope decode and stale ChangeSet handoff.
 - Regression: held-out contract Profile, exact Commerce graph/Contract/Plan/
   evaluation parity, fake maturity-input rejection, Kernel conformance,
+  strict JSON Schema export for every fingerprinted cross-layer receipt,
   TypeScript, lint, build, and diff check.
 
 ### 7. Wrong vs Correct
@@ -194,6 +203,19 @@ await fingerprintTrustedImplementation({
   schemas: [profileEvidenceSchema],
   constants: [PROFILE_RECIPE],
 })
+
+// Wrong: native null normalization becomes an opaque transform, so the trusted
+// implementation digest cannot inspect the schema.
+const nativeOptionalWrong = <T extends z.ZodType>(schema: T) =>
+  z.preprocess((value) => value === null ? undefined : value, schema.optional())
+
+// Correct: the codec declares different native-input and domain-output schemas;
+// both remain JSON-Schema-introspectable and null is removed from parsed output.
+const nativeOptional = <Value>(schema: z.ZodType<Value, Value>) => z.codec(
+  schema.nullish(),
+  schema.optional(),
+  { decode: (value) => value ?? undefined, encode: (value) => value },
+)
 await assertProfileLifecycleChangeSet({
   preview,
   previewHash: preview.previewHash,
