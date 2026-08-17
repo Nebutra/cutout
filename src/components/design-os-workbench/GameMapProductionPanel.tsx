@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Box,
   Braces,
@@ -291,7 +291,7 @@ export function GameMapProductionPanel({ launch }: { readonly launch?: GameMapLa
   const [mapName, setMapName] = useState('')
   const [brief, setBrief] = useState(launch?.intent.sourceText ?? '')
   const [referenceFile, setReferenceFile] = useState<File | null>(null)
-  const [referenceUrl, setReferenceUrl] = useState<string | null>(null)
+  const referenceCanvasRef = useRef<HTMLCanvasElement>(null)
   const [providers, setProviders] = useState<readonly ProviderConfig[]>([])
   const [providersLoaded, setProvidersLoaded] = useState(false)
   const [plan, setPlan] = useState<GameMapProductionPlan | null>(null)
@@ -329,13 +329,26 @@ export function GameMapProductionPanel({ launch }: { readonly launch?: GameMapLa
   }, [providerService])
 
   useEffect(() => {
-    if (!referenceFile) {
-      setReferenceUrl(null)
-      return
-    }
-    const url = URL.createObjectURL(referenceFile)
-    setReferenceUrl(url)
-    return () => URL.revokeObjectURL(url)
+    const canvas = referenceCanvasRef.current
+    if (!canvas || !referenceFile) return
+    let active = true
+    void createImageBitmap(referenceFile)
+      .then((bitmap) => {
+        if (!active) {
+          bitmap.close()
+          return
+        }
+        const scale = Math.min(1, 1024 / Math.max(bitmap.width, bitmap.height))
+        canvas.width = Math.max(1, Math.round(bitmap.width * scale))
+        canvas.height = Math.max(1, Math.round(bitmap.height * scale))
+        const context = canvas.getContext('2d')
+        context?.drawImage(bitmap, 0, 0, canvas.width, canvas.height)
+        bitmap.close()
+      })
+      .catch(() => {
+        if (active) setError('Planning reference could not be decoded as an image.')
+      })
+    return () => { active = false }
   }, [referenceFile])
 
   useEffect(() => {
@@ -545,8 +558,8 @@ export function GameMapProductionPanel({ launch }: { readonly launch?: GameMapLa
           <div className="flex min-h-64 flex-col border border-border bg-muted/20 p-3">
             <Label htmlFor="game-map-reference" className="text-xs">Planning reference</Label>
             <label htmlFor="game-map-reference" className="mt-2 flex min-h-48 flex-1 cursor-pointer items-center justify-center overflow-hidden border border-dashed border-border bg-background">
-              {referenceUrl
-                ? <img src={referenceUrl} alt="Selected map planning reference" className="max-h-72 w-full object-contain" />
+              {referenceFile
+                ? <canvas ref={referenceCanvasRef} role="img" aria-label="Selected map planning reference" className="max-h-72 max-w-full object-contain" />
                 : <FileImage className="size-6 text-muted-foreground" />}
               <input id="game-map-reference" className="sr-only" type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => { setReferenceFile(event.target.files?.[0] ?? null); resetProjection() }} />
             </label>

@@ -1,5 +1,6 @@
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
+import { readFileSync } from 'node:fs'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { ServiceProvider } from '@/services/context'
 import type { ServiceRegistry } from '@/services/types'
@@ -28,6 +29,14 @@ describe('Game Map Workbench projection', () => {
   afterEach(() => {
     act(() => root.unmount())
     container.remove()
+  })
+
+  it('decodes local planning references into a canvas instead of a DOM URL source', () => {
+    const source = readFileSync('src/components/design-os-workbench/GameMapProductionPanel.tsx', 'utf8')
+    expect(source).toContain('createImageBitmap(referenceFile)')
+    expect(source).toContain('<canvas ref={referenceCanvasRef}')
+    expect(source).not.toContain('URL.createObjectURL(referenceFile)')
+    expect(source).not.toContain('<img src={referenceUrl}')
   })
 
   it('opens an inferred map brief in the shared Game lane without a mode selector', async () => {
