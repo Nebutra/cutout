@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 import { createHash } from 'node:crypto'
 import { readFile, readdir } from 'node:fs/promises'
 import { basename, join, resolve } from 'node:path'

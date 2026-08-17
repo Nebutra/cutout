@@ -1,7 +1,7 @@
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { readFileSync } from 'node:fs'
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ServiceProvider } from '@/services/context'
 import type { ServiceRegistry } from '@/services/types'
 import { GameAssetProductionPanel } from './GameAssetProductionPanel'
@@ -61,9 +61,11 @@ describe('Game Map Workbench projection', () => {
       .find((button) => button.textContent?.includes('Build runtime plan'))
     expect(compile).toBeDefined()
     await act(async () => compile?.click())
+    await vi.waitFor(() => {
+      expect(container.textContent).toContain('Planning references')
+    })
 
     expect(container.textContent).toContain('side-scroll')
-    expect(container.textContent).toContain('Planning references')
     expect(container.textContent).toContain('Runtime authority')
     expect(container.textContent).toContain('Runtime geometry')
     expect(container.textContent).toContain('Neutral map bundle')

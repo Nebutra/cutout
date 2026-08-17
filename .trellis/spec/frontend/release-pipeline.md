@@ -143,6 +143,9 @@ installer version differs from their release version.
   plugin source fingerprints and mirrored text trees normalize both forms.
   Cross-platform tests use native path parsing and Windows `.cmd` shims for
   package executables; unsupported Windows process-tree control fails closed.
+  An ESM module imported by Vitest must remain shebang-free; executable command
+  entrypoints use a separate wrapper so transforms cannot reinterpret a shebang
+  after generated imports on Windows.
   Tests that launch real compilers, browsers, packagers, or other child
   processes declare an explicit per-test timeout sized for the slowest supported
   CI platform. Do not rely on the framework's short default timeout, raise the
