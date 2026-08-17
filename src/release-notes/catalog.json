@@ -2,6 +2,112 @@
   "protocol": "cutout.release-notes.catalog.v1",
   "entries": [
     {
+      "version": "0.1.21",
+      "releasedOn": "2026-08-17",
+      "locales": {
+        "en": {
+          "headline": "A Canvas-first Design OS for Commerce and Game production",
+          "highlights": [
+            {
+              "id": "canvas-agent-workflow",
+              "title": "Work through Agent and Canvas",
+              "body": "State the outcome in Agent, then create, compare, review and deliver on Canvas. Project files, Git, DESIGN.md and diagnostics remain available as secondary tools instead of mandatory workflow steps."
+            },
+            {
+              "id": "commerce-production",
+              "title": "Produce complete Commerce material sets",
+              "body": "Commerce can generate localized copy, product images, detail assets and video strategy through one bounded DAG, with retained artifacts, exact receipts, stale-result blocking and direct Canvas review."
+            },
+            {
+              "id": "game-asset-delivery",
+              "title": "Build coherent game families and maps",
+              "body": "Game production now supports reviewable action families and layered map closures, with exact source lineage, targeted repair, deterministic previews and runtime-neutral candidate bundles."
+            }
+          ]
+        },
+        "zh-CN": {
+          "headline": "以 Canvas 为中心的 Commerce 与游戏设计生产",
+          "highlights": [
+            {
+              "id": "canvas-agent-workflow",
+              "title": "通过 Agent 与 Canvas 完成工作",
+              "body": "在 Agent 中描述目标，然后直接在 Canvas 上创建、比较、审核和交付。项目文件、Git、DESIGN.md 与诊断能力作为次级工具保留，不再是必须逐步操作的流程。"
+            },
+            {
+              "id": "commerce-production",
+              "title": "生产完整的 Commerce 素材套件",
+              "body": "Commerce 可通过一个受限 DAG 生成本地化文案、商品图、详情素材与视频策略，并保留素材、精确 receipt、过期结果阻断和 Canvas 直接审核能力。"
+            },
+            {
+              "id": "game-asset-delivery",
+              "title": "构建一致的游戏动作族与地图",
+              "body": "游戏生产现在支持可逐组审核的动作族和分层地图闭包，并保留精确来源谱系、定向修复、确定性预览与引擎中立的候选交付包。"
+            }
+          ]
+        },
+        "ja": {
+          "headline": "Canvas 中心の Commerce とゲーム制作",
+          "highlights": [
+            {
+              "id": "canvas-agent-workflow",
+              "title": "Agent と Canvas で作業を完結",
+              "body": "Agent に成果を伝え、Canvas 上で作成、比較、レビュー、納品まで進めます。プロジェクトファイル、Git、DESIGN.md、診断は必須手順ではなく補助ツールとして利用できます。"
+            },
+            {
+              "id": "commerce-production",
+              "title": "完全な Commerce 素材セットを制作",
+              "body": "1つの制約付き DAG でローカライズ文案、商品画像、詳細素材、動画戦略を生成し、保持済み成果物、正確な receipt、古い結果の阻止、Canvas での直接レビューを提供します。"
+            },
+            {
+              "id": "game-asset-delivery",
+              "title": "一貫したアクション群とマップを構築",
+              "body": "ゲーム制作は、レビュー可能なアクション群とレイヤー化マップを扱い、正確なソース系譜、対象修復、決定的プレビュー、エンジン非依存の候補バンドルを保持します。"
+            }
+          ]
+        },
+        "fr": {
+          "headline": "Un Design OS centre sur Canvas pour Commerce et le jeu",
+          "highlights": [
+            {
+              "id": "canvas-agent-workflow",
+              "title": "Travailler avec Agent et Canvas",
+              "body": "Decrivez le resultat dans Agent, puis creez, comparez, revisez et livrez dans Canvas. Les fichiers, Git, DESIGN.md et les diagnostics restent des outils secondaires plutot que des etapes obligatoires."
+            },
+            {
+              "id": "commerce-production",
+              "title": "Produire des ensembles Commerce complets",
+              "body": "Commerce genere textes localises, images produit, contenus de detail et strategie video dans un DAG borne, avec artefacts conserves, receipts exacts, blocage des resultats obsoletes et revue directe dans Canvas."
+            },
+            {
+              "id": "game-asset-delivery",
+              "title": "Construire des familles et cartes de jeu coherentes",
+              "body": "La production de jeu prend en charge des familles d'actions revisables et des cartes en couches, avec filiation exacte, reparation ciblee, apercus deterministes et bundles candidats neutres vis-a-vis du moteur."
+            }
+          ]
+        },
+        "es": {
+          "headline": "Un Design OS centrado en Canvas para Commerce y juegos",
+          "highlights": [
+            {
+              "id": "canvas-agent-workflow",
+              "title": "Trabajar mediante Agent y Canvas",
+              "body": "Describe el resultado en Agent y luego crea, compara, revisa y entrega en Canvas. Los archivos, Git, DESIGN.md y los diagnosticos siguen disponibles como herramientas secundarias, no como pasos obligatorios."
+            },
+            {
+              "id": "commerce-production",
+              "title": "Producir conjuntos Commerce completos",
+              "body": "Commerce genera textos localizados, imagenes de producto, contenidos de detalle y estrategia de video mediante un DAG acotado, con artefactos retenidos, receipts exactos, bloqueo de resultados obsoletos y revision directa en Canvas."
+            },
+            {
+              "id": "game-asset-delivery",
+              "title": "Construir familias y mapas de juego coherentes",
+              "body": "La produccion de juegos admite familias de acciones revisables y mapas por capas, con linaje exacto, reparacion dirigida, vistas previas deterministas y bundles candidatos neutrales para el motor."
+            }
+          ]
+        }
+      }
+    },
+    {
       "version": "0.1.20",
       "releasedOn": "2026-08-14",
       "locales": {
@@ -112,7 +218,7 @@
       "releasedOn": "2026-08-05",
       "locales": {
         "en": {
-          "headline": "Readable preparation and honest paid-action decisions",
+          "headline": "Readable preparation and direct Provider execution",
           "highlights": [
             {
               "id": "planning-phases",
@@ -125,14 +231,14 @@
               "body": "Cutout negotiates a supported version range and generated-schema features instead of pinning one exact version, and reports a turn failure as a specific cause rather than a generic terminal error."
             },
             {
-              "id": "paid-actions-without-estimates",
-              "title": "Paid actions decided on facts",
-              "body": "A configured BYOK Provider is standing authorization for paid execution, so Cutout does not stop for per-call payment approval. Capability policy, observable progress, cancellation, and verifiable billing evidence remain in force."
+              "id": "direct-provider-execution",
+              "title": "Provider actions start from capability facts",
+              "body": "A configured BYOK Provider is sufficient execution authority, so Cutout starts calls directly while capability policy, observable progress and cancellation remain in force."
             }
           ]
         },
         "zh-CN": {
-          "headline": "可读的准备过程与诚实的付费决策",
+          "headline": "可读的准备过程与直接 Provider 执行",
           "highlights": [
             {
               "id": "planning-phases",
@@ -145,14 +251,14 @@
               "body": "Cutout 现在协商受支持的版本区间与生成式 schema 能力，不再钉死单一版本；一次对话失败会给出具体原因，而不是笼统的终止错误。"
             },
             {
-              "id": "paid-actions-without-estimates",
-              "title": "付费动作依据事实决定",
-              "body": "已配置的 BYOK Provider 即代表持续授权，Cutout 不再为每次付费调用停下来请求批准。能力策略、可观察进度、取消能力与可验证账单证据仍然保留。"
+              "id": "direct-provider-execution",
+              "title": "Provider 动作依据能力事实执行",
+              "body": "已配置的 BYOK Provider 即具备执行权限，Cutout 会直接开始调用，同时保留能力策略、可观察进度与取消能力。"
             }
           ]
         },
         "ja": {
-          "headline": "読み取れる準備処理と、誠実な有料アクション判断",
+          "headline": "読み取れる準備処理と直接的な Provider 実行",
           "highlights": [
             {
               "id": "planning-phases",
@@ -165,14 +271,14 @@
               "body": "厳密な1バージョンに固定するのではなく、対応バージョン範囲と生成スキーマ機能をネゴシエートします。ターンの失敗は、汎用的な終了エラーではなく具体的な原因として報告されます。"
             },
             {
-              "id": "paid-actions-without-estimates",
-              "title": "事実に基づく有料アクション",
-              "body": "設定済みの BYOK Provider を継続的な認可として扱い、呼び出しごとの支払い承認では停止しません。機能ポリシー、進捗の可視化、キャンセル、検証可能な請求証跡は維持されます。"
+              "id": "direct-provider-execution",
+              "title": "機能の事実に基づく Provider 実行",
+              "body": "設定済みの BYOK Provider を実行権限として扱い、Cutout は呼び出しを直接開始します。機能ポリシー、進捗の可視化、キャンセルは維持されます。"
             }
           ]
         },
         "fr": {
-          "headline": "Une préparation lisible et des décisions payantes honnêtes",
+          "headline": "Une preparation lisible et une execution Provider directe",
           "highlights": [
             {
               "id": "planning-phases",
@@ -185,14 +291,14 @@
               "body": "Cutout négocie une plage de versions prise en charge et les fonctionnalités de schéma généré au lieu de figer une version exacte, et signale l'échec d'un tour par une cause précise plutôt que par une erreur terminale générique."
             },
             {
-              "id": "paid-actions-without-estimates",
-              "title": "Des actions payantes décidées sur des faits",
-              "body": "Un Provider BYOK configuré vaut autorisation permanente pour l'exécution payante : Cutout ne s'arrête plus pour une approbation à chaque appel. La politique de capacité, la progression observable, l'annulation et les preuves de facturation vérifiables restent actives."
+              "id": "direct-provider-execution",
+              "title": "Execution Provider fondee sur les capacites",
+              "body": "Un Provider BYOK configure suffit pour executer les appels. Cutout les lance directement tout en conservant la politique de capacite, la progression observable et l'annulation."
             }
           ]
         },
         "es": {
-          "headline": "Preparación legible y decisiones de pago honestas",
+          "headline": "Preparacion legible y ejecucion Provider directa",
           "highlights": [
             {
               "id": "planning-phases",
@@ -205,9 +311,9 @@
               "body": "Cutout negocia un rango de versiones compatibles y las funciones de esquema generado en lugar de fijar una versión exacta, e informa el fallo de un turno con una causa concreta en vez de un error terminal genérico."
             },
             {
-              "id": "paid-actions-without-estimates",
-              "title": "Acciones de pago decididas con hechos",
-              "body": "Un Provider BYOK configurado actúa como autorización permanente para la ejecución de pago, por lo que Cutout no se detiene para pedir aprobación en cada llamada. Se mantienen la política de capacidades, el progreso observable, la cancelación y la evidencia de facturación verificable."
+              "id": "direct-provider-execution",
+              "title": "Ejecucion Provider basada en capacidades",
+              "body": "Un Provider BYOK configurado basta para ejecutar llamadas. Cutout las inicia directamente y conserva la politica de capacidades, el progreso observable y la cancelacion."
             }
           ]
         }
