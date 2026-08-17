@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.1.22 - 2026-08-17
+## 0.1.23 - 2026-08-17
 
 - Publish the Canvas-first Agent workflow with bounded Commerce production and
   coherent Game Asset family and map delivery from the reviewed main branch.
@@ -9,6 +9,8 @@
 - Stabilize release tests across macOS, Linux, Windows, Node 22, and Node 24 by
   keeping importable benchmark modules shebang-free and awaiting async map
   projections before asserting their evidence.
+- Prepare the packaged-app smoke evidence directory before native startup so
+  Apple Silicon release builds verify the real signed application reliably.
 
 ## 0.1.21 - 2026-08-17
 
