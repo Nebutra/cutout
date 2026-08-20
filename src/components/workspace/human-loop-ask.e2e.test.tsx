@@ -206,14 +206,14 @@ function fakeRegistry(key: string, base: string): ServiceRegistry {
       list: async () => [{
         // `wireProtocol` is mandatory for every non-gateway kind
         // (services/ai/provider-types.ts:76).
-        id: PROVIDER_ID, kind: 'openai', label: 'Test', wireProtocol: 'chat-completions', defaultModel: MODEL, enabled: true,
+        id: PROVIDER_ID, kind: 'openai', label: 'Test', wireProtocol: 'chat-completions', catalog: { models: [MODEL], fetchedAt: '2026-08-20T00:00:00.000Z' }, enabled: true,
       }],
       upsert: notUsed,
       remove: notUsed,
       setKey: notUsed,
       status: async () => ({ hasKey: true }),
       statuses: async (ids) => Object.fromEntries(ids.map((id) => [id, true])),
-      test: async () => ok({ model: MODEL, models: [MODEL] }),
+      test: async () => ok({ models: [MODEL] }),
     },
     generation: {
       generateText: async () => err('not used in this test'),

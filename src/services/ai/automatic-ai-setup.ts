@@ -86,9 +86,7 @@ export function automaticBindingsFor(
       && !isImageModelNominationCandidate(model)
       && !hasImageCapability(provider.id, model)))
     .find((row) => row !== undefined)
-  const chat = rows.find(({ provider, model }) =>
-    model === provider.defaultModel && !isImageModelNominationCandidate(model) && !hasImageCapability(provider.id, model))
-    ?? rows.find(({ provider, model }) => TEXT_MODEL.test(model) && !isImageModelNominationCandidate(model) && !hasImageCapability(provider.id, model))
+  const chat = rows.find(({ provider, model }) => TEXT_MODEL.test(model) && !isImageModelNominationCandidate(model) && !hasImageCapability(provider.id, model))
     ?? rows.find(({ provider, model }) => !isImageModelNominationCandidate(model) && !hasImageCapability(provider.id, model))
   const assessed = rows.filter(({ provider, model }) =>
     isImageModelNominationCandidate(model) || hasImageCapability(provider.id, model)
@@ -102,19 +100,12 @@ export function automaticBindingsFor(
   })
   const preferredSupportedRoute = (
     operation: 'generation' | 'edit',
-  ) => {
-    const supported = assessed.filter((route) => route[operation].supported)
-    const configuredDefault = supported.find((route) => {
-      const provider = rows.find(({ provider, model }) =>
-        provider.id === route.assignment.providerId
-        && model === route.assignment.model)?.provider
-      return provider?.defaultModel === route.assignment.model
-    })
-    return configuredDefault ?? sortImageRouteRecommendations(
-      supported.map((route) => ({ ...route, model: route.assignment.model })),
-      'refinement',
-    )[0]
-  }
+  ) => sortImageRouteRecommendations(
+    assessed
+      .filter((route) => route[operation].supported)
+      .map((route) => ({ ...route, model: route.assignment.model })),
+    'refinement',
+  )[0]
   const generation = preferredSupportedRoute('generation')
   const edit = preferredSupportedRoute('edit')
 
@@ -168,11 +159,9 @@ export async function configureAutomaticAi(
   }
   const bindings = automaticBindingsFor(configured, options)
   await setAutomaticCapabilityBindings(bindings, automaticDescriptorsFor(configured))
-  for (const { provider, models } of configured) {
+  for (const { provider } of configured) {
     setProviderVerification(provider.id, {
       status: 'verified',
-      model: provider.defaultModel,
-      models,
       checkedAt: new Date().toISOString(),
     })
   }

@@ -168,7 +168,6 @@ describe('provider discovery native contract', () => {
       draftId: 'provider-draft:opaque',
       providerId: 'provider-id',
       label: 'OpenAI',
-      defaultModel: 'gpt-5',
       enabled: true,
     })).resolves.toEqual(saved)
     expect(invokeMock).toHaveBeenCalledWith('import_provider_draft', {
@@ -176,7 +175,6 @@ describe('provider discovery native contract', () => {
         draftId: 'provider-draft:opaque',
         providerId: 'provider-id',
         label: 'OpenAI',
-        defaultModel: 'gpt-5',
         enabled: true,
       },
     })

@@ -15,7 +15,7 @@ import { Trans, useLingui } from '@lingui/react/macro'
 import type { AssetRef } from '@/services/types'
 import { useAddAsset, useAssets, useRemoveAsset } from '@/hooks/queries/assets'
 import { useComposeFromLibrary } from '@/hooks/queries/pipeline'
-import { useModelAssignments } from '@/hooks/queries/ai-settings'
+import { useTaskAssignment } from '@/hooks/queries/ai-settings'
 import { baseName, isSupportedImage } from '@/lib/image'
 import {
   Sheet,
@@ -37,8 +37,8 @@ export function LibraryDrawer({ open, onOpenChange }: LibraryDrawerProps) {
   const addAsset = useAddAsset()
   const removeAsset = useRemoveAsset()
   const compose = useComposeFromLibrary()
-  const assignments = useModelAssignments()
-  const hasImageModel = Boolean(assignments.data?.image)
+  const imageRoute = useTaskAssignment('image-generation')
+  const hasImageModel = Boolean(imageRoute.assignment)
 
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set())
   const inputRef = useRef<HTMLInputElement | null>(null)

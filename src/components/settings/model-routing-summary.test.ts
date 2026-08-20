@@ -15,7 +15,7 @@ const provider = (
   kind,
   label: kind,
   wireProtocol: kind === 'openai' ? 'responses' : 'chat-completions',
-  defaultModel: 'chat-model',
+  catalog: { models: ['chat-model'], fetchedAt: '2026-07-28T00:00:00.000Z' },
   enabled: true,
   ...overrides,
 })
@@ -40,11 +40,18 @@ const imageDescriptor = (providerId: string, model: string): ModelDescriptor => 
   ],
 })
 
-const verification = (models: readonly string[]): ProviderVerification => ({
+const verification = (): ProviderVerification => ({
   status: 'verified',
-  model: models[0]!,
-  models: [...models],
   checkedAt: '2026-07-28T00:00:00.000Z',
+})
+
+/** Catalog evidence now lives on the connection, so tests set it there. */
+const withCatalog = (
+  base: ProviderConfig,
+  models: readonly string[],
+): ProviderConfig => ({
+  ...base,
+  catalog: { models: [...models], fetchedAt: '2026-07-28T00:00:00.000Z' },
 })
 
 describe('model routing summary', () => {
@@ -69,9 +76,9 @@ describe('model routing summary', () => {
       'image-edit': { providerId: 'openai-compatible', model: 'image-model' },
     }, [imageDescriptor('openai-compatible', 'image-model')])
     const result = modelRoutingCoverage(
-      [provider('openai-compatible')],
+      [withCatalog(provider('openai-compatible'), ['chat-model', 'image-model'])],
       routes,
-      { 'openai-compatible': verification(['chat-model', 'image-model']) },
+      { 'openai-compatible': verification() },
     )
     expect(result.missing).toEqual([])
     expect(result.covered.map((item) => item.task)).toEqual([
@@ -92,9 +99,9 @@ describe('model routing summary', () => {
       'image-edit': { providerId: 'openai-compatible', model: 'image-model' },
     })
     const result = modelRoutingCoverage(
-      [provider('openai-compatible')],
+      [withCatalog(provider('openai-compatible'), ['chat-model'])],
       routes,
-      { 'openai-compatible': verification(['chat-model']) },
+      { 'openai-compatible': verification() },
     )
     expect(result.missing.map((item) => item.task)).toEqual([
       'image-generation',
@@ -108,9 +115,9 @@ describe('model routing summary', () => {
       'image-edit': { providerId: 'openai-compatible', model: 'image-model' },
     })
     const result = modelRoutingCoverage(
-      [provider('openai-compatible')],
+      [withCatalog(provider('openai-compatible'), ['image-model'])],
       routes,
-      { 'openai-compatible': verification(['image-model']) },
+      { 'openai-compatible': verification() },
     )
     expect(result.missing.map((item) => item.task)).toEqual(expect.arrayContaining([
       'image-generation',
@@ -123,14 +130,14 @@ describe('model routing summary', () => {
       'image-generation': { providerId: 'openai-compatible', model: 'image-model' },
     })
     expect(modelRoutingCoverage(
-      [provider('openai-compatible', { enabled: false })],
+      [withCatalog(provider('openai-compatible', { enabled: false }), ['image-model'])],
       route,
-      { 'openai-compatible': verification(['image-model']) },
+      { 'openai-compatible': verification() },
     ).missing.map((item) => item.task)).toContain('image-generation')
     expect(modelRoutingCoverage(
-      [provider('openai-compatible')],
+      [withCatalog(provider('openai-compatible'), ['image-model'])],
       bindings({ 'image-generation': { providerId: 'ghost', model: 'image-model' } }),
-      { ghost: verification(['image-model']) },
+      { ghost: verification() },
     ).missing.map((item) => item.task)).toContain('image-generation')
   })
 })

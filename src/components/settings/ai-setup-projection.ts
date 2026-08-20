@@ -8,6 +8,7 @@ import {
   type ProviderConfig,
 } from '@/services/ai/provider-types'
 import {
+  providerRouteVerified,
   providerVerificationIsVerified,
   type ProviderVerification,
 } from '@/services/ai/provider-verification'
@@ -123,7 +124,7 @@ function directAssignment(
     const assignment = bindings?.bindings[task]
     if (!assignment) continue
     const provider = providers.find((item) => item.id === assignment.providerId && item.enabled)
-    if (provider && providerVerificationIsVerified(verifications[provider.id], assignment.model)) {
+    if (provider && providerRouteVerified(provider, verifications[provider.id], assignment.model)) {
       return { provider, assignment }
     }
   }
@@ -276,7 +277,8 @@ export function projectAiSetup(input: AiSetupProjectionInput): AiSetupProjection
         evidence: {
           installed: configuredProvider !== undefined,
           authenticated: configuredProvider !== undefined
-            && providerVerificationIsVerified(
+            && providerRouteVerified(
+              configuredProvider,
               input.verifications[configuredProvider.id],
               assignment?.model,
             ),
@@ -291,7 +293,8 @@ export function projectAiSetup(input: AiSetupProjectionInput): AiSetupProjection
       evidence: {
         installed: configuredProvider !== undefined,
         authenticated: configuredProvider !== undefined
-          && providerVerificationIsVerified(
+          && providerRouteVerified(
+            configuredProvider,
             input.verifications[configuredProvider.id],
             assignment?.model,
           ),

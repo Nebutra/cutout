@@ -161,7 +161,7 @@ async function createContractHost(
           label: 'DashScope project contract',
           baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
           wireProtocol: 'chat-completions',
-          defaultModel: 'qwen3.8-max',
+          catalog: { models: ['qwen3.8-max'], fetchedAt: '2026-08-20T00:00:00.000Z' },
           enabled: true,
         },
         hasKey: true,

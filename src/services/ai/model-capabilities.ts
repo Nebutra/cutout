@@ -18,4 +18,12 @@ export function descriptorSupports(descriptor:ModelDescriptor,profile:ModelTaskP
 const capabilityModelAssignmentSchema=modelAssignmentSchema.strict()
 export const capabilityBindingsSchema=z.object({version:z.literal('model-assignments.v2'),bindings:z.partialRecord(modelTaskKindSchema,capabilityModelAssignmentSchema).default({}),descriptors:z.array(modelDescriptorSchema).default([])}).strict()
 export type CapabilityBindings=z.infer<typeof capabilityBindingsSchema>
+/**
+ * The two-slot view an Agent run locks for its duration (`chat` / `image`).
+ *
+ * This is a *run-level override shape*, not the settings routing table — task
+ * routing lives in `task-routing.ts`. The projection is kept semantically
+ * identical to the pre-three-layer behaviour so composer slot locking and
+ * `parseComposerModelValue` are unaffected.
+ */
 export function projectPrimaryAssignments(input:CapabilityBindings):ModelAssignments{const chat=input.bindings.text??input.bindings.vision??input.bindings.webdev??input.bindings['image-to-webdev'],image=input.bindings['image-generation']??input.bindings['image-edit'];return{...(chat?{chat}:{}),...(image?{image}:{})}}

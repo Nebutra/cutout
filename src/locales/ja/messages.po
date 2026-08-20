@@ -13,6 +13,32 @@ msgstr ""
 "Language-Team: \n"
 "Plural-Forms: nplurals=1; plural=0;\n"
 
+#. placeholder {0}: endpointModels.data.length
+#. js-lingui-explicit-id
+#: src/components/settings/ModelSlot.tsx
+#~ msgid "settings.models_discovered_from_endpoint"
+#~ msgstr "エンドポイントから {0} 件のモデルを検出しました"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+#~ msgid "settings.configured_providers"
+#~ msgstr "設定済みのプロバイダー"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderForm.tsx
+#~ msgid "settings.provider_model_label"
+#~ msgstr "既定のモデル"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+#~ msgid "settings.manual_model_bindings"
+#~ msgstr "モデルの手動割り当て"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+#~ msgid "settings.manual_model_bindings_description"
+#~ msgstr "特定のタスクの自動ルーティングを上書きします。"
+
 #. js-lingui-explicit-id
 #. placeholder {0}: project.name
 #: src/components/home/ProjectHome.tsx
@@ -58,6 +84,24 @@ msgid "registry_install.receipt_summary"
 msgstr "{0} · {1, plural, other {# 件の検証済みファイル}}"
 
 #. js-lingui-explicit-id
+#. placeholder {0}: provider.label
+#. placeholder {0}: saved.label
+#. placeholder {0}: selected.label
+#. placeholder {1}: models.length
+#: src/components/settings/ModelSlot.tsx
+#: src/components/settings/ProviderForm.tsx
+#: src/components/settings/ProviderRow.tsx
+msgid "settings.models_discovered_toast"
+msgstr "{0} · {1} 個のモデルを検出"
+
+#. js-lingui-explicit-id
+#. placeholder {0}: provider.label
+#. placeholder {1}: providerCatalogModels(provider).length
+#: src/components/settings/ModelSlot.tsx
+msgid "settings.provider_option_with_count"
+msgstr "{0}（{1} 個のモデル）"
+
+#. js-lingui-explicit-id
 #. placeholder {0}: item.name
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.toast_added_to_project"
@@ -89,10 +133,21 @@ msgid "kit_library.editor_aria"
 msgstr "{0} キットエディター"
 
 #. js-lingui-explicit-id
-#. placeholder {0}: endpointModels.data.length
+#. placeholder {0}: probedModels.length
+#: src/components/settings/ProviderForm.tsx
+msgid "settings.catalog_discovered"
+msgstr "{0} 個のモデルを検出"
+
+#. js-lingui-explicit-id
+#. placeholder {0}: catalog.length
 #: src/components/settings/ModelSlot.tsx
-msgid "settings.models_discovered_from_endpoint"
-msgstr "エンドポイントから {0} 件のモデルを検出しました"
+msgid "settings.models_from_catalog"
+msgstr "この接続のカタログに {0} 個のモデル"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderRow.tsx
+msgid "settings.catalog_model_count"
+msgstr "{0} 個のモデル"
 
 #. js-lingui-explicit-id
 #: src/components/preview/PreviewMeta.tsx
@@ -155,9 +210,20 @@ msgid "export.toast_success"
 msgstr "{savedCount, plural, other {# 枚のスライスをエクスポートしました}}"
 
 #. js-lingui-explicit-id
+#. placeholder {0}: probedModels.length - CATALOG_PREVIEW_LIMIT
+#: src/components/settings/ProviderForm.tsx
+msgid "settings.catalog_more"
+msgstr "他 {0} 件"
+
+#. js-lingui-explicit-id
 #: src/components/library/TeamGovernancePanel.tsx
 msgid "team.host_required_description"
 msgstr "レビューまたは読み取り専用共有の作成にはデスクトップコラボレーションホストが必要です。"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.step_one_description"
+msgstr "プロバイダーは接続です — エンドポイントとキー。検証するとそのモデル一覧が読み込まれ、用途はステップ 2 で決めます。"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
@@ -465,6 +531,12 @@ msgid "settings.personalization.personality_auto"
 msgstr "自動"
 
 #. js-lingui-explicit-id
+#. placeholder {0}: taskLabel(inherited.inheritedFrom, taskLabels)
+#: src/components/settings/ModelSlot.tsx
+msgid "settings.model_slot_inherited"
+msgstr "自動 · {0} を継承"
+
+#. js-lingui-explicit-id
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.policy_auto_compatible"
 msgstr "自動互換"
@@ -677,8 +749,18 @@ msgstr "方向を1つ選んでください。必要に応じて下に補足を�
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
+msgid "settings.step_two_description"
+msgstr "各タスクにどのプロバイダーのどのモデルを使うか選びます。未割り当てのタスクはより一般的なタスクを継承します。"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
 msgid "settings.claude_policy_diagnostic"
 msgstr "ベンダーポリシーの確認が完了するまで、Claude Code の実行は利用できません。"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ModelSlot.tsx
+msgid "settings.clear_binding"
+msgstr "クリア"
 
 #. js-lingui-explicit-id
 #: src/components/library/GlobalLibraryView.tsx
@@ -789,11 +871,6 @@ msgid "settings.key_placeholder_replace"
 msgstr "設定済み — 入力すると置き換わります"
 
 #. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.configured_providers"
-msgstr "設定済みのプロバイダー"
-
-#. js-lingui-explicit-id
 #: src/components/library/KitLibraryInspector.tsx
 msgid "kit_library.audit_conflicts"
 msgstr "競合"
@@ -823,6 +900,11 @@ msgstr "プロバイダーを接続"
 #: src/components/settings/sections/AiSection.tsx
 msgid "settings.connect_provider"
 msgstr "プロバイダーを接続"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.advanced_ai_management_description"
+msgstr "プロバイダーを接続し、タスクにモデルを割り当て、SVG 書き出しを設定します。"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/IntegrationsSection.tsx
@@ -997,11 +1079,6 @@ msgstr "Cutout は {0} チャネルで最新です。"
 #: src/components/home/SidebarAccount.tsx
 msgid "home.theme_dark"
 msgstr "ダーク"
-
-#. js-lingui-explicit-id
-#: src/components/settings/ProviderForm.tsx
-msgid "settings.provider_model_label"
-msgstr "既定のモデル"
 
 #. js-lingui-explicit-id
 #: src/components/home/ProjectHome.tsx
@@ -1208,7 +1285,7 @@ msgid "vectorizer.secret_placeholder"
 msgstr "APIシークレットを入力"
 
 #. js-lingui-explicit-id
-#: src/components/settings/ProviderForm.tsx
+#: src/components/settings/ModelSlot.tsx
 msgid "settings.enter_model_manually"
 msgstr "Enter model ID manually"
 
@@ -1630,11 +1707,6 @@ msgid "global_library.kit_editor_description"
 msgstr "承認済みのコンテンツアドレス指定キット投影を管理します。"
 
 #. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.manual_model_bindings"
-msgstr "モデルの手動割り当て"
-
-#. js-lingui-explicit-id
 #: src/components/settings/sections/PersonalizationSection.tsx
 msgid "settings.personalization.memory"
 msgstr "メモリ"
@@ -1673,6 +1745,11 @@ msgstr "承認済みキットに未反映"
 #: src/components/home/ProjectHome.tsx
 msgid "home.preset_mobile"
 msgstr "モバイルアプリ"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderRow.tsx
+msgid "settings.catalog_not_fetched"
+msgstr "モデル一覧は未取得"
 
 #. js-lingui-explicit-id
 #: src/components/settings/ModelSlot.tsx
@@ -1880,11 +1957,6 @@ msgid "source.dropzone_hint"
 msgstr "またはクリックして参照 · PNG、JPEG、WebP"
 
 #. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.manual_model_bindings_description"
-msgstr "特定のタスクの自動ルーティングを上書きします。"
-
-#. js-lingui-explicit-id
 #: src/components/library/KitLibraryInspector.tsx
 msgid "kit_library.parser_host_not_configured"
 msgstr "このサーフェスではパーサーホストが設定されていません。署名済みのJSON結果をインポートして候補を確認してください。"
@@ -1914,6 +1986,16 @@ msgstr "パーソナライズを読み込めませんでした。"
 #: src/components/settings/sections/PersonalizationSection.tsx
 msgid "settings.personalization.reset_done_toast"
 msgstr "パーソナライズをリセットしました"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ModelSlot.tsx
+msgid "settings.pick_from_catalog"
+msgstr "カタログから選ぶ"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderForm.tsx
+msgid "settings.catalog_assign_later"
+msgstr "「タスクにモデルを割り当てる」で、どれがどのタスクを担当するか選びます。"
 
 #. js-lingui-explicit-id
 #: src/components/home/ProjectHome.tsx
@@ -2083,11 +2165,6 @@ msgid "settings.provider_updated_toast"
 msgstr "プロバイダーを更新しました"
 
 #. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.advanced_ai_management_description"
-msgstr "プロバイダー、モデルの手動割り当て、SVG 書き出し。"
-
-#. js-lingui-explicit-id
 #: src/components/library/KitLibraryInspector.tsx
 msgid "kit_library.publish_new_version"
 msgstr "新しいバージョンを公開"
@@ -2158,6 +2235,11 @@ msgstr "参照プロバイダーホストが設定されていません。"
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.media_filter_references"
 msgstr "参照"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ModelSlot.tsx
+msgid "settings.refresh_model_catalog"
+msgstr "モデル一覧を更新"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/IntegrationsSection.tsx
@@ -2438,7 +2520,7 @@ msgid "global_library.select_item_aria"
 msgstr "{0} を選択"
 
 #. js-lingui-explicit-id
-#: src/components/settings/ProviderForm.tsx
+#: src/components/settings/ModelSlot.tsx
 msgid "settings.select_model"
 msgstr "Select a model"
 
@@ -2574,6 +2656,16 @@ msgid "global_library.tab_starters"
 msgstr "スターターキット"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.step_one_connect_providers"
+msgstr "ステップ 1 · プロバイダーを接続"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.step_two_assign_models"
+msgstr "ステップ 2 · タスクにモデルを割り当てる"
+
+#. js-lingui-explicit-id
 #: src/components/settings/sections/PersonalizationSection.tsx
 msgid "settings.personalization.personality_professional_desc"
 msgstr "構造的でフォーマル。"
@@ -2686,6 +2778,11 @@ msgid "settings.vision_capability_unverified"
 msgstr "画像入力機能がカタログのエビデンスまたはプロバイダーへの照会で確認されるまで、この割り当ては利用できません。"
 
 #. js-lingui-explicit-id
+#: src/components/settings/ProviderForm.tsx
+msgid "settings.catalog_unsupported_hint"
+msgstr "このエンドポイントはモデル一覧を提供しません。接続は保存でき、タスク割り当て時にモデル ID を手入力できます。"
+
+#. js-lingui-explicit-id
 #. placeholder {0}: pendingDelete.name
 #. placeholder {0}: project.name
 #: src/components/home/ProjectHome.tsx
@@ -2772,6 +2869,14 @@ msgstr "タイプ"
 #: src/components/settings/sections/RecoverySection.tsx
 msgid "settings.recovery.ui_reset"
 msgstr "UI 状態をリセットしました"
+
+#. js-lingui-explicit-id
+#. placeholder {0}: taskLabel(inherited.inheritedFrom, taskLabels)
+#. placeholder {1}: inheritedProvider?.label ?? inherited.assignment.providerId
+#. placeholder {2}: inherited.assignment.model
+#: src/components/settings/ModelSlot.tsx
+msgid "settings.inherited_route_detail"
+msgstr "未割り当て — 呼び出しは {0} を使用: {1} · {2}"
 
 #. js-lingui-explicit-id
 #: src/components/settings/ModelSlot.tsx
@@ -2902,6 +3007,7 @@ msgid "vectorizer.api_id_label"
 msgstr "Vectorizer.AI APIID"
 
 #. js-lingui-explicit-id
+#: src/components/settings/ModelSlot.tsx
 #: src/components/settings/ProviderForm.tsx
 #: src/components/settings/ProviderRow.tsx
 msgid "settings.status_failed"

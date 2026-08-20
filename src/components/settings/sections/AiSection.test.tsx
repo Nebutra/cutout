@@ -10,7 +10,10 @@ const provider = {
   label: 'Team OpenAI',
   baseUrl: 'https://api.openai.com/v1',
   wireProtocol: 'responses' as const,
-  defaultModel: 'gpt-5',
+  catalog: {
+    models: ['gpt-5', 'gpt-image-2'],
+    fetchedAt: '2026-07-28T00:00:00.000Z',
+  },
   enabled: true,
 }
 
@@ -102,12 +105,7 @@ describe('AiSection', () => {
       },
     })
     mocks.verifications.mockReturnValue({
-      openai: {
-        status: 'verified',
-        model: 'gpt-5',
-        models: ['gpt-5', 'gpt-image-2'],
-        checkedAt: '2026-07-28T00:00:00.000Z',
-      },
+      openai: { status: 'verified', checkedAt: '2026-07-28T00:00:00.000Z' },
     })
     mocks.automaticSetup.mockResolvedValue({ configured: [], bindings: {} })
     mocks.refetchQueries.mockResolvedValue(undefined)

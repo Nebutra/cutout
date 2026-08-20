@@ -12,7 +12,7 @@ const mocks = vi.hoisted(() => ({
   cancelDraft: vi.fn(),
   upsert: vi.fn(),
   setKey: vi.fn(),
-  testKey: vi.fn(),
+  verifyProvider: vi.fn(),
   onDone: vi.fn(),
 }))
 
@@ -33,7 +33,7 @@ vi.mock('@/services/ai/provider-discovery', async (importOriginal) => ({
 vi.mock('@/hooks/queries/providers', () => ({
   useUpsertProvider: () => ({ mutateAsync: mocks.upsert, isPending: false }),
   useSetKey: () => ({ mutateAsync: mocks.setKey, isPending: false }),
-  useTestKey: () => ({ mutateAsync: mocks.testKey, isPending: false }),
+  useVerifyProvider: () => ({ mutateAsync: mocks.verifyProvider, isPending: false }),
   useProviderStatus: () => ({ data: false }),
 }))
 
@@ -54,10 +54,14 @@ describe('ProviderForm draft verification flow', () => {
     root = createRoot(host)
     mocks.createDraft.mockResolvedValue('provider-draft:opaque')
     mocks.checkDraft.mockResolvedValue(['gpt-5'])
+    mocks.verifyProvider.mockResolvedValue({
+      models: ['gpt-5'], fetchedAt: '2026-08-20T00:00:00.000Z',
+    })
     mocks.importDraft.mockResolvedValue({
       id: 'provider-id', kind: 'openai', label: 'OpenAI',
       baseUrl: 'https://api.openai.com/v1', wireProtocol: 'responses',
-      defaultModel: 'gpt-5', enabled: true,
+      catalog: { models: ['gpt-5'], fetchedAt: '2026-08-20T00:00:00.000Z' },
+      enabled: true,
     })
   })
 
@@ -95,6 +99,9 @@ describe('ProviderForm draft verification flow', () => {
     }))
     expect(mocks.checkDraft).toHaveBeenCalledWith('provider-draft:opaque')
     expect(button('Add')?.disabled).toBe(false)
+    // The probe result is shown as evidence, never as a model to choose here.
+    expect(host.textContent).toContain('1 models discovered')
+    expect(host.querySelector('#provider-model')).toBeNull()
 
     const key = host.querySelector('#provider-key') as HTMLInputElement
     await act(async () => {
@@ -109,9 +116,11 @@ describe('ProviderForm draft verification flow', () => {
     expect(button('Add')?.disabled).toBe(false)
 
     await act(async () => button('Add')?.click())
+    // The import names no model: the draft's checked catalog becomes layer 2,
+    // and which model serves which task is decided in the routing step.
     expect(mocks.importDraft).toHaveBeenCalledWith({
       draftId: 'provider-draft:opaque', providerId: 'provider-id', label: 'OpenAI',
-      defaultModel: 'gpt-5', enabled: true,
+      enabled: true,
     })
     expect(mocks.upsert).not.toHaveBeenCalled()
     expect(mocks.onDone).toHaveBeenCalledOnce()

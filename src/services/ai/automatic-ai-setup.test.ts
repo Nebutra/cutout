@@ -20,29 +20,39 @@ vi.mock('./provider-verification', async (original) => ({
 import { automaticBindingsFor, configureAutomaticAi } from './automatic-ai-setup'
 import type { AutoConfiguredProvider, ProviderDiscoveryCandidate } from './provider-discovery'
 
+/**
+ * A connection as automatic setup produces it. A connection names no model, so
+ * a preference is expressed the only way it can be: the candidate's hint floats
+ * to the front of the catalog, exactly as Rust's `automatic_catalog` does.
+ */
 const configured = (
   id: string,
   kind: 'openai-compatible' | 'cc-switch' | 'dashscope',
   models: string[],
-  defaultModel = models[0]!,
+  hint = models[0]!,
   descriptors?: AutoConfiguredProvider['descriptors'],
-): AutoConfiguredProvider => ({
-  provider: {
-    id,
-    kind,
-    label: id,
-    baseUrl: kind === 'cc-switch'
-      ? 'http://127.0.0.1:15721/v1'
-      : kind === 'dashscope'
-        ? 'https://dashscope.aliyuncs.com/compatible-mode/v1'
-        : 'https://relay.example/v1',
-    wireProtocol: kind === 'cc-switch' ? 'responses' : 'chat-completions',
-    defaultModel,
-    enabled: true,
-  },
-  models,
-  ...(descriptors ? { descriptors } : {}),
-})
+): AutoConfiguredProvider => {
+  const ordered = models.includes(hint)
+    ? [hint, ...models.filter((model) => model !== hint)]
+    : models
+  return {
+    provider: {
+      id,
+      kind,
+      label: id,
+      baseUrl: kind === 'cc-switch'
+        ? 'http://127.0.0.1:15721/v1'
+        : kind === 'dashscope'
+          ? 'https://dashscope.aliyuncs.com/compatible-mode/v1'
+          : 'https://relay.example/v1',
+      wireProtocol: kind === 'cc-switch' ? 'responses' : 'chat-completions',
+      catalog: { models: ordered, fetchedAt: '2026-08-20T00:00:00.000Z' },
+      enabled: true,
+    },
+    models: ordered,
+    ...(descriptors ? { descriptors } : {}),
+  }
+}
 
 describe('automatic AI setup', () => {
   beforeEach(() => Object.values(mocks).forEach((mock) => mock.mockReset()))
@@ -67,7 +77,7 @@ describe('automatic AI setup', () => {
     expect(bindings['image-edit']).toEqual(bindings['image-generation'])
   })
 
-  it('prefers the verified provider default for chat and the best supported image model', () => {
+  it('prefers the hinted catalog head for chat and the best supported image model', () => {
     const bindings = automaticBindingsFor([
       configured(
         'cc-switch-upstream',
@@ -84,7 +94,7 @@ describe('automatic AI setup', () => {
     })
   })
 
-  it('honors a verified image Provider default without making Qwen a global default', () => {
+  it('honors a hinted image connection without making Qwen a global default', () => {
     const bindings = automaticBindingsFor([
       configured('gpt', 'openai-compatible', ['gpt-5.5', 'gpt-image-2'], 'gpt-5.5'),
       configured(
@@ -158,7 +168,12 @@ describe('automatic AI setup', () => {
     })).resolves.toMatchObject({
       bindings: {
         text: { providerId: 'qwen', model: 'qwen-plus' },
-        'image-generation': { providerId: 'qwen', model: 'qwen-image-3.0' },
+        // Automatic setup only runs when nothing is bound, so there is no user
+        // choice to honour and the documented fidelity ranking decides:
+        // gpt-image-2 outranks qwen-image-3.0. A connection's own preference no
+        // longer overrides that — expressing one was the job `defaultModel`
+        // used to do by accident.
+        'image-generation': { providerId: 'default', model: 'gpt-image-2' },
       },
     })
     expect(mocks.setAutomaticBindings).toHaveBeenCalledWith(expect.objectContaining({
@@ -456,12 +471,12 @@ describe('automatic AI setup', () => {
       [candidates[1]!.id],
     ])
     expect(mocks.setVerification).toHaveBeenCalledTimes(1)
+    // The receipt records that the credential passed; the catalog it found rides
+    // on the connection (`provider.catalog`), which the native configure step
+    // already persisted.
     expect(mocks.setVerification).toHaveBeenCalledWith(
       'verified-queue-route',
-      expect.objectContaining({
-        status: 'verified',
-        models: ['gpt-5.5', 'gpt-image-2'],
-      }),
+      expect.objectContaining({ status: 'verified' }),
     )
   })
 
