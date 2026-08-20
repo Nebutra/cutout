@@ -106,7 +106,6 @@ pub struct ImportDraftInput {
     draft_id: String,
     provider_id: String,
     label: String,
-    default_model: String,
     enabled: bool,
 }
 
@@ -2042,9 +2041,6 @@ pub async fn import_provider_draft<R: Runtime>(
         .checked_models
         .as_ref()
         .ok_or(DiscoveryError::NotImportable)?;
-    if !models.is_empty() && !models.iter().any(|model| model == &input.default_model) {
-        return Err(DiscoveryError::CatalogMalformed);
-    }
     let mut configured = providers::load_providers_sync(&app)
         .map_err(|error| DiscoveryError::Persistence(error.to_string()))?;
     if configured
@@ -2063,7 +2059,13 @@ pub async fn import_provider_draft<R: Runtime>(
         label: input.label,
         base_url: Some(draft.base_url),
         wire_protocol: draft.wire_protocol,
-        default_model: input.default_model,
+        // The draft was only importable because its catalog check succeeded, so
+        // the connection is born with layer 2 already populated.
+        catalog: Some(providers::ProviderCatalog {
+            models: models.clone(),
+            fetched_at: providers::now_iso(),
+        }),
+        default_model: None,
         enabled: input.enabled,
     };
     if !secret.is_empty() {
@@ -2088,17 +2090,31 @@ fn automatic_provider_id(candidate_id: &str) -> Result<String, DiscoveryError> {
     Ok(format!("local-import-{}", &digest[..24]))
 }
 
-fn automatic_default_model(
+/// Layer 2 for an automatically configured connection. The candidate's
+/// `model_hint` no longer selects a model — it only floats to the front of the
+/// catalog so downstream routing sees the agent's own preference first. An
+/// empty catalog is malformed: an importable candidate must advertise models.
+fn automatic_catalog(
     candidate: &ProviderCandidate,
     models: &[String],
-) -> Result<String, DiscoveryError> {
-    candidate
+) -> Result<providers::ProviderCatalog, DiscoveryError> {
+    if models.is_empty() {
+        return Err(DiscoveryError::CatalogMalformed);
+    }
+    let hint = candidate
         .model_hint
         .as_ref()
-        .filter(|hint| models.iter().any(|model| model == *hint))
-        .cloned()
-        .or_else(|| models.first().cloned())
-        .ok_or(DiscoveryError::CatalogMalformed)
+        .filter(|hint| models.iter().any(|model| model == *hint));
+    let ordered = match hint {
+        Some(hint) => std::iter::once(hint.clone())
+            .chain(models.iter().filter(|model| *model != hint).cloned())
+            .collect(),
+        None => models.to_vec(),
+    };
+    Ok(providers::ProviderCatalog {
+        models: ordered,
+        fetched_at: providers::now_iso(),
+    })
 }
 
 fn checkpoint_automatic_error(error: &DiscoveryError) {
@@ -2390,7 +2406,8 @@ pub async fn auto_configure_provider_candidate<R: Runtime>(
         label: candidate.label.clone(),
         base_url: Some(base_url),
         wire_protocol,
-        default_model: automatic_default_model(&candidate, &models)?,
+        catalog: Some(automatic_catalog(&candidate, &models)?),
+        default_model: None,
         enabled: true,
     };
     keys::store_imported_key(&provider_id, &secret).map_err(|_| {
@@ -2607,7 +2624,7 @@ mod tests {
         assert_eq!(candidate_secret(candidate, home.path()).unwrap(), secret);
         assert!(!serde_json::to_string(candidate).unwrap().contains(secret));
         assert!(matches!(
-            automatic_default_model(candidate, &[]),
+            automatic_catalog(candidate, &[]),
             Err(DiscoveryError::CatalogMalformed)
         ));
     }
@@ -3439,7 +3456,11 @@ wire_api = "unsupported-completions"
             label: "Existing OpenAI".into(),
             base_url: None,
             wire_protocol: None,
-            default_model: "gpt-5".into(),
+            catalog: Some(providers::ProviderCatalog {
+                models: vec!["gpt-5".to_string()],
+                fetched_at: "2026-08-20T00:00:00Z".to_string(),
+            }),
+            default_model: None,
             enabled: true,
         }];
 
@@ -3488,7 +3509,11 @@ wire_api = "unsupported-completions"
             label: "First".into(),
             base_url: Some("https://relay.example".into()),
             wire_protocol: Some(ProviderWireProtocol::Responses),
-            default_model: "gpt-5".into(),
+            catalog: Some(providers::ProviderCatalog {
+                models: vec!["gpt-5".to_string()],
+                fetched_at: "2026-08-20T00:00:00Z".to_string(),
+            }),
+            default_model: None,
             enabled: true,
         };
         let configured = vec![

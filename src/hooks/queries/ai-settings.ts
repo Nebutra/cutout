@@ -3,9 +3,14 @@
  *
  * Model assignments are a local, non-secret preference (like theme/language),
  * persisted via plugin-store — so these hooks call the local module directly
- * rather than routing through the service registry. Endpoint model discovery
- * (`/v1/models`) is a per-provider query, gated on the provider having both a
- * key and a base URL.
+ * rather than routing through the service registry.
+ *
+ * There is deliberately no endpoint-model query here. Discovering a
+ * connection's models is one action with verifying its credential
+ * (`verifyProviderCatalog`), and the result is persisted on the connection as
+ * `ProviderConfig.catalog`. The previous `useEndpointModels` query was gated on
+ * `provider.baseUrl`, which is absent for every direct vendor connection, so it
+ * was permanently disabled for them and their model pickers were always empty.
  */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
@@ -16,23 +21,34 @@ import {
   setAssignment,
 } from '@/services/ai/model-assignment.local'
 import type { ModelTaskKind } from '@/services/ai/model-capabilities'
-import { listEndpointModels } from '@/services/ai/list-models'
+import { resolveTaskRoute } from '@/services/ai/task-routing'
 import type {
   ModelAssignment,
   ModelAssignments,
   SlotId,
 } from '@/services/ai/model-assignment-types'
-import type { ProviderConfig } from '@/services/ai/provider-types'
-import { useProviderStatus } from './providers'
 
 export const aiSettingsKeys = {
   all: ['ai-settings'] as const,
   assignments: () => [...aiSettingsKeys.all, 'assignments'] as const,
   capabilityBindings: () => [...aiSettingsKeys.all, 'capability-bindings'] as const,
-  endpointModels: (id: string) =>
-    [...aiSettingsKeys.all, 'endpoint-models', id] as const,
 }
 export function useCapabilityBindings(){return useQuery({queryKey:aiSettingsKeys.capabilityBindings(),queryFn:loadCapabilityBindings})}
+
+/**
+ * The route serving one task (layer 3) — the hook every generation call site
+ * uses. Prefer this over {@link useModelAssignments}, which is the run-level
+ * two-slot override view and cannot express per-task routing.
+ */
+export function useTaskAssignment(task: ModelTaskKind) {
+  const bindings = useCapabilityBindings()
+  const route = resolveTaskRoute(bindings.data?.bindings, task)
+  return {
+    assignment: route?.assignment,
+    inheritedFrom: route?.inheritedFrom,
+    isPending: bindings.isPending,
+  }
+}
 export function useSetCapabilityBinding(){const qc=useQueryClient();return useMutation({mutationFn:(input:{task:ModelTaskKind;assignment?:ModelAssignment})=>input.assignment?setCapabilityBinding(input.task,input.assignment):clearCapabilityBinding(input.task),onSuccess:()=>Promise.all([qc.invalidateQueries({queryKey:aiSettingsKeys.capabilityBindings()}),qc.invalidateQueries({queryKey:aiSettingsKeys.assignments()})])})}
 
 /** The current model-assignment table. */
@@ -51,20 +67,5 @@ export function useSetModelAssignment() {
       setAssignment(vars.slot, vars.assignment),
     onSuccess: () =>
       qc.invalidateQueries({ queryKey: aiSettingsKeys.assignments() }),
-  })
-}
-
-/**
- * Models advertised by an endpoint via `/v1/models`. Enabled only when the
- * provider exists, has a key, and carries a base URL; otherwise the query is
- * idle and callers fall back to the suggested list.
- */
-export function useEndpointModels(provider?: ProviderConfig) {
-  const status = useProviderStatus(provider?.id ?? '')
-  const hasKey = status.data === true
-  return useQuery<string[]>({
-    queryKey: aiSettingsKeys.endpointModels(provider?.id ?? ''),
-    queryFn: () => (provider ? listEndpointModels(provider) : Promise.resolve([])),
-    enabled: Boolean(provider?.baseUrl) && hasKey,
   })
 }

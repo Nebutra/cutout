@@ -44,8 +44,12 @@ import { useImageImport } from "@/hooks/useImageImport";
 import { ImageImportActionsProvider } from "@/hooks/image-import-actions";
 import { useExport } from "@/hooks/useExport";
 import { useSliceNavigation } from "@/hooks/useSliceNavigation";
-import { useModelAssignments } from "@/hooks/queries/ai-settings";
+import {
+  useModelAssignments,
+  useTaskAssignment,
+} from "@/hooks/queries/ai-settings";
 import { useProviders } from "@/hooks/queries/providers";
+import { useLegacyBindingMigration } from "@/hooks/use-legacy-binding-migration";
 import { requestRename } from "@/hooks/useRenameIntent";
 import { useStore, getStoreState } from "@/store";
 import {
@@ -379,7 +383,11 @@ export function AppShell() {
     (s) => s.workspaceSnapshot?.designDocument ?? null,
   );
   const modelAssignments = useModelAssignments();
+  // Composing demo.html is a web-development task, so it routes on `webdev`
+  // (inheriting `text` when unbound) rather than the run-level chat slot.
+  const { assignment: webdevRoute } = useTaskAssignment("webdev");
   const providerConfigurations = useProviders();
+  useLegacyBindingMigration(providerConfigurations.data);
   const projectRepository = useMemo(() => createLocalProjectRepository(), []);
   const recoveryBackend = useMemo(() => {
     const projection = createProjectProjectionAdapter(projectRepository);
@@ -1100,16 +1108,15 @@ export function AppShell() {
     // template — it has no idea what this product actually is. When a chat
     // model is configured, ask it to compose a demo that reflects the real
     // needs/components instead, and swap it in only if that succeeds.
-    const chat = modelAssignments.data?.chat;
     let composedByAgent = false;
-    if (chat) {
+    if (webdevRoute) {
       const { composeDemoHtmlWithAgent } = await import("@/design-kit");
       const tokensCss =
         files.find((file) => file.path === "tokens.css")?.content ?? "";
       const composed = await composeDemoHtmlWithAgent({
         document: current,
         tokensCss,
-        chat,
+        chat: webdevRoute,
         generation: services.generation,
       });
       if (composed) {
@@ -1131,7 +1138,7 @@ export function AppShell() {
         ? "demo.html composed by the Agent for this product."
         : "demo.html used the deterministic template — connect a chat model for a product-aware demo.",
     });
-  }, [modelAssignments.data?.chat, services.generation]);
+  }, [webdevRoute, services.generation]);
 
   const syncDemoHtml = useCallback(
     (file: File) => {

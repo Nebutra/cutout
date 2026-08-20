@@ -142,14 +142,14 @@ function fakeRegistry(key: string, base: string): ServiceRegistry {
         // `wireProtocol` is mandatory for every non-gateway kind
         // (services/ai/provider-types.ts:76). 'openai' is OpenAI-shaped, so
         // 'chat-completions' is its only supported protocol.
-        { id: GATEWAY_PROVIDER_ID, kind: 'openai', label: 'MOX', wireProtocol: 'chat-completions', defaultModel: GATEWAY_CHAT_MODEL, enabled: true },
+        { id: GATEWAY_PROVIDER_ID, kind: 'openai', label: 'MOX', wireProtocol: 'chat-completions', catalog: { models: [GATEWAY_CHAT_MODEL, GATEWAY_IMAGE_MODEL], fetchedAt: '2026-08-20T00:00:00.000Z' }, enabled: true },
       ],
       upsert: notUsed,
       remove: notUsed,
       setKey: notUsed,
       status: async () => ({ hasKey: true }),
       statuses: async (ids) => Object.fromEntries(ids.map((id) => [id, true])),
-      test: async () => ok({ model: GATEWAY_CHAT_MODEL, models: [GATEWAY_CHAT_MODEL, GATEWAY_IMAGE_MODEL] }),
+      test: async () => ok({ models: [GATEWAY_CHAT_MODEL, GATEWAY_IMAGE_MODEL] }),
     },
     generation: createGatewayGenerationService(key, base),
     prompts: {

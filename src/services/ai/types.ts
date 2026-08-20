@@ -30,8 +30,11 @@ export interface ProviderService {
   status(id: string): Promise<{ hasKey: boolean }>
   /** Batch has-key lookup (maps to Rust `list_key_status`). */
   statuses(ids: readonly string[]): Promise<Record<string, boolean>>
-  /** Cheap round-trip through the proxy to validate the key works. */
-  test(id: string): Promise<Result<{ model: string; models: readonly string[] }>>
+  /**
+   * Cheap round-trip through the proxy: validates the credential and returns
+   * the catalog the endpoint advertises (layer 2). It does not pick a model.
+   */
+  test(id: string): Promise<Result<{ models: readonly string[] }>>
 }
 
 /**

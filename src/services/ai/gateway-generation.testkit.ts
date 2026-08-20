@@ -63,7 +63,7 @@ function gatewayProviders(base: string) {
     // `prepare`. Kept in sync with the app: 'openai' is OpenAI-shaped, so
     // 'chat-completions' is its only supported protocol.
     wireProtocol: 'chat-completions',
-    defaultModel: GATEWAY_CHAT_MODEL,
+    catalog: { models: [GATEWAY_CHAT_MODEL], fetchedAt: '2026-08-20T00:00:00.000Z' },
     enabled: true,
   }
   return { list: async (): Promise<ProviderConfig[]> => [config] }

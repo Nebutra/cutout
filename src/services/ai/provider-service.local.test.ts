@@ -16,7 +16,7 @@ const cfg = (over: Partial<ProviderConfig> = {}): ProviderConfig => ({
   id: 'p1',
   kind: 'openai-compatible',
   label: 'Relay',
-  defaultModel: 'chat-model',
+  catalog: { models: ['chat-model'], fetchedAt: '2026-08-20T00:00:00.000Z' },
   enabled: true,
   baseUrl: 'https://relay.example.com',
   wireProtocol: 'chat-completions',
@@ -53,7 +53,7 @@ describe('LocalProviderService host boundary', () => {
 
   it('rejects persisted non-Gateway records without an explicit protocol', async () => {
     invokeMock.mockResolvedValueOnce([{
-      id: 'old', kind: 'openai', label: 'Incomplete', defaultModel: 'gpt-5', enabled: true,
+      id: 'old', kind: 'openai', label: 'Incomplete', catalog: { models: ['gpt-5'], fetchedAt: '2026-08-20T00:00:00.000Z' }, enabled: true,
     }])
 
     await expect(createLocalProviderService().list()).rejects.toThrow('wire protocol is required')
@@ -63,13 +63,43 @@ describe('LocalProviderService host boundary', () => {
     invokeMock.mockResolvedValueOnce([]).mockResolvedValueOnce(undefined)
 
     const provider = await createLocalProviderService().upsert({
-      kind: 'openai', label: 'OpenAI', defaultModel: 'gpt-5', enabled: true,
+      kind: 'openai', label: 'OpenAI', catalog: { models: ['gpt-5'], fetchedAt: '2026-08-20T00:00:00.000Z' }, enabled: true,
     })
 
     expect(provider).toMatchObject({ kind: 'openai', wireProtocol: 'responses' })
     expect(invokeMock).toHaveBeenLastCalledWith('save_providers', {
       providers: [expect.objectContaining({ kind: 'openai', wireProtocol: 'responses' })],
     })
+  })
+
+  it('carries the probed catalog through an unrelated edit', async () => {
+    // Renaming a connection must not erase its model list: the catalog is the
+    // only evidence the task pickers have, and losing it silently un-routes
+    // every binding that points at this provider.
+    const catalog = { models: ['gpt-5', 'gpt-image-2'], fetchedAt: '2026-08-20T00:00:00.000Z' }
+    invokeMock.mockResolvedValueOnce([
+      { id: 'p1', kind: 'openai', label: 'Old name', wireProtocol: 'responses', catalog, enabled: true },
+    ]).mockResolvedValueOnce(undefined)
+
+    const provider = await createLocalProviderService().upsert({
+      id: 'p1', kind: 'openai', label: 'New name', wireProtocol: 'responses', catalog, enabled: true,
+    })
+
+    expect(provider.catalog).toEqual(catalog)
+    expect(invokeMock).toHaveBeenLastCalledWith('save_providers', {
+      providers: [expect.objectContaining({ label: 'New name', catalog })],
+    })
+  })
+
+  it('does not persist a model choice onto a connection', async () => {
+    invokeMock.mockResolvedValueOnce([]).mockResolvedValueOnce(undefined)
+
+    await createLocalProviderService().upsert({
+      kind: 'openai', label: 'OpenAI', wireProtocol: 'responses', enabled: true,
+    })
+
+    const [, payload] = invokeMock.mock.lastCall as [string, { providers: unknown[] }]
+    expect(payload.providers[0]).not.toHaveProperty('defaultModel')
   })
 })
 
@@ -82,7 +112,7 @@ describe('LocalProviderService.test', () => {
 
     const result = await createLocalProviderService().test('p1')
 
-    expect(result).toEqual(ok({ model: 'chat-model', models: ['chat-model'] }))
+    expect(result).toEqual(ok({ models: ['chat-model'] }))
     expect(invokeMock).toHaveBeenCalledWith(
       'ai_proxy_request',
       expect.objectContaining({ wireProtocol: 'chat-completions' }),
@@ -128,7 +158,6 @@ describe('LocalProviderService.test', () => {
     })
 
     await expect(createLocalProviderService().test('p1')).resolves.toEqual(ok({
-      model: 'chat-model',
       models: ['gemini-2.5-pro'],
     }))
     expect(invokeMock).toHaveBeenCalledWith(
@@ -154,11 +183,10 @@ describe('LocalProviderService.test', () => {
   it('uses the first-party catalog URL without issuing a generation request', async () => {
     mockProviderTest(
       { status: 200, body: JSON.stringify({ data: [{ id: 'gpt-5.4' }] }) },
-      cfg({ kind: 'openai', baseUrl: undefined, wireProtocol: 'responses', defaultModel: 'gpt-5.4' }),
+      cfg({ kind: 'openai', baseUrl: undefined, wireProtocol: 'responses', catalog: { models: ['gpt-5.4'], fetchedAt: '2026-08-20T00:00:00.000Z' } }),
     )
 
     await expect(createLocalProviderService().test('p1')).resolves.toEqual(ok({
-      model: 'gpt-5.4',
       models: ['gpt-5.4'],
     }))
     expect(invokeMock).toHaveBeenCalledWith(

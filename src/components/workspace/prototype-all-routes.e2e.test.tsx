@@ -979,7 +979,16 @@ function fakeRegistry(): ServiceRegistry {
               kind: 'openai' as const,
               label: 'E2E provider',
               wireProtocol: 'responses' as const,
-              defaultModel: CHAT_MODEL,
+              // The connection advertises exactly what its probe returns —
+              // routing is now checked against this catalog, not a default.
+              catalog: {
+                models: [
+                  CHAT_MODEL,
+                  desktopHarness.taskFitRouteEnabled ? IMAGE_MODEL : 'image-e2e',
+                  ...(desktopHarness.editRouteEnabled ? [EDIT_MODEL] : []),
+                ],
+                fetchedAt: '2026-08-20T00:00:00.000Z',
+              },
               enabled: true,
             }]
           : []
@@ -992,7 +1001,6 @@ function fakeRegistry(): ServiceRegistry {
       test: async () => {
         desktopHarness.providerTests += 1
         return ok({
-          model: CHAT_MODEL,
           models: [
             CHAT_MODEL,
             desktopHarness.taskFitRouteEnabled ? IMAGE_MODEL : 'image-e2e',

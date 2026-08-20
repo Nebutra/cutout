@@ -126,13 +126,13 @@ function registry(
       deleteApiKey: notUsed,
     },
     providers: {
-      list: async () => [{ id: PROVIDER_ID, kind: 'openai', label: 'Chat only', defaultModel: MODEL, enabled: true }],
+      list: async () => [{ id: PROVIDER_ID, kind: 'openai', label: 'Chat only', catalog: { models: [MODEL], fetchedAt: '2026-08-20T00:00:00.000Z' }, enabled: true }],
       upsert: notUsed,
       remove: notUsed,
       setKey: notUsed,
       status: async () => ({ hasKey: true }),
       statuses: async (ids) => Object.fromEntries(ids.map((id) => [id, true])),
-      test: async () => ok({ model: MODEL, models: [MODEL] }),
+      test: async () => ok({ models: [MODEL] }),
     },
     generation: {
       generateText: notUsed,

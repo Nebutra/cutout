@@ -98,11 +98,14 @@ function materialize(draft: ProviderDraft): ProviderConfig {
     id: current.id ?? crypto.randomUUID(),
     kind: current.kind,
     label: current.label,
-    defaultModel: current.defaultModel,
     enabled: current.enabled,
-    // Omit `baseUrl` entirely when absent (matches Rust's serde skip).
+    // Omit absent optional fields entirely (matches Rust's serde skip). The
+    // catalog must be carried through: an edit that dropped it would erase the
+    // connection's model list on every save.
     ...(current.baseUrl ? { baseUrl: current.baseUrl } : {}),
     ...(wireProtocol ? { wireProtocol } : {}),
+    ...(current.catalog ? { catalog: current.catalog } : {}),
+    ...(current.defaultModel ? { defaultModel: current.defaultModel } : {}),
   }
 }
 
@@ -150,7 +153,7 @@ export function createLocalProviderService(): ProviderService {
       return Object.fromEntries(rows.map((r) => [r.id, r.hasKey]))
     },
 
-    async test(id: string): Promise<Result<{ model: string; models: readonly string[] }>> {
+    async test(id: string): Promise<Result<{ models: readonly string[] }>> {
       const list = await loadProviders()
       const cfg = list.find((p) => p.id === id)
       if (!cfg) return err('provider not configured')
@@ -178,7 +181,7 @@ export function createLocalProviderService(): ProviderService {
           if (res.status >= 200 && res.status < 300) {
             const valid = validateModelsResponse(res.body)
             if (!isOk(valid)) return err(valid.error)
-            return ok({ model: cfg.defaultModel, models: valid.data })
+            return ok({ models: valid.data })
           }
           const body = snippet(res.body)
           return err(`HTTP ${res.status}${body ? ` · ${body}` : ''}`)

@@ -124,13 +124,13 @@ function fakeRegistry(
       deleteApiKey: notUsed,
     },
     providers: {
-      list: async () => [{ id: PROVIDER_ID, kind: 'openai', label: 'Test', defaultModel: MODEL, enabled: true }],
+      list: async () => [{ id: PROVIDER_ID, kind: 'openai', label: 'Test', catalog: { models: [MODEL], fetchedAt: '2026-08-20T00:00:00.000Z' }, enabled: true }],
       upsert: notUsed,
       remove: notUsed,
       setKey: notUsed,
       status: async () => ({ hasKey: true }),
       statuses: async (ids) => Object.fromEntries(ids.map((id) => [id, true])),
-      test: async () => ok({ model: MODEL, models: [MODEL] }),
+      test: async () => ok({ models: [MODEL] }),
     },
     generation: {
       generateText: notUsed,
@@ -182,7 +182,7 @@ describe('Agent response regeneration workspace flow', () => {
   it('uses a ready system Codex turn before direct text Provider preflight', async () => {
     vi.stubEnv('VITE_CUTOUT_PACKAGED_E2E', '1')
     const directToolGate = vi.fn()
-    const providerTest = vi.fn(async () => ok({ model: MODEL, models: [MODEL] }))
+    const providerTest = vi.fn(async () => ok({ models: [MODEL] }))
     const registry = fakeRegistry(
       directToolGate,
       Promise.resolve(ok({ text: '', toolCalls: [] })),
@@ -299,7 +299,7 @@ describe('Agent response regeneration workspace flow', () => {
 
   it('surfaces Retry for a transient Codex failure and retries the same runtime', async () => {
     const directToolGate = vi.fn()
-    const providerTest = vi.fn(async () => ok({ model: MODEL, models: [MODEL] }))
+    const providerTest = vi.fn(async () => ok({ models: [MODEL] }))
     const registry = fakeRegistry(
       directToolGate,
       Promise.resolve(ok({ text: '', toolCalls: [] })),
@@ -415,7 +415,7 @@ describe('Agent response regeneration workspace flow', () => {
       kind: 'openai',
       label: 'Test',
       wireProtocol: 'responses',
-      defaultModel: 'gpt-image-2',
+      catalog: { models: ['gpt-image-2'], fetchedAt: '2026-08-20T00:00:00.000Z' },
       enabled: true,
     }]
     registry.providers.test = async () => ok({
@@ -545,7 +545,7 @@ describe('Agent response regeneration workspace flow', () => {
         label: 'MOX',
         baseUrl: 'https://mox.example/v1',
         wireProtocol: 'chat-completions',
-        defaultModel: 'gpt-5.5',
+        catalog: { models: ['gpt-5.5'], fetchedAt: '2026-08-20T00:00:00.000Z' },
         enabled: true,
       },
       {
@@ -554,7 +554,7 @@ describe('Agent response regeneration workspace flow', () => {
         label: 'Qwen',
         baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
         wireProtocol: 'chat-completions',
-        defaultModel: QWEN_MODEL,
+        catalog: { models: [QWEN_MODEL], fetchedAt: '2026-08-20T00:00:00.000Z' },
         enabled: true,
       },
     ]

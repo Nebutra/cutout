@@ -93,7 +93,7 @@ export async function cancelProviderDraft(draftId: string): Promise<void> {
 }
 
 export async function importProviderDraft(input: {
-  draftId: string; providerId: string; label: string; defaultModel: string;
+  draftId: string; providerId: string; label: string;
   enabled: boolean
 }): Promise<ProviderConfig> {
   return providerConfigSchema.parse(await invoke<unknown>('import_provider_draft', { input }))

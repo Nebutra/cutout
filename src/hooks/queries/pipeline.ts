@@ -8,11 +8,13 @@
  *   - `useImportMockup`      file   → mockup  (bring-your-own screenshot, §9)
  *   - `useNameSlices`        board+boxes → slice names (vision, `ui-slice-naming`)
  *
- * The image transitions resolve the model from the Settings **image** slot and
- * go through `GenerationService.generateImages`; naming uses the **chat**
- * (understanding) slot and `generateObject`. The key stays in Rust throughout.
- * The board result reuses the existing `store.loadImage` → cutout auto-run, so
- * the `board→slices` pixel pipeline is untouched.
+ * Each mutation resolves its route by **task** (`useTaskAssignment`), classified
+ * by the capability it actually uses: `generateImages` callers route on
+ * `image-generation`, the reference-fed deconstruction routes on `image-edit`,
+ * and naming — which feeds the board bitmap — routes on `vision`. Unbound tasks
+ * inherit per `task-routing.ts`. The key stays in Rust throughout. The board
+ * result reuses the existing `store.loadImage` → cutout auto-run, so the
+ * `board→slices` pixel pipeline is untouched.
  */
 import { useCallback } from 'react'
 import { useMutation } from '@tanstack/react-query'
@@ -40,7 +42,7 @@ import {
   isSupportedImage,
 } from '@/lib/image'
 import { logTiming, markTime } from '@/lib/timing'
-import { useModelAssignments } from './ai-settings'
+import { useTaskAssignment } from './ai-settings'
 
 export interface DeconstructPreflight {
   readonly configs: readonly ProviderConfig[]
@@ -159,12 +161,11 @@ export function usePrepareDeconstructMockup() {
  */
 export function useGenerateMockup() {
   const { generation } = useServices()
-  const assignments = useModelAssignments()
+  const { assignment: image } = useTaskAssignment('image-generation')
 
   return useMutation<void, Error, void>({
     mutationFn: async () => {
       const totalStarted = markTime()
-      const image = assignments.data?.image
       if (!image) throw new Error('No image-generation model is configured.')
 
       const brief = getStoreState().brief.trim()
@@ -289,15 +290,17 @@ export function useDeconstructMockup(
   getRunAssignment?: () => ModelAssignment | undefined,
 ) {
   const { generation, providers, prompts } = useServices()
-  const assignments = useModelAssignments()
+  // Deconstruction supplies reference images, so it routes on `image-edit`
+  // (which inherits `image-generation` when unbound).
+  const { assignment: editRoute } = useTaskAssignment('image-edit')
   const loadImage = useStore((s) => s.loadImage)
 
   return useMutation<void, Error, DeconstructMockupInput | void>({
     mutationFn: async (input) => {
       // Agent runs inject their route locked at run start. Standalone canvas
       // actions keep the Settings assignment fallback.
-      const image = getRunAssignment?.() ?? assignments.data?.image
-      if (!image) throw new Error('No image-generation model is configured.')
+      const image = getRunAssignment?.() ?? editRoute
+      if (!image) throw new Error('No image-editing model is configured.')
 
       const snapshot = getStoreState()
       const mockup = snapshot.mockup
@@ -350,11 +353,10 @@ export function useDeconstructMockup(
  */
 export function useComposeMockup() {
   const { generation } = useServices()
-  const assignments = useModelAssignments()
+  const { assignment: image } = useTaskAssignment('image-generation')
 
   return useMutation<void, Error, void>({
     mutationFn: async () => {
-      const image = assignments.data?.image
       if (!image) throw new Error('No image-generation model is configured.')
 
       const snapshot = getStoreState()
@@ -402,11 +404,10 @@ export function useComposeMockup() {
  */
 export function useComposeFromLibrary() {
   const { generation, assets } = useServices()
-  const assignments = useModelAssignments()
+  const { assignment: image } = useTaskAssignment('image-generation')
 
   return useMutation<void, Error, readonly string[]>({
     mutationFn: async (assetIds) => {
-      const image = assignments.data?.image
       if (!image) throw new Error('No image-generation model is configured.')
       if (assetIds.length === 0) {
         throw new Error('Select at least one asset to compose.')
@@ -491,13 +492,14 @@ export function useNameSlices(
   getRunAssignment?: () => ModelAssignment | undefined,
 ) {
   const { generation } = useServices()
-  const assignments = useModelAssignments()
+  // Naming reads the board bitmap, so it routes on `vision`.
+  const { assignment: visionRoute } = useTaskAssignment('vision')
 
   return useMutation<number, Error, NameSlicesInput | void>({
     mutationFn: async (input) => {
       const signal = input && 'signal' in input ? input.signal : undefined
       signal?.throwIfAborted()
-      const chat = getRunAssignment?.() ?? assignments.data?.chat
+      const chat = getRunAssignment?.() ?? visionRoute
       if (!chat) throw new Error('No chat/vision model is configured.')
 
       const snapshot = getStoreState()

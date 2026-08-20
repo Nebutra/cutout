@@ -100,7 +100,25 @@ export const PROVIDER_KINDS: readonly ProviderKind[] = [
   'ollama','vllm','lm-studio',
 ] as const
 
-/** A user-configured provider connection. NO key field — see module doc. */
+/**
+ * Layer 2 — the models this connection actually advertises.
+ *
+ * Written by exactly two paths: the native draft import (new provider) and the
+ * credential probe behind Settings "Verify" (`ProviderService.test`). It lives
+ * beside the connection in `providers.json` so it survives a browser-storage
+ * wipe, and it is the only source the task-routing pickers read.
+ */
+export interface ProviderCatalog {
+  readonly models: readonly string[]
+  /** ISO timestamp of the probe that produced `models`. */
+  readonly fetchedAt: string
+}
+
+/**
+ * Layer 1 — a user-configured provider *connection*. NO key field (see module
+ * doc) and NO model choice: which model serves which task is layer 3
+ * (`CapabilityBindings`), resolved through `task-routing.ts`.
+ */
 export interface ProviderConfig {
   /** Stable uuid; also the keychain entry account (`provider:{id}`). */
   readonly id: string
@@ -111,13 +129,39 @@ export interface ProviderConfig {
   readonly baseUrl?: string
   /** Explicit generation wire protocol. Gateway is the only kind that omits it. */
   readonly wireProtocol?: ProviderWireProtocol
-  /** Default model slug, e.g. `claude-sonnet-4.6` or `anthropic/claude-sonnet-4.6`. */
-  readonly defaultModel: string
+  /** Layer 2 catalog. Absent = never probed, or the endpoint serves no catalog. */
+  readonly catalog?: ProviderCatalog
+  /**
+   * @deprecated A connection does not own a model. Retained only to parse
+   * pre-v0.1.25 `providers.json` and to seed the one-time binding migration
+   * (`legacy-binding-migration.ts`); never written for new providers and never
+   * consulted when routing a call.
+   */
+  readonly defaultModel?: string
   readonly enabled: boolean
 }
 
 /** A new-or-updated provider: `id` optional (generated on create). */
 export type ProviderDraft = Omit<ProviderConfig, 'id'> & { readonly id?: string }
+
+/**
+ * The models a connection advertises — the single read path for layer 2.
+ * Empty means "not probed yet, or this endpoint serves no catalog"; callers
+ * fall back to a manual model entry rather than to a guessed slug.
+ */
+export function providerCatalogModels(
+  provider: Pick<ProviderConfig, 'catalog'> | undefined,
+): readonly string[] {
+  return provider?.catalog?.models ?? []
+}
+
+/** Does this connection's catalog prove `model` is reachable? */
+export function providerCatalogHasModel(
+  provider: Pick<ProviderConfig, 'catalog'> | undefined,
+  model: string,
+): boolean {
+  return providerCatalogModels(provider).includes(model)
+}
 
 /**
  * Boundary validation for provider config coming back from Rust / a form.
@@ -126,12 +170,19 @@ export type ProviderDraft = Omit<ProviderConfig, 'id'> & { readonly id?: string 
  */
 export const providerKindSchema = z.string().min(1).max(120).regex(/^[a-z0-9][a-z0-9._-]*$/)
 
+export const providerCatalogSchema = z.object({
+  models: z.array(z.string().min(1)),
+  fetchedAt: z.string().datetime(),
+})
+
 const providerConfigFields = {
   kind: providerKindSchema,
   label: z.string().min(1),
   baseUrl: z.string().min(1).optional(),
   wireProtocol: providerWireProtocolSchema.optional(),
-  defaultModel: z.string().min(1),
+  catalog: providerCatalogSchema.optional(),
+  /** @deprecated see {@link ProviderConfig.defaultModel} — parsed, never required. */
+  defaultModel: z.string().min(1).optional(),
   enabled: z.boolean(),
 }
 

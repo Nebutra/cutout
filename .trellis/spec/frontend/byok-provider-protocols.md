@@ -17,6 +17,23 @@ catalog parsing, or the Settings provider form.
 - `wireProtocol` owns the SDK adapter, protocol base path, auth-header shape,
   streaming behavior, and model-catalog shape.
 
+Provider configuration is three layers, and they must not be collapsed:
+
+| Layer | Owns | Persisted in |
+| --- | --- | --- |
+| 1 Connection (`ProviderConfig`) | endpoint + protocol + credential reference | `providers.json` (Rust) |
+| 2 Catalog (`ProviderConfig.catalog`) | the models that connection advertises | `providers.json` (Rust) |
+| 3 Task routing (`CapabilityBindings`) | which connection + model serves each task | `settings.json` (plugin-store) |
+
+A connection **never names a model**. `ProviderConfig.defaultModel` is
+deprecated: it is parsed so pre-v0.1.25 files still load and so
+`legacy-binding-migration.ts` can seed a one-time `text` binding, and it is
+consulted by nothing else. Layer 2 is written by exactly two paths — the native
+draft import and `verifyProviderCatalog` (Settings "Verify"). Layer 3 is
+resolved by `task-routing.ts`; `resolveModel` has no per-kind fallback table, so
+a call with no bound model fails with `NO_MODEL_BOUND` rather than reaching a
+model the user never configured.
+
 The persisted custom-provider kind remains `openai-compatible`; its visible
 label is `Custom endpoint`.
 
@@ -29,15 +46,32 @@ type ProviderWireProtocol =
   | 'anthropic-messages'
   | 'google-generate-content'
 
+interface ProviderCatalog {
+  models: readonly string[]
+  fetchedAt: string
+}
+
 interface ProviderConfig {
   id: string
   kind: string
   label: string
   baseUrl?: string
   wireProtocol: ProviderWireProtocol
-  defaultModel: string
+  catalog?: ProviderCatalog
+  /** @deprecated read-compat + one-time migration only; never routes a call. */
+  defaultModel?: string
   enabled: boolean
 }
+
+resolveTaskRoute(
+  bindings: CapabilityBindings['bindings'] | undefined,
+  task: ModelTaskKind,
+): { assignment: ModelAssignment; inheritedFrom?: ModelTaskKind } | undefined
+
+verifyProviderCatalog(
+  providers: ProviderService,
+  providerId: string,
+): Promise<{ models: readonly string[]; fetchedAt: string }>
 
 apiBaseUrl(
   kind: ProviderKind,

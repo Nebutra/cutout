@@ -1,32 +1,33 @@
 /**
  * ProviderRow (spec §7) — one configured provider in the list.
  *
- * Shows the kind (Badge), label, endpoint host, and a status dot derived from
- * local credential state plus the persisted verification receipt:
+ * Shows the kind (Badge), label, endpoint host, the size of the probed model
+ * catalog, and a status dot derived from local credential state plus the
+ * persisted verification receipt:
  *   未配置 (no key) · 已配置 (key present) · 校验通过 / 校验失败 (last test).
- * A verified status requires the persisted model and check timestamp evidence.
  *
- * Actions: Test (round-trips through the Rust proxy → toast), Edit (re-opens the
- * form), Remove (AlertDialog confirm → deletes config **and** the keychain
- * secret). No secret is ever read or shown here.
+ * Actions: Verify (round-trips through the Rust proxy, **refreshes the model
+ * catalog**, → toast), Edit (re-opens the form), Remove (AlertDialog confirm →
+ * deletes config **and** the keychain secret). No secret is read or shown here.
  */
 import { toast } from 'sonner'
 import { Loader2, Pencil, Trash2, Wifi } from 'lucide-react'
 import { Trans, useLingui } from '@lingui/react/macro'
 import { cn } from '@/lib/utils'
-import type { ProviderConfig } from '@/services/ai/provider-types'
+import {
+  providerCatalogModels,
+  type ProviderConfig,
+} from '@/services/ai/provider-types'
 import {
   useProviderStatus,
   useProviderVerifications,
-  useTestKey,
+  useVerifyProvider,
   useRemoveProvider,
 } from '@/hooks/queries/providers'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import {
-  providerVerificationIsVerified,
-  setProviderVerification,
-} from '@/services/ai/provider-verification'
+import { providerVerificationIsVerified } from '@/services/ai/provider-verification'
+import { catalogAge } from './catalog-age'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -43,8 +44,8 @@ type StatusKind = 'unconfigured' | 'configured' | 'ok' | 'fail'
 
 /**
  * The endpoint host — a provider is a *connection* (endpoint + key), not a single
- * model. Models are assigned per capability in the Models slots below, so the row
- * shows where it connects, not one model name.
+ * model. Models are assigned per task below, so the row shows where it connects
+ * and how many models that connection advertises, never one model name.
  */
 function hostOf(baseUrl?: string): string | undefined {
   if (!baseUrl) return undefined
@@ -76,10 +77,10 @@ interface ProviderRowProps {
 }
 
 export function ProviderRow({ provider, onEdit }: ProviderRowProps) {
-  const { t } = useLingui()
+  const { t, i18n } = useLingui()
   const verifications = useProviderVerifications()
   const status = useProviderStatus(provider.id)
-  const testKey = useTestKey()
+  const verifyProvider = useVerifyProvider()
   const removeProvider = useRemoveProvider()
 
   const hasKey = status.data === true
@@ -97,15 +98,16 @@ export function ProviderRow({ provider, onEdit }: ProviderRowProps) {
     fail: t({ id: 'settings.status_failed', message: 'Verification failed' }),
   }
 
-  async function onTest() {
+  async function onVerify() {
     try {
-      const { model, models } = await testKey.mutateAsync(provider.id)
-      setProviderVerification(provider.id,{status:'verified',model,models:[...models],checkedAt:new Date().toISOString()})
+      const { models } = await verifyProvider.mutateAsync(provider.id)
       toast.success(t({ id: 'settings.status_verified', message: 'Verified' }), {
-        description: `${provider.label} · ${model}`,
+        description: t({
+          id: 'settings.models_discovered_toast',
+          message: `${provider.label} · ${models.length} models discovered`,
+        }),
       })
     } catch (error) {
-      setProviderVerification(provider.id,{status:'failed',checkedAt:new Date().toISOString(),detail:error instanceof Error?error.message:String(error)})
       toast.error(
         t({ id: 'settings.status_failed', message: 'Verification failed' }),
         {
@@ -134,6 +136,13 @@ export function ProviderRow({ provider, onEdit }: ProviderRowProps) {
 
   const label = provider.label
   const endpointHost = hostOf(provider.baseUrl)
+  const catalogSize = providerCatalogModels(provider).length
+  const catalogText = catalogSize > 0
+    ? t({ id: 'settings.catalog_model_count', message: `${catalogSize} models` })
+    : t({ id: 'settings.catalog_not_fetched', message: 'Model list not fetched' })
+  const fetchedAge = catalogSize > 0
+    ? catalogAge(provider.catalog?.fetchedAt, i18n.locale, Date.now())
+    : undefined
 
   return (
     <div className="flex items-center gap-3 rounded-lg border border-border bg-card/40 px-3 py-2">
@@ -156,6 +165,14 @@ export function ProviderRow({ provider, onEdit }: ProviderRowProps) {
               <span className="truncate font-mono">{endpointHost}</span>
             </>
           ) : null}
+          <span className="text-muted-foreground/50">·</span>
+          <span className="shrink-0">{catalogText}</span>
+          {fetchedAge ? (
+            <>
+              <span className="text-muted-foreground/50">·</span>
+              <span className="shrink-0">{fetchedAge}</span>
+            </>
+          ) : null}
         </div>
       </div>
 
@@ -163,11 +180,11 @@ export function ProviderRow({ provider, onEdit }: ProviderRowProps) {
         <Button
           variant="ghost"
           size="sm"
-          onClick={onTest}
-          disabled={!hasKey || testKey.isPending}
+          onClick={onVerify}
+          disabled={!hasKey || verifyProvider.isPending}
           aria-label={t({ id: 'settings.test_action', message: 'Test' })}
         >
-          {testKey.isPending ? <Loader2 className="animate-spin" /> : <Wifi />}
+          {verifyProvider.isPending ? <Loader2 className="animate-spin" /> : <Wifi />}
           <Trans id="settings.test_action">Test</Trans>
         </Button>
         <Button

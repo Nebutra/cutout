@@ -21,6 +21,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { base64ToBytes } from '@/lib/image'
 import { createLocalProviderService } from '@/services/ai/provider-service.local'
 import type { ProviderConfig } from '@/services/ai/provider-types'
+import { qwenImage3Route, servesQwenImage3 } from './qwen-image-3-route'
 import { useServices } from '@/services/context'
 import { GameMapProductionPanel } from './GameMapProductionPanel'
 import {
@@ -68,7 +69,6 @@ import {
   gameAssetFamilyProductionInputSchema,
 } from '@/game-asset-profile'
 
-const supportedModels = new Set(['qwen-image-3.0', 'qwen-image-3.0-pro'])
 
 function message(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
@@ -256,7 +256,7 @@ function SpriteAssetProductionPanel({ launch }: { readonly launch?: GameSpriteAs
         const imageProviders = configured.filter((provider) => (
           provider.enabled
           && provider.kind === 'dashscope'
-          && supportedModels.has(provider.defaultModel)
+          && servesQwenImage3(provider)
         ))
         setProviders(imageProviders)
         setProviderId((current) => current || imageProviders[0]?.id || '')
@@ -339,7 +339,8 @@ function SpriteAssetProductionPanel({ launch }: { readonly launch?: GameSpriteAs
   }, [launch, selectReference])
 
   const prepare = async () => {
-    if (!referenceFile || !selectedProvider || !supportedModels.has(selectedProvider.defaultModel)) return
+    const qwenModel = qwenImage3Route(selectedProvider)
+    if (!referenceFile || !selectedProvider || !qwenModel) return
     setBusy('preview')
     setError(null)
     try {
@@ -358,7 +359,7 @@ function SpriteAssetProductionPanel({ launch }: { readonly launch?: GameSpriteAs
         anchor,
         referenceFile,
         providerId: selectedProvider.id,
-        model: selectedProvider.defaultModel as 'qwen-image-3.0' | 'qwen-image-3.0-pro',
+        model: qwenModel,
       })
       setPrepared(await prepareGameAssetProductionRehearsal(input))
       setApplied(null)
@@ -377,7 +378,8 @@ function SpriteAssetProductionPanel({ launch }: { readonly launch?: GameSpriteAs
   }
 
   const prepareFamily = async () => {
-    if (!referenceFile || !selectedProvider || !supportedModels.has(selectedProvider.defaultModel)) return
+    const qwenModel = qwenImage3Route(selectedProvider)
+    if (!referenceFile || !selectedProvider || !qwenModel) return
     if (kind !== 'player' && kind !== 'npc' && kind !== 'creature' && kind !== 'prop') {
       setError('Action families require a player, NPC, creature, or grounded prop identity.')
       return
@@ -393,7 +395,7 @@ function SpriteAssetProductionPanel({ launch }: { readonly launch?: GameSpriteAs
         direction,
         referenceFile,
         providerId: selectedProvider.id,
-        model: selectedProvider.defaultModel as 'qwen-image-3.0' | 'qwen-image-3.0-pro',
+        model: qwenModel,
       })
       const previews: GameAssetActionSheetPreview[] = []
       for (const input of authored.previews) previews.push(await familyRunner.preview(input))
@@ -1104,7 +1106,7 @@ function SpriteAssetProductionPanel({ launch }: { readonly launch?: GameSpriteAs
                 <SelectTrigger><SelectValue placeholder="No Qwen image Provider" /></SelectTrigger>
                 <SelectContent>
                   {providers.map((provider) => (
-                    <SelectItem key={provider.id} value={provider.id}>{provider.label} · {provider.defaultModel}</SelectItem>
+                    <SelectItem key={provider.id} value={provider.id}>{provider.label} · {qwenImage3Route(provider)}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>

@@ -45,10 +45,10 @@ import {
 } from '@/game-asset-profile'
 import { createLocalProviderService } from '@/services/ai/provider-service.local'
 import type { ProviderConfig } from '@/services/ai/provider-types'
+import { qwenImage3Route, servesQwenImage3 } from './qwen-image-3-route'
 import { useServices } from '@/services/context'
 
 const LIVE_MAP_CANVAS = { width: 512, height: 512 } as const
-const QWEN_IMAGE_3_MODELS = new Set(['qwen-image-3.0', 'qwen-image-3.0-pro'])
 const MAP_REVIEWER_ID = 'reviewer:game-map-workbench:local-human'
 
 function errorMessage(error: unknown): string {
@@ -316,7 +316,7 @@ export function GameMapProductionPanel({ launch }: { readonly launch?: GameMapLa
         setProviders(configured.filter((provider) => (
           provider.enabled
           && provider.kind === 'dashscope'
-          && QWEN_IMAGE_3_MODELS.has(provider.defaultModel)
+          && servesQwenImage3(provider)
         )))
       })
       .catch((reason) => {
@@ -406,7 +406,8 @@ export function GameMapProductionPanel({ launch }: { readonly launch?: GameMapLa
 
   const generate = async () => {
     if (!plan) return
-    if (!selectedProvider || !QWEN_IMAGE_3_MODELS.has(selectedProvider.defaultModel)) {
+    const qwenModel = qwenImage3Route(selectedProvider)
+    if (!selectedProvider || !qwenModel) {
       setError('Enable a DashScope Qwen Image 3 Provider in Settings before generating this map.')
       return
     }
@@ -417,7 +418,7 @@ export function GameMapProductionPanel({ launch }: { readonly launch?: GameMapLa
         sourceText: brief,
         mapName: mapName.trim() || plan.title,
         providerId: selectedProvider.id,
-        model: selectedProvider.defaultModel as 'qwen-image-3.0' | 'qwen-image-3.0-pro',
+        model: qwenModel,
         runId: `run:game-map:${crypto.randomUUID()}`,
         canvas: LIVE_MAP_CANVAS,
       })
@@ -531,7 +532,7 @@ export function GameMapProductionPanel({ launch }: { readonly launch?: GameMapLa
         </div>
         <Badge variant={selectedProvider ? 'secondary' : 'outline'}>
           {selectedProvider
-            ? `${selectedProvider.label} · ${selectedProvider.defaultModel}`
+            ? `${selectedProvider.label} · ${qwenImage3Route(selectedProvider)}`
             : providersLoaded ? 'Qwen Image 3 unavailable' : 'Loading Qwen route'}
         </Badge>
       </div>
