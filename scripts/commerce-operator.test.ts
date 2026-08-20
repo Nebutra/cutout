@@ -163,7 +163,9 @@ describe('Commerce operator release identity', () => {
     // (`0\.1\.24`) is invisible to a version-bump search-and-replace, so it
     // silently keeps passing against the previous release; building one from
     // `pkg.version` instead needs escaping this assertion has no business doing.
-    expect(cargo.split('\n')).toContain(`version = "${pkg.version}"`)
+    // Split on `\r?\n`: a Windows checkout leaves a carriage return on every
+    // line, which an exact-string comparison would otherwise never match.
+    expect(cargo.split(/\r?\n/)).toContain(`version = "${pkg.version}"`)
   })
 
   it('fails the release build before compilation when the evaluator trust root is absent', () => {
