@@ -61,6 +61,63 @@ describe('ProjectRow', () => {
   })
 })
 
+function renderHomeMarkup() {
+  return renderToStaticMarkup(createElement(
+    SettingsUIProvider,
+    { value: { open: vi.fn() } },
+    createElement(
+      TooltipProvider,
+      null,
+      createElement(I18nProvider, { i18n }, createElement(ProjectHome, {
+        activeProjectId: null,
+        projects: [],
+        loadState: 'ready',
+        loadError: null,
+        onOpenProject: vi.fn(),
+        onArchiveProject: vi.fn(),
+        onRestoreProject: vi.fn(),
+        onDeleteProject: vi.fn(),
+        onRenameProject: vi.fn(),
+        onPinProject: vi.fn(),
+        onStartWithBrief: vi.fn(),
+        onImportBoard: vi.fn(),
+        onRetryProjects: vi.fn(),
+      })),
+    ),
+  ))
+}
+
+describe('ProjectHome Start lockup and Continue working', () => {
+  it('anchors the hero with the labelled Cutout symbol above the headline', () => {
+    const html = renderHomeMarkup()
+    const markStart = html.indexOf('data-cutout-brand="symbol"')
+    const headlineStart = html.indexOf('What will we design?')
+
+    expect(markStart).toBeGreaterThan(-1)
+    expect(html).toContain('aria-label="Cutout"')
+    expect(markStart).toBeLessThan(headlineStart)
+  })
+
+  it('gives the composer the taller textarea floor', () => {
+    const html = renderHomeMarkup()
+
+    expect(html).toContain('min-h-36')
+    expect(html).toContain('sm:min-h-32')
+    expect(html).not.toContain('min-h-32 w-full resize-none')
+  })
+
+  it('keeps Continue working on screen with an empty state when nothing is in progress', () => {
+    const html = renderHomeMarkup()
+
+    expect(html).toContain('Continue working')
+    expect(html).toContain('id="home-continue-heading"')
+    expect(html).toContain('aria-labelledby="home-continue-heading"')
+    expect(html).toContain('text-xs font-medium tracking-wide text-muted-foreground uppercase')
+    expect(html).toContain('Nothing in progress yet')
+    expect(html).toContain('border-dashed')
+  })
+})
+
 describe('ProjectHome outcome-first start', () => {
   it('resets and refocuses the mounted Home composer when a new-task signal repeats the route',async()=>{host=document.createElement('div');document.body.append(host);root=createRoot(host);const render=(signal:number)=>act(()=>root?.render(createElement(SettingsUIProvider,{value:{open:vi.fn()}},createElement(TooltipProvider,null,createElement(I18nProvider,{i18n},createElement(ProjectHome,{resetToStartSignal:signal,activeProjectId:null,projects:[],loadState:'ready',loadError:null,onOpenProject:vi.fn(),onArchiveProject:vi.fn(),onRestoreProject:vi.fn(),onDeleteProject:vi.fn(),onRenameProject:vi.fn(),onPinProject:vi.fn(),onStartWithBrief:vi.fn(),onImportBoard:vi.fn(),onRetryProjects:vi.fn()}))))));render(0);const textarea=host.querySelector('textarea') as HTMLTextAreaElement,web=host.querySelector('button[aria-label="Web"]') as HTMLButtonElement;act(()=>web.click());expect(textarea.value).not.toBe('');render(1);await act(settleFocus);const reset=host.querySelector('textarea') as HTMLTextAreaElement;expect(reset.value).toBe('');expect(host.querySelector('button[aria-label="Web"]')?.getAttribute('aria-pressed')).toBe('false');expect(document.activeElement).toBe(reset)})
   it('keeps presets selection-only and creates exactly once on submit',async()=>{const view=mountHome(),web=view.host.querySelector('button[aria-label="Web"]') as HTMLButtonElement,textarea=view.host.querySelector('textarea') as HTMLTextAreaElement;act(()=>{web.click();web.click();web.click()});await act(settleFocus);expect(document.activeElement).toBe(textarea);expect(view.onStartWithBrief).not.toHaveBeenCalled();expect(textarea.value).toBe('Design a responsive web experience for ');expect(web.getAttribute('aria-pressed')).toBe('true');act(()=>web.click());expect(textarea.value).toBe('');expect(web.getAttribute('aria-pressed')).toBe('false');act(()=>web.click());act(()=>textarea.closest('form')?.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})));expect(view.onStartWithBrief).toHaveBeenCalledTimes(1);expect(view.onStartWithBrief).toHaveBeenCalledWith('Design a responsive web experience for',[])})

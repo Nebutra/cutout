@@ -39,7 +39,7 @@ describe("GeneralSection", () => {
   });
 
   it("keeps the expected preference order without project developer controls", () => {
-    const rows = [...(host.firstElementChild?.children ?? [])];
+    const rows = [...(host.querySelector("[data-settings-rows]")?.children ?? [])];
     expect(rows).toHaveLength(2);
     expect(rows[0]?.textContent).toContain("Theme");
     expect(rows[1]?.textContent).toContain("Language");

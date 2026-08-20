@@ -184,6 +184,11 @@ msgid "export.toast_success"
 msgstr "{savedCount, plural, one {# tranche exportée} other {# tranches exportées}}"
 
 #. js-lingui-explicit-id
+#: src/components/onboarding/AreasOfWorkDialog.tsx
+msgid "onboarding.areas_counter"
+msgstr "{selectedCount} sur {maxCount} sélectionnés"
+
+#. js-lingui-explicit-id
 #. placeholder {0}: probedModels.length - CATALOG_PREVIEW_LIMIT
 #: src/components/settings/ProviderForm.tsx
 msgid "settings.catalog_more"
@@ -241,6 +246,11 @@ msgid "workspace.human_loop_optional_context_placeholder"
 msgstr "Ajoutez une contrainte ou décrivez une autre direction…"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/SpeechSection.tsx
+msgid "settings.speech.dictionary_hint"
+msgstr "Ajoutez les noms et termes que la transcription doit écrire exactement. Sélectionnez une entrée pour la supprimer."
+
+#. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
 msgid "settings.add_provider"
 msgstr "Ajouter un fournisseur"
@@ -274,6 +284,11 @@ msgstr "Liaisons de modèles avancées"
 #: src/components/settings/sections/PersonalizationSection.tsx
 msgid "settings.personalization.personality_aria"
 msgstr "Personnalité de l’Agent"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/PersonalizationSection.tsx
+msgid "settings.personalization.group_style"
+msgstr "Style de l’Agent"
 
 #. js-lingui-explicit-id
 #: src/components/settings/SettingsSidebar.tsx
@@ -386,6 +401,11 @@ msgid "vectorizer.secret_saved"
 msgstr "Secret API enregistré"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/GeneralSection.tsx
+msgid "settings.general.description"
+msgstr "Apparence et langue de cet appareil."
+
+#. js-lingui-explicit-id
 #: src/components/settings/SettingsDialog.tsx
 msgid "settings.dialog_a11y_desc"
 msgstr "Préférences de l'application et fournisseurs d'IA."
@@ -440,6 +460,11 @@ msgstr "Les projets archivés restent sur cet appareil jusqu'à ce que vous les 
 #: src/components/home/ProjectHome.tsx
 msgid "home.archived_empty_description"
 msgstr "Les travaux archivés apparaîtront ici."
+
+#. js-lingui-explicit-id
+#: src/components/onboarding/AreasOfWorkDialog.tsx
+msgid "onboarding.areas_group_label"
+msgstr "Domaines de travail"
 
 #. js-lingui-explicit-id
 #: src/components/home/ProjectHome.tsx
@@ -536,6 +561,11 @@ msgid "settings.speech.auto_play_aria"
 msgstr "Lire automatiquement les réponses TTS"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/SpeechSection.tsx
+msgid "settings.speech.automatic_routing"
+msgstr "Routage automatique"
+
+#. js-lingui-explicit-id
 #: src/components/home/ProjectHome.tsx
 msgid "home.nav_back"
 msgstr "Retour"
@@ -563,6 +593,7 @@ msgstr "Confirmation du Brand Book"
 
 #. js-lingui-explicit-id
 #: src/components/home/ProjectHome.tsx
+#: src/components/onboarding/AreasOfWorkDialog.tsx
 msgid "home.preset_brand"
 msgstr "Kit de marque"
 
@@ -720,6 +751,11 @@ msgstr "Choisissez un modèle avec une preuve exacte de capacité."
 #: src/components/workspace/IntentWorkspace.tsx
 msgid "workspace.human_loop_instruction"
 msgstr "Choisissez une direction. Ajoutez du contexte facultatif ci-dessous, puis appuyez sur la flèche."
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/SpeechSection.tsx
+msgid "settings.speech.trigger_hint"
+msgstr "Choisissez si la dictée s’exécute tant que la touche est maintenue ou reste active jusqu’à l’arrêt, et quel raccourci la démarre."
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
@@ -901,6 +937,11 @@ msgid "global_library.meta_content_hash"
 msgstr "Hachage du contenu"
 
 #. js-lingui-explicit-id
+#: src/components/onboarding/AreasOfWorkDialog.tsx
+msgid "onboarding.areas_continue"
+msgstr "Continuer"
+
+#. js-lingui-explicit-id
 #: src/components/workspace/IntentWorkspace.tsx
 msgid "workspace.human_loop_use_judgment_hint"
 msgstr "Continuez avec la direction recommandée par l’Agent."
@@ -1050,6 +1091,11 @@ msgid "settings.updates.up_to_date"
 msgstr "Cutout est à jour sur le canal {0}."
 
 #. js-lingui-explicit-id
+#: src/components/onboarding/AreasOfWorkDialog.tsx
+msgid "onboarding.areas_brand_line"
+msgstr "Cutout rassemble votre travail de design en un seul endroit."
+
+#. js-lingui-explicit-id
 #: src/components/home/SidebarAccount.tsx
 msgid "home.theme_dark"
 msgstr "Sombre"
@@ -1076,6 +1122,11 @@ msgstr "Supprimer définitivement"
 #: src/components/settings/sections/ArchivedSection.tsx
 msgid "home.delete_permanently_title"
 msgstr "Supprimer définitivement ?"
+
+#. js-lingui-explicit-id
+#: src/components/onboarding/AreasOfWorkDialog.tsx
+msgid "onboarding.area_desktop_description"
+msgstr "Espaces de travail desktop denses"
 
 #. js-lingui-explicit-id
 #: src/components/workspace/IntentWorkspace.tsx
@@ -1124,6 +1175,7 @@ msgstr "Systèmes de design"
 
 #. js-lingui-explicit-id
 #: src/components/home/ProjectHome.tsx
+#: src/components/onboarding/AreasOfWorkDialog.tsx
 msgid "home.preset_desktop"
 msgstr "Bureau"
 
@@ -1151,6 +1203,16 @@ msgstr "Diagnostic et récupération"
 #: src/components/settings/sections/SpeechSection.tsx
 msgid "settings.speech.dictation"
 msgstr "Dictée"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/SpeechSection.tsx
+msgid "settings.speech.trigger_title"
+msgstr "Déclencheur de dictée"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/SpeechSection.tsx
+msgid "settings.speech.dictionary_title"
+msgstr "Dictionnaire"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/SpeechSection.tsx
@@ -1264,6 +1326,11 @@ msgid "settings.enter_model_manually"
 msgstr "Enter model ID manually"
 
 #. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "gallery.projects_description"
+msgstr "Tout ce que vous avez créé dans cet espace. Le travail épinglé reste en haut."
+
+#. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
 msgid "settings.execution_confirmed"
 msgstr "Exécution confirmée"
@@ -1359,6 +1426,11 @@ msgid "preview.zoom_fit"
 msgstr "Ajuster au panneau"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/GeneralSection.tsx
+msgid "settings.theme_hint"
+msgstr "Suivez l’apparence du système ou fixez Cutout en clair ou sombre."
+
+#. js-lingui-explicit-id
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.policy_follow_updates"
 msgstr "Suivre les mises à jour"
@@ -1389,6 +1461,7 @@ msgid "settings.provider_category_gateway"
 msgstr "Passerelles"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/GeneralSection.tsx
 #: src/components/settings/SettingsSidebar.tsx
 msgid "settings.section_general"
 msgstr "Général"
@@ -1463,6 +1536,11 @@ msgstr "Hôte requis"
 #: src/components/settings/sections/SpeechSection.tsx
 msgid "settings.speech.host_required"
 msgstr "Hôte requis : l’énumération du microphone et les raccourcis système nécessitent un hôte de bureau autorisé."
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "gallery.drafts_description"
+msgstr "Des idées sans résultat pour l’instant. Reprenez-en une où vous l’aviez laissée."
 
 #. js-lingui-explicit-id
 #: src/components/settings/ProviderDirectory.tsx
@@ -1540,6 +1618,11 @@ msgid "settings.install_codex_action"
 msgstr "Installez la CLI Codex signée, puis réessayez."
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/UpdatesSection.tsx
+msgid "settings.updates.installed_build"
+msgstr "Version installée"
+
+#. js-lingui-explicit-id
 #: src/components/settings/sections/PersonalizationSection.tsx
 msgid "settings.personalization.instructions_saved_toast"
 msgstr "Instructions enregistrées"
@@ -1551,14 +1634,34 @@ msgid "settings.section_integrations"
 msgstr "Intégrations"
 
 #. js-lingui-explicit-id
+#: src/components/onboarding/AreasOfWorkDialog.tsx
+msgid "onboarding.area_mobile_description"
+msgstr "Interfaces d’applications iOS et Android"
+
+#. js-lingui-explicit-id
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.empty_fallback_label"
 msgstr "éléments"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/UpdatesSupportSection.tsx
+msgid "settings.updates.description"
+msgstr "Gardez Cutout à jour et récupérez le travail local en cas de problème."
+
+#. js-lingui-explicit-id
 #: src/components/settings/sections/SpeechSection.tsx
 msgid "settings.speech.keep_dictation_visible"
 msgstr "Garder la dictée visible"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/SpeechSection.tsx
+msgid "settings.speech.keep_dictation_visible_hint"
+msgstr "Garder le panneau de transcription à l’écran après l’arrêt de la dictée."
+
+#. js-lingui-explicit-id
+#: src/components/onboarding/AreasOfWorkDialog.tsx
+msgid "onboarding.area_poster_description"
+msgstr "Visuels clés, affiches et images sociales"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
@@ -1574,6 +1677,11 @@ msgstr "Audit du kit"
 #: src/components/settings/sections/GeneralSection.tsx
 msgid "topbar.language_label"
 msgstr "Langue"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/SpeechSection.tsx
+msgid "settings.speech.microphone_device_id_hint"
+msgstr "Laissez vide pour l’entrée système par défaut. Collez un identifiant d’appareil pour fixer un micro."
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/PersonalizationSection.tsx
@@ -1671,6 +1779,16 @@ msgid "global_library.reference_locked"
 msgstr "Verrouillé"
 
 #. js-lingui-explicit-id
+#: src/components/onboarding/AreasOfWorkDialog.tsx
+msgid "onboarding.area_brand_description"
+msgstr "Logo, palette, typographie et assets"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/UpdatesSection.tsx
+msgid "settings.updates.check_automatically_hint"
+msgstr "Rechercher une version plus récente en arrière-plan quand Cutout est ouvert."
+
+#. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
 msgid "settings.manage"
 msgstr "Gérer"
@@ -1679,6 +1797,11 @@ msgstr "Gérer"
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.kit_editor_description"
 msgstr "Gérez la projection de kit approuvée et adressée par contenu."
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/SpeechSection.tsx
+msgid "settings.speech.manual_routing"
+msgstr "Routage vocal manuel"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/PersonalizationSection.tsx
@@ -1702,6 +1825,7 @@ msgstr "ID du microphone"
 
 #. js-lingui-explicit-id
 #: src/components/home/ProjectHome.tsx
+#: src/components/onboarding/AreasOfWorkDialog.tsx
 msgid "home.preset_miniapp"
 msgstr "Mini-programme"
 
@@ -1717,6 +1841,7 @@ msgstr "Absent du kit approuvé"
 
 #. js-lingui-explicit-id
 #: src/components/home/ProjectHome.tsx
+#: src/components/onboarding/AreasOfWorkDialog.tsx
 msgid "home.preset_mobile"
 msgstr "Application mobile"
 
@@ -1864,6 +1989,11 @@ msgid "home.nothing_archived"
 msgstr "Rien n'est archivé"
 
 #. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.continue_empty_title"
+msgstr "Rien en cours pour l’instant"
+
+#. js-lingui-explicit-id
 #. placeholder {0}: query.trim()
 #: src/components/home/ProjectHome.tsx
 msgid "home.no_search_matches_description"
@@ -1967,6 +2097,11 @@ msgid "settings.pick_from_catalog"
 msgstr "Choisir dans le catalogue"
 
 #. js-lingui-explicit-id
+#: src/components/onboarding/AreasOfWorkDialog.tsx
+msgid "onboarding.areas_description"
+msgstr "Choisissez jusqu’à trois domaines dans lesquels vous travaillez le plus. Vous pourrez les modifier dans les réglages."
+
+#. js-lingui-explicit-id
 #: src/components/settings/ProviderForm.tsx
 msgid "settings.catalog_assign_later"
 msgstr "Choisissez lequel sert chaque tâche dans « Affecter des modèles aux tâches »."
@@ -1981,6 +2116,11 @@ msgstr "Épingler"
 #: src/components/home/ProjectHome.tsx
 msgid "home.pin_named"
 msgstr "Épingler {0}"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/SpeechSection.tsx
+msgid "settings.speech.manual_routing_hint"
+msgstr "Fixez un fournisseur et un modèle pour la transcription et la sortie vocale au lieu de laisser Cutout choisir."
 
 #. js-lingui-explicit-id
 #: src/components/home/ProjectHome.tsx
@@ -2035,6 +2175,7 @@ msgstr "Position"
 
 #. js-lingui-explicit-id
 #: src/components/home/ProjectHome.tsx
+#: src/components/onboarding/AreasOfWorkDialog.tsx
 msgid "home.preset_poster"
 msgstr "Affiche"
 
@@ -2097,6 +2238,16 @@ msgstr "Les projets restent sur cet appareil"
 #: src/components/home/ProjectHome.tsx
 msgid "home.drafts_empty_description"
 msgstr "Les projets qui n'ont pas encore produit de résultats se retrouveront ici."
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/ArchivedSection.tsx
+msgid "settings.archived_empty_hint"
+msgstr "Les projets archivés depuis le menu de projet arrivent ici, prêts à être restaurés ou supprimés définitivement."
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.continue_empty_description"
+msgstr "Les projets lancés depuis le brief ci-dessus se rassemblent ici, prêts à être repris."
 
 #. js-lingui-explicit-id
 #: src/components/library/LibraryDrawer.tsx
@@ -2237,6 +2388,11 @@ msgstr "Installation Registry"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/UpdatesSection.tsx
+msgid "settings.updates.channel_title"
+msgstr "Canal de publication"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/UpdatesSection.tsx
 msgid "settings.updates.release_details"
 msgstr "Détails de la version"
 
@@ -2357,6 +2513,11 @@ msgstr "Résolvez les candidats {0} en conflit avant la publication."
 #: src/components/library/ReviewBranchEditor.tsx
 msgid "review_branch.resolved"
 msgstr "résolu"
+
+#. js-lingui-explicit-id
+#: src/components/onboarding/AreasOfWorkDialog.tsx
+msgid "onboarding.area_web_description"
+msgstr "Sites responsives et applications web"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/UpdatesSection.tsx
@@ -2509,6 +2670,11 @@ msgid "settings.integrations.expired"
 msgstr "Session expirée. Actualisez ou reconnectez-vous."
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/PersonalizationSection.tsx
+msgid "settings.personalization.personality_hint"
+msgstr "Définit le ton par défaut de chaque réponse. S’applique immédiatement à tous les projets sur cet appareil."
+
+#. js-lingui-explicit-id
 #: src/components/home/SidebarAccount.tsx
 #: src/components/settings/SettingsDialog.tsx
 msgid "settings.menu_label"
@@ -2551,6 +2717,11 @@ msgid "inspector.dim_size"
 msgstr "Taille"
 
 #. js-lingui-explicit-id
+#: src/components/onboarding/AreasOfWorkDialog.tsx
+msgid "onboarding.areas_skip"
+msgstr "Passer pour l’instant"
+
+#. js-lingui-explicit-id
 #: src/components/inspector/InspectorPanel.tsx
 msgid "inspector.empty_no_slices"
 msgstr "Les régions découpées et leurs détails s'affichent ici."
@@ -2571,6 +2742,11 @@ msgstr "Découpes"
 #: src/components/library/KitLibraryInspector.tsx
 msgid "kit_library.source_heading"
 msgstr "Source"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/SpeechSection.tsx
+msgid "settings.speech.auto_play_responses_hint"
+msgstr "Lire chaque réponse de l’Agent dès son arrivée, sans appuyer sur lecture."
 
 #. js-lingui-explicit-id
 #: src/components/settings/ProviderDirectory.tsx
@@ -2618,6 +2794,11 @@ msgstr "Sortie vocale"
 #: src/updater/update-notifications.ts
 msgid "settings.updates.stable"
 msgstr "Stable"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/UpdatesSection.tsx
+msgid "settings.updates.channel_hint"
+msgstr "Stable livre des versions revues. Beta reçoit les candidates plus tôt et peut être moins prévisible."
 
 #. js-lingui-explicit-id
 #: src/components/home/ProjectHome.tsx
@@ -2670,6 +2851,11 @@ msgstr "SVG · Local"
 #: src/components/settings/VectorizerPanel.tsx
 msgid "vectorizer.heading"
 msgstr "Export SVG"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/GeneralSection.tsx
+msgid "settings.language_hint"
+msgstr "Change immédiatement la langue de l’interface et la mémorise sur cet appareil."
 
 #. js-lingui-explicit-id
 #: src/components/home/SidebarAccount.tsx
@@ -2732,6 +2918,11 @@ msgid "image.error_decode_failed"
 msgstr "Ce fichier n'a pas pu être décodé comme une image."
 
 #. js-lingui-explicit-id
+#: src/components/release-notes/WhatsNewDialog.tsx
+msgid "release_notes.brand_line"
+msgstr "Le Design OS agent-natif."
+
+#. js-lingui-explicit-id
 #: src/components/settings/KeyField.tsx
 msgid "settings.key_hint"
 msgstr "La clé est stockée localement sur cet appareil, jamais renvoyée ni affichée."
@@ -2740,6 +2931,11 @@ msgstr "La clé est stockée localement sur cet appareil, jamais renvoyée ni af
 #: src/components/preview/PreviewCanvas.tsx
 msgid "preview.empty_hint"
 msgstr "L'aperçu transparent apparaît ici une fois qu'une planche est analysée."
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/SpeechSection.tsx
+msgid "settings.speech.voice_hint"
+msgstr "Le nom de voix et la vitesse utilisés pour les réponses parlées. Disponibles une fois un adaptateur TTS connecté."
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/GeneralSection.tsx
@@ -2931,6 +3127,11 @@ msgid "settings.section_updates_support"
 msgstr "Mises à jour et assistance"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/UpdatesSupportSection.tsx
+msgid "settings.section_updates"
+msgstr "Mises à jour et assistance"
+
+#. js-lingui-explicit-id
 #: src/components/settings/sections/UpdatesSection.tsx
 msgid "settings.updates.unavailable"
 msgstr "Les mises à jour sont indisponibles."
@@ -3075,6 +3276,11 @@ msgid "global_library.tab_visual_assets"
 msgstr "Assets visuels"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/SpeechSection.tsx
+msgid "settings.speech.voice_title"
+msgstr "Voix et vitesse"
+
+#. js-lingui-explicit-id
 #: src/components/settings/sections/IntegrationsSection.tsx
 msgid "settings.integrations.waiting_callback"
 msgstr "En attente du rappel"
@@ -3086,6 +3292,7 @@ msgstr "Chaleureux et collaboratif."
 
 #. js-lingui-explicit-id
 #: src/components/home/ProjectHome.tsx
+#: src/components/onboarding/AreasOfWorkDialog.tsx
 msgid "home.preset_web"
 msgstr "Web"
 
@@ -3093,6 +3300,16 @@ msgstr "Web"
 #: src/components/settings/sections/AiSection.tsx
 msgid "settings.dimension_webdev_label"
 msgstr "Développement web"
+
+#. js-lingui-explicit-id
+#: src/components/onboarding/AreasOfWorkDialog.tsx
+msgid "onboarding.area_miniapp_description"
+msgstr "Mini-programmes WeChat et intégrés"
+
+#. js-lingui-explicit-id
+#: src/components/onboarding/AreasOfWorkDialog.tsx
+msgid "onboarding.areas_title"
+msgstr "Sur quoi travaillez-vous ?"
 
 #. js-lingui-explicit-id
 #: src/components/home/ProjectHome.tsx
@@ -3108,6 +3325,11 @@ msgstr "Nouveautés"
 #: src/components/release-notes/WhatsNewDialog.tsx
 msgid "release_notes.whats_new"
 msgstr "Nouveautés"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "gallery.archived_description"
+msgstr "Le travail que vous avez mis de côté. Restaurez un projet pour le ramener dans l’espace."
 
 #. js-lingui-explicit-id
 #: src/components/home/ProjectHome.tsx

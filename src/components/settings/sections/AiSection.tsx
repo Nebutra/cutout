@@ -265,9 +265,9 @@ export function AiSection() {
         </summary>
 
         {advanced ? (
-          <div className="mt-4 flex flex-col gap-4">
+          <div className="mt-4 flex flex-col gap-8">
             <div className="flex items-start gap-2 border-y border-border py-3 text-xs text-muted-foreground">
-              <ShieldCheck className="mt-0.5 size-3.5 shrink-0 text-emerald-500" />
+              <ShieldCheck className="mt-0.5 size-4 shrink-0 text-emerald-500" />
               <Trans id="settings.keychain_trust">
                 API keys are stored locally on this device and injected in the native layer - they never enter the web page.
               </Trans>
@@ -290,7 +290,7 @@ export function AiSection() {
                 </Trans>
               </p>
               {providers.isLoading ? (
-                <Skeleton className="h-14 w-full rounded-md" />
+                <Skeleton className="h-14 w-full" />
               ) : providers.isError ? (
                 <p className="border-y border-destructive/30 py-4 text-center text-sm text-destructive">
                   <Trans id="settings.load_failed">Failed to load providers</Trans>
@@ -409,18 +409,18 @@ export function AiSetupOverview({
           <h2 className="text-sm font-medium">{title}</h2>
           <p className="mt-1 max-w-prose text-xs text-muted-foreground">{description}</p>
           {automaticError ? <p className="mt-2 text-xs text-destructive" role="alert">{automaticError}</p> : null}
-          <div className="mt-3 divide-y divide-border border-y border-border">
+          <div className="mt-3 divide-y divide-border">
             {setup.rows.map((row) => (
-              <div key={row.capability} data-ai-capability={row.capability} data-ai-capability-status={row.status} className="flex min-w-0 items-center gap-3 py-3">
+              <div key={row.capability} data-ai-capability={row.capability} data-ai-capability-status={row.status} className="flex min-h-14 min-w-0 items-center gap-3 py-3">
                 <span aria-hidden className="shrink-0">
                   {row.status === 'ready' ? <CheckCircle2 className="size-4 text-emerald-600" /> : row.status === 'checking' ? <CircleDashed className="size-4 animate-spin text-muted-foreground" /> : <TriangleAlert className="size-4 text-amber-600 dark:text-amber-300" />}
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="block text-sm font-medium">{capabilityLabels[row.capability]}</span>
-                  <span className="block break-words text-xs text-muted-foreground">{row.adapter?.label ?? rowDescription(row)}</span>
-                  {row.adapter ? <span className="block text-[11px] text-muted-foreground">{rowDescription(row)}</span> : null}
+                  <span className="mt-0.5 block break-words text-xs text-muted-foreground">{row.adapter?.label ?? rowDescription(row)}</span>
+                  {row.adapter ? <span className="mt-0.5 block text-xs text-muted-foreground">{rowDescription(row)}</span> : null}
                 </span>
-                <span className="shrink-0">{rowAction(row)}</span>
+                <span className="flex shrink-0 items-center gap-2">{rowAction(row)}</span>
               </div>
             ))}
           </div>

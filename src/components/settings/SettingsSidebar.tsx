@@ -73,7 +73,7 @@ export function SettingsSidebar({ value, onChange, archivedCount = 0 }: Settings
           onClick={() => onChange(id)}
           aria-current={value === id}
           className={cn(
-            'flex shrink-0 items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-sm transition-colors sm:w-full',
+            'flex shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors sm:w-full',
             value === id
               ? 'bg-foreground/10 font-medium text-foreground'
               : 'text-muted-foreground hover:bg-foreground/5 hover:text-foreground',
@@ -82,7 +82,7 @@ export function SettingsSidebar({ value, onChange, archivedCount = 0 }: Settings
           <Icon className="size-4 shrink-0" />
           <span className="min-w-0 flex-1 truncate">{label}</span>
           {badge !== undefined && badge !== null ? (
-            <span className="rounded border border-border/70 bg-muted/60 px-1 py-px text-[9px] font-medium uppercase tracking-wide text-muted-foreground">
+            <span className="shrink-0 rounded-full bg-foreground/10 px-1.5 py-0.5 text-xs font-medium tabular-nums text-muted-foreground">
               {badge}
             </span>
           ) : null}

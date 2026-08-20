@@ -20,6 +20,17 @@ describe("What's New dialog contract", () => {
     expect(source).toContain("restoreFocusTo.focus()");
   });
 
+  it("uses the two-column dialog shell with a brand panel that collapses on mobile", () => {
+    expect(source).toContain("sm:max-w-3xl");
+    expect(source).toContain("sm:grid-cols-[minmax(0,17rem)_minmax(0,1fr)]");
+    expect(source).toContain("<aside className=");
+    expect(source).toContain("hidden overflow-hidden border-r border-border bg-muted p-6 sm:flex");
+    expect(source).toContain('variant="stacked"');
+    expect(source).toContain("text-foreground/5");
+    // The close X is absolute to the whole DialogContent and floats over the right column.
+    expect(source).toContain("pr-12");
+  });
+
   it("renders text and local media only, with a fixed release URL helper", () => {
     expect(source).toContain("bundledMedia(highlight.mediaId)");
     expect(source).toContain("githubReleaseUrl(note.version)");

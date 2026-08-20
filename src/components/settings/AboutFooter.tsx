@@ -23,7 +23,7 @@ export function AboutFooter() {
           }),
         })
       }
-      className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-sm text-muted-foreground transition-colors hover:bg-foreground/5 hover:text-foreground"
+      className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-muted-foreground transition-colors hover:bg-foreground/5 hover:text-foreground"
     >
       <Info className="size-4 shrink-0" aria-hidden="true" />
       <span className="min-w-0 flex-1">Cutout</span>

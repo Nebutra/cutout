@@ -7,9 +7,10 @@
  * Home navigation so "Archived" isn't a first-class workspace destination.
  */
 import { useState } from 'react'
-import { Archive, ArchiveRestore, Trash2 } from 'lucide-react'
+import { ArchiveRestore, Trash2 } from 'lucide-react'
 import { Trans, useLingui } from '@lingui/react/macro'
 import { Button } from '@/components/ui/button'
+import { CutoutBrandMark } from '@/components/brand/CutoutBrandMark'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -38,45 +39,54 @@ export function ArchivedSection({ projects, onRestoreProject, onDeleteProject }:
   const formatter = new Intl.DateTimeFormat(i18n.locale, { month: 'short', day: 'numeric', year: 'numeric' })
 
   return (
-    <section aria-labelledby="settings-archived-heading">
-      <div className="flex items-center gap-2.5">
-        <Archive className="size-4 text-muted-foreground" />
-        <h2 id="settings-archived-heading" className="text-sm font-semibold">
+    <section aria-labelledby="settings-archived-heading" className="flex flex-col gap-4">
+      <div>
+        <h2 id="settings-archived-heading" className="text-sm font-medium">
           <Trans id="settings.section_archived">Archived</Trans>
         </h2>
+        <p className="mt-0.5 text-xs text-muted-foreground">
+          <Trans id="settings.archived_description">
+            Archived projects stay on this device until you restore or delete them.
+          </Trans>
+        </p>
       </div>
-      <p className="mt-2 text-sm text-muted-foreground">
-        <Trans id="settings.archived_description">
-          Archived projects stay on this device until you restore or delete them.
-        </Trans>
-      </p>
 
       {archived.length === 0 ? (
-        <p className="mt-4 rounded-md border border-dashed border-border p-4 text-center text-xs text-muted-foreground">
-          <Trans id="home.nothing_archived">Nothing archived</Trans>
-        </p>
+        <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border px-6 py-12 text-center">
+          <CutoutBrandMark variant="symbol" className="h-8 w-auto text-muted-foreground/40" />
+          <p className="text-sm font-medium">
+            <Trans id="home.nothing_archived">Nothing archived</Trans>
+          </p>
+          <p className="max-w-sm text-xs text-muted-foreground">
+            <Trans id="settings.archived_empty_hint">
+              Projects you archive from the project menu land here, ready to be restored or removed for good.
+            </Trans>
+          </p>
+        </div>
       ) : (
-        <ul className="mt-4 divide-y divide-border rounded-md border border-border">
+        <ul className="divide-y divide-border">
           {archived.map((project) => (
-            <li key={project.id} className="flex items-center gap-3 px-3 py-2.5">
+            <li key={project.id} className="flex min-h-14 items-center gap-3 py-3">
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium">{project.name}</p>
-                <p className="text-xs text-muted-foreground">
+                <p className="mt-0.5 truncate text-xs text-muted-foreground">
                   {project.archivedAt ? formatter.format(new Date(project.archivedAt)) : null}
                 </p>
               </div>
-              <Button
-                size="icon-sm"
-                variant="ghost"
-                aria-label={t({ id: 'settings.delete_archived_named', message: `Delete ${project.name}` })}
-                onClick={() => setPendingDeleteId(project.id)}
-              >
-                <Trash2 className="size-4" />
-              </Button>
-              <Button size="sm" variant="outline" onClick={() => onRestoreProject(project.id)}>
-                <ArchiveRestore className="size-4" />
-                <Trans id="home.restore">Restore</Trans>
-              </Button>
+              <div className="flex shrink-0 items-center gap-2">
+                <Button
+                  size="icon-sm"
+                  variant="ghost"
+                  aria-label={t({ id: 'settings.delete_archived_named', message: `Delete ${project.name}` })}
+                  onClick={() => setPendingDeleteId(project.id)}
+                >
+                  <Trash2 />
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => onRestoreProject(project.id)}>
+                  <ArchiveRestore />
+                  <Trans id="home.restore">Restore</Trans>
+                </Button>
+              </div>
             </li>
           ))}
         </ul>

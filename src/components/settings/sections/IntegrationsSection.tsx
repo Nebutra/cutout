@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Layers, RefreshCw, Unplug } from "lucide-react";
+import { RefreshCw, Unplug } from "lucide-react";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@/components/ui/button";
 import { connectorCatalog } from "@/components/integrations/connector-catalog";
@@ -63,110 +63,116 @@ export function IntegrationsSection() {
   };
 
   return (
-    <section aria-labelledby="settings-integrations-heading">
-      <div className="flex items-center gap-2.5">
-        <Layers className="size-4 text-muted-foreground" />
+    <section
+      aria-labelledby="settings-integrations-heading"
+      className="flex flex-col gap-4"
+    >
+      <div>
         <h2
           id="settings-integrations-heading"
           tabIndex={-1}
-          className="text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           <Trans id="settings.section_integrations">Integrations</Trans>
         </h2>
+        <p className="mt-0.5 text-xs text-muted-foreground">
+          <Trans id="settings.integrations.description">
+            Credentials remain in the desktop host. Cutout stores only opaque,
+            revocable session handles.
+          </Trans>
+        </p>
       </div>
-      <p className="mt-2 text-sm text-muted-foreground">
-        <Trans id="settings.integrations.description">
-          Credentials remain in the desktop host. Cutout stores only opaque,
-          revocable session handles.
-        </Trans>
-      </p>
-      <div className="mt-4 divide-y divide-border rounded-md border border-border">
+      <div className="divide-y divide-border">
         {connectorCatalog.map((connector) => {
-          const state = controller.state(
-            connector.id,
-            connector.provider.id,
-          ),
+          const state = controller.state(connector.id, connector.provider.id),
             oauth = oauthProviders.has(connector.id),
             busy = ["authorizing", "refreshing", "revoking"].includes(
               state.status,
             );
           return (
-            <div key={connector.id} className="flex items-center gap-3 px-3 py-3">
+            <div
+              key={connector.id}
+              className="flex min-h-14 items-center gap-3 py-3"
+            >
               <IntegrationIcon
                 id={connector.id}
                 name={connector.product.name}
               />
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-medium">{connector.product.name}</p>
-                <p className="text-xs text-muted-foreground">
+                <p className="mt-0.5 text-xs text-muted-foreground">
                   {statusLabel(state.status, connector.unavailableReason)}
                 </p>
                 {state.error ? (
-                  <p className="mt-1 text-xs text-destructive">{state.error}</p>
+                  <p className="mt-0.5 text-xs text-destructive">
+                    {state.error}
+                  </p>
                 ) : null}
               </div>
-              {state.status === "connected" ? (
-                <>
-                  <Button
-                    size="icon-sm"
-                    variant="ghost"
-                    title={t({
-                      id: "settings.integrations.refresh_session",
-                      message: "Refresh session",
-                    })}
-                    disabled={busy}
-                    onClick={() =>
-                      void controller.refresh(connector.id).then(update)
-                    }
-                  >
-                    <RefreshCw className="size-4" />
-                  </Button>
-                  <Button
-                    size="icon-sm"
-                    variant="ghost"
-                    title={t({
-                      id: "settings.integrations.disconnect",
-                      message: "Disconnect",
-                    })}
-                    disabled={busy}
-                    onClick={() =>
-                      void controller.disconnect(connector.id).then(update)
-                    }
-                  >
-                    <Unplug className="size-4" />
-                  </Button>
-                </>
-              ) : (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={!oauth || state.status === "disabled" || busy}
-                  onClick={() =>
-                    void controller
-                      .begin(
-                        connector.id,
-                        connector.provider.id,
-                        scopes(connector.id),
-                      )
-                      .then(update)
-                  }
-                >
-                  {state.status === "authorizing"
-                    ? t({
-                        id: "settings.integrations.waiting_callback",
-                        message: "Waiting for callback",
-                      })
-                    : t({
-                        id: "settings.integrations.connect",
-                        message: "Connect",
+              <div className="flex shrink-0 items-center gap-2">
+                {state.status === "connected" ? (
+                  <>
+                    <Button
+                      size="icon-sm"
+                      variant="ghost"
+                      title={t({
+                        id: "settings.integrations.refresh_session",
+                        message: "Refresh session",
                       })}
-                </Button>
-              )}
+                      disabled={busy}
+                      onClick={() =>
+                        void controller.refresh(connector.id).then(update)
+                      }
+                    >
+                      <RefreshCw />
+                    </Button>
+                    <Button
+                      size="icon-sm"
+                      variant="ghost"
+                      title={t({
+                        id: "settings.integrations.disconnect",
+                        message: "Disconnect",
+                      })}
+                      disabled={busy}
+                      onClick={() =>
+                        void controller.disconnect(connector.id).then(update)
+                      }
+                    >
+                      <Unplug />
+                    </Button>
+                  </>
+                ) : (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={!oauth || state.status === "disabled" || busy}
+                    onClick={() =>
+                      void controller
+                        .begin(
+                          connector.id,
+                          connector.provider.id,
+                          scopes(connector.id),
+                        )
+                        .then(update)
+                    }
+                  >
+                    {state.status === "authorizing"
+                      ? t({
+                          id: "settings.integrations.waiting_callback",
+                          message: "Waiting for callback",
+                        })
+                      : t({
+                          id: "settings.integrations.connect",
+                          message: "Connect",
+                        })}
+                  </Button>
+                )}
+              </div>
             </div>
           );
         })}
       </div>
-      <p className="mt-3 text-xs text-muted-foreground">
+      <p className="text-xs text-muted-foreground">
         <Trans id="settings.integrations.handshake_note">
           Plugin, MCP, CLI and local-vault integrations become available only
           after their host handshake is verified.

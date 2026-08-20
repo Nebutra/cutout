@@ -72,7 +72,8 @@ export function RecoverySection() {
         })),
         {
           at: generatedAt,
-          level: hostStatus === "error" ? ("error" as const) : ("info" as const),
+          level:
+            hostStatus === "error" ? ("error" as const) : ("info" as const),
           scope: "host" as const,
           code: "recovery.status",
           correlationId: "local-recovery",
@@ -83,9 +84,8 @@ export function RecoverySection() {
   };
   const checkHost = async (recover = false) => {
     setHostStatus("checking");
-    const { createTauriAgentHostService } = await import(
-      "@/agent-host/tauri-service"
-    );
+    const { createTauriAgentHostService } =
+      await import("@/agent-host/tauri-service");
     const controller = createAuthoritativeRecoveryController({
       workspace: authorizedWorkspace,
       create: (workspaceHandle) =>
@@ -99,11 +99,14 @@ export function RecoverySection() {
   };
 
   return (
-    <section className="border-t border-border pt-4" aria-labelledby="recovery-title">
-      <h3 id="recovery-title" className="text-sm font-medium">
+    <section aria-labelledby="recovery-title">
+      <h3
+        id="recovery-title"
+        className="text-xs font-medium tracking-wide text-muted-foreground uppercase"
+      >
         <Trans id="settings.recovery.title">Troubleshooting</Trans>
       </h3>
-      <p className="mt-0.5 text-xs text-muted-foreground">
+      <p className="mt-2 text-xs text-muted-foreground">
         <Trans id="settings.recovery.hint">
           Reset interface preferences or export a redacted local diagnostic
           bundle. Project data is not deleted.
@@ -120,7 +123,10 @@ export function RecoverySection() {
               "cutout.canvas-grid",
             ]);
             toast.success(
-              t({ id: "settings.recovery.ui_reset", message: "UI state reset" }),
+              t({
+                id: "settings.recovery.ui_reset",
+                message: "UI state reset",
+              }),
             );
           }}
         >
@@ -128,14 +134,14 @@ export function RecoverySection() {
           <Trans id="settings.recovery.reset_ui">Reset UI state</Trans>
         </Button>
       </div>
-      <details className="group/recovery mt-3 border-t border-border/70 pt-1">
-        <summary className="flex min-h-10 cursor-pointer list-none items-center gap-2 text-xs font-medium text-muted-foreground hover:text-foreground [&::-webkit-details-marker]:hidden">
-          <ChevronRight className="size-3.5 transition-transform group-open/recovery:rotate-90" />
+      <details className="group/recovery mt-3 border-t border-border pt-1">
+        <summary className="flex min-h-10 cursor-pointer list-none items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground [&::-webkit-details-marker]:hidden">
+          <ChevronRight className="size-4 transition-transform group-open/recovery:rotate-90" />
           <Trans id="settings.recovery.advanced">
             Diagnostics and recovery
           </Trans>
         </summary>
-        <div className="space-y-3 pb-1 pl-5">
+        <div className="flex flex-col gap-3 pb-1 pl-5">
           <div className="flex flex-wrap gap-2">
             <Button
               variant="outline"
@@ -175,7 +181,7 @@ export function RecoverySection() {
             </Button>
           </div>
 
-          <div className="border-t border-border/70 pt-3">
+          <div className="border-t border-border pt-3">
             {authorizedWorkspace ? (
               <>
                 <div className="flex flex-wrap gap-2">
@@ -222,7 +228,7 @@ export function RecoverySection() {
                 id: "settings.recovery.diagnostic_preview_aria",
                 message: "Diagnostic bundle preview",
               })}
-              className="mt-3 max-h-48 overflow-auto whitespace-pre-wrap rounded-md border border-border bg-muted/20 p-2 font-mono text-[10px]"
+              className="max-h-48 overflow-auto whitespace-pre-wrap rounded-xl border border-border bg-muted/40 p-3 font-mono text-xs"
             >
               {diagnosticsPreview}
             </pre>
