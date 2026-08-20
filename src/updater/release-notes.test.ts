@@ -34,8 +34,10 @@ const migrationBundled: LocalizedReleaseNotes = {
 
 describe("release notes model", () => {
   it("bundles exact-version notes and applies whole-locale English fallback", () => {
-    expect(bundled.version).toBe("0.1.24");
-    expect(selectLocalizedReleaseNotes(bundled, "zh-CN")?.headline).toContain("Commerce");
+    expect(bundled.version).toBe("0.1.25");
+    expect(selectLocalizedReleaseNotes(bundled, "zh-CN")?.headline).not.toBe(
+      bundled.locales.en.headline,
+    );
     expect(selectLocalizedReleaseNotes(bundled, "de-DE")?.headline).toBe(
       bundled.locales.en.headline,
     );
@@ -44,19 +46,21 @@ describe("release notes model", () => {
 
   it("prefers typed localized updater notes and safely falls back to plain text", () => {
     expect(resolveUpdateReleaseNotes({
-      version: "0.1.24",
+      version: "0.1.25",
       localizedNotes: bundled,
       notes: "English fallback",
-    }, "ja")?.headline).toContain("Commerce");
-    // Deliberately a version the bundled catalog does not carry, so the typed
-    // notes cannot apply and the plain-text fallback has to.
+    }, "ja")?.headline).toBe(bundled.locales.ja.headline);
+    // Deliberately a synthetic version the bundled catalog can never carry, so
+    // the typed notes cannot apply and the plain-text fallback has to. It is
+    // far above any shippable version on purpose: this assertion used to name
+    // the next release, which broke the moment that release happened.
     expect(resolveUpdateReleaseNotes({
-      version: "0.1.25",
+      version: "99.0.0",
       localizedNotes: bundled,
       notes: "Readable English fallback.",
       publishedAt: "2026-08-04T10:00:00Z",
     }, "fr")).toMatchObject({
-      version: "0.1.25",
+      version: "99.0.0",
       releasedOn: "2026-08-04",
       highlights: [{ id: "release-notes-fallback", body: "Readable English fallback." }],
     });

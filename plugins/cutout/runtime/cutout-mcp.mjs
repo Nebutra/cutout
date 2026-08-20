@@ -13038,12 +13038,24 @@ var PROVIDER_KINDS = [
 	"vllm",
 	"lm-studio"
 ];
+/**
+* Boundary validation for provider config coming back from Rust / a form.
+* Kept permissive on `baseUrl` (host allowlisting is enforced in Rust, not here)
+* so we never reject a persisted config the UI could otherwise repair.
+*/
+var providerKindSchema = string().min(1).max(120).regex(/^[a-z0-9][a-z0-9._-]*$/);
+var providerCatalogSchema = object({
+	models: array(string().min(1)),
+	fetchedAt: string().datetime()
+});
 var providerConfigFields = {
-	kind: string().min(1).max(120).regex(/^[a-z0-9][a-z0-9._-]*$/),
+	kind: providerKindSchema,
 	label: string().min(1),
 	baseUrl: string().min(1).optional(),
 	wireProtocol: providerWireProtocolSchema.optional(),
-	defaultModel: string().min(1),
+	catalog: providerCatalogSchema.optional(),
+	/** @deprecated see {@link ProviderConfig.defaultModel} — parsed, never required. */
+	defaultModel: string().min(1).optional(),
 	enabled: boolean()
 };
 function providerWireProtocolMessage(config) {

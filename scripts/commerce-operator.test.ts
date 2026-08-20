@@ -143,7 +143,7 @@ describe('Commerce operator release identity', () => {
     expect(runner).toContain('`-R=${NATIVE_HOST_MACOS_REQUIREMENT}`')
   })
 
-  it('keeps product, Cargo, Tauri, capability, and plugin versions at 0.1.24', async () => {
+  it('keeps product, Cargo, Tauri, capability, and plugin versions at 0.1.25', async () => {
     const [pkg, tauri, capabilities, bundledCapabilities, plugin, runtimeBuild, cargo] = await Promise.all([
       readFile('package.json', 'utf8').then(JSON.parse),
       readFile('src-tauri/tauri.conf.json', 'utf8').then(JSON.parse),
@@ -153,13 +153,16 @@ describe('Commerce operator release identity', () => {
       readFile('plugins/cutout/runtime/runtime-build.json', 'utf8').then(JSON.parse),
       readFile('src-tauri/Cargo.toml', 'utf8'),
     ])
-    expect(pkg.version).toBe('0.1.24')
+    expect(pkg.version).toBe('0.1.25')
     expect(tauri.version).toBe(pkg.version)
     expect(capabilities.product.packageVersion).toBe(pkg.version)
     expect(bundledCapabilities).toEqual(capabilities)
     expect(plugin.version).toBe(pkg.version)
     expect(runtimeBuild.packageVersion).toBe(pkg.version)
-    expect(cargo).toMatch(/^version = "0\.1\.24"$/m)
+    // Derived from package.json rather than a literal: an escaped regex is
+    // invisible to a version-bump search-and-replace, so a hardcoded one silently
+    // keeps passing against the previous release.
+    expect(cargo).toMatch(new RegExp(`^version = "${pkg.version.replace(/\./g, '\\.')}"$`, 'm'))
   })
 
   it('fails the release build before compilation when the evaluator trust root is absent', () => {

@@ -36,10 +36,10 @@ function catalog(entries: unknown[] = [entry()]) {
 }
 
 describe('release-note catalog', () => {
-  it('loads the reviewed v0.1.24 entry with all five shipped locales and no historical backfill', async () => {
+  it('loads the reviewed v0.1.25 entry with all five shipped locales and no historical backfill', async () => {
     const loaded = await loadReleaseNotesCatalog(undefined, { requireAllLocales: true })
-    expect(loaded.entries.map((value) => value.version)).toEqual(['0.1.24', '0.1.20', '0.1.19'])
-    expect(Object.keys(requireReleaseNotesEntry(loaded, '0.1.24').locales)).toEqual(RELEASE_NOTES_LOCALES)
+    expect(loaded.entries.map((value) => value.version)).toEqual(['0.1.25', '0.1.24', '0.1.20', '0.1.19'])
+    expect(Object.keys(requireReleaseNotesEntry(loaded, '0.1.25').locales)).toEqual(RELEASE_NOTES_LOCALES)
     expect(findReleaseNotesEntry(loaded, '0.1.16')).toBeUndefined()
   })
 
@@ -107,7 +107,7 @@ describe('release-note catalog', () => {
 
   it('renders all release inputs through the CLI from one exact entry', async () => {
     const output = await mkdtemp(join(tmpdir(), 'cutout-release-notes-'))
-    const result = spawnSync(process.execPath, ['scripts/release-notes.mjs', 'render', '--version', '0.1.24', '--output', output, '--require-all-locales'], { cwd: process.cwd(), encoding: 'utf8' })
+    const result = spawnSync(process.execPath, ['scripts/release-notes.mjs', 'render', '--version', '0.1.25', '--output', output, '--require-all-locales'], { cwd: process.cwd(), encoding: 'utf8' })
     expect(result.status, result.stderr).toBe(0)
     const [plainText, updater, bundled, github] = await Promise.all([
       readFile(join(output, 'updater-notes.txt'), 'utf8'),
@@ -116,9 +116,9 @@ describe('release-note catalog', () => {
       readFile(join(output, 'github-release.md'), 'utf8'),
     ])
     expect(JSON.parse(updater)).toEqual(JSON.parse(bundled))
-    expect(plainText).toContain('Work through Agent and Canvas')
-    expect(plainText).toContain('Produce complete Commerce material sets')
-    expect(plainText).toContain('Build coherent game families and maps')
-    expect(github).toContain('Cutout v0\\.1\\.24')
+    expect(plainText).toContain('A provider no longer carries a model')
+    expect(plainText).toContain('Every task slot now takes effect')
+    expect(plainText).toContain('No call reaches a model you never configured')
+    expect(github).toContain('Cutout v0\\.1\\.25')
   })
 })
