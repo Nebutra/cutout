@@ -11,12 +11,15 @@
 import { useSyncExternalStore } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useServices } from '@/services/context'
-import { isErr } from '@/services/types'
 import type { ProviderConfig, ProviderDraft } from '@/services/ai/provider-types'
 import {
   providerVerificationsSnapshot,
   subscribeProviderVerifications,
 } from '@/services/ai/provider-verification'
+import {
+  verifyProviderCatalog,
+  type VerifyProviderOutcome,
+} from '@/services/ai/verify-provider'
 
 /** Query keys for provider list + per-provider key status. */
 export const providerKeys = {
@@ -67,16 +70,20 @@ export function useSetKey() {
   })
 }
 
-/** Validate a provider's key via a cheap round-trip through the proxy. */
-export function useTestKey() {
+/**
+ * Verify a connection and refresh its model catalog — one action, one writer.
+ *
+ * Checking the credential and learning which models the endpoint serves are the
+ * same round-trip, so they are persisted together: the catalog onto the
+ * provider (layer 2), the receipt into the verification store. Every "Verify" /
+ * "Refresh models" affordance calls this.
+ */
+export function useVerifyProvider() {
   const { providers } = useServices()
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (id: string): Promise<{ model: string; models: readonly string[] }> => {
-      const result = await providers.test(id)
-      if (isErr(result)) throw new Error(result.error)
-      return result.data
-    },
+    mutationFn: (id: string): Promise<VerifyProviderOutcome> =>
+      verifyProviderCatalog(providers, id),
     onSuccess: () => qc.invalidateQueries({ queryKey: providerKeys.all }),
   })
 }

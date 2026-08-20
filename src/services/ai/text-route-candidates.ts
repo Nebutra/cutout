@@ -1,7 +1,11 @@
 import { isImageModelNominationCandidate } from './image-route-assessment'
 import type { ModelAssignment } from './model-assignment-types'
-import type { ProviderConfig } from './provider-types'
 import {
+  providerCatalogModels,
+  type ProviderConfig,
+} from './provider-types'
+import {
+  providerRouteVerified,
   providerVerificationIsVerified,
   type ProviderVerification,
 } from './provider-verification'
@@ -35,7 +39,8 @@ export function verifiedTextRouteCandidates(
     )
     if (
       !provider
-      || !providerVerificationIsVerified(
+      || !providerRouteVerified(
+        provider,
         input.verifications[assignment.providerId],
         assignment.model,
       )
@@ -49,7 +54,7 @@ export function verifiedTextRouteCandidates(
   for (const provider of input.providers) {
     const verification = input.verifications[provider.id]
     if (!provider.enabled || !providerVerificationIsVerified(verification)) continue
-    for (const model of verification?.models ?? [verification!.model!]) {
+    for (const model of providerCatalogModels(provider)) {
       add({ providerId: provider.id, model })
     }
   }

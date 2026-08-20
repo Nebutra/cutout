@@ -143,7 +143,7 @@ describe('Commerce operator release identity', () => {
     expect(runner).toContain('`-R=${NATIVE_HOST_MACOS_REQUIREMENT}`')
   })
 
-  it('keeps product, Cargo, Tauri, capability, and plugin versions at 0.1.24', async () => {
+  it('keeps product, Cargo, Tauri, capability, and plugin versions at 0.1.25', async () => {
     const [pkg, tauri, capabilities, bundledCapabilities, plugin, runtimeBuild, cargo] = await Promise.all([
       readFile('package.json', 'utf8').then(JSON.parse),
       readFile('src-tauri/tauri.conf.json', 'utf8').then(JSON.parse),
@@ -153,13 +153,19 @@ describe('Commerce operator release identity', () => {
       readFile('plugins/cutout/runtime/runtime-build.json', 'utf8').then(JSON.parse),
       readFile('src-tauri/Cargo.toml', 'utf8'),
     ])
-    expect(pkg.version).toBe('0.1.24')
+    expect(pkg.version).toBe('0.1.25')
     expect(tauri.version).toBe(pkg.version)
     expect(capabilities.product.packageVersion).toBe(pkg.version)
     expect(bundledCapabilities).toEqual(capabilities)
     expect(plugin.version).toBe(pkg.version)
     expect(runtimeBuild.packageVersion).toBe(pkg.version)
-    expect(cargo).toMatch(/^version = "0\.1\.24"$/m)
+    // Compared as an exact line rather than a regex. A literal escaped pattern
+    // (`0\.1\.24`) is invisible to a version-bump search-and-replace, so it
+    // silently keeps passing against the previous release; building one from
+    // `pkg.version` instead needs escaping this assertion has no business doing.
+    // Split on `\r?\n`: a Windows checkout leaves a carriage return on every
+    // line, which an exact-string comparison would otherwise never match.
+    expect(cargo.split(/\r?\n/)).toContain(`version = "${pkg.version}"`)
   })
 
   it('fails the release build before compilation when the evaluator trust root is absent', () => {

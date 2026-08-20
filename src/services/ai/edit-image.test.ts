@@ -9,7 +9,7 @@ const cfg = (over: Partial<ProviderConfig> = {}): ProviderConfig => ({
   id: 'p1',
   kind: 'openai-compatible',
   label: 'Relay',
-  defaultModel: 'gpt-image-1',
+  catalog: { models: ['gpt-image-1'], fetchedAt: '2026-08-20T00:00:00.000Z' },
   enabled: true,
   baseUrl: 'https://relay.example/v1',
   wireProtocol: 'chat-completions',
@@ -38,10 +38,11 @@ describe('GenerationService.editImage', () => {
       kind: 'dashscope',
       baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
       wireProtocol: 'chat-completions',
-      defaultModel: 'qwen-image-edit-2511',
+      catalog: { models: ['qwen-image-edit-2511'], fetchedAt: '2026-08-20T00:00:00.000Z' },
     })]))
     const result = await gen.editImage({
       providerId: 'p1',
+      model: 'qwen-image-edit-2511',
       prompt: 'Keep both references.',
       images: [new Uint8Array([1, 2]), new Uint8Array([3, 4])],
     })
@@ -65,7 +66,7 @@ describe('GenerationService.editImage', () => {
       kind: 'xai',
       baseUrl: 'https://api.x.ai/v1',
       wireProtocol: 'chat-completions',
-      defaultModel: 'grok-imagine-image-quality',
+      catalog: { models: ['grok-imagine-image-quality'], fetchedAt: '2026-08-20T00:00:00.000Z' },
     })]))
 
     const result = await gen.editImage({
@@ -113,11 +114,11 @@ describe('GenerationService.editImage', () => {
       kind: 'xai',
       baseUrl: 'https://api.x.ai/v1',
       wireProtocol: 'chat-completions',
-      defaultModel: 'grok-imagine-image',
+      catalog: { models: ['grok-imagine-image'], fetchedAt: '2026-08-20T00:00:00.000Z' },
     })]))
 
     await expect(gen.editImage({
-      providerId: 'p1', prompt: 'Edit it.', images: [PNG_BYTES], size: '1024x1024',
+      providerId: 'p1', model: 'grok-imagine-image', prompt: 'Edit it.', images: [PNG_BYTES], size: '1024x1024',
     })).resolves.toMatchObject({ ok: true })
     const body = JSON.parse(invokeMock.mock.calls[0][1].body)
     expect(body.image).toEqual({
@@ -130,6 +131,7 @@ describe('GenerationService.editImage', () => {
     invokeMock.mockClear()
     await expect(gen.editImage({
       providerId: 'p1',
+      model: 'grok-imagine-image',
       prompt: 'Too many.',
       images: [PNG_BYTES, PNG_BYTES, PNG_BYTES, PNG_BYTES],
     })).resolves.toEqual({
@@ -137,7 +139,7 @@ describe('GenerationService.editImage', () => {
       error: 'xAI image edit accepts up to three bounded reference images.',
     })
     await expect(gen.editImage({
-      providerId: 'p1', prompt: 'Unknown.', images: [new Uint8Array([1, 2, 3])],
+      providerId: 'p1', model: 'grok-imagine-image', prompt: 'Unknown.', images: [new Uint8Array([1, 2, 3])],
     })).resolves.toEqual({
       ok: false,
       error: 'xAI reference images must be PNG, JPEG, or WebP.',
@@ -150,11 +152,12 @@ describe('GenerationService.editImage', () => {
       kind: 'xai',
       baseUrl: 'https://api.x.ai/v1',
       wireProtocol: 'chat-completions',
-      defaultModel: 'grok-imagine-image-quality-20260519',
+      catalog: { models: ['grok-imagine-image-quality-20260519'], fetchedAt: '2026-08-20T00:00:00.000Z' },
     })]))
 
     await expect(gen.editImage({
       providerId: 'p1',
+      model: 'grok-imagine-image-quality-20260519',
       prompt: 'Edit it.',
       images: [PNG_BYTES],
     })).resolves.toEqual({
@@ -170,6 +173,7 @@ describe('GenerationService.editImage', () => {
 
     const result = await gen.editImage({
       providerId: 'p1',
+      model: 'gpt-image-1',
       prompt: 'redraw as assets',
       images: [new Uint8Array([1, 2, 3])],
     })
@@ -222,6 +226,7 @@ describe('GenerationService.editImage', () => {
 
     await gen.editImage({
       providerId: 'p1',
+      model: 'gpt-image-1',
       prompt: 'p',
       images: [new Uint8Array([1])],
     })
@@ -238,6 +243,7 @@ describe('GenerationService.editImage', () => {
 
     const result = await gen.editImage({
       providerId: 'p1',
+      model: 'gpt-image-1',
       prompt: 'p',
       images: [new Uint8Array([1])],
     })
@@ -265,6 +271,7 @@ describe('GenerationService.editImage', () => {
     )
     const result = await gen.editImage({
       providerId: 'p1',
+      model: 'gpt-image-1',
       prompt: 'p',
       images: [new Uint8Array([1])],
     })
@@ -278,6 +285,7 @@ describe('GenerationService.editImage', () => {
     )
     const result = await gen.editImage({
       providerId: 'p1',
+      model: 'gpt-image-1',
       prompt: 'p',
       images: [new Uint8Array([1])],
     })
@@ -287,7 +295,7 @@ describe('GenerationService.editImage', () => {
 
   it('errors (without invoking) when there are no reference images', async () => {
     const gen = createLocalGenerationService(providersWith([cfg()]))
-    const result = await gen.editImage({ providerId: 'p1', prompt: 'p', images: [] })
+    const result = await gen.editImage({ providerId: 'p1', model: 'gpt-image-1', prompt: 'p', images: [] })
     expect(result.ok).toBe(false)
     expect(invokeMock).not.toHaveBeenCalled()
   })
@@ -299,6 +307,7 @@ describe('GenerationService.editImage', () => {
     const gen = createLocalGenerationService(providersWith([cfg()]))
     const result = await gen.editImage({
       providerId: 'p1',
+      model: 'gpt-image-1',
       prompt: 'p',
       images: [new Uint8Array([1])],
     })
@@ -314,6 +323,7 @@ describe('GenerationService.editImage', () => {
 
     const result = await gen.editImage({
       providerId: 'p1',
+      model: 'gpt-image-1',
       prompt: 'preserve the reference',
       images: [new Uint8Array([1])],
     })
@@ -330,6 +340,7 @@ describe('GenerationService.editImage', () => {
 
     const result = await gen.editImage({
       providerId: 'p1',
+      model: 'gpt-image-1',
       prompt: 'edit',
       images: [new Uint8Array([1])],
       inputFidelity: 'low',
@@ -346,6 +357,7 @@ describe('GenerationService.editImage', () => {
 
     const result = await gen.editImage({
       providerId: 'p1',
+      model: 'gpt-image-1',
       prompt: 'p',
       images: [new Uint8Array([1])],
       signal: controller.signal,
@@ -363,6 +375,7 @@ describe('GenerationService.editImage', () => {
 
     const pending = gen.editImage({
       providerId: 'p1',
+      model: 'gpt-image-1',
       prompt: 'p',
       images: [new Uint8Array([1])],
       signal: controller.signal,

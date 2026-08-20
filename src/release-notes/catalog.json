@@ -2,6 +2,112 @@
   "protocol": "cutout.release-notes.catalog.v1",
   "entries": [
     {
+      "version": "0.1.25",
+      "releasedOn": "2026-08-20",
+      "locales": {
+        "en": {
+          "headline": "Providers are connections; models are assigned per task",
+          "highlights": [
+            {
+              "id": "provider-is-a-connection",
+              "title": "A provider no longer carries a model",
+              "body": "Adding a provider now asks only for the connection: endpoint, protocol and key. The required default model is gone, so a connection can be named for what it is rather than for one model it happened to point at. Verifying a provider loads the models that endpoint actually offers, and that list is stored with the connection."
+            },
+            {
+              "id": "per-task-model-routing",
+              "title": "Every task slot now takes effect",
+              "body": "Settings offered six task slots, but calls resolved through a two-slot chat and image view, so a separate binding for Web development or Image editing was never used. Each task is now resolved on its own, and an unassigned task states which task it inherits from instead of showing a bare Auto."
+            },
+            {
+              "id": "no-guessed-models",
+              "title": "No call reaches a model you never configured",
+              "body": "A call with no bound model used to fall back to a built-in per-provider-kind table and spend on a model that was never chosen. That fallback is removed: an unbound call reports which task needs a model instead. Existing setups keep their routing through a one-time migration."
+            }
+          ]
+        },
+        "zh-CN": {
+          "headline": "提供商就是连接，模型按任务指派",
+          "highlights": [
+            {
+              "id": "provider-is-a-connection",
+              "title": "提供商不再携带模型",
+              "body": "添加提供商现在只问连接本身：地址、协议和密钥。必填的默认模型已经移除，因此连接可以按它本来的身份命名，而不是被迫叫成它当时指向的某个模型。校验提供商会加载该端点实际提供的模型清单，并与连接一同保存。"
+            },
+            {
+              "id": "per-task-model-routing",
+              "title": "每个任务槽都真正生效",
+              "body": "设置里有六个任务槽，但调用实际只走对话与图像两个槽，所以单独为网页开发或图像编辑绑定的模型从未被使用。现在每个任务独立解析；未指派的任务会明确说出它继承自哪个任务，而不是只显示一个自动。"
+            },
+            {
+              "id": "no-guessed-models",
+              "title": "不会再用你从未配置过的模型",
+              "body": "过去没有绑定模型时，调用会退回到一张按提供商种类硬编码的表，用一个你从未选择过的模型发出请求并计费。该兜底已删除：未绑定时会直接告诉你哪个任务缺模型。已有配置通过一次性迁移保留原有路由。"
+            }
+          ]
+        },
+        "ja": {
+          "headline": "プロバイダーは接続、モデルはタスクごとに割り当て",
+          "highlights": [
+            {
+              "id": "provider-is-a-connection",
+              "title": "プロバイダーはモデルを持たなくなりました",
+              "body": "プロバイダーの追加では接続そのもの（エンドポイント、プロトコル、キー）だけを尋ねます。必須だった既定モデルは廃止され、接続はその時たまたま指していたモデル名ではなく、本来の名前を付けられます。検証するとそのエンドポイントが実際に提供するモデル一覧が読み込まれ、接続と共に保存されます。"
+            },
+            {
+              "id": "per-task-model-routing",
+              "title": "すべてのタスク枠が実際に効きます",
+              "body": "設定には六つのタスク枠がありましたが、呼び出しはチャットと画像の二枠に集約されていたため、ウェブ開発や画像編集に個別に割り当てたモデルは使われていませんでした。今は各タスクが独立して解決され、未割り当てのタスクはどのタスクを継承するかを明示します。"
+            },
+            {
+              "id": "no-guessed-models",
+              "title": "設定していないモデルには到達しません",
+              "body": "モデル未割り当ての呼び出しは、プロバイダー種別ごとの組み込み表にフォールバックし、選んだ覚えのないモデルで課金されていました。このフォールバックは削除され、どのタスクにモデルが必要かを報告します。既存の設定は一度きりの移行で従来の経路を維持します。"
+            }
+          ]
+        },
+        "fr": {
+          "headline": "Un fournisseur est une connexion ; les modèles s’affectent par tâche",
+          "highlights": [
+            {
+              "id": "provider-is-a-connection",
+              "title": "Un fournisseur ne porte plus de modèle",
+              "body": "Ajouter un fournisseur ne demande plus que la connexion : point de terminaison, protocole et clé. Le modèle par défaut obligatoire disparaît, de sorte qu’une connexion peut porter son vrai nom plutôt que celui d’un modèle qu’elle visait. La vérification charge les modèles réellement proposés par ce point de terminaison et les conserve avec la connexion."
+            },
+            {
+              "id": "per-task-model-routing",
+              "title": "Chaque emplacement de tâche agit enfin",
+              "body": "Les réglages proposaient six emplacements, mais les appels passaient par une vue à deux emplacements, conversation et image : une affectation distincte pour le développement web ou la retouche d’image n’était jamais utilisée. Chaque tâche est désormais résolue seule, et une tâche non affectée indique de quelle tâche elle hérite."
+            },
+            {
+              "id": "no-guessed-models",
+              "title": "Aucun appel n’atteint un modèle non configuré",
+              "body": "Un appel sans modèle affecté retombait sur une table interne par type de fournisseur et dépensait sur un modèle jamais choisi. Ce repli est supprimé : l’appel indique quelle tâche a besoin d’un modèle. Les configurations existantes conservent leur routage via une migration unique."
+            }
+          ]
+        },
+        "es": {
+          "headline": "Un proveedor es una conexión; los modelos se asignan por tarea",
+          "highlights": [
+            {
+              "id": "provider-is-a-connection",
+              "title": "Un proveedor ya no lleva un modelo",
+              "body": "Añadir un proveedor solo pide la conexión: endpoint, protocolo y clave. Desaparece el modelo por defecto obligatorio, así que una conexión puede llamarse por lo que es y no por un modelo al que apuntaba. Verificarla carga los modelos que ese endpoint ofrece de verdad, y esa lista se guarda junto a la conexión."
+            },
+            {
+              "id": "per-task-model-routing",
+              "title": "Cada ranura de tarea surte efecto",
+              "body": "Los ajustes ofrecían seis ranuras, pero las llamadas se resolvían con una vista de dos, conversación e imagen, de modo que una asignación aparte para desarrollo web o edición de imagen nunca se usaba. Ahora cada tarea se resuelve por su cuenta y una tarea sin asignar indica de cuál hereda."
+            },
+            {
+              "id": "no-guessed-models",
+              "title": "Ninguna llamada alcanza un modelo que no configuraste",
+              "body": "Una llamada sin modelo asignado recurría a una tabla interna por tipo de proveedor y gastaba en un modelo nunca elegido. Ese respaldo se elimina: la llamada informa qué tarea necesita un modelo. Las configuraciones existentes conservan su enrutado mediante una migración única."
+            }
+          ]
+        }
+      }
+    },
+    {
       "version": "0.1.24",
       "releasedOn": "2026-08-17",
       "locales": {

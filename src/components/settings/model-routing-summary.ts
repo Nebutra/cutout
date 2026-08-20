@@ -1,4 +1,7 @@
-import type { ProviderConfig } from '@/services/ai/provider-types'
+import {
+  providerCatalogModels,
+  type ProviderConfig,
+} from '@/services/ai/provider-types'
 import { createBuiltinProviderRegistry } from '@/services/ai/provider-registry'
 import { modelTaskProfile, type CapabilityBindings } from '@/services/ai/model-capabilities'
 import {
@@ -6,9 +9,10 @@ import {
   verifiedImageRouteDescriptor,
 } from '@/services/ai/image-route-assessment'
 import {
-  providerVerificationIsVerified,
+  providerRouteVerified,
   type ProviderVerification,
 } from '@/services/ai/provider-verification'
+import { taskFallbackChain } from '@/services/ai/task-routing'
 import { MODEL_DIMENSIONS } from './model-dimensions'
 
 /**
@@ -29,7 +33,11 @@ export function modelRoutingCoverage(
   const providerById = new Map(enabledProviders.map((provider) => [provider.id, provider]))
   const isVerifiedRoute = (providerId: string, model: string) =>
     providerById.has(providerId)
-      && providerVerificationIsVerified(verifications[providerId], model)
+      && providerRouteVerified(
+        providerById.get(providerId),
+        verifications[providerId],
+        model,
+      )
   const covered=MODEL_DIMENSIONS.filter((item) => {
     const direct = bindings?.bindings[item.task]
     if (direct?.model.trim()) {
@@ -42,7 +50,7 @@ export function modelRoutingCoverage(
             provider,
             assignment: direct,
             descriptors: bindings?.descriptors ?? [],
-            verifiedCatalogModels: verifications[provider.id]?.models,
+            verifiedCatalogModels: providerCatalogModels(provider),
           }),
         })
         return item.task === 'image-edit'
@@ -51,13 +59,12 @@ export function modelRoutingCoverage(
       }
       if (isVerifiedRoute(direct.providerId, direct.model)) return true
     }
-    const fallbackTask = item.task === 'webdev'
-      ? 'text'
-      : item.task === 'image-to-webdev'
-        ? 'vision'
-        : undefined
-    const fallback = fallbackTask ? bindings?.bindings[fallbackTask] : undefined
-    if (!fallback?.model.trim() || !isVerifiedRoute(fallback.providerId, fallback.model)) return false
+    // Inheritance mirrors the runtime resolver exactly; a second table here is
+    // how the summary used to claim coverage the runtime would not honour.
+    const fallback = taskFallbackChain(item.task)
+      .map((source) => bindings?.bindings[source])
+      .find((assignment) => assignment?.model.trim())
+    if (!fallback || !isVerifiedRoute(fallback.providerId, fallback.model)) return false
     const provider = providerById.get(fallback.providerId)
     if (!provider) return false
     const capabilities = new Set(

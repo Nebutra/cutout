@@ -11,7 +11,6 @@ import {
 } from 'lucide-react'
 import { Trans, useLingui } from '@lingui/react/macro'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import type { ProviderConfig } from '@/services/ai/provider-types'
 import type { ProviderDefinition } from '@/services/ai/provider-registry'
 import {
   discoverProviderCandidates,
@@ -25,10 +24,14 @@ import {
 } from '@/services/ai/planning-runtime'
 import {
   ensureProviderVerification,
-  providerVerificationIsVerified,
+  providerRouteVerified,
 } from '@/services/ai/provider-verification'
+import { verifyProviderCatalog } from '@/services/ai/verify-provider'
+import {
+  providerCatalogModels,
+  type ProviderConfig,
+} from '@/services/ai/provider-types'
 import { useServices } from '@/services/context'
-import { isErr } from '@/services/types'
 import {
   useProviderVerifications,
   useProviders,
@@ -136,13 +139,19 @@ export function AiSection() {
   }, [runAutomaticSetup, setup])
 
   useEffect(() => {
-    const enabled = new Set(list.filter((provider) => provider.enabled).map((provider) => provider.id))
+    const enabledById = new Map(
+      list.filter((provider) => provider.enabled).map((provider) => [provider.id, provider]),
+    )
     const unresolved = [...new Map(
       Object.values(bindings.data?.bindings ?? {})
-        .filter((assignment) => assignment && enabled.has(assignment.providerId))
+        .filter((assignment) => assignment && enabledById.has(assignment.providerId))
         .map((assignment) => [`${assignment!.providerId}:${assignment!.model}`, assignment!] as const),
     ).values()].filter((assignment) =>
-      !providerVerificationIsVerified(verifications[assignment.providerId], assignment.model),
+      !providerRouteVerified(
+        enabledById.get(assignment.providerId),
+        verifications[assignment.providerId],
+        assignment.model,
+      ),
     )
     const key = unresolved.map((assignment) => `${assignment.providerId}:${assignment.model}`).sort().join('|')
     if (!key || verificationAttempt.current === key) return
@@ -150,11 +159,15 @@ export function AiSection() {
     setAutomaticBusy(true)
     setAutomaticError(undefined)
     void Promise.all(unresolved.map(async (assignment) => {
-      const status = await ensureProviderVerification(assignment.providerId, async () => {
-        const result = await providerService.test(assignment.providerId)
-        if (isErr(result)) throw new Error(result.error)
-        return result.data
-      }, undefined, assignment.model)
+      const status = await ensureProviderVerification(
+        assignment.providerId,
+        async () =>
+          (await verifyProviderCatalog(providerService, assignment.providerId)).models,
+        {
+          requiredModel: assignment.model,
+          catalogModels: providerCatalogModels(enabledById.get(assignment.providerId)),
+        },
+      )
       if (status !== 'verified') {
         throw new Error(`The authenticated provider catalog does not include ${assignment.model}.`)
       }
@@ -244,7 +257,7 @@ export function AiSection() {
             </span>
             <span className="mt-1 block text-xs text-muted-foreground">
               <Trans id="settings.advanced_ai_management_description">
-                Providers, manual model bindings and SVG export.
+                Connect providers, assign models to tasks, and configure SVG export.
               </Trans>
             </span>
           </span>
@@ -265,10 +278,17 @@ export function AiSection() {
               checking={planningRuntime.isPending}
             />
 
+            {/* Step 1 — the connection layer. A provider is an address plus a
+                credential; it deliberately names no model. */}
             <section className="flex flex-col gap-2" aria-labelledby="configured-providers-heading">
               <h3 id="configured-providers-heading" className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-                <Trans id="settings.configured_providers">Configured providers</Trans>
+                <Trans id="settings.step_one_connect_providers">Step 1 · Connect providers</Trans>
               </h3>
+              <p className="text-xs text-muted-foreground">
+                <Trans id="settings.step_one_description">
+                  A provider is a connection — an endpoint and a key. Verifying one loads the models it offers; you choose which model does what in step 2.
+                </Trans>
+              </p>
               {providers.isLoading ? (
                 <Skeleton className="h-14 w-full rounded-md" />
               ) : providers.isError ? (
@@ -472,16 +492,19 @@ const AdvancedModelAssignments = memo(function AdvancedModelAssignments() {
       description: t({ id: 'settings.dimension_image_edit_description', message: 'Edit one or more supplied images.' }),
     },
   }
+  const taskLabels = Object.fromEntries(
+    Object.entries(localizedDimensions).map(([task, value]) => [task, value.label]),
+  )
 
   return (
     <section data-settings-anchor="model-routing" tabIndex={-1} className="flex flex-col gap-3 border-t border-border pt-4 outline-none">
       <div>
         <h3 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-          <Trans id="settings.manual_model_bindings">Manual model bindings</Trans>
+          <Trans id="settings.step_two_assign_models">Step 2 · Assign models to tasks</Trans>
         </h3>
         <p className="mt-1 text-xs text-muted-foreground">
-          <Trans id="settings.manual_model_bindings_description">
-            Override automatic routing for a specific task.
+          <Trans id="settings.step_two_description">
+            Choose which provider and which of its models serves each task. Leave a task unassigned and it inherits a more general one.
           </Trans>
         </p>
       </div>
@@ -494,6 +517,7 @@ const AdvancedModelAssignments = memo(function AdvancedModelAssignments() {
               label: dimension.label,
               description: dimension.description,
             })}
+            taskLabels={taskLabels}
             advanced
           />
         ))}

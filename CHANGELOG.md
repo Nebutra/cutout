@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.1.25 - 2026-08-20
+
+- Split provider configuration into three layers that cannot be collapsed: the
+  connection, the model catalog that connection advertises, and the per-task
+  routing table. A provider no longer carries a required default model.
+- Resolve every generation call by task, so a distinct binding for web
+  development or image editing is honoured instead of being shadowed by the
+  text or image-generation binding.
+- Remove the per-provider-kind default-model fallback: a call with no bound
+  model now reports the task that needs one instead of spending on a model the
+  user never configured. Existing setups are migrated once from their legacy
+  default model.
+- Persist a connection's probed model catalog beside the connection rather than
+  in a browser verification receipt, so clearing web storage no longer strips a
+  provider of its models. Verifying a provider and refreshing its catalog are
+  now one action with one writer.
+- Rebuild Settings AI as two explicit steps — connect providers, then assign
+  models to tasks. A task row names its provider and model instead of a bare
+  model id, and says which task an unassigned route inherits from.
+
 ## 0.1.24 - 2026-08-17
 
 - Publish the Canvas-first Agent workflow with bounded Commerce production and

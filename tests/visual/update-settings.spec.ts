@@ -21,13 +21,13 @@ test("Updates stays truthful and configurable without a desktop runtime", async 
   await expect(updates.getByRole("status")).toContainText("available only in the Cutout desktop app");
   await expect(updates.getByRole("button", { name: "Check now" })).toBeDisabled();
   await expect(updates.getByText("What's New", { exact: true })).toBeVisible();
-  await expect(updates.getByText("Review the highlights for Cutout 0.1.24.")).toBeVisible();
+  await expect(updates.getByText("Review the highlights for Cutout 0.1.25.")).toBeVisible();
   const openReleaseNotes = updates.getByRole("button", { name: "Open" });
   await expect(openReleaseNotes).toBeEnabled();
   await openReleaseNotes.click();
-  const releaseNotes = page.getByRole("dialog").filter({ hasText: "Cutout v0.1.24" });
-  await expect(releaseNotes).toContainText("A Canvas-first Design OS for Commerce and Game production");
-  await expect(releaseNotes).toContainText("Work through Agent and Canvas");
+  const releaseNotes = page.getByRole("dialog").filter({ hasText: "Cutout v0.1.25" });
+  await expect(releaseNotes).toContainText("Providers are connections; models are assigned per task");
+  await expect(releaseNotes).toContainText("A provider no longer carries a model");
   await page.keyboard.press("Escape");
 
   // Browser builds have no compiled updater endpoints, so they must not offer

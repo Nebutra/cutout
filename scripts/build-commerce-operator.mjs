@@ -33,7 +33,7 @@ const version = validateReleaseVersions({
     bundledAgentCapabilities: bundledCapabilities.product?.packageVersion,
     bundledRuntime: runtimeBuild.packageVersion,
   },
-  expected: '0.1.24',
+  expected: '0.1.25',
 })
 if (JSON.stringify(capabilities) !== JSON.stringify(bundledCapabilities)) {
   throw new Error('Bundled Agent capability manifest drifted from the release source.')

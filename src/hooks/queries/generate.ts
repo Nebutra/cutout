@@ -14,7 +14,7 @@ import type { GeneratedAsset } from '@/services/ai/types'
 import type { PromptPart } from '@/prompts/types'
 import { useStore } from '@/store'
 import { decodeImage, bytesToBlob } from '@/lib/image'
-import { useModelAssignments } from './ai-settings'
+import { useTaskAssignment } from './ai-settings'
 
 export interface GenerateFromProtoInput {
   /** Raw bytes of the proto screenshot (optional — a text brief alone works). */
@@ -31,12 +31,11 @@ export interface GenerateFromProtoInput {
  */
 export function useGenerateFromProto() {
   const { generation } = useServices()
-  const assignments = useModelAssignments()
+  const { assignment: image } = useTaskAssignment('image-generation')
   const loadImage = useStore((s) => s.loadImage)
 
   return useMutation<GeneratedAsset, Error, GenerateFromProtoInput>({
     mutationFn: async ({ bytes, requirement }) => {
-      const image = assignments.data?.image
       if (!image) {
         throw new Error('No image-generation model is configured.')
       }

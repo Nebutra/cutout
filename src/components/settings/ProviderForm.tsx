@@ -6,8 +6,9 @@
  * remains transient React state and is wiped after any save attempt.
  *
  * `baseUrl` is surfaced only for `openai-compatible` (the one kind that requires
- * it); `defaultModel` is a Select seeded from `SUGGESTED_MODELS`, degrading to a
- * free-text input for kinds without a catalog (e.g. `openai-compatible`).
+ * it). The form asks for a **connection**, never a model: the credential probe
+ * discovers the endpoint's catalog (layer 2) and stores it on the provider, and
+ * which model serves which task is decided later in "Assign models to tasks".
  */
 import { useEffect, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
@@ -25,14 +26,9 @@ import {
   supportedProviderWireProtocols,
 } from '@/services/ai/provider-types'
 import {
-  DEFAULT_MODEL,
-  SUGGESTED_MODELS,
-  POPULAR_MODELS,
-} from '@/services/ai/models'
-import {
   useUpsertProvider,
   useSetKey,
-  useTestKey,
+  useVerifyProvider,
   useProviderStatus,
 } from '@/hooks/queries/providers'
 import { Button } from '@/components/ui/button'
@@ -63,11 +59,6 @@ const KIND_BRAND: Record<string, string> = {
   gateway: 'AI Gateway',
 }
 
-/** Is `model` one of the known per-kind defaults? (safe to auto-replace) */
-function isKnownDefault(model: string): boolean {
-  return Object.values(DEFAULT_MODEL).includes(model)
-}
-
 function discoveryError(error: unknown): { code?: string; message: string } {
   if (typeof error === 'object' && error !== null) {
     const value = error as { code?: unknown; message?: unknown }
@@ -75,6 +66,9 @@ function discoveryError(error: unknown): { code?: string; message: string } {
   }
   return { message: error instanceof Error ? error.message : String(error) }
 }
+
+/** How many catalog entries the connection form previews inline. */
+const CATALOG_PREVIEW_LIMIT = 8
 
 interface ProviderFormProps {
   /** Existing config → edit mode; absent → add mode. */
@@ -94,25 +88,22 @@ export function ProviderForm({ initial, initialKind, discovered, onDone }: Provi
   const [wireProtocol, setWireProtocol] = useState<ProviderWireProtocol | undefined>(
     initial?.wireProtocol ?? discovered?.wireProtocol ?? defaultProviderWireProtocol(initial?.kind ?? discovered?.kind ?? initialKind ?? 'anthropic'),
   )
-  const [defaultModel, setDefaultModel] = useState(
-    initial?.defaultModel ?? discovered?.modelHint ?? DEFAULT_MODEL[discovered?.kind ?? initialKind ?? 'anthropic'] ?? '',
-  )
   // Ephemeral: the replacement secret the user is typing. Never leaves this state
   // except straight into `setKey`, after which it is cleared.
   const [secret, setSecret] = useState('')
   const [probedModels, setProbedModels] = useState<string[]>([])
   const [probeError, setProbeError] = useState<string>()
-  const [probeErrorCode, setProbeErrorCode] = useState<string>()
   const [probing, setProbing] = useState(false)
   const [connectionDirty, setConnectionDirty] = useState(!isEdit)
-  const [manualModel, setManualModel] = useState(false)
+  /** The endpoint answered, but serves no catalog — save it anyway. */
+  const [catalogUnsupported, setCatalogUnsupported] = useState(false)
   const [nativeDraftId, setNativeDraftId] = useState<string>()
   const [importing, setImporting] = useState(false)
   const queryClient = useQueryClient()
 
   const upsert = useUpsertProvider()
   const setKey = useSetKey()
-  const testKey = useTestKey()
+  const verifyProvider = useVerifyProvider()
   const status = useProviderStatus(initial?.id ?? '')
   const hasKey = isEdit && status.data === true
 
@@ -124,7 +115,7 @@ export function ProviderForm({ initial, initialKind, discovered, onDone }: Provi
 
   function invalidateConnection() {
     if (nativeDraftId) void cancelProviderDraft(nativeDraftId)
-    setNativeDraftId(undefined); setProbedModels([]); setProbeError(undefined); setProbeErrorCode(undefined); setConnectionDirty(true)
+    setNativeDraftId(undefined); setProbedModels([]); setProbeError(undefined); setCatalogUnsupported(false); setConnectionDirty(true)
   }
 
   function onKindChange(next: string) {
@@ -132,11 +123,6 @@ export function ProviderForm({ initial, initialKind, discovered, onDone }: Provi
     setKind(nextKind)
     setWireProtocol(defaultProviderWireProtocol(nextKind))
     invalidateConnection()
-    // Re-seed the model only when it is empty or a stock default, so a custom
-    // slug the user typed survives a kind switch.
-    setDefaultModel((cur) =>
-      cur.trim() === '' || isKnownDefault(cur) ? DEFAULT_MODEL[nextKind] ?? '' : cur,
-    )
   }
 
   function kindLabel(k: ProviderKind): string {
@@ -153,21 +139,10 @@ export function ProviderForm({ initial, initialKind, discovered, onDone }: Provi
   const needsKey = definition?.authMethods.includes('api-key') ?? true
   const needsOAuth = definition?.authMethods.includes('oauth2') ?? false
   const wireProtocols = definition?.wireProtocols ?? supportedProviderWireProtocols(kind)
-  const modelOptions = Array.from(
-    new Set(
-      [
-        ...(SUGGESTED_MODELS[kind] ?? []),
-        // Relays proxy many upstreams → offer the curated mainstream shortlist.
-        ...(kind === 'openai-compatible' ? POPULAR_MODELS : []),
-        ...probedModels,
-        defaultModel,
-      ].filter((m) => m.trim()),
-    ),
-  )
-
+  // A connection is saveable once it is named, addressable, and its credential
+  // has been checked. It does not need a model — that is layer 3.
   const canSave =
     label.trim().length > 0 &&
-    defaultModel.trim().length > 0 &&
     (!needsBaseUrl || baseUrl.trim().length > 0) &&
     !busy && !connectionDirty
 
@@ -178,7 +153,7 @@ export function ProviderForm({ initial, initialKind, discovered, onDone }: Provi
       wireProtocol,
     )
     if (!resolvedBaseUrl) return
-    setProbing(true); setProbeError(undefined); setProbeErrorCode(undefined)
+    setProbing(true); setProbeError(undefined); setCatalogUnsupported(false)
     try {
       if (nativeDraftId) await cancelProviderDraft(nativeDraftId)
       const draftId = await createProviderDraft({
@@ -194,12 +169,18 @@ export function ProviderForm({ initial, initialKind, discovered, onDone }: Provi
       setNativeDraftId(draftId)
       const models = await checkProviderDraft(draftId)
       setProbedModels(models)
+      setCatalogUnsupported(false)
       setConnectionDirty(false)
-      if (!models.includes(defaultModel)) setDefaultModel(models[0] ?? '')
     } catch (error) {
       setProbedModels([])
       const detail = discoveryError(error)
-      setProbeError(detail.message); setProbeErrorCode(detail.code)
+      // An endpoint that serves no catalog is still a usable connection; the
+      // user will type model ids in the task slots instead of picking them.
+      if (detail.code === 'catalog-unsupported') {
+        setCatalogUnsupported(true)
+        setConnectionDirty(false)
+      }
+      setProbeError(detail.message)
     } finally { setProbing(false) }
   }
 
@@ -211,22 +192,26 @@ export function ProviderForm({ initial, initialKind, discovered, onDone }: Provi
         setImporting(true)
         const saved = await importProviderDraft({
           draftId: nativeDraftId, providerId: uuidv4(), label: label.trim(),
-          defaultModel: defaultModel.trim(), enabled: true,
+          enabled: true,
         })
         setSecret(''); setNativeDraftId(undefined)
-        setProviderVerification(saved.id,{status:'verified',model:defaultModel,models:probedModels,checkedAt:new Date().toISOString()})
+        // The native import already persisted the catalog it checked.
+        setProviderVerification(saved.id,{status:'verified',checkedAt:new Date().toISOString()})
         await queryClient.invalidateQueries({ queryKey: ['providers'] })
         toast.success(t({ id: 'settings.provider_added_toast', message: 'Provider added' }), { description: saved.label })
         onDone()
         return
       }
+      const probedCatalog = probedModels.length > 0
+        ? { models: probedModels, fetchedAt: new Date().toISOString() }
+        : initial?.catalog
       const draft: ProviderDraft = {
         ...(initial?.id ? { id: initial.id } : {}),
         kind,
         label: label.trim(),
         baseUrl: baseUrl.trim() ? baseUrl.trim() : undefined,
         wireProtocol,
-        defaultModel: defaultModel.trim(),
+        ...(probedCatalog ? { catalog: probedCatalog } : {}),
         enabled: initial?.enabled ?? true,
       }
       const providedKey = secret.trim().length > 0
@@ -237,7 +222,7 @@ export function ProviderForm({ initial, initialKind, discovered, onDone }: Provi
         setSecret('') // wipe the secret from JS the moment Rust has it
       }
       if (probedModels.length > 0) {
-        setProviderVerification(saved.id,{status:'verified',model:defaultModel,models:probedModels,checkedAt:new Date().toISOString()})
+        setProviderVerification(saved.id,{status:'verified',checkedAt:new Date().toISOString()})
       }
       toast.success(
         isEdit
@@ -251,17 +236,20 @@ export function ProviderForm({ initial, initialKind, discovered, onDone }: Provi
       // Auto-test: verify the key without a separate click. Non-blocking — a
       // failure only toasts; the provider stays saved either way.
       if (!needsKey || providedKey || hasKey) {
-        void testKey
+        void verifyProvider
           .mutateAsync(saved.id)
-          .then(({ model, models }) => {
-            setProviderVerification(saved.id,{status:'verified',model,models:[...models],checkedAt:new Date().toISOString()})
+          .then(({ models }) => {
             toast.success(
               t({ id: 'settings.status_verified', message: 'Verified' }),
-              { description: `${saved.label} · ${model}` },
+              {
+                description: t({
+                  id: 'settings.models_discovered_toast',
+                  message: `${saved.label} · ${models.length} models discovered`,
+                }),
+              },
             )},
           )
           .catch((error: unknown) => {
-            setProviderVerification(saved.id,{status:'failed',checkedAt:new Date().toISOString(),detail:error instanceof Error?error.message:String(error)})
             toast.error(
               t({ id: 'settings.status_failed', message: 'Verification failed' }),
               {
@@ -366,22 +354,47 @@ export function ProviderForm({ initial, initialKind, discovered, onDone }: Provi
         <Button type="button" variant="outline" onClick={() => void probeModels()} disabled={busy || probing || (!secret && !hasKey && !discovered?.credential.available && needsKey)}>
           {probing ? <Loader2 className="animate-spin" /> : <RefreshCw />}<Trans id="settings.check_connection_load_models">Check credentials and load models</Trans>
         </Button>
-        {probeError ? <span className="text-xs text-destructive">{probeError}</span> : null}
+        {probeError && !catalogUnsupported ? <span className="text-xs text-destructive">{probeError}</span> : null}
       </div>
 
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor="provider-model">
-          <Trans id="settings.provider_model_label">Default model</Trans>
-        </Label>
-        {manualModel ? <Input id="provider-model" value={defaultModel} onChange={(event) => setDefaultModel(event.target.value)} className="font-mono" placeholder="Model ID" /> :
-          <Select value={defaultModel} onValueChange={setDefaultModel} disabled={busy || probing || connectionDirty}>
-            <SelectTrigger id="provider-model" className="font-mono"><SelectValue placeholder={t({ id: 'settings.select_model', message: 'Select a model' })} /></SelectTrigger>
-            <SelectContent>
-              {modelOptions.map((model) => <SelectItem key={model} value={model} className="font-mono">{model}</SelectItem>)}
-            </SelectContent>
-          </Select>}
-        {probeErrorCode === 'catalog-unsupported' ? <Button type="button" variant="ghost" size="sm" className="self-start" onClick={() => { setManualModel(true); setConnectionDirty(false) }}><Trans id="settings.enter_model_manually">Enter model ID manually</Trans></Button> : null}
-      </div>
+      {/* The probe result is evidence about the connection, not a choice to
+          make here — models are assigned per task after saving. */}
+      {probedModels.length > 0 ? (
+        <div className="flex flex-col gap-1.5 rounded-md border border-emerald-500/30 bg-emerald-500/5 px-2.5 py-2">
+          <p className="text-xs font-medium text-emerald-700 dark:text-emerald-300">
+            {t({
+              id: 'settings.catalog_discovered',
+              message: `${probedModels.length} models discovered`,
+            })}
+          </p>
+          <p className="text-[11px] text-muted-foreground">
+            <Trans id="settings.catalog_assign_later">
+              Pick which of them serves each task under “Assign models to tasks”.
+            </Trans>
+          </p>
+          <div className="flex flex-wrap gap-1">
+            {probedModels.slice(0, CATALOG_PREVIEW_LIMIT).map((model) => (
+              <span key={model} className="rounded border border-border bg-background px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
+                {model}
+              </span>
+            ))}
+            {probedModels.length > CATALOG_PREVIEW_LIMIT ? (
+              <span className="px-1 py-0.5 text-[10px] text-muted-foreground">
+                {t({
+                  id: 'settings.catalog_more',
+                  message: `+${probedModels.length - CATALOG_PREVIEW_LIMIT} more`,
+                })}
+              </span>
+            ) : null}
+          </div>
+        </div>
+      ) : catalogUnsupported ? (
+        <p className="rounded-md border border-amber-500/30 bg-amber-500/10 px-2.5 py-2 text-xs text-amber-700 dark:text-amber-300">
+          <Trans id="settings.catalog_unsupported_hint">
+            This endpoint serves no model list. You can still save the connection and type model ids by hand when assigning tasks.
+          </Trans>
+        </p>
+      ) : null}
 
       <div className="mt-1 flex justify-end gap-2">
         <Button type="button" variant="outline" onClick={() => { if (nativeDraftId) void cancelProviderDraft(nativeDraftId); onDone() }} disabled={busy}>

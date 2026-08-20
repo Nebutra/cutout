@@ -1,6 +1,6 @@
 {
   "protocol": "cutout.codex-plugin-runtime.v1",
-  "packageVersion": "0.1.24",
+  "packageVersion": "0.1.25",
   "sourceHashes": {
     "node_modules/.pnpm/@tauri-apps+api@2.11.1/node_modules/@tauri-apps/api/core.js": "b2187a1c0c0a25806dc64f8823757ce553c09d3bbe3e409bd05cab32e245f1c9",
     "node_modules/.pnpm/@tauri-apps+api@2.11.1/node_modules/@tauri-apps/api/external/tslib/tslib.es6.js": "76dace0a1ae47c1d3e604591b8a15db2f534b776009b9e68e786dae7fe763f70",
@@ -179,9 +179,9 @@
     "src/registry/resolver.ts": "9ca4f0791f4dcd1af4ddb77c30542f05fe7d8d3b2ddc7c19220c047755311d57",
     "src/services/ai/image-route-assessment.ts": "30d13a923cdb9268629a259e80b7403dc89036846a80a4be3be9f26e8fd397dd",
     "src/services/ai/model-assignment-types.ts": "93de0101b2ad438f8b18aac9f6ef355693ea8f52ce7354094ab72d8a8880ba2d",
-    "src/services/ai/model-capabilities.ts": "784777a6f9608223726950412ccb71afb807451cec036a2f26c6c81ae8acd356",
+    "src/services/ai/model-capabilities.ts": "a80e1b14282ff9df816b4ae7b4942e49729b725ade1b7267a40d64c9fb8ad198",
     "src/services/ai/model-catalog.ts": "868bf0e8fc10a22f2f71aa3a3044acba5edac310c7321795cc8fdd4f3ad2de97",
-    "src/services/ai/provider-types.ts": "6cda6ba2d6408dc11e7996994eea3eea04caeb47f418c36556629f6c461888f4",
+    "src/services/ai/provider-types.ts": "676cd94388a999dabee831f3760a60a6126ea72639da9a3db943e5859e86bd83",
     "src/services/types.ts": "2c240401c704c5ba26049cfcce3565bb3a4d8b471560b5935cc5fd49b6cd0adb",
     "src/starter-compiler/compiler.ts": "98d2e1179954f20602335e3d744b4231552238f89852c5e02e2825237795447a",
     "src/starter-compiler/consumer-matrix.ts": "6ba1593e8e80d5096827e783dd3ba95f97d5e49d0d0536decce8ff028630642f",

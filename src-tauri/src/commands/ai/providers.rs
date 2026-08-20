@@ -1,6 +1,6 @@
 //! Non-secret provider config persistence.
 //!
-//! The provider *list* (labels, kinds, base URLs, default models) is
+//! The provider *list* (labels, kinds, base URLs, probed model catalogs) is
 //! non-sensitive and stored as JSON in the Tauri app-config dir. **Secrets are
 //! never here** — they live only in the OS keychain (see `keys.rs`). The `id`
 //! of each `ProviderConfig` is the keychain account suffix.
@@ -130,8 +130,60 @@ impl ProviderKind {
     }
 }
 
-/// A user-configured provider connection. Contains **no secret** — the key is
-/// referenced indirectly by `id` via the keychain.
+/// Days from 1970-01-01 to the civil date `y-m-d` (Howard Hinnant's
+/// `days_from_civil`, inverted here to `civil_from_days`). Pure integer math —
+/// the app has no date crate, and `ProviderCatalog.fetchedAt` must round-trip
+/// through the web layer's `z.string().datetime()`.
+fn civil_from_days(z: i64) -> (i64, u32, u32) {
+    let z = z + 719_468;
+    let era = if z >= 0 { z } else { z - 146_096 } / 146_097;
+    let doe = (z - era * 146_097) as u64; // [0, 146096]
+    let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146_096) / 365; // [0, 399]
+    let y = yoe as i64 + era * 400;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100); // [0, 365]
+    let mp = (5 * doy + 2) / 153; // [0, 11]
+    let d = (doy - (153 * mp + 2) / 5 + 1) as u32; // [1, 31]
+    let m = if mp < 10 { mp + 3 } else { mp - 9 } as u32; // [1, 12]
+    (if m <= 2 { y + 1 } else { y }, m, d)
+}
+
+/// Format epoch seconds as `YYYY-MM-DDTHH:MM:SSZ`.
+pub(crate) fn iso_timestamp_from_epoch_secs(secs: u64) -> String {
+    let days = (secs / 86_400) as i64;
+    let rem = secs % 86_400;
+    let (year, month, day) = civil_from_days(days);
+    format!(
+        "{year:04}-{month:02}-{day:02}T{:02}:{:02}:{:02}Z",
+        rem / 3600,
+        (rem % 3600) / 60,
+        rem % 60,
+    )
+}
+
+/// Wall-clock now as an ISO-8601 timestamp; falls back to the epoch if the
+/// system clock is before 1970 (a catalog is still better than none).
+pub(crate) fn now_iso() -> String {
+    let secs = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|value| value.as_secs())
+        .unwrap_or(0);
+    iso_timestamp_from_epoch_secs(secs)
+}
+
+/// Layer 2 — the models a connection advertises, captured by the last
+/// successful credential probe. Persisted beside the connection so it survives
+/// a browser-storage wipe.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProviderCatalog {
+    pub models: Vec<String>,
+    /// ISO-8601 timestamp of the probe that produced `models`.
+    pub fetched_at: String,
+}
+
+/// Layer 1 — a user-configured provider *connection*. Contains **no secret**
+/// (the key is referenced indirectly by `id` via the keychain) and **no model
+/// choice** (that is layer 3, owned by the web layer's capability bindings).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ProviderConfig {
@@ -145,8 +197,14 @@ pub struct ProviderConfig {
     pub base_url: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub wire_protocol: Option<ProviderWireProtocol>,
-    /// Model slug (e.g. `claude-sonnet-4-6` or `anthropic/claude-sonnet-4-6`).
-    pub default_model: String,
+    /// Layer 2 catalog. `None` = never probed, or the endpoint serves none.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub catalog: Option<ProviderCatalog>,
+    /// Deprecated: a connection does not own a model. Kept so pre-v0.1.25
+    /// `providers.json` still parses and can seed the one-time binding
+    /// migration; never written for new providers.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub default_model: Option<String>,
     pub enabled: bool,
 }
 
@@ -300,18 +358,60 @@ mod tests {
             label: "My Anthropic".to_string(),
             base_url: None,
             wire_protocol: Some(ProviderWireProtocol::AnthropicMessages),
-            default_model: "claude-sonnet-4-6".to_string(),
+            catalog: Some(ProviderCatalog {
+                models: vec!["claude-sonnet-4-6".to_string()],
+                fetched_at: "2026-08-20T00:00:00Z".to_string(),
+            }),
+            default_model: None,
             enabled: true,
         };
         let json = serde_json::to_string(&cfg).unwrap();
-        assert!(json.contains("\"defaultModel\":\"claude-sonnet-4-6\""));
+        assert!(json.contains("\"catalog\":{\"models\":[\"claude-sonnet-4-6\"]"));
+        assert!(
+            !json.contains("defaultModel"),
+            "a connection must not serialize a model choice"
+        );
         assert!(!json.contains("baseUrl"), "absent base_url must be omitted");
         assert!(json.contains("\"wireProtocol\":\"anthropic-messages\""));
 
         let back: ProviderConfig = serde_json::from_str(&json).unwrap();
         assert_eq!(back.id, "abc");
         assert_eq!(back.kind, ProviderKind::Anthropic);
+        assert_eq!(
+            back.catalog.as_ref().map(|catalog| catalog.models.as_slice()),
+            Some(["claude-sonnet-4-6".to_string()].as_slice())
+        );
         assert!(back.enabled);
+    }
+
+    #[test]
+    fn config_parses_pre_catalog_files_and_keeps_the_legacy_model_for_migration() {
+        // A `providers.json` written before the three-layer split: no catalog,
+        // a required defaultModel. It must still load, and the legacy model must
+        // survive so the web layer can seed a `text` binding from it exactly once.
+        let json = r#"{
+            "id":"legacy","kind":"anthropic","label":"My Anthropic",
+            "wireProtocol":"anthropic-messages",
+            "defaultModel":"claude-sonnet-4-6","enabled":true
+        }"#;
+        let cfg: ProviderConfig = serde_json::from_str(json).unwrap();
+        assert_eq!(cfg.default_model.as_deref(), Some("claude-sonnet-4-6"));
+        assert!(cfg.catalog.is_none());
+    }
+
+    #[test]
+    fn iso_timestamps_format_epoch_seconds_without_a_date_crate() {
+        assert_eq!(iso_timestamp_from_epoch_secs(0), "1970-01-01T00:00:00Z");
+        // 2026-08-20T13:45:07Z — a leap-year-adjacent date past 2000.
+        assert_eq!(
+            iso_timestamp_from_epoch_secs(1_787_233_507),
+            "2026-08-20T13:45:07Z"
+        );
+        // 2024-02-29 proves the leap-day branch.
+        assert_eq!(
+            iso_timestamp_from_epoch_secs(1_709_164_800),
+            "2024-02-29T00:00:00Z"
+        );
     }
 
     #[test]
@@ -397,7 +497,11 @@ mod tests {
             label: "DeepSeek".to_string(),
             base_url: None,
             wire_protocol: Some(ProviderWireProtocol::AnthropicMessages),
-            default_model: "m".to_string(),
+            catalog: Some(ProviderCatalog {
+                models: vec!["m".to_string()],
+                fetched_at: "2026-08-20T00:00:00Z".to_string(),
+            }),
+            default_model: None,
             enabled: true,
         };
         assert!(matches!(
@@ -414,7 +518,11 @@ mod tests {
             label: "OpenAI".to_string(),
             base_url: None,
             wire_protocol: None,
-            default_model: "gpt-5.4".to_string(),
+            catalog: Some(ProviderCatalog {
+                models: vec!["gpt-5.4".to_string()],
+                fetched_at: "2026-08-20T00:00:00Z".to_string(),
+            }),
+            default_model: None,
             enabled: true,
         };
         assert!(matches!(

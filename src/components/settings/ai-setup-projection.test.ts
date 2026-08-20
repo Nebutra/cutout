@@ -15,14 +15,15 @@ const openai: ProviderConfig = {
   label: 'OpenAI',
   baseUrl: 'https://api.openai.com/v1',
   wireProtocol: 'responses',
-  defaultModel: 'gpt-5',
+  catalog: {
+    models: ['gpt-5', 'gpt-image-2'],
+    fetchedAt: '2026-07-28T00:00:00.000Z',
+  },
   enabled: true,
 }
 
 const verified = {
   status: 'verified' as const,
-  model: 'gpt-5',
-  models: ['gpt-5', 'gpt-image-2'],
   checkedAt: '2026-07-28T00:00:00.000Z',
 }
 

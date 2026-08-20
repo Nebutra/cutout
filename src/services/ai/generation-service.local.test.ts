@@ -31,7 +31,7 @@ const cfg = (over: Partial<ProviderConfig> = {}): ProviderConfig => ({
   id: 'p1',
   kind: 'openai-compatible',
   label: 'Relay',
-  defaultModel: 'chat-model',
+  catalog: { models: ['chat-model'], fetchedAt: '2026-08-20T00:00:00.000Z' },
   enabled: true,
   baseUrl: 'https://relay.example/v1',
   wireProtocol: 'chat-completions',
@@ -54,7 +54,7 @@ beforeEach(() => {
   prompts.render.mockClear()
 })
 
-describe('GenerationService adapter injection',()=>{it('uses the injected registry instead of a provider-kind switch',async()=>{const model={id:'injected'},createModel=vi.fn(async()=>model),registry=new GenerationAdapterRegistry([{kind:'openai-compatible',policy:()=>({auth:'rust-keychain-proxy',headerStrategy:'openai-compatible',baseURL:'https://relay.example/v1'}),createModel}]);generateTextMock.mockResolvedValueOnce({text:'ok'});const generation=createLocalGenerationService(providersWith([cfg()]),prompts,registry);await expect(generation.generateText({providerId:'p1',prompt:'hello'})).resolves.toEqual(ok('ok'));expect(createModel).toHaveBeenCalledWith(expect.objectContaining({id:'p1'}),'chat-model');expect(generateTextMock).toHaveBeenCalledWith(expect.objectContaining({model}))})})
+describe('GenerationService adapter injection',()=>{it('uses the injected registry instead of a provider-kind switch',async()=>{const model={id:'injected'},createModel=vi.fn(async()=>model),registry=new GenerationAdapterRegistry([{kind:'openai-compatible',policy:()=>({auth:'rust-keychain-proxy',headerStrategy:'openai-compatible',baseURL:'https://relay.example/v1'}),createModel}]);generateTextMock.mockResolvedValueOnce({text:'ok'});const generation=createLocalGenerationService(providersWith([cfg()]),prompts,registry);await expect(generation.generateText({providerId:'p1',model:'chat-model',prompt:'hello'})).resolves.toEqual(ok('ok'));expect(createModel).toHaveBeenCalledWith(expect.objectContaining({id:'p1'}),'chat-model');expect(generateTextMock).toHaveBeenCalledWith(expect.objectContaining({model}))})})
 
 describe('GenerationService xAI text routing', () => {
   it('does not apply the image-model allowlist to an xAI text model', async () => {
@@ -108,6 +108,7 @@ describe('GenerationService.generateWithTools', () => {
 
     await generation.generateWithTools({
       providerId: 'p1',
+      model: 'chat-model',
       prompt: 'classify',
       tools: [],
       maxSteps: 4,
@@ -139,6 +140,7 @@ describe('GenerationService.generateObject', () => {
     await generation.generateObject(
       {
         providerId: 'p1',
+        model: 'chat-model',
         reasoningEffort: 'low',
         promptRef: { id: 'test-json' },
         input: [{ type: 'text', text: 'brief' }],
@@ -165,6 +167,7 @@ describe('GenerationService.generateObject', () => {
     await generation.generateObject(
       {
         providerId: 'p1',
+        model: 'chat-model',
         promptRef: { id: 'test-json' },
         input: [{ type: 'text', text: 'brief' }],
       },
@@ -324,6 +327,7 @@ describe('GenerationService.generateObject', () => {
     const result = await generation.generateObject(
       {
         providerId: 'p1',
+        model: 'chat-model',
         promptRef: { id: 'test-json' },
         input: [{ type: 'text', text: 'brief' }],
       },
@@ -362,6 +366,7 @@ describe('GenerationService.generateObject', () => {
     const result = await generation.generateObject(
       {
         providerId: 'p1',
+        model: 'chat-model',
         promptRef: { id: 'test-json' },
         input: [{ type: 'text', text: 'brief' }],
       },
@@ -506,6 +511,7 @@ describe('GenerationService.generateObject', () => {
     const result = await generation.generateObject(
       {
         providerId: 'p1',
+        model: 'chat-model',
         promptRef: { id: 'test-json' },
         input: [{ type: 'text', text: 'brief' }],
         signal: controller.signal,
@@ -541,6 +547,7 @@ describe('GenerationService.generateObject', () => {
     const result = await generation.generateObject(
       {
         providerId: 'p1',
+        model: 'chat-model',
         promptRef: { id: 'test-json' },
         input: [{ type: 'text', text: 'brief' }],
       },
@@ -579,6 +586,7 @@ describe('GenerationService.generateObject', () => {
       const result = await generation.generateObject(
         {
           providerId: 'p1',
+          model: 'chat-model',
           promptRef: { id: 'test-json' },
           input: [{ type: 'text', text: 'brief' }],
         },
@@ -610,6 +618,7 @@ describe('GenerationService.generateObject', () => {
     const result = await generation.generateObject(
       {
         providerId: 'p1',
+        model: 'chat-model',
         promptRef: { id: 'test-json' },
         input: [{ type: 'text', text: 'brief' }],
       },
@@ -644,6 +653,7 @@ describe('GenerationService.generateObject', () => {
     const result = await generation.generateObject(
       {
         providerId: 'p1',
+        model: 'chat-model',
         promptRef: { id: 'test-json' },
         input: [{ type: 'text', text: 'brief' }],
       },
@@ -679,6 +689,7 @@ describe('GenerationService.generateObject', () => {
     const result = await generation.generateObject(
       {
         providerId: 'p1',
+        model: 'chat-model',
         promptRef: { id: 'test-json' },
         input: [{ type: 'text', text: 'brief' }],
       },
@@ -720,6 +731,7 @@ describe('GenerationService.generateObject', () => {
     const result = await generation.generateObject(
       {
         providerId: 'p1',
+        model: 'chat-model',
         promptRef: { id: 'test-json' },
         input: [{ type: 'text', text: 'brief' }],
       },
@@ -771,6 +783,7 @@ describe('GenerationService.generateImages', () => {
     })]), prompts)
     const result = await generation.generateImages({
       providerId: 'p1',
+      model: 'chat-model',
       system: 'Edit the reference.',
       input: [{ type: 'image', image: new Uint8Array([1]) }],
     })
@@ -914,6 +927,7 @@ describe('GenerationService.generateImages', () => {
 
     await expect(generation.generateImages({
       providerId: 'p1',
+      model: 'chat-model',
       prompt: 'Create one image.',
     })).resolves.toEqual({
       ok: false,
@@ -932,11 +946,12 @@ describe('GenerationService.generateImages', () => {
       kind: 'xai',
       baseUrl: 'https://api.x.ai/v1',
       wireProtocol: 'chat-completions',
-      defaultModel: 'grok-imagine-image',
+      catalog: { models: ['grok-imagine-image'], fetchedAt: '2026-08-20T00:00:00.000Z' },
     })]), prompts)
 
     await expect(generation.generateImages({
       providerId: 'p1',
+      model: 'grok-imagine-image',
       prompt: 'Create one image.',
     })).resolves.toEqual(ok([{
       mediaType: 'image/jpeg',
@@ -990,7 +1005,7 @@ describe('GenerationService.generateImages', () => {
       registry,
     )
 
-    const result = await generation.generateImages({ providerId: 'p1', prompt: 'make an icon' })
+    const result = await generation.generateImages({ providerId: 'p1', model: 'chat-model', prompt: 'make an icon' })
 
     expect(result).toEqual(ok([{ mediaType: 'image/png', bytes: new Uint8Array([1, 2, 3]) }]))
     expect(invokeMock).not.toHaveBeenCalled()

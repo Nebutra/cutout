@@ -9289,6 +9289,22 @@ mod tests {
     };
     use super::*;
 
+    /// A retained real request names its own model; the Provider record no
+    /// longer carries one. The remaining guard is that the connection's probed
+    /// catalog still proves the model is reachable. An unprobed connection
+    /// (`catalog: None`) carries no such evidence, so nothing is asserted.
+    fn assert_model_in_provider_catalog(
+        provider: &super::super::providers::ProviderConfig,
+        model: &str,
+        subject: &str,
+    ) {
+        if let Some(catalog) = provider.catalog.as_ref() {
+            if !catalog.models.iter().any(|entry| entry == model) {
+                panic!("the {subject} model is absent from its Provider catalog");
+            }
+        }
+    }
+
     fn test_source(color: [u8; 3]) -> Vec<u8> {
         let mut image = image::RgbaImage::from_pixel(64, 64, image::Rgba([255, 0, 255, 255]));
         for y in 10..54 {
@@ -11297,9 +11313,7 @@ mod tests {
                 .expect("the retained action-sheet Provider is not configured");
             dashscope_image::validate_provider_record(provider, &input.provider_id)
                 .expect("the action-sheet request is not bound to an enabled DashScope Provider");
-            if provider.default_model != input.model {
-                panic!("the retained action-sheet model differs from its configured Provider model");
-            }
+            assert_model_in_provider_catalog(provider, &input.model, "retained action-sheet");
             let secret = super::super::keys::read_secret(&input.provider_id)
                 .expect("the action-sheet Provider key is unavailable in Cutout's keychain");
             let stored = preview_action_sheet_request(input, unix_millis().unwrap())
@@ -11502,9 +11516,7 @@ mod tests {
                 .expect("the parent Provider is not configured");
             dashscope_image::validate_provider_record(provider, &parent_authorization.provider_id)
                 .expect("the parent Provider is not an enabled native DashScope Provider");
-            if provider.default_model != parent_authorization.model {
-                panic!("the parent model differs from its configured Provider model");
-            }
+            assert_model_in_provider_catalog(provider, &parent_authorization.model, "parent");
             let secret = super::super::keys::read_secret(&parent_authorization.provider_id)
                 .expect("the parent Provider key is unavailable in Cutout's keychain");
             let stored = preview_action_sheet_repair_request(
@@ -11813,9 +11825,7 @@ mod tests {
                 .expect("the partial parent Provider is not configured");
             dashscope_image::validate_provider_record(provider, &parent_authorization.provider_id)
                 .expect("the partial parent is not an enabled native DashScope Provider");
-            if provider.default_model != parent_authorization.model {
-                panic!("the partial parent model differs from its configured Provider model");
-            }
+            assert_model_in_provider_catalog(provider, &parent_authorization.model, "partial parent");
             let secret = super::super::keys::read_secret(&parent_authorization.provider_id)
                 .expect("the partial parent Provider key is unavailable in Cutout's keychain");
             let repair_input = supplied_repair_input.unwrap_or_else(|| {
@@ -11995,9 +12005,7 @@ mod tests {
                 .expect("the retained request Provider is not configured");
             dashscope_image::validate_provider_record(provider, &input.provider_id)
                 .expect("the retained request is not bound to an enabled native DashScope Provider");
-            if provider.default_model != input.model {
-                panic!("the retained request model differs from its configured Provider model");
-            }
+            assert_model_in_provider_catalog(provider, &input.model, "retained request");
             let secret = super::super::keys::read_secret(&input.provider_id)
                 .expect("the retained request Provider key is unavailable in Cutout's keychain");
             let stored = preview_request(input.clone(), unix_millis().unwrap())
@@ -12177,9 +12185,7 @@ mod tests {
                 .expect("the parent Provider is not configured");
             dashscope_image::validate_provider_record(provider, &parent_authorization.provider_id)
                 .expect("the parent Provider is not an enabled native DashScope Provider");
-            if provider.default_model != parent_authorization.model {
-                panic!("the parent model differs from its configured Provider model");
-            }
+            assert_model_in_provider_catalog(provider, &parent_authorization.model, "parent");
             let secret = super::super::keys::read_secret(&parent_authorization.provider_id)
                 .expect("the parent Provider key is unavailable in Cutout's keychain");
             let stored = preview_repair_request(repair_input.clone(), unix_millis().unwrap())

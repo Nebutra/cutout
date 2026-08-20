@@ -38,7 +38,7 @@ import {
 import { getStoreState } from "@/store";
 import type { DagNodeOutput } from "@/store/types";
 import { decodeImage, bytesToBlob } from "@/lib/image";
-import { useModelAssignments } from "./ai-settings";
+import { useTaskAssignment } from "./ai-settings";
 
 /** Whether a provider kind is served by the OpenAI-shaped `/images/edits`. */
 function isOpenAiShaped(kind: ProviderKind | undefined): boolean {
@@ -78,17 +78,29 @@ function firstSlices(
   return null;
 }
 
+/** The layer-3 routes one graph run is pinned to, resolved once by the caller. */
+export interface DagRunRoutes {
+  /** `generate-image` ops. */
+  readonly imageGeneration: ModelAssignment;
+  /** `edit-image` and `deconstruct` ops — may target a different connection. */
+  readonly imageEdit: ModelAssignment;
+  /** `name` ops. */
+  readonly chat: ModelAssignment;
+  /**
+   * Kind of the *image-edit* connection: it selects the 垫图 (`editImage`) vs.
+   * Gemini multimodal branch, so it must follow the edit route rather than the
+   * generation route now that the two can point at different providers.
+   */
+  readonly imageEditKind: ProviderKind | undefined;
+}
+
 /**
- * Build the op→service dispatcher for one run. `imageKind` selects the 垫图
- * (`editImage`) vs. Gemini multimodal path; the model slots + services are
- * resolved once by the caller.
+ * Build the op→service dispatcher for one run. Generation and editing resolve
+ * independently (layer 3), so a run can generate on one connection and edit on
+ * another.
  */
-function createNodeRunner(
-  services: ServiceRegistry,
-  image: ModelAssignment,
-  chat: ModelAssignment,
-  imageKind: ProviderKind | undefined,
-) {
+function createNodeRunner(services: ServiceRegistry, routes: DagRunRoutes) {
+  const { imageGeneration, imageEdit, chat, imageEditKind } = routes;
   const { generation, prompts, cutout } = services;
 
   return async function runNode(
@@ -99,8 +111,8 @@ function createNodeRunner(
     switch (node.op) {
       case "generate-image": {
         const result = await generation.generateImages({
-          providerId: image.providerId,
-          model: image.model,
+          providerId: imageGeneration.providerId,
+          model: imageGeneration.model,
           prompt: node.prompt ?? node.label,
           signal,
         });
@@ -122,8 +134,8 @@ function createNodeRunner(
           );
         }
         const result = await generation.editImage({
-          providerId: image.providerId,
-          model: image.model,
+          providerId: imageEdit.providerId,
+          model: imageEdit.model,
           prompt: node.prompt ?? node.label,
           images: references,
           inputFidelity: node.fidelity ?? "high",
@@ -149,18 +161,18 @@ function createNodeRunner(
           ? `${rendered.system}\n\n${node.prompt}`
           : rendered.system;
         // 垫图 for OpenAI-shaped providers; Gemini keeps the multimodal path.
-        const result = isOpenAiShaped(imageKind)
+        const result = isOpenAiShaped(imageEditKind)
           ? await generation.editImage({
-              providerId: image.providerId,
-              model: image.model,
+              providerId: imageEdit.providerId,
+              model: imageEdit.model,
               prompt: promptText,
               images: [mockup],
               inputFidelity: "high",
               signal,
             })
           : await generation.generateImages({
-              providerId: image.providerId,
-              model: image.model,
+              providerId: imageEdit.providerId,
+              model: imageEdit.model,
               promptRef: { id: "ui-asset-deconstruction" },
               input: [
                 ...(node.prompt
@@ -238,7 +250,9 @@ async function imageProviderKind(
  */
 export function useRunPlan() {
   const services = useServices();
-  const assignments = useModelAssignments();
+  const { assignment: chat } = useTaskAssignment("text");
+  const { assignment: image } = useTaskAssignment("image-generation");
+  const { assignment: imageEdit } = useTaskAssignment("image-edit");
   const ownedLeaseRef = useRef<DagRunLease | null>(null);
 
   useEffect(
@@ -255,11 +269,11 @@ export function useRunPlan() {
       const { controller } = lease;
       ownedLeaseRef.current = lease;
       try {
-        const chat = assignments.data?.chat;
         if (!chat)
           throw new Error("No chat/vision model is configured for planning.");
-        const image = assignments.data?.image;
         if (!image) throw new Error("No image-generation model is configured.");
+        if (!imageEdit)
+          throw new Error("No image-editing model is configured.");
         const brief = getStoreState().brief.trim();
         if (!brief) throw new Error("Write a brief before planning.");
 
@@ -284,9 +298,17 @@ export function useRunPlan() {
         if (!dagRunCoordinator.isActive(lease)) return;
         getStoreState().setGraph(graph);
 
-        const kind = await imageProviderKind(services, image.providerId);
+        const imageEditKind = await imageProviderKind(
+          services,
+          imageEdit.providerId,
+        );
         if (!dagRunCoordinator.isActive(lease)) return;
-        const runNode = createNodeRunner(services, image, chat, kind);
+        const runNode = createNodeRunner(services, {
+          imageGeneration: image,
+          imageEdit,
+          chat,
+          imageEditKind,
+        });
         await runGraph<DagNodeOutput>(graph, {
           runNode,
           signal: controller.signal,
@@ -310,7 +332,9 @@ export function useRunPlan() {
  */
 export function useReRunSubtree() {
   const services = useServices();
-  const assignments = useModelAssignments();
+  const { assignment: chat } = useTaskAssignment("text");
+  const { assignment: image } = useTaskAssignment("image-generation");
+  const { assignment: imageEdit } = useTaskAssignment("image-edit");
   const ownedLeaseRef = useRef<DagRunLease | null>(null);
 
   useEffect(
@@ -327,9 +351,7 @@ export function useReRunSubtree() {
       const { controller } = lease;
       ownedLeaseRef.current = lease;
       try {
-        const chat = assignments.data?.chat;
-        const image = assignments.data?.image;
-        if (!chat || !image)
+        if (!chat || !image || !imageEdit)
           throw new Error("Configure a chat and an image model.");
         const store = getStoreState();
         const graph = store.graph;
@@ -346,9 +368,17 @@ export function useReRunSubtree() {
         // Mark the stale subtree idle up front so the canvas reflects the re-run.
         const stale = subtreeIds(graph, nodeId);
         store.resetDagNodes(stale);
-        const kind = await imageProviderKind(services, image.providerId);
+        const imageEditKind = await imageProviderKind(
+          services,
+          imageEdit.providerId,
+        );
         if (!dagRunCoordinator.isActive(lease)) return;
-        const runNode = createNodeRunner(services, image, chat, kind);
+        const runNode = createNodeRunner(services, {
+          imageGeneration: image,
+          imageEdit,
+          chat,
+          imageEditKind,
+        });
         await reRunSubtree<DagNodeOutput>(
           graph,
           nodeId,

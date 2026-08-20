@@ -46,7 +46,7 @@ import {
   type ProviderConfig,
   type ProviderWireProtocol,
 } from './provider-types'
-import { resolveModel } from './models'
+import { NO_MODEL_BOUND, resolveModel } from './models'
 import { invokeCancellableProxy, tauriFetch } from './tauri-fetch'
 import { apiBaseUrl } from './base-url'
 import { createDefaultGenerationAdapterRegistry, type GenerationAdapterRegistry } from './provider-adapter-registry'
@@ -732,7 +732,8 @@ export function createLocalGenerationService(
     }
     const cfg = await resolveConfig(input.providerId)
     if (!cfg) return err('provider not configured')
-    const modelId = resolveModel(cfg.kind, cfg.defaultModel, input.model)
+    const modelId = resolveModel(input.model)
+    if (!modelId) return err(NO_MODEL_BOUND)
     const model = await buildModel(cfg, modelId,adapters)
     const wireProtocol = effectiveProviderWireProtocol(cfg)
     // Thinking strength → per-vendor providerOptions (`{}` when unset/unsafe).
@@ -778,7 +779,8 @@ export function createLocalGenerationService(
     async research(input: GenerateInput): Promise<Result<string>> {
       const cfg = await resolveConfig(input.providerId)
       if (!cfg) return err('provider not configured')
-      const modelId = resolveModel(cfg.kind, cfg.defaultModel, input.model)
+      const modelId = resolveModel(input.model)
+      if (!modelId) return err(NO_MODEL_BOUND)
       const wireProtocol = effectiveProviderWireProtocol(cfg)
       const fetch = tauriFetch(cfg.id, cfg.kind, wireProtocol)
       const baseURL = apiBaseUrl(cfg.kind, cfg.baseUrl, wireProtocol)
@@ -835,7 +837,8 @@ export function createLocalGenerationService(
     ): Promise<Result<GenerateWithToolsOutput>> {
       const cfg = await resolveConfig(input.providerId)
       if (!cfg) return err('provider not configured')
-      const modelId = resolveModel(cfg.kind, cfg.defaultModel, input.model)
+      const modelId = resolveModel(input.model)
+      if (!modelId) return err(NO_MODEL_BOUND)
       const model = await buildModel(cfg, modelId,adapters)
       const providerOptions = reasoningProviderOptions(
         requestReasoningProtocol(cfg, input.reasoningProtocol),
@@ -1066,7 +1069,8 @@ export function createLocalGenerationService(
       const cfg = await resolveConfig(input.providerId)
       if (input.signal?.aborted) return err('Operation aborted')
       if (!cfg) return err('provider not configured')
-      const modelId = resolveModel(cfg.kind, cfg.defaultModel, input.model)
+      const modelId = resolveModel(input.model)
+      if (!modelId) return err(NO_MODEL_BOUND)
 
       if (cfg.kind === 'xai' && !supportsXaiImageModel(modelId, 'image-generation')) {
         return err('xAI image generation requires an exact documented Imagine API model id.')
@@ -1226,6 +1230,8 @@ export function createLocalGenerationService(
       const cfg = await resolveConfig(input.providerId)
       if (input.signal?.aborted) return err('Operation aborted')
       if (!cfg) return err('provider not configured')
+      const modelId = resolveModel(input.model)
+      if (!modelId) return err(NO_MODEL_BOUND)
       // The edits endpoint is OpenAI-shaped; other kinds have no `/images/edits`.
       const wireProtocol = effectiveProviderWireProtocol(cfg)
       if (supportsNativeDashScopeImageTransport(cfg)) {
@@ -1235,7 +1241,7 @@ export function createLocalGenerationService(
         try {
           const result = await invokeCancellableProxy<NativeImageResult>('ai_dashscope_image', {
             providerId: cfg.id,
-            model: resolveModel(cfg.kind, cfg.defaultModel, input.model),
+            model: modelId,
             operation: 'edit',
             prompt: input.prompt,
             images: input.images.map((bytes) => Array.from(bytes)),
@@ -1264,7 +1270,6 @@ export function createLocalGenerationService(
         ) {
           return err('xAI image edit accepts up to three bounded reference images.')
         }
-        const modelId = resolveModel(cfg.kind, cfg.defaultModel, input.model)
         if (!supportsXaiImageModel(modelId, 'image-edit')) {
           return err('xAI image edit requires an exact documented Imagine API model id.')
         }
@@ -1319,7 +1324,6 @@ export function createLocalGenerationService(
       if (input.images.length === 0) {
         return err('at least one reference image is required')
       }
-      const modelId = resolveModel(cfg.kind, cfg.defaultModel, input.model)
 
       // Bytes cross the Tauri IPC as number arrays → Rust `Vec<Vec<u8>>`. The
       // real key is injected in Rust; the base64 reply is decoded to PNG bytes.

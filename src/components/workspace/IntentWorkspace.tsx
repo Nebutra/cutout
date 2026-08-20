@@ -67,12 +67,38 @@ import type {
   ModelAssignment,
   ModelAssignments,
 } from "@/services/ai/model-assignment-types";
-import type { ProviderConfig } from "@/services/ai/provider-types";
+import {
+  providerCatalogModels,
+  type ProviderConfig,
+} from "@/services/ai/provider-types";
 import {
   ensureProviderVerification,
   loadProviderVerifications,
+  providerRouteVerified,
   providerVerificationIsVerified,
+  type ProviderVerification,
 } from "@/services/ai/provider-verification";
+import { verifyProviderCatalog } from "@/services/ai/verify-provider";
+
+/**
+ * Catalog-by-connection for the image-capability projection: layer 2 read off
+ * each connection, blanked unless layer 1 has a passing receipt. Reading it
+ * from the receipts themselves is what let a browser-storage wipe strip every
+ * connection of its models mid-session.
+ */
+function verifiedCatalogModelsFor(
+  providers: readonly ProviderConfig[],
+  verifications: Readonly<Record<string, ProviderVerification>>,
+): Record<string, readonly string[]> {
+  return Object.fromEntries(
+    providers.map((provider) => [
+      provider.id,
+      providerVerificationIsVerified(verifications[provider.id])
+        ? providerCatalogModels(provider)
+        : [],
+    ]),
+  );
+}
 import {
   assessImageRoute,
   isPrototypeProductionImageModel,
@@ -1111,15 +1137,8 @@ export function IntentWorkspace({
   const providers = useProviders();
   const providerVerifications = useProviderVerifications();
   const verifiedCatalogModelsByProvider = useMemo(
-    () => Object.fromEntries(
-      Object.entries(providerVerifications).map(([providerId, verification]) => [
-        providerId,
-        providerVerificationIsVerified(verification)
-          ? verification.models ?? [verification.model!]
-          : [],
-      ]),
-    ),
-    [providerVerifications],
+    () => verifiedCatalogModelsFor(providers.data ?? [], providerVerifications),
+    [providers.data, providerVerifications],
   );
   const runtimeCapabilityBindings = useMemo(
     () => projectVerifiedImageCapabilityBindings({
@@ -2118,15 +2137,21 @@ export function IntentWorkspace({
         ) {
           await ensureProviderVerification(
             assignedChat.providerId,
-            async () => {
-              const result = await services.providers.test(
-                assignedChat.providerId,
-              );
-              if (isErr(result)) throw new Error(result.error);
-              return result.data;
+            async () =>
+              (
+                await verifyProviderCatalog(
+                  services.providers,
+                  assignedChat.providerId,
+                )
+              ).models,
+            {
+              requiredModel: assignedChat.model,
+              catalogModels: providerCatalogModels(
+                providerList.find(
+                  (provider) => provider.id === assignedChat.providerId,
+                ),
+              ),
             },
-            undefined,
-            assignedChat.model,
           );
         }
         const direct = lockComposerChatRoute({
@@ -2138,7 +2163,8 @@ export function IntentWorkspace({
           modelCatalog: runtimeModelDescriptors(
             runAssignmentTable,
             providerList,
-            (providerId, model) => providerVerificationIsVerified(
+            (providerId, model) => providerRouteVerified(
+              providerList.find((provider) => provider.id === providerId),
               loadProviderVerifications()[providerId],
               model,
             ),
@@ -2177,13 +2203,9 @@ export function IntentWorkspace({
       capabilityBindings: projectVerifiedImageCapabilityBindings({
         bindings: authoritativeBindings,
         providers: providerList,
-        catalogModelsByProvider: Object.fromEntries(
-          Object.entries(loadProviderVerifications()).map(([providerId, verification]) => [
-            providerId,
-            providerVerificationIsVerified(verification)
-              ? verification.models ?? [verification.model!]
-              : [],
-          ]),
+        catalogModelsByProvider: verifiedCatalogModelsFor(
+          providerList,
+          loadProviderVerifications(),
         ),
       }),
     };
@@ -2259,7 +2281,10 @@ export function IntentWorkspace({
                 (provider) =>
                   provider.id === directChat.providerId && provider.enabled,
               ) &&
-              providerVerificationIsVerified(
+              providerRouteVerified(
+                providerList.find(
+                  (provider) => provider.id === directChat.providerId,
+                ),
                 loadProviderVerifications()[directChat.providerId],
                 directChat.model,
               ),
@@ -2369,23 +2394,26 @@ export function IntentWorkspace({
       const imageProviderId = runAssignmentTable.image?.providerId;
       if (imageProviderId && providerList.some((provider) => provider.id === imageProviderId && provider.enabled)) {
         const imageModel = runAssignmentTable.image?.model;
-        await ensureProviderVerification(imageProviderId, async () => {
-          const result = await services.providers.test(imageProviderId);
-          if (isErr(result)) throw new Error(result.error);
-          return result.data;
-        }, undefined, imageModel);
+        await ensureProviderVerification(
+          imageProviderId,
+          async () =>
+            (await verifyProviderCatalog(services.providers, imageProviderId))
+              .models,
+          {
+            ...(imageModel ? { requiredModel: imageModel } : {}),
+            catalogModels: providerCatalogModels(
+              providerList.find((provider) => provider.id === imageProviderId),
+            ),
+          },
+        );
       }
       const latestVerifications = loadProviderVerifications();
       const verifiedBindings = projectVerifiedImageCapabilityBindings({
         bindings: authoritativeBindings,
         providers: providerList,
-        catalogModelsByProvider: Object.fromEntries(
-          Object.entries(latestVerifications).map(([providerId, verification]) => [
-            providerId,
-            providerVerificationIsVerified(verification)
-              ? verification.models ?? [verification.model!]
-              : [],
-          ]),
+        catalogModelsByProvider: verifiedCatalogModelsFor(
+          providerList,
+          latestVerifications,
         ),
       }) ?? authoritativeBindings;
       lockedRuntimeSnapshotRef.current = {
@@ -2402,7 +2430,8 @@ export function IntentWorkspace({
         modelCatalog: runtimeModelDescriptors(
           runAssignmentTable,
           providerList,
-          (providerId, model) => providerVerificationIsVerified(
+          (providerId, model) => providerRouteVerified(
+            providerList.find((provider) => provider.id === providerId),
             latestVerifications[providerId],
             model,
           ),
@@ -2419,13 +2448,21 @@ export function IntentWorkspace({
       if (configuredVision && visionProvider) {
         await ensureProviderVerification(
           configuredVision.providerId,
-          async () => {
-            const result = await services.providers.test(configuredVision.providerId);
-            if (isErr(result)) throw new Error(result.error);
-            return result.data;
+          async () =>
+            (
+              await verifyProviderCatalog(
+                services.providers,
+                configuredVision.providerId,
+              )
+            ).models,
+          {
+            requiredModel: configuredVision.model,
+            catalogModels: providerCatalogModels(
+              providerList.find(
+                (provider) => provider.id === configuredVision.providerId,
+              ),
+            ),
           },
-          undefined,
-          configuredVision.model,
         );
       }
       route = {
@@ -2445,8 +2482,7 @@ export function IntentWorkspace({
               provider: imageProvider,
               assignment: route.image,
               descriptors: verifiedBindings.descriptors,
-              verifiedCatalogModels:
-                loadProviderVerifications()[imageProvider.id]?.models,
+              verifiedCatalogModels: providerCatalogModels(imageProvider),
             })
           : undefined,
       });
@@ -5390,7 +5426,7 @@ export function IntentWorkspace({
             provider,
             assignment: image,
             descriptors: runtimeSnapshot.capabilityBindings?.descriptors ?? [],
-            verifiedCatalogModels: providerVerifications[provider.id]?.models,
+            verifiedCatalogModels: providerCatalogModels(provider),
           })
         : undefined,
     });

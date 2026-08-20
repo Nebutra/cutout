@@ -58,6 +58,24 @@ msgid "registry_install.receipt_summary"
 msgstr "{0} · {1, plural, one {# archivo verificado} other {# archivos verificados}}"
 
 #. js-lingui-explicit-id
+#. placeholder {0}: provider.label
+#. placeholder {0}: saved.label
+#. placeholder {0}: selected.label
+#. placeholder {1}: models.length
+#: src/components/settings/ModelSlot.tsx
+#: src/components/settings/ProviderForm.tsx
+#: src/components/settings/ProviderRow.tsx
+msgid "settings.models_discovered_toast"
+msgstr "{0} · {1} modelos detectados"
+
+#. js-lingui-explicit-id
+#. placeholder {0}: provider.label
+#. placeholder {1}: providerCatalogModels(provider).length
+#: src/components/settings/ModelSlot.tsx
+msgid "settings.provider_option_with_count"
+msgstr "{0} ({1} modelos)"
+
+#. js-lingui-explicit-id
 #. placeholder {0}: item.name
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.toast_added_to_project"
@@ -89,10 +107,21 @@ msgid "kit_library.editor_aria"
 msgstr "Editor de kit de {0}"
 
 #. js-lingui-explicit-id
-#. placeholder {0}: endpointModels.data.length
+#. placeholder {0}: probedModels.length
+#: src/components/settings/ProviderForm.tsx
+msgid "settings.catalog_discovered"
+msgstr "{0} modelos detectados"
+
+#. js-lingui-explicit-id
+#. placeholder {0}: catalog.length
 #: src/components/settings/ModelSlot.tsx
-msgid "settings.models_discovered_from_endpoint"
-msgstr "{0} modelos descubiertos desde el endpoint"
+msgid "settings.models_from_catalog"
+msgstr "{0} modelos en el catálogo de esta conexión"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderRow.tsx
+msgid "settings.catalog_model_count"
+msgstr "{0} modelos"
 
 #. js-lingui-explicit-id
 #: src/components/preview/PreviewMeta.tsx
@@ -155,9 +184,20 @@ msgid "export.toast_success"
 msgstr "{savedCount, plural, one {Se exportó # fragmento} other {Se exportaron # fragmentos}}"
 
 #. js-lingui-explicit-id
+#. placeholder {0}: probedModels.length - CATALOG_PREVIEW_LIMIT
+#: src/components/settings/ProviderForm.tsx
+msgid "settings.catalog_more"
+msgstr "+{0} más"
+
+#. js-lingui-explicit-id
 #: src/components/library/TeamGovernancePanel.tsx
 msgid "team.host_required_description"
 msgstr "Se requiere un host de colaboración de escritorio para revisar o crear un enlace de solo lectura."
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.step_one_description"
+msgstr "Un proveedor es una conexión: un endpoint y una clave. Verificarlo carga los modelos que ofrece; en el paso 2 eliges qué hace cada uno."
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
@@ -465,6 +505,12 @@ msgid "settings.personalization.personality_auto"
 msgstr "Automática"
 
 #. js-lingui-explicit-id
+#. placeholder {0}: taskLabel(inherited.inheritedFrom, taskLabels)
+#: src/components/settings/ModelSlot.tsx
+msgid "settings.model_slot_inherited"
+msgstr "Auto · hereda de {0}"
+
+#. js-lingui-explicit-id
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.policy_auto_compatible"
 msgstr "Compatible automáticamente"
@@ -677,8 +723,18 @@ msgstr "Elige una dirección. Añade contexto opcional abajo y pulsa la flecha p
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
+msgid "settings.step_two_description"
+msgstr "Elige qué proveedor y qué modelo sirve cada tarea. Una tarea sin asignar hereda de otra más general."
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
 msgid "settings.claude_policy_diagnostic"
 msgstr "La ejecución de Claude Code no está disponible mientras se revisa la política del proveedor."
+
+#. js-lingui-explicit-id
+#: src/components/settings/ModelSlot.tsx
+msgid "settings.clear_binding"
+msgstr "Borrar"
 
 #. js-lingui-explicit-id
 #: src/components/library/GlobalLibraryView.tsx
@@ -789,11 +845,6 @@ msgid "settings.key_placeholder_replace"
 msgstr "Configurado — escribe para reemplazar"
 
 #. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.configured_providers"
-msgstr "Proveedores configurados"
-
-#. js-lingui-explicit-id
 #: src/components/library/KitLibraryInspector.tsx
 msgid "kit_library.audit_conflicts"
 msgstr "Conflictos"
@@ -823,6 +874,11 @@ msgstr "Conectar un proveedor"
 #: src/components/settings/sections/AiSection.tsx
 msgid "settings.connect_provider"
 msgstr "Conectar proveedor"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.advanced_ai_management_description"
+msgstr "Conecta proveedores, asigna modelos a tareas y configura la exportación SVG."
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/IntegrationsSection.tsx
@@ -997,11 +1053,6 @@ msgstr "Cutout está actualizado en el canal {0}."
 #: src/components/home/SidebarAccount.tsx
 msgid "home.theme_dark"
 msgstr "Oscuro"
-
-#. js-lingui-explicit-id
-#: src/components/settings/ProviderForm.tsx
-msgid "settings.provider_model_label"
-msgstr "Modelo predeterminado"
 
 #. js-lingui-explicit-id
 #: src/components/home/ProjectHome.tsx
@@ -1208,7 +1259,7 @@ msgid "vectorizer.secret_placeholder"
 msgstr "Introduce el secreto de API"
 
 #. js-lingui-explicit-id
-#: src/components/settings/ProviderForm.tsx
+#: src/components/settings/ModelSlot.tsx
 msgid "settings.enter_model_manually"
 msgstr "Enter model ID manually"
 
@@ -1630,11 +1681,6 @@ msgid "global_library.kit_editor_description"
 msgstr "Gestiona la proyección aprobada del kit direccionada por contenido."
 
 #. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.manual_model_bindings"
-msgstr "Asignaciones manuales de modelos"
-
-#. js-lingui-explicit-id
 #: src/components/settings/sections/PersonalizationSection.tsx
 msgid "settings.personalization.memory"
 msgstr "Memoria"
@@ -1673,6 +1719,11 @@ msgstr "Falta en el kit aprobado"
 #: src/components/home/ProjectHome.tsx
 msgid "home.preset_mobile"
 msgstr "Aplicación móvil"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderRow.tsx
+msgid "settings.catalog_not_fetched"
+msgstr "Lista de modelos no obtenida"
 
 #. js-lingui-explicit-id
 #: src/components/settings/ModelSlot.tsx
@@ -1880,11 +1931,6 @@ msgid "source.dropzone_hint"
 msgstr "o haz clic para explorar · PNG, JPEG, WebP"
 
 #. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.manual_model_bindings_description"
-msgstr "Sustituye el enrutamiento automático para una tarea específica."
-
-#. js-lingui-explicit-id
 #: src/components/library/KitLibraryInspector.tsx
 msgid "kit_library.parser_host_not_configured"
 msgstr "El host del analizador no está configurado en esta superficie. Importa su resultado JSON firmado para revisar los candidatos."
@@ -1914,6 +1960,16 @@ msgstr "No se pudo cargar la personalización."
 #: src/components/settings/sections/PersonalizationSection.tsx
 msgid "settings.personalization.reset_done_toast"
 msgstr "Personalización restablecida"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ModelSlot.tsx
+msgid "settings.pick_from_catalog"
+msgstr "Elegir del catálogo"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ProviderForm.tsx
+msgid "settings.catalog_assign_later"
+msgstr "Elige cuál sirve a cada tarea en «Asignar modelos a tareas»."
 
 #. js-lingui-explicit-id
 #: src/components/home/ProjectHome.tsx
@@ -2083,11 +2139,6 @@ msgid "settings.provider_updated_toast"
 msgstr "Proveedor actualizado"
 
 #. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-msgid "settings.advanced_ai_management_description"
-msgstr "Proveedores, asignaciones manuales de modelos y exportación SVG."
-
-#. js-lingui-explicit-id
 #: src/components/library/KitLibraryInspector.tsx
 msgid "kit_library.publish_new_version"
 msgstr "Publicar nueva versión"
@@ -2158,6 +2209,11 @@ msgstr "El host del proveedor de referencias no está configurado."
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.media_filter_references"
 msgstr "Referencias"
+
+#. js-lingui-explicit-id
+#: src/components/settings/ModelSlot.tsx
+msgid "settings.refresh_model_catalog"
+msgstr "Actualizar lista de modelos"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/IntegrationsSection.tsx
@@ -2438,7 +2494,7 @@ msgid "global_library.select_item_aria"
 msgstr "Seleccionar {0}"
 
 #. js-lingui-explicit-id
-#: src/components/settings/ProviderForm.tsx
+#: src/components/settings/ModelSlot.tsx
 msgid "settings.select_model"
 msgstr "Select a model"
 
@@ -2574,6 +2630,16 @@ msgid "global_library.tab_starters"
 msgstr "Kits de inicio"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.step_one_connect_providers"
+msgstr "Paso 1 · Conectar proveedores"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/AiSection.tsx
+msgid "settings.step_two_assign_models"
+msgstr "Paso 2 · Asignar modelos a tareas"
+
+#. js-lingui-explicit-id
 #: src/components/settings/sections/PersonalizationSection.tsx
 msgid "settings.personalization.personality_professional_desc"
 msgstr "Estructurada y formal."
@@ -2686,6 +2752,11 @@ msgid "settings.vision_capability_unverified"
 msgstr "Esta asignación permanecerá no disponible hasta que la capacidad de entrada de imagen se verifique mediante evidencia del catálogo o una prueba del proveedor."
 
 #. js-lingui-explicit-id
+#: src/components/settings/ProviderForm.tsx
+msgid "settings.catalog_unsupported_hint"
+msgstr "Este endpoint no ofrece lista de modelos. Puedes guardar la conexión e introducir los IDs a mano al asignar tareas."
+
+#. js-lingui-explicit-id
 #. placeholder {0}: pendingDelete.name
 #. placeholder {0}: project.name
 #: src/components/home/ProjectHome.tsx
@@ -2772,6 +2843,14 @@ msgstr "Tipo"
 #: src/components/settings/sections/RecoverySection.tsx
 msgid "settings.recovery.ui_reset"
 msgstr "Estado de la interfaz restablecido"
+
+#. js-lingui-explicit-id
+#. placeholder {0}: taskLabel(inherited.inheritedFrom, taskLabels)
+#. placeholder {1}: inheritedProvider?.label ?? inherited.assignment.providerId
+#. placeholder {2}: inherited.assignment.model
+#: src/components/settings/ModelSlot.tsx
+msgid "settings.inherited_route_detail"
+msgstr "Sin asignar: las llamadas usan {0}: {1} · {2}"
 
 #. js-lingui-explicit-id
 #: src/components/settings/ModelSlot.tsx
@@ -2902,6 +2981,7 @@ msgid "vectorizer.api_id_label"
 msgstr "ID de API de Vectorizer.AI"
 
 #. js-lingui-explicit-id
+#: src/components/settings/ModelSlot.tsx
 #: src/components/settings/ProviderForm.tsx
 #: src/components/settings/ProviderRow.tsx
 msgid "settings.status_failed"
