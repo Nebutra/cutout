@@ -13,32 +13,6 @@ msgstr ""
 "Language-Team: \n"
 "Plural-Forms: nplurals=1; plural=0;\n"
 
-#. placeholder {0}: endpointModels.data.length
-#. js-lingui-explicit-id
-#: src/components/settings/ModelSlot.tsx
-#~ msgid "settings.models_discovered_from_endpoint"
-#~ msgstr "从端点发现了 {0} 个模型"
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-#~ msgid "settings.configured_providers"
-#~ msgstr "已配置的提供商"
-
-#. js-lingui-explicit-id
-#: src/components/settings/ProviderForm.tsx
-#~ msgid "settings.provider_model_label"
-#~ msgstr "默认模型"
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-#~ msgid "settings.manual_model_bindings"
-#~ msgstr "手动模型绑定"
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-#~ msgid "settings.manual_model_bindings_description"
-#~ msgstr "为特定任务覆盖自动路由。"
-
 #. js-lingui-explicit-id
 #. placeholder {0}: project.name
 #: src/components/home/ProjectHome.tsx

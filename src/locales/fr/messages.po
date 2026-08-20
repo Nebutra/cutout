@@ -13,32 +13,6 @@ msgstr ""
 "Language-Team: \n"
 "Plural-Forms: nplurals=2; plural=(n > 1);\n"
 
-#. placeholder {0}: endpointModels.data.length
-#. js-lingui-explicit-id
-#: src/components/settings/ModelSlot.tsx
-#~ msgid "settings.models_discovered_from_endpoint"
-#~ msgstr "{0} modèles découverts depuis le point de terminaison"
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-#~ msgid "settings.configured_providers"
-#~ msgstr "Fournisseurs configurés"
-
-#. js-lingui-explicit-id
-#: src/components/settings/ProviderForm.tsx
-#~ msgid "settings.provider_model_label"
-#~ msgstr "Modèle par défaut"
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-#~ msgid "settings.manual_model_bindings"
-#~ msgstr "Affectations manuelles des modèles"
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-#~ msgid "settings.manual_model_bindings_description"
-#~ msgstr "Remplacez le routage automatique pour une tâche spécifique."
-
 #. js-lingui-explicit-id
 #. placeholder {0}: project.name
 #: src/components/home/ProjectHome.tsx

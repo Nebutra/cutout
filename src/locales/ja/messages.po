@@ -13,32 +13,6 @@ msgstr ""
 "Language-Team: \n"
 "Plural-Forms: nplurals=1; plural=0;\n"
 
-#. placeholder {0}: endpointModels.data.length
-#. js-lingui-explicit-id
-#: src/components/settings/ModelSlot.tsx
-#~ msgid "settings.models_discovered_from_endpoint"
-#~ msgstr "エンドポイントから {0} 件のモデルを検出しました"
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-#~ msgid "settings.configured_providers"
-#~ msgstr "設定済みのプロバイダー"
-
-#. js-lingui-explicit-id
-#: src/components/settings/ProviderForm.tsx
-#~ msgid "settings.provider_model_label"
-#~ msgstr "既定のモデル"
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-#~ msgid "settings.manual_model_bindings"
-#~ msgstr "モデルの手動割り当て"
-
-#. js-lingui-explicit-id
-#: src/components/settings/sections/AiSection.tsx
-#~ msgid "settings.manual_model_bindings_description"
-#~ msgstr "特定のタスクの自動ルーティングを上書きします。"
-
 #. js-lingui-explicit-id
 #. placeholder {0}: project.name
 #: src/components/home/ProjectHome.tsx

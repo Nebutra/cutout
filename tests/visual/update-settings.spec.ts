@@ -26,8 +26,8 @@ test("Updates stays truthful and configurable without a desktop runtime", async 
   await expect(openReleaseNotes).toBeEnabled();
   await openReleaseNotes.click();
   const releaseNotes = page.getByRole("dialog").filter({ hasText: "Cutout v0.1.25" });
-  await expect(releaseNotes).toContainText("A Canvas-first Design OS for Commerce and Game production");
-  await expect(releaseNotes).toContainText("Work through Agent and Canvas");
+  await expect(releaseNotes).toContainText("Providers are connections; models are assigned per task");
+  await expect(releaseNotes).toContainText("A provider no longer carries a model");
   await page.keyboard.press("Escape");
 
   // Browser builds have no compiled updater endpoints, so they must not offer

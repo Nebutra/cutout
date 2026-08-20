@@ -159,10 +159,11 @@ describe('Commerce operator release identity', () => {
     expect(bundledCapabilities).toEqual(capabilities)
     expect(plugin.version).toBe(pkg.version)
     expect(runtimeBuild.packageVersion).toBe(pkg.version)
-    // Derived from package.json rather than a literal: an escaped regex is
-    // invisible to a version-bump search-and-replace, so a hardcoded one silently
-    // keeps passing against the previous release.
-    expect(cargo).toMatch(new RegExp(`^version = "${pkg.version.replace(/\./g, '\\.')}"$`, 'm'))
+    // Compared as an exact line rather than a regex. A literal escaped pattern
+    // (`0\.1\.24`) is invisible to a version-bump search-and-replace, so it
+    // silently keeps passing against the previous release; building one from
+    // `pkg.version` instead needs escaping this assertion has no business doing.
+    expect(cargo.split('\n')).toContain(`version = "${pkg.version}"`)
   })
 
   it('fails the release build before compilation when the evaluator trust root is absent', () => {
