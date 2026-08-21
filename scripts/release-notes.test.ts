@@ -131,6 +131,10 @@ describe('release-note catalog', () => {
       expect(plainText).toContain(highlight.title)
     }
     expect(plainText).toContain(shipped.locales.en.headline)
-    expect(github).toContain(`Cutout v${version.replace(/\./g, '\\.')}`)
+    // The renderer markdown-escapes dots, so the heading reads `Cutout v0\.1\.26`.
+    // Built with split/join rather than a `.replace` regex: escaping only `.` and
+    // not `\` is incomplete sanitization, and this assertion never needed a
+    // sanitizer — it needs the literal shape the renderer emits.
+    expect(github).toContain(`Cutout v${version.split('.').join('\\.')}`)
   })
 })
