@@ -1,12 +1,12 @@
 import {
   lazy,
   Suspense,
+  type RefObject,
   useEffect,
   useLayoutEffect,
   useMemo,
   useRef,
   useState,
-  type RefObject,
 } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { withViewTransition } from "@/lib/view-transition";
@@ -19,31 +19,48 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock3,
+  FileText,
   FolderOpen,
   Globe,
   Images,
   LayoutGrid,
   Library,
   Lightbulb,
-  List,
   Link2,
-  FileText,
+  List,
   Monitor,
   MoreHorizontal,
   Palette,
   Pencil,
-  Plus,
   Pin,
   PinOff,
-  X,
+  Plus,
   Search,
-  SearchX,
   Smartphone,
   Trash2,
   type LucideIcon,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import type { LocalProjectSummary } from "@/services/local/project-repository.local";
+import { cn } from "@/lib/utils";
+import { sortProjects } from "./project-order";
+import { ConnectorMenu } from "@/components/integrations/ConnectorMenu";
+import { CutoutBrandMark } from "@/components/brand/CutoutBrandMark";
+import { SidebarAccount } from "./SidebarAccount";
+import type { DesktopUpdateController } from "@/updater/service";
+import { Input } from "@/components/ui/input";
+import { filterProjects } from "./project-search";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -54,8 +71,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Input } from "@/components/ui/input";
 import {
   Dialog,
   DialogContent,
@@ -64,25 +79,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import type { LocalProjectSummary } from "@/services/local/project-repository.local";
-import { cn } from "@/lib/utils";
-import { sortProjects } from "./project-order";
-import { filterProjects } from "./project-search";
-import { ConnectorMenu } from "@/components/integrations/ConnectorMenu";
-import { SidebarAccount } from "./SidebarAccount";
-import type { DesktopUpdateController } from "@/updater/service";
+
+export { ProjectCard, ProjectRow };
 
 const GlobalLibraryView = lazy(() =>
   import("@/components/library/GlobalLibraryView").then((module) => ({
@@ -90,25 +88,8 @@ const GlobalLibraryView = lazy(() =>
   })),
 );
 
-type HomeSection =
-  "start" | "library" | "drafts" | "projects" | "archived";
-
 function isDraftProject(project: LocalProjectSummary) {
   return project.status === "Draft" || project.status === "Empty";
-}
-type ProjectLoadState = "loading" | "ready" | "error";
-type DirectoryLayout = "grid" | "list";
-
-const DIRECTORY_LAYOUT_KEY = "cutout.home.directory-layout";
-
-function readDirectoryLayout(): DirectoryLayout {
-  try {
-    return localStorage.getItem(DIRECTORY_LAYOUT_KEY) === "list"
-      ? "list"
-      : "grid";
-  } catch {
-    return "grid";
-  }
 }
 
 interface ProjectHomeProps {
@@ -346,12 +327,21 @@ export function ProjectHome({
 
 function LibraryLoadingState() {
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-col gap-4 px-5 py-6" aria-label="Loading Library">
+    <div
+      className="mx-auto flex w-full max-w-6xl flex-col gap-5 px-6 py-8 lg:px-10 lg:py-10"
+      aria-label="Loading Library"
+    >
       <Skeleton className="h-8 w-48" />
-      <Skeleton className="h-10 w-full" />
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {Array.from({ length: 6 }, (_, index) => (
-          <Skeleton key={index} className="aspect-[4/3] w-full" />
+      <Skeleton className="h-8 w-full" />
+      <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        {Array.from({ length: 4 }, (_, index) => (
+          <div key={index} className="flex flex-col gap-3">
+            <Skeleton className="aspect-[16/10] w-full rounded-xl" />
+            <div className="flex flex-col gap-2">
+              <Skeleton className="h-3 w-32" />
+              <Skeleton className="h-3 w-20" />
+            </div>
+          </div>
         ))}
       </div>
     </div>
@@ -450,8 +440,8 @@ function WorkspaceHeader({
   ] as const;
 
   return (
-    <header className="flex h-12 shrink-0 items-center justify-between gap-3 border-b border-border bg-background/90 px-3 backdrop-blur">
-      <div className="flex min-w-0 items-center gap-1">
+    <header className="flex h-12 shrink-0 items-center justify-between gap-4 border-b border-border bg-background px-3 backdrop-blur">
+      <div className="flex min-w-0 items-center gap-2">
         <Button
           type="button"
           variant="ghost"
@@ -472,11 +462,11 @@ function WorkspaceHeader({
         >
           <ChevronRight className="size-4" />
         </Button>
-        <span className="ml-1 truncate text-sm font-medium">
+        <span className="truncate text-sm font-medium">
           {sectionLabels[section]}
         </span>
       </div>
-      <div className="flex items-center gap-1.5 overflow-x-auto">
+      <div className="flex items-center gap-2 overflow-x-auto">
         {presets.map((preset) => (
           <Button
             key={preset.id}
@@ -543,10 +533,10 @@ function WorkspaceSidebar({
       />
 
       <div className="mt-7 min-h-0">
-        <p className="px-2 text-[11px] font-medium uppercase text-muted-foreground">
+        <p className="px-3 text-xs font-medium tracking-wide text-muted-foreground uppercase">
           {t({ id: "home.recent_heading", message: "Recent" })}
         </p>
-        <div className="mt-2 space-y-0.5">
+        <div className="mt-2 flex flex-col gap-0.5">
           {recentProjects.length ? (
             recentProjects.map((project) => (
               <ProjectListItem
@@ -561,7 +551,7 @@ function WorkspaceSidebar({
               />
             ))
           ) : (
-            <p className="px-2 py-2 text-xs text-muted-foreground">
+            <p className="px-3 py-2 text-xs text-muted-foreground">
               {t({ id: "home.no_projects_yet", message: "No projects yet" })}
             </p>
           )}
@@ -573,7 +563,7 @@ function WorkspaceSidebar({
 
 function MobileNavigation(props: NavigationProps) {
   return (
-    <div className="sticky top-0 z-10 border-b border-border bg-background/95 px-3 py-2 backdrop-blur md:hidden">
+    <div className="sticky top-0 z-10 border-b border-border bg-background px-3 py-2 backdrop-blur md:hidden">
       <ProjectNavigation {...props} compact />
     </div>
   );
@@ -589,7 +579,9 @@ function ProjectNavigation({
 
   return (
     <nav
-      className={cn(compact ? "grid grid-cols-4 gap-1" : "mt-5 space-y-1")}
+      className={cn(
+        compact ? "grid grid-cols-4 gap-0.5" : "mt-5 flex flex-col gap-0.5",
+      )}
       aria-label={t({
         id: "home.workspace_navigation",
         message: "Workspace navigation",
@@ -677,10 +669,17 @@ function StartWorkspace({
     <div className="mx-auto flex min-h-full w-full max-w-6xl flex-col px-4 py-8 sm:px-6 lg:px-10 lg:py-10">
       <div className="flex flex-1 flex-col justify-center py-8 sm:py-12 lg:py-16">
         <div className="mx-auto w-full max-w-4xl">
+          <div className="flex">
+            <CutoutBrandMark
+              variant="symbol"
+              label="Cutout"
+              className="mx-auto mb-5 h-10 w-auto text-foreground"
+            />
+          </div>
           <h1 className="text-center text-3xl font-semibold tracking-tight sm:text-4xl lg:text-5xl">
             {t({ id: "home.start_title", message: "What will we design?" })}
           </h1>
-          <p className="mx-auto mt-3 max-w-2xl text-center text-sm leading-6 text-muted-foreground sm:text-base sm:leading-7">
+          <p className="mx-auto mt-3 max-w-xl text-center text-sm leading-6 text-muted-foreground">
             {t({
               id: "home.start_description",
               message:
@@ -722,12 +721,12 @@ function StartWorkspace({
                   {attachments.map((file, index) => (
                     <span
                       key={`${file.name}:${file.size}:${index}`}
-                      className="flex max-w-full items-center gap-1.5 rounded-md border border-border bg-muted/50 px-2 py-1 text-xs"
+                      className="flex max-w-full items-center gap-1.5 rounded-md border border-border bg-muted/40 px-2 py-1 text-xs"
                     >
                       <AttachmentThumbnail file={file} />
                       <span className="max-w-40 truncate">{file.name}</span>
                       {file.type.startsWith("video/") ? (
-                        <span className="text-[10px] text-muted-foreground">
+                        <span className="text-xs text-muted-foreground">
                           Adapter required
                         </span>
                       ) : null}
@@ -741,7 +740,7 @@ function StartWorkspace({
                           )
                         }
                       >
-                        <X className="size-3" />
+                        <X className="size-3.5" />
                       </button>
                     </span>
                   ))}
@@ -760,7 +759,7 @@ function StartWorkspace({
                   id: "home.brief_placeholder",
                   message: "Describe the result you want...",
                 })}
-                className="min-h-32 w-full resize-none rounded-none border-0 bg-transparent px-5 pt-4 pb-2 text-base shadow-none outline-none focus-visible:border-0 focus-visible:ring-0 dark:bg-transparent sm:min-h-28 sm:text-lg"
+                className="min-h-36 w-full resize-none rounded-none border-0 bg-transparent px-5 pt-4 pb-2 text-base shadow-none outline-none focus-visible:border-0 focus-visible:ring-0 dark:bg-transparent sm:min-h-32 sm:text-lg"
               />
               <div
                 data-testid="home-composer-actions"
@@ -852,20 +851,26 @@ function StartWorkspace({
             </div>
           </form>
 
-          {recentProjects.length ? (
-            <div className="mt-12">
-              <div className="mb-3 flex items-center justify-between">
-                <h2 className="text-sm font-semibold">
-                  {t({
-                    id: "home.continue_heading",
-                    message: "Continue working",
-                  })}
-                </h2>
-                <span className="text-xs text-muted-foreground">
-                  {t({ id: "home.local_projects", message: "Local projects" })}
-                </span>
-              </div>
-              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <section
+            className="mt-12 flex flex-col gap-2"
+            aria-labelledby="home-continue-heading"
+          >
+            <div className="flex items-center justify-between gap-4">
+              <h2
+                id="home-continue-heading"
+                className="text-xs font-medium tracking-wide text-muted-foreground uppercase"
+              >
+                {t({
+                  id: "home.continue_heading",
+                  message: "Continue working",
+                })}
+              </h2>
+              <span className="text-xs text-muted-foreground">
+                {t({ id: "home.local_projects", message: "Local projects" })}
+              </span>
+            </div>
+            {recentProjects.length ? (
+              <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
                 {recentProjects.slice(0, 4).map((project) => (
                   <ProjectListItem
                     key={project.id}
@@ -879,376 +884,66 @@ function StartWorkspace({
                   />
                 ))}
               </div>
-            </div>
-          ) : null}
+            ) : (
+              <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border px-6 py-12 text-center">
+                <CutoutBrandMark
+                  variant="symbol"
+                  className="h-8 w-auto text-muted-foreground/40"
+                />
+                <p className="text-sm font-medium">
+                  {t({
+                    id: "home.continue_empty_title",
+                    message: "Nothing in progress yet",
+                  })}
+                </p>
+                <p className="max-w-sm text-xs text-muted-foreground">
+                  {t({
+                    id: "home.continue_empty_description",
+                    message:
+                      "Projects you start from the brief above collect here, ready to pick back up.",
+                  })}
+                </p>
+              </div>
+            )}
+          </section>
         </div>
       </div>
     </div>
   );
 }
 
+/**
+ * Raster types only. `image/*` also matches `image/svg+xml`, and an SVG behind
+ * an object URL is a document that can carry its own external references — the
+ * one attachment type worth refusing to preview. Browsers do not run scripts in
+ * SVG loaded through `<img>`, so this is depth rather than a fix for a live
+ * hole, but the allowlist costs nothing and the previous `startsWith("image/")`
+ * was wider than the preview ever needed.
+ */
+const PREVIEWABLE_IMAGE_TYPES = new Set([
+  "image/png",
+  "image/jpeg",
+  "image/gif",
+  "image/webp",
+  "image/avif",
+  "image/bmp",
+]);
+
 function AttachmentThumbnail({ file }: { readonly file: File }) {
   const [url, setUrl] = useState<string>();
   useEffect(() => {
-    if (!file.type.startsWith("image/")) return;
+    if (!PREVIEWABLE_IMAGE_TYPES.has(file.type)) return;
     const next = URL.createObjectURL(file);
     setUrl(next);
     return () => URL.revokeObjectURL(next);
   }, [file]);
   if (url)
-    return <img src={url} alt="" className="size-5 rounded-sm object-cover" />;
+    return <img src={url} alt="" className="size-5 rounded-md object-cover" />;
   return file.type.startsWith("video/") ? (
     <Images className="size-4 text-muted-foreground" />
   ) : (
     <FileText className="size-4 text-muted-foreground" />
   );
-}
-
-function ProjectDirectory({
-  activeProjectId,
-  section,
-  projects,
-  loadState,
-  loadError,
-  onOpenProject,
-  onArchiveProject,
-  onRestoreProject,
-  onDeleteProject,
-  onRenameProject,
-  onPinProject,
-  onRetryProjects,
-  onStartNew,
-}: {
-  readonly activeProjectId: string | null;
-  readonly section: Exclude<HomeSection, "start">;
-  readonly projects: readonly LocalProjectSummary[];
-  readonly loadState: ProjectLoadState;
-  readonly loadError: string | null;
-  readonly onOpenProject: (id: string) => void;
-  readonly onArchiveProject: (id: string) => Promise<boolean>;
-  readonly onRestoreProject: (id: string) => void;
-  readonly onDeleteProject: (id: string) => void;
-  readonly onRenameProject: (
-    project: LocalProjectSummary,
-    name: string,
-  ) => void;
-  readonly onPinProject: (
-    project: LocalProjectSummary,
-    pinned: boolean,
-  ) => void;
-  readonly onRetryProjects: () => void;
-  readonly onStartNew: () => void;
-}) {
-  const { t, i18n } = useLingui();
-  const [query, setQuery] = useState("");
-  const [layout, setLayout] = useState<DirectoryLayout>(readDirectoryLayout);
-  const archived = section === "archived";
-  const title = archived
-    ? t({ id: "home.archived_projects", message: "Archived projects" })
-    : section === "drafts"
-      ? t({ id: "home.drafts", message: "Drafts" })
-      : t({ id: "home.your_projects", message: "Your projects" });
-  const matchedProjects = useMemo(
-    () => filterProjects(projects, query),
-    [projects, query],
-  );
-  const selectLayout = (next: DirectoryLayout) => {
-    setLayout(next);
-    try {
-      localStorage.setItem(DIRECTORY_LAYOUT_KEY, next);
-    } catch {
-      // best-effort persistence only
-    }
-  };
-
-  return (
-    <div className="mx-auto w-full max-w-6xl px-6 py-10 lg:px-10 lg:py-12">
-      <header className="border-b border-border pb-5">
-        <p className="text-sm text-muted-foreground">
-          {t({ id: "home.workspace", message: "Workspace" })}
-        </p>
-        <div className="mt-1 flex flex-wrap items-center justify-between gap-3">
-          <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">{title}</h1>
-          {loadState === "ready" && projects.length ? (
-            <div className="relative w-full sm:w-64">
-              <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                type="search"
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder={t({
-                  id: "home.search_projects",
-                  message: "Search projects...",
-                })}
-                aria-label={t({
-                  id: "home.search_projects",
-                  message: "Search projects...",
-                })}
-                className="h-9 pl-8"
-              />
-            </div>
-          ) : null}
-          <div className="flex items-center rounded-md border border-border p-0.5">
-            <Button
-              type="button"
-              variant={layout === "grid" ? "secondary" : "ghost"}
-              size="icon-sm"
-              className="size-7"
-              aria-label={t({ id: "home.layout_grid", message: "Grid view" })}
-              aria-pressed={layout === "grid"}
-              onClick={() => selectLayout("grid")}
-            >
-              <LayoutGrid className="size-3.5" />
-            </Button>
-            <Button
-              type="button"
-              variant={layout === "list" ? "secondary" : "ghost"}
-              size="icon-sm"
-              className="size-7"
-              aria-label={t({ id: "home.layout_list", message: "List view" })}
-              aria-pressed={layout === "list"}
-              onClick={() => selectLayout("list")}
-            >
-              <List className="size-3.5" />
-            </Button>
-          </div>
-          {!archived ? (
-            <Button type="button" size="sm" onClick={onStartNew}>
-              <Plus className="size-4" />
-              {t({ id: "home.new_project", message: "New project" })}
-            </Button>
-          ) : null}
-        </div>
-      </header>
-      <div className="mt-6">
-        {loadState === "loading" ? (
-          <DirectorySkeleton />
-        ) : loadState === "error" ? (
-          <DirectoryError
-            error={
-              loadError ??
-              t({
-                id: "home.project_load_error",
-                message: "Project storage could not be loaded.",
-              })
-            }
-            onRetry={onRetryProjects}
-          />
-        ) : !projects.length ? (
-          <EmptyDirectory section={section} />
-        ) : !matchedProjects.length ? (
-          <EmptySearchResults query={query} onClear={() => setQuery("")} />
-        ) : layout === "grid" ? (
-          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {matchedProjects.map((project) => (
-              <ProjectCard
-                key={project.id}
-                project={project}
-                locale={i18n.locale}
-                active={project.id === activeProjectId}
-                onOpen={() => onOpenProject(project.id)}
-                onArchive={() => onArchiveProject(project.id)}
-                onRestore={() => onRestoreProject(project.id)}
-                onDelete={() => onDeleteProject(project.id)}
-                onRename={(name) => onRenameProject(project, name)}
-                onPin={(pinned) => onPinProject(project, pinned)}
-              />
-            ))}
-          </div>
-        ) : (
-          <div className="divide-y divide-border rounded-lg border border-border bg-background">
-            {matchedProjects.map((project) => (
-              <ProjectRow
-                key={project.id}
-                project={project}
-                locale={i18n.locale}
-                active={project.id === activeProjectId}
-                onOpen={() => onOpenProject(project.id)}
-                onArchive={() => onArchiveProject(project.id)}
-                onRestore={() => onRestoreProject(project.id)}
-                onDelete={() => onDeleteProject(project.id)}
-                onRename={(name) => onRenameProject(project, name)}
-                onPin={(pinned) => onPinProject(project, pinned)}
-              />
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-export function ProjectRow({
-  project,
-  locale,
-  active,
-  onOpen,
-  onArchive,
-  onRestore,
-  onDelete,
-  onRename,
-  onPin,
-}: {
-  readonly project: LocalProjectSummary;
-  readonly locale: string;
-  readonly active: boolean;
-  readonly onOpen: () => void;
-  readonly onArchive: () => Promise<boolean>;
-  readonly onRestore: () => void;
-  readonly onDelete: () => void;
-  readonly onRename: (name: string) => void;
-  readonly onPin: (pinned: boolean) => void;
-}) {
-  return (
-    <div
-      className={cn(
-        "flex items-center gap-3 p-3 transition-colors hover:bg-muted/35",
-        active && "bg-muted/45",
-      )}
-    >
-      <button
-        type="button"
-        aria-label={`Open ${project.name}`}
-        className="flex min-w-0 flex-1 items-center gap-3 text-left"
-        onClick={onOpen}
-      >
-        <ProjectMark project={project} className="size-11" />
-        <span className="min-w-0">
-          <span className="block truncate text-sm font-semibold">
-            {project.name}
-          </span>
-          <span className="mt-0.5 block truncate text-xs text-muted-foreground">
-            {project.brief || <ProjectStatusDescription project={project} />}
-          </span>
-        </span>
-      </button>
-      <span className="hidden items-center gap-1 text-xs text-muted-foreground sm:flex">
-        <Images className="size-3" />
-        {project.assetCount}
-      </span>
-      <span className="hidden items-center gap-1 text-xs text-muted-foreground md:flex">
-        <Clock3 className="size-3" />
-        {formatProjectDate(project.updatedAt, locale)}
-      </span>
-      <ProjectActions
-        project={project}
-        onRename={onRename}
-        onPin={onPin}
-        onArchive={onArchive}
-        onRestore={onRestore}
-        onDelete={onDelete}
-      />
-    </div>
-  );
-}
-
-export function ProjectCard({
-  project,
-  locale,
-  active,
-  onOpen,
-  onArchive,
-  onRestore,
-  onDelete,
-  onRename,
-  onPin,
-}: {
-  readonly project: LocalProjectSummary;
-  readonly locale: string;
-  readonly active: boolean;
-  readonly onOpen: () => void;
-  readonly onArchive: () => Promise<boolean>;
-  readonly onRestore: () => void;
-  readonly onDelete: () => void;
-  readonly onRename: (name: string) => void;
-  readonly onPin: (pinned: boolean) => void;
-}) {
-  const { t } = useLingui();
-  const pinned = Boolean(project.pinnedAt);
-  const archived = Boolean(project.archivedAt);
-
-  return (
-    <div
-      className={cn(
-        "group relative flex flex-col overflow-hidden rounded-xl border border-border bg-background transition-colors hover:border-foreground/25",
-        active && "ring-1 ring-foreground/15",
-      )}
-    >
-      <button
-        type="button"
-        aria-label={`Open ${project.name}`}
-        className="relative block aspect-[16/10] w-full overflow-hidden bg-muted/40 outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
-        onClick={onOpen}
-      >
-        {project.thumbnail ? (
-          <CardThumbnail thumbnail={project.thumbnail} />
-        ) : (
-          <span className="flex h-full items-center justify-center">
-            <Images className="size-6 text-muted-foreground/50" />
-          </span>
-        )}
-      </button>
-      {!archived ? (
-        <div
-          className={cn(
-            "absolute right-2 top-2 transition-opacity",
-            "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100",
-            pinned && "opacity-100",
-          )}
-        >
-          <Button
-            type="button"
-            variant="secondary"
-            size="icon-sm"
-            className="shadow-sm"
-            aria-label={`${pinned ? "Unpin" : "Pin"} ${project.name}`}
-            aria-pressed={pinned}
-            onClick={() => onPin(!pinned)}
-          >
-            {pinned ? (
-              <PinOff className="size-3.5" />
-            ) : (
-              <Pin className="size-3.5" />
-            )}
-          </Button>
-        </div>
-      ) : null}
-      <div className="flex items-center gap-2.5 border-t border-border p-3">
-        <ProjectMark project={project} className="size-8" />
-        <span className="min-w-0 flex-1">
-          <span className="block truncate text-sm font-medium">
-            {project.name}
-          </span>
-          <span className="mt-0.5 block truncate text-xs text-muted-foreground">
-            {t({
-              id: "home.edited_date",
-              message: `Edited ${formatProjectDate(project.updatedAt, locale)}`,
-            })}
-          </span>
-        </span>
-        <div className="opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100">
-          <ProjectActions
-            project={project}
-            compact
-            menuOnly
-            onRename={onRename}
-            onPin={onPin}
-            onArchive={onArchive}
-            onRestore={onRestore}
-            onDelete={onDelete}
-          />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function CardThumbnail({ thumbnail }: { readonly thumbnail: Blob }) {
-  const url = useObjectUrl(thumbnail);
-
-  return url ? (
-    <img src={url} alt="" className="h-full w-full object-cover" />
-  ) : null;
 }
 
 function ProjectListItem({
@@ -1273,13 +968,14 @@ function ProjectListItem({
   return (
     <div
       className={cn(
-        "group relative flex min-w-0 items-center rounded-md transition-colors",
+        "group relative flex min-w-0 items-center rounded-lg transition-colors",
         compact &&
-          "text-sm text-muted-foreground hover:bg-muted hover:text-foreground",
+          "text-sm text-muted-foreground hover:bg-foreground/5 hover:text-foreground",
         card &&
-          "border border-border bg-background hover:border-foreground/30 hover:bg-muted/30",
+          "rounded-xl border border-border bg-background hover:border-foreground/25",
+        active && "text-foreground",
         active &&
-          "bg-muted text-foreground ring-1 ring-inset ring-foreground/10",
+          (card ? "ring-1 ring-foreground/15" : "bg-foreground/10 font-medium"),
       )}
     >
       <button
@@ -1288,7 +984,7 @@ function ProjectListItem({
         aria-label={`Open ${project.name}`}
         className={cn(
           "flex min-w-0 flex-1 items-center text-left outline-none focus-visible:ring-2 focus-visible:ring-ring",
-          compact ? "gap-2 px-2 py-1.5 pr-16" : "gap-3 p-3 pr-20",
+          compact ? "gap-2 px-3 py-1.5 pr-16" : "gap-3 p-3 pr-20",
         )}
         onClick={onOpen}
       >
@@ -1324,6 +1020,144 @@ function ProjectListItem({
       </div>
     </div>
   );
+}
+
+function NavItem({
+  icon: Icon,
+  label,
+  count,
+  badge,
+  active,
+  compact,
+  onClick,
+}: {
+  readonly icon: LucideIcon;
+  readonly label: string;
+  readonly count?: number;
+  readonly badge?: string;
+  readonly active: boolean;
+  readonly compact: boolean;
+  readonly onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      aria-current={active ? "page" : undefined}
+      className={cn(
+        "flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors",
+        compact && "justify-center px-2",
+        active
+          ? "bg-foreground/10 font-medium text-foreground"
+          : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground",
+      )}
+      onClick={onClick}
+    >
+      <Icon className="size-4" />
+      <span className={cn("truncate", !compact && "flex-1 text-left")}>
+        {label}
+      </span>
+      {badge ? (
+        <span
+          className={cn(
+            "shrink-0 rounded-full bg-foreground/10 px-1.5 py-0.5 text-xs font-medium tracking-wide text-muted-foreground uppercase",
+            compact && "hidden",
+          )}
+        >
+          {badge}
+        </span>
+      ) : null}
+      {count !== undefined ? (
+        <span className="text-xs tabular-nums text-muted-foreground">
+          {count}
+        </span>
+      ) : null}
+    </button>
+  );
+}
+
+function projectCounts(projects: readonly LocalProjectSummary[]) {
+  const active = projects.filter((project) => !project.archivedAt);
+  return {
+    active: active.length,
+    drafts: active.filter(isDraftProject).length,
+    archived: projects.filter((project) => Boolean(project.archivedAt)).length,
+  };
+}
+
+export type HomeSection =
+  "start" | "library" | "drafts" | "projects" | "archived";
+export type ProjectLoadState = "loading" | "ready" | "error";
+
+function ProjectRow({
+  project,
+  locale,
+  active,
+  onOpen,
+  onArchive,
+  onRestore,
+  onDelete,
+  onRename,
+  onPin,
+}: {
+  readonly project: LocalProjectSummary;
+  readonly locale: string;
+  readonly active: boolean;
+  readonly onOpen: () => void;
+  readonly onArchive: () => Promise<boolean>;
+  readonly onRestore: () => void;
+  readonly onDelete: () => void;
+  readonly onRename: (name: string) => void;
+  readonly onPin: (pinned: boolean) => void;
+}) {
+  return (
+    <div
+      className={cn(
+        "flex min-h-14 items-center gap-3 p-3 transition-colors hover:bg-foreground/5",
+        active && "bg-foreground/10",
+      )}
+    >
+      <button
+        type="button"
+        aria-label={`Open ${project.name}`}
+        className="flex min-w-0 flex-1 items-center gap-3 text-left"
+        onClick={onOpen}
+      >
+        <ProjectMark project={project} className="size-11" />
+        <span className="min-w-0">
+          <span className="block truncate text-sm font-medium">
+            {project.name}
+          </span>
+          <span className="mt-0.5 block truncate text-xs text-muted-foreground">
+            {project.brief || <ProjectStatusDescription project={project} />}
+          </span>
+        </span>
+      </button>
+      <span className="hidden items-center gap-1 text-xs text-muted-foreground sm:flex">
+        <Images className="size-3.5" />
+        {project.assetCount}
+      </span>
+      <span className="hidden items-center gap-1 text-xs text-muted-foreground md:flex">
+        <Clock3 className="size-3.5" />
+        {formatProjectDate(project.updatedAt, locale)}
+      </span>
+      <ProjectActions
+        project={project}
+        onRename={onRename}
+        onPin={onPin}
+        onArchive={onArchive}
+        onRestore={onRestore}
+        onDelete={onDelete}
+      />
+    </div>
+  );
+}
+
+function CardThumbnail({ thumbnail }: { readonly thumbnail: Blob }) {
+  const url = useObjectUrl(thumbnail);
+
+  return url ? (
+    <img src={url} alt="" className="h-full w-full object-cover" />
+  ) : null;
 }
 
 function ProjectActions({
@@ -1401,7 +1235,7 @@ function ProjectActions({
                   message: `More actions for ${project.name}`,
                 })}
               >
-                <MoreHorizontal className="size-4" />
+                <MoreHorizontal className="size-3.5" />
               </Button>
             </DropdownMenuTrigger>
           </TooltipTrigger>
@@ -1586,7 +1420,7 @@ function ProjectMark({
   ) : (
     <span
       className={cn(
-        "flex shrink-0 items-center justify-center rounded-md border border-border bg-muted/30",
+        "flex shrink-0 items-center justify-center rounded-md border border-border bg-muted/40",
         className,
       )}
     >
@@ -1651,15 +1485,340 @@ function ProjectStatusDescription({
   return `${statusMessages[project.status]} · ${project.assetCount} ${assetLabel}`;
 }
 
+function formatProjectDate(timestamp: number, locale: string) {
+  return new Intl.DateTimeFormat(locale, {
+    month: "short",
+    day: "numeric",
+  }).format(new Date(timestamp));
+}
+
+type DirectoryLayout = "grid" | "list";
+
+const DIRECTORY_LAYOUT_KEY = "cutout.home.directory-layout";
+
+function readDirectoryLayout(): DirectoryLayout {
+  try {
+    return localStorage.getItem(DIRECTORY_LAYOUT_KEY) === "list"
+      ? "list"
+      : "grid";
+  } catch {
+    return "grid";
+  }
+}
+
+function ProjectDirectory({
+  activeProjectId,
+  section,
+  projects,
+  loadState,
+  loadError,
+  onOpenProject,
+  onArchiveProject,
+  onRestoreProject,
+  onDeleteProject,
+  onRenameProject,
+  onPinProject,
+  onRetryProjects,
+  onStartNew,
+}: {
+  readonly activeProjectId: string | null;
+  readonly section: Exclude<HomeSection, "start">;
+  readonly projects: readonly LocalProjectSummary[];
+  readonly loadState: ProjectLoadState;
+  readonly loadError: string | null;
+  readonly onOpenProject: (id: string) => void;
+  readonly onArchiveProject: (id: string) => Promise<boolean>;
+  readonly onRestoreProject: (id: string) => void;
+  readonly onDeleteProject: (id: string) => void;
+  readonly onRenameProject: (
+    project: LocalProjectSummary,
+    name: string,
+  ) => void;
+  readonly onPinProject: (
+    project: LocalProjectSummary,
+    pinned: boolean,
+  ) => void;
+  readonly onRetryProjects: () => void;
+  readonly onStartNew: () => void;
+}) {
+  const { t, i18n } = useLingui();
+  const [query, setQuery] = useState("");
+  const [layout, setLayout] = useState<DirectoryLayout>(readDirectoryLayout);
+  const archived = section === "archived";
+  const title = archived
+    ? t({ id: "home.archived_projects", message: "Archived projects" })
+    : section === "drafts"
+      ? t({ id: "home.drafts", message: "Drafts" })
+      : t({ id: "home.your_projects", message: "Your projects" });
+  const description = archived
+    ? t({
+        id: "gallery.archived_description",
+        message:
+          "Work you have set aside. Restore a project to bring it back into the workspace.",
+      })
+    : section === "drafts"
+      ? t({
+          id: "gallery.drafts_description",
+          message:
+            "Ideas that have not produced results yet. Pick one up where you left off.",
+        })
+      : t({
+          id: "gallery.projects_description",
+          message:
+            "Everything you have made in this workspace. Pinned work stays at the top.",
+        });
+  const matchedProjects = useMemo(
+    () => filterProjects(projects, query),
+    [projects, query],
+  );
+  const selectLayout = (next: DirectoryLayout) => {
+    setLayout(next);
+    try {
+      localStorage.setItem(DIRECTORY_LAYOUT_KEY, next);
+    } catch {
+      // best-effort persistence only
+    }
+  };
+
+  return (
+    <div className="mx-auto w-full max-w-6xl px-6 py-8 lg:px-10 lg:py-10">
+      <header className="relative border-b border-border pb-6">
+        <p className="text-xs text-muted-foreground">
+          {t({ id: "home.workspace", message: "Workspace" })}
+        </p>
+        <div className="mt-1 flex flex-wrap items-start justify-between gap-4">
+          <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">{title}</h1>
+          <div className="flex shrink-0 items-center gap-2">
+            {!archived ? (
+              <Button type="button" onClick={onStartNew}>
+                <Plus className="size-4" />
+                {t({ id: "home.new_project", message: "New project" })}
+              </Button>
+            ) : null}
+          </div>
+          {/* `basis-full` is what breaks the description onto its own line;
+              the measure cap lives on the inner span so max-width cannot clamp
+              the flex basis back down and cancel the wrap. */}
+          <p className="order-last w-full basis-full text-sm leading-6 text-muted-foreground">
+            <span className="block max-w-xl">{description}</span>
+          </p>
+        </div>
+        <CutoutBrandMark
+          variant="symbol"
+          className="pointer-events-none absolute -top-1 right-0 hidden h-24 w-auto text-foreground/[0.05] lg:block"
+        />
+      </header>
+      <div className="mt-4 flex flex-wrap items-center gap-2">
+        {loadState === "ready" && projects.length ? (
+          <div className="relative min-w-48 flex-1 sm:max-w-md">
+            <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              type="search"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder={t({
+                id: "home.search_projects",
+                message: "Search projects...",
+              })}
+              aria-label={t({
+                id: "home.search_projects",
+                message: "Search projects...",
+              })}
+              className="pl-8"
+            />
+          </div>
+        ) : null}
+        <div className="flex items-center gap-0.5 rounded-lg bg-muted/40 p-0.5">
+          <Button
+            type="button"
+            variant={layout === "grid" ? "secondary" : "ghost"}
+            size="icon-sm"
+            aria-label={t({ id: "home.layout_grid", message: "Grid view" })}
+            aria-pressed={layout === "grid"}
+            onClick={() => selectLayout("grid")}
+          >
+            <LayoutGrid className="size-3.5" />
+          </Button>
+          <Button
+            type="button"
+            variant={layout === "list" ? "secondary" : "ghost"}
+            size="icon-sm"
+            aria-label={t({ id: "home.layout_list", message: "List view" })}
+            aria-pressed={layout === "list"}
+            onClick={() => selectLayout("list")}
+          >
+            <List className="size-3.5" />
+          </Button>
+        </div>
+      </div>
+      <div className="mt-6">
+        {loadState === "loading" ? (
+          <DirectorySkeleton />
+        ) : loadState === "error" ? (
+          <DirectoryError
+            error={
+              loadError ??
+              t({
+                id: "home.project_load_error",
+                message: "Project storage could not be loaded.",
+              })
+            }
+            onRetry={onRetryProjects}
+          />
+        ) : !projects.length ? (
+          <EmptyDirectory section={section} />
+        ) : !matchedProjects.length ? (
+          <EmptySearchResults query={query} onClear={() => setQuery("")} />
+        ) : layout === "grid" ? (
+          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {matchedProjects.map((project) => (
+              <ProjectCard
+                key={project.id}
+                project={project}
+                locale={i18n.locale}
+                active={project.id === activeProjectId}
+                onOpen={() => onOpenProject(project.id)}
+                onArchive={() => onArchiveProject(project.id)}
+                onRestore={() => onRestoreProject(project.id)}
+                onDelete={() => onDeleteProject(project.id)}
+                onRename={(name) => onRenameProject(project, name)}
+                onPin={(pinned) => onPinProject(project, pinned)}
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="divide-y divide-border">
+            {matchedProjects.map((project) => (
+              <ProjectRow
+                key={project.id}
+                project={project}
+                locale={i18n.locale}
+                active={project.id === activeProjectId}
+                onOpen={() => onOpenProject(project.id)}
+                onArchive={() => onArchiveProject(project.id)}
+                onRestore={() => onRestoreProject(project.id)}
+                onDelete={() => onDeleteProject(project.id)}
+                onRename={(name) => onRenameProject(project, name)}
+                onPin={(pinned) => onPinProject(project, pinned)}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ProjectCard({
+  project,
+  locale,
+  active,
+  onOpen,
+  onArchive,
+  onRestore,
+  onDelete,
+  onRename,
+  onPin,
+}: {
+  readonly project: LocalProjectSummary;
+  readonly locale: string;
+  readonly active: boolean;
+  readonly onOpen: () => void;
+  readonly onArchive: () => Promise<boolean>;
+  readonly onRestore: () => void;
+  readonly onDelete: () => void;
+  readonly onRename: (name: string) => void;
+  readonly onPin: (pinned: boolean) => void;
+}) {
+  const { t } = useLingui();
+  const pinned = Boolean(project.pinnedAt);
+  const archived = Boolean(project.archivedAt);
+
+  return (
+    <div
+      className={cn(
+        "group relative flex flex-col overflow-hidden rounded-xl border border-border bg-background transition-colors hover:border-foreground/25",
+        active && "ring-1 ring-foreground/15",
+      )}
+    >
+      <button
+        type="button"
+        aria-label={`Open ${project.name}`}
+        className="relative block aspect-[16/10] w-full overflow-hidden bg-muted/40 outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+        onClick={onOpen}
+      >
+        {project.thumbnail ? (
+          <CardThumbnail thumbnail={project.thumbnail} />
+        ) : (
+          <span className="flex h-full items-center justify-center">
+            <Images className="size-6 text-muted-foreground/50" />
+          </span>
+        )}
+      </button>
+      {!archived ? (
+        <div
+          className={cn(
+            "absolute right-2 top-2 transition-opacity",
+            "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100",
+            pinned && "opacity-100",
+          )}
+        >
+          <Button
+            type="button"
+            variant="secondary"
+            size="icon-sm"
+            className="shadow-sm"
+            aria-label={`${pinned ? "Unpin" : "Pin"} ${project.name}`}
+            aria-pressed={pinned}
+            onClick={() => onPin(!pinned)}
+          >
+            {pinned ? (
+              <PinOff className="size-3.5" />
+            ) : (
+              <Pin className="size-3.5" />
+            )}
+          </Button>
+        </div>
+      ) : null}
+      <div className="flex items-center gap-2.5 border-t border-border p-3">
+        <ProjectMark project={project} className="size-8" />
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-sm font-medium">
+            {project.name}
+          </span>
+          <span className="mt-0.5 block truncate text-xs text-muted-foreground">
+            {t({
+              id: "home.edited_date",
+              message: `Edited ${formatProjectDate(project.updatedAt, locale)}`,
+            })}
+          </span>
+        </span>
+        <div className="opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100">
+          <ProjectActions
+            project={project}
+            compact
+            menuOnly
+            onRename={onRename}
+            onPin={onPin}
+            onArchive={onArchive}
+            onRestore={onRestore}
+            onDelete={onDelete}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function DirectorySkeleton() {
   return (
-    <div className="space-y-2 rounded-lg border border-border bg-background p-3">
+    <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
       {Array.from({ length: 4 }, (_, index) => (
-        <div key={index} className="flex items-center gap-3 py-1">
-          <Skeleton className="size-11 rounded-md" />
-          <div className="flex-1 space-y-2">
-            <Skeleton className="h-3 w-40" />
-            <Skeleton className="h-3 w-64 max-w-full" />
+        <div key={index} className="flex flex-col gap-3">
+          <Skeleton className="aspect-[16/10] w-full rounded-xl" />
+          <div className="flex flex-col gap-2">
+            <Skeleton className="h-3 w-32" />
+            <Skeleton className="h-3 w-20" />
           </div>
         </div>
       ))}
@@ -1677,17 +1836,17 @@ function DirectoryError({
   const { t } = useLingui();
 
   return (
-    <div className="flex items-start justify-between gap-4 rounded-lg border border-destructive/30 bg-destructive/5 p-4">
+    <div className="flex items-start justify-between gap-4 rounded-xl border border-destructive/30 bg-destructive/5 p-6">
       <div className="flex gap-3">
-        <AlertCircle className="mt-0.5 size-4 text-destructive" />
-        <div>
-          <h2 className="text-sm font-semibold text-destructive">
+        <AlertCircle className="mt-0.5 size-4 shrink-0 text-destructive" />
+        <div className="min-w-0">
+          <h2 className="text-sm font-medium text-destructive">
             {t({
               id: "home.load_failed_title",
               message: "Could not load projects",
             })}
           </h2>
-          <p className="mt-1 text-sm text-destructive/80">{error}</p>
+          <p className="mt-0.5 text-xs text-destructive/80">{error}</p>
         </div>
       </div>
       <Button variant="outline" size="sm" onClick={onRetry}>
@@ -1703,12 +1862,6 @@ function EmptyDirectory({
   readonly section: Exclude<HomeSection, "start">;
 }) {
   const { t } = useLingui();
-  const Icon =
-    section === "archived"
-      ? Archive
-      : section === "drafts"
-        ? FileText
-        : LayoutGrid;
   const heading =
     section === "archived"
       ? t({ id: "home.nothing_archived", message: "Nothing archived" })
@@ -1733,12 +1886,13 @@ function EmptyDirectory({
           });
 
   return (
-    <div className="flex min-h-56 flex-col items-center justify-center rounded-lg border border-dashed border-border bg-background/70 p-6 text-center">
-      <Icon className="size-5 text-muted-foreground" />
-      <h2 className="mt-3 text-sm font-semibold">{heading}</h2>
-      <p className="mt-1 max-w-sm text-sm text-muted-foreground">
-        {description}
-      </p>
+    <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border px-6 py-12 text-center">
+      <CutoutBrandMark
+        variant="symbol"
+        className="h-8 w-auto text-muted-foreground/40"
+      />
+      <p className="text-sm font-medium">{heading}</p>
+      <p className="max-w-sm text-xs text-muted-foreground">{description}</p>
     </div>
   );
 }
@@ -1753,89 +1907,23 @@ function EmptySearchResults({
   const { t } = useLingui();
 
   return (
-    <div className="flex min-h-56 flex-col items-center justify-center rounded-lg border border-dashed border-border bg-background/70 p-6 text-center">
-      <SearchX className="size-5 text-muted-foreground" />
-      <h2 className="mt-3 text-sm font-semibold">
+    <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border px-6 py-12 text-center">
+      <CutoutBrandMark
+        variant="symbol"
+        className="h-8 w-auto text-muted-foreground/40"
+      />
+      <p className="text-sm font-medium">
         {t({ id: "home.no_search_matches", message: "No matching projects" })}
-      </h2>
-      <p className="mt-1 max-w-sm text-sm text-muted-foreground">
+      </p>
+      <p className="max-w-sm text-xs text-muted-foreground">
         {t({
           id: "home.no_search_matches_description",
           message: `Nothing matches “${query.trim()}”. Try a different name or brief keyword.`,
         })}
       </p>
-      <Button variant="outline" size="sm" className="mt-4" onClick={onClear}>
+      <Button variant="outline" size="sm" onClick={onClear}>
         {t({ id: "home.clear_search", message: "Clear search" })}
       </Button>
     </div>
   );
-}
-
-function NavItem({
-  icon: Icon,
-  label,
-  count,
-  badge,
-  active,
-  compact,
-  onClick,
-}: {
-  readonly icon: LucideIcon;
-  readonly label: string;
-  readonly count?: number;
-  readonly badge?: string;
-  readonly active: boolean;
-  readonly compact: boolean;
-  readonly onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      aria-current={active ? "page" : undefined}
-      className={cn(
-        "flex items-center gap-2 rounded-md px-2 py-2 text-sm transition-colors",
-        compact && "justify-center",
-        active
-          ? "bg-muted text-foreground"
-          : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
-      )}
-      onClick={onClick}
-    >
-      <Icon className="size-4" />
-      <span className={cn("truncate", !compact && "flex-1 text-left")}>
-        {label}
-      </span>
-      {badge ? (
-        <span
-          className={cn(
-            "rounded border border-border/70 bg-muted/60 px-1 py-px text-[9px] font-medium uppercase tracking-wide text-muted-foreground",
-            compact && "hidden",
-          )}
-        >
-          {badge}
-        </span>
-      ) : null}
-      {count !== undefined ? (
-        <span className="text-xs tabular-nums text-muted-foreground">
-          {count}
-        </span>
-      ) : null}
-    </button>
-  );
-}
-
-function projectCounts(projects: readonly LocalProjectSummary[]) {
-  const active = projects.filter((project) => !project.archivedAt);
-  return {
-    active: active.length,
-    drafts: active.filter(isDraftProject).length,
-    archived: projects.filter((project) => Boolean(project.archivedAt)).length,
-  };
-}
-
-function formatProjectDate(timestamp: number, locale: string) {
-  return new Intl.DateTimeFormat(locale, {
-    month: "short",
-    day: "numeric",
-  }).format(new Date(timestamp));
 }

@@ -65,7 +65,7 @@ export function SettingsDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="h-[min(46rem,calc(100dvh-1rem))] w-[calc(100vw-1rem)] min-w-0 max-w-3xl gap-0 overflow-hidden p-0 sm:h-[min(46rem,calc(100dvh-3rem))]"
+        className="h-[min(46rem,calc(100dvh-1rem))] w-[calc(100vw-1rem)] min-w-0 max-w-4xl gap-0 overflow-hidden p-0 sm:h-[min(46rem,calc(100dvh-3rem))]"
         onOpenAutoFocus={PACKAGED_E2E ? (event) => event.preventDefault() : undefined}
       >
         <DialogTitle className="sr-only">
@@ -78,14 +78,14 @@ export function SettingsDialog({
         </DialogDescription>
 
         <div className="flex h-full min-h-0 min-w-0 flex-col sm:flex-row">
-          <aside className="flex w-full shrink-0 flex-col border-b border-border bg-muted/20 p-2 sm:w-44 sm:border-r sm:border-b-0">
+          <aside className="flex w-full shrink-0 flex-col border-b border-border bg-muted/40 p-2 sm:w-56 sm:border-r sm:border-b-0 sm:p-3">
             <SettingsSidebar value={section} onChange={setSection} archivedCount={archivedCount} />
             <div className="mt-auto hidden pt-2 sm:block">
               <AboutFooter />
             </div>
           </aside>
 
-          <div className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain p-3 sm:p-5">
+          <div className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain p-4 sm:p-6">
             {section === 'general' ? (
               <GeneralSection />
             ) : section === 'speech' ? (

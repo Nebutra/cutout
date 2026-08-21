@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Loader2, Mic, RotateCcw, Volume2 } from "lucide-react";
+import { Loader2, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { defaultSpeechPreferences, type SpeechPreferences } from "@/speech";
@@ -60,8 +60,7 @@ export function SpeechSection() {
             message: "Could not save speech preferences",
           }),
           {
-            description:
-              error instanceof Error ? error.message : String(error),
+            description: error instanceof Error ? error.message : String(error),
           },
         );
       }
@@ -94,23 +93,20 @@ export function SpeechSection() {
       </div>
     );
   return (
-    <section aria-labelledby="speech-heading" className="flex flex-col gap-5">
+    <section aria-labelledby="speech-heading" className="flex flex-col gap-8">
       <div>
-        <div className="flex items-center gap-2">
-          <Mic className="size-4" />
-          <h2 id="speech-heading" className="text-sm font-semibold">
-            <Trans id="settings.section_speech">Speech</Trans>
-          </h2>
-        </div>
-        <p className="mt-1 text-sm text-muted-foreground">
+        <h2 id="speech-heading" className="text-sm font-medium">
+          <Trans id="settings.section_speech">Speech</Trans>
+        </h2>
+        <p className="mt-0.5 text-xs text-muted-foreground">
           <Trans id="settings.speech.description">
-            Configure dictation and spoken output without changing how the
-            Agent plans your work.
+            Configure dictation and spoken output without changing how the Agent
+            plans your work.
           </Trans>
         </p>
         <p
           role={hostUnavailable ? "alert" : undefined}
-          className="mt-2 rounded-md border border-amber-500/25 bg-amber-500/10 px-2.5 py-2 text-xs text-amber-700 dark:text-amber-300"
+          className="mt-3 rounded-xl border border-amber-500/25 bg-amber-500/10 p-3 text-xs text-amber-700 dark:text-amber-300"
         >
           <Trans id="settings.speech.host_required">
             Host required: microphone enumeration and system-level shortcuts
@@ -126,255 +122,366 @@ export function SpeechSection() {
           ) : null}
         </p>
       </div>
-      <div className="rounded-lg border border-border p-3">
-        <div className="flex items-center justify-between">
-          <h3 className="text-sm font-medium">
-            <Trans id="settings.speech.models_title">Speech models</Trans>
-          </h3>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setAdvanced((v) => !v)}
-            aria-expanded={advanced}
-          >
-            <Trans id="settings.advanced">Advanced</Trans>
-          </Button>
-        </div>
-        <p className="mt-1 text-xs text-muted-foreground">
-          <Trans id="settings.speech.models_description">
-            Auto routing is used by default. ASR and TTS remain
-            capability-required until compatible adapters are connected.
-          </Trans>
-        </p>
-        {advanced ? (
-          <div className="mt-3 flex flex-col gap-2">
-            {SPEECH_MODEL_DIMENSIONS.map((dimension) => {
-              const localized =
-                dimension.task === "asr"
-                  ? {
-                      label: t({
-                        id: "settings.dimension_asr_label",
-                        message: "Speech to text",
-                      }),
-                      description: t({
-                        id: "settings.dimension_asr_description",
-                        message: "Transcribe spoken audio.",
-                      }),
-                    }
-                  : {
-                      label: t({
-                        id: "settings.dimension_tts_label",
-                        message: "Text to speech",
-                      }),
-                      description: t({
-                        id: "settings.dimension_tts_description",
-                        message: "Create spoken audio.",
-                      }),
-                    };
-              return (
-                <ModelSlot
-                  key={dimension.task}
-                  {...dimension}
-                  {...localized}
-                  advanced
-                />
-              );
-            })}
+
+      <section
+        className="flex flex-col gap-2"
+        aria-labelledby="speech-models-heading"
+      >
+        <h3
+          id="speech-models-heading"
+          className="text-xs font-medium tracking-wide text-muted-foreground uppercase"
+        >
+          <Trans id="settings.speech.models_title">Speech models</Trans>
+        </h3>
+        <div className="divide-y divide-border">
+          <div className="flex min-h-14 items-center justify-between gap-4 py-3">
+            <div className="min-w-0">
+              <div className="text-sm font-medium">
+                <Trans id="settings.speech.automatic_routing">
+                  Automatic routing
+                </Trans>
+              </div>
+              <div className="mt-0.5 text-xs text-muted-foreground">
+                <Trans id="settings.speech.models_description">
+                  Auto routing is used by default. ASR and TTS remain
+                  capability-required until compatible adapters are connected.
+                </Trans>
+              </div>
+            </div>
+            <div className="flex shrink-0 items-center gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setAdvanced((v) => !v)}
+                aria-expanded={advanced}
+              >
+                <Trans id="settings.advanced">Advanced</Trans>
+              </Button>
+            </div>
           </div>
-        ) : null}
-      </div>
-      <div className="rounded-lg border border-border p-3">
-        <h3 className="text-sm font-medium">
+          {advanced ? (
+            <div className="py-4">
+              <div className="text-sm font-medium">
+                <Trans id="settings.speech.manual_routing">
+                  Manual speech routing
+                </Trans>
+              </div>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                <Trans id="settings.speech.manual_routing_hint">
+                  Pin a specific provider and model for transcription and spoken
+                  output instead of letting Cutout choose.
+                </Trans>
+              </p>
+              <div className="mt-3 flex flex-col gap-2">
+                {SPEECH_MODEL_DIMENSIONS.map((dimension) => {
+                  const localized =
+                    dimension.task === "asr"
+                      ? {
+                          label: t({
+                            id: "settings.dimension_asr_label",
+                            message: "Speech to text",
+                          }),
+                          description: t({
+                            id: "settings.dimension_asr_description",
+                            message: "Transcribe spoken audio.",
+                          }),
+                        }
+                      : {
+                          label: t({
+                            id: "settings.dimension_tts_label",
+                            message: "Text to speech",
+                          }),
+                          description: t({
+                            id: "settings.dimension_tts_description",
+                            message: "Create spoken audio.",
+                          }),
+                        };
+                  return (
+                    <ModelSlot
+                      key={dimension.task}
+                      {...dimension}
+                      {...localized}
+                      advanced
+                    />
+                  );
+                })}
+              </div>
+            </div>
+          ) : null}
+        </div>
+      </section>
+
+      <section
+        className="flex flex-col gap-2"
+        aria-labelledby="speech-dictation-heading"
+      >
+        <h3
+          id="speech-dictation-heading"
+          className="text-xs font-medium tracking-wide text-muted-foreground uppercase"
+        >
           <Trans id="settings.speech.dictation">Dictation</Trans>
         </h3>
-        <label className="mt-3 block text-xs text-muted-foreground">
-          <Trans id="settings.speech.microphone_device_id">
-            Microphone device ID
-          </Trans>
-          <Input
-            value={draft.microphoneDeviceId}
-            disabled={busy || hostUnavailable}
-            onChange={(e) =>
-              setDraft({ ...draft, microphoneDeviceId: e.target.value })
-            }
-            placeholder={t({
-              id: "settings.speech.not_set",
-              message: "Not set",
-            })}
-            aria-label={t({
-              id: "settings.speech.microphone_device_id",
-              message: "Microphone device ID",
-            })}
-          />
-        </label>
-        <div className="mt-3 grid grid-cols-2 gap-2">
-          <label className="text-xs text-muted-foreground">
-            <Trans id="settings.speech.activation">Activation</Trans>
-            <select
-              value={draft.activationMode}
+        <div className="divide-y divide-border">
+          <label className="block py-4">
+            <span className="block text-sm font-medium">
+              <Trans id="settings.speech.microphone_device_id">
+                Microphone device ID
+              </Trans>
+            </span>
+            <span className="mt-0.5 block text-xs text-muted-foreground">
+              <Trans id="settings.speech.microphone_device_id_hint">
+                Leave empty to use the system default input. Paste a device ID
+                to pin one microphone.
+              </Trans>
+            </span>
+            <Input
+              className="mt-3"
+              value={draft.microphoneDeviceId}
               disabled={busy || hostUnavailable}
               onChange={(e) =>
-                setDraft({
-                  ...draft,
-                  activationMode: e.target
-                    .value as SpeechPreferences["activationMode"],
-                })
+                setDraft({ ...draft, microphoneDeviceId: e.target.value })
               }
-              className="mt-1 h-9 w-full rounded-md border bg-background px-2"
-            >
-              <option value="push-to-talk">
-                {t({
-                  id: "settings.speech.push_to_talk",
-                  message: "Push to talk",
-                })}
-              </option>
-              <option value="toggle">
-                {t({ id: "settings.speech.toggle", message: "Toggle" })}
-              </option>
-            </select>
-          </label>
-          <label className="text-xs text-muted-foreground">
-            <Trans id="settings.speech.shortcut">Shortcut</Trans>
-            <Input
-              value={draft.shortcut}
-              disabled={busy || hostUnavailable}
-              onChange={(e) => setDraft({ ...draft, shortcut: e.target.value })}
               placeholder={t({
                 id: "settings.speech.not_set",
                 message: "Not set",
               })}
               aria-label={t({
-                id: "settings.speech.shortcut_aria",
-                message: "Speech shortcut",
+                id: "settings.speech.microphone_device_id",
+                message: "Microphone device ID",
               })}
             />
           </label>
-        </div>
-        <label className="mt-3 flex items-center justify-between gap-3 text-sm">
-          <Trans id="settings.speech.keep_dictation_visible">
-            Keep dictation visible
-          </Trans>
-          <Switch
-            checked={draft.keepDictationVisible}
-            disabled={busy || hostUnavailable}
-            onCheckedChange={(value) =>
-              setDraft({ ...draft, keepDictationVisible: value })
-            }
-            aria-label={t({
-              id: "settings.speech.keep_dictation_visible",
-              message: "Keep dictation visible",
-            })}
-          />
-        </label>
-        <div className="mt-3">
-          <label className="text-xs text-muted-foreground">
-            <Trans id="settings.speech.dictionary_entry">
-              Dictionary entry
-            </Trans>
-          </label>
-          <div className="mt-1 flex gap-2">
-            <Input
-              value={dictionary}
-              disabled={busy || hostUnavailable}
-              onChange={(e) => setDictionary(e.target.value)}
-              aria-label={t({
-                id: "settings.speech.dictionary_entry",
-                message: "Dictionary entry",
-              })}
-            />
-            <Button
-              variant="outline"
-              disabled={!dictionary.trim() || busy || hostUnavailable}
-              onClick={() => {
-                setDraft({
-                  ...draft,
-                  dictionary: [
-                    ...new Set([...draft.dictionary, dictionary.trim()]),
-                  ],
-                });
-                setDictionary("");
-              }}
-            >
-              <Trans id="settings.add">Add</Trans>
-            </Button>
+          <div className="py-4">
+            <div className="text-sm font-medium">
+              <Trans id="settings.speech.trigger_title">
+                Dictation trigger
+              </Trans>
+            </div>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              <Trans id="settings.speech.trigger_hint">
+                Choose whether dictation runs while the key is held or stays on
+                until you stop it, and which shortcut starts it.
+              </Trans>
+            </p>
+            <div className="mt-3 grid grid-cols-2 gap-3">
+              <label className="text-xs text-muted-foreground">
+                <Trans id="settings.speech.activation">Activation</Trans>
+                <select
+                  value={draft.activationMode}
+                  disabled={busy || hostUnavailable}
+                  onChange={(e) =>
+                    setDraft({
+                      ...draft,
+                      activationMode: e.target
+                        .value as SpeechPreferences["activationMode"],
+                    })
+                  }
+                  className="mt-1.5 h-8 w-full rounded-lg border border-border bg-background px-2 text-sm text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-50"
+                >
+                  <option value="push-to-talk">
+                    {t({
+                      id: "settings.speech.push_to_talk",
+                      message: "Push to talk",
+                    })}
+                  </option>
+                  <option value="toggle">
+                    {t({ id: "settings.speech.toggle", message: "Toggle" })}
+                  </option>
+                </select>
+              </label>
+              <label className="text-xs text-muted-foreground">
+                <Trans id="settings.speech.shortcut">Shortcut</Trans>
+                <Input
+                  className="mt-1.5"
+                  value={draft.shortcut}
+                  disabled={busy || hostUnavailable}
+                  onChange={(e) =>
+                    setDraft({ ...draft, shortcut: e.target.value })
+                  }
+                  placeholder={t({
+                    id: "settings.speech.not_set",
+                    message: "Not set",
+                  })}
+                  aria-label={t({
+                    id: "settings.speech.shortcut_aria",
+                    message: "Speech shortcut",
+                  })}
+                />
+              </label>
+            </div>
           </div>
-          <div className="mt-2 flex flex-wrap gap-1">
-            {draft.dictionary.map((value) => (
-              <button
-                key={value}
-                type="button"
+          <label className="flex min-h-14 items-center justify-between gap-4 py-3">
+            <span className="min-w-0">
+              <span className="block text-sm font-medium">
+                <Trans id="settings.speech.keep_dictation_visible">
+                  Keep dictation visible
+                </Trans>
+              </span>
+              <span className="mt-0.5 block text-xs text-muted-foreground">
+                <Trans id="settings.speech.keep_dictation_visible_hint">
+                  Keep the live transcript panel on screen after dictation
+                  stops.
+                </Trans>
+              </span>
+            </span>
+            <span className="flex shrink-0 items-center gap-2">
+              <Switch
+                checked={draft.keepDictationVisible}
                 disabled={busy || hostUnavailable}
-                onClick={() =>
+                onCheckedChange={(value) =>
+                  setDraft({ ...draft, keepDictationVisible: value })
+                }
+                aria-label={t({
+                  id: "settings.speech.keep_dictation_visible",
+                  message: "Keep dictation visible",
+                })}
+              />
+            </span>
+          </label>
+          <div className="py-4">
+            <div className="text-sm font-medium">
+              <Trans id="settings.speech.dictionary_title">Dictionary</Trans>
+            </div>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              <Trans id="settings.speech.dictionary_hint">
+                Add names and terms that transcription should spell exactly.
+                Select an entry to remove it.
+              </Trans>
+            </p>
+            <div className="mt-3 flex gap-2">
+              <Input
+                value={dictionary}
+                disabled={busy || hostUnavailable}
+                onChange={(e) => setDictionary(e.target.value)}
+                aria-label={t({
+                  id: "settings.speech.dictionary_entry",
+                  message: "Dictionary entry",
+                })}
+              />
+              <Button
+                variant="outline"
+                disabled={!dictionary.trim() || busy || hostUnavailable}
+                onClick={() => {
                   setDraft({
                     ...draft,
-                    dictionary: draft.dictionary.filter(
-                      (item) => item !== value,
-                    ),
-                  })
-                }
-                className="rounded border px-1.5 py-0.5 text-xs disabled:opacity-50"
-                aria-label={t({
-                  id: "settings.speech.remove_entry",
-                  message: `Remove ${value}`,
-                })}
+                    dictionary: [
+                      ...new Set([...draft.dictionary, dictionary.trim()]),
+                    ],
+                  });
+                  setDictionary("");
+                }}
               >
-                {value} ×
-              </button>
-            ))}
+                <Trans id="settings.add">Add</Trans>
+              </Button>
+            </div>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {draft.dictionary.map((value) => (
+                <button
+                  key={value}
+                  type="button"
+                  disabled={busy || hostUnavailable}
+                  onClick={() =>
+                    setDraft({
+                      ...draft,
+                      dictionary: draft.dictionary.filter(
+                        (item) => item !== value,
+                      ),
+                    })
+                  }
+                  className="rounded-full border border-border px-2.5 py-0.5 text-xs transition-colors hover:border-foreground/25 hover:bg-foreground/5 focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-50"
+                  aria-label={t({
+                    id: "settings.speech.remove_entry",
+                    message: `Remove ${value}`,
+                  })}
+                >
+                  {value} ×
+                </button>
+              ))}
+            </div>
           </div>
         </div>
-      </div>
-      <div className="rounded-lg border border-border p-3">
-        <div className="flex items-center gap-2">
-          <Volume2 className="size-4" />
-          <h3 className="text-sm font-medium">
-            <Trans id="settings.speech.spoken_output">Spoken output</Trans>
-          </h3>
-        </div>
-        <p className="mt-1 text-xs text-muted-foreground">
+      </section>
+
+      <section
+        className="flex flex-col gap-2"
+        aria-labelledby="speech-output-heading"
+      >
+        <h3
+          id="speech-output-heading"
+          className="text-xs font-medium tracking-wide text-muted-foreground uppercase"
+        >
+          <Trans id="settings.speech.spoken_output">Spoken output</Trans>
+        </h3>
+        <p className="text-xs text-muted-foreground">
           <Trans id="settings.speech.spoken_output_capability">
             Capability required: voice discovery and playback stay disabled
             until a TTS adapter is available.
           </Trans>
         </p>
-        <div className="mt-3 grid grid-cols-2 gap-2">
-          <Input
-            value={draft.ttsVoice}
-            disabled
-            aria-label={t({
-              id: "settings.speech.tts_voice",
-              message: "TTS voice",
-            })}
-            placeholder={t({
-              id: "settings.speech.tts_adapter_required",
-              message: "TTS adapter required",
-            })}
-          />
-          <Input
-            type="number"
-            value={draft.ttsRate}
-            disabled
-            aria-label={t({
-              id: "settings.speech.tts_rate",
-              message: "TTS rate",
-            })}
-          />
+        <div className="divide-y divide-border">
+          <div className="py-4">
+            <div className="text-sm font-medium">
+              <Trans id="settings.speech.voice_title">Voice and rate</Trans>
+            </div>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              <Trans id="settings.speech.voice_hint">
+                The voice name and playback speed used for spoken replies. Both
+                unlock once a TTS adapter is connected.
+              </Trans>
+            </p>
+            <div className="mt-3 grid grid-cols-2 gap-3">
+              <Input
+                value={draft.ttsVoice}
+                disabled
+                aria-label={t({
+                  id: "settings.speech.tts_voice",
+                  message: "TTS voice",
+                })}
+                placeholder={t({
+                  id: "settings.speech.tts_adapter_required",
+                  message: "TTS adapter required",
+                })}
+              />
+              <Input
+                type="number"
+                value={draft.ttsRate}
+                disabled
+                aria-label={t({
+                  id: "settings.speech.tts_rate",
+                  message: "TTS rate",
+                })}
+              />
+            </div>
+          </div>
+          <label className="flex min-h-14 items-center justify-between gap-4 py-3">
+            <span className="min-w-0">
+              <span className="block text-sm font-medium">
+                <Trans id="settings.speech.auto_play_responses">
+                  Auto-play responses
+                </Trans>
+              </span>
+              <span className="mt-0.5 block text-xs text-muted-foreground">
+                <Trans id="settings.speech.auto_play_responses_hint">
+                  Speak each Agent reply as soon as it arrives, without pressing
+                  play.
+                </Trans>
+              </span>
+            </span>
+            <span className="flex shrink-0 items-center gap-2">
+              <Switch
+                checked={draft.ttsAutoPlay}
+                disabled
+                aria-label={t({
+                  id: "settings.speech.auto_play_aria",
+                  message: "Auto-play TTS responses",
+                })}
+              />
+            </span>
+          </label>
         </div>
-        <label className="mt-3 flex items-center justify-between text-sm">
-          <Trans id="settings.speech.auto_play_responses">
-            Auto-play responses
-          </Trans>
-          <Switch
-            checked={draft.ttsAutoPlay}
-            disabled
-            aria-label={t({
-              id: "settings.speech.auto_play_aria",
-              message: "Auto-play TTS responses",
-            })}
-          />
-        </label>
-      </div>
-      <div className="flex justify-between">
+      </section>
+
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <AlertDialog>
           <AlertDialogTrigger asChild>
             <Button variant="ghost" disabled={busy || !storageAvailable}>

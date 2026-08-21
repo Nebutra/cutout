@@ -121,7 +121,7 @@ msgstr "该连接的模型清单中有 {0} 个模型"
 #. js-lingui-explicit-id
 #: src/components/settings/ProviderRow.tsx
 msgid "settings.catalog_model_count"
-msgstr "{0} 个模型"
+msgstr "{catalogSize} 个模型"
 
 #. js-lingui-explicit-id
 #: src/components/preview/PreviewMeta.tsx
@@ -241,6 +241,11 @@ msgid "workspace.human_loop_optional_context_placeholder"
 msgstr "补充限制条件或描述其他方向…"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/SpeechSection.tsx
+msgid "settings.speech.dictionary_hint"
+msgstr "添加需要转写严格拼写的人名和术语。点击条目即可移除。"
+
+#. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
 msgid "settings.add_provider"
 msgstr "添加提供方"
@@ -274,6 +279,11 @@ msgstr "高级模型绑定"
 #: src/components/settings/sections/PersonalizationSection.tsx
 msgid "settings.personalization.personality_aria"
 msgstr "Agent 个性"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/PersonalizationSection.tsx
+msgid "settings.personalization.group_style"
+msgstr "Agent 风格"
 
 #. js-lingui-explicit-id
 #: src/components/settings/SettingsSidebar.tsx
@@ -384,6 +394,11 @@ msgstr "API 密钥已移除"
 #: src/components/settings/VectorizerPanel.tsx
 msgid "vectorizer.secret_saved"
 msgstr "API 密钥已保存"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/GeneralSection.tsx
+msgid "settings.general.description"
+msgstr "这台设备的外观与语言。"
 
 #. js-lingui-explicit-id
 #: src/components/settings/SettingsDialog.tsx
@@ -534,6 +549,11 @@ msgstr "自动播放回复"
 #: src/components/settings/sections/SpeechSection.tsx
 msgid "settings.speech.auto_play_aria"
 msgstr "自动播放 TTS 回复"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/SpeechSection.tsx
+msgid "settings.speech.automatic_routing"
+msgstr "自动路由"
 
 #. js-lingui-explicit-id
 #: src/components/home/ProjectHome.tsx
@@ -720,6 +740,11 @@ msgstr "选择具有明确能力证据的模型。"
 #: src/components/workspace/IntentWorkspace.tsx
 msgid "workspace.human_loop_instruction"
 msgstr "选择一个方向。你也可以在下方补充说明，然后点击箭头继续。"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/SpeechSection.tsx
+msgid "settings.speech.trigger_hint"
+msgstr "选择听写是按住按键期间运行，还是保持开启直到你手动停止，以及用哪个快捷键启动。"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
@@ -1154,6 +1179,16 @@ msgstr "听写"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/SpeechSection.tsx
+msgid "settings.speech.trigger_title"
+msgstr "听写触发方式"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/SpeechSection.tsx
+msgid "settings.speech.dictionary_title"
+msgstr "词典"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/SpeechSection.tsx
 msgid "settings.speech.dictionary_entry"
 msgstr "词典条目"
 
@@ -1264,6 +1299,11 @@ msgid "settings.enter_model_manually"
 msgstr "手动输入模型 ID"
 
 #. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "gallery.projects_description"
+msgstr "你在这个工作区做过的一切。置顶的项目会留在最上面。"
+
+#. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
 msgid "settings.execution_confirmed"
 msgstr "执行已确认"
@@ -1359,6 +1399,11 @@ msgid "preview.zoom_fit"
 msgstr "适应窗口"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/GeneralSection.tsx
+msgid "settings.theme_hint"
+msgstr "跟随系统外观，或把 Cutout 固定为浅色或深色。"
+
+#. js-lingui-explicit-id
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.policy_follow_updates"
 msgstr "跟随更新"
@@ -1389,6 +1434,7 @@ msgid "settings.provider_category_gateway"
 msgstr "网关"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/GeneralSection.tsx
 #: src/components/settings/SettingsSidebar.tsx
 msgid "settings.section_general"
 msgstr "通用"
@@ -1463,6 +1509,11 @@ msgstr "需要主机"
 #: src/components/settings/sections/SpeechSection.tsx
 msgid "settings.speech.host_required"
 msgstr "需要主机：麦克风枚举与系统级快捷键需要已授权的桌面主机。"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "gallery.drafts_description"
+msgstr "还没有产出结果的想法。挑一个接着做。"
 
 #. js-lingui-explicit-id
 #: src/components/settings/ProviderDirectory.tsx
@@ -1540,6 +1591,11 @@ msgid "settings.install_codex_action"
 msgstr "安装已签名的 Codex CLI，然后重试。"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/UpdatesSection.tsx
+msgid "settings.updates.installed_build"
+msgstr "已安装版本"
+
+#. js-lingui-explicit-id
 #: src/components/settings/sections/PersonalizationSection.tsx
 msgid "settings.personalization.instructions_saved_toast"
 msgstr "指令已保存"
@@ -1556,9 +1612,19 @@ msgid "global_library.empty_fallback_label"
 msgstr "项目"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/UpdatesSupportSection.tsx
+msgid "settings.updates.description"
+msgstr "保持 Cutout 为最新版本，并在出问题时恢复本地工作。"
+
+#. js-lingui-explicit-id
 #: src/components/settings/sections/SpeechSection.tsx
 msgid "settings.speech.keep_dictation_visible"
 msgstr "保持听写界面可见"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/SpeechSection.tsx
+msgid "settings.speech.keep_dictation_visible_hint"
+msgstr "听写停止后，仍在屏幕上保留实时转写面板。"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
@@ -1574,6 +1640,11 @@ msgstr "套件审计"
 #: src/components/settings/sections/GeneralSection.tsx
 msgid "topbar.language_label"
 msgstr "语言"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/SpeechSection.tsx
+msgid "settings.speech.microphone_device_id_hint"
+msgstr "留空则使用系统默认输入设备。粘贴设备 ID 可固定某一个麦克风。"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/PersonalizationSection.tsx
@@ -1671,6 +1742,11 @@ msgid "global_library.reference_locked"
 msgstr "已锁定"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/UpdatesSection.tsx
+msgid "settings.updates.check_automatically_hint"
+msgstr "Cutout 打开时在后台查找更新的版本。"
+
+#. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
 msgid "settings.manage"
 msgstr "管理"
@@ -1679,6 +1755,11 @@ msgstr "管理"
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.kit_editor_description"
 msgstr "管理已批准的、内容寻址的套件投影。"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/SpeechSection.tsx
+msgid "settings.speech.manual_routing"
+msgstr "手动语音路由"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/PersonalizationSection.tsx
@@ -1864,6 +1945,11 @@ msgid "home.nothing_archived"
 msgstr "暂无归档"
 
 #. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.continue_empty_title"
+msgstr "还没有进行中的项目"
+
+#. js-lingui-explicit-id
 #. placeholder {0}: query.trim()
 #: src/components/home/ProjectHome.tsx
 msgid "home.no_search_matches_description"
@@ -1983,6 +2069,11 @@ msgid "home.pin_named"
 msgstr "置顶 {0}"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/SpeechSection.tsx
+msgid "settings.speech.manual_routing_hint"
+msgstr "为转写和语音输出固定某个提供商和模型，而不交给 Cutout 自动选择。"
+
+#. js-lingui-explicit-id
 #: src/components/home/ProjectHome.tsx
 msgid "home.pin_project"
 msgstr "置顶项目"
@@ -2097,6 +2188,16 @@ msgstr "项目保存在这台设备上"
 #: src/components/home/ProjectHome.tsx
 msgid "home.drafts_empty_description"
 msgstr "尚未产出结果的项目会汇总在这里。"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/ArchivedSection.tsx
+msgid "settings.archived_empty_hint"
+msgstr "从项目菜单归档的项目会落在这里，可以恢复，也可以彻底删除。"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.continue_empty_description"
+msgstr "从上面的需求开始的项目会汇集在这里，随时可以接着做。"
 
 #. js-lingui-explicit-id
 #: src/components/library/LibraryDrawer.tsx
@@ -2234,6 +2335,11 @@ msgstr "注册表桌面主机需要 Cutout 桌面应用。"
 #: src/components/library/RegistryInstallPanel.tsx
 msgid "registry_install.section_aria"
 msgstr "注册表安装"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/UpdatesSection.tsx
+msgid "settings.updates.channel_title"
+msgstr "发布通道"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/UpdatesSection.tsx
@@ -2509,6 +2615,11 @@ msgid "settings.integrations.expired"
 msgstr "会话已过期。请刷新或重新连接。"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/PersonalizationSection.tsx
+msgid "settings.personalization.personality_hint"
+msgstr "设定每次回复的默认语气。立即对这台设备上的所有项目生效。"
+
+#. js-lingui-explicit-id
 #: src/components/home/SidebarAccount.tsx
 #: src/components/settings/SettingsDialog.tsx
 msgid "settings.menu_label"
@@ -2573,6 +2684,11 @@ msgid "kit_library.source_heading"
 msgstr "源文件"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/SpeechSection.tsx
+msgid "settings.speech.auto_play_responses_hint"
+msgstr "Agent 的每条回复一到达就朗读，无需手动播放。"
+
+#. js-lingui-explicit-id
 #: src/components/settings/ProviderDirectory.tsx
 msgid "settings.provider_category_speech"
 msgstr "语音"
@@ -2618,6 +2734,11 @@ msgstr "语音输出"
 #: src/updater/update-notifications.ts
 msgid "settings.updates.stable"
 msgstr "稳定版"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/UpdatesSection.tsx
+msgid "settings.updates.channel_hint"
+msgstr "稳定版发布经过审核的版本。Beta 更早收到候选版本，可能不够稳定。"
 
 #. js-lingui-explicit-id
 #: src/components/home/ProjectHome.tsx
@@ -2670,6 +2791,11 @@ msgstr "SVG · 本地"
 #: src/components/settings/VectorizerPanel.tsx
 msgid "vectorizer.heading"
 msgstr "SVG 导出"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/GeneralSection.tsx
+msgid "settings.language_hint"
+msgstr "立即切换界面语言，并在这台设备上记住选择。"
 
 #. js-lingui-explicit-id
 #: src/components/home/SidebarAccount.tsx
@@ -2732,6 +2858,11 @@ msgid "image.error_decode_failed"
 msgstr "该文件无法解码为图像。"
 
 #. js-lingui-explicit-id
+#: src/components/release-notes/WhatsNewDialog.tsx
+msgid "release_notes.brand_line"
+msgstr "Agent 原生的设计操作系统。"
+
+#. js-lingui-explicit-id
 #: src/components/settings/KeyField.tsx
 msgid "settings.key_hint"
 msgstr "密钥仅保存在本机，永不回传或显示。"
@@ -2740,6 +2871,11 @@ msgstr "密钥仅保存在本机，永不回传或显示。"
 #: src/components/preview/PreviewCanvas.tsx
 msgid "preview.empty_hint"
 msgstr "分析素材图后，透明预览将显示在此处。"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/SpeechSection.tsx
+msgid "settings.speech.voice_hint"
+msgstr "语音回复使用的音色名称和播放速度。连接 TTS 适配器后才可用。"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/GeneralSection.tsx
@@ -2931,6 +3067,11 @@ msgid "settings.section_updates_support"
 msgstr "更新与支持"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/UpdatesSupportSection.tsx
+msgid "settings.section_updates"
+msgstr "更新与支持"
+
+#. js-lingui-explicit-id
 #: src/components/settings/sections/UpdatesSection.tsx
 msgid "settings.updates.unavailable"
 msgstr "更新功能仅在 Cutout 桌面版中可用。"
@@ -3075,6 +3216,11 @@ msgid "global_library.tab_visual_assets"
 msgstr "视觉素材"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/SpeechSection.tsx
+msgid "settings.speech.voice_title"
+msgstr "音色与语速"
+
+#. js-lingui-explicit-id
 #: src/components/settings/sections/IntegrationsSection.tsx
 msgid "settings.integrations.waiting_callback"
 msgstr "等待回调"
@@ -3108,6 +3254,11 @@ msgstr "更新说明"
 #: src/components/release-notes/WhatsNewDialog.tsx
 msgid "release_notes.whats_new"
 msgstr "更新说明"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "gallery.archived_description"
+msgstr "你搁置的工作。恢复某个项目即可让它回到工作区。"
 
 #. js-lingui-explicit-id
 #: src/components/home/ProjectHome.tsx

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Brain, Loader2, RotateCcw, Sparkles } from "lucide-react";
+import { Loader2, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 import { Trans, useLingui } from "@lingui/react/macro";
 import {
@@ -11,6 +11,7 @@ import {
   useResetPersonalization,
   useSavePersonalization,
 } from "@/hooks/queries/personalization";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -141,16 +142,13 @@ export function PersonalizationSection() {
           message: "Could not save personalization",
         }),
         {
-          description:
-            error instanceof Error ? error.message : String(error),
+          description: error instanceof Error ? error.message : String(error),
         },
       );
     }
   };
 
-  const selectPersonality = (
-    value: PersonalizationSettings["personality"],
-  ) => {
+  const selectPersonality = (value: PersonalizationSettings["personality"]) => {
     setPersonality(value);
     if (value === "custom" && !instructions.trim()) return;
     void persist(
@@ -180,7 +178,7 @@ export function PersonalizationSection() {
     return (
       <div
         role="alert"
-        className="rounded-lg border border-destructive/30 bg-destructive/5 p-4"
+        className="rounded-xl border border-destructive/30 bg-destructive/5 p-3"
       >
         <p className="text-sm font-medium text-destructive">
           <Trans id="settings.personalization.load_failed">
@@ -201,22 +199,19 @@ export function PersonalizationSection() {
   return (
     <section
       aria-labelledby="personalization-heading"
-      className="flex flex-col gap-5"
+      className="flex flex-col gap-8"
     >
       <div>
-        <div className="flex items-center gap-2">
-          <Sparkles className="size-4 text-muted-foreground" />
-          <h2 id="personalization-heading" className="text-sm font-semibold">
-            <Trans id="settings.section_personalization">Personalization</Trans>
-          </h2>
-        </div>
-        <p className="mt-1 text-sm text-muted-foreground">
+        <h2 id="personalization-heading" className="text-sm font-medium">
+          <Trans id="settings.section_personalization">Personalization</Trans>
+        </h2>
+        <p className="mt-0.5 text-xs text-muted-foreground">
           <Trans id="settings.personalization.description">
             Shape how the Agent works with you while keeping every project
             focused on the result.
           </Trans>
         </p>
-        <p className="mt-2 rounded-md border border-border bg-muted/20 px-2.5 py-2 text-xs text-muted-foreground">
+        <p className="mt-3 rounded-xl border border-border bg-muted/40 p-3 text-xs text-muted-foreground">
           <Trans id="settings.personalization.compatibility">
             Compatibility: these preferences are stored locally. External Agents
             receive only privacy-safe capability status, never your instruction
@@ -225,138 +220,169 @@ export function PersonalizationSection() {
         </p>
       </div>
 
-      <div>
-        <h3 className="text-sm font-medium">
-          <Trans id="settings.personalization.personality">Personality</Trans>
+      <section
+        className="flex flex-col gap-2"
+        aria-labelledby="personalization-style-heading"
+      >
+        <h3
+          id="personalization-style-heading"
+          className="text-xs font-medium tracking-wide text-muted-foreground uppercase"
+        >
+          <Trans id="settings.personalization.group_style">Agent style</Trans>
         </h3>
-        <div
-          role="radiogroup"
-          aria-label={t({
-            id: "settings.personalization.personality_aria",
-            message: "Agent personality",
-          })}
-          className="mt-2 grid grid-cols-2 gap-2"
-        >
-          {personalities.map((item) => (
-            <button
-              key={item.value}
-              type="button"
-              role="radio"
-              aria-checked={personality === item.value}
-              disabled={busy}
-              onClick={() => selectPersonality(item.value)}
-              className={`rounded-lg border p-2.5 text-left disabled:opacity-50 ${
-                personality === item.value
-                  ? "border-foreground bg-foreground/5"
-                  : "border-border"
-              }`}
-            >
-              <span className="block text-sm font-medium">{item.label}</span>
-              <span className="mt-0.5 block text-xs text-muted-foreground">
-                {item.description}
-              </span>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div>
-        <div className="flex items-end justify-between gap-3">
-          <Label htmlFor="custom-instructions">
-            <Trans id="settings.personalization.custom_instructions">
-              Custom instructions
-            </Trans>
-          </Label>
-          <span className="text-[11px] text-muted-foreground">
-            {instructions.length} / 4000
-          </span>
-        </div>
-        <Textarea
-          id="custom-instructions"
-          value={instructions}
-          disabled={busy}
-          maxLength={4000}
-          onChange={(event) => setInstructions(event.target.value)}
-          placeholder={t({
-            id: "settings.personalization.custom_instructions_placeholder",
-            message:
-              "Describe stable preferences, constraints, or how you want results presented.",
-          })}
-          className="mt-2 min-h-28 resize-y"
-          aria-describedby="custom-instructions-help"
-        />
-        <p
-          id="custom-instructions-help"
-          className="mt-1 text-xs text-muted-foreground"
-        >
-          <Trans id="settings.personalization.custom_instructions_help">
-            Do not include API keys or private credentials. Project-specific
-            requirements belong in the project brief.
-          </Trans>
-        </p>
-        {personality === "custom" && !instructions.trim() ? (
-          <p
-            role="alert"
-            className="mt-1 text-xs text-amber-700 dark:text-amber-300"
-          >
-            <Trans id="settings.personalization.custom_requires_instructions">
-              Custom personality requires instructions before it can be saved.
-            </Trans>
-          </p>
-        ) : null}
-        <div className="mt-2 flex justify-end">
-          <Button
-            size="sm"
-            disabled={
-              !dirty ||
-              busy ||
-              (personality === "custom" && !instructions.trim())
-            }
-            onClick={() =>
-              void persist(
-                {
-                  ...settings,
-                  personality,
-                  customInstructions: instructions,
-                },
-                t({
-                  id: "settings.personalization.instructions_saved_toast",
-                  message: "Instructions saved",
-                }),
-              )
-            }
-          >
-            {save.isPending ? <Loader2 className="animate-spin" /> : null}
-            <Trans id="settings.personalization.save_changes">
-              Save changes
-            </Trans>
-          </Button>
-        </div>
-      </div>
-
-      <div className="rounded-lg border border-border p-3">
-        <div className="flex items-center gap-2">
-          <Brain className="size-4 text-muted-foreground" />
-          <div>
-            <h3 className="text-sm font-medium">
-              <Trans id="settings.personalization.memory">Memory</Trans>
-            </h3>
-            <p className="text-xs text-muted-foreground">
-              <Trans id="settings.personalization.memory_description">
-                Allow useful preferences to carry across your local work.
+        <div className="divide-y divide-border">
+          <div className="py-4">
+            <div className="text-sm font-medium">
+              <Trans id="settings.personalization.personality">
+                Personality
+              </Trans>
+            </div>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              <Trans id="settings.personalization.personality_hint">
+                Sets the default tone of every reply. Applies immediately across
+                all projects on this device.
               </Trans>
             </p>
+            <div
+              role="radiogroup"
+              aria-label={t({
+                id: "settings.personalization.personality_aria",
+                message: "Agent personality",
+              })}
+              className="mt-3 grid gap-3 sm:grid-cols-2"
+            >
+              {personalities.map((item) => (
+                <button
+                  key={item.value}
+                  type="button"
+                  role="radio"
+                  aria-checked={personality === item.value}
+                  disabled={busy}
+                  onClick={() => selectPersonality(item.value)}
+                  className={cn(
+                    "flex min-h-16 w-full items-start gap-3 rounded-xl border p-3 text-left transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-50",
+                    personality === item.value
+                      ? "border-foreground bg-foreground/5"
+                      : "border-border hover:border-foreground/25 hover:bg-foreground/5",
+                  )}
+                >
+                  <span className="min-w-0">
+                    <span className="block text-sm font-medium">
+                      {item.label}
+                    </span>
+                    <span className="mt-0.5 block text-xs text-muted-foreground">
+                      {item.description}
+                    </span>
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="py-4">
+            <div className="flex items-start justify-between gap-4">
+              <Label
+                htmlFor="custom-instructions"
+                className="text-sm font-medium"
+              >
+                <Trans id="settings.personalization.custom_instructions">
+                  Custom instructions
+                </Trans>
+              </Label>
+              <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+                {instructions.length} / 4000
+              </span>
+            </div>
+            <p
+              id="custom-instructions-help"
+              className="mt-0.5 text-xs text-muted-foreground"
+            >
+              <Trans id="settings.personalization.custom_instructions_help">
+                Do not include API keys or private credentials. Project-specific
+                requirements belong in the project brief.
+              </Trans>
+            </p>
+            <Textarea
+              id="custom-instructions"
+              value={instructions}
+              disabled={busy}
+              maxLength={4000}
+              onChange={(event) => setInstructions(event.target.value)}
+              placeholder={t({
+                id: "settings.personalization.custom_instructions_placeholder",
+                message:
+                  "Describe stable preferences, constraints, or how you want results presented.",
+              })}
+              className="mt-3 min-h-28 resize-y"
+              aria-describedby="custom-instructions-help"
+            />
+            {personality === "custom" && !instructions.trim() ? (
+              <p
+                role="alert"
+                className="mt-2 text-xs text-amber-700 dark:text-amber-300"
+              >
+                <Trans id="settings.personalization.custom_requires_instructions">
+                  Custom personality requires instructions before it can be
+                  saved.
+                </Trans>
+              </p>
+            ) : null}
+            <div className="mt-3 flex justify-end">
+              <Button
+                size="sm"
+                disabled={
+                  !dirty ||
+                  busy ||
+                  (personality === "custom" && !instructions.trim())
+                }
+                onClick={() =>
+                  void persist(
+                    {
+                      ...settings,
+                      personality,
+                      customInstructions: instructions,
+                    },
+                    t({
+                      id: "settings.personalization.instructions_saved_toast",
+                      message: "Instructions saved",
+                    }),
+                  )
+                }
+              >
+                {save.isPending ? <Loader2 className="animate-spin" /> : null}
+                <Trans id="settings.personalization.save_changes">
+                  Save changes
+                </Trans>
+              </Button>
+            </div>
           </div>
         </div>
-        <div className="mt-3 divide-y divide-border">
-          <label className="flex items-center justify-between gap-4 py-2">
-            <span>
-              <span className="block text-sm">
+      </section>
+
+      <section
+        className="flex flex-col gap-2"
+        aria-labelledby="personalization-memory-heading"
+      >
+        <h3
+          id="personalization-memory-heading"
+          className="text-xs font-medium tracking-wide text-muted-foreground uppercase"
+        >
+          <Trans id="settings.personalization.memory">Memory</Trans>
+        </h3>
+        <p className="text-xs text-muted-foreground">
+          <Trans id="settings.personalization.memory_description">
+            Allow useful preferences to carry across your local work.
+          </Trans>
+        </p>
+        <div className="divide-y divide-border">
+          <label className="flex min-h-14 items-center justify-between gap-4 py-3">
+            <span className="min-w-0">
+              <span className="block text-sm font-medium">
                 <Trans id="settings.personalization.use_memory">
                   Use memory
                 </Trans>
               </span>
-              <span className="block text-xs text-muted-foreground">
+              <span className="mt-0.5 block text-xs text-muted-foreground">
                 <Trans id="settings.personalization.use_memory_desc">
                   Reuse approved preferences in future sessions.
                 </Trans>
@@ -391,14 +417,14 @@ export function PersonalizationSection() {
               })}
             />
           </label>
-          <label className="flex items-center justify-between gap-4 py-2">
-            <span>
-              <span className="block text-sm">
+          <label className="flex min-h-14 items-center justify-between gap-4 py-3">
+            <span className="min-w-0">
+              <span className="block text-sm font-medium">
                 <Trans id="settings.personalization.tool_assisted_memory">
                   Tool-assisted memory
                 </Trans>
               </span>
-              <span className="block text-xs text-muted-foreground">
+              <span className="mt-0.5 block text-xs text-muted-foreground">
                 <Trans id="settings.personalization.tool_assisted_memory_desc">
                   Let approved tools contribute preference signals.
                 </Trans>
@@ -428,7 +454,7 @@ export function PersonalizationSection() {
             />
           </label>
         </div>
-        <div className="mt-2 flex justify-end">
+        <div className="flex justify-end">
           <AlertDialog>
             <AlertDialogTrigger asChild>
               <Button
@@ -495,7 +521,7 @@ export function PersonalizationSection() {
             </AlertDialogContent>
           </AlertDialog>
         </div>
-      </div>
+      </section>
     </section>
   );
 }

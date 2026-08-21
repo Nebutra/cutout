@@ -121,7 +121,7 @@ msgstr "この接続のカタログに {0} 個のモデル"
 #. js-lingui-explicit-id
 #: src/components/settings/ProviderRow.tsx
 msgid "settings.catalog_model_count"
-msgstr "{0} 個のモデル"
+msgstr "{catalogSize} 個のモデル"
 
 #. js-lingui-explicit-id
 #: src/components/preview/PreviewMeta.tsx
@@ -241,6 +241,11 @@ msgid "workspace.human_loop_optional_context_placeholder"
 msgstr "制約を追加するか、別の方向性を説明してください…"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/SpeechSection.tsx
+msgid "settings.speech.dictionary_hint"
+msgstr "文字起こしで正確に表記させたい固有名詞や用語を追加します。項目を選ぶと削除できます。"
+
+#. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
 msgid "settings.add_provider"
 msgstr "プロバイダーを追加"
@@ -274,6 +279,11 @@ msgstr "詳細なモデル割り当て"
 #: src/components/settings/sections/PersonalizationSection.tsx
 msgid "settings.personalization.personality_aria"
 msgstr "Agent のパーソナリティ"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/PersonalizationSection.tsx
+msgid "settings.personalization.group_style"
+msgstr "エージェントのスタイル"
 
 #. js-lingui-explicit-id
 #: src/components/settings/SettingsSidebar.tsx
@@ -384,6 +394,11 @@ msgstr "APIシークレットを削除しました"
 #: src/components/settings/VectorizerPanel.tsx
 msgid "vectorizer.secret_saved"
 msgstr "APIシークレットを保存しました"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/GeneralSection.tsx
+msgid "settings.general.description"
+msgstr "この端末の外観と言語。"
 
 #. js-lingui-explicit-id
 #: src/components/settings/SettingsDialog.tsx
@@ -534,6 +549,11 @@ msgstr "応答を自動再生"
 #: src/components/settings/sections/SpeechSection.tsx
 msgid "settings.speech.auto_play_aria"
 msgstr "TTS 応答を自動再生"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/SpeechSection.tsx
+msgid "settings.speech.automatic_routing"
+msgstr "自動ルーティング"
 
 #. js-lingui-explicit-id
 #: src/components/home/ProjectHome.tsx
@@ -720,6 +740,11 @@ msgstr "正確な機能エビデンスがあるモデルを選択してくださ
 #: src/components/workspace/IntentWorkspace.tsx
 msgid "workspace.human_loop_instruction"
 msgstr "方向を1つ選んでください。必要に応じて下に補足を入力し、矢印を押して続行します。"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/SpeechSection.tsx
+msgid "settings.speech.trigger_hint"
+msgstr "ディクテーションをキーを押している間だけ動かすか、止めるまで継続するか、また起動ショートカットを選びます。"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
@@ -1154,6 +1179,16 @@ msgstr "ディクテーション"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/SpeechSection.tsx
+msgid "settings.speech.trigger_title"
+msgstr "ディクテーションの開始方法"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/SpeechSection.tsx
+msgid "settings.speech.dictionary_title"
+msgstr "辞書"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/SpeechSection.tsx
 msgid "settings.speech.dictionary_entry"
 msgstr "辞書エントリ"
 
@@ -1264,6 +1299,11 @@ msgid "settings.enter_model_manually"
 msgstr "Enter model ID manually"
 
 #. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "gallery.projects_description"
+msgstr "このワークスペースで作ったものすべて。ピン留めした作業は上に固定されます。"
+
+#. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
 msgid "settings.execution_confirmed"
 msgstr "実行確認済み"
@@ -1359,6 +1399,11 @@ msgid "preview.zoom_fit"
 msgstr "ペインに合わせる"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/GeneralSection.tsx
+msgid "settings.theme_hint"
+msgstr "システムの外観に従うか、Cutout を明るい／暗いに固定します。"
+
+#. js-lingui-explicit-id
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.policy_follow_updates"
 msgstr "更新に追従"
@@ -1389,6 +1434,7 @@ msgid "settings.provider_category_gateway"
 msgstr "ゲートウェイ"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/GeneralSection.tsx
 #: src/components/settings/SettingsSidebar.tsx
 msgid "settings.section_general"
 msgstr "一般"
@@ -1463,6 +1509,11 @@ msgstr "ホストが必要です"
 #: src/components/settings/sections/SpeechSection.tsx
 msgid "settings.speech.host_required"
 msgstr "ホストが必要：マイクの列挙とシステムショートカットには認可されたデスクトップホストが必要です。"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "gallery.drafts_description"
+msgstr "まだ成果になっていないアイデア。続きから取りかかれます。"
 
 #. js-lingui-explicit-id
 #: src/components/settings/ProviderDirectory.tsx
@@ -1540,6 +1591,11 @@ msgid "settings.install_codex_action"
 msgstr "署名済みの Codex CLI をインストールして、再試行してください。"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/UpdatesSection.tsx
+msgid "settings.updates.installed_build"
+msgstr "インストール済みビルド"
+
+#. js-lingui-explicit-id
 #: src/components/settings/sections/PersonalizationSection.tsx
 msgid "settings.personalization.instructions_saved_toast"
 msgstr "指示を保存しました"
@@ -1556,9 +1612,19 @@ msgid "global_library.empty_fallback_label"
 msgstr "項目"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/UpdatesSupportSection.tsx
+msgid "settings.updates.description"
+msgstr "Cutout を最新に保ち、問題が起きたときにローカルの作業を復旧します。"
+
+#. js-lingui-explicit-id
 #: src/components/settings/sections/SpeechSection.tsx
 msgid "settings.speech.keep_dictation_visible"
 msgstr "ディクテーションを表示したままにする"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/SpeechSection.tsx
+msgid "settings.speech.keep_dictation_visible_hint"
+msgstr "ディクテーション停止後もライブ文字起こしパネルを表示したままにします。"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
@@ -1574,6 +1640,11 @@ msgstr "キット監査"
 #: src/components/settings/sections/GeneralSection.tsx
 msgid "topbar.language_label"
 msgstr "言語"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/SpeechSection.tsx
+msgid "settings.speech.microphone_device_id_hint"
+msgstr "空欄ならシステム既定の入力を使用します。デバイス ID を貼ると特定のマイクに固定します。"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/PersonalizationSection.tsx
@@ -1671,6 +1742,11 @@ msgid "global_library.reference_locked"
 msgstr "ロック中"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/UpdatesSection.tsx
+msgid "settings.updates.check_automatically_hint"
+msgstr "Cutout の起動中にバックグラウンドで新しいリリースを探します。"
+
+#. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
 msgid "settings.manage"
 msgstr "管理"
@@ -1679,6 +1755,11 @@ msgstr "管理"
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.kit_editor_description"
 msgstr "承認済みのコンテンツアドレス指定キット投影を管理します。"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/SpeechSection.tsx
+msgid "settings.speech.manual_routing"
+msgstr "音声ルーティングを手動指定"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/PersonalizationSection.tsx
@@ -1864,6 +1945,11 @@ msgid "home.nothing_archived"
 msgstr "アーカイブはありません"
 
 #. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.continue_empty_title"
+msgstr "進行中のものはまだありません"
+
+#. js-lingui-explicit-id
 #. placeholder {0}: query.trim()
 #: src/components/home/ProjectHome.tsx
 msgid "home.no_search_matches_description"
@@ -1983,6 +2069,11 @@ msgid "home.pin_named"
 msgstr "{0} をピン留め"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/SpeechSection.tsx
+msgid "settings.speech.manual_routing_hint"
+msgstr "文字起こしと音声出力に使うプロバイダーとモデルを固定し、Cutout の自動選択に任せません。"
+
+#. js-lingui-explicit-id
 #: src/components/home/ProjectHome.tsx
 msgid "home.pin_project"
 msgstr "プロジェクトをピン留め"
@@ -2097,6 +2188,16 @@ msgstr "プロジェクトはこの端末に保存されます"
 #: src/components/home/ProjectHome.tsx
 msgid "home.drafts_empty_description"
 msgstr "まだ成果物のないプロジェクトはここに集まります。"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/ArchivedSection.tsx
+msgid "settings.archived_empty_hint"
+msgstr "プロジェクトメニューからアーカイブしたものがここに入ります。復元も完全削除もできます。"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.continue_empty_description"
+msgstr "上のブリーフから始めたプロジェクトがここに集まり、いつでも再開できます。"
 
 #. js-lingui-explicit-id
 #: src/components/library/LibraryDrawer.tsx
@@ -2234,6 +2335,11 @@ msgstr "レジストリデスクトップホストにはCutoutデスクトップ
 #: src/components/library/RegistryInstallPanel.tsx
 msgid "registry_install.section_aria"
 msgstr "レジストリのインストール"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/UpdatesSection.tsx
+msgid "settings.updates.channel_title"
+msgstr "リリースチャンネル"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/UpdatesSection.tsx
@@ -2509,6 +2615,11 @@ msgid "settings.integrations.expired"
 msgstr "セッションの期限が切れました。更新するか再接続してください。"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/PersonalizationSection.tsx
+msgid "settings.personalization.personality_hint"
+msgstr "すべての返信の既定のトーンを決めます。この端末のすべてのプロジェクトに即時反映されます。"
+
+#. js-lingui-explicit-id
 #: src/components/home/SidebarAccount.tsx
 #: src/components/settings/SettingsDialog.tsx
 msgid "settings.menu_label"
@@ -2573,6 +2684,11 @@ msgid "kit_library.source_heading"
 msgstr "ソース"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/SpeechSection.tsx
+msgid "settings.speech.auto_play_responses_hint"
+msgstr "エージェントの返信が届いた時点で、再生を押さずに読み上げます。"
+
+#. js-lingui-explicit-id
 #: src/components/settings/ProviderDirectory.tsx
 msgid "settings.provider_category_speech"
 msgstr "音声"
@@ -2618,6 +2734,11 @@ msgstr "音声出力"
 #: src/updater/update-notifications.ts
 msgid "settings.updates.stable"
 msgstr "安定版"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/UpdatesSection.tsx
+msgid "settings.updates.channel_hint"
+msgstr "Stable はレビュー済みのリリースを配信します。Beta は候補版を早く受け取りますが、安定性は劣ります。"
 
 #. js-lingui-explicit-id
 #: src/components/home/ProjectHome.tsx
@@ -2670,6 +2791,11 @@ msgstr "SVG · ローカル"
 #: src/components/settings/VectorizerPanel.tsx
 msgid "vectorizer.heading"
 msgstr "SVGエクスポート"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/GeneralSection.tsx
+msgid "settings.language_hint"
+msgstr "表示言語をすぐに切り替え、この端末に記憶します。"
 
 #. js-lingui-explicit-id
 #: src/components/home/SidebarAccount.tsx
@@ -2732,6 +2858,11 @@ msgid "image.error_decode_failed"
 msgstr "このファイルは画像としてデコードできませんでした。"
 
 #. js-lingui-explicit-id
+#: src/components/release-notes/WhatsNewDialog.tsx
+msgid "release_notes.brand_line"
+msgstr "エージェントネイティブなデザイン OS。"
+
+#. js-lingui-explicit-id
 #: src/components/settings/KeyField.tsx
 msgid "settings.key_hint"
 msgstr "キーはこのデバイスにローカル保存され、返送も表示もされません。"
@@ -2740,6 +2871,11 @@ msgstr "キーはこのデバイスにローカル保存され、返送も表示
 #: src/components/preview/PreviewCanvas.tsx
 msgid "preview.empty_hint"
 msgstr "シートが解析されると、ここに透過プレビューが表示されます。"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/SpeechSection.tsx
+msgid "settings.speech.voice_hint"
+msgstr "音声返信に使うボイス名と再生速度。TTS アダプターを接続すると有効になります。"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/GeneralSection.tsx
@@ -2931,6 +3067,11 @@ msgid "settings.section_updates_support"
 msgstr "アップデートとサポート"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/UpdatesSupportSection.tsx
+msgid "settings.section_updates"
+msgstr "アップデートとサポート"
+
+#. js-lingui-explicit-id
 #: src/components/settings/sections/UpdatesSection.tsx
 msgid "settings.updates.unavailable"
 msgstr "更新は利用できません。"
@@ -3075,6 +3216,11 @@ msgid "global_library.tab_visual_assets"
 msgstr "ビジュアルアセット"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/SpeechSection.tsx
+msgid "settings.speech.voice_title"
+msgstr "ボイスと速度"
+
+#. js-lingui-explicit-id
 #: src/components/settings/sections/IntegrationsSection.tsx
 msgid "settings.integrations.waiting_callback"
 msgstr "コールバック待機中"
@@ -3108,6 +3254,11 @@ msgstr "新機能"
 #: src/components/release-notes/WhatsNewDialog.tsx
 msgid "release_notes.whats_new"
 msgstr "新機能"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "gallery.archived_description"
+msgstr "脇に置いた作業です。プロジェクトを復元するとワークスペースに戻ります。"
 
 #. js-lingui-explicit-id
 #: src/components/home/ProjectHome.tsx

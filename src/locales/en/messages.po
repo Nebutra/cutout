@@ -241,6 +241,11 @@ msgid "workspace.human_loop_optional_context_placeholder"
 msgstr "Add a constraint or describe another direction…"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/SpeechSection.tsx
+msgid "settings.speech.dictionary_hint"
+msgstr "Add names and terms that transcription should spell exactly. Select an entry to remove it."
+
+#. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
 msgid "settings.add_provider"
 msgstr "Add provider"
@@ -274,6 +279,11 @@ msgstr "Advanced model bindings"
 #: src/components/settings/sections/PersonalizationSection.tsx
 msgid "settings.personalization.personality_aria"
 msgstr "Agent personality"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/PersonalizationSection.tsx
+msgid "settings.personalization.group_style"
+msgstr "Agent style"
 
 #. js-lingui-explicit-id
 #: src/components/settings/SettingsSidebar.tsx
@@ -384,6 +394,11 @@ msgstr "API Secret removed"
 #: src/components/settings/VectorizerPanel.tsx
 msgid "vectorizer.secret_saved"
 msgstr "API Secret saved"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/GeneralSection.tsx
+msgid "settings.general.description"
+msgstr "Appearance and language for this device."
 
 #. js-lingui-explicit-id
 #: src/components/settings/SettingsDialog.tsx
@@ -534,6 +549,11 @@ msgstr "Auto-play responses"
 #: src/components/settings/sections/SpeechSection.tsx
 msgid "settings.speech.auto_play_aria"
 msgstr "Auto-play TTS responses"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/SpeechSection.tsx
+msgid "settings.speech.automatic_routing"
+msgstr "Automatic routing"
 
 #. js-lingui-explicit-id
 #: src/components/home/ProjectHome.tsx
@@ -720,6 +740,11 @@ msgstr "Choose a model with exact capability evidence."
 #: src/components/workspace/IntentWorkspace.tsx
 msgid "workspace.human_loop_instruction"
 msgstr "Choose one direction. Add optional context below, then press the arrow."
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/SpeechSection.tsx
+msgid "settings.speech.trigger_hint"
+msgstr "Choose whether dictation runs while the key is held or stays on until you stop it, and which shortcut starts it."
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
@@ -1154,6 +1179,16 @@ msgstr "Dictation"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/SpeechSection.tsx
+msgid "settings.speech.trigger_title"
+msgstr "Dictation trigger"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/SpeechSection.tsx
+msgid "settings.speech.dictionary_title"
+msgstr "Dictionary"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/SpeechSection.tsx
 msgid "settings.speech.dictionary_entry"
 msgstr "Dictionary entry"
 
@@ -1264,6 +1299,11 @@ msgid "settings.enter_model_manually"
 msgstr "Enter model ID manually"
 
 #. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "gallery.projects_description"
+msgstr "Everything you have made in this workspace. Pinned work stays at the top."
+
+#. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
 msgid "settings.execution_confirmed"
 msgstr "Execution confirmed"
@@ -1359,6 +1399,11 @@ msgid "preview.zoom_fit"
 msgstr "Fit to pane"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/GeneralSection.tsx
+msgid "settings.theme_hint"
+msgstr "Follow the system appearance or pin Cutout to light or dark."
+
+#. js-lingui-explicit-id
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.policy_follow_updates"
 msgstr "Follow updates"
@@ -1389,6 +1434,7 @@ msgid "settings.provider_category_gateway"
 msgstr "Gateways"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/GeneralSection.tsx
 #: src/components/settings/SettingsSidebar.tsx
 msgid "settings.section_general"
 msgstr "General"
@@ -1463,6 +1509,11 @@ msgstr "Host required"
 #: src/components/settings/sections/SpeechSection.tsx
 msgid "settings.speech.host_required"
 msgstr "Host required: microphone enumeration and system-level shortcuts need an authorized desktop host."
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "gallery.drafts_description"
+msgstr "Ideas that have not produced results yet. Pick one up where you left off."
 
 #. js-lingui-explicit-id
 #: src/components/settings/ProviderDirectory.tsx
@@ -1540,6 +1591,11 @@ msgid "settings.install_codex_action"
 msgstr "Install the signed Codex CLI, then retry."
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/UpdatesSection.tsx
+msgid "settings.updates.installed_build"
+msgstr "Installed build"
+
+#. js-lingui-explicit-id
 #: src/components/settings/sections/PersonalizationSection.tsx
 msgid "settings.personalization.instructions_saved_toast"
 msgstr "Instructions saved"
@@ -1556,9 +1612,19 @@ msgid "global_library.empty_fallback_label"
 msgstr "items"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/UpdatesSupportSection.tsx
+msgid "settings.updates.description"
+msgstr "Keep Cutout current and recover local work when something goes wrong."
+
+#. js-lingui-explicit-id
 #: src/components/settings/sections/SpeechSection.tsx
 msgid "settings.speech.keep_dictation_visible"
 msgstr "Keep dictation visible"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/SpeechSection.tsx
+msgid "settings.speech.keep_dictation_visible_hint"
+msgstr "Keep the live transcript panel on screen after dictation stops."
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
@@ -1574,6 +1640,11 @@ msgstr "Kit audit"
 #: src/components/settings/sections/GeneralSection.tsx
 msgid "topbar.language_label"
 msgstr "Language"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/SpeechSection.tsx
+msgid "settings.speech.microphone_device_id_hint"
+msgstr "Leave empty to use the system default input. Paste a device ID to pin one microphone."
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/PersonalizationSection.tsx
@@ -1671,6 +1742,11 @@ msgid "global_library.reference_locked"
 msgstr "Locked"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/UpdatesSection.tsx
+msgid "settings.updates.check_automatically_hint"
+msgstr "Look for a newer release in the background while Cutout is open."
+
+#. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
 msgid "settings.manage"
 msgstr "Manage"
@@ -1679,6 +1755,11 @@ msgstr "Manage"
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.kit_editor_description"
 msgstr "Manage the approved, content-addressed kit projection."
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/SpeechSection.tsx
+msgid "settings.speech.manual_routing"
+msgstr "Manual speech routing"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/PersonalizationSection.tsx
@@ -1864,6 +1945,11 @@ msgid "home.nothing_archived"
 msgstr "Nothing archived"
 
 #. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.continue_empty_title"
+msgstr "Nothing in progress yet"
+
+#. js-lingui-explicit-id
 #. placeholder {0}: query.trim()
 #: src/components/home/ProjectHome.tsx
 msgid "home.no_search_matches_description"
@@ -1983,6 +2069,11 @@ msgid "home.pin_named"
 msgstr "Pin {0}"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/SpeechSection.tsx
+msgid "settings.speech.manual_routing_hint"
+msgstr "Pin a specific provider and model for transcription and spoken output instead of letting Cutout choose."
+
+#. js-lingui-explicit-id
 #: src/components/home/ProjectHome.tsx
 msgid "home.pin_project"
 msgstr "Pin project"
@@ -2097,6 +2188,16 @@ msgstr "Projects stay on this device"
 #: src/components/home/ProjectHome.tsx
 msgid "home.drafts_empty_description"
 msgstr "Projects that have not produced results yet will collect here."
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/ArchivedSection.tsx
+msgid "settings.archived_empty_hint"
+msgstr "Projects you archive from the project menu land here, ready to be restored or removed for good."
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "home.continue_empty_description"
+msgstr "Projects you start from the brief above collect here, ready to pick back up."
 
 #. js-lingui-explicit-id
 #: src/components/library/LibraryDrawer.tsx
@@ -2234,6 +2335,11 @@ msgstr "Registry desktop host requires the Cutout desktop app."
 #: src/components/library/RegistryInstallPanel.tsx
 msgid "registry_install.section_aria"
 msgstr "Registry install"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/UpdatesSection.tsx
+msgid "settings.updates.channel_title"
+msgstr "Release channel"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/UpdatesSection.tsx
@@ -2509,6 +2615,11 @@ msgid "settings.integrations.expired"
 msgstr "Session expired. Refresh or reconnect."
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/PersonalizationSection.tsx
+msgid "settings.personalization.personality_hint"
+msgstr "Sets the default tone of every reply. Applies immediately across all projects on this device."
+
+#. js-lingui-explicit-id
 #: src/components/home/SidebarAccount.tsx
 #: src/components/settings/SettingsDialog.tsx
 msgid "settings.menu_label"
@@ -2573,6 +2684,11 @@ msgid "kit_library.source_heading"
 msgstr "Source"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/SpeechSection.tsx
+msgid "settings.speech.auto_play_responses_hint"
+msgstr "Speak each Agent reply as soon as it arrives, without pressing play."
+
+#. js-lingui-explicit-id
 #: src/components/settings/ProviderDirectory.tsx
 msgid "settings.provider_category_speech"
 msgstr "Speech"
@@ -2618,6 +2734,11 @@ msgstr "Spoken output"
 #: src/updater/update-notifications.ts
 msgid "settings.updates.stable"
 msgstr "Stable"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/UpdatesSection.tsx
+msgid "settings.updates.channel_hint"
+msgstr "Stable ships reviewed releases. Beta receives candidates earlier and may be less predictable."
 
 #. js-lingui-explicit-id
 #: src/components/home/ProjectHome.tsx
@@ -2670,6 +2791,11 @@ msgstr "SVG · Local"
 #: src/components/settings/VectorizerPanel.tsx
 msgid "vectorizer.heading"
 msgstr "SVG export"
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/GeneralSection.tsx
+msgid "settings.language_hint"
+msgstr "Switches the interface language immediately and remembers it on this device."
 
 #. js-lingui-explicit-id
 #: src/components/home/SidebarAccount.tsx
@@ -2732,6 +2858,11 @@ msgid "image.error_decode_failed"
 msgstr "That file could not be decoded as an image."
 
 #. js-lingui-explicit-id
+#: src/components/release-notes/WhatsNewDialog.tsx
+msgid "release_notes.brand_line"
+msgstr "The agent-native Design OS."
+
+#. js-lingui-explicit-id
 #: src/components/settings/KeyField.tsx
 msgid "settings.key_hint"
 msgstr "The key is stored locally on this device, never sent back or displayed."
@@ -2740,6 +2871,11 @@ msgstr "The key is stored locally on this device, never sent back or displayed."
 #: src/components/preview/PreviewCanvas.tsx
 msgid "preview.empty_hint"
 msgstr "The transparent preview appears here once a sheet is analyzed."
+
+#. js-lingui-explicit-id
+#: src/components/settings/sections/SpeechSection.tsx
+msgid "settings.speech.voice_hint"
+msgstr "The voice name and playback speed used for spoken replies. Both unlock once a TTS adapter is connected."
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/GeneralSection.tsx
@@ -2931,6 +3067,11 @@ msgid "settings.section_updates_support"
 msgstr "Updates & Support"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/UpdatesSupportSection.tsx
+msgid "settings.section_updates"
+msgstr "Updates and support"
+
+#. js-lingui-explicit-id
 #: src/components/settings/sections/UpdatesSection.tsx
 msgid "settings.updates.unavailable"
 msgstr "Updates are available only in the Cutout desktop app."
@@ -3075,6 +3216,11 @@ msgid "global_library.tab_visual_assets"
 msgstr "Visual Assets"
 
 #. js-lingui-explicit-id
+#: src/components/settings/sections/SpeechSection.tsx
+msgid "settings.speech.voice_title"
+msgstr "Voice and rate"
+
+#. js-lingui-explicit-id
 #: src/components/settings/sections/IntegrationsSection.tsx
 msgid "settings.integrations.waiting_callback"
 msgstr "Waiting for callback"
@@ -3108,6 +3254,11 @@ msgstr "What's New"
 #: src/components/release-notes/WhatsNewDialog.tsx
 msgid "release_notes.whats_new"
 msgstr "What's New"
+
+#. js-lingui-explicit-id
+#: src/components/home/ProjectHome.tsx
+msgid "gallery.archived_description"
+msgstr "Work you have set aside. Restore a project to bring it back into the workspace."
 
 #. js-lingui-explicit-id
 #: src/components/home/ProjectHome.tsx
