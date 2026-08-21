@@ -121,7 +121,7 @@ msgstr "该连接的模型清单中有 {0} 个模型"
 #. js-lingui-explicit-id
 #: src/components/settings/ProviderRow.tsx
 msgid "settings.catalog_model_count"
-msgstr "{0} 个模型"
+msgstr "{catalogSize} 个模型"
 
 #. js-lingui-explicit-id
 #: src/components/preview/PreviewMeta.tsx

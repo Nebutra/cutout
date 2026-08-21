@@ -121,7 +121,7 @@ msgstr "この接続のカタログに {0} 個のモデル"
 #. js-lingui-explicit-id
 #: src/components/settings/ProviderRow.tsx
 msgid "settings.catalog_model_count"
-msgstr "{0} 個のモデル"
+msgstr "{catalogSize} 個のモデル"
 
 #. js-lingui-explicit-id
 #: src/components/preview/PreviewMeta.tsx

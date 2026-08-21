@@ -121,7 +121,7 @@ msgstr "{0} modèles dans le catalogue de cette connexion"
 #. js-lingui-explicit-id
 #: src/components/settings/ProviderRow.tsx
 msgid "settings.catalog_model_count"
-msgstr "{0} modèles"
+msgstr "{catalogSize} modèles"
 
 #. js-lingui-explicit-id
 #: src/components/preview/PreviewMeta.tsx
