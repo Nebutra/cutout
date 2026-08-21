@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.1.26 - 2026-08-21
+
+- Move Settings, the release-notes dialog, project home and the project
+  directory onto one visual contract: shared spacing rhythm, radius scale, type
+  scale and button hierarchy, replacing four competing row containers, two
+  untokenised nav rails and two loading treatments for the same card grid.
+- Show the provider beside the model on every task row, and state which task an
+  unassigned route inherits from instead of a bare "Auto".
+- Fix the project-directory header above ~1100px, where the description
+  rendered beside the title instead of below it, ran under the brandmark and
+  squeezed the primary action between them.
+- Restore the model count beside each provider. All four translations bound the
+  placeholder as `{0}` while the source message names it `{catalogSize}`, so the
+  number rendered empty. A catalog parity test now fails on that class of
+  mismatch, which nothing in lint, typecheck or the test suites could see.
+- Stop previewing non-raster attachments through an object URL, and remove a
+  duplicate nested "Updates" landmark introduced with the new section headers.
+
 ## 0.1.25 - 2026-08-20
 
 - Split provider configuration into three layers that cannot be collapsed: the

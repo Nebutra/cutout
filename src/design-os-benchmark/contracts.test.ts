@@ -119,7 +119,7 @@ describe('Design OS evidence benchmark', () => {
       challengeId: 'challenge:caller',
       challengeHash: 'd'.repeat(64),
       evaluatorKeyId: 'evaluator:caller',
-      hostBuildVersion: '0.1.25',
+      hostBuildVersion: '0.1.26',
       commitmentId: 'commitment:caller',
       commitmentHash: 'a'.repeat(64),
       attestationId: 'attestation:caller',
