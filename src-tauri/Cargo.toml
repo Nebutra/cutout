@@ -1,6 +1,6 @@
 [package]
 name = "app"
-version = "0.1.25"
+version = "0.1.26"
 default-run = "app"
 description = "Local-first AI design production workspace"
 authors = ["Nebutra Team"]

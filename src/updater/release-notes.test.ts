@@ -34,7 +34,7 @@ const migrationBundled: LocalizedReleaseNotes = {
 
 describe("release notes model", () => {
   it("bundles exact-version notes and applies whole-locale English fallback", () => {
-    expect(bundled.version).toBe("0.1.25");
+    expect(bundled.version).toBe("0.1.26");
     expect(selectLocalizedReleaseNotes(bundled, "zh-CN")?.headline).not.toBe(
       bundled.locales.en.headline,
     );
@@ -46,7 +46,7 @@ describe("release notes model", () => {
 
   it("prefers typed localized updater notes and safely falls back to plain text", () => {
     expect(resolveUpdateReleaseNotes({
-      version: "0.1.25",
+      version: "0.1.26",
       localizedNotes: bundled,
       notes: "English fallback",
     }, "ja")?.headline).toBe(bundled.locales.ja.headline);

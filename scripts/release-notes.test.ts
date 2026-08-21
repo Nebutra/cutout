@@ -36,10 +36,16 @@ function catalog(entries: unknown[] = [entry()]) {
 }
 
 describe('release-note catalog', () => {
-  it('loads the reviewed v0.1.25 entry with all five shipped locales and no historical backfill', async () => {
+  it('loads the reviewed v0.1.26 entry with all five shipped locales and no historical backfill', async () => {
     const loaded = await loadReleaseNotesCatalog(undefined, { requireAllLocales: true })
-    expect(loaded.entries.map((value) => value.version)).toEqual(['0.1.25', '0.1.24', '0.1.20', '0.1.19'])
-    expect(Object.keys(requireReleaseNotesEntry(loaded, '0.1.25').locales)).toEqual(RELEASE_NOTES_LOCALES)
+    // Derived, not pinned: the head is whatever package.json ships and the tail is
+    // the retained history. A literal list means every release edits this test.
+    const shipping = JSON.parse(await readFile('package.json', 'utf8')).version as string
+    expect(loaded.entries[0]?.version).toBe(shipping)
+    expect(loaded.entries.map((value) => value.version)).toEqual(
+      [...new Set([shipping, ...loaded.entries.map((value) => value.version)])],
+    )
+    expect(Object.keys(requireReleaseNotesEntry(loaded, '0.1.26').locales)).toEqual(RELEASE_NOTES_LOCALES)
     expect(findReleaseNotesEntry(loaded, '0.1.16')).toBeUndefined()
   })
 
@@ -106,8 +112,10 @@ describe('release-note catalog', () => {
   })
 
   it('renders all release inputs through the CLI from one exact entry', async () => {
+    const version = JSON.parse(await readFile('package.json', 'utf8')).version as string
+    const catalog = await loadReleaseNotesCatalog(undefined, { requireAllLocales: true })
     const output = await mkdtemp(join(tmpdir(), 'cutout-release-notes-'))
-    const result = spawnSync(process.execPath, ['scripts/release-notes.mjs', 'render', '--version', '0.1.25', '--output', output, '--require-all-locales'], { cwd: process.cwd(), encoding: 'utf8' })
+    const result = spawnSync(process.execPath, ['scripts/release-notes.mjs', 'render', '--version', version, '--output', output, '--require-all-locales'], { cwd: process.cwd(), encoding: 'utf8' })
     expect(result.status, result.stderr).toBe(0)
     const [plainText, updater, bundled, github] = await Promise.all([
       readFile(join(output, 'updater-notes.txt'), 'utf8'),
@@ -116,9 +124,17 @@ describe('release-note catalog', () => {
       readFile(join(output, 'github-release.md'), 'utf8'),
     ])
     expect(JSON.parse(updater)).toEqual(JSON.parse(bundled))
-    expect(plainText).toContain('A provider no longer carries a model')
-    expect(plainText).toContain('Every task slot now takes effect')
-    expect(plainText).toContain('No call reaches a model you never configured')
-    expect(github).toContain('Cutout v0\\.1\\.25')
+    // Assert the render carries the catalog's own copy rather than a snapshot of
+    // it, so new release notes do not require editing this test.
+    const shipped = requireReleaseNotesEntry(catalog, version, { requireAllLocales: true })
+    for (const highlight of shipped.locales.en.highlights) {
+      expect(plainText).toContain(highlight.title)
+    }
+    expect(plainText).toContain(shipped.locales.en.headline)
+    // The renderer markdown-escapes dots, so the heading reads `Cutout v0\.1\.26`.
+    // Built with split/join rather than a `.replace` regex: escaping only `.` and
+    // not `\` is incomplete sanitization, and this assertion never needed a
+    // sanitizer — it needs the literal shape the renderer emits.
+    expect(github).toContain(`Cutout v${version.split('.').join('\\.')}`)
   })
 })

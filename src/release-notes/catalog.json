@@ -2,6 +2,112 @@
   "protocol": "cutout.release-notes.catalog.v1",
   "entries": [
     {
+      "version": "0.1.26",
+      "releasedOn": "2026-08-21",
+      "locales": {
+        "en": {
+          "headline": "Settings, home and the project directory on one visual system",
+          "highlights": [
+            {
+              "id": "one-visual-system",
+              "title": "Four surfaces, one set of rules",
+              "body": "Settings, the release-notes dialog, home and the project directory had each drifted into their own dialect — four competing row containers in Settings alone, two nav rails sharing no tokens, and two different loading treatments for the same card grid. They now share one spacing rhythm, radius scale, type scale and button hierarchy."
+            },
+            {
+              "id": "task-rows-name-their-provider",
+              "title": "Every task row names its provider",
+              "body": "A task row now reads as provider and model rather than a bare model id, and a task you have not assigned says which task it inherits from instead of showing a bare Auto. Expanding it states the route a call would actually take."
+            },
+            {
+              "id": "gallery-header-fix",
+              "title": "The project directory header no longer breaks on wide windows",
+              "body": "Above roughly 1100 pixels the description rendered beside the title instead of below it, running under the brandmark and squeezing the primary action between them. The model count beside each provider also renders again after a translation bound the wrong placeholder name."
+            }
+          ]
+        },
+        "zh-CN": {
+          "headline": "设置、首页与项目目录统一到一套视觉系统",
+          "highlights": [
+            {
+              "id": "one-visual-system",
+              "title": "四个界面，一套规则",
+              "body": "设置、发布说明弹窗、首页和项目目录各自长出了自己的方言 —— 仅设置里就有四种互相竞争的行容器，两条导航栏不共享任何样式变量，同一种卡片网格有两套加载态。现在它们共用一套间距节奏、圆角、字阶和按钮层级。"
+            },
+            {
+              "id": "task-rows-name-their-provider",
+              "title": "每个任务行都写明提供商",
+              "body": "任务行现在显示「提供商 · 模型」，而不再是一个孤零零的模型 ID；未指派的任务会说明它继承自哪个任务，而不是只显示「自动」。展开后会写明调用实际会走哪条路由。"
+            },
+            {
+              "id": "gallery-header-fix",
+              "title": "项目目录页头在宽窗口下不再错位",
+              "body": "约 1100 像素以上时，描述文字会排到标题右边而不是下方，压在品牌标记上并把主按钮夹在中间。此外，提供商旁边的模型数量也恢复显示 —— 此前一处翻译绑错了占位符名称。"
+            }
+          ]
+        },
+        "ja": {
+          "headline": "設定・ホーム・プロジェクト一覧をひとつのビジュアルシステムに",
+          "highlights": [
+            {
+              "id": "one-visual-system",
+              "title": "4 つの画面に 1 つのルール",
+              "body": "設定、リリースノート、ホーム、プロジェクト一覧はそれぞれ独自の方言に分かれていました。設定だけで 4 種類の行コンテナが競合し、2 つのナビゲーションはトークンを共有せず、同じカードグリッドに 2 通りのローディング表現がありました。今はひとつの余白リズム・角丸・文字スケール・ボタン階層を共有します。"
+            },
+            {
+              "id": "task-rows-name-their-provider",
+              "title": "各タスク行がプロバイダー名を表示",
+              "body": "タスク行は「プロバイダー · モデル」と表示され、モデル ID だけが並ぶことはなくなりました。未割り当てのタスクは、単なる「自動」ではなく、どのタスクを継承するかを示します。展開すると実際に使われる経路がわかります。"
+            },
+            {
+              "id": "gallery-header-fix",
+              "title": "広い画面でプロジェクト一覧の見出しが崩れません",
+              "body": "およそ 1100 ピクセルを超えると、説明文が見出しの下ではなく右側に回り込み、ブランドマークに重なって主要ボタンを挟み込んでいました。あわせて、プロバイダー横のモデル数も再び表示されます（翻訳が誤ったプレースホルダー名を参照していました）。"
+            }
+          ]
+        },
+        "fr": {
+          "headline": "Réglages, accueil et répertoire de projets sur un seul système visuel",
+          "highlights": [
+            {
+              "id": "one-visual-system",
+              "title": "Quatre surfaces, un seul jeu de règles",
+              "body": "Les réglages, la fenêtre de notes de version, l’accueil et le répertoire de projets avaient chacun dérivé vers leur propre dialecte : quatre conteneurs de ligne concurrents dans les seuls réglages, deux rails de navigation sans jetons communs, deux traitements de chargement pour la même grille. Ils partagent désormais un rythme d’espacement, une échelle de rayons, une échelle typographique et une hiérarchie de boutons."
+            },
+            {
+              "id": "task-rows-name-their-provider",
+              "title": "Chaque tâche nomme son fournisseur",
+              "body": "Une ligne de tâche affiche le fournisseur et le modèle plutôt qu’un identifiant seul, et une tâche non affectée indique de quelle tâche elle hérite au lieu d’un simple « Auto ». Son détail précise la route qu’un appel emprunterait réellement."
+            },
+            {
+              "id": "gallery-header-fix",
+              "title": "L’en-tête du répertoire ne casse plus sur les fenêtres larges",
+              "body": "Au-delà d’environ 1100 pixels, la description se plaçait à côté du titre au lieu d’en dessous, passant sous la marque et coinçant l’action principale. Le nombre de modèles affiché près de chaque fournisseur revient également : une traduction pointait vers un mauvais nom de variable."
+            }
+          ]
+        },
+        "es": {
+          "headline": "Ajustes, inicio y directorio de proyectos en un solo sistema visual",
+          "highlights": [
+            {
+              "id": "one-visual-system",
+              "title": "Cuatro superficies, un conjunto de reglas",
+              "body": "Los ajustes, el diálogo de notas de versión, el inicio y el directorio de proyectos habían derivado cada uno hacia su propio dialecto: cuatro contenedores de fila en competencia solo en ajustes, dos barras de navegación sin tokens comunes y dos tratamientos de carga para la misma cuadrícula. Ahora comparten un ritmo de espaciado, escala de radios, escala tipográfica y jerarquía de botones."
+            },
+            {
+              "id": "task-rows-name-their-provider",
+              "title": "Cada fila de tarea nombra su proveedor",
+              "body": "Una fila de tarea muestra proveedor y modelo en lugar de un identificador suelto, y una tarea sin asignar indica de cuál hereda en vez de un simple «Auto». Al desplegarla se ve la ruta que tomaría realmente una llamada."
+            },
+            {
+              "id": "gallery-header-fix",
+              "title": "La cabecera del directorio ya no se rompe en ventanas anchas",
+              "body": "Por encima de unos 1100 píxeles la descripción se colocaba junto al título en lugar de debajo, pasando bajo la marca y estrujando la acción principal. También vuelve a mostrarse el número de modelos junto a cada proveedor: una traducción apuntaba a un nombre de marcador incorrecto."
+            }
+          ]
+        }
+      }
+    },
+    {
       "version": "0.1.25",
       "releasedOn": "2026-08-20",
       "locales": {
