@@ -184,11 +184,6 @@ msgid "export.toast_success"
 msgstr "{savedCount, plural, other {# 枚のスライスをエクスポートしました}}"
 
 #. js-lingui-explicit-id
-#: src/components/onboarding/AreasOfWorkDialog.tsx
-msgid "onboarding.areas_counter"
-msgstr "{maxCount} 件中 {selectedCount} 件を選択"
-
-#. js-lingui-explicit-id
 #. placeholder {0}: probedModels.length - CATALOG_PREVIEW_LIMIT
 #: src/components/settings/ProviderForm.tsx
 msgid "settings.catalog_more"
@@ -462,11 +457,6 @@ msgid "home.archived_empty_description"
 msgstr "アーカイブした作業はここに表示されます。"
 
 #. js-lingui-explicit-id
-#: src/components/onboarding/AreasOfWorkDialog.tsx
-msgid "onboarding.areas_group_label"
-msgstr "作業領域"
-
-#. js-lingui-explicit-id
 #: src/components/home/ProjectHome.tsx
 msgid "home.asset_singular"
 msgstr "アセット"
@@ -593,7 +583,6 @@ msgstr "ブランドブックの確認"
 
 #. js-lingui-explicit-id
 #: src/components/home/ProjectHome.tsx
-#: src/components/onboarding/AreasOfWorkDialog.tsx
 msgid "home.preset_brand"
 msgstr "ブランドキット"
 
@@ -937,11 +926,6 @@ msgid "global_library.meta_content_hash"
 msgstr "コンテンツハッシュ"
 
 #. js-lingui-explicit-id
-#: src/components/onboarding/AreasOfWorkDialog.tsx
-msgid "onboarding.areas_continue"
-msgstr "続ける"
-
-#. js-lingui-explicit-id
 #: src/components/workspace/IntentWorkspace.tsx
 msgid "workspace.human_loop_use_judgment_hint"
 msgstr "Agent の推奨する方向で続行します。"
@@ -1091,11 +1075,6 @@ msgid "settings.updates.up_to_date"
 msgstr "Cutout は {0} チャネルで最新です。"
 
 #. js-lingui-explicit-id
-#: src/components/onboarding/AreasOfWorkDialog.tsx
-msgid "onboarding.areas_brand_line"
-msgstr "Cutout はデザインの仕事をひとつの場所にまとめます。"
-
-#. js-lingui-explicit-id
 #: src/components/home/SidebarAccount.tsx
 msgid "home.theme_dark"
 msgstr "ダーク"
@@ -1122,11 +1101,6 @@ msgstr "完全に削除"
 #: src/components/settings/sections/ArchivedSection.tsx
 msgid "home.delete_permanently_title"
 msgstr "完全に削除しますか？"
-
-#. js-lingui-explicit-id
-#: src/components/onboarding/AreasOfWorkDialog.tsx
-msgid "onboarding.area_desktop_description"
-msgstr "情報密度の高いデスクトップ作業画面"
 
 #. js-lingui-explicit-id
 #: src/components/workspace/IntentWorkspace.tsx
@@ -1175,7 +1149,6 @@ msgstr "デザインシステム"
 
 #. js-lingui-explicit-id
 #: src/components/home/ProjectHome.tsx
-#: src/components/onboarding/AreasOfWorkDialog.tsx
 msgid "home.preset_desktop"
 msgstr "デスクトップ"
 
@@ -1634,11 +1607,6 @@ msgid "settings.section_integrations"
 msgstr "連携"
 
 #. js-lingui-explicit-id
-#: src/components/onboarding/AreasOfWorkDialog.tsx
-msgid "onboarding.area_mobile_description"
-msgstr "iOS と Android のアプリ画面"
-
-#. js-lingui-explicit-id
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.empty_fallback_label"
 msgstr "項目"
@@ -1657,11 +1625,6 @@ msgstr "ディクテーションを表示したままにする"
 #: src/components/settings/sections/SpeechSection.tsx
 msgid "settings.speech.keep_dictation_visible_hint"
 msgstr "ディクテーション停止後もライブ文字起こしパネルを表示したままにします。"
-
-#. js-lingui-explicit-id
-#: src/components/onboarding/AreasOfWorkDialog.tsx
-msgid "onboarding.area_poster_description"
-msgstr "キービジュアル・ポスター・SNS 用画像"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
@@ -1779,11 +1742,6 @@ msgid "global_library.reference_locked"
 msgstr "ロック中"
 
 #. js-lingui-explicit-id
-#: src/components/onboarding/AreasOfWorkDialog.tsx
-msgid "onboarding.area_brand_description"
-msgstr "ロゴ・配色・書体・アセット"
-
-#. js-lingui-explicit-id
 #: src/components/settings/sections/UpdatesSection.tsx
 msgid "settings.updates.check_automatically_hint"
 msgstr "Cutout の起動中にバックグラウンドで新しいリリースを探します。"
@@ -1825,7 +1783,6 @@ msgstr "マイクデバイス ID"
 
 #. js-lingui-explicit-id
 #: src/components/home/ProjectHome.tsx
-#: src/components/onboarding/AreasOfWorkDialog.tsx
 msgid "home.preset_miniapp"
 msgstr "ミニプログラム"
 
@@ -1841,7 +1798,6 @@ msgstr "承認済みキットに未反映"
 
 #. js-lingui-explicit-id
 #: src/components/home/ProjectHome.tsx
-#: src/components/onboarding/AreasOfWorkDialog.tsx
 msgid "home.preset_mobile"
 msgstr "モバイルアプリ"
 
@@ -2097,11 +2053,6 @@ msgid "settings.pick_from_catalog"
 msgstr "カタログから選ぶ"
 
 #. js-lingui-explicit-id
-#: src/components/onboarding/AreasOfWorkDialog.tsx
-msgid "onboarding.areas_description"
-msgstr "よく手がける領域を 3 つまで選んでください。あとから設定で変更できます。"
-
-#. js-lingui-explicit-id
 #: src/components/settings/ProviderForm.tsx
 msgid "settings.catalog_assign_later"
 msgstr "「タスクにモデルを割り当てる」で、どれがどのタスクを担当するか選びます。"
@@ -2175,7 +2126,6 @@ msgstr "位置"
 
 #. js-lingui-explicit-id
 #: src/components/home/ProjectHome.tsx
-#: src/components/onboarding/AreasOfWorkDialog.tsx
 msgid "home.preset_poster"
 msgstr "ポスター"
 
@@ -2515,11 +2465,6 @@ msgid "review_branch.resolved"
 msgstr "解決済み"
 
 #. js-lingui-explicit-id
-#: src/components/onboarding/AreasOfWorkDialog.tsx
-msgid "onboarding.area_web_description"
-msgstr "レスポンシブなサイトと Web アプリ"
-
-#. js-lingui-explicit-id
 #: src/components/settings/sections/UpdatesSection.tsx
 msgid "settings.updates.install_note"
 msgstr "「インストールして再起動」を選んだ後にのみ再起動します。進行中の Agent 作業はインストールをブロックします。"
@@ -2715,11 +2660,6 @@ msgstr "Codex CLI でサインインして、再試行してください。"
 #: src/components/inspector/SliceDimensions.tsx
 msgid "inspector.dim_size"
 msgstr "サイズ"
-
-#. js-lingui-explicit-id
-#: src/components/onboarding/AreasOfWorkDialog.tsx
-msgid "onboarding.areas_skip"
-msgstr "後で設定する"
 
 #. js-lingui-explicit-id
 #: src/components/inspector/InspectorPanel.tsx
@@ -3292,7 +3232,6 @@ msgstr "温かく協力的。"
 
 #. js-lingui-explicit-id
 #: src/components/home/ProjectHome.tsx
-#: src/components/onboarding/AreasOfWorkDialog.tsx
 msgid "home.preset_web"
 msgstr "Web"
 
@@ -3300,16 +3239,6 @@ msgstr "Web"
 #: src/components/settings/sections/AiSection.tsx
 msgid "settings.dimension_webdev_label"
 msgstr "Web開発"
-
-#. js-lingui-explicit-id
-#: src/components/onboarding/AreasOfWorkDialog.tsx
-msgid "onboarding.area_miniapp_description"
-msgstr "WeChat やアプリ内ミニプログラム"
-
-#. js-lingui-explicit-id
-#: src/components/onboarding/AreasOfWorkDialog.tsx
-msgid "onboarding.areas_title"
-msgstr "どんな仕事をしていますか？"
 
 #. js-lingui-explicit-id
 #: src/components/home/ProjectHome.tsx

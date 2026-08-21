@@ -184,11 +184,6 @@ msgid "export.toast_success"
 msgstr "{savedCount, plural, one {# tranche exportée} other {# tranches exportées}}"
 
 #. js-lingui-explicit-id
-#: src/components/onboarding/AreasOfWorkDialog.tsx
-msgid "onboarding.areas_counter"
-msgstr "{selectedCount} sur {maxCount} sélectionnés"
-
-#. js-lingui-explicit-id
 #. placeholder {0}: probedModels.length - CATALOG_PREVIEW_LIMIT
 #: src/components/settings/ProviderForm.tsx
 msgid "settings.catalog_more"
@@ -462,11 +457,6 @@ msgid "home.archived_empty_description"
 msgstr "Les travaux archivés apparaîtront ici."
 
 #. js-lingui-explicit-id
-#: src/components/onboarding/AreasOfWorkDialog.tsx
-msgid "onboarding.areas_group_label"
-msgstr "Domaines de travail"
-
-#. js-lingui-explicit-id
 #: src/components/home/ProjectHome.tsx
 msgid "home.asset_singular"
 msgstr "élément"
@@ -593,7 +583,6 @@ msgstr "Confirmation du Brand Book"
 
 #. js-lingui-explicit-id
 #: src/components/home/ProjectHome.tsx
-#: src/components/onboarding/AreasOfWorkDialog.tsx
 msgid "home.preset_brand"
 msgstr "Kit de marque"
 
@@ -937,11 +926,6 @@ msgid "global_library.meta_content_hash"
 msgstr "Hachage du contenu"
 
 #. js-lingui-explicit-id
-#: src/components/onboarding/AreasOfWorkDialog.tsx
-msgid "onboarding.areas_continue"
-msgstr "Continuer"
-
-#. js-lingui-explicit-id
 #: src/components/workspace/IntentWorkspace.tsx
 msgid "workspace.human_loop_use_judgment_hint"
 msgstr "Continuez avec la direction recommandée par l’Agent."
@@ -1091,11 +1075,6 @@ msgid "settings.updates.up_to_date"
 msgstr "Cutout est à jour sur le canal {0}."
 
 #. js-lingui-explicit-id
-#: src/components/onboarding/AreasOfWorkDialog.tsx
-msgid "onboarding.areas_brand_line"
-msgstr "Cutout rassemble votre travail de design en un seul endroit."
-
-#. js-lingui-explicit-id
 #: src/components/home/SidebarAccount.tsx
 msgid "home.theme_dark"
 msgstr "Sombre"
@@ -1122,11 +1101,6 @@ msgstr "Supprimer définitivement"
 #: src/components/settings/sections/ArchivedSection.tsx
 msgid "home.delete_permanently_title"
 msgstr "Supprimer définitivement ?"
-
-#. js-lingui-explicit-id
-#: src/components/onboarding/AreasOfWorkDialog.tsx
-msgid "onboarding.area_desktop_description"
-msgstr "Espaces de travail desktop denses"
 
 #. js-lingui-explicit-id
 #: src/components/workspace/IntentWorkspace.tsx
@@ -1175,7 +1149,6 @@ msgstr "Systèmes de design"
 
 #. js-lingui-explicit-id
 #: src/components/home/ProjectHome.tsx
-#: src/components/onboarding/AreasOfWorkDialog.tsx
 msgid "home.preset_desktop"
 msgstr "Bureau"
 
@@ -1634,11 +1607,6 @@ msgid "settings.section_integrations"
 msgstr "Intégrations"
 
 #. js-lingui-explicit-id
-#: src/components/onboarding/AreasOfWorkDialog.tsx
-msgid "onboarding.area_mobile_description"
-msgstr "Interfaces d’applications iOS et Android"
-
-#. js-lingui-explicit-id
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.empty_fallback_label"
 msgstr "éléments"
@@ -1657,11 +1625,6 @@ msgstr "Garder la dictée visible"
 #: src/components/settings/sections/SpeechSection.tsx
 msgid "settings.speech.keep_dictation_visible_hint"
 msgstr "Garder le panneau de transcription à l’écran après l’arrêt de la dictée."
-
-#. js-lingui-explicit-id
-#: src/components/onboarding/AreasOfWorkDialog.tsx
-msgid "onboarding.area_poster_description"
-msgstr "Visuels clés, affiches et images sociales"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
@@ -1779,11 +1742,6 @@ msgid "global_library.reference_locked"
 msgstr "Verrouillé"
 
 #. js-lingui-explicit-id
-#: src/components/onboarding/AreasOfWorkDialog.tsx
-msgid "onboarding.area_brand_description"
-msgstr "Logo, palette, typographie et assets"
-
-#. js-lingui-explicit-id
 #: src/components/settings/sections/UpdatesSection.tsx
 msgid "settings.updates.check_automatically_hint"
 msgstr "Rechercher une version plus récente en arrière-plan quand Cutout est ouvert."
@@ -1825,7 +1783,6 @@ msgstr "ID du microphone"
 
 #. js-lingui-explicit-id
 #: src/components/home/ProjectHome.tsx
-#: src/components/onboarding/AreasOfWorkDialog.tsx
 msgid "home.preset_miniapp"
 msgstr "Mini-programme"
 
@@ -1841,7 +1798,6 @@ msgstr "Absent du kit approuvé"
 
 #. js-lingui-explicit-id
 #: src/components/home/ProjectHome.tsx
-#: src/components/onboarding/AreasOfWorkDialog.tsx
 msgid "home.preset_mobile"
 msgstr "Application mobile"
 
@@ -2097,11 +2053,6 @@ msgid "settings.pick_from_catalog"
 msgstr "Choisir dans le catalogue"
 
 #. js-lingui-explicit-id
-#: src/components/onboarding/AreasOfWorkDialog.tsx
-msgid "onboarding.areas_description"
-msgstr "Choisissez jusqu’à trois domaines dans lesquels vous travaillez le plus. Vous pourrez les modifier dans les réglages."
-
-#. js-lingui-explicit-id
 #: src/components/settings/ProviderForm.tsx
 msgid "settings.catalog_assign_later"
 msgstr "Choisissez lequel sert chaque tâche dans « Affecter des modèles aux tâches »."
@@ -2175,7 +2126,6 @@ msgstr "Position"
 
 #. js-lingui-explicit-id
 #: src/components/home/ProjectHome.tsx
-#: src/components/onboarding/AreasOfWorkDialog.tsx
 msgid "home.preset_poster"
 msgstr "Affiche"
 
@@ -2515,11 +2465,6 @@ msgid "review_branch.resolved"
 msgstr "résolu"
 
 #. js-lingui-explicit-id
-#: src/components/onboarding/AreasOfWorkDialog.tsx
-msgid "onboarding.area_web_description"
-msgstr "Sites responsives et applications web"
-
-#. js-lingui-explicit-id
 #: src/components/settings/sections/UpdatesSection.tsx
 msgid "settings.updates.install_note"
 msgstr "Le redémarrage n’a lieu qu’après avoir choisi Installer et redémarrer. Un travail Agent actif bloque l’installation."
@@ -2715,11 +2660,6 @@ msgstr "Connectez-vous avec la CLI Codex, puis réessayez."
 #: src/components/inspector/SliceDimensions.tsx
 msgid "inspector.dim_size"
 msgstr "Taille"
-
-#. js-lingui-explicit-id
-#: src/components/onboarding/AreasOfWorkDialog.tsx
-msgid "onboarding.areas_skip"
-msgstr "Passer pour l’instant"
 
 #. js-lingui-explicit-id
 #: src/components/inspector/InspectorPanel.tsx
@@ -3292,7 +3232,6 @@ msgstr "Chaleureux et collaboratif."
 
 #. js-lingui-explicit-id
 #: src/components/home/ProjectHome.tsx
-#: src/components/onboarding/AreasOfWorkDialog.tsx
 msgid "home.preset_web"
 msgstr "Web"
 
@@ -3300,16 +3239,6 @@ msgstr "Web"
 #: src/components/settings/sections/AiSection.tsx
 msgid "settings.dimension_webdev_label"
 msgstr "Développement web"
-
-#. js-lingui-explicit-id
-#: src/components/onboarding/AreasOfWorkDialog.tsx
-msgid "onboarding.area_miniapp_description"
-msgstr "Mini-programmes WeChat et intégrés"
-
-#. js-lingui-explicit-id
-#: src/components/onboarding/AreasOfWorkDialog.tsx
-msgid "onboarding.areas_title"
-msgstr "Sur quoi travaillez-vous ?"
 
 #. js-lingui-explicit-id
 #: src/components/home/ProjectHome.tsx

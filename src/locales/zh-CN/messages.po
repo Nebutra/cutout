@@ -184,11 +184,6 @@ msgid "export.toast_success"
 msgstr "{savedCount, plural, other {已导出 # 个切片}}"
 
 #. js-lingui-explicit-id
-#: src/components/onboarding/AreasOfWorkDialog.tsx
-msgid "onboarding.areas_counter"
-msgstr "已选 {selectedCount} / {maxCount}"
-
-#. js-lingui-explicit-id
 #. placeholder {0}: probedModels.length - CATALOG_PREVIEW_LIMIT
 #: src/components/settings/ProviderForm.tsx
 msgid "settings.catalog_more"
@@ -462,11 +457,6 @@ msgid "home.archived_empty_description"
 msgstr "归档的工作会显示在这里。"
 
 #. js-lingui-explicit-id
-#: src/components/onboarding/AreasOfWorkDialog.tsx
-msgid "onboarding.areas_group_label"
-msgstr "工作领域"
-
-#. js-lingui-explicit-id
 #: src/components/home/ProjectHome.tsx
 msgid "home.asset_singular"
 msgstr "个素材"
@@ -593,7 +583,6 @@ msgstr "品牌手册确认"
 
 #. js-lingui-explicit-id
 #: src/components/home/ProjectHome.tsx
-#: src/components/onboarding/AreasOfWorkDialog.tsx
 msgid "home.preset_brand"
 msgstr "品牌 VI"
 
@@ -937,11 +926,6 @@ msgid "global_library.meta_content_hash"
 msgstr "内容哈希"
 
 #. js-lingui-explicit-id
-#: src/components/onboarding/AreasOfWorkDialog.tsx
-msgid "onboarding.areas_continue"
-msgstr "继续"
-
-#. js-lingui-explicit-id
 #: src/components/workspace/IntentWorkspace.tsx
 msgid "workspace.human_loop_use_judgment_hint"
 msgstr "使用 Agent 推荐的方向继续。"
@@ -1091,11 +1075,6 @@ msgid "settings.updates.up_to_date"
 msgstr "Cutout 在 {0} 通道上已是最新。"
 
 #. js-lingui-explicit-id
-#: src/components/onboarding/AreasOfWorkDialog.tsx
-msgid "onboarding.areas_brand_line"
-msgstr "Cutout 把你的设计工作收在一处。"
-
-#. js-lingui-explicit-id
 #: src/components/home/SidebarAccount.tsx
 msgid "home.theme_dark"
 msgstr "深色"
@@ -1122,11 +1101,6 @@ msgstr "永久删除"
 #: src/components/settings/sections/ArchivedSection.tsx
 msgid "home.delete_permanently_title"
 msgstr "永久删除？"
-
-#. js-lingui-explicit-id
-#: src/components/onboarding/AreasOfWorkDialog.tsx
-msgid "onboarding.area_desktop_description"
-msgstr "信息密集的桌面工具界面"
 
 #. js-lingui-explicit-id
 #: src/components/workspace/IntentWorkspace.tsx
@@ -1175,7 +1149,6 @@ msgstr "设计系统"
 
 #. js-lingui-explicit-id
 #: src/components/home/ProjectHome.tsx
-#: src/components/onboarding/AreasOfWorkDialog.tsx
 msgid "home.preset_desktop"
 msgstr "桌面端"
 
@@ -1634,11 +1607,6 @@ msgid "settings.section_integrations"
 msgstr "集成"
 
 #. js-lingui-explicit-id
-#: src/components/onboarding/AreasOfWorkDialog.tsx
-msgid "onboarding.area_mobile_description"
-msgstr "iOS 与 Android 应用界面"
-
-#. js-lingui-explicit-id
 #: src/components/library/GlobalLibraryView.tsx
 msgid "global_library.empty_fallback_label"
 msgstr "项目"
@@ -1657,11 +1625,6 @@ msgstr "保持听写界面可见"
 #: src/components/settings/sections/SpeechSection.tsx
 msgid "settings.speech.keep_dictation_visible_hint"
 msgstr "听写停止后，仍在屏幕上保留实时转写面板。"
-
-#. js-lingui-explicit-id
-#: src/components/onboarding/AreasOfWorkDialog.tsx
-msgid "onboarding.area_poster_description"
-msgstr "主视觉、海报与社交图"
 
 #. js-lingui-explicit-id
 #: src/components/settings/sections/AiSection.tsx
@@ -1779,11 +1742,6 @@ msgid "global_library.reference_locked"
 msgstr "已锁定"
 
 #. js-lingui-explicit-id
-#: src/components/onboarding/AreasOfWorkDialog.tsx
-msgid "onboarding.area_brand_description"
-msgstr "标志、配色、字体与素材"
-
-#. js-lingui-explicit-id
 #: src/components/settings/sections/UpdatesSection.tsx
 msgid "settings.updates.check_automatically_hint"
 msgstr "Cutout 打开时在后台查找更新的版本。"
@@ -1825,7 +1783,6 @@ msgstr "麦克风设备 ID"
 
 #. js-lingui-explicit-id
 #: src/components/home/ProjectHome.tsx
-#: src/components/onboarding/AreasOfWorkDialog.tsx
 msgid "home.preset_miniapp"
 msgstr "小程序"
 
@@ -1841,7 +1798,6 @@ msgstr "该已批准套件中缺失"
 
 #. js-lingui-explicit-id
 #: src/components/home/ProjectHome.tsx
-#: src/components/onboarding/AreasOfWorkDialog.tsx
 msgid "home.preset_mobile"
 msgstr "移动 App"
 
@@ -2097,11 +2053,6 @@ msgid "settings.pick_from_catalog"
 msgstr "从清单中选择"
 
 #. js-lingui-explicit-id
-#: src/components/onboarding/AreasOfWorkDialog.tsx
-msgid "onboarding.areas_description"
-msgstr "选择你最常做的领域，最多三个。之后可以在设置里修改。"
-
-#. js-lingui-explicit-id
 #: src/components/settings/ProviderForm.tsx
 msgid "settings.catalog_assign_later"
 msgstr "稍后在「为任务指派模型」中决定它们各自负责哪个任务。"
@@ -2175,7 +2126,6 @@ msgstr "位置"
 
 #. js-lingui-explicit-id
 #: src/components/home/ProjectHome.tsx
-#: src/components/onboarding/AreasOfWorkDialog.tsx
 msgid "home.preset_poster"
 msgstr "海报"
 
@@ -2515,11 +2465,6 @@ msgid "review_branch.resolved"
 msgstr "已解决"
 
 #. js-lingui-explicit-id
-#: src/components/onboarding/AreasOfWorkDialog.tsx
-msgid "onboarding.area_web_description"
-msgstr "响应式网站与 Web 应用"
-
-#. js-lingui-explicit-id
 #: src/components/settings/sections/UpdatesSection.tsx
 msgid "settings.updates.install_note"
 msgstr "仅在你选择「安装并重启」后才会重启。进行中的 Agent 工作会阻止安装。"
@@ -2715,11 +2660,6 @@ msgstr "使用 Codex CLI 登录，然后重试。"
 #: src/components/inspector/SliceDimensions.tsx
 msgid "inspector.dim_size"
 msgstr "尺寸"
-
-#. js-lingui-explicit-id
-#: src/components/onboarding/AreasOfWorkDialog.tsx
-msgid "onboarding.areas_skip"
-msgstr "暂时跳过"
 
 #. js-lingui-explicit-id
 #: src/components/inspector/InspectorPanel.tsx
@@ -3292,7 +3232,6 @@ msgstr "温暖且善于协作。"
 
 #. js-lingui-explicit-id
 #: src/components/home/ProjectHome.tsx
-#: src/components/onboarding/AreasOfWorkDialog.tsx
 msgid "home.preset_web"
 msgstr "网页端"
 
@@ -3300,16 +3239,6 @@ msgstr "网页端"
 #: src/components/settings/sections/AiSection.tsx
 msgid "settings.dimension_webdev_label"
 msgstr "网页开发"
-
-#. js-lingui-explicit-id
-#: src/components/onboarding/AreasOfWorkDialog.tsx
-msgid "onboarding.area_miniapp_description"
-msgstr "微信及应用内小程序"
-
-#. js-lingui-explicit-id
-#: src/components/onboarding/AreasOfWorkDialog.tsx
-msgid "onboarding.areas_title"
-msgstr "你主要做哪些方向？"
 
 #. js-lingui-explicit-id
 #: src/components/home/ProjectHome.tsx
