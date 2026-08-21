@@ -912,10 +912,27 @@ function StartWorkspace({
   );
 }
 
+/**
+ * Raster types only. `image/*` also matches `image/svg+xml`, and an SVG behind
+ * an object URL is a document that can carry its own external references — the
+ * one attachment type worth refusing to preview. Browsers do not run scripts in
+ * SVG loaded through `<img>`, so this is depth rather than a fix for a live
+ * hole, but the allowlist costs nothing and the previous `startsWith("image/")`
+ * was wider than the preview ever needed.
+ */
+const PREVIEWABLE_IMAGE_TYPES = new Set([
+  "image/png",
+  "image/jpeg",
+  "image/gif",
+  "image/webp",
+  "image/avif",
+  "image/bmp",
+]);
+
 function AttachmentThumbnail({ file }: { readonly file: File }) {
   const [url, setUrl] = useState<string>();
   useEffect(() => {
-    if (!file.type.startsWith("image/")) return;
+    if (!PREVIEWABLE_IMAGE_TYPES.has(file.type)) return;
     const next = URL.createObjectURL(file);
     setUrl(next);
     return () => URL.revokeObjectURL(next);
