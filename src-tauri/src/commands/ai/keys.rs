@@ -201,16 +201,48 @@ mod macos_vault {
         }
     }
 
+    /// Items whose ACL this process has already tried to migrate.
+    ///
+    /// `SecKeychainItemSetAccess` *writes* the ACL, and macOS gates writing an
+    /// ACL far more strictly than reading through one: a read succeeds silently
+    /// once the app is on the trusted list, but rewriting the ACL prompts for
+    /// the login password every single time. Migrating on every read therefore
+    /// produced a password prompt on every read — the opposite of the intent —
+    /// and `let _ =` swallowed the outcome, so a permanently failing migration
+    /// looked identical to a successful one.
+    pub(super) fn migrated_items(
+    ) -> &'static std::sync::Mutex<std::collections::HashSet<String>> {
+        static MIGRATED: std::sync::OnceLock<
+            std::sync::Mutex<std::collections::HashSet<String>>,
+        > = std::sync::OnceLock::new();
+        MIGRATED.get_or_init(Default::default)
+    }
+
     pub(super) fn read(service: &str, provider_id: &str) -> Result<Option<String>, KeyError> {
         let account = account(provider_id);
         match find_generic_password(None, service, &account) {
             Ok((secret, item)) => {
                 let secret =
                     String::from_utf8(secret.to_owned()).map_err(|_| KeyError::Keychain)?;
-                // A legacy item can require one last OS confirmation for this
-                // initial read. Once macOS permits it, upgrade its ACL so
-                // later Cutout reads are silent. Never broaden a failed ACL.
-                let _ = set_item_access(&item);
+                // The read already succeeded, so this item's ACL admits Cutout
+                // and the secret is in hand either way. Attempt the migration
+                // at most once per item per process, and never let its outcome
+                // affect the read.
+                let key = format!("{service}\0{account}");
+                let first_attempt = migrated_items()
+                    .lock()
+                    .unwrap_or_else(|poisoned| poisoned.into_inner())
+                    .insert(key);
+                if first_attempt {
+                    if let Err(error) = set_item_access(&item) {
+                        // Not fatal — the read worked, so the item is usable as
+                        // it stands. Surfacing it matters because a silent retry
+                        // loop is exactly how this became a prompt on every read.
+                        eprintln!(
+                            "cutout: keychain ACL migration skipped for {account}: {error:?}"
+                        );
+                    }
+                }
                 Ok(Some(secret))
             }
             Err(error) if error.code() == errSecItemNotFound => Ok(None),
@@ -385,6 +417,27 @@ pub async fn list_key_status(provider_ids: Vec<String>) -> Result<Vec<KeyStatus>
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The ACL migration must run at most once per item per process.
+    ///
+    /// `SecKeychainItemSetAccess` prompts for the login password every time it
+    /// runs, so a per-read migration turned every credential read into a
+    /// password prompt. This asserts the gate that makes it once-per-process;
+    /// the migration itself needs a real keychain and is not exercised here.
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn acl_migration_is_attempted_once_per_item() {
+        let gate = |service: &str, account: &str| {
+            super::macos_vault::migrated_items()
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner())
+                .insert(format!("{service}\0{account}"))
+        };
+        assert!(gate("test-service", "provider:a"), "first read migrates");
+        assert!(!gate("test-service", "provider:a"), "second read does not");
+        assert!(gate("test-service", "provider:b"), "a different item still does");
+        assert!(gate("other-service", "provider:a"), "so does another service");
+    }
 
     #[test]
     fn empty_secret_is_rejected() {
