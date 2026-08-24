@@ -57,10 +57,11 @@ benchmark constraints without forking product semantics or weakening safety.
       the source category and from title-only facts. All `176/176` explicitly
       supported measurement facts localize deterministically, while public gold
       stays outside the runtime package.
-- [ ] B9: Package version `1.0.3` completes a fresh package-native real
-      DashScope Run and validates the resulting eleven files. This remains
-      separate from official hidden-set or leaderboard evidence.
-- [x] B10: A fresh `1.0.3` submission ZIP contains the exact reviewed 18-file
+- [x] B9: Final package version `1.0.6` completes a fresh package-native real
+      DashScope Run from the exact versioned ZIP bytes and independently
+      validates the resulting eleven files. This remains separate from
+      official hidden-set or leaderboard evidence.
+- [x] B10: The final `1.0.6` submission ZIP contains the exact reviewed 19-file
       closure and passes version, package validation and all package tests from
       a standalone read-only extraction without repository source access.
 

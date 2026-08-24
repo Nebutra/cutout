@@ -110,6 +110,47 @@ snapshot; it does not retroactively turn the `1.0.2` package into that evidence.
   official hidden-set score or leaderboard result was produced; upload
   compliance is verified, while SOTA remains an external result.
 
+## 1.0.6 Final Submission Verification (2026-08-24)
+
+- `1.0.6` adds dependency-free native CONNECT support for the platform
+  `HTTPS_PROXY` path without weakening the DashScope authority allowlist or TLS
+  verification. Credential-bearing and unsafe proxy URLs fail closed, and
+  cancellation closes accepted tunnels. Provider transport tests cover direct,
+  proxied, rejected and cancelled paths.
+- Multimodal QA is pixel-anchor-first and explicitly role-bound. Localization
+  aliases share the runtime/offline document validator; ambiguous aliases fail
+  after structured planning and before media spend. Package contract tests pass
+  `42/42` and fixture Providers remain labeled contract evidence only.
+- The exact archive
+  `dist/cutout-qianwen-commerce-agent-1.0.6-20260824.zip` contains 19 root
+  files, `305455` uncompressed bytes and `88789` compressed bytes. Its SHA-256
+  is `d03c3c5d2055bbd247f94dd9da7ab431fcee6cd2fad85c39da5b6d7e2ca1d69a`.
+  Final `dist/agent.zip` is byte-identical with the same size and hash. Its
+  fresh read-only standalone extraction under Node `22.23.2` reports version
+  `1.0.6`, passes the package validator and all `42/42` tests without repository
+  source access. Docker was unavailable for this final byte-identical pass and
+  is not claimed as evidence.
+- A fresh package-native DashScope Run from those exact ZIP bytes exited `0` in
+  `1066134ms`, published exactly eleven files and logged A1-A7 as true. One
+  rejected `detail-4` candidate exercised the bounded repair path; its repaired
+  replacement and every other output passed semantic QA.
+- The independently executed validator from a second fresh extraction passed
+  A1-A7, reported six-of-six decoded `1024 x 1024` images, physical eligibility
+  ratio `1.0`, and exact output digest
+  `95dd9646c75be21536d04757527e369ea154a539eebf9ebc9406444b2d8148ff`.
+  Contact-sheet review found consistent taupe color, plush material, lapel,
+  button construction, silhouette and wearer identity across main, rear,
+  material, construction and scene roles.
+- `product_video.mp4` is H.264/yuv420p at `1440 x 1440`, 30fps, 150 frames and
+  `5039ms`, with AAC audio, `10598815` bytes and SHA-256
+  `c7f23d0de9ad2408c8d97cd2cc2f947d47f51ca1fcb4dcd3c1fdd81d6d7d00bc`.
+  Representative-frame review preserved product color, texture, construction
+  and model identity through the camera move.
+- Root `pnpm lint`, forced TypeScript, `pnpm agent:validate` and
+  `git diff --check` passed before this evidence update. The real Run proves the
+  final submission package and output contract; it is not an official hidden
+  test, leaderboard score, SOTA claim or guarantee of first place.
+
 ## Bug Analysis: Platform Prompt Was Not An Executable Fixture
 
 ### 1. Root Cause Category

@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 
-export const VERSION = '1.0.5'
+export const VERSION = '1.0.6'
 export const MODELS = Object.freeze({
   text: 'qwen3.8-max',
   qa: 'qwen3-vl-plus',

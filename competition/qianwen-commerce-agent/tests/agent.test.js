@@ -8,7 +8,8 @@ import { deterministicSeed } from '../lib/contracts.js'
 import { buildAttributeIndex, buildCategoryIndex, catalogCandidates, compactFactsForModel, evidenceBackedCatalogAttributes, normalizeProduct, planImageRoleSources } from '../lib/data.js'
 import { inventoryInputs, parsePromptPaths } from '../lib/filesystem.js'
 import {
-  decodeFactTranslations, factLocalizationInventory, indexFactTranslations, localizeFact,
+  assertLocalizedDocumentScriptClosure, assertLocalizedFactsScriptClosure, decodeFactTranslations, factLocalizationInventory,
+  indexFactTranslations, localizeFact,
 } from '../lib/localization.js'
 import { fixtureDirectories, mockDashScope } from './helpers.js'
 import { validateRehearsal } from '../scripts/validate-rehearsal.js'
@@ -43,7 +44,7 @@ test('production path survives 429 polling and publishes exact 11-file closure w
       text: 1, qa: 7, image: 6, video: 1, polls: 3, posts: 15,
       seeds: mock.counts.seeds, sizes: Array(6).fill('1024*1024'),
       imageSources: mock.counts.imageSources, imagePrompts: mock.counts.imagePrompts,
-      qaSources: mock.counts.qaSources, qaPrompts: mock.counts.qaPrompts,
+      qaSources: mock.counts.qaSources, qaPrompts: mock.counts.qaPrompts, qaLabels: mock.counts.qaLabels,
       videoSources: mock.counts.videoSources, localizationFactIds: mock.counts.localizationFactIds,
       maxConcurrentImages: 1,
     })
@@ -65,10 +66,16 @@ test('production path survives 429 polling and publishes exact 11-file closure w
     assert.ok(mock.counts.imagePrompts.slice(1).every((prompt) =>
       prompt.includes('The third reference is the accepted generated hero.')
       && prompt.includes('Use it only for presentation and sibling consistency')))
-    assert.ok(mock.counts.qaPrompts[0].rejectWhen.some((rule) => rule.startsWith('main-image role')))
+    assert.ok(mock.counts.qaPrompts[0].rejectWhen.some((rule) => rule.includes('main-image media')))
     assert.ok(!mock.counts.qaPrompts[0].rejectWhen.some((rule) => rule.startsWith('detail role')))
     assert.ok(mock.counts.qaPrompts[1].rejectWhen.some((rule) => rule.startsWith('detail role')))
-    assert.ok(!mock.counts.qaPrompts[1].rejectWhen.some((rule) => rule.startsWith('main-image role')))
+    assert.ok(!mock.counts.qaPrompts[1].rejectWhen.some((rule) => rule.includes('main-image media')))
+    assert.deepEqual(Object.keys(mock.counts.qaPrompts[0].productIdentity).sort(), ['evidencePolicy', 'productId'])
+    assert.match(mock.counts.qaPrompts[0].productIdentity.evidencePolicy, /first source image wins/)
+    assert.ok(mock.counts.qaPrompts[0].rejectWhen.some((rule) => rule.includes('do not infer visual expectations from title')))
+    assert.match(mock.counts.qaLabels[0][0], /^SOURCE ANCHOR 1:/)
+    assert.match(mock.counts.qaLabels[0].at(-1), /^FINAL IMAGE CANDIDATE:/)
+    assert.match(mock.counts.qaLabels.at(-1).at(-1), /^FINAL VIDEO CANDIDATE:/)
     assert.match(mock.counts.qaPrompts[1].requiredShape.siblingConsistent, /third reference/)
     assert.ok(mock.counts.videoSources[0]?.includes('/results/image-1.png'))
     assert.ok(mock.counts.seeds.every((seed) => Number.isInteger(seed) && seed >= 0 && seed <= 2_147_483_647))
@@ -196,6 +203,79 @@ test('deterministic market localization preserves source values while converting
     key: '材质功能', value: '防污', sourceKey: '材质功能', sourceValue: '防污', changed: false,
     display: '材质功能: 防污',
   })
+  const aliasInventory = factLocalizationInventory({ attributes: [{ key: '面料成分2', value: '兔毛' }], skus: [] })
+  const aliasTranslations = decodeFactTranslations([{
+    id: aliasInventory[0].id,
+    en: { key: 'Fabric composition', value: 'rabbit hair' },
+    ko: { key: '원단 구성', value: '토끼털' },
+    pt: { key: 'Composicao do tecido', value: 'pelo de coelho' },
+  }], aliasInventory)
+  const aliasIndex = indexFactTranslations(aliasTranslations)
+  assert.deepEqual(localizeFact('en', '材质', '兔毛', aliasIndex), {
+    key: 'Material', value: 'rabbit hair', sourceKey: '材质', sourceValue: '兔毛', changed: true,
+    display: 'Material: rabbit hair (source value: `兔毛`)',
+  })
+  const repeatedAliasInventory = factLocalizationInventory({
+    attributes: [{ key: '主面料成分', value: '兔毛' }, { key: '主面料成分2', value: '兔毛' }, { key: '面料2成分', value: '兔毛' }], skus: [],
+  })
+  const repeatedAliasTranslations = decodeFactTranslations(repeatedAliasInventory.map((entry, index) => ({
+    id: entry.id,
+    en: { key: ['Material', 'Material 2', 'Fabric 2 composition'][index], value: 'Rabbit Hair' },
+    ko: { key: ['소재', '소재 2', '원단 2 성분'][index], value: '토끼털' },
+    pt: { key: ['Material', 'Material 2', 'Composicao do tecido 2'][index], value: 'Pelo de Coelho' },
+  })), repeatedAliasInventory)
+  assert.deepEqual(localizeFact('en', '材质', '兔毛', indexFactTranslations(repeatedAliasTranslations)), {
+    key: 'Material', value: 'Rabbit Hair', sourceKey: '材质', sourceValue: '兔毛', changed: true,
+    display: 'Material: Rabbit Hair (source value: `兔毛`)',
+  })
+  const conflictingAliasTranslations = decodeFactTranslations(repeatedAliasInventory.slice(0, 2).map((entry, index) => ({
+    id: entry.id,
+    en: { key: 'Material', value: index === 0 ? 'rabbit hair' : 'hare fiber' },
+    ko: { key: '소재', value: index === 0 ? '토끼털' : '산토끼 털' },
+    pt: { key: 'Material', value: index === 0 ? 'pelo de coelho' : 'fibra de lebre' },
+  })), repeatedAliasInventory.slice(0, 2))
+  const conflictingAliasIndex = indexFactTranslations(conflictingAliasTranslations)
+  assert.equal(localizeFact('en', '材质', '兔毛', conflictingAliasIndex).value, '兔毛')
+  assert.throws(() => assertLocalizedFactsScriptClosure(
+    [{ key: '材质', value: '兔毛' }], conflictingAliasIndex, 'Catalog attributes',
+  ), /Catalog attributes 1 contains en script leakage/)
+  const scriptContract = {
+    locale: 'en', identityHeading: 'Source and Product Identity', mediaHeading: 'Image and Video Assets',
+    sourceValueLabel: 'source value', name: 'product_description_en.md',
+  }
+  assert.doesNotThrow(() => assertLocalizedDocumentScriptClosure(
+    '## Product Attributes\n\n- Material: rabbit hair (source value: `兔毛`) `offer.json/product/0`\n\n## Source and Product Identity\n\n- Source title: `兔毛`\n\n## Image and Video Assets\n',
+    scriptContract,
+  ))
+  assert.throws(() => assertLocalizedDocumentScriptClosure(
+    '## Product Attributes\n\n- Catalog-confirmed Material: 兔毛 `offer.json/product/0`\n\n## Source and Product Identity\n\n## Image and Video Assets\n',
+    scriptContract,
+  ), /script leakage/)
+})
+
+test('ambiguous catalog localization fails before any media Provider execution', async () => {
+  const fixture = await fixtureDirectories(); cleanup.push(fixture.root)
+  const productPath = join(fixture.input, 'offer.json')
+  const product = JSON.parse(await readFile(productPath, 'utf8'))
+  product.ret.result.result.productAttribute.splice(0, 1,
+    { attrName: '主面料成分', attrValue: '兔毛' },
+    { attrName: '主面料成分2', attrValue: '兔毛' })
+  await writeFile(productPath, JSON.stringify(product))
+  const attributesPath = join(fixture.input, 'clothing_attributes.json')
+  const attributeCatalog = JSON.parse(await readFile(attributesPath, 'utf8'))
+  attributeCatalog.categories.find(({ categoryId }) => categoryId === '29072')
+    .categoryMetadata.categoryProductAttrList[0].values.push({ valueNameAlias: '兔毛' })
+  await writeFile(attributesPath, JSON.stringify(attributeCatalog))
+  const mock = await mockDashScope({ catalogMaterialValue: '兔毛', conflictingMaterialTranslations: true })
+  try {
+    await assert.rejects(main(
+      ['--prompt', `Input directory: "${fixture.input}" Output directory: "${fixture.output}"`],
+      { DASHSCOPE_API_KEY: 'ambiguous-localization-key', DASHSCOPE_BASE_URL: mock.origin },
+      { allowTestOrigin: true, allowedResultOrigins: new Set([mock.origin]), timing: { pollIntervalMs: 1, sleep: async () => {} } },
+    ), /Catalog attributes 1 contains en script leakage/)
+    assert.deepEqual({ text: mock.counts.text, image: mock.counts.image, video: mock.counts.video },
+      { text: 1, image: 0, video: 0 })
+  } finally { await mock.close() }
 })
 
 test('fact translation closure is exact, ordered, script-clean, and protects numeric and 3XL evidence', () => {
@@ -338,6 +418,24 @@ test('rejected main image repairs under main-image physical constraints without 
   } finally { await mock.close() }
 })
 
+test('restart restores a completed main repair and re-runs only invalidated QA policy', async () => {
+  const fixture = await fixtureDirectories(); cleanup.push(fixture.root)
+  const mock = await mockDashScope({ failQaAtSet: [1, 2] })
+  const args = ['--prompt', `Input directory: "${fixture.input}" Output directory: "${fixture.output}"`]
+  const environment = { DASHSCOPE_API_KEY: 'repair-resume-key', DASHSCOPE_BASE_URL: mock.origin }
+  const options = { allowTestOrigin: true, allowedResultOrigins: new Set([mock.origin]), timing: { pollIntervalMs: 1, sleep: async () => {} } }
+  try {
+    await assert.rejects(main(args, environment, options), /Main image failed bounded QA after repair/)
+    assert.equal(mock.counts.image, 2)
+    assert.equal(mock.counts.qa, 2)
+    await rm(join(fixture.output, '.qianwen-agent-work', 'checkpoints', 'main-qa-2.json'))
+    assert.equal(await main(args, environment, options), 0)
+    assert.equal(mock.counts.image, 7)
+    assert.equal(mock.counts.qa, 9)
+    assert.equal((await readdir(fixture.output)).length, 11)
+  } finally { await mock.close() }
+})
+
 test('one surplus planned image prompt is ignored without changing the six-role output contract', async () => {
   const fixture = await fixtureDirectories(); cleanup.push(fixture.root)
   const mock = await mockDashScope({ extraImagePrompt: true })
@@ -351,6 +449,29 @@ test('one surplus planned image prompt is ignored without changing the six-role 
     assert.equal(mock.counts.image, 6)
     assert.equal((await readdir(fixture.output)).filter((name) => /^(?:main|detail)_image/.test(name)).length, 6)
   } finally { await mock.close() }
+})
+
+test('visual material authenticity remains valid while an unsupported authentic-product claim fails closed', async () => {
+  const passingFixture = await fixtureDirectories(); cleanup.push(passingFixture.root)
+  const passing = await mockDashScope({ creativeStrategy: 'Use material authenticity as a visual fidelity goal without adding product claims.' })
+  try {
+    assert.equal(await main(
+      ['--prompt', `Input directory: "${passingFixture.input}" Output directory: "${passingFixture.output}"`],
+      { DASHSCOPE_API_KEY: 'authenticity-fidelity-key', DASHSCOPE_BASE_URL: passing.origin },
+      { allowTestOrigin: true, allowedResultOrigins: new Set([passing.origin]), timing: { pollIntervalMs: 1, sleep: async () => {} } },
+    ), 0)
+  } finally { await passing.close() }
+
+  const failingFixture = await fixtureDirectories(); cleanup.push(failingFixture.root)
+  const failing = await mockDashScope({ creativeStrategy: 'Present this as a guaranteed authentic product.' })
+  try {
+    await assert.rejects(main(
+      ['--prompt', `Input directory: "${failingFixture.input}" Output directory: "${failingFixture.output}"`],
+      { DASHSCOPE_API_KEY: 'authentic-product-claim-key', DASHSCOPE_BASE_URL: failing.origin },
+      { allowTestOrigin: true, allowedResultOrigins: new Set([failing.origin]), timing: { pollIntervalMs: 1, sleep: async () => {} } },
+    ), /unsupported claim/)
+    assert.equal(failing.counts.image, 0)
+  } finally { await failing.close() }
 })
 
 test('one invalid localized plan is repaired before any media node starts', async () => {

@@ -94,7 +94,7 @@ export async function mockDashScope(options = {}) {
   const video = mp4Fixture()
   const counts = {
     text: 0, qa: 0, image: 0, video: 0, polls: 0, posts: 0, seeds: [], sizes: [],
-    imageSources: [], imagePrompts: [], qaSources: [], qaPrompts: [], videoSources: [],
+    imageSources: [], imagePrompts: [], qaSources: [], qaPrompts: [], qaLabels: [], videoSources: [],
     localizationFactIds: [], maxConcurrentImages: 0,
   }
   let activeImages = 0
@@ -118,12 +118,14 @@ export async function mockDashScope(options = {}) {
         counts.qa += 1
         const qaPrompt = JSON.parse(json.messages?.[1]?.content?.[0]?.text ?? '{}')
         counts.qaPrompts.push(qaPrompt)
+        counts.qaLabels.push(json.messages?.[1]?.content?.filter((entry) => entry.type === 'text').slice(1).map((entry) => entry.text) ?? [])
         counts.qaSources.push(json.messages?.[1]?.content?.filter((entry) => entry.type === 'image_url').map((entry) => entry.image_url?.url) ?? [])
         if (qaPrompt.expectedRole === options.failQaTransportRole) {
           response.destroy()
           return
         }
-        const sourceFail = !failedNamedRole && (counts.qa === options.failQaAt || qaPrompt.expectedRole === options.failQaRole)
+        const sourceFail = (options.failQaAtSet?.includes(counts.qa) ?? false)
+          || (!failedNamedRole && (counts.qa === options.failQaAt || qaPrompt.expectedRole === options.failQaRole))
         const siblingFail = !failedNamedRole && qaPrompt.expectedRole === options.failSiblingQaRole
         const fail = sourceFail || siblingFail
         if (fail) failedNamedRole = true
@@ -149,7 +151,19 @@ export async function mockDashScope(options = {}) {
       const requestContract = JSON.parse(json.messages?.[1]?.content ?? '{}')
       const planningContract = requestContract.planningContract ?? requestContract
       let factTranslations = (planningContract.localizationFacts ?? []).map((fact) => {
-        const model = fact.sourceValue.includes('3XL')
+        const model = fact.sourceValue === '兔毛'
+          ? options.conflictingMaterialTranslations && fact.sourceKey.includes('2')
+            ? {
+                en: { key: 'Material', value: 'hare fiber' },
+                ko: { key: '소재', value: '산토끼 털' },
+                pt: { key: 'Material', value: 'fibra de lebre' },
+              }
+            : {
+                en: { key: 'Material', value: 'rabbit hair' },
+                ko: { key: '소재', value: '토끼털' },
+                pt: { key: 'Material', value: 'pelo de coelho' },
+              }
+          : fact.sourceValue.includes('3XL')
           ? {
               en: { key: 'Model', value: '3XL classic style' },
               ko: { key: '모델', value: '3XL 클래식 스타일' },
@@ -171,14 +185,14 @@ export async function mockDashScope(options = {}) {
       if (factTranslations[0] && options.factTranslationFailure === 'script-leak') factTranslations[0].pt.value = 'trama 手工'
       sendJson(200, { choices: [{ message: { content: JSON.stringify({
         categoryId: '29073',
-        catalogAttributes: [{ attrId: 'attr-material', value: '棉' }, { attrId: 'attr-color-primary', value: '红色' }, { attrId: 'attr-size', value: 'M' }],
+        catalogAttributes: [{ attrId: 'attr-material', value: options.catalogMaterialValue ?? '棉' }, { attrId: 'attr-color-primary', value: '红色' }, { attrId: 'attr-size', value: 'M' }],
         locales: {
           en: { categoryName: 'Womens tops', title: unsafeTitle ?? 'Red cotton everyday top', overview: leakCjk ? 'A red everyday 上衣 with source-backed details.' : 'A red everyday top with a cotton material description from the source record.', skuIntro: 'Available source SKU details:', attributeIntro: 'Source-backed product details:' },
           ko: { categoryName: '여성 상의', title: '레드 코튼 데일리 상의', overview: '상품 원본 정보에 면 소재로 기재된 레드 데일리 상의입니다.', skuIntro: '원본 SKU 정보:', attributeIntro: '원본 기반 상품 정보:' },
           pt: { categoryName: 'Blusas femininas', title: 'Blusa vermelha de algodao para o dia a dia', overview: 'Blusa vermelha para o dia a dia, descrita na fonte como confeccionada em algodao.', skuIntro: 'Detalhes do SKU de origem:', attributeIntro: 'Detalhes confirmados na fonte:' },
         },
         factTranslations,
-        creativeDirection: { summary: 'A quiet neutral studio system focused on exact product identity.', imagePrompts: Array.from({ length: options.extraImagePrompt ? 7 : 6 }, (_, index) => `Studio product view ${index + 1}`), videoPrompt: 'Stable studio turntable movement around the product.', strategy: 'Keep a single neutral studio direction across every market.' },
+        creativeDirection: { summary: 'A quiet neutral studio system focused on exact product identity.', imagePrompts: Array.from({ length: options.extraImagePrompt ? 7 : 6 }, (_, index) => `Studio product view ${index + 1}`), videoPrompt: 'Stable studio turntable movement around the product.', strategy: options.creativeStrategy ?? 'Keep a single neutral studio direction across every market.' },
       }) } }] })
       return
     }

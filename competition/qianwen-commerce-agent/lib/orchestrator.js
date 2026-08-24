@@ -1,7 +1,7 @@
 import { join } from 'node:path'
 import {
   AgentError, IMAGE_ROLES, LIMITS, MEDIA_INVENTORY_ROLES, MODELS, VIDEO_BASENAME, VIDEO_STORYBOARD,
-  deterministicSeed, invariant,
+  deterministicSeed, invariant, sha256, stableJson,
 } from './contracts.js'
 import {
   catalogCandidates, compactFactsForModel, evidenceBackedCatalogAttributes, planImageRoleSources,
@@ -9,7 +9,7 @@ import {
 } from './data.js'
 import { assertWorkspaceIdentity, atomicWrite, publishExact, readCheckpoint, writeCheckpoint } from './filesystem.js'
 import {
-  decodeFactTranslations, factLocalizationInventory, factLocalizationInventoryCoverage,
+  assertLocalizedDocumentScriptClosure, assertLocalizedFactsScriptClosure, decodeFactTranslations, factLocalizationInventory, factLocalizationInventoryCoverage,
   indexFactTranslations, localizeFact, localizationSummary,
 } from './localization.js'
 import { inspectDocument, inspectImage, inspectVideo } from './media.js'
@@ -17,16 +17,16 @@ import { stageMedia } from './provider.js'
 
 const LOCALES = Object.freeze([
   Object.freeze({ id: 'en', key: 'en', label: 'English', market: 'United States', file: 'product_description_en.md', headings: {
-    locale: 'Locale', category: 'Exact leaf category', overview: 'Product Overview', skus: 'SKU Breakdown', attributes: 'Product Attributes', identity: 'Source and Product Identity', media: 'Image and Video Assets', fidelity: 'Source Fidelity', noSkus: 'No distinct SKU records were supplied in the source product JSON.', noAttributes: 'No product attributes were supplied.', catalogConfirmed: 'Catalog-confirmed', evidence: 'evidence', sourceKinds: Object.freeze({ product: 'product attribute', sale: 'sales attribute' }), sourceLabels: Object.freeze({ productId: 'Product ID', platform: 'Source platform', url: 'Product URL', title: 'Source product title', category: 'Source category' }), fidelityCopy: 'Claims are limited to the supplied product record and exact catalog-backed values. Source references use JSON Pointer notation.',
+    locale: 'Locale', category: 'Exact leaf category', overview: 'Product Overview', skus: 'SKU Breakdown', attributes: 'Product Attributes', identity: 'Source and Product Identity', media: 'Image and Video Assets', fidelity: 'Source Fidelity', sourceValueLabel: 'source value', noSkus: 'No distinct SKU records were supplied in the source product JSON.', noAttributes: 'No product attributes were supplied.', catalogConfirmed: 'Catalog-confirmed', evidence: 'evidence', sourceKinds: Object.freeze({ product: 'product attribute', sale: 'sales attribute' }), sourceLabels: Object.freeze({ productId: 'Product ID', platform: 'Source platform', url: 'Product URL', title: 'Source product title', category: 'Source category' }), fidelityCopy: 'Claims are limited to the supplied product record and exact catalog-backed values. Source references use JSON Pointer notation.',
   } }),
   Object.freeze({ id: 'ko', key: 'ko', label: '한국어', market: '대한민국', file: 'product_description_ko.md', headings: {
-    locale: '로케일', category: '정확한 최하위 카테고리', overview: '상품 개요', skus: 'SKU 구성', attributes: '상품 속성', identity: '출처 및 상품 식별 정보', media: '이미지 및 영상 에셋', fidelity: '출처 일치성', noSkus: '원본 상품 JSON에 개별 SKU 정보가 없습니다.', noAttributes: '제공된 상품 속성이 없습니다.', catalogConfirmed: '카탈로그 확인', evidence: '근거', sourceKinds: Object.freeze({ product: '상품 속성', sale: '판매 속성' }), sourceLabels: Object.freeze({ productId: '상품 ID', platform: '원본 플랫폼', url: '상품 URL', title: '원본 상품명', category: '원본 카테고리' }), fidelityCopy: '모든 설명은 제공된 상품 원본과 카탈로그로 확인된 값으로 제한됩니다. 출처 표시는 JSON Pointer 형식입니다.',
+    locale: '로케일', category: '정확한 최하위 카테고리', overview: '상품 개요', skus: 'SKU 구성', attributes: '상품 속성', identity: '출처 및 상품 식별 정보', media: '이미지 및 영상 에셋', fidelity: '출처 일치성', sourceValueLabel: '원문 값', noSkus: '원본 상품 JSON에 개별 SKU 정보가 없습니다.', noAttributes: '제공된 상품 속성이 없습니다.', catalogConfirmed: '카탈로그 확인', evidence: '근거', sourceKinds: Object.freeze({ product: '상품 속성', sale: '판매 속성' }), sourceLabels: Object.freeze({ productId: '상품 ID', platform: '원본 플랫폼', url: '상품 URL', title: '원본 상품명', category: '원본 카테고리' }), fidelityCopy: '모든 설명은 제공된 상품 원본과 카탈로그로 확인된 값으로 제한됩니다. 출처 표시는 JSON Pointer 형식입니다.',
   } }),
   Object.freeze({ id: 'pt', key: 'pt', label: 'Português', market: 'Brasil', file: 'product_description_pt.md', headings: {
-    locale: 'Localidade', category: 'Categoria final exata', overview: 'Visao geral do produto', skus: 'Detalhamento de SKUs', attributes: 'Atributos do produto', identity: 'Origem e identificacao do produto', media: 'Imagens e video', fidelity: 'Fidelidade a fonte', noSkus: 'Nenhum SKU separado foi informado no JSON de origem.', noAttributes: 'Nenhum atributo de produto foi informado.', catalogConfirmed: 'Confirmado no catalogo', evidence: 'evidencia', sourceKinds: Object.freeze({ product: 'atributo do produto', sale: 'atributo de venda' }), sourceLabels: Object.freeze({ productId: 'ID do produto', platform: 'Plataforma de origem', url: 'URL do produto', title: 'Titulo original do produto', category: 'Categoria original' }), fidelityCopy: 'As alegacoes estao limitadas ao cadastro fornecido e aos valores confirmados no catalogo. As referencias usam a notacao JSON Pointer.',
+    locale: 'Localidade', category: 'Categoria final exata', overview: 'Visao geral do produto', skus: 'Detalhamento de SKUs', attributes: 'Atributos do produto', identity: 'Origem e identificacao do produto', media: 'Imagens e video', fidelity: 'Fidelidade a fonte', sourceValueLabel: 'valor original', noSkus: 'Nenhum SKU separado foi informado no JSON de origem.', noAttributes: 'Nenhum atributo de produto foi informado.', catalogConfirmed: 'Confirmado no catalogo', evidence: 'evidencia', sourceKinds: Object.freeze({ product: 'atributo do produto', sale: 'atributo de venda' }), sourceLabels: Object.freeze({ productId: 'ID do produto', platform: 'Plataforma de origem', url: 'URL do produto', title: 'Titulo original do produto', category: 'Categoria original' }), fidelityCopy: 'As alegacoes estao limitadas ao cadastro fornecido e aos valores confirmados no catalogo. As referencias usam a notacao JSON Pointer.',
   } }),
 ])
-const FORBIDDEN_COPY = /(?:waterproof|medical[- ]grade|cure[sd]?|guaranteed|certified|authentic|eco[- ]friendly|sustainable|antibacterial|fireproof|100%\s+(?:cotton|silk|wool))/i
+const FORBIDDEN_COPY = /(?:\bwaterproof\b|\bmedical[- ]grade\b|\bcure[sd]?\b|\bguaranteed\b|\bcertified\b|\bauthentic\b|\beco[- ]friendly\b|\bsustainable\b|\bantibacterial\b|\bfireproof\b|\b100%\s+(?:cotton|silk|wool)\b)/i
 const CREDENTIAL_SHAPED_TEXT = /(?:\bBearer\s+[A-Za-z0-9._~+/-]{12,}|\bsk-[A-Za-z0-9_-]{16,})/i
 
 function exactObjectKeys(value, expected, label) {
@@ -358,62 +358,79 @@ function validateQaVerdict(value, mediaKind) {
 }
 
 async function ensureMediaQa({ provider, workspace, nodeId, mediaKind, roleLabel, resultUrl, sourceUrls, facts, roleSourcePlan }) {
+  const mainImageRole = mediaKind === 'image' && roleLabel === IMAGE_ROLES[0].label
+  const detailImageRole = mediaKind === 'image' && !mainImageRole
+  const siblingPosition = sourceUrls.length > 2 ? 'third' : 'second'
+  const qaPrompt = {
+    task: 'Compare the final media (last item) against the immutable source anchor and, when present, the accepted generated sibling reference. Return a strict JSON QA verdict.',
+    productIdentity: {
+      productId: facts.productId.value,
+      evidencePolicy: 'The product title and taxonomy are lookup metadata, not visual ground truth. When wording conflicts with visible pixels, the first source image wins. Never infer expected material, silhouette or construction from title or category text.',
+    },
+    identityAnchor: {
+      authority: 'The first preceding source image is the immutable pixel-level identity anchor.',
+      role: facts.identityAnchor.role,
+      sourcePointer: facts.identityAnchor.pointer,
+    },
+    sourceSupport: roleSourcePlan?.supportingReference
+      ? {
+          authority: 'The second preceding image is the deterministic product-provided support selected for this semantic role. It cannot broaden the source evidence.',
+          role: roleSourcePlan.supportingReference.role,
+          sourcePointer: roleSourcePlan.supportingReference.pointer,
+          purpose: roleSourcePlan.purpose,
+        }
+      : 'No additional role-specific source image exists for this node.',
+    siblingReference: sourceUrls.length > 1
+      ? `The ${siblingPosition} preceding image is the accepted generated hero. It informs presentation consistency but can never replace or broaden source evidence.`
+      : 'No accepted generated sibling exists for this node; siblingConsistent must be true when source fidelity is preserved.',
+    expectedRole: roleLabel,
+    requiredShape: {
+      usable: 'boolean', identityPreserved: 'boolean: pixel-level source fidelity against the first reference',
+      siblingConsistent: `boolean: consistency with the ${siblingPosition} reference when present`,
+      roleFulfilled: 'boolean', hasMajorDefects: 'boolean',
+      defects: ['short factual defect strings'], repairPrompt: 'specific correction prompt or empty string',
+    },
+    rejectWhen: [
+      'product silhouette, exact anchor color, pixel-visible material texture, construction, logos, markings or identity changed relative to the first source image; do not infer visual expectations from title or taxonomy wording',
+      'count, placement, shape or presence of buttons, zippers, pockets, seams, panels, cuffs, collars, straps or other construction details changed',
+      'the final media blends or substitutes another SKU, color variant or non-anchor source image',
+      'the final media preserves the source product but drifts from the accepted sibling creative direction, color treatment, proportions or product presentation',
+      ...(detailImageRole ? ['detail role adds no useful purchase information beyond the main view or merely changes crop, wall, hanger or lighting'] : []),
+      ...(mainImageRole ? ['the final main-image media is not centered, fully visible and isolated on a clean pure-white marketplace background; source-anchor background is irrelevant'] : []),
+      'blur, unreadable product, severe crop, duplicated parts, anatomy defects, morphing, added accessories, broken text or major visual artifacts',
+      ...(mediaKind === 'video' ? ['unstable identity across time, intolerable flicker, scene corruption or major temporal defects'] : []),
+    ],
+  }
+  const policyHash = sha256(stableJson({ schema: 'qianwen.media-qa-policy.v3-labeled-media', mediaKind, roleLabel, resultUrl, sourceUrls, qaPrompt }))
   const checkpoint = await readCheckpoint(workspace, nodeId)
-  if (checkpoint?.state === 'qa-complete') return validateQaVerdict(checkpoint.result, mediaKind)
+  if (checkpoint?.state === 'qa-complete' && checkpoint.policyHash === policyHash) {
+    return validateQaVerdict(checkpoint.result, mediaKind)
+  }
   let raw
-  if (checkpoint?.state === 'qa-ready') raw = checkpoint.result
+  if (checkpoint?.state === 'qa-ready' && checkpoint.policyHash === policyHash) raw = checkpoint.result
   else {
-    const mainImageRole = mediaKind === 'image' && roleLabel === IMAGE_ROLES[0].label
-    const detailImageRole = mediaKind === 'image' && !mainImageRole
-    const siblingPosition = sourceUrls.length > 2 ? 'third' : 'second'
     invariant(!checkpoint || checkpoint.state !== 'submit-intent', 'ambiguous-provider-execution', `A prior QA request may have reached the Provider; automatic resubmission is forbidden: ${nodeId}`)
     raw = await provider.mediaQa(nodeId, {
-      mediaKind, resultUrl, sourceUrls,
-      prompt: JSON.stringify({
-        task: 'Compare the final media (last item) against the immutable source anchor and, when present, the accepted generated sibling reference. Return a strict JSON QA verdict.',
-        productIdentity: { productId: facts.productId.value, title: facts.title.value },
-        identityAnchor: {
-          authority: 'The first preceding source image is the immutable identity anchor.',
-          role: facts.identityAnchor.role,
-          sourcePointer: facts.identityAnchor.pointer,
-        },
-        sourceSupport: roleSourcePlan?.supportingReference
-          ? {
-              authority: 'The second preceding image is the deterministic product-provided support selected for this semantic role. It cannot broaden the source evidence.',
-              role: roleSourcePlan.supportingReference.role,
-              sourcePointer: roleSourcePlan.supportingReference.pointer,
-              purpose: roleSourcePlan.purpose,
-            }
-          : 'No additional role-specific source image exists for this node.',
-        siblingReference: sourceUrls.length > 1
-          ? `The ${siblingPosition} preceding image is the accepted generated hero. It informs presentation consistency but can never replace or broaden source evidence.`
-          : 'No accepted generated sibling exists for this node; siblingConsistent must be true when source fidelity is preserved.',
-        expectedRole: roleLabel,
-        requiredShape: {
-          usable: 'boolean', identityPreserved: 'boolean: source fidelity against the first reference',
-          siblingConsistent: `boolean: consistency with the ${siblingPosition} reference when present`,
-          roleFulfilled: 'boolean', hasMajorDefects: 'boolean',
-          defects: ['short factual defect strings'], repairPrompt: 'specific correction prompt or empty string',
-        },
-        rejectWhen: [
-          'product silhouette, exact anchor color, construction, logos, markings or identity changed',
-          'count, placement, shape or presence of buttons, zippers, pockets, seams, panels, cuffs, collars, straps or other construction details changed',
-          'the final media blends or substitutes another SKU, color variant or non-anchor source image',
-          'the final media preserves the source product but drifts from the accepted sibling creative direction, color treatment, proportions or product presentation',
-          ...(detailImageRole ? ['detail role adds no useful purchase information beyond the main view or merely changes crop, wall, hanger or lighting'] : []),
-          ...(mainImageRole ? ['main-image role is not centered, fully visible and isolated on a clean pure-white marketplace background'] : []),
-          'blur, unreadable product, severe crop, duplicated parts, anatomy defects, morphing, added accessories, broken text or major visual artifacts',
-          ...(mediaKind === 'video' ? ['unstable identity across time, intolerable flicker, scene corruption or major temporal defects'] : []),
-        ],
-      }),
+      mediaKind, resultUrl, sourceUrls, policyHash, prompt: JSON.stringify(qaPrompt),
     })
   }
   const result = validateQaVerdict(raw, mediaKind)
-  await writeCheckpoint(workspace, nodeId, { state: 'qa-complete', result: raw })
+  await writeCheckpoint(workspace, nodeId, { state: 'qa-complete', policyHash, result: raw })
   return result
 }
 
 async function produceReviewedImage({ provider, workspace, role, prompt, sourceUrls, seed, facts, roleSourcePlan }) {
+  const repairRole = { ...role, id: `${role.id}-repair` }
+  const repairCheckpoint = await readCheckpoint(workspace, repairRole.id)
+  if (repairCheckpoint?.state === 'completed') {
+    const image = await ensureImage({ provider, workspace, role: repairRole, prompt, sourceUrls, seed })
+    const qa = await ensureMediaQa({
+      provider, workspace, nodeId: `${role.id}-qa-2`, mediaKind: 'image', roleLabel: role.label,
+      resultUrl: image.url, sourceUrls: [facts.identityAnchor.url], facts, roleSourcePlan,
+    })
+    invariant(qa.usable, 'media-qa-failed', `Main image failed bounded QA after repair: ${qa.defects.join('; ') || 'unspecified defect'}`)
+    return { ...image, qa, repaired: true }
+  }
   let image = await ensureImage({ provider, workspace, role, prompt, sourceUrls, seed })
   let qa = await ensureMediaQa({
     provider, workspace, nodeId: `${role.id}-qa-1`, mediaKind: 'image', roleLabel: role.label,
@@ -421,7 +438,6 @@ async function produceReviewedImage({ provider, workspace, role, prompt, sourceU
   })
   let repaired = false
   if (!qa.usable) {
-    const repairRole = { ...role, id: `${role.id}-repair` }
     const correction = qa.repairPrompt ?? (qa.defects.join('; ') || 'Restore exact product identity and role clarity.')
     const repairPrompt = `${prompt}\nThe second reference is the rejected prior main output. Use it only as the targeted repair subject; it is not source evidence and cannot replace the first reference. `+
       `QA correction: ${correction} `+
@@ -551,8 +567,9 @@ export function evaluateArtifacts({ facts, category, attributes, documents, imag
 
 export async function runProduction({ provider, workspace, outputRoot, facts, categoryIndex, attributeIndex, inputDigest, logger }) {
   const { plan, category, attributes } = await ensurePlan({ provider, workspace, facts, categoryIndex, attributeIndex, inputDigest })
-  await logger.write('structured_plan_complete', { categoryId: category.id, catalogAttributeCount: attributes.length })
   const translationIndex = indexFactTranslations(plan.factTranslations)
+  assertLocalizedFactsScriptClosure(attributes, translationIndex, 'Catalog attributes')
+  await logger.write('structured_plan_complete', { categoryId: category.id, catalogAttributeCount: attributes.length })
   const roleSourcePlans = planImageRoleSources(facts)
   const roleSourcePlanById = new Map(roleSourcePlans.map((entry) => [entry.roleId, entry]))
 
@@ -591,32 +608,47 @@ export async function runProduction({ provider, workspace, outputRoot, facts, ca
     const supportingSource = roleSourcePlan.supportingReference?.url
     const generationSources = [...new Set([identitySource, supportingSource, main.url].filter(Boolean))].slice(0, 3)
     const qaSources = [...new Set([identitySource, supportingSource, main.url].filter(Boolean))].slice(0, 3)
-    let image = await ensureImage({
-      provider, workspace, role, prompt: imagePrompt(role, offset + 1, roleSourcePlan), sourceUrls: generationSources,
-      seed: deterministicSeed(inputDigest, role.id),
-    })
-    assertActive()
-    let qa = await ensureMediaQa({
-      provider, workspace, nodeId: `${role.id}-qa-1`, mediaKind: 'image', roleLabel: role.label,
-      resultUrl: image.url, sourceUrls: qaSources, facts, roleSourcePlan,
-    })
+    const repairRole = { ...role, id: `${role.id}-repair` }
+    const repairCheckpoint = await readCheckpoint(workspace, repairRole.id)
+    let image
+    let qa
     let repaired = false
-    if (!qa.usable) {
-      assertActive()
-      const repairRole = { ...role, id: `${role.id}-repair` }
-      const correction = qa.repairPrompt ?? (qa.defects.join('; ') || 'Restore exact product identity and role clarity.')
+    if (repairCheckpoint?.state === 'completed') {
       image = await ensureImage({
-        provider, workspace, role: repairRole,
-        prompt: `${imagePrompt(role, offset + 1, roleSourcePlan, 'repair')}\nQA correction: ${correction} Correct only the cited defects. Preserve all unaffected product details and the intended semantic role.`,
-        sourceUrls: [...new Set([identitySource, supportingSource, image.url].filter(Boolean))].slice(0, 3),
-        seed: deterministicSeed(inputDigest, role.id, 'repair'),
+        provider, workspace, role: repairRole, prompt: imagePrompt(role, offset + 1, roleSourcePlan, 'repair'),
+        sourceUrls: generationSources, seed: deterministicSeed(inputDigest, role.id, 'repair'),
       })
-      assertActive()
       qa = await ensureMediaQa({
         provider, workspace, nodeId: `${role.id}-qa-2`, mediaKind: 'image', roleLabel: role.label,
         resultUrl: image.url, sourceUrls: qaSources, facts, roleSourcePlan,
       })
       repaired = true
+    } else {
+      image = await ensureImage({
+        provider, workspace, role, prompt: imagePrompt(role, offset + 1, roleSourcePlan), sourceUrls: generationSources,
+        seed: deterministicSeed(inputDigest, role.id),
+      })
+      assertActive()
+      qa = await ensureMediaQa({
+        provider, workspace, nodeId: `${role.id}-qa-1`, mediaKind: 'image', roleLabel: role.label,
+        resultUrl: image.url, sourceUrls: qaSources, facts, roleSourcePlan,
+      })
+      if (!qa.usable) {
+        assertActive()
+        const correction = qa.repairPrompt ?? (qa.defects.join('; ') || 'Restore exact product identity and role clarity.')
+        image = await ensureImage({
+          provider, workspace, role: repairRole,
+          prompt: `${imagePrompt(role, offset + 1, roleSourcePlan, 'repair')}\nQA correction: ${correction} Correct only the cited defects. Preserve all unaffected product details and the intended semantic role.`,
+          sourceUrls: [...new Set([identitySource, supportingSource, image.url].filter(Boolean))].slice(0, 3),
+          seed: deterministicSeed(inputDigest, role.id, 'repair'),
+        })
+        assertActive()
+        qa = await ensureMediaQa({
+          provider, workspace, nodeId: `${role.id}-qa-2`, mediaKind: 'image', roleLabel: role.label,
+          resultUrl: image.url, sourceUrls: qaSources, facts, roleSourcePlan,
+        })
+        repaired = true
+      }
     }
     invariant(qa.identityPreserved && qa.siblingConsistent && qa.roleFulfilled,
       'media-identity-failed', `Image identity or semantic role failed after bounded repair: ${role.id}`)
@@ -645,6 +677,10 @@ export async function runProduction({ provider, workspace, outputRoot, facts, ca
     const bytes = renderDescription({
       locale, localized: plan.locales[locale.key], facts, category, catalogAttributes: attributes,
       imageFiles, videoFile: video.artifact.file, translationIndex,
+    })
+    assertLocalizedDocumentScriptClosure(bytes.toString('utf8'), {
+      locale: locale.id, identityHeading: locale.headings.identity, mediaHeading: locale.headings.media,
+      sourceValueLabel: locale.headings.sourceValueLabel, name: locale.file,
     })
     const inspection = inspectDocument(bytes, locale.file)
     await assertWorkspaceIdentity(workspace)

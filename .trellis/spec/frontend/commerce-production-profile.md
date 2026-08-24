@@ -505,13 +505,14 @@ Host normalizes those exact paths back to the pinned official origin.
   storyboard and actual QA/repair results are rendered into strategy output.
 - Public gold, product ids and accepted-answer fields exist only in the outer
   repository evaluator. Package validation rejects any runtime import or
-  identifier that couples the submitted 18-file Agent to that evaluator.
+  identifier that couples the submitted 19-file Agent to that evaluator.
 
 ### 4. Validation & Error Matrix
 
 | Condition | Required behavior |
 | --- | --- |
 | Translation is missing, reordered, duplicated or rebound to another fact id | reject the structured plan before media generation |
+| Two source facts map to the same concept/value alias but disagree on a localized value | discard the ambiguous alias; if a catalog value remains source-script-bearing, reject before media generation |
 | Numeric or protected model/size token changes case or content | reject as `invalid-model-output` |
 | Target-language prose leaks another market script | reject the plan or completed output |
 | Residual localization requires more than 80 facts | reject as `invalid-product`; never truncate |
@@ -546,7 +547,7 @@ Host normalizes those exact paths back to the pinned official origin.
 - Initial detail and targeted-repair prompts assert the exact reference order
   and authority; QA and strategy consume the same role-source plan.
 - Official origin, `/api/v1`, `/compatible-mode/v1` and rejected arbitrary base
-  paths; exact 18-file dependency-free package closure under Debian Node 22.
+  paths; exact 19-file dependency-free package closure under Debian Node 22.
 - Public benchmark tests are evaluator-only. Local Provider servers and media
   fixtures prove contracts and rejection paths but contribute no live quality,
   production maturity, hidden-set score or SOTA evidence.
@@ -605,6 +606,12 @@ non-overlapping regular directory.
 - When `AGENT_LOG_DIR` is absent, use a no-file logger and write only below the
   evaluator-selected output root. Do not invent `/tmp`, a sibling log root or
   another caller-independent destination.
+- When `HTTPS_PROXY` or `https_proxy` is present, every HTTPS Provider API,
+  task-poll and result-download request must use that endpoint through HTTP
+  CONNECT. `HTTP_PROXY` / `http_proxy` is the fallback only when no HTTPS proxy
+  exists. Keep target TLS certificate verification enabled, never forward the
+  DashScope authorization header in CONNECT, and reject proxy credentials,
+  non-HTTP protocols or URL path/query/fragment components.
 - Successful publication remains the exact eleven-file output closure. Package
   tests and local Provider fixtures prove the entrypoint contract only; they do
   not constitute a live Provider Run, hidden-set score or SOTA evidence.
@@ -621,6 +628,8 @@ non-overlapping regular directory.
 | Path is wrapped in backticks or straight/curly quotes | remove the matching wrapper and preserve the enclosed absolute path |
 | `AGENT_LOG_DIR` is absent | continue with the no-file logger |
 | `AGENT_LOG_DIR` is relative, malformed, oversized, symlinked or overlaps input/output | reject as `invalid-log-path` or `invalid-path` |
+| Platform proxy is present | route every allowed HTTPS request through CONNECT while retaining target TLS verification |
+| Proxy URL contains credentials, a non-HTTP protocol, path, query, fragment or malformed control bytes | reject as `invalid-proxy` before Provider submission |
 
 ### 5. Good / Base / Bad Cases
 
@@ -640,6 +649,9 @@ non-overlapping regular directory.
   exact eleven-file closure through the deterministic local Provider contract.
 - Retain English, simplified Chinese, relative-path, same-path, curly-quote,
   symlink and overlapping-log negative coverage.
+- Use a real local CONNECT listener to prove the selected proxy receives the
+  exact `dashscope.aliyuncs.com:443` authority; a direct-fetch fixture is not
+  sufficient evidence for this transport contract.
 - Rebuild the ZIP, extract it outside the repository, run version, package
   validation and all package tests, then repeat in read-only network-disabled
   Debian `linux/amd64` Node 22.

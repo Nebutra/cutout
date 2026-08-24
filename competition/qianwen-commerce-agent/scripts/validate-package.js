@@ -13,7 +13,7 @@ const json = async (path) => JSON.parse(await readFile(path, 'utf8'))
 const sha256 = (bytes) => createHash('sha256').update(bytes).digest('hex')
 const EXPECTED_FILES = Object.freeze([
   'README.md', 'agent.js', 'agent.json', 'lib/contracts.js', 'lib/data.js', 'lib/filesystem.js',
-  'lib/localization.js', 'lib/media.js', 'lib/orchestrator.js', 'lib/provider.js', 'package.json', 'provenance.json',
+  'lib/localization.js', 'lib/media.js', 'lib/orchestrator.js', 'lib/provider.js', 'lib/transport.js', 'package.json', 'provenance.json',
   'scripts/validate-package.js', 'scripts/validate-rehearsal.js', 'tests/agent.test.js',
   'tests/helpers.js', 'tests/provider.test.js', 'tests/rehearsal-validator.test.js',
 ].sort())
