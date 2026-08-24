@@ -8,6 +8,7 @@ import {
 } from './lib/filesystem.js'
 import { runProduction } from './lib/orchestrator.js'
 import { DashScopeClient } from './lib/provider.js'
+import { createProviderFetch } from './lib/transport.js'
 
 function argumentsFor(argv) {
   if (argv.length === 1 && argv[0] === '--version') return { mode: 'version' }
@@ -52,7 +53,7 @@ export async function main(argv = process.argv.slice(2), environment = process.e
     const workspace = await createWorkspace(roots.output, planHash, apiKey)
     const provider = new DashScopeClient({
       apiKey, baseUrl, deadline, workspace, planHash, logger,
-      fetchImpl: options.fetchImpl, allowedResultOrigins: options.allowedResultOrigins,
+      fetchImpl: createProviderFetch(environment, options.fetchImpl), allowedResultOrigins: options.allowedResultOrigins,
       allowTestOrigin: options.allowTestOrigin, timing: options.timing,
     })
     const result = await runProduction({

@@ -62,6 +62,10 @@ function protectedTokens(value) {
   return value.match(/(?:[A-Za-z][A-Za-z0-9._/-]*\d[A-Za-z0-9._/-]*|\d+[A-Z][A-Z0-9._/-]*)/giu) ?? []
 }
 function factId(key, value) { return `fact:${sha256(JSON.stringify([normalized(key), normalized(value)])).slice(0, 20)}` }
+function factAliasId(key, value) {
+  const concept = keyConcept(key)
+  return concept ? `fact-alias:${sha256(JSON.stringify([concept, normalized(value)])).slice(0, 20)}` : undefined
+}
 
 function convertWeightRanges(value, locale) {
   return value.replace(/(\d+(?:\.\d+)?)\s*[-~至到]\s*(\d+(?:\.\d+)?)\s*斤/giu, (_, rawMinimum, rawMaximum) => {
@@ -172,7 +176,7 @@ export function decodeFactTranslations(value, inventory) {
     const expected = inventory[index]
     exactObjectKeys(entry, ['id', ...LOCALE_IDS], `Fact translation ${index + 1}`)
     invariant(entry.id === expected.id, 'invalid-model-output', 'Fact translation identity or order changed.')
-    const localized = { id: entry.id }
+    const localized = { id: entry.id, sourceKey: expected.sourceKey, sourceValue: expected.sourceValue }
     for (const locale of LOCALE_IDS) {
       exactObjectKeys(entry[locale], ['key', 'value'], `Fact translation ${index + 1} ${locale}`)
       const key = safeModelText(entry[locale].key, `Fact translation ${index + 1} ${locale} key`)
@@ -195,14 +199,30 @@ export function decodeFactTranslations(value, inventory) {
 }
 
 export function indexFactTranslations(translations) {
-  return new Map(translations.map((translation) => [translation.id, translation]))
+  const index = new Map(translations.map((translation) => [translation.id, translation]))
+  const ambiguous = new Set()
+  for (const translation of translations) {
+    const alias = factAliasId(translation.sourceKey, translation.sourceValue)
+    if (!alias || ambiguous.has(alias)) continue
+    const existing = index.get(alias)
+    const valueProjection = Object.freeze(Object.fromEntries(LOCALE_IDS.map((locale) => [locale,
+      Object.freeze({ value: translation[locale].value }),
+    ])))
+    if (!existing) index.set(alias, valueProjection)
+    else if (LOCALE_IDS.some((locale) => existing[locale].value !== translation[locale].value)) {
+      index.delete(alias)
+      ambiguous.add(alias)
+    }
+  }
+  return index
 }
 
 export function localizeFact(locale, key, value, translationIndex = undefined) {
   const deterministic = deterministicFact(locale, key, value)
-  const translated = translationIndex?.get(factId(key, value))?.[locale]
-  const localizedKey = translated?.key ?? deterministic.key
-  const localizedValue = translated?.value ?? deterministic.value
+  const exact = translationIndex?.get(factId(key, value))?.[locale]
+  const aliased = exact ? undefined : translationIndex?.get(factAliasId(key, value))?.[locale]
+  const localizedKey = exact?.key ?? deterministic.key
+  const localizedValue = exact?.value ?? aliased?.value ?? deterministic.value
   const changed = localizedKey !== deterministic.sourceKey || localizedValue !== deterministic.sourceValue
   return Object.freeze({
     key: localizedKey,
@@ -212,6 +232,42 @@ export function localizeFact(locale, key, value, translationIndex = undefined) {
     changed,
     display: changed ? `${localizedKey}: ${localizedValue} (${SOURCE_LABEL[locale]}: \`${deterministic.sourceValue}\`)` : `${localizedKey}: ${localizedValue}`,
   })
+}
+
+export function assertLocalizedFactsScriptClosure(facts, translationIndex, label = 'Localized facts') {
+  invariant(Array.isArray(facts), 'invalid-document', `${label} are unavailable.`)
+  for (const locale of LOCALE_IDS) {
+    for (const [index, fact] of facts.entries()) {
+      const localized = localizeFact(locale, fact?.key, fact?.value, translationIndex)
+      const prose = `${localized.key} ${localized.value}`
+      const leaked = locale === 'ko' ? NON_KOREAN_MARKET_SCRIPT.test(prose) : NON_LATIN_MARKET_SCRIPT.test(prose)
+      invariant(!leaked, 'invalid-document', `${label} ${index + 1} contains ${locale} script leakage.`)
+    }
+  }
+}
+
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+export function assertLocalizedDocumentScriptClosure(text, contract) {
+  invariant(typeof text === 'string' && contract && typeof contract === 'object',
+    'invalid-document', 'Localized document script contract is unavailable.')
+  const identity = new RegExp(`(^## ${escapeRegExp(contract.identityHeading)}\\s*$)[\\s\\S]*?(?=^## ${escapeRegExp(contract.mediaHeading)}\\s*$)`, 'mu')
+  const prose = text.replace(identity, '$1\n').split(/\r?\n/u).map((line) => {
+    if (!/^\s*- /u.test(line) || !/`[^`\r\n]+\/[^`\r\n]+`\s*$/u.test(line)) return line
+    return line
+      .replace(/^(\s*-\s+)\*\*`[^`\r\n]*`\*\*/u, '$1')
+      .replace(new RegExp(`\\(${escapeRegExp(contract.sourceValueLabel)}: \\x60[^\\x60\\r\\n]*\\x60\\)`, 'gu'), '')
+      .replace(/\s+`[^`\r\n]+\/[^`\r\n]+`\s*$/u, '')
+  }).join('\n')
+  if (contract.locale === 'ko') {
+    invariant(!NON_KOREAN_MARKET_SCRIPT.test(prose), 'invalid-document', `Korean localized body contains source-market script leakage: ${contract.name}`)
+    invariant((prose.match(/\p{Script=Hangul}/gu) ?? []).length >= 10,
+      'invalid-document', 'Korean description lacks Hangul content.')
+  } else {
+    invariant(!NON_LATIN_MARKET_SCRIPT.test(prose), 'invalid-document', `${contract.locale} localized body contains source-market script leakage: ${contract.name}`)
+  }
 }
 
 export function localizationSummary(facts, translationIndex = undefined) {

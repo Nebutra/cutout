@@ -15,6 +15,12 @@ or `OPENAI_BASE_URL` may provide the official DashScope origin, exact `/api/v1`
 base, or exact `/compatible-mode/v1` base. Production validation rejects other
 origins and base paths.
 
+When the evaluator supplies `HTTPS_PROXY` (or its lowercase form), the Agent
+uses an HTTP CONNECT tunnel for every Provider API, task-poll and result-download
+request. `HTTP_PROXY` is accepted only as the conventional fallback for HTTPS
+traffic. The tunnel keeps end-to-end TLS certificate verification enabled and
+does not send the DashScope authorization header to the proxy.
+
 The output directory must initially be empty. The Agent publishes exactly three
 localized Markdown descriptions, six PNG/JPEG images, one MP4 video, and
 one Markdown strategy document after all deterministic validation gates pass.

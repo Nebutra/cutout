@@ -1,12 +1,14 @@
 import assert from 'node:assert/strict'
 import { lstat, mkdir, readFile, readdir, rename, rm, symlink } from 'node:fs/promises'
 import { join } from 'node:path'
+import { createServer } from 'node:http'
 import { after, test } from 'node:test'
 import { DashScopeClient } from '../lib/provider.js'
 import { LIMITS } from '../lib/contracts.js'
 import { main } from '../agent.js'
 import { fixtureDirectories } from './helpers.js'
 import { assertOutputAvailable, authorizeRoots, createLogger, createWorkspace } from '../lib/filesystem.js'
+import { createProviderFetch } from '../lib/transport.js'
 
 const cleanup = []
 after(async () => { await Promise.all(cleanup.map((path) => rm(path, { recursive: true, force: true }))) })
@@ -16,6 +18,67 @@ async function clientWorkspace(fixture, planHash) {
   const info = await lstat(fixture.output)
   return createWorkspace({ resolved: fixture.output, canonical: fixture.output, device: info.dev, inode: info.ino }, planHash, 'test-key')
 }
+
+test('platform HTTPS_PROXY is used as a real CONNECT transport before Provider TLS', async (context) => {
+  let authority
+  const proxy = createServer()
+  proxy.on('connect', (request, socket) => {
+    authority = request.url
+    socket.end('HTTP/1.1 502 Bad Gateway\r\nContent-Length: 0\r\n\r\n')
+  })
+  await new Promise((resolve, reject) => {
+    proxy.once('error', reject)
+    proxy.listen(0, '127.0.0.1', resolve)
+  })
+  context.after(() => new Promise((resolve) => proxy.close(resolve)))
+  const address = proxy.address()
+  assert(address && typeof address === 'object')
+  const transport = createProviderFetch({ HTTPS_PROXY: `http://127.0.0.1:${address.port}` })
+  await assert.rejects(
+    transport('https://dashscope.aliyuncs.com/api/v1/tasks/opaque', { signal: AbortSignal.timeout(5_000) }),
+    /proxy refused.*HTTP 502/i,
+  )
+  assert.equal(authority, 'dashscope.aliyuncs.com:443')
+})
+
+test('aborting target TLS negotiation closes the accepted CONNECT tunnel', async (context) => {
+  let acceptTunnel
+  const tunnelAccepted = new Promise((resolve) => { acceptTunnel = resolve })
+  let closeTunnel
+  const tunnelClosed = new Promise((resolve) => { closeTunnel = resolve })
+  const proxy = createServer()
+  proxy.on('connect', (_request, socket) => {
+    socket.on('error', () => {})
+    socket.once('close', closeTunnel)
+    socket.write('HTTP/1.1 200 Connection Established\r\n\r\n')
+    socket.resume()
+    acceptTunnel()
+  })
+  await new Promise((resolve, reject) => {
+    proxy.once('error', reject)
+    proxy.listen(0, '127.0.0.1', resolve)
+  })
+  context.after(() => new Promise((resolve) => proxy.close(resolve)))
+  const address = proxy.address()
+  assert(address && typeof address === 'object')
+  const controller = new AbortController()
+  const request = createProviderFetch({ HTTPS_PROXY: `http://127.0.0.1:${address.port}` })(
+    'https://dashscope.aliyuncs.com/api/v1/tasks/opaque', { signal: controller.signal },
+  )
+  await tunnelAccepted
+  controller.abort(new Error('test CONNECT cancellation'))
+  await assert.rejects(request, /test CONNECT cancellation/)
+  await tunnelClosed
+})
+
+test('platform proxy configuration rejects credentials and unsupported URL components', () => {
+  for (const value of [
+    'socks5://proxy.internal:1080',
+    'http://user:secret@proxy.internal:3128',
+    'http://proxy.internal:3128/path',
+    'http://proxy.internal:3128?token=secret',
+  ]) assert.throws(() => createProviderFetch({ HTTPS_PROXY: value }), /proxy configuration/)
+})
 
 test('official root, native API, and compatible-mode base URLs normalize to the fixed DashScope origin', async () => {
   for (const [index, baseUrl] of [

@@ -8,6 +8,7 @@ import {
   invariant, sha256, stableJson,
 } from '../lib/contracts.js'
 import { inspectDocument, inspectImage, inspectVideo } from '../lib/media.js'
+import { assertLocalizedDocumentScriptClosure } from '../lib/localization.js'
 
 const REPORT_SCHEMA = 'qianwen.rehearsal-evidence.v1'
 const DESCRIPTION_NAMES = DOCUMENT_NAMES.filter((name) => name !== 'strategy_document.md')
@@ -188,30 +189,6 @@ function assertSourceIdentityClosure(text, contract, name) {
   'invalid-document', `Localized source identity labels are invalid: ${name}`)
 }
 
-function proseWithoutExplicitEvidence(text, contract) {
-  const identity = new RegExp(`(^## ${escapeRegExp(contract.identity)}\\s*$)[\\s\\S]*?(?=^## ${escapeRegExp(contract.media)}\\s*$)`, 'mu')
-  return text.replace(identity, '$1\n').split(/\r?\n/u).map((line) => {
-    if (!/^\s*- /u.test(line) || !/`[^`\r\n]+\/[^`\r\n]+`\s*$/u.test(line)) return line
-    return line
-      .replace(/^(\s*-\s+)\*\*`[^`\r\n]*`\*\*/u, '$1')
-      .replace(new RegExp(`\\(${escapeRegExp(contract.sourceValueLabel)}: \\x60[^\\x60\\r\\n]*\\x60\\)`, 'gu'), '')
-      .replace(/\s+`[^`\r\n]+\/[^`\r\n]+`\s*$/u, '')
-  }).join('\n')
-}
-
-function assertLocaleScriptClosure(text, contract, name) {
-  const prose = proseWithoutExplicitEvidence(text, contract)
-  if (contract.locale === 'ko') {
-    invariant(!/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/u.test(prose),
-      'invalid-document', `Korean localized body contains source-market script leakage: ${name}`)
-    invariant((prose.match(/\p{Script=Hangul}/gu) ?? []).length >= 10,
-      'invalid-document', 'Korean description lacks Hangul content.')
-  } else {
-    invariant(!/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/u.test(prose),
-      'invalid-document', `${contract.locale} localized body contains source-market script leakage: ${name}`)
-  }
-}
-
 function validateDescription(name, text, mediaNames) {
   const contract = DESCRIPTION_CONTRACTS[name]
   invariant(contract && /^# [^\r\n]{2,500}\r?$/mu.test(text), 'invalid-document', `Description title is missing: ${name}`)
@@ -250,7 +227,10 @@ function validateDescription(name, text, mediaNames) {
   invariant(actualMediaLines.length === expectedMediaLines.length
     && actualMediaLines.every((line, index) => line === expectedMediaLines[index]),
   'invalid-document', `Deterministic media role closure is missing or contains free-form entries: ${name}`)
-  assertLocaleScriptClosure(text, contract, name)
+  assertLocalizedDocumentScriptClosure(text, {
+    locale: contract.locale, identityHeading: contract.identity, mediaHeading: contract.media,
+    sourceValueLabel: contract.sourceValueLabel, name,
+  })
   if (name.endsWith('_pt.md')) invariant((text.toLocaleLowerCase('pt-BR').match(/\b(?:a|o|de|do|da|para|com|produto|tamanho|cor|material|imagem|detalhes|origem)\b/gu) ?? []).length >= 5,
     'invalid-document', 'Portuguese description lacks locale evidence.')
   return categoryId

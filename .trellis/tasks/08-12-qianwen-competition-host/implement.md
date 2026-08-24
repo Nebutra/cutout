@@ -13,9 +13,11 @@
 - [x] Add general category-lineage retrieval, exact-first attribute evidence,
       deterministic market localization and a repository-only public benchmark
       with source-category-free and title-only counterfactuals.
-- [ ] Execute one fresh package-native real DashScope rehearsal for `1.0.3`.
-- [x] Build the `1.0.3` submission candidate and validate its exact closure,
-      version, package validator and tests from a standalone read-only extraction.
+- [x] Execute one fresh package-native real DashScope rehearsal from the exact
+      final `1.0.6` versioned ZIP bytes.
+- [x] Build the `1.0.6` submission candidate and validate its exact 19-file
+      closure, version, package validator and 42 tests from a standalone
+      read-only extraction.
 
 ## Validation
 
@@ -25,6 +27,9 @@
       full relevant tests, `pnpm agent:validate` and `rtk git diff --check`.
 - [x] Run the reviewed public sample benchmark without model or network access;
       do not count it as a real Provider run or official competition score.
+- [x] Independently validate the final real Run's exact eleven-file closure,
+      localized documents, six decoded images, MP4 structure, `ffprobe` result,
+      six-image contact sheet and representative video frames.
 
 ## Dependency And Rollback
 

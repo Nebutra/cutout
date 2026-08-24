@@ -218,10 +218,22 @@ export class DashScopeClient {
     return result
   }
 
-  async mediaQa(nodeId, { prompt, mediaKind, resultUrl: generatedUrl, sourceUrls = [] }) {
+  async mediaQa(nodeId, { prompt, mediaKind, resultUrl: generatedUrl, sourceUrls = [], policyHash }) {
     invariant(['image', 'video'].includes(mediaKind), 'invalid-qa-request', 'Media QA kind is invalid.')
+    invariant(typeof policyHash === 'string' && /^[a-f0-9]{64}$/.test(policyHash), 'invalid-qa-request', 'Media QA policy binding is invalid.')
     const content = [{ type: 'text', text: prompt }]
-    for (const url of sourceUrls.slice(0, 3)) content.push({ type: 'image_url', image_url: { url } })
+    for (const [index, url] of sourceUrls.slice(0, 3).entries()) {
+      const label = index === 0
+        ? 'SOURCE ANCHOR 1: immutable pixel identity. Its background is source context and is not judged against the final role.'
+        : index === sourceUrls.length - 1
+          ? `ACCEPTED GENERATED SIBLING ${index + 1}: presentation consistency only; never source authority.`
+          : `SOURCE SUPPORT ${index + 1}: product-provided evidence for the requested semantic role.`
+      content.push({ type: 'text', text: label })
+      content.push({ type: 'image_url', image_url: { url } })
+    }
+    content.push({ type: 'text', text: mediaKind === 'image'
+      ? 'FINAL IMAGE CANDIDATE: evaluate this image for the expected role and background. Compare its product pixels to SOURCE ANCHOR 1.'
+      : 'FINAL VIDEO CANDIDATE: evaluate this video for temporal quality and the expected role. Compare its product identity to SOURCE ANCHOR 1.' })
     content.push(mediaKind === 'image'
       ? { type: 'image_url', image_url: { url: generatedUrl } }
       : { type: 'video_url', video_url: { url: generatedUrl } })
@@ -241,7 +253,7 @@ export class DashScopeClient {
     let result
     try { result = JSON.parse(raw) } catch { throw new AgentError('invalid-provider-response', 'Media QA response is not valid JSON.') }
     assertSafeModelResult(result, 'Media QA response')
-    await writeCheckpoint(this.workspace, nodeId, { state: 'qa-ready', mediaKind, result })
+    await writeCheckpoint(this.workspace, nodeId, { state: 'qa-ready', mediaKind, policyHash, result })
     return result
   }
 
