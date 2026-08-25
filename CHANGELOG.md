@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.27 - 2026-08-25
+
+- Stop asking for the login keychain password on every provider-credential
+  read. `read()` rewrote the item's access list on each call, and macOS gates
+  rewriting an ACL far more strictly than reading through one, so the migration
+  intended to make later reads silent was itself the prompt. It now runs at
+  most once per item per process and reports failure instead of discarding it.
+
 ## 0.1.26 - 2026-08-21
 
 - Move Settings, the release-notes dialog, project home and the project

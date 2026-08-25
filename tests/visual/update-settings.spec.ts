@@ -21,13 +21,13 @@ test("Updates stays truthful and configurable without a desktop runtime", async 
   await expect(updates.getByRole("status")).toContainText("available only in the Cutout desktop app");
   await expect(updates.getByRole("button", { name: "Check now" })).toBeDisabled();
   await expect(updates.getByText("What's New", { exact: true })).toBeVisible();
-  await expect(updates.getByText("Review the highlights for Cutout 0.1.26.")).toBeVisible();
+  await expect(updates.getByText("Review the highlights for Cutout 0.1.27.")).toBeVisible();
   const openReleaseNotes = updates.getByRole("button", { name: "Open" });
   await expect(openReleaseNotes).toBeEnabled();
   await openReleaseNotes.click();
-  const releaseNotes = page.getByRole("dialog").filter({ hasText: "Cutout v0.1.26" });
-  await expect(releaseNotes).toContainText("Settings, home and the project directory on one visual system");
-  await expect(releaseNotes).toContainText("Four surfaces, one set of rules");
+  const releaseNotes = page.getByRole("dialog").filter({ hasText: "Cutout v0.1.27" });
+  await expect(releaseNotes).toContainText("Reading a provider key no longer asks for your keychain password");
+  await expect(releaseNotes).toContainText("One prompt became none");
   await page.keyboard.press("Escape");
 
   // Browser builds have no compiled updater endpoints, so they must not offer

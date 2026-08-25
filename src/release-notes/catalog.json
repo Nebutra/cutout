@@ -2,6 +2,62 @@
   "protocol": "cutout.release-notes.catalog.v1",
   "entries": [
     {
+      "version": "0.1.27",
+      "releasedOn": "2026-08-25",
+      "locales": {
+        "en": {
+          "headline": "Reading a provider key no longer asks for your keychain password",
+          "highlights": [
+            {
+              "id": "keychain-prompt-fix",
+              "title": "One prompt became none",
+              "body": "Every read of a stored provider credential asked macOS for the login keychain password. The code meant to make later reads silent was itself the cause: it rewrote the item's access list on each read, and macOS gates rewriting an access list far more strictly than reading through one. That upgrade now runs at most once per credential per launch, and reports failure instead of silently retrying forever."
+            }
+          ]
+        },
+        "zh-CN": {
+          "headline": "读取提供商密钥不再索要钥匙串密码",
+          "highlights": [
+            {
+              "id": "keychain-prompt-fix",
+              "title": "从每次弹窗到不再弹窗",
+              "body": "每次读取已保存的提供商凭证，macOS 都会索要登录钥匙串密码。原本为了让后续读取变静默的代码恰恰是元凶：它在每次读取时重写条目的访问列表，而 macOS 对重写访问列表的要求远高于通过它读取。该升级现在每个凭证每次启动最多执行一次，失败会报告而不是无声地永远重试。"
+            }
+          ]
+        },
+        "ja": {
+          "headline": "プロバイダーキーの読み取りでキーチェーンのパスワードを求めなくなりました",
+          "highlights": [
+            {
+              "id": "keychain-prompt-fix",
+              "title": "毎回の入力がゼロに",
+              "body": "保存済みプロバイダー資格情報を読むたび、macOS がログインキーチェーンのパスワードを求めていました。後続の読み取りを無音にするためのコード自体が原因で、読み取りのたびに項目のアクセスリストを書き換えていました。macOS はアクセスリストの書き換えを読み取りよりはるかに厳しく制限します。この移行は資格情報ごとに起動あたり最大 1 回になり、失敗時は黙って再試行せず報告します。"
+            }
+          ]
+        },
+        "fr": {
+          "headline": "Lire une clé de fournisseur ne demande plus votre mot de passe de trousseau",
+          "highlights": [
+            {
+              "id": "keychain-prompt-fix",
+              "title": "D’une invite à chaque fois à aucune",
+              "body": "Chaque lecture d’un identifiant de fournisseur enregistré demandait le mot de passe du trousseau de session. Le code censé rendre les lectures suivantes silencieuses en était la cause : il réécrivait la liste d’accès de l’élément à chaque lecture, et macOS encadre la réécriture d’une liste d’accès bien plus strictement que la lecture. Cette mise à niveau s’exécute désormais au plus une fois par identifiant et par lancement, et signale un échec au lieu de réessayer indéfiniment en silence."
+            }
+          ]
+        },
+        "es": {
+          "headline": "Leer una clave de proveedor ya no pide la contraseña del llavero",
+          "highlights": [
+            {
+              "id": "keychain-prompt-fix",
+              "title": "De una petición cada vez a ninguna",
+              "body": "Cada lectura de una credencial de proveedor guardada pedía la contraseña del llavero de inicio de sesión. El código destinado a hacer silenciosas las lecturas posteriores era la causa: reescribía la lista de acceso del elemento en cada lectura, y macOS regula reescribir una lista de acceso mucho más estrictamente que leer a través de ella. Esa actualización ahora se ejecuta como máximo una vez por credencial y por arranque, e informa del fallo en lugar de reintentar en silencio para siempre."
+            }
+          ]
+        }
+      }
+    },
+    {
       "version": "0.1.26",
       "releasedOn": "2026-08-21",
       "locales": {

@@ -4,7 +4,7 @@
   "product": {
     "name": "Cutout",
     "positioning": "Agent-native Design OS with a visual workbench and repo-native control plane",
-    "packageVersion": "0.1.26"
+    "packageVersion": "0.1.27"
   },
   "protocol": {
     "control": "cutout.control.v1",
@@ -120,7 +120,7 @@
     "No cloud collaboration or remote project service.",
     "No arbitrary command execution, process spawning, absolute-path scans or arbitrary export destinations.",
     "No provider executor or bundled Coding workspace is available in the default CLI/MCP headless host; coding.* requires injected controlled adapters and tool.invoke returns capability-required.",
-    "The separate 0.1.26 Commerce production binary is restricted to evaluator-signed held-out packages, opaque private jobs and a fixed native command union. Its adjacent signed credential setup accepts only one bounded secret for the fixed Commerce Provider into an operator-only Keychain namespace; neither binary is exposed through cutout.control.v1, CLI or MCP or acts as a generic headless Provider executor.",
+    "The separate 0.1.27 Commerce production binary is restricted to evaluator-signed held-out packages, opaque private jobs and a fixed native command union. Its adjacent signed credential setup accepts only one bounded secret for the fixed Commerce Provider into an operator-only Keychain namespace; neither binary is exposed through cutout.control.v1, CLI or MCP or acts as a generic headless Provider executor.",
     "The desktop Commerce workbench has a separate Project mode for one bounded ordinary product record, offline catalogs and one to three local product images. It executes the fixed eleven-role Commerce DAG through an enabled keyed first-party DashScope Provider with native receipts, semantic QA, retained-byte review and browser downloads. Project receipts carry no evaluator commitment and do not produce benchmark or productionReady claims; this Provider workflow is not exposed through cutout.control.v1, CLI or MCP.",
     "The desktop codex-system adapter has an internal native-owned zero-tool turn path with isolated staged context, negotiated app-server schema checks and sanitized terminal evidence. Public conversation binding and turnExecution remain capability-required until a signed packaged turn succeeds against a healthy real upstream.",
     "The desktop app has an internal durable local Agent Host, a native-routed Provider executor, and a bounded static-site Coding backend under an opaque host-managed workspace. Those desktop lifecycle bindings are not exposed through cutout.control.v1, CLI, or MCP, and no arbitrary-shell executor is provided.",
