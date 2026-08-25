@@ -34,7 +34,7 @@ const migrationBundled: LocalizedReleaseNotes = {
 
 describe("release notes model", () => {
   it("bundles exact-version notes and applies whole-locale English fallback", () => {
-    expect(bundled.version).toBe("0.1.26");
+    expect(bundled.version).toBe("0.1.27");
     expect(selectLocalizedReleaseNotes(bundled, "zh-CN")?.headline).not.toBe(
       bundled.locales.en.headline,
     );
@@ -46,7 +46,7 @@ describe("release notes model", () => {
 
   it("prefers typed localized updater notes and safely falls back to plain text", () => {
     expect(resolveUpdateReleaseNotes({
-      version: "0.1.26",
+      version: "0.1.27",
       localizedNotes: bundled,
       notes: "English fallback",
     }, "ja")?.headline).toBe(bundled.locales.ja.headline);
@@ -82,13 +82,18 @@ describe("release notes model", () => {
         },
       },
     })).toBeUndefined();
+    // Highlight ids must line up across locales. Reversing the list expressed
+    // that before, but it is a no-op when a release ships a single highlight —
+    // the check then passed for the wrong reason. Renaming an id breaks the
+    // alignment at any length.
     expect(validateLocalizedReleaseNotes({
       ...bundled,
       locales: {
         ...bundled.locales,
         ja: {
           ...bundled.locales.ja,
-          highlights: [...bundled.locales.ja.highlights].reverse(),
+          highlights: bundled.locales.ja.highlights.map((highlight, index) =>
+            index === 0 ? { ...highlight, id: "misaligned-id" } : highlight),
         },
       },
     })).toBeUndefined();
