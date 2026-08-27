@@ -41,14 +41,14 @@ function pending() {
   }))
   return {
     commitment: {
-      challengeSelection: { payload: { expiresAt: 2_000, hostBuildVersion: '0.1.27' } },
+      challengeSelection: { payload: { expiresAt: 2_000, hostBuildVersion: '0.1.28' } },
     },
     completionRequest: {
       protocol: 'cutout.commerce-held-out-evaluator-completion.v2',
       challengeId: 'challenge:test',
       challengeHash: HASH,
       evaluatorKeyId: 'evaluator:minisign:test',
-      hostBuildVersion: '0.1.27',
+      hostBuildVersion: '0.1.28',
       commitmentHash: HASH,
       inputManifestHash: HASH,
       runId: 'run:test',
@@ -79,7 +79,7 @@ async function inspectablePending() {
           protocol: 'cutout.commerce-held-out-challenge-selection.v2',
           benchmark: { id: 'benchmark:commerce-profile:p1-p7', version: 2 },
           profile: { id: 'profile:commerce-materials', version: '1.1.0' },
-          hostBuildVersion: '0.1.27',
+          hostBuildVersion: '0.1.28',
           challengeId,
           challengeNonce: 'n'.repeat(32),
           inputManifestHash,
@@ -92,7 +92,7 @@ async function inspectablePending() {
       },
       challengeHash,
       evaluatorKeyId,
-      hostBuildVersion: '0.1.27',
+      hostBuildVersion: '0.1.28',
       inputManifest: {
         schema: 'commerce.held-out-input-manifest.v1',
         rehearsalIdentity: bundle.identity,
@@ -118,7 +118,7 @@ async function inspectablePending() {
       challengeId,
       challengeHash,
       evaluatorKeyId,
-      hostBuildVersion: '0.1.27',
+      hostBuildVersion: '0.1.28',
       commitmentHash,
       inputManifestHash,
       runId: bundle.runId,
@@ -333,7 +333,7 @@ describe('independent Commerce evaluator handoff (not benchmark evidence)', () =
     const payload = createChallengePayload({
       inputManifestHash: HASH,
       evaluatorKeyId: 'evaluator:minisign:test',
-      hostBuildVersion: '0.1.27',
+      hostBuildVersion: '0.1.28',
       ttlMinutes: 30,
       now: 1_000,
     })
@@ -341,7 +341,7 @@ describe('independent Commerce evaluator handoff (not benchmark evidence)', () =
       protocol: 'cutout.commerce-held-out-challenge-selection.v2',
       inputManifestHash: HASH,
       evaluatorKeyId: 'evaluator:minisign:test',
-      hostBuildVersion: '0.1.27',
+      hostBuildVersion: '0.1.28',
       issuedAt: 1_000,
       expiresAt: 1_801_000,
     })
@@ -351,11 +351,11 @@ describe('independent Commerce evaluator handoff (not benchmark evidence)', () =
 
   it('derives one authoritative evaluator build version and rejects package/Cargo drift', () => {
     expect(resolveAuthoritativeHostBuildVersion({
-      packageVersion: '0.1.27',
-      cargoVersion: '0.1.27',
-    })).toBe('0.1.27')
+      packageVersion: '0.1.28',
+      cargoVersion: '0.1.28',
+    })).toBe('0.1.28')
     expect(() => resolveAuthoritativeHostBuildVersion({
-      packageVersion: '0.1.27',
+      packageVersion: '0.1.28',
       cargoVersion: '0.1.19',
     })).toThrow(/drifted/)
   })
@@ -373,7 +373,7 @@ describe('independent Commerce evaluator handoff (not benchmark evidence)', () =
     expect(validateAcceptedReview(accepted, value)).toEqual(accepted)
     expect(createCompletionPayload({ pending: value, review: accepted, completedAt: 1_600 })).toMatchObject({
       challengeId: 'challenge:test',
-      hostBuildVersion: '0.1.27',
+      hostBuildVersion: '0.1.28',
       bundleHash: HASH,
       decision: 'accepted',
       deliverableCount: 11,

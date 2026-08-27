@@ -143,7 +143,7 @@ describe('Commerce operator release identity', () => {
     expect(runner).toContain('`-R=${NATIVE_HOST_MACOS_REQUIREMENT}`')
   })
 
-  it('keeps product, Cargo, Tauri, capability, and plugin versions at 0.1.27', async () => {
+  it('keeps product, Cargo, Tauri, capability, and plugin versions at 0.1.28', async () => {
     const [pkg, tauri, capabilities, bundledCapabilities, plugin, runtimeBuild, cargo] = await Promise.all([
       readFile('package.json', 'utf8').then(JSON.parse),
       readFile('src-tauri/tauri.conf.json', 'utf8').then(JSON.parse),
@@ -153,7 +153,7 @@ describe('Commerce operator release identity', () => {
       readFile('plugins/cutout/runtime/runtime-build.json', 'utf8').then(JSON.parse),
       readFile('src-tauri/Cargo.toml', 'utf8'),
     ])
-    expect(pkg.version).toBe('0.1.27')
+    expect(pkg.version).toBe('0.1.28')
     expect(tauri.version).toBe(pkg.version)
     expect(capabilities.product.packageVersion).toBe(pkg.version)
     expect(bundledCapabilities).toEqual(capabilities)

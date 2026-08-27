@@ -2,6 +2,62 @@
   "protocol": "cutout.release-notes.catalog.v1",
   "entries": [
     {
+      "version": "0.1.28",
+      "releasedOn": "2026-08-27",
+      "locales": {
+        "en": {
+          "headline": "Cutout no longer asks for your keychain password",
+          "highlights": [
+            {
+              "id": "keychain-acl-write-removed",
+              "title": "The cause is gone, not just the frequency",
+              "body": "0.1.27 reduced the login keychain password prompt from every credential read to once per credential per launch, which left the cause in place. Rewriting a keychain item's access list is a privileged write and macOS demands the password every single time, while reading through a list that already admits Cutout is silent. That rewrite has been removed, so reading, saving and replacing a provider key all run without a prompt. Stored credentials are untouched and need no re-entry."
+            }
+          ]
+        },
+        "zh-CN": {
+          "headline": "Cutout 不再索要你的钥匙串密码",
+          "highlights": [
+            {
+              "id": "keychain-acl-write-removed",
+              "title": "这次去掉的是原因，不只是频率",
+              "body": "0.1.27 把登录钥匙串的密码弹窗从「每次读取凭证」降到了「每个凭证每次启动一次」，原因却仍在：重写钥匙串条目的访问列表属于特权写入，macOS 每次都会索要密码；而通过一个已经允许 Cutout 的访问列表去读取则是静默的。现在这次重写已被彻底删除，读取、保存和更换提供商密钥都不会再弹窗。已保存的凭证保持原样，无需重新输入。"
+            }
+          ]
+        },
+        "ja": {
+          "headline": "Cutout がキーチェーンのパスワードを求めなくなりました",
+          "highlights": [
+            {
+              "id": "keychain-acl-write-removed",
+              "title": "頻度ではなく原因を取り除きました",
+              "body": "0.1.27 ではログインキーチェーンのパスワード要求を「資格情報を読むたび」から「資格情報ごとに起動あたり 1 回」へ減らしましたが、原因は残っていました。キーチェーン項目のアクセスリストの書き換えは特権的な書き込みで、macOS は毎回パスワードを求めます。一方、すでに Cutout を許可しているアクセスリストを通した読み取りは無音です。今回その書き換え自体を削除したため、プロバイダーキーの読み取り・保存・変更のいずれでもパスワードを求められません。保存済みの資格情報はそのままで、入力し直す必要はありません。"
+            }
+          ]
+        },
+        "fr": {
+          "headline": "Cutout ne demande plus votre mot de passe de trousseau",
+          "highlights": [
+            {
+              "id": "keychain-acl-write-removed",
+              "title": "C’est la cause qui disparaît, pas seulement la fréquence",
+              "body": "La version 0.1.27 avait ramené la demande de mot de passe du trousseau de « à chaque lecture d’identifiant » à « une fois par identifiant et par lancement », sans toucher à la cause. Réécrire la liste d’accès d’un élément du trousseau est une écriture privilégiée : macOS exige le mot de passe à chaque fois, alors que lire à travers une liste qui autorise déjà Cutout est silencieux. Cette réécriture a été supprimée. Lire, enregistrer et remplacer une clé de fournisseur se font sans invite, et les identifiants enregistrés restent intacts."
+            }
+          ]
+        },
+        "es": {
+          "headline": "Cutout ya no pide la contraseña del llavero",
+          "highlights": [
+            {
+              "id": "keychain-acl-write-removed",
+              "title": "Desaparece la causa, no solo la frecuencia",
+              "body": "La versión 0.1.27 redujo la petición de la contraseña del llavero de «en cada lectura de credencial» a «una vez por credencial y por arranque», sin tocar la causa. Reescribir la lista de acceso de un elemento del llavero es una escritura privilegiada: macOS pide la contraseña siempre, mientras que leer a través de una lista que ya admite Cutout es silencioso. Esa reescritura se ha eliminado. Leer, guardar y reemplazar una clave de proveedor ya no piden nada, y las credenciales guardadas quedan intactas."
+            }
+          ]
+        }
+      }
+    },
+    {
       "version": "0.1.27",
       "releasedOn": "2026-08-25",
       "locales": {

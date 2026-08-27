@@ -1700,7 +1700,7 @@ mod tests {
     #[test]
     fn challenge_window_and_exact_identity_fail_closed() {
         let mut value = challenge();
-        assert_eq!(HOST_BUILD_VERSION, "0.1.27");
+        assert_eq!(HOST_BUILD_VERSION, "0.1.28");
         assert!(validate_challenge_binding(&value, &"a".repeat(64), "evaluator:test", 20).is_ok());
         assert!(
             validate_challenge_binding(&value, &"a".repeat(64), "evaluator:test", 101).is_err()
@@ -1812,7 +1812,7 @@ mod tests {
     fn challenge_payload_uses_the_cross_runtime_canonical_json_contract() {
         let encoded = String::from_utf8(canonical_json_bytes(&challenge()).unwrap()).unwrap();
         assert_eq!(encoded, format!(
-            "{{\"allowedRunId\":\"run:test\",\"benchmark\":{{\"id\":\"benchmark:commerce-profile:p1-p7\",\"version\":2}},\"challengeId\":\"challenge:test\",\"challengeNonce\":\"{}\",\"evaluatorKeyId\":\"evaluator:test\",\"expiresAt\":100,\"hostBuildVersion\":\"0.1.27\",\"inputManifestHash\":\"{}\",\"issuedAt\":10,\"profile\":{{\"id\":\"profile:commerce-materials\",\"version\":\"1.1.0\"}},\"protocol\":\"cutout.commerce-held-out-challenge-selection.v2\"}}",
+            "{{\"allowedRunId\":\"run:test\",\"benchmark\":{{\"id\":\"benchmark:commerce-profile:p1-p7\",\"version\":2}},\"challengeId\":\"challenge:test\",\"challengeNonce\":\"{}\",\"evaluatorKeyId\":\"evaluator:test\",\"expiresAt\":100,\"hostBuildVersion\":\"0.1.28\",\"inputManifestHash\":\"{}\",\"issuedAt\":10,\"profile\":{{\"id\":\"profile:commerce-materials\",\"version\":\"1.1.0\"}},\"protocol\":\"cutout.commerce-held-out-challenge-selection.v2\"}}",
             "n".repeat(32), "a".repeat(64)
         ));
     }
