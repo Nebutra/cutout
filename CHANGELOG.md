@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.1.28 - 2026-08-27
+
+- Remove the macOS keychain ACL rewrite outright, so no provider-credential
+  operation asks for the login keychain password. 0.1.27 narrowed that prompt
+  from every read to once per item per process and left the cause standing:
+  `SecKeychainItemSetAccess` is a privileged write that macOS gates behind the
+  password on every call, nothing recorded the rewrite across launches, and the
+  item's access list already admitted Cutout, so the rewrite bought nothing and
+  cost a prompt per credential per launch. Reads, saves and replacements now
+  take no ACL write path at all. Existing credentials keep their access lists
+  untouched and need no re-entry.
+
 ## 0.1.27 - 2026-08-25
 
 - Stop asking for the login keychain password on every provider-credential

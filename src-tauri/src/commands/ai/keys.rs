@@ -77,43 +77,24 @@ fn entry(provider_id: &str) -> Result<Entry, KeyError> {
     entry_for(active_keychain_service(), provider_id)
 }
 
-/// The macOS legacy Keychain ACL API is the only system API that can grant a
-/// signed desktop binary ongoing access to one generic-password item.  We use
-/// it only for Cutout's own Provider credentials; it does not change the
-/// login keychain or any other application's items.
+/// macOS credential storage, which deliberately never writes an item ACL.
+///
+/// `SecKeychainItemSetAccess` is a privileged *write*: macOS demands the login
+/// keychain password on every call, while reading through an ACL that already
+/// admits this app is silent. An ACL "migration" here therefore bought nothing
+/// and cost a password prompt on every launch. The SecItem write path attaches
+/// the access metadata a signed app needs for its own items — do not add one
+/// back.
 #[cfg(target_os = "macos")]
 mod macos_vault {
-    use std::ffi::c_char;
-    use std::ptr;
-
-    use core_foundation::array::{CFArray, CFArrayRef};
-    use core_foundation::base::{CFType, CFTypeRef, TCFType};
-    use core_foundation::string::{CFString, CFStringRef};
+    use core_foundation::base::TCFType;
     use security_framework::item::{ItemClass, ItemSearchOptions, Reference, SearchResult};
-    use security_framework::os::macos::access::SecAccess;
     use security_framework::os::macos::keychain_item::SecKeychainItem;
     use security_framework::os::macos::passwords::find_generic_password;
-    use security_framework_sys::base::{
-        errSecItemNotFound, errSecSuccess, SecAccessRef, SecKeychainItemRef,
-    };
+    use security_framework_sys::base::{errSecItemNotFound, errSecSuccess};
     use security_framework_sys::keychain_item::SecKeychainItemDelete;
 
     use super::{account, entry_for, KeyError};
-
-    const ACL_LABEL: &str = "Cutout Provider credential";
-
-    extern "C" {
-        fn SecTrustedApplicationCreateFromPath(
-            path: *const c_char,
-            application: *mut CFTypeRef,
-        ) -> i32;
-        fn SecAccessCreate(
-            descriptor: CFStringRef,
-            trusted_list: CFArrayRef,
-            access: *mut SecAccessRef,
-        ) -> i32;
-        fn SecKeychainItemSetAccess(item: SecKeychainItemRef, access: SecAccessRef) -> i32;
-    }
 
     fn item_for(service: &str, provider_id: &str) -> Result<Option<SecKeychainItem>, KeyError> {
         let mut query = ItemSearchOptions::new();
@@ -132,117 +113,18 @@ mod macos_vault {
         }
     }
 
-    fn current_process_access() -> Result<SecAccess, KeyError> {
-        let mut trusted_application: CFTypeRef = ptr::null();
-        // A null path is defined by Security.framework as the calling binary.
-        // That pins the ACL to the signed Cutout process rather than a mutable
-        // filesystem path supplied by a caller.
-        if unsafe { SecTrustedApplicationCreateFromPath(ptr::null(), &mut trusted_application) }
-            != errSecSuccess
-            || trusted_application.is_null()
-        {
-            return Err(KeyError::Keychain);
-        }
-        let trusted_application = unsafe { CFType::wrap_under_create_rule(trusted_application) };
-        let trusted_list = CFArray::from_CFTypes(&[trusted_application]);
-        let descriptor = CFString::new(ACL_LABEL);
-        let mut access = ptr::null_mut();
-        if unsafe {
-            SecAccessCreate(
-                descriptor.as_concrete_TypeRef(),
-                trusted_list.as_concrete_TypeRef(),
-                &mut access,
-            )
-        } != errSecSuccess
-            || access.is_null()
-        {
-            return Err(KeyError::Keychain);
-        }
-        Ok(unsafe { SecAccess::wrap_under_create_rule(access) })
-    }
-
-    fn set_item_access(item: &SecKeychainItem) -> Result<(), KeyError> {
-        let access = current_process_access()?;
-        if unsafe {
-            SecKeychainItemSetAccess(item.as_concrete_TypeRef(), access.as_concrete_TypeRef())
-        } == errSecSuccess
-        {
-            Ok(())
-        } else {
-            Err(KeyError::Keychain)
-        }
-    }
-
     pub(super) fn store(service: &str, provider_id: &str, secret: &str) -> Result<(), KeyError> {
-        match item_for(service, provider_id)? {
-            Some(mut item) => {
-                // Migrate access before changing the existing secret. If the
-                // legacy ACL refuses this operation, the old credential stays
-                // intact and macOS may ask once for the user's authorization.
-                set_item_access(&item)?;
-                item.set_password(secret.as_bytes())
-                    .map_err(|_| KeyError::Keychain)
-            }
-            None => {
-                // Let the modern SecItem path establish macOS's signed-app
-                // partition metadata first, then replace only this item's ACL
-                // with the current Cutout identity. Legacy-only creation here
-                // can break securityd access for a later signed app launch.
-                entry_for(service, provider_id)?
-                    .set_password(secret)
-                    .map_err(KeyError::from)?;
-                let item = item_for(service, provider_id)?.ok_or(KeyError::Keychain)?;
-                if let Err(error) = set_item_access(&item) {
-                    unsafe { SecKeychainItemDelete(item.as_concrete_TypeRef()) };
-                    return Err(error);
-                }
-                Ok(())
-            }
-        }
-    }
-
-    /// Items whose ACL this process has already tried to migrate.
-    ///
-    /// `SecKeychainItemSetAccess` *writes* the ACL, and macOS gates writing an
-    /// ACL far more strictly than reading through one: a read succeeds silently
-    /// once the app is on the trusted list, but rewriting the ACL prompts for
-    /// the login password every single time. Migrating on every read therefore
-    /// produced a password prompt on every read — the opposite of the intent —
-    /// and `let _ =` swallowed the outcome, so a permanently failing migration
-    /// looked identical to a successful one.
-    pub(super) fn migrated_items(
-    ) -> &'static std::sync::Mutex<std::collections::HashSet<String>> {
-        static MIGRATED: std::sync::OnceLock<
-            std::sync::Mutex<std::collections::HashSet<String>>,
-        > = std::sync::OnceLock::new();
-        MIGRATED.get_or_init(Default::default)
+        entry_for(service, provider_id)?
+            .set_password(secret)
+            .map_err(KeyError::from)
     }
 
     pub(super) fn read(service: &str, provider_id: &str) -> Result<Option<String>, KeyError> {
         let account = account(provider_id);
         match find_generic_password(None, service, &account) {
-            Ok((secret, item)) => {
+            Ok((secret, _item)) => {
                 let secret =
                     String::from_utf8(secret.to_owned()).map_err(|_| KeyError::Keychain)?;
-                // The read already succeeded, so this item's ACL admits Cutout
-                // and the secret is in hand either way. Attempt the migration
-                // at most once per item per process, and never let its outcome
-                // affect the read.
-                let key = format!("{service}\0{account}");
-                let first_attempt = migrated_items()
-                    .lock()
-                    .unwrap_or_else(|poisoned| poisoned.into_inner())
-                    .insert(key);
-                if first_attempt {
-                    if let Err(error) = set_item_access(&item) {
-                        // Not fatal — the read worked, so the item is usable as
-                        // it stands. Surfacing it matters because a silent retry
-                        // loop is exactly how this became a prompt on every read.
-                        eprintln!(
-                            "cutout: keychain ACL migration skipped for {account}: {error:?}"
-                        );
-                    }
-                }
                 Ok(Some(secret))
             }
             Err(error) if error.code() == errSecItemNotFound => Ok(None),
@@ -417,27 +299,6 @@ pub async fn list_key_status(provider_ids: Vec<String>) -> Result<Vec<KeyStatus>
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    /// The ACL migration must run at most once per item per process.
-    ///
-    /// `SecKeychainItemSetAccess` prompts for the login password every time it
-    /// runs, so a per-read migration turned every credential read into a
-    /// password prompt. This asserts the gate that makes it once-per-process;
-    /// the migration itself needs a real keychain and is not exercised here.
-    #[cfg(target_os = "macos")]
-    #[test]
-    fn acl_migration_is_attempted_once_per_item() {
-        let gate = |service: &str, account: &str| {
-            super::macos_vault::migrated_items()
-                .lock()
-                .unwrap_or_else(|poisoned| poisoned.into_inner())
-                .insert(format!("{service}\0{account}"))
-        };
-        assert!(gate("test-service", "provider:a"), "first read migrates");
-        assert!(!gate("test-service", "provider:a"), "second read does not");
-        assert!(gate("test-service", "provider:b"), "a different item still does");
-        assert!(gate("other-service", "provider:a"), "so does another service");
-    }
 
     #[test]
     fn empty_secret_is_rejected() {

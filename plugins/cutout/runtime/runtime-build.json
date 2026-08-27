@@ -1,6 +1,6 @@
 {
   "protocol": "cutout.codex-plugin-runtime.v1",
-  "packageVersion": "0.1.27",
+  "packageVersion": "0.1.28",
   "sourceHashes": {
     "node_modules/.pnpm/@tauri-apps+api@2.11.1/node_modules/@tauri-apps/api/core.js": "b2187a1c0c0a25806dc64f8823757ce553c09d3bbe3e409bd05cab32e245f1c9",
     "node_modules/.pnpm/@tauri-apps+api@2.11.1/node_modules/@tauri-apps/api/external/tslib/tslib.es6.js": "76dace0a1ae47c1d3e604591b8a15db2f534b776009b9e68e786dae7fe763f70",
